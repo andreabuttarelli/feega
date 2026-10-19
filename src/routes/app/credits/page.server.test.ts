@@ -10,7 +10,12 @@ vi.mock('$lib/server/stripe', () => ({
 	subscribedRungPrice: (...a: unknown[]) => subscribedRungPrice(...a)
 }));
 
+const { privateEnv } = vi.hoisted(() => ({ privateEnv: {} as Record<string, string | undefined> }));
+vi.mock('$env/dynamic/private', () => ({ env: privateEnv }));
+
 import { load, actions } from '$lib/server/dashboard/pages/credits';
+
+const NATIVE_UA = 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 FeegaNative/0.3.0';
 
 type Row = Record<string, unknown>;
 
@@ -69,8 +74,9 @@ function fakeSupabase(world: World = {}) {
 
 const noCookies = { get: () => undefined };
 
-function run(supabase: unknown, query = '') {
+function run(supabase: unknown, query = '', userAgent = 'Mozilla/5.0') {
 	return (load as (e: unknown) => Promise<Record<string, any>>)({
+		request: new Request('https://example.test/app/credits', { headers: { 'user-agent': userAgent } }),
 		locals: { supabase },
 		cookies: noCookies,
 		parent: async () => ({ org: { id: ORG.id } }),
@@ -165,6 +171,18 @@ describe('/app/credits — the workspace credits page', () => {
 
 	it('carries purchasesReady from the readiness gate', async () => {
 		expect((await run(fakeSupabase({ ready: false }))).purchasesReady).toBe(false);
+	});
+
+	it('sells through the web checkout everywhere while store billing is off', async () => {
+		privateEnv.NATIVE_STORE_BILLING = undefined;
+		expect((await run(fakeSupabase(), '', NATIVE_UA)).billingChannel).toBe('web');
+	});
+
+	it('sells through the store inside the native app once store billing is on', async () => {
+		privateEnv.NATIVE_STORE_BILLING = 'on';
+		expect((await run(fakeSupabase(), '', NATIVE_UA)).billingChannel).toBe('store');
+		expect((await run(fakeSupabase())).billingChannel).toBe('web');
+		privateEnv.NATIVE_STORE_BILLING = undefined;
 	});
 
 	describe('actions.buyOneTime', () => {
