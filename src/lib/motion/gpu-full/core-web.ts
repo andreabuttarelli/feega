@@ -1,4 +1,4 @@
-import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item } from './display-list';
+import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item, type LayerItem } from './display-list';
 import type { Picture, Pictures, Raster } from './raster';
 import type { Affine } from '../affine';
 import type { Rgba } from './rgba';
@@ -16,6 +16,14 @@ type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<P
 
 const NO_PICTURES: Pictures = () => null;
 
+const UNTURNED: Affine = [1, 0, 0, 1, 0, 0];
+
+const asPicture = (l: LayerItem): ImageItem & { source: string } => ({ ...l, kind: ItemKind.Image, clip: l.source, src: l.source, video: false, mediaTime: 0, fit: 'fill', focus: [0.5, 0.5], zoom: 1, clipped: true, inner: UNTURNED });
+
+export const forCore = (item: Item): Item => (item.kind === ItemKind.Layer ? asPicture(item) : item);
+
+const drawable = (list: DisplayList): DisplayList => ({ ...list, items: list.items.map(forCore) });
+
 const coverPicture = (src: string) => ({ kind: ItemKind.Image, clip: src, src, video: false }) as ImageItem;
 
 function wanted(items: Item[]): ImageItem[] {
@@ -26,7 +34,7 @@ function wanted(items: Item[]): ImageItem[] {
   ]);
 }
 
-const moving = (picture: Picture) => typeof HTMLVideoElement !== 'undefined' && picture.source instanceof HTMLVideoElement;
+const moving = (picture: Picture) => (typeof HTMLVideoElement !== 'undefined' && picture.source instanceof HTMLVideoElement) || (typeof HTMLCanvasElement !== 'undefined' && picture.source instanceof HTMLCanvasElement);
 
 async function coreModule(): Promise<CoreModule> {
   const core = (await import(/* @vite-ignore */ CORE_URL)) as CoreModule;
@@ -61,11 +69,13 @@ function rasterOf(attached: Attached): CoreRaster {
   const drawn = (items: Item[]) => items.filter((i): i is Item => (i as Item | Use).kind !== 'use');
 
   return {
-    draw: (list: DisplayList, pictures = NO_PICTURES) => {
+    draw: (raw: DisplayList, pictures = NO_PICTURES) => {
+      const list = drawable(raw);
       wanted(list.items).forEach((item) => upload(item, pictures));
       return attached.draw(JSON.stringify(list)).split('\n').filter(Boolean);
     },
-    putGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
+    putGroup: (key: string, raw: DisplayList, pictures = NO_PICTURES) => {
+      const list = drawable(raw);
       wanted(list.items).forEach((item) => upload(item, pictures));
       attached.put_group(key, JSON.stringify(list));
     },

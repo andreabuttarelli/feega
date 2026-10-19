@@ -9,13 +9,13 @@ const READ_TIMEOUT_MS = 60_000;
 
 const withProbe = (html: string) => (html.includes('</body>') ? html.replace('</body>', `${domProbeScript()}</body>`) : html + domProbeScript());
 
-export async function mountDomReader(host: HTMLElement, compose: Compose, clips: string[], size: { width: number; height: number }): Promise<DomReader> {
+export async function mountDomReader(host: HTMLElement, compose: Compose, clips: string[], composed: ReadonlySet<string>, size: { width: number; height: number }): Promise<DomReader> {
   const frame = document.createElement('iframe');
   frame.setAttribute('sandbox', 'allow-scripts');
   frame.setAttribute('aria-hidden', 'true');
   frame.style.cssText = `position:absolute;left:0;top:0;width:${size.width}px;height:${size.height}px;border:0;opacity:0;pointer-events:none;z-index:-1`;
   const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
-  frame.srcdoc = withProbe(compose(new Set(clips)));
+  frame.srcdoc = withProbe(compose(composed));
   host.appendChild(frame);
   await loaded;
 
