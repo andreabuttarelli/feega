@@ -76,7 +76,7 @@
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
-  import { revealIn } from '$lib/canvas/gpu/reveal-gate';
+  import { revealIn as revealDelay } from '$lib/canvas/gpu/reveal-gate';
   import { getFontEmbedCSS, toCanvas } from 'html-to-image';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
@@ -342,7 +342,7 @@
     void shown;
     void looking;
     const missing = unpreviewed();
-    const wait = revealIn(missing.length, performance.now() - openedAt);
+    const wait = revealDelay(missing.length, performance.now() - openedAt);
     if (!wait) {
       revealed = true;
       exposeReveal(Math.round(performance.now() - openedAt), missing);
