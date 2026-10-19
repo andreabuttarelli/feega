@@ -44,7 +44,7 @@
   });
 
   $effect(() => {
-    const target = rightBar.active?.element ?? park;
+    const target = rightBar.holder?.element ?? park;
     if (!bar || !target) {
       return;
     }
