@@ -1,9 +1,15 @@
 import { FillRule, ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type Paint, type PathItem } from './display-list';
 import { imageRect, type Size } from './image-rect';
 import { gaussianKernel, MAX_TAPS } from './kernel';
+import { BlendMode } from '../blend';
+import { MaskMode } from '../mask';
+import { CoverKind, RampKind, type MaskLayer } from './mask-layers';
 
 const MAX_STOPS = 8;
 const MSAA = 8;
+const STENCIL_ALL = 0xff;
+const CLIP_BIT = 0x80;
+const COVER_BITS = 0x7f;
 
 const PATH_VS = `#version 300 es
 in vec2 a_pos;
@@ -64,6 +70,63 @@ void main() {
   outColor = texture(u_src, uv) * u_opacity;
 }`;
 
+const BLEND_FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_src;
+uniform sampler2D u_dst;
+uniform float u_opacity;
+uniform int u_mode;
+uniform sampler2D u_mask;
+uniform int u_masked;
+out vec4 outColor;
+float lum(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }
+vec3 clipColor(vec3 c) {
+  float l = lum(c); float n = min(min(c.r, c.g), c.b); float x = max(max(c.r, c.g), c.b);
+  if (n < 0.0) { c = l + (c - l) * l / max(l - n, 1e-6); }
+  if (x > 1.0) { c = l + (c - l) * (1.0 - l) / max(x - l, 1e-6); }
+  return c;
+}
+vec3 setLum(vec3 c, float l) { return clipColor(c + (l - lum(c))); }
+float sat(vec3 c) { return max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b); }
+vec3 setSat(vec3 c, float s) {
+  float n = min(min(c.r, c.g), c.b); float x = max(max(c.r, c.g), c.b);
+  return x > n ? (c - n) * s / (x - n) : vec3(0.0);
+}
+float dodge(float b, float s) { return b == 0.0 ? 0.0 : s >= 1.0 ? 1.0 : min(1.0, b / (1.0 - s)); }
+float burn(float b, float s) { return b >= 1.0 ? 1.0 : s <= 0.0 ? 0.0 : 1.0 - min(1.0, (1.0 - b) / s); }
+float hard(float b, float s) { return s <= 0.5 ? b * 2.0 * s : 1.0 - (1.0 - b) * (1.0 - (2.0 * s - 1.0)); }
+float soft(float b, float s) {
+  float d = b <= 0.25 ? ((16.0 * b - 12.0) * b + 4.0) * b : sqrt(b);
+  return s <= 0.5 ? b - (1.0 - 2.0 * s) * b * (1.0 - b) : b + (2.0 * s - 1.0) * (d - b);
+}
+vec3 mixed(vec3 b, vec3 s) {
+  if (u_mode == 1) return b * s;
+  if (u_mode == 2) return b + s - b * s;
+  if (u_mode == 3) return vec3(hard(s.r, b.r), hard(s.g, b.g), hard(s.b, b.b));
+  if (u_mode == 4) return min(b, s);
+  if (u_mode == 5) return max(b, s);
+  if (u_mode == 6) return vec3(dodge(b.r, s.r), dodge(b.g, s.g), dodge(b.b, s.b));
+  if (u_mode == 7) return vec3(burn(b.r, s.r), burn(b.g, s.g), burn(b.b, s.b));
+  if (u_mode == 8) return vec3(hard(b.r, s.r), hard(b.g, s.g), hard(b.b, s.b));
+  if (u_mode == 9) return vec3(soft(b.r, s.r), soft(b.g, s.g), soft(b.b, s.b));
+  if (u_mode == 10) return abs(b - s);
+  if (u_mode == 11) return b + s - 2.0 * b * s;
+  if (u_mode == 12) return setLum(setSat(s, sat(b)), lum(b));
+  if (u_mode == 13) return setLum(setSat(b, sat(s)), lum(b));
+  if (u_mode == 14) return setLum(s, lum(b));
+  if (u_mode == 15) return setLum(b, lum(s));
+  return s;
+}
+void main() {
+  vec4 s = texture(u_src, v_uv) * u_opacity * (u_masked == 1 ? texture(u_mask, v_uv).a : 1.0);
+  vec4 d = texture(u_dst, v_uv);
+  vec3 cs = s.a > 0.0 ? s.rgb / s.a : vec3(0.0);
+  vec3 cb = d.a > 0.0 ? d.rgb / d.a : vec3(0.0);
+  vec3 rgb = s.rgb * (1.0 - d.a) + d.rgb * (1.0 - s.a) + s.a * d.a * clamp(mixed(cb, cs), 0.0, 1.0);
+  outColor = vec4(rgb, s.a + d.a - s.a * d.a);
+}`;
+
 const QUAD_VS = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
@@ -95,8 +158,61 @@ precision highp float;
 in vec2 v_uv;
 uniform sampler2D u_src;
 uniform float u_opacity;
+uniform sampler2D u_mask;
+uniform int u_masked;
 out vec4 outColor;
-void main() { outColor = texture(u_src, v_uv) * u_opacity; }`;
+void main() {
+  float m = u_masked == 1 ? texture(u_mask, v_uv).a : 1.0;
+  outColor = texture(u_src, v_uv) * u_opacity * m;
+}`;
+
+const FOLD_FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_acc;
+uniform sampler2D u_cov;
+uniform int u_mode;
+uniform int u_first;
+uniform float u_level;
+uniform int u_invert;
+uniform int u_luma;
+out vec4 outColor;
+void main() {
+  vec4 c = texture(u_cov, v_uv);
+  float cov = u_luma == 1 ? dot(c.rgb, vec3(0.2125, 0.7154, 0.0721)) : c.a;
+  float l = u_invert == 1 ? 1.0 - u_level * cov : u_level * cov;
+  float seed = (u_mode == 1 || u_mode == 2) ? 1.0 : 0.0;
+  float k = u_first == 1 ? seed : texture(u_acc, v_uv).a;
+  float o = u_mode == 0 ? k + l - k * l : u_mode == 1 ? k * (1.0 - l) : u_mode == 2 ? k * l : k + l - 2.0 * k * l;
+  outColor = vec4(o);
+}`;
+
+const BLEND_MODE: Record<BlendMode, number> = {
+  [BlendMode.Normal]: 0,
+  [BlendMode.Multiply]: 1,
+  [BlendMode.Screen]: 2,
+  [BlendMode.Overlay]: 3,
+  [BlendMode.Darken]: 4,
+  [BlendMode.Lighten]: 5,
+  [BlendMode.ColorDodge]: 6,
+  [BlendMode.ColorBurn]: 7,
+  [BlendMode.HardLight]: 8,
+  [BlendMode.SoftLight]: 9,
+  [BlendMode.Difference]: 10,
+  [BlendMode.Exclusion]: 11,
+  [BlendMode.Hue]: 12,
+  [BlendMode.Saturation]: 13,
+  [BlendMode.Color]: 14,
+  [BlendMode.Luminosity]: 15
+};
+
+const FOLD_MODE: Record<MaskMode, number> = { [MaskMode.Add]: 0, [MaskMode.Subtract]: 1, [MaskMode.Intersect]: 2, [MaskMode.Difference]: 3 };
+const WHITE: [number, number, number, number] = [1, 1, 1, 1];
+const CLEAR: [number, number, number, number] = [1, 1, 1, 0];
+const RAMP_PAINT: Record<RampKind, Paint> = {
+  [RampKind.Linear]: { kind: PaintKind.Linear, from: [0, 0.5], to: [1, 0.5], stops: [{ at: 0, color: WHITE }, { at: 1, color: CLEAR }] },
+  [RampKind.Radial]: { kind: PaintKind.Radial, center: [0.5, 0.5], radius: 0.5, stops: [{ at: 0, color: WHITE }, { at: 1, color: CLEAR }] }
+};
 
 const PAINT_KIND: Record<PaintKind, number> = { [PaintKind.Solid]: 0, [PaintKind.Linear]: 1, [PaintKind.Radial]: 2 };
 
@@ -193,11 +309,15 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   const blurProgram = program(gl, QUAD_VS, BLUR_FS);
   const copyProgram = program(gl, QUAD_VS, COPY_FS);
   const imageProgram = program(gl, PATH_VS, IMAGE_FS);
+  const blendProgram = program(gl, QUAD_VS, BLEND_FS);
   const textures = new Map<TexImageSource, WebGLTexture>();
   const main = target(gl, width, height, samples);
   const layer = target(gl, width, height, samples);
   const ping = plain(gl, width, height);
   const pong = plain(gl, width, height);
+  const accA = plain(gl, width, height);
+  const accB = plain(gl, width, height);
+  const foldProgram = program(gl, QUAD_VS, FOLD_FS);
   const geometry = gl.createBuffer()!;
   const quad = gl.createBuffer()!;
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
@@ -227,6 +347,25 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.uniform1f(u(pathProgram, 'u_radius'), paint.radius);
   }
 
+  function fan(contours: number[][]) {
+    for (const contour of contours) {
+      if (contour.length < 6) {
+        continue;
+      }
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(contour), gl.STREAM_DRAW);
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, contour.length / 2);
+    }
+  }
+
+  const COVERAGE: Record<FillRule, () => void> = {
+    [FillRule.EvenOdd]: () => gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT),
+    [FillRule.NonZero]: () => {
+      gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP);
+      gl.stencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP);
+    },
+    [FillRule.Union]: () => gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR_WRAP)
+  };
+
   function fillPath(item: PathItem, opacity: number) {
     const m = item.matrix;
     gl.useProgram(pathProgram);
@@ -235,28 +374,26 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.bindBuffer(gl.ARRAY_BUFFER, geometry);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.enable(gl.STENCIL_TEST);
+    gl.stencilMask(STENCIL_ALL);
     gl.clear(gl.STENCIL_BUFFER_BIT);
     gl.colorMask(false, false, false, false);
-    gl.stencilFunc(gl.ALWAYS, 0, 0xff);
-    if (item.rule === FillRule.EvenOdd) {
+    if (item.within) {
+      gl.stencilMask(CLIP_BIT);
+      gl.stencilFunc(gl.ALWAYS, 0, STENCIL_ALL);
       gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
-    } else {
-      gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP);
-      gl.stencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP);
+      fan(item.within.contours);
     }
-    for (const contour of item.contours) {
-      if (contour.length < 6) {
-        continue;
-      }
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(contour), gl.STREAM_DRAW);
-      gl.drawArrays(gl.TRIANGLE_FAN, 0, contour.length / 2);
-    }
+    gl.stencilMask(COVER_BITS);
+    gl.stencilFunc(item.within ? gl.EQUAL : gl.ALWAYS, item.within?.outside ? 0 : CLIP_BIT, CLIP_BIT);
+    COVERAGE[item.rule]();
+    fan(item.contours);
     gl.colorMask(true, true, true, true);
-    gl.stencilFunc(gl.NOTEQUAL, 0, 0xff);
-    gl.stencilOp(gl.ZERO, gl.ZERO, gl.ZERO);
+    gl.stencilFunc(gl.NOTEQUAL, 0, COVER_BITS);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
     setPaint(item.paint, opacity);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bounds(item.contours)), gl.STREAM_DRAW);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.stencilMask(STENCIL_ALL);
     gl.disable(gl.STENCIL_TEST);
   }
 
@@ -300,7 +437,9 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
       return;
     }
     const m = item.matrix;
-    const r = imageRect(item.size, picture.size, item.fit, item.focus, item.zoom);
+    const fitted = imageRect(item.size, picture.size, item.fit, item.focus, item.zoom);
+    const [k, , , , tx, ty] = item.inner;
+    const r = { x: fitted.x * k + tx, y: fitted.y * k + ty, width: fitted.width * k, height: fitted.height * k };
     const { width: w, height: h } = item.size;
     gl.useProgram(imageProgram);
     gl.uniformMatrix3fv(u(imageProgram, 'u_matrix'), false, [m[0], m[1], 0, m[2], m[3], 0, m[4], m[5], 1]);
@@ -325,12 +464,22 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     fillPath(item, opacity);
   }
 
-  function blurred(item: Item, pictures: Pictures) {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, layer.fbo);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    drawItem(item, 1, pictures);
-    resolveInto(layer);
+  function scissored(item: Item, paint: () => void) {
+    if (!item.scissor) {
+      paint();
+      return;
+    }
+    const [x0, y0, x1, y1] = item.scissor;
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(Math.round(x0), Math.round(height - y1), Math.round(x1 - x0), Math.round(y1 - y0));
+    paint();
+    gl.disable(gl.SCISSOR_TEST);
+  }
+
+  function blurredFrom(item: Item, src: WebGLTexture): WebGLTexture {
+    if (item.blur <= 0) {
+      return src;
+    }
     const { weights, step } = gaussianKernel(item.blur);
     const blur = (dir: [number, number]) => () => {
       gl.uniform2f(u(blurProgram, 'u_dir'), dir[0], dir[1]);
@@ -338,10 +487,104 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
       gl.uniform1fv(u(blurProgram, 'u_w'), Float32Array.from({ length: MAX_TAPS }, (_, i) => weights[i] ?? 0));
     };
     gl.disable(gl.BLEND);
-    pass(blurProgram, layer.texture, ping.fbo, blur([step / width, 0]));
+    pass(blurProgram, src, ping.fbo, blur([step / width, 0]));
     pass(blurProgram, ping.texture, pong.fbo, blur([0, step / height]));
     gl.enable(gl.BLEND);
-    pass(copyProgram, pong.texture, main.fbo, () => gl.uniform1f(u(copyProgram, 'u_opacity'), item.opacity));
+    return pong.texture;
+  }
+
+  function bindMask(prog: WebGLProgram, mask: WebGLTexture | null) {
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, mask);
+    gl.uniform1i(u(prog, 'u_mask'), 2);
+    gl.uniform1i(u(prog, 'u_masked'), mask ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+
+  function composite(item: Item, src: WebGLTexture, mask: WebGLTexture | null) {
+    if (item.blend === BlendMode.Normal) {
+      pass(copyProgram, src, main.fbo, () => {
+        gl.uniform1f(u(copyProgram, 'u_opacity'), item.opacity);
+        bindMask(copyProgram, mask);
+      });
+      return;
+    }
+    resolveInto(main);
+    gl.disable(gl.BLEND);
+    pass(blendProgram, src, main.fbo, () => {
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, main.texture);
+      gl.uniform1i(u(blendProgram, 'u_dst'), 1);
+      gl.uniform1f(u(blendProgram, 'u_opacity'), item.opacity);
+      gl.uniform1i(u(blendProgram, 'u_mode'), BLEND_MODE[item.blend]);
+      bindMask(blendProgram, mask);
+      gl.activeTexture(gl.TEXTURE0);
+    });
+    gl.enable(gl.BLEND);
+  }
+
+  function intoLayer(paint: () => void) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, layer.fbo);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    paint();
+    resolveInto(layer);
+  }
+
+  function blurTexture(src: WebGLTexture, sigma: number): WebGLTexture {
+    return sigma > 0 ? blurredFrom({ blur: sigma } as Item, src) : src;
+  }
+
+  type Fold = { cov: WebGLTexture; mode: MaskMode; level: number; invert: boolean; luma: boolean };
+
+  function coverPaint(m: MaskLayer, pictures: Pictures) {
+    const c = m.cover;
+    if (c.kind === CoverKind.Picture) {
+      drawImage({ kind: ItemKind.Image, clip: c.src, src: c.src, video: false, mediaTime: 0, size: { width: 1, height: 1 }, fit: 'fill', focus: [0.5, 0.5], zoom: 1, clipped: true, inner: [1, 0, 0, 1, 0, 0], opacity: 1, matrix: c.matrix, blur: 0, blend: BlendMode.Normal }, 1, pictures);
+      return;
+    }
+    const paint = c.kind === CoverKind.Ramp ? RAMP_PAINT[c.ramp] : { kind: PaintKind.Solid as const, color: WHITE };
+    fillPath({ kind: ItemKind.Path, clip: '', contours: c.contours, rule: FillRule.NonZero, paint, opacity: 1, matrix: c.matrix, blur: 0, blend: BlendMode.Normal }, 1);
+  }
+
+  function maskOf(item: Item, pictures: Pictures): WebGLTexture | null {
+    let mask: WebGLTexture | null = null;
+    for (const m of item.masks ?? []) {
+      intoLayer(() => coverPaint(m, pictures));
+      mask = foldOne(mask, { cov: blurTexture(layer.texture, m.feather), mode: m.mode, level: m.level, invert: m.invert, luma: m.cover.kind === CoverKind.Picture && m.cover.luma });
+    }
+    const matte = item.matte;
+    if (matte) {
+      intoLayer(() => matte.items.forEach((i) => drawItem(i, i.opacity, pictures)));
+      mask = foldOne(mask, { cov: layer.texture, mode: MaskMode.Intersect, level: 1, invert: matte.invert, luma: matte.luma });
+    }
+    return mask;
+  }
+
+  function foldOne(acc: WebGLTexture | null, step: Fold): WebGLTexture {
+    const into = acc === accA.texture ? accB : accA;
+    gl.disable(gl.BLEND);
+    pass(foldProgram, step.cov, into.fbo, () => {
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, acc);
+      gl.uniform1i(u(foldProgram, 'u_acc'), 1);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.uniform1i(u(foldProgram, 'u_cov'), 0);
+      gl.uniform1i(u(foldProgram, 'u_mode'), FOLD_MODE[step.mode]);
+      gl.uniform1i(u(foldProgram, 'u_first'), acc ? 0 : 1);
+      gl.uniform1f(u(foldProgram, 'u_level'), step.level);
+      gl.uniform1i(u(foldProgram, 'u_invert'), step.invert ? 1 : 0);
+      gl.uniform1i(u(foldProgram, 'u_luma'), step.luma ? 1 : 0);
+    });
+    gl.enable(gl.BLEND);
+    return into.texture;
+  }
+
+  function layered(item: Item, pictures: Pictures) {
+    const mask = item.masks || item.matte ? maskOf(item, pictures) : null;
+    intoLayer(() => drawItem(item, 1, pictures));
+    const src = blurredFrom(item, layer.texture);
+    scissored(item, () => composite(item, src, mask));
   }
 
   function draw(list: DisplayList, pictures: Pictures = NO_PICTURES) {
@@ -353,12 +596,12 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     for (const item of list.items) {
-      if (item.blur > 0) {
-        blurred(item, pictures);
+      if (item.blur > 0 || item.blend !== BlendMode.Normal || item.masks || item.matte) {
+        layered(item, pictures);
         continue;
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, main.fbo);
-      drawItem(item, item.opacity, pictures);
+      scissored(item, () => drawItem(item, item.opacity, pictures));
     }
     resolveInto(main);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, main.resolve);

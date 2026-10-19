@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '../brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
-import { Ease } from '../design';
+import { Ease, TransitionKind } from '../design';
 import { addClip, setKeyframes, type OpResult } from '../timeline';
 import { FillType } from '../fill/model';
-import { displayListAt, ItemKind, PaintKind, Unsupported, type PathItem } from './display-list';
+import { BlendMode } from '../blend';
+import { displayListAt, FillRule, ItemKind, PaintKind, Unsupported, type PathItem } from './display-list';
 import { apply2d } from '../affine';
 
 function must(r: OpResult): MotionDoc {
@@ -84,6 +85,36 @@ describe('displayListAt', () => {
     const blurred = patch(withCard, 'card', { effects: [{ id: 'e1', kind: 'gaussian-blur', enabled: true, params: { radius: 12 } }] } as never);
 
     expect(pathOf(blurred, 'card')?.blur).toBeGreaterThan(0);
+  });
+
+  it('strokes a shape as a union band in its paint, clipped to the shape when inside', () => {
+    const strokes = [{ paint: { type: FillType.Solid, color: '#ffffff' }, width: 0.01, align: 'inside' }];
+    const stroked = patch(withCard, 'card', { props: { ...cardProps, strokes } });
+    const band = list(stroked).items.filter((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'card')[1];
+
+    expect(band).toMatchObject({ rule: FillRule.Union, paint: { kind: PaintKind.Solid, color: [1, 1, 1, 1] }, within: { outside: false } });
+    expect(corners(band).right - corners(band).left).toBeCloseTo(192 + 21.6);
+  });
+
+  it('plays an entrance transition on the whole layer', () => {
+    const sliding = patch(withCard, 'card', { transitionIn: { kind: TransitionKind.SlideUp, durationInFrames: 10 } });
+
+    expect(corners(pathOf(sliding, 'card', 0)).top).toBeCloseTo(486 + 0.12 * 1080);
+    expect(pathOf(sliding, 'card', 0)?.opacity).toBe(0);
+  });
+
+  it('wipes with a frame-space scissor', () => {
+    const wiping = patch(withCard, 'card', { transitionIn: { kind: TransitionKind.Wipe, durationInFrames: 10 } });
+
+    expect(pathOf(wiping, 'card', 0)?.scissor).toEqual([0, 0, 0, 1080]);
+    expect(pathOf(wiping, 'card', 10)?.scissor).toBeUndefined();
+  });
+
+  it('carries the clip blend mode to its items', () => {
+    const multiplied = patch(withCard, 'card', { blend: BlendMode.Multiply });
+
+    expect(pathOf(multiplied, 'card')?.blend).toBe(BlendMode.Multiply);
+    expect(pathOf(withCard, 'card')?.blend).toBe(BlendMode.Normal);
   });
 
   it('names what it cannot draw yet instead of drawing it wrong', () => {

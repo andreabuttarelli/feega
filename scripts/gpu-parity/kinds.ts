@@ -4,6 +4,7 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { Ease } from '$lib/motion/design';
 import { addClip, setKeyframes, type OpResult } from '$lib/motion/timeline';
 import { FillType } from '$lib/motion/fill/model';
+import { maskSchema } from '$lib/motion/mask';
 
 const SECONDS = 60;
 const out = process.argv[2];
@@ -38,6 +39,59 @@ const KINDS: Record<string, () => MotionDoc> = {
   images: () => must(addClip(must(addClip(must(addClip(backdrop, { component: 'Image', from: 0, durationInFrames: SECONDS, props: { assetId: 'pic-a', x: 0.27, y: 0.5, width: 0.4, height: 0.6, focusX: 0.2 } }, 'cover')), { component: 'Image', from: 0, durationInFrames: SECONDS, props: { assetId: 'pic-b', fit: 'contain', x: 0.73, y: 0.3, width: 0.4, height: 0.3 } }, 'contain')), { component: 'Logo', from: 0, durationInFrames: SECONDS, props: { assetId: 'pic-c', x: 0.73, y: 0.75, width: 0.2, height: 0.2 } }, 'logo')),
   zoom: () => keys(keys(must(addClip(backdrop, { component: 'Image', from: 0, durationInFrames: SECONDS, props: { assetId: 'pic-a', x: 0.5, y: 0.5, width: 0.6, height: 0.6 } }, 'kb')), 'kb', 'zoom', 1, 1.6), 'kb', 'rotateZ', 0, 8),
   video: () => must(addClip(backdrop, { component: 'Video', from: 0, durationInFrames: SECONDS, props: { assetId: 'video-a', x: 0.5, y: 0.5, width: 0.7, height: 0.7, speed: 1.5 } }, 'vid')),
+  strokes: () =>
+    [
+      ['center', { shape: 'rect', x: 0.2, y: 0.3, width: 0.18, height: 0.25, roundness: 0.1, fill: '#1c1c1e', strokes: [{ paint: { type: 'solid', color: '#ff9f0a' }, width: 0.012, align: 'center' }] }],
+      ['inside', { shape: 'ellipse', x: 0.5, y: 0.3, width: 0.18, height: 0.25, fill: '#1c1c1e', strokes: [{ paint: { type: 'solid', color: '#30d158' }, width: 0.015, align: 'inside' }] }],
+      ['outside', { shape: 'star', x: 0.8, y: 0.3, width: 0.18, height: 0.3, fill: '#1c1c1e', strokes: [{ paint: { type: 'solid', color: '#0a84ff' }, width: 0.01, align: 'outside', join: 'round' }] }],
+      ['dashed', { shape: 'rect', x: 0.2, y: 0.75, width: 0.2, height: 0.25, fills: [], strokes: [{ paint: { type: 'solid', color: '#ffffff' }, width: 0.006, dash: 0.03, gap: 0.015 }] }],
+      ['open', { shape: 'path', x: 0.5, y: 0.75, width: 0.2, height: 0.25, path: 'M0 1 L0.3 0 L0.6 0.8 L1 0.1', fills: [], strokes: [{ paint: { type: 'solid', color: '#ff375f' }, width: 0.012, cap: 'round', join: 'round' }] }],
+      ['graded', { shape: 'polygon', x: 0.8, y: 0.75, width: 0.18, height: 0.28, sides: 5, fills: [], strokes: [{ paint: { type: 'linear-gradient', angle: 0, stops }, width: 0.014, cap: 'square', join: 'bevel' }] }]
+    ].reduce((doc, [id, props]) => shape(doc, id as string, props as Record<string, unknown>), backdrop),
+  transitions: () =>
+    ['fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'scale', 'wipe', 'blur'].reduce((doc, kind, i) => {
+      const placed = shape(doc, kind, { shape: 'rect', x: 0.14 + (i % 4) * 0.24, y: i < 4 ? 0.3 : 0.72, width: 0.16, height: 0.25, roundness: 0.1, fill: ['#ff3b30', '#ff9f0a', '#ffd60a', '#30d158', '#0a84ff', '#5e5ce6', '#bf5af2', '#ff375f'][i] });
+      return { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === kind ? { ...c, transitionIn: { kind, durationInFrames: 24 }, transitionOut: { kind, durationInFrames: 24 } } : c)) })) } as MotionDoc;
+    }, backdrop),
+  moves: () =>
+    ['drift-up', 'zoom-in', 'pan-left'].reduce((doc, move, i) => must(addClip(doc, { component: 'Image', from: 0, durationInFrames: SECONDS, props: { assetId: 'pic-a', x: 0.18 + i * 0.32, y: 0.5, width: 0.28, height: 0.5, move, easing: 'linear' } }, move)), backdrop),
+  blends: () =>
+    ['multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'].reduce(
+      (doc, blend, i) => {
+        const placed = shape(doc, blend, { shape: 'ellipse', x: 0.1 + (i % 5) * 0.2, y: 0.2 + Math.floor(i / 5) * 0.3, width: 0.12, height: 0.22, fills: [{ type: 'linear-gradient', angle: 0, stops }] });
+        return { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === blend ? { ...c, blend } : c)) })) } as MotionDoc;
+      },
+      must(addClip(backdrop, { component: 'Image', from: 0, durationInFrames: SECONDS, props: { assetId: 'pic-a', x: 0.5, y: 0.5, width: 1, height: 1 } }, 'under'))
+    ),
+  masks: () => {
+    const cell = (i: number) => ({ x: 0.14 + (i % 4) * 0.24, y: i < 4 ? 0.3 : 0.72 });
+    const specs: Record<string, unknown>[] = [
+      { kind: 'rect', width: 0.12, height: 0.18, feather: 10 },
+      { kind: 'ellipse', width: 0.14, height: 0.22, invert: true },
+      { kind: 'polygon', width: 0.16, height: 0.26, rotation: 20 },
+      { kind: 'linear', width: 0.18, height: 0.3, rotation: 90 },
+      { kind: 'radial', width: 0.2, height: 0.3 },
+      { kind: 'luma', assetId: 'pic-a', width: 0.2, height: 0.3 },
+      { kind: 'image', assetId: 'pic-c', width: 0.2, height: 0.3, opacity: 0.6 },
+      { kind: 'rect', width: 0.18, height: 0.28, stack: { kind: 'ellipse', mode: 'subtract', width: 0.1, height: 0.16 } }
+    ];
+    return specs.reduce((doc, spec, i) => {
+      const { stack, ...own } = spec as { stack?: Record<string, unknown> };
+      const id = `m${i}`;
+      const placed = shape(doc, id, { shape: 'rect', ...cell(i), width: 0.2, height: 0.3, fills: [{ type: 'linear-gradient', angle: 45, stops }] });
+      const mask = maskSchema.parse({ ...own, ...cell(i) });
+      const maskStack = stack ? [maskSchema.parse({ ...stack, ...cell(i) })] : [];
+      return { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? { ...c, mask, maskStack } : c)) })) } as MotionDoc;
+    }, backdrop);
+  },
+  mattes: () => {
+    const lower = shape(shape(backdrop, 'alpha', { shape: 'rect', x: 0.3, y: 0.5, width: 0.35, height: 0.6, fills: [{ type: 'linear-gradient', angle: 0, stops }] }), 'luma', { shape: 'rect', x: 0.72, y: 0.5, width: 0.35, height: 0.6, fills: [{ type: 'linear-gradient', angle: 90, stops }] });
+    const template = lower.tracks.flatMap((t) => t.clips).find((c) => c.id === 'alpha')!;
+    const hole = (id: string, x: number, fill: string) => ({ ...template, id, props: { ...template.props, shape: 'star', x, y: 0.5, width: 0.3, height: 0.5, fills: [{ type: 'solid', color: fill }] } });
+    const top = { ...lower.tracks[0], id: 'mattes', clips: [hole('star-a', 0.3, '#ffffff'), hole('star-l', 0.72, '#888888')] };
+    const stacked = { ...lower, tracks: [top, ...lower.tracks] };
+    return { ...stacked, tracks: stacked.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'alpha' ? { ...c, matte: 'alpha', matteFrom: 'star-a' } : c.id === 'luma' ? { ...c, matte: 'luma-inverted', matteFrom: 'star-l' } : c)) })) } as MotionDoc;
+  },
   blur: () => keys(must(addClip(shape(backdrop, 'sharp', { shape: 'rect', x: 0.3, y: 0.5, width: 0.2, height: 0.3, fill: '#ffd60a' }), { component: 'Shape', from: 0, durationInFrames: SECONDS, props: { shape: 'star', x: 0.7, y: 0.5, width: 0.25, height: 0.4, fill: '#bf5af2' }, effects: [{ id: 'g', kind: 'gaussian-blur', enabled: true, params: { radius: 6 } }] } as never, 'soft')), 'sharp', 'blur', 0, 24)
 };
 

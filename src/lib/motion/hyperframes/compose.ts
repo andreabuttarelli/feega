@@ -816,3 +816,5 @@ const LIVE_SCRIPT: Record<Liveness, (input: SpecInput, delivery: Delivery) => st
 function scriptJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
+
+export { HIDDEN as EDGE_HIDDEN, SHOWN as EDGE_SHOWN, MOVE as MOVES };
