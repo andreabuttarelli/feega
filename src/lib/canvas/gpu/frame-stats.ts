@@ -1,6 +1,8 @@
 const KEEP = 600;
 
-type Stats = { render: number[]; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; reveal?: { ms: number; missing: string[] }; settled?: number };
+export type TextureReport = { count: number; bytes: number; largest: string[] };
+
+type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; reveal?: { ms: number; missing: string[] }; settled?: number };
 
 declare global {
   interface Window {
@@ -48,4 +50,9 @@ export function count(name: Counter) {
   const stats = (window.__gpuCanvas ??= { render: [] });
   const counts = (stats.counts ??= {});
   counts[name] = (counts[name] ?? 0) + 1;
+}
+
+export function exposeTextures(report: () => TextureReport) {
+  const stats = (window.__gpuCanvas ??= { render: [] });
+  stats.textures = report;
 }

@@ -111,14 +111,16 @@
   import { FEEGA_TOKENS } from '$lib/motion/brand';
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
+  import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
+  import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, frameResize, motionEditorPath, type FrameResize, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, frameResize, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { fitToNode } from '$lib/motion/custom-size';
   import { barContextOf } from '$lib/canvas/bottom-bar';
-  import { CanvasState, NodeMode, Opening, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
+  import { CanvasState, NodeMode, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { decoded, painted } from '$lib/canvas/paint-wait';
   import { viewportOf } from '$lib/motion/editor-layout';
@@ -126,6 +128,7 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHead } from '$lib/canvas/frame-outlines';
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
+  import { framesToWarm } from '$lib/canvas/warm-frames';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type HostMove, type PointerPoint } from '$lib/canvas/canvas-drop';
@@ -1216,8 +1219,7 @@
   const SAVE_MAX_WAIT_MS = 2000;
   const SAVE_BACKOFF_CAP_MS = 30000;
   const REMOTE_REFRESH_MS = 250;
-  const WARM_AFTER_MS = 500;
-  const WARM_ON_LOAD = 6;
+  const WARM_EVERY_MS = 1000;
   let saveStatus = $state(SaveStatus.Saved);
   let placeStatus = $state(SaveStatus.Saved);
   let unsentCount = $state(0);
@@ -1348,6 +1350,8 @@
     }
   }
 
+  const liveHost = $derived(domReason ? LiveHost.Node : LiveHost.Canvas);
+
   let dismissedMotion = $state<string | null>(null);
   let requestedMotion = $state<string | null>(null);
   let pageWidth = $state(0);
@@ -1409,12 +1413,25 @@
     }
   }
 
-  const motionIds = $derived(nodes.filter((n) => n.type === 'motion').slice(0, WARM_ON_LOAD).map((n) => n.id).join());
+  const warmed = new Map<string, number>();
+
+  function warmInView() {
+    const corner = toFlow?.({ x: 0, y: 0 });
+    const far = toFlow?.({ x: innerWidth, y: innerHeight });
+    if (!corner || !far) {
+      return;
+    }
+    const view = { x: corner.x, y: corner.y, w: far.x - corner.x, h: far.y - corner.y };
+    const frames = nodes.filter((n) => n.type === 'motion' && n.version > 0).map((n) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, version: n.version }));
+    for (const id of framesToWarm(frames, view, warmed)) {
+      warmed.set(id, frames.find((f) => f.id === id)!.version);
+      warmMotion(id);
+    }
+  }
 
   $effect(() => {
-    const ids = motionIds.split(',').filter(Boolean);
-    const timer = setTimeout(() => ids.forEach(warmMotion), WARM_AFTER_MS);
-    return () => clearTimeout(timer);
+    const timer = setInterval(() => (window.requestIdleCallback ? window.requestIdleCallback(warmInView) : warmInView()), WARM_EVERY_MS);
+    return () => clearInterval(timer);
   });
 
   function reframe(id: string | null, free: Insets) {
@@ -3412,6 +3429,11 @@
     onUserPan={() => (following = null)}
     follow={followView}
   >
+    {#snippet tileOver({ id })}
+      {@const over = liveHost === LiveHost.Canvas ? nodes.find((n) => n.id === id) : null}
+      {@const overMotion = over ? motionOf(over) : null}
+      {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive && tileMode(id, inlineMotion, inlineStage.leaving) === NodeMode.Preview} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
+    {/snippet}
     {#snippet tile({ id, selected })}
       {@const row = nodes.find((n) => n.id === id)}
       {#if row}
@@ -3617,7 +3639,7 @@
           <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} nodeMode={tileMode(id, inlineMotion, inlineStage.leaving)} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} onenter={() => requestMotion(id)} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} nodeMode={tileMode(id, inlineMotion, inlineStage.leaving)} onenter={() => requestMotion(id)} {liveHost} liveUrl={motionLivePath(motionAt)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}

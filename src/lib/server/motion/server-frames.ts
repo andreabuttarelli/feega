@@ -20,6 +20,16 @@ export type StillPage = FramePage & { picture: (mime: string, quality?: number) 
 
 export type StillPort = { open: (viewport: Viewport) => Promise<StillPage> };
 
+export type PageBox = { left: number; top: number; width: number; height: number };
+
+export type ExportPage = StillPage & {
+  freeze: () => Promise<string>;
+  boxOf: (clipId: string) => Promise<PageBox | null>;
+  shot: (mime: string, quality: number | undefined, clip: PageBox | null) => Promise<Buffer>;
+};
+
+export type ExportPort = { open: (viewport: Viewport) => Promise<ExportPage>; print: (html: string) => Promise<Buffer> };
+
 export type FrameAsk = { compose: ComposeInput; times: readonly number[]; size?: number };
 
 function scaleFor(doc: ComposeInput['doc'], size: number): number {
