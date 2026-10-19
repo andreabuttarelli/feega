@@ -10,6 +10,8 @@ import { FluidProbe, Read, type Box, type PixelWatch, type Watch } from './fixtu
 import { recordsVideo, scorecard, verdictOf, type SessionRun, type StepResult } from './fixtures/fluidity-report';
 
 const PROFILE = process.env.FLUID_PROFILE;
+const VIDEO = process.env.FLUID_VIDEO !== 'off';
+const ONLY = process.env.FLUID_STEPS ? new RegExp(process.env.FLUID_STEPS) : null;
 const OUT = process.env.FLUID_OUT ?? join(homedir(), 'Documents', 'feega-videos', 'fluidity');
 const SLUG = process.env.FLUID_PROJECT_SLUG ?? 'gpu-fixture-0aef6d1a';
 const RENDERERS = (process.env.FLUID_RENDERERS ?? 'gpu,dom').split(',');
@@ -122,21 +124,38 @@ async function inView(page: Page, id: string): Promise<Box> {
   return (await page.locator(nodeSel(id)).boundingBox())!;
 }
 
+const WHEEL_PROBE = 40;
+const wheelGains = new WeakMap<Page, number>();
+
+async function wheelGain(page: Page): Promise<number> {
+  const known = wheelGains.get(page);
+  if (known) {
+    return known;
+  }
+  const seen = page.evaluate(() => new Promise<number>((done) => addEventListener('wheel', (e) => done(e.deltaY), { capture: true, once: true })));
+  await page.mouse.wheel(0, WHEEL_PROBE);
+  const gain = (await seen) / WHEEL_PROBE;
+  wheelGains.set(page, gain);
+  await page.mouse.wheel(0, -WHEEL_PROBE / gain);
+  return gain;
+}
+
 async function zoomOnto(page: Page, id: string) {
   const area = { width: VIEWPORT.width - IN_VIEW.left - IN_VIEW.right, height: VIEWPORT.height - IN_VIEW.top - IN_VIEW.bottom };
   const goal = { x: IN_VIEW.left + area.width / 2, y: IN_VIEW.top + area.height / 2 };
   for (let i = 0; i < ZOOM_TRIES; i++) {
     const b = (await page.locator(nodeSel(id)).boundingBox())!;
-    if (visible(b) && b.width > area.width * FILL_SHARE * 0.5) {
+    if (visible(b) && Math.max(b.width / area.width, b.height / area.height) > FILL_SHARE / 2) {
       return;
     }
-    const at = centre(b);
     await page.mouse.move(goal.x, goal.y);
-    await page.mouse.wheel(at.x - goal.x, at.y - goal.y);
+    const gain = await wheelGain(page);
+    const at = centre((await page.locator(nodeSel(id)).boundingBox())!);
+    await page.mouse.wheel((at.x - goal.x) / gain, (at.y - goal.y) / gain);
     await page.waitForTimeout(120);
     const scale = Math.min((area.width * FILL_SHARE) / b.width, (area.height * FILL_SHARE) / b.height);
     await page.keyboard.down('Control');
-    await page.mouse.wheel(0, -Math.log(scale) / WHEEL_ZOOM);
+    await page.mouse.wheel(0, -Math.log(scale) / WHEEL_ZOOM / gain);
     await page.keyboard.up('Control');
     await page.waitForTimeout(200);
   }
@@ -426,6 +445,19 @@ const STEPS: Step[] = [
     }
   },
   {
+    name: 'ungroup ⌘⇧G',
+    drive: async ({ page, ids }) => {
+      const [group, box, copy] = [ids.get('group')!, ids.get('box')!, ids.get('copy')!];
+      await leaveEditor(page);
+      await clickNode(page, group);
+      await leaveEditor(page);
+      await page.keyboard.press('ControlOrMeta+Shift+g');
+      await expect(page.locator(nodeSel(group))).toHaveCount(0, { timeout: OPEN_MS });
+      await expect(page.locator(nodeSel(box))).toHaveCount(1, { timeout: OPEN_MS });
+      return { touched: [group, box, copy] };
+    }
+  },
+  {
     name: 'add text, type, size, font',
     drive: async ({ page, ids, watch }) => {
       await leaveEditor(page);
@@ -619,22 +651,6 @@ const STEPS: Step[] = [
     }
   },
   {
-    name: 'ungroup ⌘⇧G',
-    drive: async ({ page, ids }) => {
-      await leaveEditor(page);
-      await marquee(page, [ids.get('box')!, ids.get('copy')!]);
-      const before = await domIds(page);
-      await page.keyboard.press('ControlOrMeta+g');
-      const group = await newNode(page, before);
-      await leaveEditor(page);
-      await clickNode(page, group);
-      await leaveEditor(page);
-      await page.keyboard.press('ControlOrMeta+Shift+g');
-      await expect(page.locator(nodeSel(group))).toHaveCount(0, { timeout: OPEN_MS });
-      return { touched: [group] };
-    }
-  },
-  {
     name: 'delete inserted nodes',
     drive: async ({ page, ids }) => {
       await leaveEditor(page);
@@ -790,7 +806,7 @@ async function runSession(page: Page, path: string): Promise<StepRun[]> {
   const ids = new Map<string, string>();
   const runs: StepRun[] = [];
 
-  for (const step of STEPS) {
+  for (const step of STEPS.filter((s) => !ONLY || ONLY.test(s.name))) {
     const everTouched = new Set(ids.values());
     const camera = step.name.startsWith('pan');
     const background = camera ? [] : await untouchedWatches(page, probe, everTouched);
@@ -827,7 +843,9 @@ async function runSession(page: Page, path: string): Promise<StepRun[]> {
     runs.push({ name: step.name, facts, error, finalChecks });
     console.log(`[fluid] ${step.name} ${Date.now() - began}ms ${error ? `UNDRIVEN ${error}` : JSON.stringify(facts)}`);
   }
-  runs.push(await afterReload(page, ids));
+  if (!ONLY) {
+    runs.push(await afterReload(page, ids));
+  }
   console.log(`[fluid] after reload ${JSON.stringify(runs.at(-1))}`);
   return runs;
 }
@@ -840,7 +858,7 @@ function writeRun(run: SessionRun) {
 }
 
 async function recordedContext(browser: Browser, browserName: string, name: string): Promise<BrowserContext> {
-  if (!recordsVideo(browserName)) {
+  if (!VIDEO || !recordsVideo(browserName)) {
     return browser.newContext({ viewport: VIEWPORT });
   }
   mkdirSync(join(OUT, 'raw', name), { recursive: true });
