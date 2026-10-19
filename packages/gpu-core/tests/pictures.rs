@@ -1,10 +1,14 @@
 use gpu_core::display_list::{parse, Item};
-use gpu_core::pictures::{picture, Pictures};
-use gpu_core::render::Renderer;
+use gpu_core::pictures::Pictures;
+#[cfg(feature = "gpu")]
+use gpu_core::pictures::picture;
 use gpu_core::scene::build;
 
+#[cfg(feature = "gpu")]
 const RED: [u8; 4] = [255, 0, 0, 255];
+#[cfg(feature = "gpu")]
 const GREEN: [u8; 4] = [0, 255, 0, 255];
+#[cfg(feature = "gpu")]
 const BLUE: [u8; 4] = [0, 0, 255, 255];
 
 fn list(fit: &str, clipped: bool) -> String {
@@ -20,11 +24,13 @@ fn list(fit: &str, clipped: bool) -> String {
     )
 }
 
+#[cfg(feature = "gpu")]
 fn halves() -> Pictures {
     let row: Vec<u8> = [RED, RED, GREEN, GREEN].concat();
     Pictures::from([("pic".to_string(), picture(4, 2, [row.clone(), row].concat()))])
 }
 
+#[cfg(feature = "gpu")]
 fn at(pixels: &[u8], x: usize, y: usize) -> [u8; 4] {
     pixels[(y * 64 + x) * 4..(y * 64 + x) * 4 + 4].try_into().unwrap()
 }
@@ -44,9 +50,10 @@ fn an_image_without_its_picture_is_skipped_by_name() {
     assert_eq!(skipped[0].what, "image");
 }
 
+#[cfg(feature = "gpu")]
 #[test]
 fn cover_fills_the_box_and_crops_to_it() {
-    let mut renderer = Renderer::new().expect("a GPU adapter");
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
     let pixels = renderer.render(&parse(&list("cover", true)).unwrap(), &halves()).unwrap();
 
     assert_eq!(at(&pixels, 18, 32), RED);
@@ -56,9 +63,10 @@ fn cover_fills_the_box_and_crops_to_it() {
     assert_eq!(at(&pixels, 56, 32), BLUE);
 }
 
+#[cfg(feature = "gpu")]
 #[test]
 fn contain_leaves_the_box_edges_empty() {
-    let mut renderer = Renderer::new().expect("a GPU adapter");
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
     let pixels = renderer.render(&parse(&list("contain", true)).unwrap(), &halves()).unwrap();
 
     assert_eq!(at(&pixels, 20, 32), RED);
@@ -66,9 +74,10 @@ fn contain_leaves_the_box_edges_empty() {
     assert_eq!(at(&pixels, 32, 45), BLUE);
 }
 
+#[cfg(feature = "gpu")]
 #[test]
 fn an_unclipped_picture_spills_past_its_box() {
-    let mut renderer = Renderer::new().expect("a GPU adapter");
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
     let pixels = renderer.render(&parse(&list("cover", false)).unwrap(), &halves()).unwrap();
 
     assert_eq!(at(&pixels, 4, 32), RED);
