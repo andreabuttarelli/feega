@@ -193,10 +193,6 @@ fn cache_clip(group: &str) -> String {
     format!("{CACHE_PREFIX}{group}")
 }
 
-pub fn is_cache_clip(clip: &str) -> bool {
-    clip.starts_with(CACHE_PREFIX)
-}
-
 fn building_clip(group: &str) -> String {
     format!("{CACHE_PREFIX}{group}#building")
 }

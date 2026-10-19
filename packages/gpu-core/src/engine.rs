@@ -3,8 +3,8 @@ use vello::peniko::{color::AlphaColor, Color, ImageData};
 use vello::wgpu;
 use vello::{AaConfig, AaSupport, RenderParams, RendererOptions, Scene};
 
-use crate::display_list::{DisplayList, Rgba};
-use crate::groups::{is_cache_clip, Plan};
+use crate::display_list::{Cover, DisplayList, Item, Rgba};
+use crate::groups::Plan;
 use crate::filter_passes::{layer_texture, FilterPasses, WgpuRunner};
 use crate::layers::{prepare, Surface};
 use crate::pictures::Pictures;
@@ -23,7 +23,30 @@ struct Gpu<'a> {
     runner: WgpuRunner<'a>,
     width: u32,
     height: u32,
-    pictures: &'a Pictures,
+    drawn: Vec<ImageData>,
+}
+
+fn clips(items: &[Item]) -> Vec<&str> {
+    items
+        .iter()
+        .flat_map(|item| {
+            let own = match item {
+                Item::Image(i) => vec![i.clip.as_str()],
+                _ => vec![],
+            };
+            let look = item.look();
+            let covers = look.and_then(|l| l.masks.as_ref()).into_iter().flatten().filter_map(|m| match &m.cover {
+                Cover::Picture { src, .. } => Some(src.as_str()),
+                _ => None,
+            });
+            let matte = look.and_then(|l| l.matte.as_ref()).map(|m| clips(&m.items)).unwrap_or_default();
+            own.into_iter().chain(covers).chain(matte).collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+fn drawn(list: &DisplayList, pictures: &Pictures) -> Vec<ImageData> {
+    clips(&list.items).into_iter().filter_map(|c| pictures.get(c).cloned()).collect()
 }
 
 fn base(colour: Option<Rgba>) -> Color {
@@ -32,10 +55,8 @@ fn base(colour: Option<Rgba>) -> Color {
 
 impl Gpu<'_> {
     fn render(&mut self, scene: &Scene, base: Color, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
-        for (clip, image) in self.pictures {
-            if !is_cache_clip(clip) {
-                self.vello.mark_override_image_dirty(image);
-            }
+        for image in &self.drawn {
+            self.vello.mark_override_image_dirty(image);
         }
         let params = RenderParams { base_color: base, width, height, antialiasing_method: AaConfig::Area };
         self.vello.render_to_texture(self.runner.device, self.runner.queue, scene, target, &params)
@@ -78,7 +99,7 @@ impl Engine {
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
-        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, pictures };
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, drawn: drawn(list, pictures) };
         let layers = prepare(&mut gpu, list, pictures)?;
         let (scene, skipped) = build(list, pictures, &layers);
         let drawn = gpu.render(&scene, base(list.background), target, (list.width, list.height));
