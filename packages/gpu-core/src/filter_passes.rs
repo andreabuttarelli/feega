@@ -289,6 +289,143 @@ fn run(xy: vec2<i32>) -> vec4<f32> {
 }
 "#;
 
+const LENS: &str = r#"
+const FLAT: f32 = 0.55;
+const DEPTH: f32 = 0.55;
+const TAU: f32 = 6.2831853;
+const KEY: vec3<f32> = vec3<f32>(-0.42, -0.58, 0.70);
+const FILL: vec3<f32> = vec3<f32>(0.78, 0.18, 0.60);
+const FROST_TAPS: i32 = 12;
+
+fn ss(e0: f32, e1: f32, x: f32) -> f32 { let t = clamp((x - e0) / (e1 - e0), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+fn middle() -> vec2<f32> { return vec2<f32>(p[0], p[1]); }
+fn drop_at(i: u32) -> vec3<f32> { return vec3<f32>(p[2u + i * 3u], p[3u + i * 3u], p[4u + i * 3u]); }
+fn tint() -> vec3<f32> { return vec3<f32>(p[28], p[29], p[30]); }
+
+fn smin(x: f32, y: f32, k: f32) -> f32 {
+  let h = max(k - abs(x - y), 0.0) / k;
+  return min(x, y) - h * h * k * 0.25;
+}
+
+fn ripple(q: vec3<f32>) -> f32 {
+  let t = p[20] * p[19] * TAU;
+  let s = p[21];
+  return sin(q.x * 2.3 + t + s) * sin(q.y * 1.9 - t * 0.83 + s * 1.37)
+    + 0.55 * sin((q.x - q.y) * 3.1 + t * 1.61 + s * 2.11)
+    + 0.3 * sin(q.z * 4.0 + q.x * 2.7 - t * 2.27 + s * 0.71);
+}
+
+fn field(at: vec3<f32>) -> f32 {
+  let c0 = middle();
+  let rel = at.xy - c0;
+  let q = c0 + vec2<f32>(p[14] * rel.x + p[15] * rel.y, p[15] * rel.x + p[16] * rel.y);
+  var d = 1e5;
+  for (var i = 0u; i < 4u; i++) {
+    let c = drop_at(i);
+    if (c.z < 0.5) { continue; }
+    d = smin(d, length(vec3<f32>(q - c.xy, at.z / FLAT)) - c.z, p[17]);
+  }
+  return d + p[18] * ripple(vec3<f32>(q - c0, at.z) / drop_at(0u).z);
+}
+
+fn flat_field(at: vec2<f32>) -> f32 { return field(vec3<f32>(at, 0.0)); }
+
+fn sampled(q: vec2<f32>) -> vec3<f32> { return straight(bilinear(a, q)).rgb; }
+
+fn content(q: vec2<f32>) -> vec3<f32> {
+  if (p[24] < 0.5) { return sampled(q); }
+  var sum = vec3<f32>(0.0);
+  for (var i = 0; i < FROST_TAPS; i++) {
+    let turn = f32(i) * 2.39996;
+    let r = sqrt((f32(i) + 0.5) / f32(FROST_TAPS)) * p[24];
+    sum += sampled(q + vec2<f32>(cos(turn), sin(turn)) * r);
+  }
+  return sum / f32(FROST_TAPS);
+}
+
+fn env(r: vec3<f32>) -> vec3<f32> {
+  var c = mix(vec3<f32>(0.025, 0.03, 0.04), vec3<f32>(0.15, 0.16, 0.19), ss(-0.1, 0.9, r.z));
+  c += vec3<f32>(1.0) * ss(0.90, 0.985, dot(r, normalize(KEY))) * 1.7;
+  c += vec3<f32>(0.75, 0.85, 1.0) * ss(0.955, 0.995, dot(r, normalize(FILL))) * 0.9;
+  c += vec3<f32>(0.55) * pow(max(1.0 - abs(r.z), 0.0), 10.0) * 0.3;
+  return c;
+}
+
+fn bent(at: vec2<f32>, n: vec3<f32>, zs: f32, eta: f32, depth: f32) -> vec2<f32> {
+  let inner = refract(vec3<f32>(0.0, 0.0, -1.0), n, eta);
+  let off = inner.xy * zs / max(-inner.z, 0.12);
+  let leaving = refract(inner, vec3<f32>(0.0, 0.0, 1.0), 1.0 / eta);
+  if (dot(leaving, leaving) < 1e-4) { return vec2<f32>(1e5); }
+  return at + off + leaving.xy * depth / max(-leaving.z, 0.12);
+}
+
+fn seen_at(at: vec2<f32>, n: vec3<f32>) -> vec3<f32> {
+  if (at.x > 9e4) { return env(reflect(vec3<f32>(0.0, 0.0, -1.0), n)) * 0.35; }
+  return content(at);
+}
+
+fn under(at: vec2<f32>, r0: f32) -> vec4<f32> {
+  let o = vec2<f32>(0.10, 0.22) * r0;
+  let fs = flat_field(at - o);
+  let shade = 0.7 * (1.0 - ss(-0.35 * r0, 0.5 * r0, fs));
+  let focus = ss(0.0, -0.4 * r0, flat_field(at - o * 1.35) + 0.42 * r0);
+  let light = mix(vec3<f32>(1.0), tint(), 0.5) * focus * 0.55;
+  return vec4<f32>(light, shade);
+}
+
+fn grain(at: vec2<f32>) -> f32 { return fract(sin(dot(floor(at), vec2<f32>(12.9898, 78.233))) * 43758.5453) - 0.5; }
+
+fn boxed(at: vec2<f32>) -> bool {
+  let lo = vec2<f32>(max(floor(p[31]), 0.0), max(floor(p[32]), 0.0));
+  let hi = vec2<f32>(ceil(p[31] + p[33]), ceil(p[32] + p[34]));
+  return at.x >= lo.x && at.y >= lo.y && at.x < hi.x && at.y < hi.y;
+}
+
+fn run(xy: vec2<i32>) -> vec4<f32> {
+  let at = centre(xy);
+  let presence = p[27];
+  if (presence <= 0.0 || !boxed(at)) { return vec4<f32>(0.0); }
+  let r0 = drop_at(0u).z;
+  let f0 = flat_field(at);
+  let below = under(at, r0);
+  if (f0 > 1.0) { return below * presence; }
+  var lo = 0.0;
+  var hi = r0 * FLAT * 2.2 + p[18] * 2.0;
+  for (var i = 0; i < 16; i++) {
+    let mid = 0.5 * (lo + hi);
+    if (field(vec3<f32>(at, mid)) < 0.0) { lo = mid; } else { hi = mid; }
+  }
+  let s = vec3<f32>(at, lo);
+  let e = vec3<f32>(1.0, 0.0, 0.0);
+  let n = normalize(vec3<f32>(field(s + e.xyy) - field(s - e.xyy), field(s + e.yxy) - field(s - e.yxy), field(s + e.yyx) - field(s - e.yyx)));
+  let depth = DEPTH * r0;
+  let ior = p[22];
+  let disp = p[23];
+  var seen = vec3<f32>(
+    seen_at(bent(at, n, lo, 1.0 / max(ior - disp, 1.0001), depth), n).r,
+    seen_at(bent(at, n, lo, 1.0 / ior, depth), n).g,
+    seen_at(bent(at, n, lo, 1.0 / (ior + disp), depth), n).b
+  );
+  let tinted = tint();
+  let amount = p[26];
+  seen = mix(seen, seen * tinted, amount) + tinted * amount * 0.05;
+  let f0r = pow((ior - 1.0) / (ior + 1.0), 2.0);
+  let fresnel = f0r + (1.0 - f0r) * pow(1.0 - max(n.z, 0.0), 5.0);
+  let view = vec3<f32>(0.0, 0.0, 1.0);
+  let key = normalize(KEY);
+  let fill = normalize(FILL);
+  let refl = p[25];
+  let spec = pow(max(dot(n, normalize(key + view)), 0.0), 900.0) * 3.2 + pow(max(dot(n, normalize(key + view)), 0.0), 70.0) * 0.12 + pow(max(dot(n, normalize(fill + view)), 0.0), 500.0) * 1.1;
+  let side = select(vec2<f32>(0.0), normalize(n.xy), length(n.xy) > 1e-4);
+  let edge = ss(2.6, 0.0, -f0);
+  let rim = edge * 1.2 * (0.3 + 0.7 * max(dot(side, normalize(key.xy)), 0.0));
+  let glow = ss(0.38 * r0, 0.0, -f0) * max(dot(side, -normalize(key.xy)), 0.0) * 0.22;
+  let glass = seen * (1.0 - fresnel * refl) + env(reflect(-view, n)) * fresnel * refl + (spec + rim) * refl + mix(vec3<f32>(1.0), tinted, 0.6) * glow + grain(at) * 0.03;
+  let cover = clamp(0.5 - f0, 0.0, 1.0);
+  return (vec4<f32>(glass, 1.0) * cover + below * (1.0 - cover)) * presence;
+}
+"#;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Op {
     Matrix,
@@ -304,9 +441,10 @@ pub enum Op {
     Blur,
     Blend,
     Fold,
+    Lens,
 }
 
-const SOURCES: [(Op, &str); 13] = [
+const SOURCES: [(Op, &str); 14] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -320,6 +458,7 @@ const SOURCES: [(Op, &str); 13] = [
     (Op::Blur, BLUR),
     (Op::Blend, BLEND),
     (Op::Fold, FOLD),
+    (Op::Lens, LENS),
 ];
 
 pub struct FilterPasses {

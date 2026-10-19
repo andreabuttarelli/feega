@@ -3,7 +3,7 @@ import { chromium, devices, webkit, type Browser, type BrowserContextOptions, ty
 import heavy from '../../tests/e2e/fixtures/heavy-canvas-landings.json' with { type: 'json' };
 
 const BASE = process.env.BENCH_BASE_URL ?? 'http://localhost:5199';
-const SETTLE_MS = 12_000;
+const SETTLE_MS = Number(process.env.BENCH_SETTLE_MS ?? 12_000);
 const FULL_PAINT_TIMEOUT_MS = 60_000;
 const PAN_MS = 4000;
 const PAN_STEP = 40;

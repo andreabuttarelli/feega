@@ -28,6 +28,9 @@ async function zoomOnto(page: Page, nodeId: string, steps: number) {
   }
 }
 
+const LEGEND = `document.querySelectorAll('[data-testid=gpu-node]').forEach((n) => { const r = n.getBoundingClientRect(); const d = document.createElement('div'); d.className = 'parity-legend'; d.style.cssText = 'position:fixed;pointer-events:none;z-index:99999;box-sizing:border-box;border:2px solid ' + (n.dataset.core ? '#00c853' : '#ff1744') + ';left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px'; document.body.appendChild(d); })`;
+const UNLEGEND = `document.querySelectorAll('.parity-legend').forEach((d) => d.remove())`;
+
 type Shot = { name: string; file: string };
 
 async function shots(renderer: string): Promise<Shot[]> {
@@ -41,6 +44,10 @@ async function shots(renderer: string): Promise<Shot[]> {
     await page.waitForTimeout(STEP_MS);
     const file = `${OUT}/parity-${name}-${renderer || 'gpu'}.png`;
     const full = await page.screenshot({ timeout: 120_000 });
+    await page.evaluate(LEGEND);
+    const legend = await page.screenshot({ timeout: 120_000 });
+    await page.evaluate(UNLEGEND);
+    await sharp(legend).extract({ left: CANVAS_AREA.x, top: CANVAS_AREA.y, width: CANVAS_AREA.width, height: CANVAS_AREA.height }).toFile(file.replace('.png', '-legend.png'));
     await sharp(full).extract({ left: CANVAS_AREA.x, top: CANVAS_AREA.y, width: CANVAS_AREA.width, height: CANVAS_AREA.height }).toFile(file);
     taken.push({ name, file });
   };
@@ -48,7 +55,7 @@ async function shots(renderer: string): Promise<Shot[]> {
   await page.getByRole('button', { name: 'Reject all' }).click({ timeout: 8000 }).catch(() => undefined);
   await page.waitForTimeout(SETTLE_MS);
   await take('fit');
-  for (const landing of heavy.landings) {
+  for (const landing of (process.env.PARITY_NODES ? process.env.PARITY_NODES.split(',').map((id) => ({ key: id.slice(0, 8), desktop: { nodeId: id } })) : heavy.landings)) {
     for (const steps of ZOOMS_IN) {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90_000 });
       await page.waitForTimeout(SETTLE_MS / 2);

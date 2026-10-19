@@ -1,6 +1,6 @@
 import { isNodeType } from '../node-data';
 
-export type ClaimTile = { id: string; kind?: string; rotation?: number };
+export type ClaimTile = { id: string; kind?: string };
 
 export type CoreState = { on: boolean; refused: ReadonlySet<string>; dom: ReadonlySet<string> };
 
@@ -13,5 +13,5 @@ export function claimedByCore(t: ClaimTile, s: CoreState): boolean {
   if (t.kind === FRAME) {
     return !s.refused.has(t.id);
   }
-  return isNodeType(t.kind) && !t.rotation && !s.dom.has(t.id);
+  return isNodeType(t.kind) && !s.dom.has(t.id);
 }

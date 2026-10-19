@@ -3,7 +3,7 @@
 #953 dropped a poster after the core had drawn its node; until then Pixi had already fetched,
 decoded and uploaded it, the html-to-image queue still captured core cards, and stored previews
 were still uploaded. Now `claimedByCore` decides it up front: with the core on, every
-unrotated, non-DOM node card and every frame the core has not refused belongs to the core from
+non-DOM node card and every frame the core has not refused belongs to the core from
 the first frame. Pixi gets a hidden blank face for it; snapshot preload, capture, upload and the
 poster shelf skip it; the reveal waits for the core to have drawn it. `CoreFrames` reports
 refused frames (source failed, partial list); frames with no head revision are refused too, so

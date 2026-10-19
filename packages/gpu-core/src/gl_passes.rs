@@ -278,7 +278,143 @@ vec4 run(ivec2 xy) {
 const FLIP: &str = "
 vec4 run(ivec2 xy) { return texelFetch(a, ivec2(xy.x, textureSize(a, 0).y - 1 - xy.y), 0); }";
 
-const SOURCES: [(Op, &str); 13] = [
+const LENS: &str = "
+const float FLAT = 0.55;
+const float DEPTH = 0.55;
+const float TAU = 6.2831853;
+const vec3 KEY = vec3(-0.42, -0.58, 0.70);
+const vec3 FILL = vec3(0.78, 0.18, 0.60);
+const int FROST_TAPS = 12;
+
+float ss(float e0, float e1, float x) { float t = clamp((x - e0) / (e1 - e0), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+vec2 middle() { return vec2(p(0), p(1)); }
+vec3 dropAt(int i) { return vec3(p(2 + i * 3), p(3 + i * 3), p(4 + i * 3)); }
+vec3 tint() { return vec3(p(28), p(29), p(30)); }
+
+float smin(float x, float y, float k) {
+  float h = max(k - abs(x - y), 0.0) / k;
+  return min(x, y) - h * h * k * 0.25;
+}
+
+float ripple(vec3 q) {
+  float t = p(20) * p(19) * TAU;
+  float s = p(21);
+  return sin(q.x * 2.3 + t + s) * sin(q.y * 1.9 - t * 0.83 + s * 1.37)
+    + 0.55 * sin((q.x - q.y) * 3.1 + t * 1.61 + s * 2.11)
+    + 0.3 * sin(q.z * 4.0 + q.x * 2.7 - t * 2.27 + s * 0.71);
+}
+
+float field(vec3 at) {
+  vec2 c0 = middle();
+  vec2 rel = at.xy - c0;
+  vec2 q = c0 + vec2(p(14) * rel.x + p(15) * rel.y, p(15) * rel.x + p(16) * rel.y);
+  float d = 1e5;
+  for (int i = 0; i < 4; i++) {
+    vec3 c = dropAt(i);
+    if (c.z < 0.5) { continue; }
+    d = smin(d, length(vec3(q - c.xy, at.z / FLAT)) - c.z, p(17));
+  }
+  return d + p(18) * ripple(vec3(q - c0, at.z) / dropAt(0).z);
+}
+
+float flatField(vec2 at) { return field(vec3(at, 0.0)); }
+
+vec3 sampled(vec2 q) { return straight(bilinear(a, q)).rgb; }
+
+vec3 content(vec2 q) {
+  if (p(24) < 0.5) { return sampled(q); }
+  vec3 sum = vec3(0.0);
+  for (int i = 0; i < FROST_TAPS; i++) {
+    float turn = float(i) * 2.39996;
+    float r = sqrt((float(i) + 0.5) / float(FROST_TAPS)) * p(24);
+    sum += sampled(q + vec2(cos(turn), sin(turn)) * r);
+  }
+  return sum / float(FROST_TAPS);
+}
+
+vec3 env(vec3 r) {
+  vec3 c = mix(vec3(0.025, 0.03, 0.04), vec3(0.15, 0.16, 0.19), ss(-0.1, 0.9, r.z));
+  c += vec3(1.0) * ss(0.90, 0.985, dot(r, normalize(KEY))) * 1.7;
+  c += vec3(0.75, 0.85, 1.0) * ss(0.955, 0.995, dot(r, normalize(FILL))) * 0.9;
+  c += vec3(0.55) * pow(max(1.0 - abs(r.z), 0.0), 10.0) * 0.3;
+  return c;
+}
+
+vec2 bent(vec2 at, vec3 n, float zs, float eta, float depth) {
+  vec3 inner = refract(vec3(0.0, 0.0, -1.0), n, eta);
+  vec2 off = inner.xy * zs / max(-inner.z, 0.12);
+  vec3 leaving = refract(inner, vec3(0.0, 0.0, 1.0), 1.0 / eta);
+  if (dot(leaving, leaving) < 1e-4) { return vec2(1e5); }
+  return at + off + leaving.xy * depth / max(-leaving.z, 0.12);
+}
+
+vec3 seenAt(vec2 at, vec3 n) {
+  if (at.x > 9e4) { return env(reflect(vec3(0.0, 0.0, -1.0), n)) * 0.35; }
+  return content(at);
+}
+
+vec4 under(vec2 at, float r0) {
+  vec2 o = vec2(0.10, 0.22) * r0;
+  float fs = flatField(at - o);
+  float shade = 0.7 * (1.0 - ss(-0.35 * r0, 0.5 * r0, fs));
+  float focus = ss(0.0, -0.4 * r0, flatField(at - o * 1.35) + 0.42 * r0);
+  vec3 light = mix(vec3(1.0), tint(), 0.5) * focus * 0.55;
+  return vec4(light, shade);
+}
+
+float grain(vec2 at) { return fract(sin(dot(floor(at), vec2(12.9898, 78.233))) * 43758.5453) - 0.5; }
+
+bool boxed(vec2 at) {
+  vec2 lo = vec2(max(floor(p(31)), 0.0), max(floor(p(32)), 0.0));
+  vec2 hi = vec2(ceil(p(31) + p(33)), ceil(p(32) + p(34)));
+  return at.x >= lo.x && at.y >= lo.y && at.x < hi.x && at.y < hi.y;
+}
+
+vec4 run(ivec2 xy) {
+  vec2 at = centre(xy);
+  float presence = p(27);
+  if (presence <= 0.0 || !boxed(at)) { return vec4(0.0); }
+  float r0 = dropAt(0).z;
+  float f0 = flatField(at);
+  vec4 below = under(at, r0);
+  if (f0 > 1.0) { return below * presence; }
+  float lo = 0.0;
+  float hi = r0 * FLAT * 2.2 + p(18) * 2.0;
+  for (int i = 0; i < 16; i++) {
+    float mid = 0.5 * (lo + hi);
+    if (field(vec3(at, mid)) < 0.0) { lo = mid; } else { hi = mid; }
+  }
+  vec3 s = vec3(at, lo);
+  vec3 e = vec3(1.0, 0.0, 0.0);
+  vec3 n = normalize(vec3(field(s + e.xyy) - field(s - e.xyy), field(s + e.yxy) - field(s - e.yxy), field(s + e.yyx) - field(s - e.yyx)));
+  float depth = DEPTH * r0;
+  float ior = p(22);
+  float disp = p(23);
+  vec3 seen = vec3(
+    seenAt(bent(at, n, lo, 1.0 / max(ior - disp, 1.0001), depth), n).r,
+    seenAt(bent(at, n, lo, 1.0 / ior, depth), n).g,
+    seenAt(bent(at, n, lo, 1.0 / (ior + disp), depth), n).b
+  );
+  vec3 tinted = tint();
+  float amount = p(26);
+  seen = mix(seen, seen * tinted, amount) + tinted * amount * 0.05;
+  float f0r = pow((ior - 1.0) / (ior + 1.0), 2.0);
+  float fresnel = f0r + (1.0 - f0r) * pow(1.0 - max(n.z, 0.0), 5.0);
+  vec3 view = vec3(0.0, 0.0, 1.0);
+  vec3 key = normalize(KEY);
+  vec3 fill = normalize(FILL);
+  float refl = p(25);
+  float spec = pow(max(dot(n, normalize(key + view)), 0.0), 900.0) * 3.2 + pow(max(dot(n, normalize(key + view)), 0.0), 70.0) * 0.12 + pow(max(dot(n, normalize(fill + view)), 0.0), 500.0) * 1.1;
+  vec2 side = length(n.xy) > 1e-4 ? normalize(n.xy) : vec2(0.0);
+  float edge = ss(2.6, 0.0, -f0);
+  float rim = edge * 1.2 * (0.3 + 0.7 * max(dot(side, normalize(key.xy)), 0.0));
+  float glow = ss(0.38 * r0, 0.0, -f0) * max(dot(side, -normalize(key.xy)), 0.0) * 0.22;
+  vec3 glass = seen * (1.0 - fresnel * refl) + env(reflect(-view, n)) * fresnel * refl + (spec + rim) * refl + mix(vec3(1.0), tinted, 0.6) * glow + grain(at) * 0.03;
+  float cover = clamp(0.5 - f0, 0.0, 1.0);
+  return (vec4(glass, 1.0) * cover + below * (1.0 - cover)) * presence;
+}";
+
+const SOURCES: [(Op, &str); 14] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -292,6 +428,7 @@ const SOURCES: [(Op, &str); 13] = [
     (Op::Blur, BLUR),
     (Op::Blend, BLEND),
     (Op::Fold, FOLD),
+    (Op::Lens, LENS),
 ];
 
 pub struct GlTex {

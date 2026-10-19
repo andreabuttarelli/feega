@@ -45,6 +45,10 @@ impl Renderer {
         self.library.put_font(key, source);
     }
 
+    pub fn has_font(&self, key: &str) -> bool {
+        self.library.has_font(key)
+    }
+
     pub fn render(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<Rendered, RenderError> {
         let (list, missing) = self.library.resolve(list);
         let list = &list;

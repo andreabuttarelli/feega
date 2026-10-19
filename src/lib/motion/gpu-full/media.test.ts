@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FEEGA_TOKENS } from '../brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import { addClip, type OpResult } from '../timeline';
 import { drawFrame, ItemKind, prepare, Unsupported, type ImageItem } from './display-list';
 import { imageRect } from './image-rect';
+import { createMedia, Readiness } from './media';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -41,6 +42,29 @@ describe('image items', () => {
     const doc = must(addClip(blank, { component: 'Logo', from: 0, durationInFrames: 30 }, 'logo'));
 
     expect(drawFrame(prepared(doc), 0).unsupported).toContainEqual({ clip: 'logo', component: 'Logo', reason: Unsupported.Text });
+  });
+});
+
+describe('createMedia', () => {
+  const picture = (src: string): ImageItem => ({ kind: ItemKind.Image, clip: src, src, video: false }) as ImageItem;
+  const list = (...srcs: string[]) => ({ width: 10, height: 10, background: null, items: srcs.map(picture), unsupported: [] });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('says a list is partial when one of its pictures never loads, so its caller can keep what it shows', async () => {
+    vi.stubGlobal(
+      'Image',
+      class {
+        src = '';
+        naturalWidth = 4;
+        naturalHeight = 4;
+        decode = () => (this.src.includes('gone') ? Promise.reject(new Error('404')) : Promise.resolve());
+      }
+    );
+    const media = createMedia();
+
+    expect(await media.ready(list('/ok.png'))).toBe(Readiness.Whole);
+    expect(await media.ready(list('/ok.png', '/gone.png'))).toBe(Readiness.Partial);
   });
 });
 

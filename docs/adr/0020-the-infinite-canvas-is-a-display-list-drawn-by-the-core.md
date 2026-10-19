@@ -58,7 +58,7 @@ input: pointer/wheel/keys in TS ─► hit-test in TS on the same boxes ─► c
 ### Today on `?renderer=core` (19/10/2026)
 
 `claimedByCore` (`src/lib/canvas/gpu/core-claim.ts`) is the one rule: with the core on, every
-unrotated, non-DOM node card and every frame the core has not refused is the core's from the
+non-DOM node card and every frame the core has not refused is the core's from the
 first frame. Pixi gets a blank hidden face for it (no poster, thumbs, text, snapshot or chrome),
 the snapshot preload, html-to-image queue, stored-preview upload and poster shelf skip it, and
 the reveal waits on the core having drawn it. A frame is refused (back to Pixi's poster) when
@@ -69,7 +69,7 @@ its source fails, it has no head revision, or its list has parts the core cannot
 | Step | Gate | Removes |
 |---|---|---|
 | A | partial frames on the heavy copy → 0 (today 32/57 Chrome, 24/36 iPhone): every doc part drawn by `drawFrame` | Pixi frame posters, poster shelf, `poster-lod` on canvas |
-| B | rotated cards in the core (box matrix, hit-test already in TS) | Pixi card faces |
+| B | cards over the core texture budget (`resident`) drawn or paged by the core, not left blank | Pixi card faces |
 | C | DOM-handed tiles stay DOM, but their resting picture is the core's | snapshot queue/cache, `card-previews` route, bucket folder, `canvas-page` preview load, html-to-image in `GpuFlow` |
 | D | chrome, wires, marquee, guides, selection, peers in the core (#952, #954) | `chrome-layer.ts`, Pixi overlay |
 | E | `Renderer.Core` default in `renderer-flag.ts`; parity bench (`canvas-core-parity.ts`) ≤ 1% pixels off; this bench no worse on Chrome and iPhone | `?renderer=gpu` path |

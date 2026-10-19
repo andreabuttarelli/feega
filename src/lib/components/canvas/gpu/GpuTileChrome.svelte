@@ -8,7 +8,7 @@
   import { tileHovered } from '$lib/canvas/layers';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
 
-  let { tile, selected, full, resizable = false, onrotate }: { tile: Tile; selected: boolean; full: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void } = $props();
+  let { tile, selected, full, painted = false, resizable = false, onrotate, knobDrawn = false }: { tile: Tile; selected: boolean; full: boolean; painted?: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void; knobDrawn?: boolean } = $props();
 
   const CORNERS = ['top left', 'top right', 'bottom left', 'bottom right'] as const;
 
@@ -39,7 +39,7 @@
   }
 </script>
 
-{#if full && label && Icon}
+{#if full && label && Icon && !painted}
   <div class="node-label" class:is-chosen={chrome.ring === NodeChrome.Selected}>
     <Icon size={12} strokeWidth={1.8} />
     <span>{label}</span>
@@ -49,15 +49,16 @@
   </div>
 {/if}
 
-{#if !selected && tileHovered(layersSource.hovered, tile.id, layersSource.video?.nodeId ?? null)}
+{#if !painted && !selected && tileHovered(layersSource.hovered, tile.id, layersSource.video?.nodeId ?? null)}
   <div class="tile-hover" data-testid="tile-hover" aria-hidden="true"></div>
 {/if}
 
-{#if chrome.ring !== NodeChrome.None}
+{#if chrome.ring !== NodeChrome.None && !painted}
   <div class={`tile-selection ring-${chrome.ring}`} data-testid="tile-selection" data-ring={chrome.ring} style={`outline-color:${ringColor}`} aria-hidden="true"></div>
 {/if}
 
 {#if full}
+<div class="port-layer" class:painted>
 {#each ports as connector, i (connector)}
   <div class="svelte-flow__handle typed-port port-in target" data-handleid={connector} data-nodeid={tile.id} style={`top:${spaced(i, ports.length)};--port:${CONNECTOR_STYLE[connector].color}`} title={CONNECTOR_STYLE[connector].label} aria-label={CONNECTOR_STYLE[connector].label}></div>
   <span class="port-name port-name-in" style={`top:${spaced(i, ports.length)};--port:${CONNECTOR_STYLE[connector].color}`}>{CONNECTOR_STYLE[connector].label}</span>
@@ -72,20 +73,27 @@
   <div class="svelte-flow__handle typed-port port-out source" data-handleid={out.handle} data-nodeid={tile.id} style={`top:${spaced(i, outputs.length)};--port:${CONNECTOR_STYLE[out.port].color}`} title={out.label} aria-label={out.label}></div>
   <span class={`port-name port-name-out ${out.incompatible ? 'port-name-flagged' : ''}`} style={`top:${spaced(i, outputs.length)};--port:${CONNECTOR_STYLE[out.port].color}`}>{out.label}</span>
 {/each}
-
+</div>
 {/if}
 
 {#if resizable && chrome.handles}
   {#each CORNERS as corner (corner)}
-    <div class={`svelte-flow__resize-control handle ${corner}`} style={`border-color:${ringColor}`}></div>
+    <div class={`svelte-flow__resize-control handle ${corner}`} class:painted style={`border-color:${ringColor}`}></div>
   {/each}
 {/if}
 
 {#if selected && tile.rotatable && onrotate}
-  <button type="button" class="rotate-handle nodrag nopan" aria-label="Rotate" data-testid="rotate-handle" onpointerdown={startRotate}></button>
+  <button type="button" class="rotate-handle nodrag nopan" class:drawn={knobDrawn} aria-label="Rotate" data-testid="rotate-handle" onpointerdown={startRotate}></button>
 {/if}
 
 <style>
+  .port-layer {
+    display: contents;
+  }
+  .port-layer.painted > :global(*),
+  .painted.handle {
+    opacity: 0 !important;
+  }
   .tile-hover {
     position: absolute;
     inset: 0;
@@ -215,5 +223,9 @@
     background: var(--ui-panel-raised, #fff);
     cursor: grab;
     z-index: 5;
+  }
+
+  .rotate-handle.drawn {
+    opacity: 0;
   }
 </style>

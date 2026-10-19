@@ -2,6 +2,7 @@
 import UIKit
 import AuthenticationServices
 import Capacitor
+import FeegaCore
 
 public final class FeegaAppleSignInPlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     public let identifier = "FeegaAppleSignInPlugin"
@@ -27,16 +28,19 @@ public final class FeegaAppleSignInPlugin: CAPPlugin, CAPBridgedPlugin, ASAuthor
     }
 
     public func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
-        guard
-            let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-            let token = credential.identityToken.flatMap({ String(data: $0, encoding: .utf8) })
-        else {
+        let credential = authorization.credential as? ASAuthorizationAppleIDCredential
+        let identity = AppleIdentity(
+            token: credential?.identityToken,
+            code: credential?.authorizationCode,
+            givenName: credential?.fullName?.givenName,
+            familyName: credential?.fullName?.familyName
+        )
+        guard let identity else {
             pending?.reject("no_identity_token")
+            pending = nil
             return
         }
-        let code = credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-        let name = [credential.fullName?.givenName, credential.fullName?.familyName].compactMap { $0 }.joined(separator: " ")
-        pending?.resolve(["identityToken": token, "authorizationCode": code, "fullName": name])
+        pending?.resolve(identity.payload)
         pending = nil
     }
 

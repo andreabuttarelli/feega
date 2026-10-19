@@ -25,8 +25,13 @@
   import CoreFrames from './CoreFrames.svelte';
   import { cardKey, cardOnCanvas, portMarks, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
-  import { NodeChrome } from '$lib/canvas/selection-chrome';
+  import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
+  import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { tileHovered } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
+  import { overlayOf } from '$lib/canvas/core/world-overlay';
+  import { peerOutlines } from '$lib/canvas/peer-outlines';
+  import { displayName } from '$lib/realtime/frame-presence';
   import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
@@ -76,7 +81,9 @@
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
   import { claimedByCore } from '$lib/canvas/gpu/core-claim';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
-  import { GpuScene, themeOf, type Card } from '$lib/canvas/gpu/scene';
+  import { Fling, type Glide } from '$lib/canvas/core/inertia';
+  import { FramePacer } from '$lib/canvas/core/frame-pacer';
+  import { GpuScene, GridPlace, themeOf, type Card } from '$lib/canvas/gpu/scene';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { Counter, count, exposeLoss, exposeReveal, exposeSettled, recordFrame } from '$lib/canvas/gpu/frame-stats';
@@ -222,20 +229,25 @@
       return [];
     }
     const theme = { ...look, panel: look.paper };
-    return placed.filter(drawsCard).map((t) => {
-      const idle = !chromeIds.has(t.id);
+    return placed.filter(drawsCard).flatMap((t) => {
+      const on = selected.includes(t.id);
+      const dom = chromeIds.has(t.id) && !on;
+      const chrome = dom ? { ring: NodeChrome.None, handles: false } : nodeChrome(t.id, on, layersSource.video);
+      const hovered = !on && !dom && tileHovered(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null);
       const card: CardTile = {
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
-        ring: NodeChrome.None,
-        handles: false,
-        hovered: false,
-        ...(idle ? portMarks(t) : { inputs: [], outputs: [] }),
-        label: idle ? labelOf(t) : null,
-        icon: idle ? (text.icons.get(t.kind as NodeType) ?? null) : null
+        ring: chrome.ring,
+        handles: resizable && on && chrome.handles,
+        hovered,
+        ...(dom ? { inputs: [], outputs: [] } : portMarks(t)),
+        label: dom ? null : labelOf(t),
+        icon: dom ? null : (text.icons.get(t.kind as NodeType) ?? null),
+        names: on
       };
-      return { key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold) };
+      const turn = t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined;
+      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold), turn }];
     });
   });
   const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
@@ -695,7 +707,7 @@
     scene?.setOverlay({
       selected: selectedBoxes,
       resizable,
-      marquee,
+      marquee: coreOn ? null : marquee,
       ghost: ghostCurve,
       ghostOk: ghost?.ok ?? false,
       hovered: hovered && !selected.includes(hovered) ? (byId.get(hovered) ?? null) : null,
@@ -705,6 +717,10 @@
 
   $effect(() => {
     scene?.setCamera(view);
+  });
+
+  $effect(() => {
+    scene?.placeGrid(coreOn ? GridPlace.UnderCore : GridPlace.Scene);
   });
 
   $effect(() => {
@@ -921,7 +937,31 @@
 
   const pointerOf = (e: PointerEvent) => (e.pointerType === 'touch' ? Pointer.Touch : e.pointerType === 'pen' ? Pointer.Pen : Pointer.Mouse);
 
+  const fling = new Fling();
+  let glide: Glide | null = null;
+  let glidedAt = 0;
+
+  function glideStep(t: number): boolean {
+    const d = glide?.step(glidedAt ? t - glidedAt : 0);
+    glidedAt = t;
+    if (!d) {
+      glide = null;
+      return false;
+    }
+    view = panBy(view, d);
+    return true;
+  }
+
+  const glider = new FramePacer(glideStep, (frame) => requestAnimationFrame(frame));
+
+  function startGlide() {
+    glide = fling.release(performance.now());
+    glidedAt = 0;
+    glider.invalidate();
+  }
+
   function onDown(e: PointerEvent) {
+    glide = null;
     markBusy();
     measureSurface();
     const p = local(e);
@@ -959,7 +999,11 @@
 
   function startGesture(kind: GestureKind, hit: Hit, w: Point, e: PointerEvent) {
     const START: Record<GestureKind, () => Active | null> = {
-      [GestureKind.Pan]: () => ({ kind: GestureKind.Pan, last: local(e), moved: false }),
+      [GestureKind.Pan]: () => {
+        fling.release(e.timeStamp);
+        fling.sample(local(e), e.timeStamp);
+        return { kind: GestureKind.Pan, last: local(e), moved: false };
+      },
       [GestureKind.Drag]: () => {
         if (hit.kind !== HitKind.Node) {
           return null;
@@ -1048,6 +1092,7 @@
         }
         props.onUserPan?.();
         view = panBy(view, { x: p.x - a.last.x, y: p.y - a.last.y });
+        fling.sample(p, e.timeStamp);
         a.last = p;
         a.moved ||= far;
         suppressMenu ||= far;
@@ -1140,6 +1185,9 @@
       [GestureKind.Pan]: () => {
         if (a.kind === GestureKind.Pan && !a.moved && e.button === 0) {
           clearSelection();
+        }
+        if (a.kind === GestureKind.Pan && a.moved && coreOn) {
+          startGlide();
         }
       },
       [GestureKind.Drag]: () => {
@@ -1258,6 +1306,7 @@
   }
 
   function onWheel(e: WheelEvent) {
+    glide = null;
     markBusy();
     props.onUserPan?.();
     const target = e.target as HTMLElement;
@@ -1281,6 +1330,25 @@
 
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
+  const corePeers = $derived(coreOn && coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
+  const coreRotate = $derived(coreOn && props.onRotate ? selectedBoxes.filter((t) => t.rotatable && !t.rotation).map((t) => ({ id: t.id, box: { x: t.x, y: t.y, w: t.w, h: t.h } })) : []);
+  const coreOverlay = $derived(
+    coreOn && coreLook && coreType
+      ? overlayOf({
+          curves,
+          selected,
+          selectedEdge,
+          marquee,
+          guides: snapGuides,
+          zoom: view.zoom,
+          theme: { ...coreLook, panel: coreLook.paper },
+          glyphs: coreType.glyphs,
+          peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
+          outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
+          rotate: coreRotate
+        })
+      : []
+  );
   let snapSpacing = $state<SpacingGap[]>([]);
   let altHeld = $state(false);
 
@@ -1667,10 +1735,10 @@
     data-owns-pinch
   >
     {#if coreOn && scene}
-      <CoreFrames frames={coreFrames} cards={coreCards} {view} {area} sourceUrl={coreSource} onready={coreReady} onfallback={(why) => { console.warn(`[canvas] core off: ${why}`); coreOn = false; coreDrawn = new Set(); coreRefused = new Set(); }} />
+      <CoreFrames frames={coreFrames} cards={coreCards} overlay={coreOverlay} {view} {area} sourceUrl={coreSource} onready={coreReady} onfallback={(why) => { console.warn(`[canvas] core off: ${why}`); coreOn = false; coreDrawn = new Set(); coreRefused = new Set(); }} />
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
-      <svg class="gpu-edges" aria-hidden="true">
+      <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
         {#each curves as c (c.edge.id)}
           <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} class:iterate={(c.edge.mode ?? 'fixed') === 'iterate'} class:linked={selected.includes(c.edge.source) || selected.includes(c.edge.target)} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
             <path class="svelte-flow__edge-path" d={`M${c.curve.from.x},${c.curve.from.y} C${c.curve.c1.x},${c.curve.c1.y} ${c.curve.c2.x},${c.curve.c2.y} ${c.curve.to.x},${c.curve.to.y}`} />
@@ -1699,10 +1767,11 @@
           data-testid="gpu-node"
           data-id={t.id}
           data-kind={t.kind}
+          data-core={coreDrawn.has(t.id) || undefined}
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} />
+          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} knobDrawn={coreRotate.some((r) => r.id === t.id)} />
           {@render props.tileOver?.({ id: t.id })}
           {#if !domIds.has(t.id) && t.kind === 'motion'}
             {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
@@ -1723,9 +1792,9 @@
           {/if}
         </div>
       {/each}
-      <PeerLayer peers={props.peers ?? []} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
+      <PeerLayer peers={corePeers.length ? (props.peers ?? []).filter((p) => p.chat) : (props.peers ?? [])} outlined={!corePeers.length} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
       {#if measured.length || snapGuides.length || snapSpacing.length}
-        <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={snapGuides} zoom={view.zoom} />
+        <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={coreOn ? [] : snapGuides} zoom={view.zoom} />
       {/if}
     </div>
   </div>
@@ -1934,6 +2003,10 @@
   .gpu-edges .iterate path {
     stroke: var(--ui-wire-iterate);
     stroke-dasharray: 6 4;
+  }
+
+  .gpu-edges.core {
+    visibility: hidden;
   }
 
   .wire-iterate-badge circle {

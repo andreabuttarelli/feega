@@ -5,18 +5,24 @@
   import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
   import { loadFonts } from '$lib/motion/gpu-full/text/load';
   import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
-  import { createMedia } from '$lib/motion/gpu-full/media';
-  import type { Viewport } from '$lib/canvas/dot-grid';
-  import { visibleIds } from '$lib/canvas/gpu/camera';
-  import { screenUses, type PutFrame } from '$lib/canvas/core/screen-uses';
-  import { drawsWhole, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { createMedia, Readiness } from '$lib/motion/gpu-full/media';
+  import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
+  import { ItemKind } from '$lib/motion/gpu-full/display-list';
+  import { SpatialIndex } from '$lib/canvas/core/spatial-index';
+  import { FramePacer } from '$lib/canvas/core/frame-pacer';
+  import { resident, type HeldFrame } from '$lib/canvas/core/residency';
+  import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
+  import { screenUses, type Turn } from '$lib/canvas/core/screen-uses';
+  import { throughCamera } from '$lib/canvas/core/world-overlay';
+  import type { PathItem } from '$lib/motion/gpu-full/display-list';
+  import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
 
-  type CoreCard = { key: string; frame: FrameOnCanvas };
+  type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
   type Source = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens };
 
-  let { frames, cards = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (drawn: Set<string>, refused: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, cards = [], overlay = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; overlay?: PathItem[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (drawn: Set<string>, refused: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const BACKENDS = [createCore, createCoreGl];
@@ -40,15 +46,17 @@
       return;
     }
     const source = (await res.json()) as Source;
-    const fonts = await loadFonts(source.doc, source.assets);
+    const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing: smoothingOf(navigator.userAgent) });
     const list = drawFrame(prepared, stillFrame(source.doc));
-    await media.ready(list);
-    lists = new Map(lists).set(keyOf(f), list);
+    if ((await media.ready(list)) === Readiness.Partial) {
+      return;
+    }
+    lists = new Map(lists).set(keyOf(f), onStage(list, f.kind));
   }
 
   $effect(() => {
-    const seen = visibleIds(frames.map((f) => ({ id: f.id, ...f.box })), view, area);
+    const seen = new SpatialIndex(frames.map((f) => ({ id: f.id, ...f.box }))).visible(view, area);
     for (const f of frames) {
       if (seen.has(f.id) && !asked.has(keyOf(f))) {
         asked.add(keyOf(f));
@@ -67,26 +75,34 @@
     for (const c of cards) {
       if (!cardLists.has(c.key) && !readying.has(c.key)) {
         readying.add(c.key);
-        void media.ready(c.frame.list).then(() => (cardLists = new Map(cardLists).set(c.key, c.frame.list)));
+        void media.ready(c.frame.list).then((readiness) => {
+          if (readiness === Readiness.Whole) {
+            cardLists = new Map(cardLists).set(c.key, c.frame.list);
+          }
+        });
       }
     }
   });
 
-  const cardPuts = $derived(cards.flatMap((c): PutFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height } }] : [])));
+  const imagesIn = (list: DisplayList) => list.items.filter((i) => i.kind === ItemKind.Image).length;
+
+  const cardPuts = $derived(cards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, images: imagesIn(c.frame.list), turn: c.turn }] : [])));
 
   const framePuts = $derived(
-    frames.flatMap((f): PutFrame[] => {
+    frames.flatMap((f): HeldFrame[] => {
       const list = lists.get(keyOf(f));
-      return list && drawsWhole(list) ? [{ id: f.id, group: keyOf(f), box: f.box, size: { width: list.width, height: list.height } }] : [];
+      return list && drawsWhole(list) ? [{ id: f.id, group: keyOf(f), box: f.box, size: { width: list.width, height: list.height }, images: imagesIn(list) }] : [];
     })
   );
 
   const whole = $derived([...cardPuts, ...framePuts]);
   const listOf = (group: string) => cardLists.get(group) ?? lists.get(group)!;
+  const textureBytes = BUDGET[currentDevice()].textureBytes;
+  const held = $derived(resident(whole, view, area, textureBytes));
 
   $effect(() => {
     const partial = frames.filter((f) => lists.has(keyOf(f)) && !drawsWhole(lists.get(keyOf(f))!)).map((f) => f.id);
-    onready(new Set(whole.map((f) => f.id)), new Set([...failed, ...partial]));
+    onready(new Set(held.map((f) => f.id)), new Set([...failed, ...partial]));
   });
 
   $effect(() => {
@@ -119,38 +135,38 @@
     };
   });
 
-  let pending = 0;
+  function paint(): boolean {
+    const into = raster;
+    if (!into) {
+      return false;
+    }
+    const shown = held;
+    const keep = new Set(shown.map((f) => f.group));
+    for (const group of [...put].filter((g) => !keep.has(g))) {
+      into.dropGroup(group);
+      put.delete(group);
+    }
+    for (const f of shown.filter((f) => !put.has(f.group))) {
+      into.putGroup(f.group, listOf(f.group), media.pictures);
+      put.add(f.group);
+    }
+    const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
+    const screen = screenUses(shown, at, { width: area.width * resolution, height: area.height * resolution }, null);
+    into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, media.pictures);
+    return false;
+  }
+
+  const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame));
 
   $effect(() => {
-    const into = raster;
-    const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
-    const shown = whole;
-    const size = { width: area.width * resolution, height: area.height * resolution };
-    cancelAnimationFrame(pending);
-    if (!into) {
-      return;
-    }
-    pending = requestAnimationFrame(() => {
-      for (const f of shown) {
-        if (!put.has(f.group)) {
-          into.putGroup(f.group, listOf(f.group), media.pictures);
-          put.add(f.group);
-        }
-      }
-      const live = new Set(cards.map((c) => c.key));
-      for (const key of cardLists.keys()) {
-        if (!live.has(key) && put.delete(key)) {
-          into.dropGroup(key);
-        }
-      }
-      into.drawScreen(screenUses(shown, at, size, null), media.pictures);
-    });
+    void [raster, held, overlay, view.x, view.y, view.zoom, area.width, area.height];
+    pacer.invalidate();
   });
 
   $effect(() => () => media.dispose());
 </script>
 
-<canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+<canvas class="core-frames" bind:this={canvas} style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
 
 <style>
   .core-frames {

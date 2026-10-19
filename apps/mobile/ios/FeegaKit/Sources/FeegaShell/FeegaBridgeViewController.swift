@@ -57,6 +57,9 @@ public final class FeegaBridgeViewController: CAPBridgeViewController, WKScriptM
         if ShellFlag.appleSignIn.isOn {
             bridge?.registerPluginInstance(FeegaAppleSignInPlugin())
         }
+        #if DEBUG
+        bridge?.registerPluginInstance(FeegaStoreKitPlugin())
+        #endif
         guard let webView else {
             return
         }

@@ -5,6 +5,11 @@ import WebKit
 enum DemoScript {
     static func install(in controller: WKUserContentController) {
         let env = ProcessInfo.processInfo.environment
+        if let session = env["FEEGA_DEMO_SESSION"] {
+            let source = sessionSource(session, path: env["FEEGA_DEMO_PATH"] ?? "")
+            controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            return
+        }
         guard let email = env["FEEGA_DEMO_EMAIL"], let password = env["FEEGA_DEMO_PASSWORD"] else {
             return
         }
@@ -32,6 +37,17 @@ enum DemoScript {
         })();
         """
         controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+    }
+
+    private static func sessionSource(_ session: String, path: String) -> String {
+        """
+        (() => {
+          const stored = \(session);
+          if (!localStorage.getItem(stored.key)) localStorage.setItem(stored.key, JSON.stringify(stored.value));
+          const path = \(json(["path": path])).path;
+          if (path && location.pathname !== path) location.replace(path);
+        })();
+        """
     }
 
     private static func json(_ values: [String: String]) -> String {

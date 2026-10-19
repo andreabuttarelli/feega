@@ -16,8 +16,9 @@ import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, fi
 import { StrokeAlign, strokesOf, type Stroke } from '../stroke/model';
 import { Cap, Join, dashes, strokePolygons } from './stroke';
 import { shapeLayers, type ShapeLook } from '../shape/render';
+import { lookAt } from '../hyperframes/shapes';
 import { modifierFilter } from '../shape/modifiers';
-import { ShapeKind, modifierValues } from '../shape/schema';
+import { ShapeKind, modifierOfKey, modifierValues } from '../shape/schema';
 import { flatten, rectOutline, type Outline } from '../shape/geometry';
 import { rgbaOf, type Rgba } from './rgba';
 import { FillRule, PaintKind, type Paint, type Stop } from './paint';
@@ -28,15 +29,20 @@ import { stillSeconds } from '../still';
 import { animatorOfKey, COLOR_VALUE, SELECTOR_KEYS, type TextAnimator } from '../text-animators/model';
 import { textPathAt, type OnPath } from '../hyperframes/text-path';
 import { paintOnPath } from './text/on-path';
-import { NO_TYPESET, paintText, TEXT_COMPONENTS, TextGap, type TextComponent, type Typeset } from './text/painter';
+import { NO_TYPESET, paintText, planOf, TEXT_COMPONENTS, TextGap, type NativeFaces, type TextComponent, type TextPlan, type Typeset } from './text/painter';
+import { resolvedRequest, type FaceRule } from './text/fonts';
+import { lensAt, type Lens } from './lens';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
+export type { Lens } from './lens';
 export { FillRule, PaintKind, type Paint, type Stop };
 
 export enum ItemKind {
   Path = 'path',
   Image = 'image',
-  Layer = 'layer'
+  Layer = 'layer',
+  Text = 'text',
+  Lens = 'lens'
 }
 
 export enum Unsupported {
@@ -70,7 +76,13 @@ export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video
 
 export type LayerItem = { kind: ItemKind.Layer; clip: string; source: string; size: Size; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
-export type Item = PathItem | ImageItem | LayerItem;
+export type Turn = { scale: number; rotation: number };
+
+export type TextItem = { kind: ItemKind.Text; clip: string; plan: TextPlan; turn: Turn; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+
+export type LensItem = { kind: ItemKind.Lens; clip: string; lens: Lens; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+
+export type Item = PathItem | ImageItem | LayerItem | TextItem | LensItem;
 
 export enum FilterKind {
   Css = 'css',
@@ -87,11 +99,11 @@ export type Gap = { clip: string; component: ComponentId; reason: Unsupported; d
 
 export type DomReads = ReadonlyMap<string, DomRead>;
 
-export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[] };
+export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[]; faces?: readonly FaceRule[] };
 
 export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset };
 
-type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
+type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<TextItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LensItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
 type Size = { width: number; height: number };
 type Partly = { content: Content[]; gaps: string[] };
 type Painted = Content[] | Partly | Unsupported;
@@ -101,6 +113,7 @@ type Painter = (env: Env) => Painted;
 const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment']);
 const DEPTH_KEYS: readonly TransformKey[] = ['z', 'rotateX', 'rotateY', 'skewX', 'skewY'];
 const DRAWN_SOURCES: ReadonlySet<Source> = new Set([Source.Transform, Source.Prop, Source.Param]);
+const SAMPLED_IN_PLACE: ReadonlySet<Source> = new Set([Source.Mask]);
 const SOLID_PATTERN = 'solid';
 const CENTRE = 0.5;
 const REMAPPED: ReadonlySet<ComponentId> = new Set(['Video']);
@@ -143,8 +156,8 @@ function strokeBands(s: Stroke, outline: Outline, unit: number): number[][] {
   return runs.flatMap((r) => strokePolygons(r.pts, r.closed, width, s.cap as Cap, s.join as Join));
 }
 
-function shapePainter({ props, size, unit, colour, time }: Env): Painted {
-  const look = props as unknown as ShapeLook;
+function shapePainter({ clip, props, size, unit, colour, time, fps }: Env): Painted {
+  const look = { ...(props as unknown as ShapeLook), modifiers: lookAt(clip, time * fps).modifiers };
   const fills = fillsOf(props).filter((f) => f.visible);
   const stack = look.modifiers.filter((m) => m.enabled).map((m) => ({ kind: m.kind, values: modifierValues(m) }));
   const problems: [boolean, Unsupported][] = [
@@ -195,8 +208,21 @@ const logoPainter = ({ props, size, asset, logo }: Env): Painted => {
 
 const TEXT_GAP: Record<TextGap, Unsupported> = { [TextGap.Font]: Unsupported.Font, [TextGap.Glyph]: Unsupported.Glyph, [TextGap.Fill]: Unsupported.Fill };
 
+function nativeText(env: Env, native: NativeFaces): Painted {
+  const { clip, animators, props, box, stage, css, time, fps, still, typeset } = env;
+  const plan = planOf({ component: clip.component as TextComponent, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
+  if (typeof plan === 'string') {
+    return TEXT_GAP[plan];
+  }
+  const turn = { scale: Number(props.scale ?? 1), rotation: Number(props.rotation ?? 0) };
+  return [{ kind: ItemKind.Text, plan: { ...plan, request: resolvedRequest(plan.request, native.registry) }, turn, opacity: 1, matrix: IDENTITY }];
+}
+
 function textPainter(env: Env): Painted {
   const { clip, animators, onPath, props, box, stage, css, time, fps, still, typeset } = env;
+  if (typeset.native && !onPath) {
+    return nativeText(env, typeset.native);
+  }
   const component = clip.component as TextComponent;
   const painted = onPath ? paintOnPath({ component, ...typeset, props, stage, box, colour: css, animators, onPath }) : paintText({ component, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
   if (typeof painted === 'string') {
@@ -232,6 +258,8 @@ const customPainter = ({ read, clip }: Env): Painted => {
   return { content: read.drawn.map((d) => (CONTENT_OF[d.kind] as (d: Drawn, clip: string) => Content)(d, clip.id)), gaps: read.gaps.map((g) => `${g.reason} ${g.element} ×${g.count}`) };
 };
 
+const lensPainter = ({ clip, stage, fps, time, css }: Env): Painted => [{ kind: ItemKind.Lens, lens: lensAt(clip, { ...stage, fps }, Math.round(time * fps), css), opacity: 1, matrix: IDENTITY }];
+
 const unturned: Placement = (props, frame) => ({ ...boxed(props, frame), turn: IDENTITY });
 
 const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }>> = {
@@ -241,14 +269,15 @@ const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }
   Video: { place: boxed, paint: videoPainter },
   Logo: { place: boxed, paint: logoPainter },
   ...Object.fromEntries(TEXT_COMPONENTS.map((c) => [c, { place: unturned, paint: textPainter }])),
-  Custom: { place: fullFrame, paint: customPainter }
+  Custom: { place: fullFrame, paint: customPainter },
+  LiquidBlob: { place: fullFrame, paint: lensPainter }
 };
 
 const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
 
-const drawnKey = (clip: MotionClip, key: string) => effectOfKey(key) !== null || animatorOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
+const drawnKey = (clip: MotionClip, key: string) => effectOfKey(key) !== null || animatorOfKey(key) !== null || modifierOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
 
-const drawnSource = (clip: MotionClip, source: Source | undefined) => (source !== undefined && DRAWN_SOURCES.has(source)) || (source === Source.Remap && REMAPPED.has(clip.component));
+const drawnSource = (clip: MotionClip, source: Source | undefined) => (source !== undefined && (DRAWN_SOURCES.has(source) || SAMPLED_IN_PLACE.has(source))) || (source === Source.Remap && REMAPPED.has(clip.component));
 
 const keyframedOutside = (clip: MotionClip) => Object.entries(clip.keyframes).some(([key, track]) => track.length > 0 && !drawnKey(clip, key));
 
@@ -399,7 +428,7 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     unsupported.push({ clip: clip.id, component: clip.component, reason: drawn });
   }
   const background = doc.background === Background.Transparent ? null : colour('brand.background');
-  return { ...size, background, items, unsupported };
+  return { ...size, background, items, unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
 }
 
 export const displayListAt = (doc: MotionDoc, frame: number, tokens: BrandTokens, typeset: Typeset = NO_TYPESET): DisplayList => drawFrame(prepare(doc, tokens, {}, typeset), frame);

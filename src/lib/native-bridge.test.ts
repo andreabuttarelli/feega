@@ -81,6 +81,35 @@ describe('nativeBridge', () => {
     expect(nativeBridge(capacitor({ Purchases: {} }), { revenueCatKey: '' })?.store).toBeNull();
   });
 
+  it('without a RevenueCat key a debug shell buys straight from StoreKit, for the org', async () => {
+    const FeegaStoreKit = {
+      purchase: vi.fn(async () => ({ purchased: true })),
+      restore: vi.fn(async () => ({ purchased: true }))
+    };
+    const store = nativeBridge(capacitor({ Purchases: {}, FeegaStoreKit }), { revenueCatKey: '' })?.store;
+
+    expect(await store?.purchase(ORG, 'feega_pack_8')).toEqual({ purchased: true });
+    expect(await store?.restore(ORG)).toEqual({ purchased: true });
+    expect(FeegaStoreKit.purchase).toHaveBeenCalledWith({ appUserId: ORG, productId: 'feega_pack_8' });
+    expect(FeegaStoreKit.restore).toHaveBeenCalledWith({ appUserId: ORG });
+  });
+
+  it('with a RevenueCat key RevenueCat wins over local StoreKit', async () => {
+    const FeegaStoreKit = { purchase: vi.fn(), restore: vi.fn() };
+    const Purchases = {
+      configure: vi.fn(async () => undefined),
+      logIn: vi.fn(async () => ({})),
+      getProducts: vi.fn(async () => ({ products: [{ identifier: 'p' }] })),
+      purchaseStoreProduct: vi.fn(async () => ({})),
+      restorePurchases: vi.fn()
+    };
+
+    await nativeBridge(capacitor({ Purchases, FeegaStoreKit }), { revenueCatKey: KEY })?.store?.purchase(ORG, 'p');
+
+    expect(Purchases.purchaseStoreProduct).toHaveBeenCalled();
+    expect(FeegaStoreKit.purchase).not.toHaveBeenCalled();
+  });
+
   it('in Capacitor shares with the system sheet and taps a light haptic', async () => {
     const Share = { share: vi.fn(async () => ({})) };
     const Haptics = { impact: vi.fn(async () => undefined) };
