@@ -3690,7 +3690,7 @@
   {/if}
   {#if editingMotion}
     {#key editingMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} onhostdrag={hostDrag} onhostfit={(share) => fitHost(editingMotion, share)} {canvasundo} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onreveal={(free) => editingMotion && focusOn([editingMotion], free, FocusMode.Reveal)} onmoveout={moveOut} onhostdrag={hostDrag} onhostfit={(share) => fitHost(editingMotion, share)} {canvasundo} />
     {/key}
   {/if}
 

@@ -221,7 +221,7 @@
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent', Layers: 'layers' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: HostShare) => void) | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onsheet = () => {}, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onsheet?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: HostShare) => void) | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
@@ -939,6 +939,14 @@
   const floorPx = $derived(sheetFloor(transport));
   const sheetRoom = () => ({ viewport: viewportH, stageBottom: stageEl?.getBoundingClientRect().bottom ?? 0, floor: floorPx });
   const sheetPx = $derived(sheetDrag?.height ?? (viewportH ? fitHeight(sheetPxSet ?? sheetHeight(detent, sheetRoom()), sheetRoom()) : 0));
+
+  $effect(() => {
+    void sheet;
+    void sheetPx;
+    if (!sheetDrag) {
+      untrack(onsheet);
+    }
+  });
 
   $effect(() => {
     const shown = sheet;
