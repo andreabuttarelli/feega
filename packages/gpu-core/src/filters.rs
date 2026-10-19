@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
 use serde_json::{Map, Value};
-use vello::wgpu;
 
 use crate::colour::rgba_of;
-use crate::display_list::{CssFunction, Filter, Rgba, SvgNode};
-use crate::filter_passes::{FilterPasses, Op};
+use crate::display_list::{CssFunction, Filter, MaskMode, Rgba, SvgNode};
+use crate::filter_passes::Op;
 use crate::kernel::{gaussian, MAX_TAPS};
 use crate::turbulence::{lattice_of, stitched_frequency, CHANNELS, LATTICE};
 
@@ -92,35 +91,68 @@ fn lookup(table: &[(&str, f32)], key: &str, fallback: f32) -> f32 {
     table.iter().find(|(k, _)| *k == key).map_or(fallback, |(_, v)| *v)
 }
 
+pub trait Runner {
+    type Tex: Clone;
+
+    fn run(&self, op: Op, inputs: [&Self::Tex; 2], params: &[f32]) -> Self::Tex;
+    fn size(tex: &Self::Tex) -> (u32, u32);
+}
+
 #[derive(Clone)]
-struct Img {
-    tex: wgpu::Texture,
+struct Img<T> {
+    tex: T,
     region: Option<[f32; 4]>,
 }
 
-pub struct Fx<'a> {
-    pub device: &'a wgpu::Device,
-    pub queue: &'a wgpu::Queue,
-    pub passes: &'a FilterPasses,
+pub struct Fold {
+    pub mode: MaskMode,
+    pub level: f32,
+    pub invert: bool,
+    pub luma: bool,
 }
 
-impl Fx<'_> {
-    fn op(&self, op: Op, a: &wgpu::Texture, b: &wgpu::Texture, params: &[f32]) -> Img {
-        Img { tex: self.passes.run(self.device, self.queue, op, [a, b], params), region: None }
+const MODE_CODE: [(MaskMode, f32); 4] = [(MaskMode::Add, 0.), (MaskMode::Subtract, 1.), (MaskMode::Intersect, 2.), (MaskMode::Difference, 3.)];
+
+pub struct Fx<'a, R: Runner> {
+    pub runner: &'a R,
+}
+
+impl<R: Runner> Fx<'_, R> {
+    fn op(&self, op: Op, a: &R::Tex, b: &R::Tex, params: &[f32]) -> Img<R::Tex> {
+        Img { tex: self.runner.run(op, [a, b], params), region: None }
     }
 
-    fn size(t: &wgpu::Texture) -> (f64, f64) {
-        (t.width() as f64, t.height() as f64)
+    fn size(t: &R::Tex) -> (f64, f64) {
+        let (w, h) = R::size(t);
+        (w as f64, h as f64)
     }
 
-    fn matrix(&self, src: &Img, m: &[f32]) -> Img {
+    fn plain(tex: R::Tex) -> Img<R::Tex> {
+        Img { tex, region: None }
+    }
+
+    pub fn blurred(&self, tex: R::Tex, sigma: f64) -> R::Tex {
+        self.blur(Self::plain(tex), sigma, sigma).tex
+    }
+
+    pub fn masked(&self, body: &R::Tex, mask: &R::Tex) -> R::Tex {
+        self.op(Op::Composite, body, mask, &[1.0, 0.0, 0.0, 0.0, 0.0]).tex
+    }
+
+    pub fn folded(&self, acc: Option<&R::Tex>, cover: &R::Tex, step: Fold) -> R::Tex {
+        let mode = MODE_CODE.iter().find(|(m, _)| *m == step.mode).map_or(0.0, |(_, c)| *c);
+        let params = [mode, acc.is_none() as u8 as f32, step.invert as u8 as f32, step.luma as u8 as f32, step.level];
+        self.op(Op::Fold, acc.unwrap_or(cover), cover, &params).tex
+    }
+
+    fn matrix(&self, src: &Img<R::Tex>, m: &[f32]) -> Img<R::Tex> {
         let mut full = IDENTITY_MATRIX;
         full.iter_mut().zip(m).for_each(|(slot, v)| *slot = *v);
         self.op(Op::Matrix, &src.tex, &src.tex, &full)
     }
 
-    fn blur(&self, src: Img, sx: f64, sy: f64) -> Img {
-        let along = |img: Img, sigma: f64, dir: (u32, u32)| {
+    fn blur(&self, src: Img<R::Tex>, sx: f64, sy: f64) -> Img<R::Tex> {
+        let along = |img: Img<R::Tex>, sigma: f64, dir: (u32, u32)| {
             if sigma <= 0.0 {
                 return img;
             }
@@ -133,30 +165,30 @@ impl Fx<'_> {
         along(along(src, sx, (1, 0)), sy, (0, 1))
     }
 
-    fn offset(&self, src: &Img, d: (f64, f64), alpha: bool) -> Img {
+    fn offset(&self, src: &Img<R::Tex>, d: (f64, f64), alpha: bool) -> Img<R::Tex> {
         self.op(Op::Offset, &src.tex, &src.tex, &[d.0 as f32, d.1 as f32, alpha as u8 as f32])
     }
 
-    fn alpha_of(&self, src: &Img) -> Img {
+    fn alpha_of(&self, src: &Img<R::Tex>) -> Img<R::Tex> {
         self.offset(src, (0.0, 0.0), true)
     }
 
-    fn flood(&self, like: &Img, c: Rgba) -> Img {
+    fn flood(&self, like: &Img<R::Tex>, c: Rgba) -> Img<R::Tex> {
         self.op(Op::Flood, &like.tex, &like.tex, &c)
     }
 
-    fn composite(&self, a: &Img, b: &Img, op: &str, k: [f32; 4]) -> Img {
+    fn composite(&self, a: &Img<R::Tex>, b: &Img<R::Tex>, op: &str, k: [f32; 4]) -> Img<R::Tex> {
         self.op(Op::Composite, &a.tex, &b.tex, &[lookup(&COMPOSITE_OPS, op, 0.0), k[0], k[1], k[2], k[3]])
     }
 
-    fn shadow(&self, src: &Img, d: (f64, f64), sigma: f64, c: Rgba) -> Img {
+    fn shadow(&self, src: &Img<R::Tex>, d: (f64, f64), sigma: f64, c: Rgba) -> Img<R::Tex> {
         let soft = self.blur(self.alpha_of(src), sigma, sigma);
         let ink = self.composite(&self.flood(src, c), &self.offset(&soft, d, false), "in", [0.0; 4]);
         self.composite(src, &ink, "over", [0.0; 4])
     }
 
-    fn morph(&self, src: Img, r: (f64, f64), dilate: bool) -> Img {
-        let along = |img: Img, r: f64, dir: (f64, f64)| {
+    fn morph(&self, src: Img<R::Tex>, r: (f64, f64), dilate: bool) -> Img<R::Tex> {
+        let along = |img: Img<R::Tex>, r: f64, dir: (f64, f64)| {
             if r <= 0.0 {
                 return img;
             }
@@ -166,7 +198,7 @@ impl Fx<'_> {
         along(along(src, r.0, (1.0, 0.0)), r.1, (0.0, 1.0))
     }
 
-    fn table(&self, src: &Img, funcs: &[SvgNode]) -> Img {
+    fn table(&self, src: &Img<R::Tex>, funcs: &[SvgNode]) -> Img<R::Tex> {
         let mut params = vec![0.0f32; 16 + 4 * MAX_TABLE];
         for (ch, tag) in ["feFuncR", "feFuncG", "feFuncB", "feFuncA"].iter().enumerate() {
             let Some(f) = funcs.iter().find(|f| f.tag == *tag) else { continue };
@@ -185,7 +217,7 @@ impl Fx<'_> {
         self.op(Op::Table, &src.tex, &src.tex, &params)
     }
 
-    fn colour_matrix(&self, src: &Img, attrs: &Map<String, Value>) -> Img {
+    fn colour_matrix(&self, src: &Img<R::Tex>, attrs: &Map<String, Value>) -> Img<R::Tex> {
         let kind = text(attrs.get("type"));
         let m = match if kind.is_empty() { "matrix" } else { kind.as_str() } {
             "matrix" => numbers(attrs.get("values")),
@@ -197,19 +229,19 @@ impl Fx<'_> {
         self.matrix(src, &m)
     }
 
-    fn lighting(&self, like: &Img, node: &SvgNode, s: f64) -> Img {
+    fn lighting(&self, like: &Img<R::Tex>, node: &SvgNode, s: f64) -> Img<R::Tex> {
         let light = node.children.iter().find(|c| c.tag == "fePointLight");
         let at = |k: &str| (num(light.and_then(|l| l.attrs.get(k)), 0.0) * s) as f32;
         let c = node.attrs.get("lighting-color").and_then(|v| rgba_of(&text(Some(v)))).unwrap_or(WHITE);
         self.op(Op::Light, &like.tex, &like.tex, &[at("x"), at("y"), at("z"), c[0], c[1], c[2], num(node.attrs.get("diffuseConstant"), 1.0) as f32])
     }
 
-    fn blend(&self, a: &Img, b: &Img, mode: &str) -> Img {
+    fn blend(&self, a: &Img<R::Tex>, b: &Img<R::Tex>, mode: &str) -> Img<R::Tex> {
         let index = BLENDS.iter().position(|m| *m == mode).unwrap_or(0);
         self.op(Op::Blend, &a.tex, &b.tex, &[index as f32])
     }
 
-    fn turbulence(&self, like: &Img, n: &SvgNode) -> Img {
+    fn turbulence(&self, like: &Img<R::Tex>, n: &SvgNode) -> Img<R::Tex> {
         let (w, h) = Self::size(&like.tex);
         let region = [num(n.attrs.get("x"), 0.0), num(n.attrs.get("y"), 0.0), num(n.attrs.get("width"), w), num(n.attrs.get("height"), h)];
         let stitch = text(n.attrs.get("stitchTiles")) == "stitch";
@@ -233,13 +265,13 @@ impl Fx<'_> {
         out
     }
 
-    fn tile(&self, src: &Img) -> Img {
+    fn tile(&self, src: &Img<R::Tex>) -> Img<R::Tex> {
         let (w, h) = Self::size(&src.tex);
         let region = src.region.unwrap_or([0.0, 0.0, w as f32, h as f32]);
         self.op(Op::Tile, &src.tex, &src.tex, &region)
     }
 
-    fn displace(&self, src: &Img, map: &Img, n: &SvgNode, s: f64) -> Img {
+    fn displace(&self, src: &Img<R::Tex>, map: &Img<R::Tex>, n: &SvgNode, s: f64) -> Img<R::Tex> {
         let channel = |k: &str| {
             let v = text(n.attrs.get(k));
             lookup(&CHANNEL_INDEX, if v.is_empty() { "A" } else { &v }, 3.0)
@@ -247,8 +279,8 @@ impl Fx<'_> {
         self.op(Op::Displace, &src.tex, &map.tex, &[(num(n.attrs.get("scale"), 0.0) * s) as f32, channel("xChannelSelector"), channel("yChannelSelector")])
     }
 
-    fn svg_graph(&self, source: Img, filter: &SvgNode, space: Linear) -> Img {
-        let mut results: HashMap<String, Img> = HashMap::new();
+    fn svg_graph(&self, source: Img<R::Tex>, filter: &SvgNode, space: Linear) -> Img<R::Tex> {
+        let mut results: HashMap<String, Img<R::Tex>> = HashMap::new();
         let mut last = source.clone();
         let s = scale(space);
         let colour_of = |node: &SvgNode| {
@@ -278,7 +310,7 @@ impl Fx<'_> {
                     self.composite(&input(a("in")), &input(a("in2")), if op.is_empty() { "over" } else { &op }, k)
                 }
                 "feMerge" => {
-                    let layers: Vec<Img> = node.children.iter().map(|c| input(c.attrs.get("in"))).collect();
+                    let layers: Vec<Img<R::Tex>> = node.children.iter().map(|c| input(c.attrs.get("in"))).collect();
                     let mut merged = layers.first().cloned().unwrap_or_else(|| last.clone());
                     for over in layers.iter().skip(1) {
                         merged = self.composite(over, &merged, "over", [0.0; 4]);
@@ -308,7 +340,7 @@ impl Fx<'_> {
         last
     }
 
-    fn css_graph(&self, source: Img, fns: &[CssFunction], space: Linear) -> Img {
+    fn css_graph(&self, source: Img<R::Tex>, fns: &[CssFunction], space: Linear) -> Img<R::Tex> {
         let s = scale(space);
         let px = |v: Option<&String>| v.and_then(|v| leading_number(v)).unwrap_or(0.0);
         fns.iter().fold(source, |src, f| {
@@ -330,8 +362,8 @@ impl Fx<'_> {
         })
     }
 
-    pub fn apply(&self, src: wgpu::Texture, filters: &[Filter], space: Linear) -> wgpu::Texture {
-        let start = Img { tex: src, region: None };
+    pub fn apply(&self, src: R::Tex, filters: &[Filter], space: Linear) -> R::Tex {
+        let start = Self::plain(src);
         let out = filters.iter().fold(start, |img, f| match f {
             Filter::Css { fns } => self.css_graph(img, fns, space),
             Filter::Svg { nodes } => nodes.iter().fold(img, |i, node| self.svg_graph(i, node, space)),
