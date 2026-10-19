@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -171,6 +171,14 @@ describe('a custom frame takes the size the hand gives it', () => {
 
   it('keeps both sides and sizes the picture to the node, under the bar', () => {
     expect(frameResize(custom, { w: 600, h: 300 + MOTION_NODE_BAR_H }, FORMATS[MotionFormat.Landscape])).toEqual({ w: 600, h: 300 + MOTION_NODE_BAR_H, picture: { width: 600, height: 300 } });
+  });
+
+  it('only a preset grows its node to the open doc; a custom frame or a free element is sized by the node, never by a stale doc', () => {
+    const element = motionOf({ id: 'e', type: 'motion', data: elementNodeOf({ width: 300, height: 100 }).data })!;
+
+    expect(heightFollowsDoc(preset)).toBe(true);
+    expect(heightFollowsDoc(custom)).toBe(false);
+    expect(heightFollowsDoc(element)).toBe(false);
   });
 
   it('a preset keeps its aspect and asks for no picture change', () => {

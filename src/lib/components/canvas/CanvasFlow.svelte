@@ -266,6 +266,7 @@
     onTemplate?: (id: string, at: { x: number; y: number }) => void;
     onFrameTemplates?: (at: { x: number; y: number }) => void;
     onNodeClicked?: (id: string) => void;
+    onNodeDoubled?: (id: string) => void;
     barContext?: BarContext;
     onDraw?: (drawn: DrawnWire) => Promise<void>;
     onDrawFrame?: (target: { box: CanvasBox } | { at: { x: number; y: number } }) => Promise<void>;

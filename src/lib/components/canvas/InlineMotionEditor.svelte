@@ -1,4 +1,5 @@
 <script lang="ts" module>
+  import type { HostShare } from '$lib/motion/text-fit';
   import { earlyFetch } from '$lib/canvas/early-fetch';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
 
@@ -46,7 +47,7 @@
   import { track } from '$lib/analytics';
   import type { CanvasUndo, HostDrag, MoveOut } from '$lib/canvas/canvas-drop';
 
-  let { projectId, canvasId, nodeId, revision = 0, leaving = false, onclose, onframe, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; revision?: number; leaving?: boolean; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: { width: number; height: number }) => void) | null; canvasundo?: CanvasUndo | null } = $props();
+  let { projectId, canvasId, nodeId, revision = 0, leaving = false, onclose, onframe, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; revision?: number; leaving?: boolean; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: HostShare) => void) | null; canvasundo?: CanvasUndo | null } = $props();
 
   const opensOn = untrack(() => (get(propertiesRequest) === nodeId ? OpensOn.Properties : OpensOn.Stage));
   propertiesRequest.set(null);

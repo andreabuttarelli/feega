@@ -34,6 +34,14 @@ async function clipsOf(admin: SupabaseClient, nodeId: string): Promise<Clip[]> {
   return doc?.tracks.flatMap((t) => t.clips) ?? [];
 }
 
+async function shownSize(admin: SupabaseClient, nodeId: string): Promise<number> {
+  const { data: node } = await admin.from('nodes').select('width').eq('id', nodeId).single();
+  const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', nodeId).order('version', { ascending: false }).limit(1);
+  const doc = data?.[0]?.doc as { width: number; height: number; tracks: { clips: Clip[] }[] };
+  const size = Number(doc.tracks.flatMap((t) => t.clips)[0].props.size);
+  return (size * Math.min(doc.width, doc.height) * Number(node?.width)) / doc.width;
+}
+
 async function inkPixels(page: Page, nodeId: string): Promise<{ count: number; height: number }> {
   const tile = page.locator(`[data-motion-node="${nodeId}"]`);
   const box = (await tile.boundingBox())!;
@@ -151,13 +159,10 @@ test.describe('free text on the canvas @real', () => {
     await page.keyboard.type('Hello');
     await leave(page, pane);
     await expect.poll(async () => (await clipsOf(admin, element.id)).map((c) => c.props.text), { timeout: 10_000 }).toEqual(['Hello']);
-    await page.waitForTimeout(8000);
-    console.log('DBG', JSON.stringify((await admin.from('nodes').select('data').eq('id', element.id).single()).data));
-    await page.screenshot({ path: `${process.env.SHOTS_DIR}/dbg-size.png` });
     await posterOfHead(admin, element.id);
     await visibleText(page, element.id);
     const before = await inkPixels(page, element.id);
-    const sizeBefore = Number((await clipsOf(admin, element.id))[0].props.size);
+    const sizeBefore = await shownSize(admin, element.id);
 
     await page.locator(`[data-motion-node="${element.id}"]`).dblclick();
     await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
@@ -170,13 +175,13 @@ test.describe('free text on the canvas @real', () => {
     for (const name of ['Weight', 'Size', 'Tracking', 'Leading']) {
       await expect(props.locator(`[data-field="${name}"]`), `${name} is in the inspector`).toBeVisible();
     }
-    for (const label of ['Font', 'Align', 'Box width', 'Fill']) {
+    for (const label of ['Font', 'Align', 'Resizing', 'Fill']) {
       await expect(props.getByText(label, { exact: true }).first(), `${label} is in the inspector`).toBeAttached();
     }
     const shownPx = Number(await field.inputValue());
     await field.fill(String(Math.round(shownPx / 2)));
     await field.press('Enter');
-    await expect.poll(async () => Number((await clipsOf(admin, element.id))[0].props.size), { timeout: 10_000 }).toBeLessThan(sizeBefore);
+    await expect.poll(() => shownSize(admin, element.id), { timeout: 10_000 }).toBeLessThan(sizeBefore);
     await leave(page, pane);
     await posterOfHead(admin, element.id);
 

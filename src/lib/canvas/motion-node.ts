@@ -118,6 +118,8 @@ const FREE_KIND: ReadonlySet<FrameKind> = new Set([FrameKind.Element]);
 
 const sizingOf = (node: Pick<MotionNode, 'kind' | 'format'>): Sizing => ((node.kind === FrameKind.Frame && node.format === MotionFormat.Custom) || FREE_KIND.has(node.kind) ? Sizing.Free : Sizing.Fixed);
 
+export const heightFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>): boolean => sizingOf(node) === Sizing.Fixed;
+
 export type FrameResize = { w: number; h: number; picture: Picture | null };
 
 const RESIZE: Record<Sizing, (node: MotionNode, asked: { w: number; h: number }, picture: Picture, mode: NodeMode) => FrameResize> = {
