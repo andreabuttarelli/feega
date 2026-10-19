@@ -42,7 +42,7 @@ describe('the 3D model viewer', () => {
   });
 
   it('the canvas draws it for every 3D node, with the render views wired', () => {
-    expect(page).toMatch(/<Model3dViewer[^>]*src=\{`\/p\/\$\{data\.projectId\}\/c\/\$\{data\.canvas\.id\}\/assets\/\$\{refId\}`\}[^>]*onrender=/s);
+    expect(page).toMatch(/<Model3dViewer[^>]*src=\{canvasAssetUrl\(data\.projectId, data\.canvas\.id, refId, AssetSize\.Full\)\}[^>]*onrender=/s);
   });
 
   it('the shared canvas draws it too', () => {
