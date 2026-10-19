@@ -13,7 +13,6 @@
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Gesture } from '$lib/motion/drill';
   import { onMount, tick, untrack } from 'svelte';
-  import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import FrameHover from './FrameHover.svelte';
   import FrameLiveControls from './FrameLiveControls.svelte';
@@ -311,11 +310,6 @@
         <div class="skeleton" data-testid="motion-node-skeleton"></div>
       {:else if !chrome.bar}
         <div class="placeholder" data-testid="element-placeholder"></div>
-      {:else}
-        <div class="empty">
-          <Clapperboard size={28} />
-          <span class="format">{size.label}</span>
-        </div>
       {/if}
     {/if}
     {#if !previewing}<div class="host" class:nodrag={layers.editor} class:nopan={layers.editor} data-testid="motion-node-editing" bind:this={host}></div>{/if}
@@ -407,22 +401,6 @@
     position: absolute;
     inset: 0;
     background: var(--ui-field, #f2f2f2);
-  }
-
-  .empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .format {
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-  }
-
-  .format {
-    color: var(--ui-accent);
   }
 
 </style>

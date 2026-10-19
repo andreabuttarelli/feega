@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from './doc';
 import { HISTORY_LIMIT, UNSAVED_VERSION, adoptHead, amend, canRedo, canUndo, followHead, previousSource, record, redo, startHistory, undo } from './history';
-import { Agent } from './start-prompt';
+import { Agent } from './agent-state';
 import { setCanvas } from './timeline';
 
 const base = newMotionDoc(MotionFormat.Landscape);

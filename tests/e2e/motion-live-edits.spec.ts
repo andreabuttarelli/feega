@@ -28,15 +28,14 @@ test.describe('motion agent live edits @real', () => {
     });
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
-    await expect(page.getByTestId('empty-state')).toBeVisible();
+    await expect(page.getByTestId('empty-state')).toHaveCount(0);
 
     const input = page.getByLabel('Agent', { exact: true }).locator('textarea');
     await input.fill('a title');
     await input.press('Enter');
 
-    await expect(page.getByTestId('empty-state')).toBeHidden();
     await page.waitForTimeout(PAST_HEAD_POLL_MS);
-    await expect(page.getByTestId('empty-state')).toBeHidden();
+    await expect(page.getByTestId('empty-state')).toHaveCount(0);
     await expect.poll(() => saved.some((body) => body.includes('Motion'))).toBe(true);
   });
 });
