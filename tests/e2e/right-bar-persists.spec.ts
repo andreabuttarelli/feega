@@ -122,7 +122,7 @@ test.describe('the right bar is one instance across canvas and motion editor @re
     await page.getByRole('button', { name: 'Canvas', exact: true }).click();
     const stage = page.getByTestId('motion-node-stage').first();
     await stage.click({ position: { x: 60, y: 10 } });
-    await stage.getByTestId('open-motion-editor').click();
+    await stage.dblclick({ position: { x: 60, y: 10 } });
     await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
     await page.getByTestId('phone-tab-chat').click();
     await expectSameBar(page);
