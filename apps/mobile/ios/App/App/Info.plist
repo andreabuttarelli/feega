@@ -20,8 +20,23 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.feega.mobile</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>feega</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>FeegaAppleSignIn</key>
+	<string>off</string>
+	<key>FeegaWebURL</key>
+	<string>https://oh.feega.app</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>

@@ -55,7 +55,7 @@ export function pageEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePat
 }
 
 function withVerifiedUser(db: Db, user: User): Db {
-  const auth = { getUser: async () => ({ data: { user }, error: null }) };
+  const auth = { getUser: async () => ({ data: { user }, error: null }), signOut: async () => ({ error: null }) };
   return Object.assign(Object.create(db) as Db, { auth });
 }
 

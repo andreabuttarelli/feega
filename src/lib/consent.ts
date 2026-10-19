@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { applyConsent } from './analytics';
+import { isNativeShell } from './native-shell';
 import {
   CONSENT_COOKIE,
   CONSENT_MAX_AGE_S,
@@ -36,7 +37,7 @@ export function initConsent() {
   const choice = readCookie();
   consent.set(choice);
   if (!choice) {
-    showBanner.set(true);
+    showBanner.set(!isNativeShell(navigator.userAgent));
     return;
   }
   applyConsent(choice);
