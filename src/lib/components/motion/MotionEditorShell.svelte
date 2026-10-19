@@ -304,9 +304,9 @@
   let display = $state(TimeDisplay.Timecode);
   let width = $state(1440);
   let hostWidth = $state(0);
-  const viewport = $derived(viewportOf(rules.measure === Measure.Host && hostWidth ? hostWidth : width));
-  const chatPlace = $derived(CHAT_PLACE[viewport]);
   const barSeat = $derived(mount === Mount.Canvas && viewportOf(width) === Viewport.Desktop ? BarSeat.InPlace : BarSeat.Own);
+  const viewport = $derived(barSeat === BarSeat.InPlace ? Viewport.Desktop : viewportOf(rules.measure === Measure.Host && hostWidth ? hostWidth : width));
+  const chatPlace = $derived(CHAT_PLACE[viewport]);
   let moreOpen = $state(false);
   let menuOpen = $state(false);
   let clockOpen = $state(false);
