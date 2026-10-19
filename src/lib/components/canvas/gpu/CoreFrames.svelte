@@ -4,7 +4,7 @@
   import { drawFrame, prepare, type DisplayList } from '$lib/motion/gpu-full/display-list';
   import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
   import { loadFonts } from '$lib/motion/gpu-full/text/load';
-  import { createCore, type CoreRaster } from '$lib/motion/gpu-full/core-web';
+  import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
   import { createMedia } from '$lib/motion/gpu-full/media';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { visibleIds } from '$lib/canvas/gpu/camera';
@@ -19,7 +19,7 @@
   let { frames, cards = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
-  const BACKENDS = [createCore];
+  const BACKENDS = [createCore, createCoreGl];
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let raster = $state<CoreRaster | null>(null);
@@ -150,6 +150,7 @@
     inset: 0;
     width: 100%;
     height: 100%;
+    z-index: 1;
     pointer-events: none;
   }
 </style>

@@ -34,4 +34,8 @@ describe('still frame', () => {
   it('draws a resting frame at the same instant its poster was taken', () => {
     expect(stillFrame({ fps: 30, durationInFrames: 90 })).toBe(36);
   });
+
+  it('a still doc rests on its own still frame', () => {
+    expect(stillFrame({ fps: 30, durationInFrames: 60, still: { frame: 0 } })).toBe(0);
+  });
 });
