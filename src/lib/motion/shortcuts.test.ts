@@ -207,6 +207,13 @@ describe('mask keys', () => {
   });
 });
 
+describe('scale tool key', () => {
+  it('K is the scale tool in Design and still pauses in Motion', () => {
+    expect(commandFor({ key: 'k', code: 'KeyK', mod: false, shift: false }, EditMode.Design)).toBe(Command.ToolScale);
+    expect(commandFor({ key: 'k', code: 'KeyK', mod: false, shift: false }, EditMode.Motion)).toBe(Command.Pause);
+  });
+});
+
 describe('pixel grid key', () => {
   it("⇧' shows or hides the pixel grid", () => {
     expect(press('"', { shift: true, code: 'Quote' })).toBe(Command.TogglePixelGrid);

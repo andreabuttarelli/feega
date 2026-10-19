@@ -202,6 +202,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToolRectangle]: motion('add_shape'),
   [Command.ToolEllipse]: motion('add_shape'),
   [Command.ToolPen]: motion('set_path'),
+  [Command.ToolScale]: motion('arrange_space'),
   [Command.ToggleEditMode]: uiOnly('Design writes the base value (set_props, set_transform), Motion writes a keyframe (set_keyframes): the mode picks the tool, it is not saved'),
   [Command.MoveLeft]: motion('set_transform'),
   [Command.MoveRight]: motion('set_transform'),

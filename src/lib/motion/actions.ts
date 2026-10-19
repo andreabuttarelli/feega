@@ -7,6 +7,7 @@ import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+import Scaling from '@lucide/svelte/icons/scaling';
 import Grid3x3 from '@lucide/svelte/icons/grid-3x3';
 import VectorSquare from '@lucide/svelte/icons/vector-square';
 import BringToFront from '@lucide/svelte/icons/bring-to-front';
@@ -288,6 +289,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToolText]: { name: 'Text tool', icon: TypeIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
   [Command.ToolRectangle]: { name: 'Rectangle tool', icon: SquareIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
   [Command.ToolEllipse]: { name: 'Ellipse tool', icon: CircleIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolScale]: { name: 'Scale tool', icon: Scaling, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToolPen]: { name: 'Pen tool', icon: PenTool, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Tap points, tap the first to close' },
   [Tool.FitGraph]: { name: 'Fit curves to view', icon: Maximize, group: GuideGroup.Timeline, place: Place.Graph },
 

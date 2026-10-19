@@ -9,6 +9,7 @@
   import { reorderAt } from '$lib/motion/layout/guides';
   import { measureGaps } from '$lib/motion/measure-gaps';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
+  import { ScaleMode, bakeScale } from '$lib/motion/scale-tool';
   import { guessedBoxes } from '$lib/motion/move-element';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
@@ -36,7 +37,8 @@
     onframemove = null,
     onmenu = null,
     edittext = null,
-    layoutBounds = []
+    layoutBounds = [],
+    scaleMode = ScaleMode.Resize
   }: {
     doc: MotionDoc;
     frame: number;
@@ -57,6 +59,7 @@
     onframemove?: HostDrag | null;
     onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
     edittext?: ((selector: string, at: { x: number; y: number } | null, oninput: (text: string) => void) => Promise<string | null>) | null;
+    scaleMode?: ScaleMode;
     layoutBounds?: Bounds[];
   } = $props();
 
@@ -469,7 +472,7 @@
     if (!box) {
       return;
     }
-    const { patch, guides } = dragPatch({ doc: laid, clipId: grab.clipId, frame, box, grip: grab.grip, handle: grab.handle, from: grab.from, to: local(e), shift: e.shiftKey, snapTargets: [...others(grab.clipId), ...layoutBounds], snapPx: snapReach() });
+    const { patch, guides } = dragPatch({ doc: laid, clipId: grab.clipId, frame, box, grip: grab.grip, handle: grab.handle, from: grab.from, to: local(e), shift: e.shiftKey || baking(grab.grip), snapTargets: [...others(grab.clipId), ...layoutBounds], snapPx: snapReach() });
     const result = writePatch(doc, grab.clipId, frame, patch);
     if (!result.ok) {
       return;
@@ -500,9 +503,12 @@
     return { move: { ...hostShift(unit, g.start, to), turn: 0 }, to, send };
   }
 
+  const baking = (grip: Grip) => grip === Grip.Scale && scaleMode === ScaleMode.Scale;
+
   function end(e: PointerEvent | null) {
     const done = live;
     const grip = grab?.grip;
+    const clipId = grab?.clipId;
     const hosting = hostGesture(grab, e);
     const reordered = done && grip === Grip.Move && grab && e ? reorderAt(doc, grab.clipId, local(e)) : null;
     const outside = grab && e ? leaving(e) : null;
@@ -520,6 +526,13 @@
     }
     if (reordered?.ok) {
       onchange(reordered.doc, 'Reordered in the auto layout');
+      return;
+    }
+    if (done && grip && baking(grip) && clipId) {
+      const baked = bakeScale(doc, clipId, frame, done.patch);
+      if (baked.ok) {
+        onchange(baked.doc, 'Scaled with the scale tool');
+      }
       return;
     }
     if (done && grip) {
@@ -540,7 +553,7 @@
 
 <svelte:window onkeydown={(e) => (altHeld = e.altKey)} onkeyup={(e) => (altHeld = e.altKey)} onblur={() => (altHeld = false)} />
 
-<div class="overlay" class:typing={inPlace} bind:this={host} data-testid="selection-overlay" role="presentation" oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
+<div class="overlay" class:typing={inPlace} class:scaling={scaleMode === ScaleMode.Scale} data-scale-tool={scaleMode} bind:this={host} data-testid="selection-overlay" role="presentation" oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} data-testid="hover-box" />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
@@ -718,6 +731,10 @@
 
   .scale {
     cursor: nwse-resize;
+  }
+
+  .scaling .scale span {
+    background: var(--ui-accent);
   }
 
   .rotate {
