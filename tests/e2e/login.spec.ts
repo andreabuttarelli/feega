@@ -16,3 +16,9 @@ test('oauth forms are wired', async ({ page }) => {
   await expect(page.locator('form[action="?/google"]')).toHaveCount(1);
   await expect(page.locator('form[action="?/github"]')).toHaveCount(1);
 });
+
+test('localhost offers Sign in with Apple', async ({ page }) => {
+  await page.goto('/login');
+
+  await expect(page.locator('form[action="?/apple"] button')).toBeVisible();
+});
