@@ -96,14 +96,25 @@ export function textPathBake(clip: MotionClip, doc: MotionDoc, frame: Frame = do
   return { id: clip.id, from: clip.from, index, curves, placements };
 }
 
-export function textPathOutline(doc: MotionDoc, clip: MotionClip, frame: number): Curve | null {
+export type OnPath = { curve: Curve; placement: Placement };
+
+export function textPathAt(doc: MotionDoc, clip: MotionClip, frame: number): OnPath | null {
   const path = clip.textPath;
   if (!path) {
     return null;
   }
   const local = Math.min(Math.max(frame - clip.from, 0), clip.durationInFrames - 1);
+  const v = valuesAt(clip, path, local);
+  return { curve: curveOf(doc, clip, path, v, local, sizeOf(clip.props, doc)), placement: placementOf(v) };
+}
+
+export function textPathOutline(doc: MotionDoc, clip: MotionClip, frame: number): Curve | null {
+  const at = textPathAt(doc, clip, frame);
+  if (!at) {
+    return null;
+  }
   const box = sizeOf(clip.props, doc);
-  const curve = curveOf(doc, clip, path, valuesAt(clip, path, local), local, box);
+  const curve = at.curve;
   const center: [number, number] = [Number(clip.props.x) * doc.width, Number(clip.props.y) * doc.height];
   const own = composeLocal({ x: 0, y: 0, rotateZ: Number(clip.props.rotation ?? 0), scaleX: Number(clip.props.scale ?? 1), scaleY: Number(clip.props.scale ?? 1) }, center);
   const toFrame = mul2d(worldAt(doc, clip.id, frame, doc), own);
