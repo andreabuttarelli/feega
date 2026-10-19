@@ -3,7 +3,7 @@
   import { Action } from '$lib/motion/actions';
   import { onMount } from 'svelte';
   import Download from '@lucide/svelte/icons/download';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
   import { applyValues, exposeField, FieldType, fieldValues, removeField } from '$lib/motion/template/fields';
@@ -134,8 +134,7 @@
   }
 
   async function post(name: string, form: FormData) {
-    const res = await fetch(`${editorUrl}?/${name}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(editorUrl, name, form);
     return result.type === 'success' ? { ok: true, data: (result.data ?? {}) as Record<string, unknown> } : { ok: false, data: (result.type === 'failure' ? result.data : { error: 'request_failed' }) as Record<string, unknown> };
   }
 

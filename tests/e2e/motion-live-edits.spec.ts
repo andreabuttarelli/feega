@@ -22,7 +22,7 @@ test.describe('motion agent live edits @real', () => {
       return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: edited });
     });
     page.on('request', (req) => {
-      if (req.url().includes('?/ops')) {
+      if (new URL(req.url()).searchParams.get('action') === 'ops') {
         saved.push(req.postData() ?? '');
       }
     });

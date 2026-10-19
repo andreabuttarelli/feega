@@ -11,7 +11,7 @@
   import { onMount, tick, untrack } from 'svelte';
   import { clipSeek } from '$lib/motion/storyboard';
   import { POSTER_WIDTH, posterFormat, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import { replaceState } from '$app/navigation';
   import { page } from '$app/state';
   import { RenderEngine, engineFlag } from '$lib/motion/gpu/engine-flag';
@@ -573,7 +573,7 @@
 
   const poster = posterJob(
     () => preview?.still(posterSecond(history.present), POSTER_WIDTH, posterFormat(history.present.background)) ?? Promise.resolve(''),
-    (jpeg, shotAt) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)), revision: String(shotAt) }),
+    (jpeg, shotAt) => sendPoster(editorUrl, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)), revision: String(shotAt) }),
     () => version
   );
   let posterVersion = data.node.posterAssetId ? data.head.version : -1;
@@ -634,8 +634,7 @@
     for (const id of ids) {
       form.append('assetId', id);
     }
-    const res = await fetch(`${editorUrl}?/analyze`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(editorUrl, 'analyze', form);
     if (result.type === 'success') {
       analyses = { ...analyses, ...((result.data as { analyses: Record<string, AudioAnalysis> }).analyses ?? {}) };
     }
@@ -749,8 +748,7 @@
     form.set('version', String(version));
     form.set('summary', unsavedSummary);
     frameDocs.sending(data.node.id);
-    const res = await fetch(`${editorUrl}?/ops`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(editorUrl, 'ops', form);
     saving = false;
 
     if (result.type === 'success') {
@@ -1264,8 +1262,7 @@
     const form = new FormData();
     form.set('doc', JSON.stringify(withTemplate));
     form.set('clipId', clipId);
-    const res = await fetch(`${editorUrl}?/templateSounds`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(editorUrl, 'templateSounds', form);
     if (result.type !== 'success') {
       notice = 'The template is in; its sounds could not be added.';
       return;
@@ -1379,8 +1376,7 @@
   let revisions = $state<Revision[]>([]);
 
   async function editorAction(name: string, form = new FormData()) {
-    const res = await fetch(`${editorUrl}?/${name}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    return deserialize(await res.text());
+    return await postPageAction(editorUrl, name, form);
   }
 
   type Fork = { id: string; frameId: string; name: string; baseVersion: number };

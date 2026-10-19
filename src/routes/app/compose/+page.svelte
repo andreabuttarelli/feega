@@ -27,7 +27,7 @@
       void videoPoster(item.previewUrl, POSTER.width)
         .then(({ jpeg, height }) => {
           frames[item.id] = jpeg;
-          return sendPoster(`?project=${data.projectId}&/poster`, jpeg, { node: item.id, width: String(POSTER.width), height: String(height) });
+          return sendPoster(`?project=${data.projectId}`, jpeg, { node: item.id, width: String(POSTER.width), height: String(height) });
         })
         .catch((e) => console.error('[compose] poster not derived', e));
     }
