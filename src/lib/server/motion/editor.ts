@@ -1,6 +1,6 @@
 import { isInteractive } from '$lib/motion/interactive/settings';
 import type { Db } from '$lib/server/db/client';
-import { listFontAssets, listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
+import { findAssets, listFontAssets, listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
 import { findBrandLook } from '$lib/server/repos/brands';
 import { DataCheck, findNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { appendRevision, readHead, RevisionOutcome, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
@@ -83,6 +83,11 @@ export async function motionAssets(scope: AssetScope, ttlSeconds?: number): Prom
   const unique = [...new Map([...media, ...fonts].map((a) => [a.id, a])).values()];
   const usable = unique.filter((a) => kindOf(a) && a.url).sort(newestFirst).slice(0, ASSET_LIMIT);
   return signAssets(scope, usable, ttlSeconds);
+}
+
+export async function namedAssets(scope: AssetScope, ids: string[]): Promise<MotionAsset[]> {
+  const found = await findAssets(scope.db, { orgId: scope.orgId, assetIds: ids });
+  return signAssets(scope, [...found.values()].filter((a) => kindOf(a) && a.url));
 }
 
 export async function assetsById(scope: AssetScope, ids: string[]): Promise<Record<string, string>> {

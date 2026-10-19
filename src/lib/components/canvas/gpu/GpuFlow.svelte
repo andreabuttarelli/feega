@@ -25,7 +25,9 @@
   import CoreFrames from './CoreFrames.svelte';
   import { cardKey, cardOnCanvas, portMarks, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
-  import { NodeChrome } from '$lib/canvas/selection-chrome';
+  import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
+  import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { tileHovered } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
   import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
@@ -73,8 +75,10 @@
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
-  import { faceOf } from '$lib/canvas/gpu/card-face';
+  import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
+  import { Fling, type Glide } from '$lib/canvas/core/inertia';
+  import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { GpuScene, GridPlace, themeOf, type Card } from '$lib/canvas/gpu/scene';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
@@ -205,20 +209,24 @@
       return [];
     }
     const theme = { ...look, panel: look.paper };
-    return placed.filter(drawsCard).map((t) => {
-      const idle = !chromeIds.has(t.id);
+    return placed.filter(drawsCard).flatMap((t) => {
+      const on = selected.includes(t.id);
+      const dom = chromeIds.has(t.id) && !on;
+      const chrome = dom ? { ring: NodeChrome.None, handles: false } : nodeChrome(t.id, on, layersSource.video);
+      const hovered = !on && !dom && tileHovered(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null);
       const card: CardTile = {
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
-        ring: NodeChrome.None,
-        handles: false,
-        hovered: false,
-        ...(idle ? portMarks(t) : { inputs: [], outputs: [] }),
-        label: idle ? labelOf(t) : null,
-        icon: idle ? (text.icons.get(t.kind as NodeType) ?? null) : null
+        ring: chrome.ring,
+        handles: resizable && on && chrome.handles,
+        hovered,
+        ...(dom ? { inputs: [], outputs: [] } : portMarks(t)),
+        label: dom ? null : labelOf(t),
+        icon: dom ? null : (text.icons.get(t.kind as NodeType) ?? null),
+        names: on
       };
-      return { key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold) };
+      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold) }];
     });
   });
   const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
@@ -615,6 +623,11 @@
     })
   );
 
+  function faceFor(t: Tile) {
+    const face = faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []);
+    return coreDrawn.has(t.id) ? handedToCore(face) : face;
+  }
+
   const cards = $derived(
     placed.map(
       (t): Card => ({
@@ -624,7 +637,7 @@
         w: t.w,
         h: t.h,
         rotation: t.rotation ?? 0,
-        face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
+        face: faceFor(t),
         hidden: handedOver(t) || coreDrawn.has(t.id),
         snapshot: shotOf(t.id),
         running: isRunning(summaries.get(t.id)?.data ?? {}),
@@ -899,7 +912,31 @@
 
   const pointerOf = (e: PointerEvent) => (e.pointerType === 'touch' ? Pointer.Touch : e.pointerType === 'pen' ? Pointer.Pen : Pointer.Mouse);
 
+  const fling = new Fling();
+  let glide: Glide | null = null;
+  let glidedAt = 0;
+
+  function glideStep(t: number): boolean {
+    const d = glide?.step(glidedAt ? t - glidedAt : 0);
+    glidedAt = t;
+    if (!d) {
+      glide = null;
+      return false;
+    }
+    view = panBy(view, d);
+    return true;
+  }
+
+  const glider = new FramePacer(glideStep, (frame) => requestAnimationFrame(frame));
+
+  function startGlide() {
+    glide = fling.release(performance.now());
+    glidedAt = 0;
+    glider.invalidate();
+  }
+
   function onDown(e: PointerEvent) {
+    glide = null;
     markBusy();
     measureSurface();
     const p = local(e);
@@ -937,7 +974,11 @@
 
   function startGesture(kind: GestureKind, hit: Hit, w: Point, e: PointerEvent) {
     const START: Record<GestureKind, () => Active | null> = {
-      [GestureKind.Pan]: () => ({ kind: GestureKind.Pan, last: local(e), moved: false }),
+      [GestureKind.Pan]: () => {
+        fling.release(e.timeStamp);
+        fling.sample(local(e), e.timeStamp);
+        return { kind: GestureKind.Pan, last: local(e), moved: false };
+      },
       [GestureKind.Drag]: () => {
         if (hit.kind !== HitKind.Node) {
           return null;
@@ -1026,6 +1067,7 @@
         }
         props.onUserPan?.();
         view = panBy(view, { x: p.x - a.last.x, y: p.y - a.last.y });
+        fling.sample(p, e.timeStamp);
         a.last = p;
         a.moved ||= far;
         suppressMenu ||= far;
@@ -1118,6 +1160,9 @@
       [GestureKind.Pan]: () => {
         if (a.kind === GestureKind.Pan && !a.moved && e.button === 0) {
           clearSelection();
+        }
+        if (a.kind === GestureKind.Pan && a.moved && coreOn) {
+          startGlide();
         }
       },
       [GestureKind.Drag]: () => {
@@ -1236,6 +1281,7 @@
   }
 
   function onWheel(e: WheelEvent) {
+    glide = null;
     markBusy();
     props.onUserPan?.();
     const target = e.target as HTMLElement;
@@ -1680,7 +1726,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} />
+          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} />
           {@render props.tileOver?.({ id: t.id })}
           {#if !domIds.has(t.id) && t.kind === 'motion'}
             {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}

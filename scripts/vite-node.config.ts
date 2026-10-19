@@ -9,6 +9,8 @@ export default defineConfig({
     alias: {
       '$app/environment': r('_shims/app-environment.ts'),
       '$app/server': r('_shims/app-server.ts'),
+      '$app/forms': r('_shims/app-forms.ts'),
+      '$app/navigation': r('_shims/app-navigation.ts'),
       '$env/dynamic/private': r('_shims/env-private.ts'),
       '$env/dynamic/public': r('_shims/env-public.ts'),
       '$env/static/public': r('_shims/env-static-public.ts'),

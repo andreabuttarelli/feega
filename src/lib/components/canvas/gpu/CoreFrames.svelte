@@ -7,8 +7,12 @@
   import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
   import { createMedia, Readiness } from '$lib/motion/gpu-full/media';
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
-  import { visibleIds } from '$lib/canvas/gpu/camera';
-  import { screenUses, type PutFrame } from '$lib/canvas/core/screen-uses';
+  import { ItemKind } from '$lib/motion/gpu-full/display-list';
+  import { SpatialIndex } from '$lib/canvas/core/spatial-index';
+  import { FramePacer } from '$lib/canvas/core/frame-pacer';
+  import { resident, type HeldFrame } from '$lib/canvas/core/residency';
+  import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
+  import { screenUses } from '$lib/canvas/core/screen-uses';
   import { drawsWhole, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
 
@@ -46,7 +50,7 @@
   }
 
   $effect(() => {
-    const seen = visibleIds(frames.map((f) => ({ id: f.id, ...f.box })), view, area);
+    const seen = new SpatialIndex(frames.map((f) => ({ id: f.id, ...f.box }))).visible(view, area);
     for (const f of frames) {
       if (seen.has(f.id) && !asked.has(keyOf(f))) {
         asked.add(keyOf(f));
@@ -71,20 +75,24 @@
     }
   });
 
-  const cardPuts = $derived(cards.flatMap((c): PutFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height } }] : [])));
+  const imagesIn = (list: DisplayList) => list.items.filter((i) => i.kind === ItemKind.Image).length;
+
+  const cardPuts = $derived(cards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, images: imagesIn(c.frame.list) }] : [])));
 
   const framePuts = $derived(
-    frames.flatMap((f): PutFrame[] => {
+    frames.flatMap((f): HeldFrame[] => {
       const list = lists.get(keyOf(f));
-      return list && drawsWhole(list) ? [{ id: f.id, group: keyOf(f), box: f.box, size: { width: list.width, height: list.height } }] : [];
+      return list && drawsWhole(list) ? [{ id: f.id, group: keyOf(f), box: f.box, size: { width: list.width, height: list.height }, images: imagesIn(list) }] : [];
     })
   );
 
   const whole = $derived([...cardPuts, ...framePuts]);
   const listOf = (group: string) => cardLists.get(group) ?? lists.get(group)!;
+  const textureBytes = BUDGET[currentDevice()].textureBytes;
+  const held = $derived(resident(whole, view, area, textureBytes));
 
   $effect(() => {
-    onready(new Set(whole.map((f) => f.id)));
+    onready(new Set(held.map((f) => f.id)));
   });
 
   $effect(() => {
@@ -117,32 +125,31 @@
     };
   });
 
-  let pending = 0;
+  function paint(): boolean {
+    const into = raster;
+    if (!into) {
+      return false;
+    }
+    const shown = held;
+    const keep = new Set(shown.map((f) => f.group));
+    for (const group of [...put].filter((g) => !keep.has(g))) {
+      into.dropGroup(group);
+      put.delete(group);
+    }
+    for (const f of shown.filter((f) => !put.has(f.group))) {
+      into.putGroup(f.group, listOf(f.group), media.pictures);
+      put.add(f.group);
+    }
+    const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
+    into.drawScreen(screenUses(shown, at, { width: area.width * resolution, height: area.height * resolution }, null), media.pictures);
+    return false;
+  }
+
+  const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame));
 
   $effect(() => {
-    const into = raster;
-    const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
-    const shown = whole;
-    const size = { width: area.width * resolution, height: area.height * resolution };
-    cancelAnimationFrame(pending);
-    if (!into) {
-      return;
-    }
-    pending = requestAnimationFrame(() => {
-      for (const f of shown) {
-        if (!put.has(f.group)) {
-          into.putGroup(f.group, listOf(f.group), media.pictures);
-          put.add(f.group);
-        }
-      }
-      const live = new Set(cards.map((c) => c.key));
-      for (const key of cardLists.keys()) {
-        if (!live.has(key) && put.delete(key)) {
-          into.dropGroup(key);
-        }
-      }
-      into.drawScreen(screenUses(shown, at, size, null), media.pictures);
-    });
+    void [raster, held, view.x, view.y, view.zoom, area.width, area.height];
+    pacer.invalidate();
   });
 
   $effect(() => () => media.dispose());
@@ -156,6 +163,7 @@
     inset: 0;
     width: 100%;
     height: 100%;
+    z-index: 1;
     pointer-events: none;
   }
 </style>

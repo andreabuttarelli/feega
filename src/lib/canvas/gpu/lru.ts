@@ -1,6 +1,7 @@
 export type Lru<V> = {
   get: (key: string) => V | undefined;
   set: (key: string, value: V, bytes: number) => void;
+  drop: (key: string) => void;
   clear: () => void;
   readonly bytes: number;
 };
@@ -42,6 +43,15 @@ export function createLru<V>(budget: number, release: (key: string, value: V) =>
       entries.set(key, { value, bytes });
       total += bytes;
       evict(key);
+    },
+    drop(key) {
+      const e = entries.get(key);
+      if (!e || inUse(key)) {
+        return;
+      }
+      entries.delete(key);
+      total -= e.bytes;
+      release(key, e.value);
     },
     clear() {
       for (const [key, e] of entries) {
