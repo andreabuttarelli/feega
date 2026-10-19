@@ -19,6 +19,7 @@
 
   let widthPx = $state(readChatPanelPx());
   let prefill = $state<ChatPrefill | null>(null);
+  let held = $state(true);
 
   $effect(() => {
     const handoff = $page.data.handoff as ChatHandoff | null | undefined;
@@ -56,7 +57,7 @@
 </script>
 
 {#if open}
-  <div class="chat-pane" style={`--chat-w: ${widthPx}px;`}>
+  <div class="chat-pane" class:stowed={!held} style={`--chat-w: ${widthPx}px;`}>
     <div
       class="chat-resize-handle"
       role="separator"
@@ -66,7 +67,7 @@
       onpointerdown={onResizeStart}
     ></div>
     <div class="chat-column">
-      <BarSlot {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
+      <BarSlot bind:held {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
     </div>
   </div>
 {/if}
@@ -81,6 +82,10 @@
     display: flex;
     background: var(--ui-wash);
     border-left: 1px solid var(--ui-divider);
+  }
+
+  .stowed {
+    display: none;
   }
 
   .chat-resize-handle {

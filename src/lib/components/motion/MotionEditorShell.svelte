@@ -2197,7 +2197,7 @@
     {#snippet chat()}
     <aside class="chat" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Chat</span><span class="editing" data-testid="chat-editing">{editingLabel(editingName)}</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
-      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} /><BarSlot reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} properties={docked ? barProperties : undefined} />{/if}
+      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} />{/if}<BarSlot reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} properties={docked ? barProperties : undefined} />
     </aside>
     {/snippet}
     </SideColumn>
