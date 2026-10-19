@@ -4,9 +4,9 @@
   import { drawFrame, prepare, type DisplayList } from '$lib/motion/gpu-full/display-list';
   import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
   import { loadFonts } from '$lib/motion/gpu-full/text/load';
-  import { createCore, type CoreRaster } from '$lib/motion/gpu-full/core-web';
-  import { createMedia } from '$lib/motion/gpu-full/media';
-  import type { Viewport } from '$lib/canvas/dot-grid';
+  import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
+  import { createMedia, Readiness } from '$lib/motion/gpu-full/media';
+  import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
   import { visibleIds } from '$lib/canvas/gpu/camera';
   import { screenUses, type PutFrame } from '$lib/canvas/core/screen-uses';
   import { drawsWhole, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
@@ -19,7 +19,7 @@
   let { frames, cards = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
-  const BACKENDS = [createCore];
+  const BACKENDS = [createCore, createCoreGl];
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let raster = $state<CoreRaster | null>(null);
@@ -39,7 +39,9 @@
     const fonts = await loadFonts(source.doc, source.assets);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing: smoothingOf(navigator.userAgent) });
     const list = drawFrame(prepared, stillFrame(source.doc));
-    await media.ready(list);
+    if ((await media.ready(list)) === Readiness.Partial) {
+      return;
+    }
     lists = new Map(lists).set(keyOf(f), list);
   }
 
@@ -60,7 +62,11 @@
     for (const c of cards) {
       if (!cardLists.has(c.key) && !readying.has(c.key)) {
         readying.add(c.key);
-        void media.ready(c.frame.list).then(() => (cardLists = new Map(cardLists).set(c.key, c.frame.list)));
+        void media.ready(c.frame.list).then((readiness) => {
+          if (readiness === Readiness.Whole) {
+            cardLists = new Map(cardLists).set(c.key, c.frame.list);
+          }
+        });
       }
     }
   });
@@ -142,7 +148,7 @@
   $effect(() => () => media.dispose());
 </script>
 
-<canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+<canvas class="core-frames" bind:this={canvas} style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
 
 <style>
   .core-frames {

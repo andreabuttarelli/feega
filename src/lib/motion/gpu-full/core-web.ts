@@ -5,6 +5,7 @@ import type { Rgba } from './rgba';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
 
+type Size = { width: number; height: number };
 type Attached = { draw: (list: string) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; drop_group: (key: string) => void; free: () => void };
 
 export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine };
@@ -85,7 +86,37 @@ export async function createCore(canvas: HTMLCanvasElement, width: number, heigh
   return rasterOf(await core.WebCore.attach(canvas, width, height));
 }
 
+export const GL_PICTURE_SIDE = 2048;
+
+export function glPictureSize(size: Size): Size {
+  const scale = Math.min(1, GL_PICTURE_SIDE / Math.max(size.width, size.height));
+  return { width: Math.round(size.width * scale), height: Math.round(size.height * scale) };
+}
+
+function fitted(source: unknown, size: Size): { source: unknown; size: Size } {
+  const fit = glPictureSize(size);
+  if (fit.width === size.width && fit.height === size.height) {
+    return { source, size };
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = fit.width;
+  canvas.height = fit.height;
+  canvas.getContext('2d')!.drawImage(source as CanvasImageSource, 0, 0, fit.width, fit.height);
+  return { source: canvas, size: fit };
+}
+
+const GL_CONTEXT = { antialias: false, depth: true };
+
 export async function createCoreGl(canvas: HTMLCanvasElement, width: number, height: number): Promise<CoreRaster> {
+  if (!canvas.getContext('webgl2', GL_CONTEXT)) {
+    throw new Error('webgl2 unavailable');
+  }
   const core = await coreModule();
-  return rasterOf(core.WebGlCore.attach(canvas, width, height));
+  const attached = core.WebGlCore.attach(canvas, width, height);
+  const picture = attached.picture.bind(attached);
+  attached.picture = (clip, source, w, h) => {
+    const fit = fitted(source, { width: w, height: h });
+    picture(clip, fit.source, fit.size.width, fit.size.height);
+  };
+  return rasterOf(attached);
 }
