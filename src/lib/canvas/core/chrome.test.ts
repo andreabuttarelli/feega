@@ -3,7 +3,10 @@ import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 import { rgbaOf } from '$lib/motion/gpu-full/rgba';
 import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
-import { tileChrome, ChromePart, type ChromeTile, type Glyphs } from './chrome';
+import { tileChrome, ChromePart, PortState, type ChromeTile, type Glyphs } from './chrome';
+import type { ConnectorType } from '$lib/canvas/connectors';
+
+const marks = (...types: ConnectorType[]) => types.map((type) => ({ type, state: PortState.Quiet }));
 
 const box = (contours: number[][]) => {
   const xs = contours.flatMap((c) => c.filter((_, i) => i % 2 === 0));
@@ -24,7 +27,7 @@ const tile = (over: Partial<ChromeTile> = {}): ChromeTile => ({
   hovered: false,
   ringColor: '#7c5cff',
   inputs: [],
-  output: null,
+  outputs: [],
   label: null,
   icon: null,
   names: false,
@@ -59,7 +62,7 @@ describe('tileChrome', () => {
   });
 
   it('spaces input ports evenly on the left edge, outside the box, in their connector colour', () => {
-    const ports = ofPart(tile({ inputs: ['text', 'images'] }), ChromePart.PortIn);
+    const ports = ofPart(tile({ inputs: marks('text', 'images') }), ChromePart.PortIn);
 
     expect(ports.map((p) => box(p.contours))).toEqual([
       [90, 245, 100, 255],
@@ -69,7 +72,7 @@ describe('tileChrome', () => {
   });
 
   it('centres the output port on the right edge', () => {
-    const [port] = ofPart(tile({ output: 'videos' }), ChromePart.PortOut);
+    const [port] = ofPart(tile({ outputs: marks('videos') }), ChromePart.PortOut);
 
     expect(box(port.contours)).toEqual([400, 270, 410, 280]);
   });
@@ -86,20 +89,20 @@ describe('tileChrome', () => {
   });
 
   it('draws chrome above the ring order: hover, ring, ports, handles, label', () => {
-    const order = parts(tile({ ring: NodeChrome.Selected, handles: true, inputs: ['text'], output: 'text', label: 'Text' })).map((i) => i.clip.split(':')[1]);
+    const order = parts(tile({ ring: NodeChrome.Selected, handles: true, inputs: marks('text'), outputs: marks('text'), label: 'Text' })).map((i) => i.clip.split(':')[1]);
 
     expect([...new Set(order)]).toEqual([ChromePart.Ring, ChromePart.PortIn, ChromePart.PortOut, ChromePart.Handle, ChromePart.Label]);
   });
 
   it('names each port beside it, 16px outside, in its colour, only when asked', () => {
-    const t = tile({ inputs: ['text'], output: 'images', names: true });
+    const t = tile({ inputs: marks('text'), outputs: marks('images'), names: true });
     const names = ofPart(t, ChromePart.PortName);
 
     expect(names.map((n) => box(n.contours))).toEqual([
       [40, 270, 84, 281],
       [416, 270, 482, 281]
     ]);
-    expect(ofPart(tile({ inputs: ['text'] }), ChromePart.PortName)).toHaveLength(0);
+    expect(ofPart(tile({ inputs: marks('text') }), ChromePart.PortName)).toHaveLength(0);
   });
 
   it('puts the kind icon before the label and shifts the label past it', () => {
@@ -120,5 +123,20 @@ describe('tileChrome', () => {
     tileChrome(tile({ label: 'Image' }), (text, size, set) => (asked.push(set?.tracking), glyphs(text, size, set)));
 
     expect(asked).toEqual([0]);
+  });
+
+  it('dims ports a drag cannot reach and half-dims flagged ones', () => {
+    const t = tile({ inputs: [{ type: 'text', state: PortState.Off }, { type: 'images', state: PortState.Flagged }] });
+    const [off, flagged] = ofPart(t, ChromePart.PortIn);
+
+    expect(off.opacity).toBe(0.12);
+    expect(flagged.opacity).toBe(0.5);
+  });
+
+  it('rings a lit port 1px out, offset 1px, and names it', () => {
+    const t = tile({ outputs: [{ type: 'videos', state: PortState.Lit }] });
+
+    expect(box(ofPart(t, ChromePart.PortRing)[0].contours)).toEqual([398, 268, 412, 282]);
+    expect(ofPart(t, ChromePart.PortName)).toHaveLength(1);
   });
 });
