@@ -54,8 +54,10 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   let fonts: Promise<string> | null = null;
   const tool = () => (window as unknown as { htmlToImage: HtmlToImage }).htmlToImage;
 
+  const PRECISE_TEXT = '*{text-rendering:geometricPrecision}';
+  const preciseText = () => document.head.appendChild(Object.assign(document.createElement('style'), { textContent: PRECISE_TEXT }));
   const load = () =>
-    (lib ??= tool()
+    (lib ??= (preciseText(), tool())
       ? Promise.resolve()
       : new Promise((ok, ko) => {
           const s = document.createElement('script');
