@@ -24,6 +24,14 @@ describe('canvas scene', () => {
     expect(item.blur).toBe(4);
   });
 
+  it('places the items inside a group through the camera too', () => {
+    const grouped: FrameOnCanvas = { id: 'g', box: { x: 0, y: 0, w: 200, h: 100 }, list: { ...doc([]), items: [{ kind: ItemKind.Group, clip: 'g', items: [square('g-a')], opacity: 1, matrix: [1, 0, 0, 1, 0, 0], blur: 0, blend: BlendMode.Normal }] } };
+
+    const [, group] = canvasScene([grouped], { x: 10, y: 20, zoom: 0.5 }, SCREEN, new Set(), LOOK).items;
+
+    expect(group.kind === ItemKind.Group && group.items[0].matrix).toEqual([1, 0, 0, 1, 15, 25]);
+  });
+
   it('clips every item to its frame on screen', () => {
     const scene = canvasScene([frame('f', 100)], { x: 0, y: 0, zoom: 1 }, SCREEN, new Set(), LOOK);
     expect(paths(scene)[1].scissor).toEqual([100, 0, 300, 100]);
