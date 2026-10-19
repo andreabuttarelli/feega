@@ -14,7 +14,7 @@ const rectContour = ([x0, y0, x1, y1]: Scissor) => [x0, y0, x1, y0, x1, y1, x0, 
 
 const onScreen = (view: Viewport, b: Box): Scissor => [view.x + b.x * view.zoom, view.y + b.y * view.zoom, view.x + (b.x + b.w) * view.zoom, view.y + (b.y + b.h) * view.zoom];
 
-const visible = ([x0, y0, x1, y1]: Scissor, screen: Screen) => x1 >= 0 && y1 >= 0 && x0 <= screen.width && y0 <= screen.height;
+const visible = ([x0, y0, x1, y1]: Scissor, screen: Screen, reach: number) => x1 >= -reach && y1 >= -reach && x0 <= screen.width + reach && y0 <= screen.height + reach;
 
 const solid = (clip: string, contours: number[][], color: Rgba, rule = FillRule.NonZero): PathItem => ({ kind: ItemKind.Path, clip, contours, rule, paint: { kind: PaintKind.Solid, color }, opacity: 1, matrix: [1, 0, 0, 1, 0, 0], blur: 0, blend: BlendMode.Normal });
 
@@ -59,8 +59,8 @@ function ring(id: string, [x0, y0, x1, y1]: Scissor, look: SceneLook): PathItem 
   return solid(`selection:${id}`, [rectContour([x0 - w, y0 - w, x1 + w, y1 + w]), rectContour([x0, y0, x1, y1])], look.selection, FillRule.EvenOdd);
 }
 
-export function canvasScene(frames: FrameOnCanvas[], view: Viewport, screen: Screen, selected: ReadonlySet<string>, look: SceneLook): DisplayList {
-  const shown = frames.map((f) => ({ f, rect: onScreen(view, f.box) })).filter(({ rect }) => visible(rect, screen));
+export function canvasScene(frames: FrameOnCanvas[], view: Viewport, screen: Screen, selected: ReadonlySet<string>, look: SceneLook, reach = 0): DisplayList {
+  const shown = frames.map((f) => ({ f, rect: onScreen(view, f.box) })).filter(({ rect }) => visible(rect, screen, reach));
   const rings = shown.filter(({ f }) => selected.has(f.id)).map(({ f, rect }) => ring(f.id, rect, look));
   return {
     width: screen.width,
