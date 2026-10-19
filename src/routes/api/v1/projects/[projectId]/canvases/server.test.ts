@@ -10,7 +10,7 @@ const findReachableProject = vi.fn();
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject }));
 
 const listCanvases = vi.fn();
-vi.mock('$lib/server/repos/canvas', () => ({ listCanvases }));
+vi.mock('$lib/server/repos/canvas', async (original) => ({ ...(await original<object>()), listCanvases }));
 
 const { GET } = await import('./+server');
 
