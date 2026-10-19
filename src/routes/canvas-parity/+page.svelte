@@ -17,7 +17,7 @@
   import type { ImageItem, Item } from '$lib/motion/gpu-full/display-list';
   import type { Affine } from '$lib/motion/parent';
   import { cardItems, type CoreCard } from '$lib/canvas/core/cards';
-  import { tileChrome } from '$lib/canvas/core/chrome';
+  import { PortState, tileChrome } from '$lib/canvas/core/chrome';
   import { iconContours } from '$lib/canvas/core/icon-outline';
   import { glyphsOf } from '$lib/canvas/core/glyphs';
   import { ssim, type Pixels } from '$lib/canvas/core/ssim';
@@ -80,6 +80,7 @@
     return (item: ImageItem) => bySrc.get(item.src) ?? null;
   }
 
+  const quiet = (type: ConnectorType) => ({ type, state: PortState.Quiet });
   const portsFor = (kind: keyof typeof NODE_PORTS) => {
     const { inputs, output } = NODE_PORTS[kind];
     return { inputs: Array.isArray(inputs) ? [...inputs] : SAMPLE_INPUTS, output: (output && output in CONNECTOR_STYLE ? output : 'images') as ConnectorType };
@@ -111,7 +112,7 @@
     const items = cards.flatMap((c) => {
       const ports = portsFor(c.kind);
       const chrome = withChrome
-        ? tileChrome({ id: c.id, x: c.x, y: c.y, width: c.w, height: c.h, ring: NodeChrome.None, handles: false, hovered: false, ringColor: theme.accent, inputs: ports.inputs, output: ports.output, label: NODE_KIND_LABEL[c.kind], icon: icons.get(c.kind) ?? null, names: false }, glyphs)
+        ? tileChrome({ id: c.id, x: c.x, y: c.y, width: c.w, height: c.h, ring: NodeChrome.None, handles: false, hovered: false, ringColor: theme.accent, inputs: ports.inputs.map(quiet), outputs: [quiet(ports.output)], label: NODE_KIND_LABEL[c.kind], icon: icons.get(c.kind) ?? null, names: false }, glyphs)
         : [];
       return [...cardItems(c as CoreCard, coreTheme, glyphs, bold), ...chrome];
     });
