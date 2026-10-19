@@ -110,7 +110,9 @@
 
   @media (max-width: 767px) {
     .chat-pane {
+      flex: 1 1 auto;
       width: 100%;
+      height: auto;
       border-left: 0;
       background: var(--ui-panel);
     }

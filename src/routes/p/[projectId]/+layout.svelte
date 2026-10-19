@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { _ } from 'svelte-i18n';
   import { modeOf, ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
   import { page } from '$app/state';
@@ -32,9 +33,15 @@
   import type { ShareState } from '$lib/canvas/shared-view';
   import { handoffOf } from '$lib/canvas/chat-handoff';
   import { editingLabel, propertiesRequest, propertiesTarget } from '$lib/canvas/phone-properties';
+  import PhoneSheet from '$lib/components/canvas/PhoneSheet.svelte';
+  import LayersPanel from '$lib/components/canvas/LayersPanel.svelte';
+  import { Density } from '$lib/canvas/layer-density';
+  import { PhoneSheetKind, phoneSheets } from '$lib/canvas/phone-sheets.svelte';
+  import { Detent } from '$lib/motion/sheet-detents';
 
   let { data, children } = $props();
 
+  const PHONE_SWITCH_PX = 64;
   const CANVAS_ROUTE_ID = '/p/[projectId]/c/[canvasId]';
   const onCanvasRoute = $derived(page.route.id === CANVAS_ROUTE_ID);
 
@@ -86,7 +93,7 @@
       return;
     }
     chatOpen = true;
-    mobileView = untrack(() => showView(mobileView, 'chat'));
+    showMobile('chat');
   });
 
   $effect(() => {
@@ -102,7 +109,7 @@
     }
     chatOpen = true;
     writeChatOpen(true);
-    mobileView = untrack(() => showView(mobileView, 'chat'));
+    showMobile('chat');
   });
 
   function onRailPanel(entry: NavEntry) {
@@ -147,11 +154,29 @@
 
   $effect(() => {
     void page.url.pathname;
-    mobileView = untrack(() => showView(mobileView, 'canvas'));
+    showMobile('canvas');
+  });
+
+  const SHEET_OF: Record<MobileView, PhoneSheetKind | null> = { canvas: null, chat: PhoneSheetKind.Chat };
+
+  function showMobile(view: MobileView) {
+    untrack(() => {
+      mobileView = showView(mobileView, view);
+      phoneSheets.shown = SHEET_OF[view];
+    });
+  }
+
+  $effect(() => {
+    const chatShown = phoneSheets.shown === PhoneSheetKind.Chat;
+    untrack(() => {
+      if (chatShown !== (mobileView.view === 'chat')) {
+        mobileView = showView(mobileView, chatShown ? 'chat' : 'canvas');
+      }
+    });
   });
 
   function onMobileView(view: MobileView) {
-    mobileView = showView(mobileView, view);
+    showMobile(view);
     if (view === 'canvas') {
       revealCanvas();
     }
@@ -167,7 +192,7 @@
   }
 
   const viewSwitch = $derived(
-    onCanvasRoute && !inlineStage.editing ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView, properties: { target: $propertiesTarget?.name ?? null, onopen: openProperties } } : null
+    onCanvasRoute && !inlineStage.editing ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView, properties: { target: $propertiesTarget?.name ?? null, onopen: openProperties }, layers: phoneSheets.shown === PhoneSheetKind.Layers, onlayers: () => phoneSheets.toggle(PhoneSheetKind.Layers), inserting: phoneSheets.shown === PhoneSheetKind.Insert, oninsert: () => phoneSheets.toggle(PhoneSheetKind.Insert) } : null
   );
 
   const canEdit = $derived(can(data.org.role, OrgAction.Edit));
@@ -199,13 +224,18 @@
       backHref={onCanvasRoute ? null : (data.canvases[0]?.href ?? `/p/${projectId}`)}
     />
     <main class="mobile-main" class:is-canvas={onCanvasRoute} class:is-typing={typing}>
-      <div class="mobile-view" class:is-hidden={mobileView.view === 'chat'}>
+      <div class="mobile-view">
         {@render children()}
       </div>
-      <div class="mobile-chat" class:is-hidden={mobileView.view !== 'chat'} data-testid="mobile-chat">
+      <PhoneSheet name="canvas-chat" title={$_('app.shell.mobile.chat')} open={mobileView.view === 'chat'} onclose={() => onMobileView('canvas')} floorPx={typing ? 0 : PHONE_SWITCH_PX} opensAt={Detent.Full} testid="mobile-chat">
         <CanvasChatPanel open={true} />
         {#if $propertiesTarget}<span class="editing" data-testid="canvas-chat-editing">{editingLabel($propertiesTarget.name)}</span>{/if}
-      </div>
+      </PhoneSheet>
+      {#if onCanvasRoute}
+        <PhoneSheet name="canvas-layers" title={$_('app.nav2.layers')} open={phoneSheets.shown === PhoneSheetKind.Layers} onclose={() => phoneSheets.close(PhoneSheetKind.Layers)} floorPx={PHONE_SWITCH_PX} testid="mobile-layers">
+          <LayersPanel density={Density.Touch} />
+        </PhoneSheet>
+      {/if}
       {#if viewSwitch && !typing}
         <MobileViewSwitch {...viewSwitch} />
       {/if}
@@ -328,14 +358,11 @@
   }
   .mobile-main.is-canvas {
     overflow: hidden;
+    --mobile-stack-top: calc(var(--mobile-bar-clearance) + var(--mobile-stack-gap));
   }
   .project-shell.is-editing .mobile-main :global(.runs),
   .project-shell.is-editing .mobile-main :global(.save-status) {
     display: none;
-  }
-  .mobile-main.is-canvas:has(.mobile-view:not(.is-hidden) :global([data-testid='add-bar'])) {
-    --mobile-switch-bottom: calc(var(--mobile-bar-clearance) + var(--mobile-stack-gap));
-    --mobile-stack-top: calc(var(--mobile-switch-bottom) + var(--mobile-bar-h) + var(--mobile-stack-gap));
   }
   .mobile-main.is-canvas .mobile-view {
     height: 100%;
@@ -343,15 +370,9 @@
   .mobile-main:not(.is-canvas) {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  .mobile-view.is-hidden {
-    visibility: hidden;
-  }
   .editing {
-    position: absolute;
-    z-index: 2;
-    top: var(--ui-space-2);
-    left: 50%;
-    transform: translateX(-50%);
+    order: -1;
+    align-self: center;
     max-width: calc(100% - 32px);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -362,18 +383,5 @@
     color: var(--ui-accent);
     font-size: var(--ui-text-xs);
     font-weight: 500;
-  }
-
-  .mobile-chat.is-hidden {
-    display: none;
-  }
-  .mobile-chat {
-    position: absolute;
-    inset: 0;
-    padding-bottom: var(--mobile-bar-clearance);
-    background: var(--paper, #fff);
-  }
-  .mobile-main.is-typing .mobile-chat {
-    padding-bottom: 0;
   }
 </style>

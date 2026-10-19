@@ -22,6 +22,9 @@
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { page } from '$app/state';
   import { SOCIAL_PUBLISHING_SURFACE, visibleUnder } from '$lib/social-publishing';
+  import { MOBILE_QUERY } from '$lib/breakpoints';
+  import { PhoneSheetKind, phoneSheets } from '$lib/canvas/phone-sheets.svelte';
+  import PhoneSheet from './PhoneSheet.svelte';
 
   let {
     onpick,
@@ -33,6 +36,8 @@
   }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; context?: BarContext; zoom?: number } = $props();
 
   const PERCENT = 100;
+  const SWITCH_PX = 64;
+  const FRAME_TABS_PX = 56;
 
   let barEl = $state<HTMLElement | null>(null);
   let timelinePx = $state(0);
@@ -133,6 +138,48 @@
   ];
 
   const SELECT_TOOL = SHAPE_TOOLS.find((t) => t.tool === DrawTool.Select)!;
+
+  let phone = $state(typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches);
+
+  $effect(() => {
+    const query = matchMedia(MOBILE_QUERY);
+    const follow = () => (phone = query.matches);
+    query.addEventListener('change', follow);
+    return () => query.removeEventListener('change', follow);
+  });
+
+  type Tile = { id: string; label: string; icon: (typeof SHAPE_TOOLS)[number]['icon'] | typeof PenTool; run: () => void };
+  type Section = { title: string; tiles: Tile[] };
+
+  const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], icon: ADDABLE_ICON[what], run: () => onpick?.(what) });
+  const drawTiles = $derived(DRAW_TOOLS.filter((t) => t.tool !== DrawTool.Select).map((t) => ({ id: `draw-${t.tool}`, label: t.name, icon: t.icon, run: () => (frameBar.tool = t.tool) })));
+  const UPLOAD_TILE: Tile = { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile };
+
+  const INSERT_SECTIONS: Record<BarContext, () => Section[]> = {
+    [BarContext.Canvas]: () => [
+      { title: 'Design', tiles: drawTiles },
+      { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...visibleUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.addable, CANVAS_BAR_MORE)].map(addTile) },
+      { title: 'Media', tiles: [UPLOAD_TILE] },
+      {
+        title: 'Templates',
+        tiles: [
+          ...(ontemplate ? [{ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }] : []),
+          ...(onframes ? [{ id: 'frame-templates', label: 'Frame templates', icon: Clapperboard, run: onframes }] : [])
+        ]
+      }
+    ],
+    [BarContext.Frame]: () => [
+      { title: 'Design', tiles: drawTiles },
+      { title: 'Media', tiles: [{ id: 'image', label: 'Insert image', icon: ImagePlus, run: () => frameBar.host?.act(FrameAction.Image) }] },
+      { title: 'Templates', tiles: [{ id: 'frame-library', label: 'Frame templates', icon: LayoutTemplate, run: () => frameBar.host?.act(FrameAction.Library) }] }
+    ]
+  };
+  const insertSections = $derived(INSERT_SECTIONS[context]().filter((section) => section.tiles.length));
+
+  function insert(tile: Tile) {
+    phoneSheets.close(PhoneSheetKind.Insert);
+    tile.run();
+  }
 
   const SLOT: Record<BarSlot, Snippet> = {
     [BarSlot.Mode]: modeSlot,
@@ -277,7 +324,7 @@
   </span>
 {/snippet}
 
-<div bind:this={barEl} class="add-bar" class:covered={barHidden(context, frameBar.covered)} class:stowed={!barShown(context, frameBar.editMode)} aria-hidden={!barShown(context, frameBar.editMode)} inert={!barShown(context, frameBar.editMode)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
+<div bind:this={barEl} class="add-bar" class:phone class:covered={barHidden(context, frameBar.covered)} class:stowed={!barShown(context, frameBar.editMode)} aria-hidden={!barShown(context, frameBar.editMode)} inert={!barShown(context, frameBar.editMode)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
   {#key `${context}:${mode}`}
     <div class="group" data-testid={`bar-${context}`}>
       {#each barSlots(context, mode) as s (s)}{@render SLOT[s]()}{/each}
@@ -319,7 +366,59 @@
   {/if}
 </div>
 
+{#if phone}
+  <PhoneSheet name="insert" title="Insert" open={phoneSheets.shown === PhoneSheetKind.Insert} onclose={() => phoneSheets.close(PhoneSheetKind.Insert)} floorPx={context === BarContext.Frame ? FRAME_TABS_PX : SWITCH_PX} testid="insert-sheet">
+    {#each insertSections as section (section.title)}
+      <h4 class="insert-head">{section.title}</h4>
+      <div class="insert-grid">
+        {#each section.tiles as tile (tile.id)}
+          <button type="button" class="insert-tile" data-insert={tile.id} onclick={() => insert(tile)}>
+            <tile.icon size={22} strokeWidth={1.6} />
+            <span>{tile.label}</span>
+          </button>
+        {/each}
+      </div>
+    {/each}
+  </PhoneSheet>
+{/if}
+
 <style>
+  .add-bar.phone {
+    display: none;
+  }
+
+  .insert-head {
+    margin: 12px 8px 6px;
+    font-size: var(--ui-type-caption);
+    font-weight: var(--ui-weight-semibold);
+    color: var(--ui-text-secondary);
+  }
+
+  .insert-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 6px;
+  }
+
+  .insert-tile {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 6px;
+    min-height: 76px;
+    padding: 8px 4px;
+    border: 0;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font-size: var(--ui-type-caption);
+    text-align: center;
+  }
+
+  .insert-tile:active {
+    background: var(--ui-pressed);
+  }
+
   .add-bar.covered {
     visibility: hidden;
   }

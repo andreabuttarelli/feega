@@ -44,7 +44,12 @@
   import { PickMode, clipActions, parentChoices } from '$lib/motion/clip-bar';
   import type { Point } from '$lib/motion/press-menu';
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
-  import { Detent, nearestDetent, nextDetent, sheetHeight } from '$lib/motion/sheet-detents';
+  import { Detent, fitHeight, nearestDetent, readSheetPx, settleHeight, sheetHeight, tapHeight, writeSheetPx } from '$lib/motion/sheet-detents';
+  import LayersPanel from '$lib/components/canvas/LayersPanel.svelte';
+  import { Density } from '$lib/canvas/layer-density';
+  import { PhoneSheetKind, phoneSheets } from '$lib/canvas/phone-sheets.svelte';
+  import LayersIcon from '@lucide/svelte/icons/layers';
+  import PlusIcon from '@lucide/svelte/icons/plus';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
   import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, OpensOn, defaultTimelinePx, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
@@ -211,7 +216,7 @@
 
   const phoneMore = (item: BarItem) => viewport === Viewport.Phone && ON_PHONE[item] === PhonePlace.More;
 
-  const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
+  const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent', Layers: 'layers' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
   let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: { width: number; height: number }) => void) | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
@@ -273,7 +278,8 @@
   const analysing = new Set<string>();
   let sheet = $state<Sheet>(Sheet.None);
   let detent = $state(Detent.Half);
-  let openAt = Detent.Half;
+  let openAt: Detent | null = null;
+  let sheetPxSet = $state<number | null>(null);
   let sheetDrag = $state<{ y: number; from: number; height: number } | null>(null);
   let stageEl = $state<HTMLElement | null>(null);
   let selectedPart = $state<string | null>(null);
@@ -854,18 +860,37 @@
   function peekChat() {
     if (sheet === Sheet.Agent) {
       detent = Detent.Peek;
+      sheetPxSet = null;
     }
   }
 
   const transport = $derived(transportOf(viewport, sheet === Sheet.Agent ? detent : null));
   const floorPx = $derived(sheetFloor(transport));
   const sheetRoom = () => ({ viewport: viewportH, stageBottom: stageEl?.getBoundingClientRect().bottom ?? 0, floor: floorPx });
-  const sheetPx = $derived(sheetDrag?.height ?? (viewportH ? sheetHeight(detent, sheetRoom()) : 0));
+  const sheetPx = $derived(sheetDrag?.height ?? (viewportH ? fitHeight(sheetPxSet ?? sheetHeight(detent, sheetRoom()), sheetRoom()) : 0));
 
   $effect(() => {
-    void sheet;
-    detent = openAt;
-    openAt = Detent.Half;
+    const shown = sheet;
+    untrack(() => openSheet(shown));
+  });
+
+  function openSheet(shown: Sheet) {
+    const remembered = openAt ? null : readSheetPx(localStore(), shown);
+    sheetPxSet = remembered;
+    detent = openAt ?? (remembered !== null && viewportH ? nearestDetent(remembered, sheetRoom()) : Detent.Half);
+    openAt = null;
+  }
+
+  $effect(() => {
+    if (sheet !== Sheet.None) {
+      untrack(() => phoneSheets.close(PhoneSheetKind.Insert));
+    }
+  });
+
+  $effect(() => {
+    if (phoneSheets.shown === PhoneSheetKind.Insert) {
+      untrack(() => (sheet = Sheet.None));
+    }
   });
 
   function grabSheet(e: PointerEvent) {
@@ -884,8 +909,11 @@
       return;
     }
     const moved = !isTap({ x: 0, y: sheetDrag.y }, { x: 0, y: e.clientY });
-    detent = moved ? nearestDetent(sheetDrag.height, sheetRoom()) : nextDetent(detent);
+    const room = sheetRoom();
+    sheetPxSet = moved ? settleHeight(sheetDrag.height, room) : tapHeight(sheetPx, room);
+    detent = nearestDetent(sheetPxSet, room);
     sheetDrag = null;
+    writeSheetPx(localStore(), sheet, sheetPxSet);
   }
 
   const LAND: Record<Landing, (shown: AgentDraft) => void> = {
@@ -2173,6 +2201,12 @@
     </aside>
     {/snippet}
     </SideColumn>
+    {#if viewport === Viewport.Phone}
+    <aside class="layers-sheet" class:open={sheet === Sheet.Layers} aria-label="Layers">
+      <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Layers</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
+      {#if sheet === Sheet.Layers}<div class="sheet-body"><LayersPanel density={Density.Touch} /></div>{/if}
+    </aside>
+    {/if}
 
     <section class="timeline-area" class:gone={!controlShown(doc, VideoControl.Timeline)} bind:this={timelineEl} bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
@@ -2240,6 +2274,8 @@
   </div>
 
   <nav class="tabs" bind:this={tabsEl} {...dockOf(Part.Tabs)} aria-label="Panels">
+    <button type="button" class="icon-tab" class:on={phoneSheets.shown === PhoneSheetKind.Insert} aria-pressed={phoneSheets.shown === PhoneSheetKind.Insert} aria-label="Insert" data-testid="phone-tab-insert" onclick={() => phoneSheets.toggle(PhoneSheetKind.Insert)}><PlusIcon size={18} aria-hidden="true" /></button>
+    <button type="button" class:on={sheet === Sheet.Layers} aria-pressed={sheet === Sheet.Layers} data-testid="phone-tab-layers" onclick={() => (sheet = sheet === Sheet.Layers ? Sheet.None : Sheet.Layers)}><LayersIcon size={18} aria-hidden="true" />Layers</button>
     <button type="button" class:on={sheet === Sheet.Properties} aria-pressed={sheet === Sheet.Properties} data-testid="phone-tab-properties" onclick={() => (sheet = sheet === Sheet.Properties ? Sheet.None : Sheet.Properties)}><SlidersHorizontal size={18} aria-hidden="true" />Properties</button>
     <button type="button" class:on={sheet === Sheet.Agent} aria-pressed={sheet === Sheet.Agent} data-testid="phone-tab-chat" onclick={() => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)}><MessageCircle size={18} aria-hidden="true" />Chat</button>
   </nav>
@@ -3153,6 +3189,7 @@
   }
 
   [data-viewport='phone']:not([data-dragging]) .props,
+  [data-viewport='phone']:not([data-dragging]) .layers-sheet,
   [data-viewport='phone']:not([data-dragging]) .chat {
     transition: bottom 160ms ease, height 160ms ease;
   }
@@ -3222,13 +3259,15 @@
   }
 
   [data-viewport='phone'] .props,
+  [data-viewport='phone'] .layers-sheet,
   [data-viewport='phone'] .chat {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--sheet-floor);
+    bottom: calc(var(--sheet-floor) + env(safe-area-inset-bottom, 0px));
     height: var(--sheet-h);
-    z-index: 30;
+    z-index: 80;
+    border-radius: var(--ui-radius-lg) var(--ui-radius-lg) 0 0;
     display: none;
     flex-direction: column;
     background: var(--ui-raised);
@@ -3236,12 +3275,38 @@
   }
 
   [data-viewport='phone'] .props.open,
+  [data-viewport='phone'] .layers-sheet.open,
   [data-viewport='phone'] .chat.open {
     display: flex;
   }
 
   [data-viewport='phone'] .props.open {
-    overflow: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: var(--ui-space-4);
+  }
+
+  [data-viewport='phone'] .props > .sheet-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: inherit;
+  }
+
+  .layers-sheet {
+    display: none;
+  }
+
+  .layers-sheet .sheet-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 8px 8px;
+  }
+
+  .editor[data-mount='canvas'] .layers-sheet {
+    background: var(--ui-bg);
   }
 
   .grabber {
@@ -3314,6 +3379,10 @@
     font-size: 13px;
     font-weight: 500;
     color: var(--ui-text-2);
+  }
+
+  .tabs button.icon-tab {
+    flex: 0 0 44px;
   }
 
   .tabs button.on {

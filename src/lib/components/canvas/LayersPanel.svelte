@@ -26,6 +26,8 @@
   import PartsProbe from './PartsProbe.svelte';
   import { rowWindow } from '$lib/canvas/row-window';
   import { IconButton, IconSize, Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
+  import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import { Density, ROW_STEP_PX } from '$lib/canvas/layer-density';
   import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayer, dropPlace, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
@@ -33,7 +35,8 @@
   const INDENT_PX = 14;
   const FOLD_GUTTER = 24;
   const PROBE_LANES = 6;
-  const ROW_STEP_PX = 33;
+  let { density = Density.Pointer }: { density?: Density } = $props();
+  const rowStep = $derived(ROW_STEP_PX[density]);
   const OVERSCAN = 8;
   const FALLBACK_VIEW_PX = 1000;
 
@@ -136,7 +139,7 @@
     }
     const index = untrack(() => shown.findIndex((r) => r.id === first));
     if (index >= 0) {
-      scroller.scrollTop = listTop + index * ROW_STEP_PX - scroller.clientHeight / 2;
+      scroller.scrollTop = listTop + index * rowStep - scroller.clientHeight / 2;
     }
   });
 
@@ -162,7 +165,7 @@
   const inside = $derived(rowsInside(rows, isPicked));
   let query = $state('');
   const shown = $derived(searchRows(rows, query));
-  const span = $derived(rowWindow({ ...view, count: shown.length, rowPx: ROW_STEP_PX, overscan: OVERSCAN }));
+  const span = $derived(rowWindow({ ...view, count: shown.length, rowPx: rowStep, overscan: OVERSCAN }));
   const visible = $derived(shown.slice(span.start, span.end));
   const ROW_HUE: Record<string, string> = { motion: 'var(--ui-type-frame)', image: 'var(--ui-type-media)', video: 'var(--ui-type-media)', text: 'var(--ui-type-text)' };
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
@@ -270,7 +273,7 @@
 <input class="search" type="search" placeholder="Search layers…" aria-label="Search layers" data-testid="layers-search" bind:value={query} />
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="layers" bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" style:padding-top={`${span.start * ROW_STEP_PX}px`} style:padding-bottom={`${(shown.length - span.end) * ROW_STEP_PX}px`} onkeydown={onKey}>
+<div class="layers" class:touch={density === Density.Touch} bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" style:padding-top={`${span.start * rowStep}px`} style:padding-bottom={`${(shown.length - span.end) * rowStep}px`} onkeydown={onKey}>
   {#each visible as row (`${row.nodeId}/${row.key}`)}
     {@const RowIcon = KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square}
     <div
@@ -314,6 +317,10 @@
         <input class="name-input" value={row.label} autofocus aria-label="Track name" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
       {:else}
         <span class="name">{row.label}</span>
+      {/if}
+      {#if density === Density.Touch && editable(row) && isPicked(row)}
+        <IconButton size={IconSize.Sm} label="Bring forward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Up, SUMMARY[LayerAction.Up]))}><ChevronUp /></IconButton>
+        <IconButton size={IconSize.Sm} label="Send backward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Down, SUMMARY[LayerAction.Down]))}><ChevronDown /></IconButton>
       {/if}
       {#if editable(row)}
         <IconButton size={IconSize.Sm} label={eyeLabel(row)} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
@@ -391,6 +398,19 @@
     cursor: default;
     user-select: none;
     transition: background-color var(--ui-dur-fast) var(--ui-ease);
+  }
+
+  .layers.touch {
+    --ui-row: 44px;
+  }
+
+  .layers.touch :global(button) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .layers.touch .fold {
+    margin-left: -30px;
   }
 
   .row:hover {
