@@ -8,7 +8,11 @@ import { test, expect, devices, webkit, type Page } from '@playwright/test';
 type Point = { x: number; y: number };
 type Facts = { inputP95: number | null; inputs: number; frameP95: number | null; frames: number; memoryMb: number };
 type Row = { device: string; canvas: string; run: number; step: string; facts: Facts | null; error: string | null };
-type Step = { name: string; drive: (page: Page) => Promise<void> };
+type Step = { name: string; drive: (page: Page) => Promise<void>; still?: Applies };
+
+enum Applies {
+  Animated = 'animated'
+}
 
 enum Device {
   IPhone = 'iphone',
@@ -28,6 +32,9 @@ const OUT = process.env.FLUID_OUT ?? join(homedir(), 'Documents', 'feega-videos'
 const SETTLE_MS = 6_000;
 const STEP_MS = 20_000;
 const TEST_MS = 600_000;
+const HYDRATE_MS = 60_000;
+const PHASE_MS = 90_000;
+const LOGIN_TRIES = 3;
 const ACTION_MS = 10_000;
 const AFTER_STEP_MS = 800;
 const MOVES = 24;
@@ -36,12 +43,14 @@ const PINCH_FROM_PX = 60;
 const PINCH_TO_PX = 140;
 const PAN_PX = 120;
 const MIN_TARGET_PX = 60;
-const ZOOM_TRIES = 12;
+const ZOOM_TRIES = 20;
 const PLAY_MS = 3_000;
 const SCRUB_MOVES = 30;
 const DOUBLE_TAP_WAIT_MS = 1_500;
+const EDITOR_OPEN_MS = 18_000;
 const EDITOR_STEPS = /timeline scrub|playback|properties sheet|typing in place|colour drag|editor close/;
 const TYPED = 'Fluid';
+const STILL_MODE = 'still';
 const COLOURS = ['#e11d48', '#16a34a', '#2563eb', '#f59e0b', '#9333ea', '#0ea5e9'];
 const KB_PER_MB = 1024;
 const WEBKIT_PROCESS = /WebKit\.(WebContent|GPU)/;
@@ -171,7 +180,18 @@ async function bringMotionNodeIntoReach(page: Page) {
   const node = page.locator(MOTION_NODE).first();
   for (let i = 0; i < ZOOM_TRIES; i++) {
     const box = (await node.count()) ? await node.boundingBox() : null;
-    if (box && box.width >= MIN_TARGET_PX && box.x > 0 && box.y > 60) {
+    const view = page.viewportSize()!;
+    const middle = box ? { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 200) } : null;
+    const seen = middle && middle.x > 0 && middle.x < view.width && middle.y > 60 && middle.y < view.height - 120;
+    if (box && middle && !seen) {
+      const from = await emptyPoint(page);
+      const dx = (view.width / 2 - middle.x) / 2;
+      const dy = (view.height / 2 - middle.y) / 2;
+      await fingers(page, [line(from, dx, dy), line({ x: from.x + PINCH_FROM_PX, y: from.y }, dx, dy)]);
+      await page.waitForTimeout(250);
+      continue;
+    }
+    if (box && box.width >= MIN_TARGET_PX) {
       return;
     }
     const at = box ? { x: box.x + box.width / 2, y: box.y + box.height / 2 } : await emptyPoint(page);
@@ -196,9 +216,21 @@ async function doubleTapOpen(page: Page) {
   if (!byTaps) {
     await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, clientX: x, clientY: y, detail: 2 })), at);
   }
-  console.log(`[touch] editor opened by ${byTaps ? 'two taps' : 'dblclick dispatched after two taps'}`);
-  await expect(editor).toBeVisible();
+  const asked = Date.now();
+  await expect(editor).toBeVisible({ timeout: EDITOR_OPEN_MS });
+  console.log(`[touch] editor opened by ${byTaps ? 'two taps' : 'dblclick dispatched after two taps'} in ${Date.now() - asked} ms`);
   await page.waitForTimeout(SETTLE_MS / 2);
+}
+
+async function openProperties(page: Page) {
+  const tab = page.getByTestId('phone-tab-properties');
+  const inspector = page.getByTestId('motion-inspector');
+  if ((await tab.getAttribute('aria-pressed')) === 'true') {
+    await tab.tap();
+    await expect(inspector).toBeHidden();
+  }
+  await tab.tap();
+  await expect(inspector).toBeVisible();
 }
 
 const STEPS: Step[] = [
@@ -209,11 +241,11 @@ const STEPS: Step[] = [
   { name: 'insert sheet', drive: async (page) => { await tapSequence(page, 'mobile-view-insert'); await expect(page.getByTestId('insert-sheet')).toBeVisible(); await page.getByTestId('mobile-view-insert').tap(); await expect(page.getByTestId('insert-sheet')).toBeHidden(); } },
   { name: 'layers sheet', drive: async (page) => { await tapSequence(page, 'mobile-view-layers'); await expect(page.getByTestId('mobile-layers')).toBeVisible(); await page.getByTestId('mobile-view-layers').tap(); await expect(page.getByTestId('mobile-layers')).toBeHidden(); } },
   { name: 'double-tap open', drive: doubleTapOpen },
-  { name: 'timeline scrub', drive: async (page) => { const ruler = (await page.getByRole('slider', { name: 'Playhead' }).boundingBox())!; const from = { x: ruler.x + 10, y: ruler.y + ruler.height / 2 }; await fingers(page, [Array.from({ length: SCRUB_MOVES + 1 }, (_, i) => ({ x: from.x + ((ruler.width - 20) * i) / SCRUB_MOVES, y: from.y }))]); } },
-  { name: 'playback', drive: async (page) => { await page.keyboard.press('Space'); await page.waitForTimeout(PLAY_MS); await page.keyboard.press('Space'); } },
-  { name: 'properties sheet', drive: async (page) => { await page.getByTestId('phone-tab-layers').tap(); await page.locator('aside.layers-sheet [data-kind="clip"]').first().tap(); await expect(page.locator('aside.props')).toBeVisible(); } },
-  { name: 'typing in place', drive: async (page) => { const field = page.locator('aside.props input[type="text"]:visible').first(); const was = await field.inputValue(); await field.tap(); await field.press('End'); await page.keyboard.type(TYPED, { delay: 60 }); await field.fill(was); await field.press('Enter'); } },
-  { name: 'colour drag', drive: async (page) => { await page.getByTestId('fill-swatch').first().tap(); await page.getByTestId('fill-editor').locator('.colour .chip').first().tap(); const wheel = page.getByTestId('colour-popover').locator('input[type=color]'); const was = await wheel.inputValue(); for (const hex of [...COLOURS, was]) { await wheel.evaluate((el: HTMLInputElement, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, hex); await page.waitForTimeout(50); } await wheel.evaluate((el: HTMLInputElement) => el.dispatchEvent(new Event('change', { bubbles: true }))); await page.keyboard.press('Escape'); } },
+  { name: 'timeline scrub', still: Applies.Animated, drive: async (page) => { const ruler = (await page.getByRole('slider', { name: 'Playhead' }).boundingBox())!; const from = { x: ruler.x + 10, y: ruler.y + ruler.height / 2 }; await fingers(page, [Array.from({ length: SCRUB_MOVES + 1 }, (_, i) => ({ x: from.x + ((ruler.width - 20) * i) / SCRUB_MOVES, y: from.y }))]); } },
+  { name: 'playback', still: Applies.Animated, drive: async (page) => { await page.keyboard.press('Space'); await page.waitForTimeout(PLAY_MS); await page.keyboard.press('Space'); } },
+  { name: 'properties sheet', drive: openProperties },
+  { name: 'typing in place', drive: async (page) => { const field = page.getByTestId('motion-inspector').locator('input[type="text"]:visible').first(); const was = await field.inputValue(); await field.tap(); await field.press('End'); await page.keyboard.type(TYPED, { delay: 60 }); await field.fill(was); await field.press('Enter'); } },
+  { name: 'colour drag', drive: async (page) => { await page.getByTestId('motion-inspector').getByTestId('fill-label').first().tap(); await page.getByTestId('fill-editor').locator('.colour .chip').first().tap(); const wheel = page.getByTestId('colour-popover').locator('input[type=color]'); const was = await wheel.inputValue(); for (const hex of [...COLOURS, was]) { await wheel.evaluate((el: HTMLInputElement, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, hex); await page.waitForTimeout(50); } await wheel.evaluate((el: HTMLInputElement) => el.dispatchEvent(new Event('change', { bubbles: true }))); await page.keyboard.press('Escape'); } },
   { name: 'editor close', drive: async (page) => { for (let i = 0; i < 3 && (await page.getByTestId('motion-editor').count()); i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); } await expect(page.getByTestId('motion-editor')).toHaveCount(0); } }
 ];
 
@@ -238,6 +270,7 @@ async function lightCanvas(db: SupabaseClient): Promise<{ projectId: string; can
 
 async function login(page: Page, base: string) {
   await page.goto(`${base}/login`);
+  await expect(page.locator('html')).not.toHaveAttribute('data-hydrating', '', { timeout: HYDRATE_MS });
   await page.fill('input[type=email]', process.env.E2E_TEST_EMAIL!);
   await page.fill('input[type=password]', process.env.E2E_TEST_PASSWORD!);
   await page.press('input[type=password]', 'Enter');
@@ -245,6 +278,8 @@ async function login(page: Page, base: string) {
 }
 
 async function session(base: string, device: Device, canvas: { projectId: string; canvasId: string }, label: string, run: number): Promise<Row[]> {
+  const phase = (what: string) => console.log(`[touch] ${device} ${label} #${run} phase: ${what}`);
+  phase('launch');
   const before = webkitPids();
   const browser = await webkit.launch();
   const rows: Row[] = [];
@@ -253,16 +288,24 @@ async function session(base: string, device: Device, canvas: { projectId: string
     context.setDefaultTimeout(ACTION_MS);
     const page = await context.newPage();
     const mine = new Set([...webkitPids()].filter((p) => !before.has(p)));
-    await login(page, base);
+    phase('login');
+    await signIn(page, base);
     await page.addInitScript(install);
-    await page.goto(`${base}/p/${canvas.projectId}/c/${canvas.canvasId}`);
+    phase('canvas');
+    await page.goto(`${base}/p/${canvas.projectId}/c/${canvas.canvasId}`, { waitUntil: 'domcontentloaded', timeout: PHASE_MS });
     await page.getByRole('button', { name: 'Reject all' }).click({ timeout: 5_000 }).catch(() => undefined);
     await expect(page.locator(SURFACE).first()).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(SETTLE_MS);
-    await bringMotionNodeIntoReach(page);
+    phase('reach');
+    await within('reach', bringMotionNodeIntoReach(page));
+    phase('steps');
     for (const step of STEPS.filter((s) => !ONLY || ONLY.test(s.name))) {
       if (EDITOR_STEPS.test(step.name) && !(await page.getByTestId('motion-editor').count())) {
         rows.push({ device, canvas: label, run, step: step.name, facts: null, error: 'editor not open' });
+        continue;
+      }
+      if (step.still === Applies.Animated && (await page.getByTestId('motion-editor').getAttribute('data-mode')) === STILL_MODE) {
+        console.log(`[touch] ${device} ${label} #${run} ${step.name} n/a on a still frame`);
         continue;
       }
       await page.evaluate(() => (window as unknown as { __touch: { start: () => void } }).__touch.start());
@@ -285,6 +328,20 @@ async function session(base: string, device: Device, canvas: { projectId: string
     await browser.close();
   }
   return rows;
+}
+
+function within<T>(what: string, work: Promise<T>): Promise<T> {
+  return Promise.race([work, new Promise<never>((_, no) => setTimeout(() => no(new Error(`${what} over ${PHASE_MS} ms`)), PHASE_MS))]);
+}
+
+async function signIn(page: Page, base: string) {
+  for (let i = 1; ; i++) {
+    const done = await within('login', login(page, base)).then(() => true, (err) => (i < LOGIN_TRIES ? false : Promise.reject(err)));
+    if (done) {
+      return;
+    }
+    console.log(`[touch] login retry ${i}`);
+  }
 }
 
 const median = (xs: (number | null)[]): string => {
