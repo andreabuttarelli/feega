@@ -59,7 +59,7 @@ function toAsset(row: AssetColumns): Asset {
 
 export async function listProjectAssets(
   db: Db,
-  scope: { orgId: string; projectId: string; source?: AssetSource }
+  scope: { orgId: string; projectId: string; source?: AssetSource; types?: AssetType[]; mimePrefix?: string; limit?: number }
 ): Promise<Asset[]> {
   let query = db
     .from('assets')
@@ -71,7 +71,16 @@ export async function listProjectAssets(
     query = query.eq('source', scope.source);
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false });
+  if (scope.types) {
+    query = query.in('type', scope.types).not('url', 'is', null);
+  }
+
+  if (scope.mimePrefix) {
+    query = query.like('mime_type', `${scope.mimePrefix}%`);
+  }
+
+  const ordered = query.order('created_at', { ascending: false });
+  const { data, error } = await (scope.limit ? ordered.limit(scope.limit) : ordered);
 
   if (error) {
     throw error;

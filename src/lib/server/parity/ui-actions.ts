@@ -66,10 +66,11 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   moveElement: canvas('move_frame_element'),
   copyElement: canvas('copy_frame_element'),
   frameSize: motion('set_canvas'),
+  exportSelection: canvas('export_selection'),
   createFormats: canvas('create_formats'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
-  drawFrame: canvas('create_node'),
+  drawFrame: canvas('draw_frame'),
   moveFree: canvas('move_frame_element'),
   copyFree: canvas('copy_frame_element'),
   groupElements: canvas('group_elements'),
@@ -113,7 +114,12 @@ export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
   deleteTemplate: motion('delete_template'),
   batchStatus: editor('batch_status'),
   cancelRender: canvas('cancel_render'),
-  renderStatus: editor('render_status')
+  renderStatus: editor('render_status'),
+  branches: editor('list_branches'),
+  createBranch: editor('create_branch'),
+  reviewBranch: editor('review_branch'),
+  mergeBranch: editor('merge_branch'),
+  dropBranch: editor('drop_branch')
 };
 
 export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
@@ -169,12 +175,16 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleChat]: VIEW,
   [Command.ToggleInspector]: VIEW,
   [Command.ToggleTimeline]: VIEW,
+  [Command.TogglePixelGrid]: VIEW,
+  [Command.ToggleLayoutGuides]: VIEW,
+  [Command.ToggleOutlines]: VIEW,
   [Command.Help]: VIEW,
   [Command.Precompose]: motion('precompose'),
   [Command.Group]: motion('precompose'),
   [Command.Ungroup]: motion('ungroup'),
   [Command.AutoLayout]: motion('add_auto_layout'),
   [Command.UseAsMask]: motion('use_as_mask'),
+  [Command.EditAsVector]: motion('to_vector'),
   [Command.BringForward]: motion('arrange_layers'),
   [Command.SendBackward]: motion('arrange_layers'),
   [Command.BringToFront]: motion('arrange_layers'),
@@ -183,6 +193,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Subtract]: motion('combine_shapes'),
   [Command.Intersect]: motion('combine_shapes'),
   [Command.Exclude]: motion('combine_shapes'),
+  [Command.OutlineStroke]: motion('combine_shapes'),
+  [Command.Flatten]: motion('combine_shapes'),
   [Command.RemoveMask]: motion('release_mask'),
   [Command.AlignLeft]: motion('arrange_space'),
   [Command.AlignCenter]: motion('arrange_space'),
@@ -198,6 +210,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToolRectangle]: motion('add_shape'),
   [Command.ToolEllipse]: motion('add_shape'),
   [Command.ToolPen]: motion('set_path'),
+  [Command.ToolScale]: motion('arrange_space'),
   [Command.ToggleEditMode]: uiOnly('Design writes the base value (set_props, set_transform), Motion writes a keyframe (set_keyframes): the mode picks the tool, it is not saved'),
   [Command.MoveLeft]: motion('set_transform'),
   [Command.MoveRight]: motion('set_transform'),
@@ -274,6 +287,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'use-as-mask': motion('use_as_mask'),
   'release-mask': motion('release_mask'),
   'create-formats': canvas('create_formats'),
+  export: canvas('export_selection'),
   delete: canvas('delete_node')
 };
 
@@ -330,7 +344,6 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'remove a keyframe': motion('remove_keyframes'),
   'element to another frame or a new frame': canvas('move_frame_element'),
   'generative output into a frame': canvas('place_in_frame'),
-  'connect a generative node to a frame': canvas('connect_nodes'),
   'export PNG': motion('export_image'),
   'export MP4': tool('render_video'),
   'restore a revision': tool('restore_motion_revision'),

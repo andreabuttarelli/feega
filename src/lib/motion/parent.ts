@@ -40,8 +40,16 @@ function visualIds(doc: Tracks): Set<string> {
   return new Set(doc.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => (t.clips as Parented[]).map((c) => c.id)));
 }
 
+const parentMaps = new WeakMap<Tracks, Map<string, string | null>>();
+
 function parentMap(doc: Tracks): Map<string, string | null> {
-  return new Map(clipsOf(doc).map((c) => [c.id, c.parent ?? null]));
+  const known = parentMaps.get(doc);
+  if (known) {
+    return known;
+  }
+  const parents = new Map(clipsOf(doc).map((c) => [c.id, c.parent ?? null]));
+  parentMaps.set(doc, parents);
+  return parents;
 }
 
 export function ancestorsOf(doc: Tracks, clipId: string): string[] {
@@ -131,8 +139,20 @@ export function decomposeLocal(m: Affine, [ox, oy]: [number, number]): Pose2d {
   return { x: m[4] - ox + lx, y: m[5] - oy + ly, rotateZ, scaleX, scaleY };
 }
 
-export function worldAt(doc: Tracks, clipId: string, frame: number, size: Size): Affine {
+const clipIndexes = new WeakMap<Tracks, Map<string, Posed>>();
+
+function clipIndex(doc: Tracks): Map<string, Posed> {
+  const known = clipIndexes.get(doc);
+  if (known) {
+    return known;
+  }
   const byId = new Map(clipsOf(doc).map((c) => [c.id, c]));
+  clipIndexes.set(doc, byId);
+  return byId;
+}
+
+export function worldAt(doc: Tracks, clipId: string, frame: number, size: Size): Affine {
+  const byId = clipIndex(doc);
   return [...ancestorsOf(doc, clipId), clipId].reduce<Affine>((m, id) => {
     const clip = byId.get(id);
     return clip ? mul2d(m, localAt(clip, frame, size)) : m;

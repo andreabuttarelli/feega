@@ -7,6 +7,11 @@ import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+import PenLine from '@lucide/svelte/icons/pen-line';
+import Combine from '@lucide/svelte/icons/combine';
+import Scaling from '@lucide/svelte/icons/scaling';
+import Grid3x3 from '@lucide/svelte/icons/grid-3x3';
+import VectorSquare from '@lucide/svelte/icons/vector-square';
 import BringToFront from '@lucide/svelte/icons/bring-to-front';
 import SendToBack from '@lucide/svelte/icons/send-to-back';
 import SquaresUnite from '@lucide/svelte/icons/squares-unite';
@@ -219,6 +224,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.EditAsVector]: { name: 'Edit as vector', icon: PenTool, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.BringForward]: { name: 'Bring forward', icon: BringToFront, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.SendBackward]: { name: 'Send backward', icon: SendToBack, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.BringToFront]: { name: 'Bring to front', icon: BringToFront, group: GuideGroup.Edit, menu: MenuSection.Layer },
@@ -227,6 +233,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Subtract]: { name: 'Subtract', icon: SquaresSubtract, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Intersect]: { name: 'Intersect', icon: SquaresIntersect, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Exclude]: { name: 'Exclude', icon: SquaresExclude, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.OutlineStroke]: { name: 'Outline stroke', icon: PenLine, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.Flatten]: { name: 'Flatten', icon: Combine, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignLeft]: { name: 'Align left', icon: AlignStartVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignCenter]: { name: 'Align horizontal centres', icon: AlignCenterVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignRight]: { name: 'Align right', icon: AlignEndVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
@@ -286,6 +294,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToolText]: { name: 'Text tool', icon: TypeIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
   [Command.ToolRectangle]: { name: 'Rectangle tool', icon: SquareIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
   [Command.ToolEllipse]: { name: 'Ellipse tool', icon: CircleIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolScale]: { name: 'Scale tool', icon: Scaling, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToolPen]: { name: 'Pen tool', icon: PenTool, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Tap points, tap the first to close' },
   [Tool.FitGraph]: { name: 'Fit curves to view', icon: Maximize, group: GuideGroup.Timeline, place: Place.Graph },
 
@@ -293,6 +302,9 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.PreviewZoomOut]: { name: 'Zoom preview out', icon: ZoomOut, group: GuideGroup.View, menu: MenuSection.View, gesture: PINCH_PREVIEW },
   [Command.PreviewFit]: { name: 'Fit preview', icon: Scan, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.PreviewActual]: { name: 'Preview at 100%', icon: SquareDashed, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
+  [Command.TogglePixelGrid]: { name: 'Pixel grid', icon: Grid3x3, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.ToggleLayoutGuides]: { name: 'Layout guides', icon: LayoutGrid, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.ToggleOutlines]: { name: 'Outline view', icon: VectorSquare, group: GuideGroup.View, menu: MenuSection.View },
   [Command.PreviewSelection]: { name: 'Zoom to selection', icon: Scan, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleInspector]: { name: 'Properties panel', icon: PanelRight, group: GuideGroup.View, place: Place.Bar },
   [Command.ToggleTimeline]: { name: 'Timeline', icon: PanelBottom, group: GuideGroup.View, place: Place.Transport },

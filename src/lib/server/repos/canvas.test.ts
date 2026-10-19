@@ -5,6 +5,7 @@ import {
   deleteConnection,
   deleteNode,
   findNode,
+  listBranchNodes,
   listNodes,
   listNodesByIds,
   moveNode,
@@ -517,5 +518,19 @@ describe('patchNodeData on a node the caller already read', () => {
 
     expect(out.outcome).toBe('written');
     expect(calls.filter((c) => c.table === 'nodes' && c.op === 'select')).toEqual([]);
+  });
+});
+
+describe('branch nodes stay off the canvas', () => {
+  const rows = () => ({ nodes: [{ ...nodeRow, id: 'frame', type: 'motion', data: {} }, { ...nodeRow, id: 'fork', type: 'motion', data: { branchOf: { nodeId: 'frame', baseVersion: 3, name: 'b' } } }] });
+
+  it('listNodes never returns a branch', async () => {
+    const { db } = fakeDb(rows());
+    expect((await listNodes(db, { orgId: ORG, canvasId: CANVAS })).map((n) => n.id)).toEqual(['frame']);
+  });
+
+  it('listBranchNodes returns only the branches', async () => {
+    const { db } = fakeDb(rows());
+    expect((await listBranchNodes(db, { orgId: ORG, canvasId: CANVAS })).map((n) => n.id)).toEqual(['fork']);
   });
 });

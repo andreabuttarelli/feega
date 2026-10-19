@@ -46,6 +46,7 @@ export type SelectionActionId =
   | 'use-as-mask'
   | 'release-mask'
   | 'create-formats'
+  | 'export'
   | 'delete';
 
 export type SelectionActionGroup = 'primary' | 'secondary' | 'overflow' | 'menu' | 'danger';
@@ -83,6 +84,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'use-as-mask', label: 'Use as mask', group: 'menu', minNodes: 1, shortcut: 'Mod+Ctrl+M' },
   { id: 'release-mask', label: 'Remove mask', group: 'menu', minNodes: 1 },
   { id: 'create-formats', label: 'Create formats…', group: 'menu', minNodes: 1 },
+  { id: 'export', label: 'Export…', group: 'menu', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
   { id: 'report', label: 'Report content', group: 'overflow', minNodes: 1 },
   { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, shortcut: 'Backspace' }
@@ -101,7 +103,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -109,11 +111,14 @@ type Summary = { data: Record<string, unknown> };
 
 const isGroup = (n: Summary) => n.data.kind === FrameKind.Group;
 
+const isDrawn = (n: Summary) => typeof n.data.format === 'string' && n.data.kind !== FrameKind.Group;
+
 const isFrame = (n: Summary) => typeof n.data.format === 'string' && (n.data.kind ?? FrameKind.Frame) === FrameKind.Frame;
 
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
   ungroup: (summaries) => summaries.some(isGroup),
-  'create-formats': (summaries) => summaries.length === 1 && isFrame(summaries[0])
+  'create-formats': (summaries) => summaries.length === 1 && isFrame(summaries[0]),
+  export: (summaries) => summaries.length > 0 && summaries.every(isDrawn)
 };
 
 export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): boolean {

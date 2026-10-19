@@ -207,6 +207,44 @@ describe('mask keys', () => {
   });
 });
 
+describe('outline stroke key', () => {
+  it('⌥⌘O outlines the stroke of the selected shape', () => {
+    expect(press('ø', { mod: true, alt: true, code: 'KeyO' })).toBe(Command.OutlineStroke);
+  });
+});
+
+describe('flatten key', () => {
+  it('⌘E flattens the selected shapes, E alone still switches the mode', () => {
+    expect(press('e', { mod: true, code: 'KeyE' })).toBe(Command.Flatten);
+    expect(press('e', { code: 'KeyE' })).toBe(Command.ToggleEditMode);
+  });
+});
+
+describe('scale tool key', () => {
+  it('K is the scale tool in Design and still pauses in Motion', () => {
+    expect(commandFor({ key: 'k', code: 'KeyK', mod: false, shift: false }, EditMode.Design)).toBe(Command.ToolScale);
+    expect(commandFor({ key: 'k', code: 'KeyK', mod: false, shift: false }, EditMode.Motion)).toBe(Command.Pause);
+  });
+});
+
+describe('pixel grid key', () => {
+  it("⇧' shows or hides the pixel grid", () => {
+    expect(press('"', { shift: true, code: 'Quote' })).toBe(Command.TogglePixelGrid);
+  });
+});
+
+describe('layout guides key', () => {
+  it('⇧G shows or hides the layout guides', () => {
+    expect(press('G', { shift: true, code: 'KeyG' })).toBe(Command.ToggleLayoutGuides);
+  });
+});
+
+describe('outline view key', () => {
+  it('⌘Y switches the frame to outlines and back', () => {
+    expect(press('y', { mod: true, code: 'KeyY' })).toBe(Command.ToggleOutlines);
+  });
+});
+
 describe('select matching key', () => {
   it('⌥⌘A selects every layer like the selected ones', () => {
     expect(press('å', { mod: true, alt: true, code: 'KeyA' })).toBe(Command.SelectMatching);

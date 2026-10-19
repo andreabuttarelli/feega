@@ -3,7 +3,7 @@ import { parsePart } from './poster-parts';
 
 export const PAGE = '@page';
 
-export type PartUsage = { parts: Record<string, number>; fields: Record<string, string[]> };
+export type PartUsage = { parts: Record<string, number>; fields: Record<string, string[]>; shapes?: Record<string, string> };
 
 export enum Reach {
   Own = 'own',

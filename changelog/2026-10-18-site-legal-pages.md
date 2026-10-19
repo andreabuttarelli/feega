@@ -15,3 +15,7 @@ now render from `src/routes/(site)/[doc=legal]` with the site header and footer 
   shift-tolerant match); diffs in `~/Documents/feega-videos/site-migration/`.
 - Nothing changes for oh.feega.app: `/` still redirects into the app. Serving the homepage on the
   site host comes with the homepage itself.
+
+- Hidden in production: every `(site)` route answers 404 when `VERCEL_ENV=production` unless
+  `PUBLIC_SITE_ENABLED=true` (`siteVisibility`, `siteGate` in `hooks.server.ts`). Local and preview
+  deploys show it.

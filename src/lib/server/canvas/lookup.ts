@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import type { Canvas } from '$lib/server/repos/canvas';
-import type { Membership } from '$lib/server/repos/orgs';
+import { listMemberships, type Membership } from '$lib/server/repos/orgs';
 import { modeOf, type ProjectMode } from '$lib/project-mode';
 
 /**
@@ -54,4 +54,30 @@ export async function findCanvasForUser(
   }
 
   return null;
+}
+
+export type OpenedCanvas = { memberships: Membership[]; found: OpenCanvas | null };
+
+export async function openCanvasForUser(db: Db, input: { userId: string; canvasId: string }): Promise<OpenedCanvas> {
+  const [memberships, read] = await Promise.all([
+    listMemberships(db, input.userId),
+    db.from('canvases').select(`org_id, ${CANVAS_COLUMNS}`).eq('id', input.canvasId).is('deleted_at', null).maybeSingle()
+  ]);
+  if (read.error) {
+    throw read.error;
+  }
+  const data = read.data;
+  if (!data || !memberships.some((m) => m.org.id === data.org_id)) {
+    return { memberships, found: null };
+  }
+  const project = data.projects as { mode?: string; brand_id?: string | null } | null;
+  return {
+    memberships,
+    found: {
+      orgId: data.org_id,
+      canvas: { id: data.id, projectId: data.project_id, name: data.name, viewport: (data.viewport as Canvas['viewport']) ?? null },
+      mode: modeOf(project?.mode),
+      projectBrandId: project?.brand_id ?? null
+    }
+  };
 }

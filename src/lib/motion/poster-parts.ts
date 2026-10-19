@@ -3,6 +3,7 @@ import { PropFormat } from './custom/component';
 import { setProps, type OpResult } from './timeline';
 import type { MeasuredBox } from './hyperframes/measure';
 import { LineEdit, editLines, lineRows, markedPoster, removePhoto, wordsOf } from './poster-lines';
+import { shapePaint } from './part-shapes';
 
 export const PART_SEP = '#';
 
@@ -54,7 +55,17 @@ export function editablePart(doc: MotionDoc, clip: MotionClip, part: string): Pa
     return field === CLIP_TEXT && typeof clip.props[field] === 'string' ? PartEdit.Text : PartEdit.None;
   }
   const spec = doc.components[String(clip.props.name)]?.propsSchema.properties?.[field];
+  if (shapePaint(String(clip.props.name), field)) {
+    return PartEdit.None;
+  }
   return spec?.type === 'string' && TEXT_FORMATS.has(spec.format) && typeof clip.props[field] === 'string' ? PartEdit.Text : PartEdit.None;
+}
+
+export function drawnTexts(doc: MotionDoc, clip: MotionClip): Record<string, string> {
+  if (clip.component !== CUSTOM_CLIP) {
+    return {};
+  }
+  return Object.fromEntries(Object.entries(clip.props).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim() !== '' && editablePart(doc, clip, entry[0]) === PartEdit.Text));
 }
 
 const isMarkedLines = (clip: MotionClip, field: string) => clip.component === CUSTOM_CLIP && markedPoster(String(clip.props.name))?.lines === field;
@@ -86,6 +97,7 @@ export enum PartKind {
   Line = 'line',
   Photo = 'photo',
   Arrow = 'arrow',
+  Shape = 'shape',
   Other = 'other'
 }
 
@@ -106,6 +118,7 @@ const PART_LOOK: Record<PartKind, PartLook> = {
   [PartKind.Text]: { label: (doc, clip, part) => fieldTitle(doc, clip, parsePart(part).field), icon: 'text' },
   [PartKind.Photo]: { label: (_doc, _clip, part) => `Photo ${indexOf(part)}`, icon: 'image' },
   [PartKind.Arrow]: { label: () => 'Arrow', icon: 'arrow' },
+  [PartKind.Shape]: { label: (doc, clip, part) => (parsePart(part).index === null ? fieldTitle(doc, clip, parsePart(part).field) : `Shape ${indexOf(part)}`), icon: 'shape' },
   [PartKind.Other]: { label: (doc, clip, part) => (parsePart(part).index === null ? fieldTitle(doc, clip, parsePart(part).field) : `Line ${indexOf(part)}`), icon: 'part' }
 };
 
@@ -116,6 +129,9 @@ export function partKind(doc: MotionDoc, clip: MotionClip, part: string): PartKi
   const marked = clip.component === CUSTOM_CLIP && markedPoster(String(clip.props.name));
   if (marked && MARKED_KIND[field]) {
     return MARKED_KIND[field];
+  }
+  if (clip.component === CUSTOM_CLIP && shapePaint(String(clip.props.name), field)) {
+    return PartKind.Shape;
   }
   if (editablePart(doc, clip, part) !== PartEdit.Text) {
     return PartKind.Other;
@@ -143,6 +159,7 @@ const PART_OPS: Record<PartKind, Partial<Record<PartAction, PartOp>>> = {
   [PartKind.Photo]: { [PartAction.Delete]: removePhoto },
   [PartKind.Arrow]: { [PartAction.Delete]: withoutArrow },
   [PartKind.Text]: {},
+  [PartKind.Shape]: {},
   [PartKind.Other]: {}
 };
 
