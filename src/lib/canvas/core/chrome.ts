@@ -143,7 +143,8 @@ function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   const top = t.y - LABEL_GAP - LABEL_PAD - line;
   const icon = t.icon ? [{ ...item(t, ChromePart.Icon, shift(t.icon, t.x, top + (line - ICON_SIZE) / 2), LABEL_COLOR), rule: FillRule.Union }] : [];
   const left = t.icon ? t.x + ICON_SIZE + ICON_GAP : t.x;
-  return [...icon, item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE, { leading: LABEL_LEADING, tracking: 0 }).contours, left, top), LABEL_COLOR)];
+  const label = item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE, { leading: LABEL_LEADING, tracking: 0 }).contours, left, top), LABEL_COLOR);
+  return [...icon, { ...label, scissor: [t.x, top, t.x + t.width, top + line] }];
 }
 
 function name(t: ChromeTile, glyphs: Glyphs, m: PortMark, centre: number, side: ChromePart): PathItem {
