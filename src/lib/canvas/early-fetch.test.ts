@@ -14,6 +14,15 @@ describe('fetching the editor session when the frame is selected', () => {
     expect(asked).toEqual(['/a/session', '/a/session']);
   });
 
+  it('a warmed session that lands is handed on, so a later open can reuse it by version past the freshness window', async () => {
+    const landed: [string, string][] = [];
+    const early = earlyFetch<string>({ load: async () => 'doc', now: () => 0, landed: (url, value) => landed.push([url, value]) });
+
+    early.start('/a/session');
+    await early.take('/a/session');
+    expect(landed).toEqual([['/a/session', 'doc']]);
+  });
+
   it('a selection long ago is stale: the open asks again, never edits an old version', async () => {
     let now = 0;
     let n = 0;

@@ -1,0 +1,7 @@
+# Play an interactive frame live on the canvas
+
+- Frames whose doc has `interactive` get a "Play" switch above the tile, next to the label (`FrameLiveControls`). On: an iframe over the frame loads `/p/.../motion/<id>/live`, the hosted interactive player page (`livePage` in `interactive/bundle.ts`, same composition as a published embed but unsaved, signed asset URLs, `no-store`). Pointer and keyboard go to the frame; it autoplays/loops per its settings; runtime inputs and vars react. Off: the iframe goes, the poster/snapshot underneath shows again. No editor opens.
+- One live frame at a time (`frameLive`, `nextLive`). Off by the switch, by Esc on the canvas, or by Esc inside the live page (bridge script, `live-bridge.ts`). Known gap: once the composition's own iframe has keyboard focus (after a press in it), Esc reaches only the composition; the switch still works.
+- Wheel over a live frame that does not scroll is handed back to the canvas (bridge posts it, the tile re-dispatches it), so pan/zoom keep working; a scrolling (scrub) frame keeps its wheel.
+- The canvas knows a frame is interactive from node data: `saveMotionDoc` now writes `interactive` with `docHeadRevision` (`headPatch`). Frames saved before this show no switch until their next save.
+- Renderers: DOM draws the controls in `MotionNode`; GPU draws them in a `tileOver` snippet on every `gpu-node` (`LiveHost` decides, so they never appear twice and the live iframe is not remounted when the GPU node flips to DOM).

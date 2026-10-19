@@ -72,6 +72,7 @@
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { Counter, count, exposeLoss, exposeReveal, exposeSettled, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
+  import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
@@ -80,7 +81,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
 
   const DOM_CAP = 6;
   const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
@@ -244,8 +245,7 @@
   let shown = $state(new Map<string, string>());
   const shotOf = (id: string) => shown.get(id) ?? null;
   const showSnapshot = (id: string, key: string, bitmap: ImageBitmap) => {
-    scene?.setSnapshot(id, key, bitmap);
-    shown = new Map(shown).set(id, key);
+    void scene?.setSnapshot(id, key, bitmap).then(() => (shown = new Map(shown).set(id, key)));
   };
   const preloaded = new Set<string>();
   let looking = $state(new Set<string>());
@@ -394,7 +394,7 @@
   let schedulerTick = $state(0);
   $effect(() => {
     void schedulerTick;
-    if (shotJob || !scene) {
+    if (shotJob || !scene || !BUDGET[currentDevice()].shootsSnapshots) {
       return;
     }
     if (performance.now() < busyUntil) {
@@ -494,7 +494,7 @@
 
   let parked = $state(new Map<string, number>());
   let shelfClock = $state(0);
-  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock)));
+  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock).slice(0, BUDGET[currentDevice()].posterShelf)));
   const shelfSince = new Map<string, number>();
   $effect(() => {
     const now = Date.now();
@@ -1586,6 +1586,7 @@
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
           <GpuTileChrome tile={t} selected={on} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} />
+          {@render props.tileOver?.({ id: t.id })}
           {#if !domIds.has(t.id) && t.kind === 'motion'}
             {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>

@@ -8,7 +8,8 @@ const pinned = setStill(newMotionDoc(MotionFormat.Poster), 1);
 
 vi.mock('$lib/server/repos/assets', async (original) => ({ ...(await original<object>()), insertAsset }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => ({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, projectBrandId: null }) }));
+const lookupFound = () => ({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, projectBrandId: null });
+vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => lookupFound(), openCanvasForUser: async () => ({ memberships: [], found: lookupFound() }) }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
 vi.mock('$lib/server/motion/editor', async (original) => ({
   ...(await original<object>()),

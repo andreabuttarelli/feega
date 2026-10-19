@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
-import { listMemberships, type Membership } from '$lib/server/repos/orgs';
+import type { Membership } from '$lib/server/repos/orgs';
 import { findNode } from '$lib/server/repos/canvas';
-import { findCanvasForUser, type OpenCanvas } from '$lib/server/canvas/lookup';
+import { findCanvasForUser, openCanvasForUser, type OpenCanvas } from '$lib/server/canvas/lookup';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import type { Db } from '$lib/server/db/client';
 import { findMotionNode } from './editor';
@@ -31,8 +31,7 @@ export async function canvasScope(locals: App.Locals, params: Params): Promise<C
     throw error(500, 'no client');
   }
 
-  const memberships = await listMemberships(db, user.id);
-  const found = await findCanvasForUser(db, { canvasId: params.canvasId, memberships });
+  const { memberships, found } = await openCanvasForUser(db, { userId: user.id, canvasId: params.canvasId });
   if (!found || found.canvas.projectId !== params.projectId) {
     throw error(404, 'This canvas does not exist, or is not yours');
   }

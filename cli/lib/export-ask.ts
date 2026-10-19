@@ -24,7 +24,14 @@ function rowOf(flags: ExportFlags): Row {
   return row;
 }
 
-export function exportAsk(frameIds: string[], flags: ExportFlags): { frameIds: string[]; rows: Row[]; name?: string } {
+const ELEMENT_SEP = ':';
+
+export function exportAsk(targets: string[], flags: ExportFlags): { frameIds: string[]; elements: { frameId: string; elementId: string }[]; rows: Row[]; name?: string } {
   const rows = flags.rows ? (JSON.parse(flags.rows) as Row[]) : [rowOf(flags)];
-  return { frameIds, rows, ...(flags.name ? { name: flags.name } : {}) };
+  const frameIds = targets.filter((t) => !t.includes(ELEMENT_SEP));
+  const elements = targets.filter((t) => t.includes(ELEMENT_SEP)).map((t) => {
+    const [frameId, elementId] = t.split(ELEMENT_SEP);
+    return { frameId, elementId };
+  });
+  return { frameIds, elements, rows, ...(flags.name ? { name: flags.name } : {}) };
 }

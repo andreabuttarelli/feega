@@ -30,33 +30,53 @@ export function resample(contour: Contour, n: number): Pt[] {
 
 const rotate = (ring: readonly Pt[], shift: number): Pt[] => ring.map((_, i) => ring[(i + shift) % ring.length]);
 
-function cost(a: readonly Pt[], b: readonly Pt[]): number {
+function flat(points: readonly Pt[]): Float64Array {
+  const out = new Float64Array(points.length * 2);
+  points.forEach((p, i) => {
+    out[i * 2] = p[0];
+    out[i * 2 + 1] = p[1];
+  });
+  return out;
+}
+
+function shiftedCost(a: Float64Array, ring: Float64Array, shift: number): number {
   let total = 0;
-  for (let i = 0; i < a.length; i++) {
-    total += (a[i][0] - b[i][0]) ** 2 + (a[i][1] - b[i][1]) ** 2;
+  const size = ring.length;
+  let j = shift * 2;
+  for (let i = 0; i < a.length; i += 2) {
+    if (j >= size) {
+      j -= size;
+    }
+    const dx = a[i] - ring[j];
+    const dy = a[i + 1] - ring[j + 1];
+    total += dx * dx + dy * dy;
+    j += 2;
   }
   return total;
 }
 
 function aligned(from: readonly Pt[], to: readonly Pt[], closed: boolean, startShift: number): Pt[] {
   const reversed = [...to].reverse();
+  const source = flat(from);
+  const rings = [to, reversed].map((points) => ({ points, flat: flat(points) }));
   if (!closed) {
-    return cost(from, to) <= cost(from, reversed) ? [...to] : reversed;
+    return shiftedCost(source, rings[0].flat, 0) <= shiftedCost(source, rings[1].flat, 0) ? [...to] : reversed;
   }
-  let best: Pt[] = [...to];
+  let best: readonly Pt[] = to;
+  let bestShift = 0;
   let lowest = Infinity;
-  for (const ring of [to, reversed]) {
-    for (let shift = 0; shift < ring.length; shift++) {
-      const candidate = rotate(ring, shift);
-      const c = cost(from, candidate);
+  for (const ring of rings) {
+    for (let shift = 0; shift < ring.points.length; shift++) {
+      const c = shiftedCost(source, ring.flat, shift);
       if (c < lowest - 1e-12) {
         lowest = c;
-        best = candidate;
+        best = ring.points;
+        bestShift = shift;
       }
     }
   }
   const n = best.length;
-  return rotate(best, ((Math.round(startShift * n) % n) + n) % n);
+  return rotate(best, bestShift + (((Math.round(startShift * n) % n) + n) % n));
 }
 
 function centroid(points: readonly Pt[]): Pt {
