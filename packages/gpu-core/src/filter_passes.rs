@@ -181,11 +181,11 @@ fn turbulence(ch: i32, at: vec2<f32>) -> f32 {
   return sum;
 }
 fn run(xy: vec2<i32>) -> vec4<f32> {
-  let at = centre(xy);
-  if (at.x < p[5] || at.y < p[6] || at.x >= p[5] + p[7] || at.y >= p[6] + p[8]) { return vec4<f32>(0.0); }
+  let cell = centre(xy);
+  if (cell.x < p[5] || cell.y < p[6] || cell.x >= p[5] + p[7] || cell.y >= p[6] + p[8]) { return vec4<f32>(0.0); }
   var c = vec4<f32>(0.0);
   for (var ch = 0; ch < 4; ch++) {
-    let t = turbulence(ch, at);
+    let t = turbulence(ch, cell + 0.5);
     c[ch] = clamp(select(t, (t + 1.0) * 0.5, p[3] > 0.5), 0.0, 1.0);
   }
   return vec4<f32>(c.rgb * c.a, c.a);

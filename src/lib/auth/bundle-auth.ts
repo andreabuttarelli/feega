@@ -18,7 +18,7 @@ export enum AuthMode {
 }
 
 export const NEXT_PARAM = 'next';
-const HOME = '/app';
+export const BUNDLE_HOME = '/app';
 const IN_APP_PATH = /^\/(?!\/)/;
 
 export function bundleAuthRoute(pathname: string): BundleAuthPage | null {
@@ -30,5 +30,5 @@ export function oauthReturnUrl(next: string): string {
 }
 
 export function nextAfterSignIn(next: string | null): string {
-  return next && IN_APP_PATH.test(next) ? next : HOME;
+  return next && IN_APP_PATH.test(next) ? next : BUNDLE_HOME;
 }

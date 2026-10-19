@@ -448,7 +448,7 @@
   {#if FULL_ENGINES.has(engine) && fullDoc}
     <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
       {#key `${fullDoc.doc.width}x${fullDoc.doc.height}`}
-        <GpuFullLayer backend={FULL_BACKEND[engine] ?? FullBackend.WebGl2} doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+        <GpuFullLayer backend={FULL_BACKEND[engine] ?? FullBackend.WebGl2} doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} compose={gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
       {/key}
     </div>
   {/if}

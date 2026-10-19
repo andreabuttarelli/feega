@@ -26,6 +26,8 @@ const tile = (over: Partial<ChromeTile> = {}): ChromeTile => ({
   inputs: [],
   output: null,
   label: null,
+  icon: null,
+  names: false,
   ...over
 });
 
@@ -87,5 +89,23 @@ describe('tileChrome', () => {
     const order = parts(tile({ ring: NodeChrome.Selected, handles: true, inputs: ['text'], output: 'text', label: 'Text' })).map((i) => i.clip.split(':')[1]);
 
     expect([...new Set(order)]).toEqual([ChromePart.Ring, ChromePart.PortIn, ChromePart.PortOut, ChromePart.Handle, ChromePart.Label]);
+  });
+
+  it('names each port beside it, 16px outside, in its colour, only when asked', () => {
+    const t = tile({ inputs: ['text'], output: 'images', names: true });
+    const names = ofPart(t, ChromePart.PortName);
+
+    expect(names.map((n) => box(n.contours))).toEqual([
+      [40, 270, 84, 281],
+      [416, 270, 482, 281]
+    ]);
+    expect(ofPart(tile({ inputs: ['text'] }), ChromePart.PortName)).toHaveLength(0);
+  });
+
+  it('puts the kind icon before the label and shifts the label past it', () => {
+    const t = tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]] });
+
+    expect(box(ofPart(t, ChromePart.Icon)[0].contours)).toEqual([100, 184, 112, 196]);
+    expect(box(ofPart(t, ChromePart.Label)[0].contours)).toEqual([117, 184, 177, 196]);
   });
 });

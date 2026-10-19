@@ -29,6 +29,15 @@ async function coreModule(): Promise<CoreModule> {
 
 function rasterOf(attached: Attached): Raster {
   const uploaded = new Map<string, Picture['source']>();
+  const stills = new Map<string, HTMLCanvasElement>();
+
+  function still(clip: string, picture: Picture): HTMLCanvasElement {
+    const canvas = stills.get(clip) ?? stills.set(clip, document.createElement('canvas')).get(clip)!;
+    canvas.width = picture.size.width;
+    canvas.height = picture.size.height;
+    canvas.getContext('2d')!.drawImage(picture.source, 0, 0);
+    return canvas;
+  }
 
   function upload(item: ImageItem, pictures: Pictures) {
     const picture = pictures(item);
@@ -38,7 +47,7 @@ function rasterOf(attached: Attached): Raster {
     if (uploaded.get(item.clip) === picture.source && !moving(picture)) {
       return;
     }
-    attached.picture(item.clip, picture.source, picture.size.width, picture.size.height);
+    attached.picture(item.clip, moving(picture) ? still(item.clip, picture) : picture.source, picture.size.width, picture.size.height);
     uploaded.set(item.clip, picture.source);
   }
 
