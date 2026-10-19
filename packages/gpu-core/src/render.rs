@@ -3,6 +3,7 @@ use vello::wgpu;
 use vello::{AaConfig, RenderParams, RendererOptions};
 
 use crate::display_list::DisplayList;
+use crate::pictures::Pictures;
 use crate::scene::build;
 
 const ROW_ALIGN: u32 = 256;
@@ -30,8 +31,8 @@ impl Renderer {
         Ok(Self { device, queue, vello })
     }
 
-    pub fn render(&mut self, list: &DisplayList) -> Result<Vec<u8>, RenderError> {
-        let (scene, _) = build(list);
+    pub fn render(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<Vec<u8>, RenderError> {
+        let (scene, _) = build(list, pictures);
         let size = wgpu::Extent3d { width: list.width, height: list.height, depth_or_array_layers: 1 };
         let target = self.device.create_texture(&wgpu::TextureDescriptor {
             label: None,

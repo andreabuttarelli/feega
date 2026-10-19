@@ -1,4 +1,5 @@
 pub mod display_list;
+pub mod pictures;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;
