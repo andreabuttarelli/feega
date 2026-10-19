@@ -75,6 +75,8 @@
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
+  import { Fling, type Glide } from '$lib/canvas/core/inertia';
+  import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { GpuScene, themeOf, type Card } from '$lib/canvas/gpu/scene';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
@@ -895,7 +897,31 @@
 
   const pointerOf = (e: PointerEvent) => (e.pointerType === 'touch' ? Pointer.Touch : e.pointerType === 'pen' ? Pointer.Pen : Pointer.Mouse);
 
+  const fling = new Fling();
+  let glide: Glide | null = null;
+  let glidedAt = 0;
+
+  function glideStep(t: number): boolean {
+    const d = glide?.step(glidedAt ? t - glidedAt : 0);
+    glidedAt = t;
+    if (!d) {
+      glide = null;
+      return false;
+    }
+    view = panBy(view, d);
+    return true;
+  }
+
+  const glider = new FramePacer(glideStep, (frame) => requestAnimationFrame(frame));
+
+  function startGlide() {
+    glide = fling.release(performance.now());
+    glidedAt = 0;
+    glider.invalidate();
+  }
+
   function onDown(e: PointerEvent) {
+    glide = null;
     markBusy();
     measureSurface();
     const p = local(e);
@@ -933,7 +959,11 @@
 
   function startGesture(kind: GestureKind, hit: Hit, w: Point, e: PointerEvent) {
     const START: Record<GestureKind, () => Active | null> = {
-      [GestureKind.Pan]: () => ({ kind: GestureKind.Pan, last: local(e), moved: false }),
+      [GestureKind.Pan]: () => {
+        fling.release(e.timeStamp);
+        fling.sample(local(e), e.timeStamp);
+        return { kind: GestureKind.Pan, last: local(e), moved: false };
+      },
       [GestureKind.Drag]: () => {
         if (hit.kind !== HitKind.Node) {
           return null;
@@ -1022,6 +1052,7 @@
         }
         props.onUserPan?.();
         view = panBy(view, { x: p.x - a.last.x, y: p.y - a.last.y });
+        fling.sample(p, e.timeStamp);
         a.last = p;
         a.moved ||= far;
         suppressMenu ||= far;
@@ -1114,6 +1145,9 @@
       [GestureKind.Pan]: () => {
         if (a.kind === GestureKind.Pan && !a.moved && e.button === 0) {
           clearSelection();
+        }
+        if (a.kind === GestureKind.Pan && a.moved && coreOn) {
+          startGlide();
         }
       },
       [GestureKind.Drag]: () => {
@@ -1232,6 +1266,7 @@
   }
 
   function onWheel(e: WheelEvent) {
+    glide = null;
     markBusy();
     props.onUserPan?.();
     const target = e.target as HTMLElement;
