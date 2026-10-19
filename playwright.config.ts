@@ -28,7 +28,8 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     ...(process.env.E2E_REAL_STACK === '1' ? [{ name: 'webkit-iphone', testMatch: /canvas-motion-(webgl|open)/, use: { ...devices['iPhone 15'] } }, { name: 'webkit', testMatch: /selection-outline|dashboard-nav|page-zoom-lock|gpu-canvas-no-scroll/, use: { ...devices['Desktop Safari'] } }, { name: 'webkit-ipad', testMatch: /page-zoom-lock/, use: { ...devices['iPad Pro 11'] } }] : []),
     ...(process.env.E2E_HEAVY_PHONE === '1' ? [{ name: 'webkit-iphone-heavy', testMatch: /phone-heavy-frame-memory|ipad-playback-fps|landing-edit-latency/ }] : []),
-    ...(process.env.E2E_PERF === '1' ? [{ name: 'webkit-perf', testMatch: /canvas-frame-budget|canvas-stress|editor-scrub|fluidity-scorecard|canvas-inline-play|inline-editor-open/, use: { ...devices['Desktop Safari'] } }] : [])
+    ...(process.env.FLUID_TOUCH === '1' ? [{ name: 'webkit-touch', testMatch: /fluidity-touch/ }] : []),
+    ...(process.env.E2E_PERF === '1' ? [{ name: 'webkit-perf', testMatch: /canvas-frame-budget|canvas-stress|editor-scrub|fluidity-scorecard|canvas-inline-play|inline-editor-open|canvas-core-perf/, use: { ...devices['Desktop Safari'] } }, { name: 'webkit-iphone-perf', testMatch: /canvas-core-perf/, use: { ...devices['iPhone 15'] } }] : [])
   ],
   webServer: {
     command: `npx vite dev --port ${E2E_PORT} --strictPort`,

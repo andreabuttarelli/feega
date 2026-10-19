@@ -55,6 +55,17 @@ pub enum Cover {
     Picture { src: String, luma: bool, matrix: Affine },
 }
 
+impl Cover {
+    pub fn moved(self, by: Affine) -> Self {
+        let times = |m: Affine| (vello::kurbo::Affine::new(by) * vello::kurbo::Affine::new(m)).as_coeffs();
+        match self {
+            Cover::Path { contours, matrix } => Cover::Path { contours, matrix: times(matrix) },
+            Cover::Ramp { ramp, contours, matrix } => Cover::Ramp { ramp, contours, matrix: times(matrix) },
+            Cover::Picture { src, luma, matrix } => Cover::Picture { src, luma, matrix: times(matrix) },
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct MaskLayer {
     pub mode: MaskMode,
@@ -154,10 +165,32 @@ fn normal() -> String {
     "normal".into()
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct UseItem {
+    pub clip: String,
+    pub group: String,
+    pub matrix: Affine,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GlyphsItem {
+    pub clip: String,
+    pub font: String,
+    #[serde(default)]
+    pub coords: Vec<(String, f32)>,
+    pub size: f64,
+    pub glyphs: Vec<[f64; 3]>,
+    pub paint: Paint,
+    #[serde(flatten)]
+    pub look: Look,
+}
+
 #[derive(Debug, Clone)]
 pub enum Item {
     Path(PathItem),
     Image(ImageItem),
+    Use(UseItem),
+    Glyphs(GlyphsItem),
     Other { clip: String, kind: String },
 }
 
@@ -166,7 +199,7 @@ impl Item {
         match self {
             Item::Path(p) => Some(&p.look),
             Item::Image(i) => Some(&i.look),
-            Item::Other { .. } => None,
+            Item::Use(_) | Item::Glyphs(_) | Item::Other { .. } => None,
         }
     }
 
@@ -174,6 +207,8 @@ impl Item {
         match self {
             Item::Path(p) => &p.clip,
             Item::Image(i) => &i.clip,
+            Item::Use(u) => &u.clip,
+            Item::Glyphs(g) => &g.clip,
             Item::Other { clip, .. } => clip,
         }
     }
@@ -182,6 +217,8 @@ impl Item {
         match self {
             Item::Path(_) => "path",
             Item::Image(_) => "image",
+            Item::Use(_) => "use",
+            Item::Glyphs(_) => "glyphs",
             Item::Other { kind, .. } => kind,
         }
     }
@@ -194,6 +231,8 @@ impl<'de> Deserialize<'de> for Item {
         match text("kind").as_str() {
             "path" => serde_json::from_value(value).map(Item::Path).map_err(serde::de::Error::custom),
             "image" => serde_json::from_value(value).map(Item::Image).map_err(serde::de::Error::custom),
+            "use" => serde_json::from_value(value).map(Item::Use).map_err(serde::de::Error::custom),
+            "glyphs" => serde_json::from_value(value).map(Item::Glyphs).map_err(serde::de::Error::custom),
             _ => Ok(Item::Other { clip: text("clip"), kind: text("kind") }),
         }
     }

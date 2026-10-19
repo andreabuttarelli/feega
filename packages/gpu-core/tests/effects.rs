@@ -111,4 +111,19 @@ mod gpu {
 
         assert!(distinct.len() > 8);
     }
+
+    #[test]
+    fn turbulence_samples_where_the_browser_does_one_pixel_past_the_corner() {
+        let json = r#"{ "width": 64, "height": 64, "background": null, "items": [
+    { "kind": "path", "clip": "sq", "contours": [[0, 0, 64, 0, 64, 64, 0, 64]], "rule": "nonzero",
+      "paint": { "kind": "solid", "color": [1, 1, 1, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal",
+      "space": [1, 0, 0, 1], "filters": [{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [
+        { "tag": "feTurbulence", "attrs": { "type": "fractalNoise", "baseFrequency": "0.25", "numOctaves": 1, "seed": 3,
+          "x": 0, "y": 0, "width": 64, "height": 64, "stitchTiles": "stitch" } } ] }] }] } ] }"#;
+        let pixels = render(json);
+        let near = |a: [u8; 4], b: [u8; 4]| a.iter().zip(b).all(|(x, y)| (*x as i32 - y as i32).abs() <= 3);
+
+        assert!(near(px(&pixels, 0, 0), [132, 122, 103, 126]), "{:?}", px(&pixels, 0, 0));
+        assert!(near(px(&pixels, 20, 10), [120, 132, 138, 99]), "{:?}", px(&pixels, 20, 10));
+    }
 }

@@ -36,7 +36,7 @@
 	<key>FeegaAppleSignIn</key>
 	<string>off</string>
 	<key>FeegaWebSource</key>
-	<string>hosted</string>
+	<string>bundle</string>
 	<key>FeegaWebURL</key>
 	<string>https://oh.feega.app</string>
 	<key>LSRequiresIPhoneOS</key>

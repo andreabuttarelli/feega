@@ -239,7 +239,7 @@ void main() {
 }`;
 
 const CHANNEL_INDEX: Record<string, number> = { R: 0, G: 1, B: 2, A: 3 };
-const TURBULENCE_CENTER = 0.5;
+const TURBULENCE_CENTER = 1;
 
 const COMPOSITE_OPS: Record<string, number> = { over: 0, in: 1, out: 2, atop: 3, xor: 4, arithmetic: 5 };
 

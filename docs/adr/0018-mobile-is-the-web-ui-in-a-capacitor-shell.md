@@ -25,9 +25,12 @@ FeegaBridgeViewController (CAPBridgeViewController)
 
 - **One WebView, one session.** The web app signs in as it does in a browser; nothing is handed
   between native and web.
-- **Bundled build.** `npm run bundle` (apps/mobile) builds `build:spa`, copies it into `www` and
-  sets `FeegaWebSource = bundle`: Capacitor then serves it from `capacitor://localhost`. Hosted
-  stays the default until media signed URLs and client-side login land in the static build.
+- **Bundled build (default since 2026-10-19).** `npm run bundle` (apps/mobile) builds `build:spa`
+  into `www`; Capacitor serves it from `capacitor://localhost` with the `index.html` fallback, and
+  `/` opens `/app`. `capacitor://` has no cookies, so in the bundle the browser Supabase client keeps
+  the session in `localStorage`. OAuth returns on `feega://auth/callback`, mapped to
+  `capacitor://localhost/auth/callback` (rerouted to `/auth/native/callback`). `window.open` of
+  public pages goes to the system browser. `FeegaWebSource = hosted` loads the hosted app instead.
 - **One page-side bridge.** `src/lib/native-bridge.ts` picks Tauri IPC or Capacitor plugins;
   login (Apple), the store paywall, share and haptics call it, never a shell API directly.
 - **Native code is only what Capacitor can't do from the page:**

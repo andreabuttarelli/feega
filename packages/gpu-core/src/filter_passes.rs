@@ -1,7 +1,7 @@
 use vello::wgpu;
 use vello::wgpu::util::DeviceExt;
 
-use crate::passes::layer_texture;
+use crate::filters::Runner;
 
 const GROUP: u32 = 8;
 
@@ -181,11 +181,11 @@ fn turbulence(ch: i32, at: vec2<f32>) -> f32 {
   return sum;
 }
 fn run(xy: vec2<i32>) -> vec4<f32> {
-  let at = centre(xy);
-  if (at.x < p[5] || at.y < p[6] || at.x >= p[5] + p[7] || at.y >= p[6] + p[8]) { return vec4<f32>(0.0); }
+  let cell = centre(xy);
+  if (cell.x < p[5] || cell.y < p[6] || cell.x >= p[5] + p[7] || cell.y >= p[6] + p[8]) { return vec4<f32>(0.0); }
   var c = vec4<f32>(0.0);
   for (var ch = 0; ch < 4; ch++) {
-    let t = turbulence(ch, at);
+    let t = turbulence(ch, cell + 0.5);
     c[ch] = clamp(select(t, (t + 1.0) * 0.5, p[3] > 0.5), 0.0, 1.0);
   }
   return vec4<f32>(c.rgb * c.a, c.a);
@@ -218,6 +218,22 @@ fn run(xy: vec2<i32>) -> vec4<f32> {
     sum += (texel(a, xy + dir * i) + texel(a, xy - dir * i)) * p[3u + u32(i)];
   }
   return sum;
+}
+"#;
+
+const FOLD: &str = r#"
+fn run(xy: vec2<i32>) -> vec4<f32> {
+  let c = texel(b, xy);
+  let cov = select(c.a, dot(c.rgb, vec3<f32>(0.2125, 0.7154, 0.0721)), p[3] > 0.5);
+  let l = select(p[4] * cov, 1.0 - p[4] * cov, p[2] > 0.5);
+  let mode = u32(p[0]);
+  let seed = select(0.0, 1.0, mode == 1u || mode == 2u);
+  let k = select(texel(a, xy).a, seed, p[1] > 0.5);
+  var o = k + l - 2.0 * k * l;
+  if (mode == 0u) { o = k + l - k * l; }
+  if (mode == 1u) { o = k * (1.0 - l); }
+  if (mode == 2u) { o = k * l; }
+  return vec4<f32>(o);
 }
 "#;
 
@@ -287,9 +303,10 @@ pub enum Op {
     Displace,
     Blur,
     Blend,
+    Fold,
 }
 
-const SOURCES: [(Op, &str); 12] = [
+const SOURCES: [(Op, &str); 13] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -302,11 +319,43 @@ const SOURCES: [(Op, &str); 12] = [
     (Op::Displace, DISPLACE),
     (Op::Blur, BLUR),
     (Op::Blend, BLEND),
+    (Op::Fold, FOLD),
 ];
 
 pub struct FilterPasses {
     layout: wgpu::BindGroupLayout,
     pipelines: Vec<(Op, wgpu::ComputePipeline)>,
+}
+
+pub fn layer_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    })
+}
+
+pub struct WgpuRunner<'a> {
+    pub device: &'a wgpu::Device,
+    pub queue: &'a wgpu::Queue,
+    pub passes: &'a FilterPasses,
+}
+
+impl Runner for WgpuRunner<'_> {
+    type Tex = wgpu::Texture;
+
+    fn run(&self, op: Op, inputs: [&wgpu::Texture; 2], params: &[f32]) -> wgpu::Texture {
+        self.passes.run(self.device, self.queue, op, inputs, params)
+    }
+
+    fn size(tex: &wgpu::Texture) -> (u32, u32) {
+        (tex.width(), tex.height())
+    }
 }
 
 fn entry(binding: u32, ty: wgpu::BindingType) -> wgpu::BindGroupLayoutEntry {

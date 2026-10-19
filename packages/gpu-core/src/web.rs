@@ -6,6 +6,7 @@ use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap
 
 use crate::display_list::parse;
 use crate::engine::Engine;
+use crate::groups::{report, Library};
 use crate::pictures::Pictures;
 
 #[wasm_bindgen]
@@ -19,6 +20,7 @@ pub struct WebCore {
     target: wgpu::Texture,
     pictures: Pictures,
     textures: HashMap<String, wgpu::Texture>,
+    library: Library,
 }
 
 fn failed<E: std::fmt::Debug>(e: E) -> JsValue {
@@ -81,7 +83,7 @@ impl WebCore {
         let engine = Engine::new(&device).map_err(failed)?;
         let blitter = wgpu::util::TextureBlitter::new(&device, format);
         let target = storage(&device, width, height);
-        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new() })
+        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), library: Library::new() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -105,8 +107,17 @@ impl WebCore {
         Ok(())
     }
 
+    pub fn put_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
+        self.library.put_group(key, &parse(list_json).map_err(failed)?);
+        Ok(())
+    }
+
+    pub fn drop_group(&mut self, key: &str) {
+        self.library.drop_group(key);
+    }
+
     pub fn draw(&mut self, list_json: &str) -> Result<String, JsValue> {
-        let list = parse(list_json).map_err(failed)?;
+        let (list, missing) = self.library.resolve(&parse(list_json).map_err(failed)?);
         let view = self.target.create_view(&wgpu::TextureViewDescriptor::default());
         let skipped = self.engine.draw(&self.device, &self.queue, &list, &self.pictures, &view).map_err(failed)?;
         let frame = match self.surface.get_current_texture() {
@@ -118,6 +129,6 @@ impl WebCore {
         self.blitter.copy(&self.device, &mut encoder, &view, &out);
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
-        Ok(skipped.iter().map(|s| format!("{} {}", s.clip, s.what)).collect::<Vec<_>>().join("\n"))
+        Ok(report(&[skipped, missing].concat()))
     }
 }

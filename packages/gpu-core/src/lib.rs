@@ -3,9 +3,16 @@ pub mod colour;
 pub mod display_list;
 pub mod engine;
 pub mod filter_passes;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod files;
 pub mod filters;
+#[cfg(target_arch = "wasm32")]
+pub mod gl_passes;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod glyphs;
+pub mod groups;
 pub mod kernel;
-pub mod passes;
+pub mod layers;
 pub mod pictures;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;

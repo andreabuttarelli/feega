@@ -69,6 +69,7 @@
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
+  import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { GpuScene, themeOf, type Card } from '$lib/canvas/gpu/scene';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
@@ -360,7 +361,8 @@
     }
     return !scene?.awaitsMedia(t.id);
   };
-  const unpreviewed = () => [...visibleIds(placed, view, area)].filter((id) => byId.get(id) && !previewed(byId.get(id)!));
+  const cullIndex = $derived(new SpatialIndex(placed));
+  const unpreviewed = () => [...cullIndex.visible(view, area)].filter((id) => byId.get(id) && !previewed(byId.get(id)!));
 
   $effect(() => {
     void revealTick;
@@ -796,16 +798,9 @@
     return { x: e.clientX - s.left, y: e.clientY - s.top };
   }
 
-  function topNodeAt(w: Point): string | null {
-    for (let i = placed.length - 1; i >= 0; i--) {
-      const t = placed[i];
-      const top = t.tag === NameTag.Hidden ? t.y : t.y - LABEL_CLEARANCE;
-      if (w.x >= t.x && w.y >= top && w.x <= t.x + t.w && w.y <= t.y + t.h) {
-        return t.id;
-      }
-    }
-    return null;
-  }
+  const hitIndex = $derived(new SpatialIndex(placed.map((t) => (t.tag === NameTag.Hidden ? t : { id: t.id, x: t.x, y: t.y - LABEL_CLEARANCE, w: t.w, h: t.h + LABEL_CLEARANCE }))));
+
+  const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
 
   function hitAt(w: Point): Hit {
     const port = spec.flow.nodesConnectable ? portAt(ports, w, view.zoom) : null;
