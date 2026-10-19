@@ -25,7 +25,9 @@
   import CoreFrames from './CoreFrames.svelte';
   import { cardKey, cardOnCanvas, portMarks, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
-  import { NodeChrome } from '$lib/canvas/selection-chrome';
+  import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
+  import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { tileHovered } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
   import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
@@ -205,20 +207,24 @@
       return [];
     }
     const theme = { ...look, panel: look.paper };
-    return placed.filter(drawsCard).map((t) => {
-      const idle = !chromeIds.has(t.id);
+    return placed.filter(drawsCard).flatMap((t) => {
+      const on = selected.includes(t.id);
+      const dom = chromeIds.has(t.id) && !on;
+      const chrome = dom ? { ring: NodeChrome.None, handles: false } : nodeChrome(t.id, on, layersSource.video);
+      const hovered = !on && !dom && tileHovered(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null);
       const card: CardTile = {
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
-        ring: NodeChrome.None,
-        handles: false,
-        hovered: false,
-        ...(idle ? portMarks(t) : { inputs: [], outputs: [] }),
-        label: idle ? labelOf(t) : null,
-        icon: idle ? (text.icons.get(t.kind as NodeType) ?? null) : null
+        ring: chrome.ring,
+        handles: resizable && on && chrome.handles,
+        hovered,
+        ...(dom ? { inputs: [], outputs: [] } : portMarks(t)),
+        label: dom ? null : labelOf(t),
+        icon: dom ? null : (text.icons.get(t.kind as NodeType) ?? null),
+        names: on
       };
-      return { key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold) };
+      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold) }];
     });
   });
   const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
@@ -1676,7 +1682,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} />
+          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} />
           {@render props.tileOver?.({ id: t.id })}
           {#if !domIds.has(t.id) && t.kind === 'motion'}
             {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
