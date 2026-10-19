@@ -18,7 +18,8 @@ export enum CardPart {
   Footer = 'footer',
   Status = 'status',
   Model = 'model',
-  Thumb = 'thumb'
+  Thumb = 'thumb',
+  Shot = 'shot'
 }
 
 enum Fit {
@@ -26,7 +27,7 @@ enum Fit {
   Contain = 'contain'
 }
 
-export type CoreCard = Box & { id: string; face: CardFace };
+export type CoreCard = Box & { id: string; face: CardFace; shot?: string | null };
 
 const PAD = 14;
 const BODY_SIZE = 13;
@@ -135,4 +136,9 @@ const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
   [Surface.Blank]: (x) => panel(x)
 };
 
-export const cardItems = (c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): Item[] => SURFACES[c.face.surface]({ c, theme, glyphs, bold, clip: (p) => `${c.id}:${p}` });
+const pictured = (x: Ctx, shot: string): Item[] => [...panel(x), { ...image(x, CardPart.Shot, { url: shot, video: false }, whole(x.c), Fit.Cover), clip: `${x.clip(CardPart.Shot)}:${shot}` }];
+
+export function cardItems(c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): Item[] {
+  const x: Ctx = { c, theme, glyphs, bold, clip: (p) => `${c.id}:${p}` };
+  return c.shot ? pictured(x, c.shot) : SURFACES[c.face.surface](x);
+}

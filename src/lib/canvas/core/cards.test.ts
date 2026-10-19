@@ -71,6 +71,16 @@ describe('cardItems', () => {
     expect(thumbs[0].size.width).toBeCloseTo((300 - 28 - 8) / 3);
   });
 
+  it('draws the tile picture over the whole card instead of the sketch once the tile was pictured', () => {
+    const items = cardItems(card('image', { prompt: 'a cat', output_asset_id: 'o1' }, { shot: 'blob:tile' }), theme, glyphs);
+    const [shot] = part(items, CardPart.Shot) as ImageItem[];
+
+    expect(shot.src).toBe('blob:tile');
+    expect(shot.size).toEqual({ width: 200, height: 100 });
+    expect(part(items, CardPart.Status)).toEqual([]);
+    expect(part(items, CardPart.Media)).toEqual([]);
+  });
+
   it('moves every item by the card position', () => {
     const [, paper] = paths(cardItems(card('doc', {}, { x: 50, y: 70 }), theme, glyphs), CardPart.Panel);
 
