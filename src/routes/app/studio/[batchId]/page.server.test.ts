@@ -35,7 +35,7 @@ vi.mock('$lib/server/repos/product-batches', async (original) => ({
 vi.mock('$lib/server/repos/brands', () => ({ findBrand: vi.fn(async () => state.brand), listOrgBrands: vi.fn(async () => []) }));
 vi.mock('$lib/server/repos/posts', () => ({ promoteToPost: vi.fn(async () => ({ id: 'post-1' })) }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/studio/batch-page');
 const posts = await import('$lib/server/repos/posts');
 
 function event(fields: Record<string, string>) {

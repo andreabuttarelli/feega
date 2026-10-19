@@ -60,7 +60,7 @@ vi.mock('$lib/server/repos/product-batches', async (original) => ({
   listBatches: vi.fn(async () => [])
 }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/dashboard/pages/studio');
 const batches = await import('$lib/server/repos/product-batches');
 const canvas = await import('$lib/server/repos/canvas');
 

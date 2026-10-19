@@ -32,6 +32,8 @@ describe('a page action goes to the API when the page has a bearer twin', () => 
   it('every dashboard page and the project pages have one', () => {
     expect(apiPathOf('/app/credits')).toBe('/api/v1/me/pages/credits');
     expect(apiPathOf('/app/upscale')).toBe('/api/v1/me/pages/upscale');
+    expect(apiPathOf('/app/studio?project=p1')).toBe('/api/v1/me/pages/studio?project=p1');
+    expect(apiPathOf('/app/studio/b1')).toBe('/api/v1/studio/b1');
     expect(apiPathOf('/p/p1/influencers')).toBe('/api/v1/projects/p1/pages/influencers');
     expect(apiPathOf('/p/p1/brands/new')).toBe('/api/v1/projects/p1/pages/brand-new');
     expect(apiPathOf('/p/p1/assets?tab=all')).toBe('/api/v1/projects/p1/pages/assets?tab=all');

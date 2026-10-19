@@ -43,6 +43,7 @@ const BEARER_PAGES: Row[] = [
   { page: /^\/p\/([^/?#]+)\/c\/([^/?#]+)$/, api: (m) => `/api/v1/projects/${m[1]}/canvases/${m[2]}`, reader: BARE },
   { page: /^\/p\/([^/?#]+)\/c\/([^/?#]+)\/motion\/([^/?#]+)$/, api: (m) => `/api/v1/projects/${m[1]}/canvases/${m[2]}/motion/${m[3]}`, reader: BARE },
   { page: /^\/app\/compose\/([^/?#]+)$/, api: (m) => `/api/v1/compose/${m[1]}`, reader: BARE },
+  { page: /^\/app\/studio\/([^/?#]+)$/, api: (m) => `/api/v1/studio/${m[1]}`, reader: BARE },
   ...DASHBOARD_ROWS,
   ...PROJECT_ROWS
 ];
