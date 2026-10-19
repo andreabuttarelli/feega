@@ -27,7 +27,8 @@ ENV CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 COPY --from=builder /app/package.json /app/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/build ./build
+COPY --from=builder /app/scripts/node-server.mjs ./scripts/node-server.mjs
 COPY --from=builder /app/build-worker /app/build-worker
 USER node
 EXPOSE 3000
-CMD ["node", "build"]
+CMD ["node", "scripts/node-server.mjs"]
