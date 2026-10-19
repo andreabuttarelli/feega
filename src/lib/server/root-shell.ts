@@ -6,6 +6,8 @@ import { trackingAllowed } from '$lib/analytics';
 import { socialPublishing } from '$lib/server/social-publishing';
 import { firstRunFlags } from '$lib/server/dashboard/first-run-flags';
 
+export const APP_HOST_PARAM = 'host';
+
 export const load = async ({ url, untrack, locals: { safeGetSession, db } }: Pick<ServerLoadEvent, 'url' | 'untrack' | 'locals'>) => {
   const { session, user } = await safeGetSession();
 
@@ -21,7 +23,7 @@ export const load = async ({ url, untrack, locals: { safeGetSession, db } }: Pic
   // Il secondo si risolve QUI, non nel browser: la lista di chi è interno vive in $lib/server e al
   // client arriva solo il booleano — gli indirizzi del team non finiscono in un bundle pubblico.
   const internalViewer = isInternalEmail(user?.email);
-  const analyticsOptOut = !trackingAllowed(untrack(() => url.hostname)) || internalViewer;
+  const analyticsOptOut = !trackingAllowed(untrack(() => url.searchParams.get(APP_HOST_PARAM) ?? url.hostname)) || internalViewer;
 
   // Seline Profiles: identify authenticated users server-side (adblock-proof). Debounced in
   // $lib/server/seline. Client script still stitches the browser visitor via setUser in identifyUser.

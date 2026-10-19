@@ -16,7 +16,7 @@ declare global {
       db: () => Promise<Db | null>;
     }
     interface PageData {
-      session: Session | null;
+      session?: Session | null;
     }
     interface PageState {
       /**

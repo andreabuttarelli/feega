@@ -1,16 +1,25 @@
 import '$lib/i18n';
 import { waitLocale } from 'svelte-i18n';
 import type { LayoutLoad } from './$types';
-import { dev } from '$app/environment';
+import { browser, dev } from '$app/environment';
 import { injectAnalytics } from '@vercel/analytics/sveltekit';
+import { viewerCall, viewerSession } from '$lib/api/client';
+import type { RootShell } from '$lib/server/root-shell';
 
-// Initialize Vercel Web Analytics
 injectAnalytics({ mode: dev ? 'development' : 'production' });
 
-// Runs on server (SSR) and client (hydration) before the tree renders. Awaiting the dictionary
-// here is what keeps SSR output and the first client render identical — no flash of raw keys.
-export const load: LayoutLoad = async ({ data }) => {
+const ROOT_API = '/api/v1/me/root';
+
+async function inBrowser(): Promise<RootShell> {
+  const [session, shell] = await Promise.all([viewerSession(), viewerCall<RootShell>(`${ROOT_API}?host=${encodeURIComponent(location.hostname)}`)]);
+  return { ...shell, session };
+}
+
+async function onServer(fetch: typeof globalThis.fetch): Promise<RootShell> {
+  return (await (await fetch(ROOT_API)).json()) as RootShell;
+}
+
+export const load: LayoutLoad = async ({ fetch }) => {
   await waitLocale();
-  // Spread so session data from +layout.server.ts reaches child pages.
-  return { ...data };
+  return browser ? inBrowser() : onServer(fetch);
 };

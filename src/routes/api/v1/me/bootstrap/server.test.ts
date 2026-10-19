@@ -37,7 +37,7 @@ vi.mock('$lib/server/social-publishing', () => ({ socialPublishing: async () => 
 
 const { GET } = await import('./+server');
 const { appShell } = await import('$lib/server/dashboard/app-shell');
-const { load: rootLoad } = await import('../../../../+layout.server');
+const { load: rootLoad } = await import('$lib/server/root-shell');
 
 async function call(headers: Record<string, string>, org?: string) {
   const url = new URL(`https://feega.test/api/v1/me/bootstrap${org ? `?org=${org}` : ''}`);
