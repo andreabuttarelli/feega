@@ -48,7 +48,7 @@ async function shots(renderer: string): Promise<Shot[]> {
   await page.getByRole('button', { name: 'Reject all' }).click({ timeout: 8000 }).catch(() => undefined);
   await page.waitForTimeout(SETTLE_MS);
   await take('fit');
-  for (const landing of heavy.landings) {
+  for (const landing of (process.env.PARITY_NODES ? process.env.PARITY_NODES.split(',').map((id) => ({ key: id.slice(0, 8), desktop: { nodeId: id } })) : heavy.landings)) {
     for (const steps of ZOOMS_IN) {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90_000 });
       await page.waitForTimeout(SETTLE_MS / 2);
