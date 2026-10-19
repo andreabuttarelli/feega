@@ -1,4 +1,4 @@
-import { deserialize } from '$app/forms';
+import { postPageAction } from '$lib/api/page-action';
 import { createSupabaseBrowserClient } from '$lib/supabase/client';
 import { exportPath, type ExportScope, type Size } from '../export-plan';
 import { MP4_MIME } from './encode';
@@ -19,8 +19,7 @@ export async function saveExport(blob: Blob, input: { scope: ExportScope; editor
   form.set('width', String(input.size.width));
   form.set('height', String(input.size.height));
   form.set('seconds', String(input.seconds));
-  const res = await fetch(`${input.editorUrl}?/exported`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-  const result = deserialize(await res.text());
+  const result = await postPageAction(input.editorUrl, 'exported', form);
   if (result.type === 'success') {
     return { ok: true, assetId: String(result.data?.assetId) };
   }

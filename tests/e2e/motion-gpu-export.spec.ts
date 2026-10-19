@@ -85,7 +85,7 @@ async function seededEditor(page: Page, doc: Doc, { session, admin, seedNode }: 
 }
 
 async function exported(page: Page, dir: string, name: string): Promise<{ file: string; engine: string | null }> {
-  await page.route('**/*?/exported', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ type: 'failure', status: 400, data: '[{"error":1},"not saved in e2e"]' }) }));
+  await page.route(/[?&]action=exported(&|$)/, (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'not saved in e2e' }) }));
   await page.getByTestId('export-open').click();
   const choose = page.getByTestId('export-mode-video');
   if (await choose.isVisible().catch(() => false)) {

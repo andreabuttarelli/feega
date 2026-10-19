@@ -1,7 +1,7 @@
 <script lang="ts">
   import X from '@lucide/svelte/icons/x';
   import ExternalLink from '@lucide/svelte/icons/external-link';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
   import type { BrandTokens } from '$lib/motion/brand';
   import type { MotionDoc } from '$lib/motion/doc';
@@ -38,8 +38,7 @@
   let error = $state('');
 
   async function post(action: string, form: FormData): Promise<{ ok: boolean; data: Record<string, unknown> }> {
-    const res = await fetch(`${actionUrl}${actionUrl.includes('?') ? '&' : '?'}/${action}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(actionUrl, action, form);
     if (result.type === 'success') {
       return { ok: true, data: (result.data ?? {}) as Record<string, unknown> };
     }

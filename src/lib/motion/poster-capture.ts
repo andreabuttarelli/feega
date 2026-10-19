@@ -1,3 +1,4 @@
+import { postPageAction } from '$lib/api/page-action';
 import { Background } from './doc';
 import { FrameFormat } from './hyperframes/capture';
 export const POSTER_WIDTH = 480;
@@ -37,12 +38,12 @@ export function posterJob(shoot: () => Promise<string>, send: (jpeg: string, rev
   };
 }
 
-export async function sendPoster(actionUrl: string, jpeg: string, fields: Record<string, string>): Promise<void> {
+export async function sendPoster(pageUrl: string, jpeg: string, fields: Record<string, string>): Promise<void> {
   const form = new FormData();
   const mime = DATA_URL_MIME.exec(jpeg)?.[1] ?? JPEG_MIME;
   form.set('file', new File([await (await fetch(jpeg)).blob()], POSTER_FILE[mime] ?? 'poster.jpg', { type: mime }));
   Object.entries(fields).forEach(([k, v]) => form.set(k, v));
-  await fetch(actionUrl, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+  await postPageAction(pageUrl, 'poster', form);
 }
 
 export function videoPoster(src: string, width: number): Promise<{ jpeg: string; height: number }> {

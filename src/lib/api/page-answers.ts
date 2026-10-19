@@ -16,7 +16,7 @@ function locationOf(status: number, body: Body): string | null {
   return typeof body.redirect === 'string' ? body.redirect : null;
 }
 
-export function canvasActionOf(status: number, body: Body): ActionResult {
+export function pageActionOf(status: number, body: Body): ActionResult {
   const location = locationOf(status, body);
   if (location) {
     return { type: 'redirect', status: SEE_OTHER, location };

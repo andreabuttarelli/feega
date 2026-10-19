@@ -58,7 +58,7 @@
 
   const poster = posterJob(
     () => preview?.still(posterSecond(doc), POSTER_WIDTH) ?? Promise.resolve(''),
-    (jpeg) => sendPoster(`${data.editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * doc.height) / doc.width)) })
+    (jpeg) => sendPoster(data.editorUrl, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * doc.height) / doc.width)) })
   );
   let posterVersion = data.node.posterAssetId ? data.head.version : -1;
   $effect(() => {

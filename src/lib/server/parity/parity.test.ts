@@ -8,7 +8,7 @@ import { motionToolList } from '$lib/server/motion/tool-run';
 import { CANVAS_PAGE_ACTIONS, EDITOR_ACTIONS, FRAME_PAGE_ACTIONS, PARITY_TABLES, SELECTION_TOOLBAR, type Parity, type Route } from './ui-actions';
 
 const CANVAS_PAGE = 'src/lib/server/canvas/canvas-page.ts';
-const FRAME_PAGE = 'src/routes/p/[projectId]/c/[canvasId]/motion/[nodeId]/+page.server.ts';
+const FRAME_PAGE = 'src/lib/server/frame-editor/editor-page.ts';
 const MCP_DOCS = 'docs/mcp-tools.md';
 
 const KNOWN_GAPS = [

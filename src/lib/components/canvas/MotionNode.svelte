@@ -264,7 +264,7 @@
     posters.set(key, shot);
     slots = releaseCapture(slots, node.id);
     if (shot) {
-      void sendPoster(`${href}?/poster`, shot, { width: String(width), height: String(Math.round((width * source.height) / source.width)), revision: String(revision) }).catch(() => undefined);
+      void sendPoster(href, shot, { width: String(width), height: String(Math.round((width * source.height) / source.width)), revision: String(revision) }).catch(() => undefined);
     }
   }
 
