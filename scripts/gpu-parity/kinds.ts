@@ -162,6 +162,15 @@ const KINDS: Record<string, () => MotionDoc> = {
       'wide',
       { text: 'Auto width', sizing: 'auto', x: 0.3, y: 0.8, width: 0.4, height: 0.2, rotation: 45, scale: 0.8 }
     ),
+  painted: () => {
+    const linear = [{ type: FillType.Linear, angle: 20, stops }];
+    const radial = [{ type: FillType.Radial, center: { x: 0.3, y: 0.4 }, radius: 1.2, stops }];
+    const outline = (color: string, align: string) => [{ paint: { type: FillType.Solid, color }, width: 0.004, align }];
+    const titled = clip(backdrop, 'Title', 'grad', { text: 'Gradient title\nsecond line', y: 0.22, height: 0.35, fills: linear });
+    const body = clip(titled, 'Text', 'body', { text: 'Radial body copy that wraps onto two lines', align: 'left', size: 0.06, x: 0.3, y: 0.62, width: 0.45, height: 0.25, fills: radial });
+    const kicker = clip(body, 'Kicker', 'kick', { text: 'outside stroke', size: 0.06, x: 0.75, y: 0.62, fills: [{ type: FillType.Solid, color: '#ffffff' }], strokes: outline('#ff375f', 'outside') });
+    return clip(kicker, 'Caption', 'cap', { text: 'Centred stroke, mixed fills', x: 0.5, y: 0.88, size: 0.04, fills: [{ type: FillType.Solid, color: '#0a84ff' }, { type: FillType.Solid, color: '#ffd60a', opacity: 0.5 }], strokes: outline('#30d158', 'center') });
+  },
   blur: () => keys(must(addClip(shape(backdrop, 'sharp', { shape: 'rect', x: 0.3, y: 0.5, width: 0.2, height: 0.3, fill: '#ffd60a' }), { component: 'Shape', from: 0, durationInFrames: SECONDS, props: { shape: 'star', x: 0.7, y: 0.5, width: 0.25, height: 0.4, fill: '#bf5af2' }, effects: [{ id: 'g', kind: 'gaussian-blur', enabled: true, params: { radius: 6 } }] } as never, 'soft')), 'sharp', 'blur', 0, 24)
 };
 

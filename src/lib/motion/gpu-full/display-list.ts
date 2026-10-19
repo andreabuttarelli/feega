@@ -183,7 +183,7 @@ const logoPainter = ({ props, size, asset, logo }: Env): Painted => {
   return src ? [picture(src, size, { fit: 'width', clipped: false })] : Unsupported.Text;
 };
 
-const TEXT_GAP: Record<TextGap, Unsupported> = { [TextGap.Font]: Unsupported.Font, [TextGap.Glyph]: Unsupported.Glyph, [TextGap.Fill]: Unsupported.Fill, [TextGap.Stroke]: Unsupported.Stroke };
+const TEXT_GAP: Record<TextGap, Unsupported> = { [TextGap.Font]: Unsupported.Font, [TextGap.Glyph]: Unsupported.Glyph, [TextGap.Fill]: Unsupported.Fill };
 
 function textPainter(env: Env): Painted {
   const { clip, animators, props, box, stage, css, time, fps, still, typeset } = env;
@@ -194,7 +194,7 @@ function textPainter(env: Env): Painted {
   const { frame, inks } = painted;
   const scale = Number(props.scale ?? 1);
   const turn = scaleAbout(frame.left + frame.width / 2, frame.top + frame.height / 2, Number(props.rotation ?? 0), scale);
-  return inks.map((ink) => ({ kind: ItemKind.Path as const, contours: ink.contours, rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: ink.color }, opacity: ink.opacity, matrix: mul2d(turn, ink.matrix), blur: ink.blur * scale }));
+  return inks.map((ink) => ({ kind: ItemKind.Path as const, contours: ink.contours, rule: ink.rule, paint: ink.paint, opacity: ink.opacity, matrix: mul2d(turn, ink.matrix), blur: ink.blur * scale }));
 }
 
 type Box = { left: number; top: number; width: number; height: number };
