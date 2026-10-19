@@ -13,9 +13,13 @@ function apiUrl(path: string): string {
   return `${publicEnv.PUBLIC_API_BASE ?? ''}${path}`;
 }
 
-export async function viewerSession() {
+export function browserSupabase(): ReturnType<typeof createSupabaseBrowserClient> {
   supabase ??= createSupabaseBrowserClient();
-  const { data } = await supabase.auth.getSession();
+  return supabase;
+}
+
+export async function viewerSession() {
+  const { data } = await browserSupabase().auth.getSession();
   return data.session;
 }
 

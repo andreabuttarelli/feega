@@ -1,5 +1,7 @@
 import type { Reroute } from '@sveltejs/kit';
-import { building } from '$app/environment';
+import { browser, building } from '$app/environment';
+import { bundleApiBase } from '$lib/api/bundle-fetch';
+import { bundleAuthRoute } from '$lib/auth/bundle-auth';
 import { env as publicEnv } from '$env/dynamic/public';
 import { isSiteHost } from '$lib/site/host';
 
@@ -20,6 +22,10 @@ function isAppHost(h: string): boolean {
 }
 
 export const reroute: Reroute = ({ url }) => {
+  if (browser && bundleApiBase()) {
+    return bundleAuthRoute(url.pathname) ?? undefined;
+  }
+
   if (isSiteHost(url)) {
     return;
   }

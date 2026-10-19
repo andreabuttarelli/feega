@@ -22,23 +22,57 @@ export const TIER_PX: Record<Tier, number> = {
 };
 
 const SIZE_PARAM = 'size';
-const CANVAS_ASSET_PATH = /^(\/p\/[^/?#]+\/c\/[^/?#]+\/assets\/[^/?#]+)(\?[^#]*)?$/;
+export const ASSET_GRANT_PARAM = 'grant';
+
+const ASSET_PATH = /^\/p\/[^/?#]+\/c\/[^/?#]+\/assets\/[^/?#]+$/;
+const ASSET_PATH_IN_TEXT = /"(\/p\/[^/"?#]+\/c\/[^/"?#]+\/assets\/[^/"?#]+)(?:\?size=([a-z0-9]+))?"/g;
+const LOCAL = 'https://local';
+
+export type AssetGrant = { apiBase: string; grant: string };
+
+let granted: AssetGrant | null = null;
+
+export function useAssetGrant(grant: AssetGrant | null): void {
+  granted = grant;
+}
 
 function isAssetSize(value: string | null): value is AssetSize {
   return Object.values(AssetSize).includes(value as AssetSize);
 }
 
+export function isCanvasAssetPath(pathname: string): boolean {
+  return ASSET_PATH.test(pathname);
+}
+
 function withSize(path: string, size: AssetSize): string {
-  return size === AssetSize.Full ? path : `${path}?${SIZE_PARAM}=${size}`;
+  const params = new URLSearchParams();
+  if (size !== AssetSize.Full) {
+    params.set(SIZE_PARAM, size);
+  }
+  if (granted) {
+    params.set(ASSET_GRANT_PARAM, granted.grant);
+  }
+  const search = params.toString();
+  return `${granted?.apiBase ?? ''}${path}${search ? `?${search}` : ''}`;
 }
 
 export function canvasAssetUrl(projectId: string, canvasId: string, assetId: string, size: AssetSize): string {
   return withSize(`/p/${projectId}/c/${canvasId}/assets/${assetId}`, size);
 }
 
+function assetPathOf(url: string): string | null {
+  const parsed = new URL(url, LOCAL);
+  const ours = parsed.origin === LOCAL || parsed.origin === granted?.apiBase;
+  return ours && isCanvasAssetPath(parsed.pathname) ? parsed.pathname : null;
+}
+
 export function sized(url: string, size: AssetSize): string {
-  const match = CANVAS_ASSET_PATH.exec(url);
-  return match ? withSize(match[1], size) : url;
+  const path = assetPathOf(url);
+  return path ? withSize(path, size) : url;
+}
+
+export function grantedAssetPaths(text: string): string {
+  return text.replace(ASSET_PATH_IN_TEXT, (_, path: string, size: string | undefined) => `"${withSize(path, isAssetSize(size ?? null) ? (size as AssetSize) : AssetSize.Full)}"`);
 }
 
 export function sizeOf(url: URL): AssetSize {

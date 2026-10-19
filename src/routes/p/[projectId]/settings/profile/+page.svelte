@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { signOutForm } from '$lib/auth/sign-out-form';
   import { enhance } from '$lib/settings/enhance';
   import { _ } from 'svelte-i18n';
   import { SvelteSet } from 'svelte/reactivity';
@@ -130,7 +131,7 @@
 
 <Panel title={$_('app.settings.profile.session')}>
   <Field label={$_('app.account.signOut')} hint={$_('app.settings.profile.signOutDesc')} layout={FieldLayout.Row}>
-    <form method="POST" action="/auth/signout">
+    <form method="POST" action="/auth/signout" use:signOutForm>
       <Button variant="secondary" type="submit">{$_('app.account.signOut')}</Button>
     </form>
   </Field>

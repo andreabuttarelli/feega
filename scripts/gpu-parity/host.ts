@@ -11,6 +11,8 @@ import type { MotionDoc } from '$lib/motion/doc';
 import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
 import { createMedia } from '$lib/motion/gpu-full/media';
 import { mountCustomReads } from '$lib/motion/gpu-full/dom/custom';
+import { loadFonts } from '$lib/motion/gpu-full/text/load';
+import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
 import { BACKENDS, FullBackend } from '$lib/motion/gpu-full/backends';
 import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
 
@@ -63,7 +65,7 @@ async function gpuShots(input: ShotsInput): Promise<ShotsResult> {
 
 async function fullShots(input: ShotsInput, backend: FullBackend): Promise<ShotsResult> {
   const doc = input.spec.doc as MotionDoc;
-  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets);
+  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets, { fonts: await loadFonts(doc, input.spec.assets), smoothing: smoothingOf(navigator.userAgent) });
   const media = createMedia();
   const custom = await mountCustomReads(host(), composer(input.spec), prepared);
   const canvas = document.createElement('canvas');

@@ -7,6 +7,10 @@ import { FillType } from '../fill/model';
 import { BlendMode } from '../blend';
 import { displayListAt, FillRule, ItemKind, PaintKind, Unsupported, type PathItem } from './display-list';
 import { apply2d } from '../affine';
+import { boxBook } from './text/test-face';
+import { Smoothing } from './text/painter';
+
+const boxType = { fonts: boxBook(), smoothing: Smoothing.Plain };
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -122,8 +126,22 @@ describe('displayListAt', () => {
     const shadowed = patch(titled, 'card', { blend: BlendMode.Multiply, effects: [{ id: 'e1', kind: 'lut', enabled: true, params: {} }], mask: { kind: 'text', text: 'x' } } as never as never);
     const drawn = list(shadowed);
 
-    expect(drawn.unsupported).toContainEqual({ clip: 'title', component: 'Title', reason: Unsupported.Component });
+    expect(drawn.unsupported).toContainEqual({ clip: 'title', component: 'Title', reason: Unsupported.Font });
     expect(drawn.unsupported).toContainEqual({ clip: 'card', component: 'Shape', reason: Unsupported.Mask });
     expect(drawn.items.map((i) => i.clip)).toEqual(['bg']);
+  });
+
+  it('draws text clips as glyph outlines once fonts are loaded', () => {
+    const titled = must(addClip(withBg, { component: 'Title', from: 0, durationInFrames: 90, props: { text: 'ab' } }, 'title'));
+    const glyphs = displayListAt(titled, 60, FEEGA_TOKENS, boxType).items.filter((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'title');
+
+    expect(glyphs.flatMap((i) => i.contours)).toHaveLength(2);
+  });
+
+  it('names a text bent along a path', () => {
+    const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90 }, 'text'));
+    const bent = patch(texted, 'text', { textPath: { path: 'M0 0 L1 0' } } as never);
+
+    expect(displayListAt(bent, 0, FEEGA_TOKENS, boxType).unsupported).toContainEqual({ clip: 'text', component: 'Text', reason: Unsupported.TextPath });
   });
 });

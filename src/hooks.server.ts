@@ -17,6 +17,7 @@ import { isCsrfForbidden } from '$lib/server/csrf';
 import { redirectFor } from '$lib/server/host-redirects';
 import { corsPreflight, extraOrigins, withCors } from '$lib/server/api-cors';
 import { SessionSource, bearerSession, bearerTokenOf, sessionSourceOf } from '$lib/server/bearer-session';
+import { grantBearerOf } from '$lib/server/canvas/asset-grant';
 import { SiteVisibility, rootShowsSite, siteVisibility } from '$lib/site/visibility';
 import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
@@ -185,7 +186,7 @@ export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentr
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
-  const requestBearer = bearerTokenOf(event.request);
+  const requestBearer = bearerTokenOf(event.request) ?? grantBearerOf(event.request);
   const source = sessionSourceOf(event.request, event.url);
   event.locals.supabase = markRlsScoped(createServerClient(publicEnv.PUBLIC_SUPABASE_URL, publicEnv.PUBLIC_SUPABASE_ANON_KEY, {
     ...(requestBearer ? { global: { headers: { Authorization: `Bearer ${requestBearer}` } } } : {}),
