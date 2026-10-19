@@ -6,7 +6,7 @@
     "allowNavigation": ["oh.feega.app", "feega.app", "localhost"]
   },
   "ios": {
-    "contentInset": "never",
+    "contentInset": "always",
     "limitsNavigationsToAppBoundDomains": false
   }
 }

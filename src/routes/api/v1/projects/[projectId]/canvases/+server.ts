@@ -5,7 +5,7 @@ import { listMemberships } from '$lib/server/repos/orgs';
 import { findReachableProject } from '$lib/server/projects/lookup';
 import { listCanvases } from '$lib/server/repos/canvas';
 import { canvasPath } from '$lib/server/tenancy/entry';
-import type { CanvasList } from '$lib/api/mobile-contract';
+import type { CanvasList } from '$lib/api/project-lists';
 
 const NOT_FOUND = 404;
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CanvasList } from '$lib/api/mobile-contract';
+import { CanvasList } from '$lib/api/project-lists';
 
 const USER = { id: 'u1', email: 'ada@x.it' };
 vi.mock('$lib/server/db/client', () => ({ createUserDb: () => ({}) }));

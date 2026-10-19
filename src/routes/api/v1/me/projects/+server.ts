@@ -4,7 +4,7 @@ import { ORG_PARAM, bearerOf } from '$lib/server/api/bearer-page';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listProjects } from '$lib/server/repos/projects';
 import { ProjectMode } from '$lib/project-mode';
-import type { ProjectList } from '$lib/api/mobile-contract';
+import type { ProjectList } from '$lib/api/project-lists';
 
 const NOT_FOUND = 404;
 

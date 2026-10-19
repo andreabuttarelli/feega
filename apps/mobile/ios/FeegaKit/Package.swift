@@ -6,7 +6,7 @@ let package = Package(
     platforms: [.iOS(.v16), .macOS(.v13)],
     products: [
         .library(name: "FeegaCore", targets: ["FeegaCore"]),
-        .library(name: "FeegaUI", targets: ["FeegaUI"])
+        .library(name: "FeegaShell", targets: ["FeegaShell"])
     ],
     dependencies: [
         .package(path: "../vendor/capacitor-swift-pm")
@@ -14,7 +14,7 @@ let package = Package(
     targets: [
         .target(name: "FeegaCore"),
         .target(
-            name: "FeegaUI",
+            name: "FeegaShell",
             dependencies: [
                 "FeegaCore",
                 .product(name: "Capacitor", package: "capacitor-swift-pm", condition: .when(platforms: [.iOS]))

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectMode } from '$lib/project-mode';
-import { ProjectList } from '$lib/api/mobile-contract';
+import { ProjectList } from '$lib/api/project-lists';
 
 const USER = { id: 'u1', email: 'ada@x.it' };
 vi.mock('$lib/server/db/client', () => ({ createUserDb: () => ({}) }));

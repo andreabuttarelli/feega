@@ -4,7 +4,6 @@
   "version": "0.1.0",
   "description": "feega for iPhone, iPad and Android: native screens, canvas and editor in a Capacitor WebView",
   "scripts": {
-    "config": "node scripts/config.mjs",
     "wire": "ruby scripts/wire-xcode.rb",
     "sync": "cap sync",
     "ios:sim": "xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO build",
