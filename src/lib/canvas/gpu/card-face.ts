@@ -3,6 +3,7 @@ import { NODE_KIND_LABEL, NameTag } from '../node-label';
 import { isNodeType, type NodeType } from '../node-data';
 import { isUploadedNodeRow } from '../uploaded-node';
 import type { Poster } from '../poster-lod';
+import type { GenTileView } from '../gen-tile-view';
 
 export enum Surface {
   Generate = 'generate',
@@ -31,6 +32,7 @@ export type CardFace = {
   title: string;
   subtitle: string;
   thumbs: string[];
+  gen: GenTileView | null;
 };
 
 type Data = Record<string, unknown>;
@@ -107,7 +109,8 @@ const BLANK: CardFace = {
   text: '',
   title: '',
   subtitle: '',
-  thumbs: []
+  thumbs: [],
+  gen: null
 };
 
 function labelOf(t: FaceTile, kind: NodeType): string | null {
@@ -117,7 +120,7 @@ function labelOf(t: FaceTile, kind: NodeType): string | null {
   return t.displayName?.trim() || NODE_KIND_LABEL[kind];
 }
 
-export function faceOf(t: FaceTile, data: Data, asset: AssetUrl, thumbs: string[] = []): CardFace {
+export function faceOf(t: FaceTile, data: Data, asset: AssetUrl, thumbs: string[] = [], gen: GenTileView | null = null): CardFace {
   if (!t.kind || !isNodeType(t.kind)) {
     return BLANK;
   }
@@ -126,7 +129,8 @@ export function faceOf(t: FaceTile, data: Data, asset: AssetUrl, thumbs: string[
   if (isUploadedNodeRow({ type: kind, data })) {
     return { ...BLANK, surface: Surface.Media, label, media: { url: asset(str(data.assetId)), video: kind === 'video' } };
   }
-  return { ...BLANK, label, thumbs, ...FACES[kind](data, asset, t) };
+  const face = { ...BLANK, label, thumbs, ...FACES[kind](data, asset, t) };
+  return face.surface === Surface.Generate ? { ...face, gen } : face;
 }
 
 export const handedToCore = (face: CardFace): CardFace => ({ ...face, media: null, live: null });

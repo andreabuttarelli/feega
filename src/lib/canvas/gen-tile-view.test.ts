@@ -49,4 +49,10 @@ describe('genTileView', () => {
     expect(v.runs).toBe(2);
     expect(v.shown).toBe(1);
   });
+
+  it('carries the text of the run on show', () => {
+    const runs = [{ id: 'a', mediaId: 'm1', prompt: 'p', text: 'hello' }] as GenNode['runs'];
+
+    expect(genTileView(node({ medium: 'text', runs, refId: 'm1' }), quote(), extras).output).toBe('hello');
+  });
 });
