@@ -82,6 +82,7 @@ async function run(target: Target, renderer: string) {
   const firstMs = Date.now() - t0;
   await page.waitForTimeout(SETTLE_MS);
   const idleMb = rssMb(mine());
+  const pixiTextureMb = Math.round(((await page.evaluate('window.__gpuCanvas?.textures?.().bytes ?? 0')) as number) / 1024 / 1024);
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}-settled.png` });
   const motion = await pan(page);
   const panMb = rssMb(mine());
@@ -90,7 +91,7 @@ async function run(target: Target, renderer: string) {
   const backend = await page.locator('[data-renderer]').first().getAttribute('data-renderer');
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}.png` });
   await browser.close();
-  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion };
+  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, pixiTextureMb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion };
 }
 
 const targets = (process.env.BENCH_TARGETS ?? `${Target.Chrome},${Target.IPhone}`).split(',') as Target[];

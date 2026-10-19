@@ -75,7 +75,7 @@
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
-  import { faceOf } from '$lib/canvas/gpu/card-face';
+  import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Fling, type Glide } from '$lib/canvas/core/inertia';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
@@ -623,6 +623,11 @@
     })
   );
 
+  function faceFor(t: Tile) {
+    const face = faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []);
+    return coreDrawn.has(t.id) ? handedToCore(face) : face;
+  }
+
   const cards = $derived(
     placed.map(
       (t): Card => ({
@@ -632,7 +637,7 @@
         w: t.w,
         h: t.h,
         rotation: t.rotation ?? 0,
-        face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
+        face: faceFor(t),
         hidden: handedOver(t) || coreDrawn.has(t.id),
         snapshot: shotOf(t.id),
         running: isRunning(summaries.get(t.id)?.data ?? {}),

@@ -7,6 +7,7 @@ import { bytesOf } from './texture-bytes';
 
 export type TextureCache = {
   want: (url: string, ready: (tex: Texture) => void) => () => void;
+  drop: (url: string) => void;
   clear: () => void;
 };
 
@@ -66,6 +67,9 @@ export function createTextureCache({ changed, device, pinned, evicted, decode, q
         )
         .catch(settle);
       return () => fresh.delete(ready);
+    },
+    drop(url) {
+      lru.drop(url);
     },
     clear() {
       lru.clear();
