@@ -7,11 +7,11 @@ import { ungrouped } from './ungroup';
 const CORE_URL = '/gpu-core/gpu_core.js';
 
 type Size = { width: number; height: number };
-type Attached = { draw: (list: string) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; drop_group: (key: string) => void; free: () => void };
+type Attached = { draw: (list: string) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; free: () => void };
 
-export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine };
+export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine; cache?: boolean };
 export type Screen = { width: number; height: number; background: Rgba | null; items: (Item | Use)[] };
-export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; dropGroup: (key: string) => void; drawScreen: (screen: Screen, pictures?: Pictures) => void };
+export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; dropGroup: (key: string) => void; drawScreen: (screen: Screen, pictures?: Pictures) => boolean; upload: (list: DisplayList, pictures: Pictures) => void; cacheBytes: () => number };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
 
@@ -37,10 +37,20 @@ function wanted(items: Item[]): ImageItem[] {
 
 const moving = (picture: Picture) => (typeof HTMLVideoElement !== 'undefined' && picture.source instanceof HTMLVideoElement) || (typeof HTMLCanvasElement !== 'undefined' && picture.source instanceof HTMLCanvasElement);
 
-async function coreModule(): Promise<CoreModule> {
+let loading: Promise<CoreModule> | null = null;
+
+async function loadCore(): Promise<CoreModule> {
   const core = (await import(/* @vite-ignore */ CORE_URL)) as CoreModule;
   await core.default();
   return core;
+}
+
+export function warmCore(): Promise<CoreModule> {
+  loading ??= loadCore().catch((e: unknown) => {
+    loading = null;
+    throw e;
+  });
+  return loading;
 }
 
 function rasterOf(attached: Attached): CoreRaster {
@@ -82,11 +92,19 @@ function rasterOf(attached: Attached): CoreRaster {
       wanted(list.items).forEach((item) => upload(item, pictures));
       attached.put_group(key, JSON.stringify(flat(list)));
     },
+    appendGroup: (key: string, raw: DisplayList, pictures = NO_PICTURES) => {
+      const list = drawable(raw);
+      wanted(list.items).forEach((item) => upload(item, pictures));
+      attached.append_group(key, JSON.stringify(flat(list)));
+    },
     dropGroup: (key: string) => attached.drop_group(key),
+    upload: (list: DisplayList, pictures: Pictures) => wanted(list.items).forEach((item) => upload(item, pictures)),
     drawScreen: (screen: Screen, pictures = NO_PICTURES) => {
       wanted(drawn(screen.items as Item[])).forEach((item) => upload(item, pictures));
       attached.draw(JSON.stringify(flat(screen)));
+      return attached.cache_pending();
     },
+    cacheBytes: () => attached.cache_bytes(),
     dispose: () => attached.free()
   };
 }
@@ -95,7 +113,7 @@ export async function createCore(canvas: HTMLCanvasElement, width: number, heigh
   if (!('gpu' in navigator)) {
     throw new Error('webgpu unavailable');
   }
-  const core = await coreModule();
+  const core = await warmCore();
   return rasterOf(await core.WebCore.attach(canvas, width, height));
 }
 
@@ -124,7 +142,7 @@ export async function createCoreGl(canvas: HTMLCanvasElement, width: number, hei
   if (!canvas.getContext('webgl2', GL_CONTEXT)) {
     throw new Error('webgl2 unavailable');
   }
-  const core = await coreModule();
+  const core = await warmCore();
   const attached = core.WebGlCore.attach(canvas, width, height);
   const picture = attached.picture.bind(attached);
   attached.picture = (clip, source, w, h) => {

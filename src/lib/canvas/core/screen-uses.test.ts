@@ -24,6 +24,18 @@ describe('screen uses', () => {
     expect(screenUses([], { x: 0, y: 0, zoom: 1 }, SCREEN, null)).toEqual({ width: 800, height: 600, background: null, items: [] });
   });
 
+  it('asks the core to cache a still frame', () => {
+    const [use] = screenUses([{ ...frame('a', 0), cache: true }], { x: 0, y: 0, zoom: 1 }, SCREEN, null).items;
+    expect(use).toMatchObject({ group: 'a:1', cache: true });
+  });
+
+  it('sends cached frames within a screen of the viewport so the core rasters them ahead', () => {
+    const near = { ...frame('near', 1000), cache: true };
+    const far = { ...frame('far', 2000), cache: true };
+    const plain = frame('plain', 1000);
+    expect(screenUses([near, far, plain], { x: 0, y: 0, zoom: 1 }, SCREEN, null).items.map((u) => (u as { clip: string }).clip)).toEqual(['near']);
+  });
+
   it('turns a rotated frame about its world pivot', () => {
     const turned = { ...frame('a', 0), size: { width: 200, height: 100 }, turn: { degrees: 90, about: { x: 100, y: 50 } } };
     const [use] = screenUses([turned], { x: 0, y: 0, zoom: 1 }, SCREEN, null).items as { matrix: number[] }[];

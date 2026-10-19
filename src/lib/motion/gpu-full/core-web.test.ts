@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BlendMode } from '../blend';
 import { ItemKind, type LayerItem } from './display-list';
-import { GL_PICTURE_SIDE, forCore, glPictureSize } from './core-web';
+import { GL_PICTURE_SIDE, forCore, glPictureSize, warmCore } from './core-web';
 
 describe('glPictureSize', () => {
   it('keeps a picture that fits the WebGL atlas as it is', () => {
@@ -19,5 +19,13 @@ const layer: LayerItem = { kind: ItemKind.Layer, clip: 'ph', source: 'ph:0', siz
 describe('the core draws a layer', () => {
   it('as a picture keyed by its source, filling its box', () => {
     expect(forCore(layer)).toMatchObject({ kind: ItemKind.Image, clip: 'ph:0', src: 'ph:0', size: { width: 40, height: 20 }, fit: 'fill', clipped: true, inner: [1, 0, 0, 1, 0, 0], opacity: 0.5, matrix: [1, 0, 0, 1, 3, 4] });
+  });
+});
+
+describe('warming the core', () => {
+  it('loads and compiles the wasm once, however many canvases ask', () => {
+    const first = warmCore();
+    first.catch(() => undefined);
+    expect(warmCore()).toBe(first);
   });
 });
