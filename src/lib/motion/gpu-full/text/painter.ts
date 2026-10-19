@@ -18,7 +18,7 @@ import { rgbaOf, type Rgba } from '../rgba';
 import type { Face, FaceBook, Request } from './face';
 import type { FaceRule } from './fonts';
 import type { FontFace } from '../../fonts/model';
-import { layOut, Shaping, Spaces, type Flow, type Glyph, type Laid, type Line, type Type } from './layout';
+import { layOut, NO_EXTRA, Shaping, Spaces, type Extra, type Flow, type Glyph, type Laid, type Line, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
 import { clipped, contoursOf, dilated, within, type Rect } from './outline';
@@ -200,7 +200,7 @@ export const moved = (contours: number[][], dx: number, dy: number) => contours.
 
 const rect = ([l, t, r, b]: Rect) => [l, t, r, t, r, b, l, b];
 
-export const STILL: Look = { opacity: 1, blur: 0, turn: [1, 0, 0, 1, 0, 0], tint: null };
+export const STILL: Look = { opacity: 1, blur: 0, turn: [1, 0, 0, 1, 0, 0], tint: null, spacing: 0 };
 
 const WORD = /\S+/g;
 
@@ -374,9 +374,9 @@ const visible = (paint: Paint) => paint.kind !== PaintKind.Solid || paint.color[
 
 export const tintedPaint = (paint: Paint, look: Look, colour: Colour): Paint => (look.tint && paint.kind === PaintKind.Solid ? { kind: PaintKind.Solid, color: mixed(paint.color, colour(look.tint.color), look.tint.amount) } : paint);
 
-export type Tinted = { opacity: number; blur: number; turn: Affine; tint: { color: Rgba; amount: number } | null };
+export type Tinted = { opacity: number; blur: number; turn: Affine; tint: { color: Rgba; amount: number } | null; spacing?: number };
 
-const UNTINTED: Tinted = { ...STILL, tint: null };
+const UNTINTED: Tinted = { opacity: 1, blur: 0, turn: STILL.turn, tint: null };
 
 const tinted = (paint: Paint, look: Tinted): Paint => (look.tint && paint.kind === PaintKind.Solid ? { kind: PaintKind.Solid, color: mixed(paint.color, look.tint.color, look.tint.amount) } : paint);
 
@@ -411,14 +411,15 @@ const wordsOf = (text: string): Word[] => text.split('\n').flatMap((line, l) => 
 
 const charsBeforeOf = (words: Word[]) => words.map((_, w) => words.slice(0, w).reduce((n, word) => n + word.chars, 0));
 
-function looksOf(text: string, run: Animation, colour: Colour, hiddenWhenIsolated: boolean): Tinted[] {
+function looksOf(text: string, run: Animation, colour: Colour, hiddenWhenIsolated: boolean, tracking: number): Tinted[] {
   const words = wordsOf(text);
   const before = charsBeforeOf(words);
   return words.flatMap((word, w) =>
     Array.from({ length: word.chars }, (_, letter) => {
       const look = run.at({ [AnimatorUnit.Char]: before[w] + letter, [AnimatorUnit.Word]: w, [AnimatorUnit.Line]: word.line });
       const skipped = hiddenWhenIsolated && (run.isolates || look.opacity < 1);
-      return { ...look, opacity: skipped ? 0 : look.opacity, tint: look.tint ? { color: colour(look.tint.color), amount: look.tint.amount } : null };
+      const { spacing, ...own } = look;
+      return { ...own, ...(run.tracks ? { spacing: spacing - tracking } : {}), opacity: skipped ? 0 : look.opacity, tint: look.tint ? { color: colour(look.tint.color), amount: look.tint.amount } : null };
     })
   );
 }
@@ -455,7 +456,7 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
     backdrop: kind.inset > 0 ? colour(String(p.background)) : null,
     fills,
     outline: outlineOf(env, colour),
-    animation: run ? { finest: run.finest, looks: looksOf(cased, run, colour, throughText(visibleFills)) } : null,
+    animation: run ? { finest: run.finest, looks: looksOf(cased, run, colour, throughText(visibleFills), Number(p.tracking)) } : null,
     smoothing: env.smoothing
   };
 }
@@ -464,7 +465,12 @@ type Placed = { laid: Laid; type: Type; room: number };
 
 function place(plan: TextPlan, fonts: FaceBook): Placed {
   const typeAt = (size: number): Type => ({ request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping });
-  const lay = (size: number) => layOut(plan.paragraphs, typeAt(size), plan.flow, plan.frame.width, fonts);
+  const looks = plan.animation?.looks;
+  const words = wordsOf(plan.text);
+  const before = charsBeforeOf(words);
+  const wordsBefore = plan.paragraphs.map((_, i) => plan.paragraphs.slice(0, i).reduce((n, para) => n + (para.match(WORD)?.length ?? 0), 0));
+  const extra: Extra = looks ? (paragraph, word, letter) => looks[(before[wordsBefore[paragraph] + word] ?? 0) + letter]?.spacing ?? 0 : NO_EXTRA;
+  const lay = (size: number) => layOut(plan.paragraphs, typeAt(size), plan.flow, plan.frame.width, fonts, extra);
   const size = plan.fits ? fitSize(plan.size, (s) => lay(s), plan.frame) : plan.size;
   const laid = lay(size);
   return { laid, type: typeAt(size), room: plan.frame.hugs ? laid.width : plan.frame.width };

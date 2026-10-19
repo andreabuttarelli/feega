@@ -57,4 +57,10 @@ describe('paintOnPath', () => {
   it('names a character no font covers', () => {
     expect(paintOnPath(env('a★', [[0, 0], [100, 0]], { fonts: boxBook(new Set(['★'])) }))).toBe(TextGap.Glyph);
   });
+
+  it('spreads characters by a tracking animator', () => {
+    const spread = animatorSchema.parse({ id: 'a', unit: AnimatorUnit.Char, values: { tracking: 0.5 } });
+
+    expect(extent(drawn(paintOnPath(env('ab', [[0, 200], [1000, 200]], { animators: [spread] })))).right).toBeCloseTo(SIZE + SIZE / 2);
+  });
 });

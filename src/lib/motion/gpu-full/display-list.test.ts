@@ -187,8 +187,16 @@ describe('displayListAt', () => {
       expect(glyphsAt(blurred, 60).map((i) => i.blur)).toEqual([4, 4]);
     });
 
-    it('still names a tracking animator', () => {
-      expect(displayListAt(animated({ tracking: 0.1 }), 60, FEEGA_TOKENS, boxType).unsupported).toContainEqual({ clip: 'text', component: 'Text', reason: Unsupported.Animator });
+    it('draws a tracking animator by spreading the selected characters', () => {
+      const width = (doc: MotionDoc) => {
+        const ink = corners(glyphsAt(doc, 60).reduce((all, i) => ({ ...i, contours: [...all.contours, ...i.contours] })));
+        return ink.right - ink.left;
+      };
+      const tracked = must(addAnimator(texted, 'text', 'a', { values: { tracking: 0.5 } }));
+
+      expect(displayListAt(tracked, 60, FEEGA_TOKENS, boxType).unsupported).toEqual([]);
+      expect(width(tracked)).toBeGreaterThan(width(texted));
     });
   });
+
 });

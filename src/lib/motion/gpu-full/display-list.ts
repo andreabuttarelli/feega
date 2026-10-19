@@ -220,7 +220,7 @@ function nativeText(env: Env, native: NativeFaces): Painted {
   if (typeof plan === 'string') {
     return TEXT_GAP[plan];
   }
-  if (!plan.fills.every((f) => NATIVE_FILLS.has(f.kind))) {
+  if (!plan.fills.every((f) => NATIVE_FILLS.has(f.kind)) || plan.animation?.looks.some((l) => (l.spacing ?? 0) !== 0)) {
     return outlinedText(env);
   }
   const turn = { scale: Number(props.scale ?? 1), rotation: Number(props.rotation ?? 0) };
@@ -301,7 +301,6 @@ const keyframedOutside = (clip: MotionClip) => Object.entries(clip.keyframes).so
 
 const CLIP_LIMITS: [Unsupported, (clip: MotionClip) => boolean][] = [
   [Unsupported.Component, (clip) => !PAINTERS[clip.component]],
-  [Unsupported.Animator, (clip) => clip.animators.some((a) => a.values.tracking !== undefined)],
   [Unsupported.Shader, (clip) => clip.shaders.length > 0],
   [Unsupported.Space3d, (clip) => keyed(clip, DEPTH_KEYS)],
   [Unsupported.Keyframe, keyframedOutside]

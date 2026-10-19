@@ -288,4 +288,12 @@ describe('paintText', () => {
       expect(inksOf(gradient, { animators: [faded] })).toHaveLength(1);
     });
   });
+
+  it('lets a tracking animator replace the text tracking inside its units, as the page does', () => {
+    const zero = animatorSchema.parse({ id: 'a', unit: AnimatorUnit.Char, values: { tracking: 0 } });
+    const width = (inks: Ink[]) => extent(inks).right - extent(inks).left;
+    const tracked = { text: 'abc', align: 'left', tracking: 0.1 };
+
+    expect(width(drawn(paintText(env('Text', tracked, { animators: [zero] }))))).toBeCloseTo(width(drawn(paintText(env('Text', { ...tracked, tracking: 0 })))), 0);
+  });
 });
