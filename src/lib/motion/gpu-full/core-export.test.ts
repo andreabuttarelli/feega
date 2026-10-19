@@ -22,7 +22,7 @@ describe('export through the core', () => {
   });
 
   it('leaves a video to the HTML engine when one frame has something the core does not draw', () => {
-    const doc = must(addClip(base, { component: 'LiquidBlob', from: 10, durationInFrames: 10 }, 'blob'));
+    const doc = must(addClip(base, { component: 'Device3D', from: 10, durationInFrames: 10 }, 'device'));
 
     expect(coreExportable(prepare(doc, FEEGA_TOKENS), [0])).toBe(true);
     expect(coreExportable(prepare(doc, FEEGA_TOKENS), [0, 0.5])).toBe(false);

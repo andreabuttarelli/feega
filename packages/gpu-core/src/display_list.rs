@@ -327,6 +327,41 @@ pub struct TextItem {
     pub look: Look,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Lens {
+    pub center: [f32; 2],
+    pub drops: [f32; 12],
+    pub unwarp: [f32; 3],
+    pub blend: f32,
+    pub wobble: f32,
+    pub wobble_speed: f32,
+    pub time: f32,
+    pub seed: f32,
+    pub ior: f32,
+    pub dispersion: f32,
+    pub frost: f32,
+    pub reflection: f32,
+    pub tint_amount: f32,
+    pub presence: f32,
+    pub tint: [f32; 3],
+    #[serde(rename = "box")]
+    pub area: [f32; 4],
+}
+
+impl Lens {
+    pub fn params(&self) -> Vec<f32> {
+        let scalars = [self.blend, self.wobble, self.wobble_speed, self.time, self.seed, self.ior, self.dispersion, self.frost, self.reflection, self.tint_amount, self.presence];
+        [&self.center[..], &self.drops, &self.unwarp, &scalars, &self.tint, &self.area].concat()
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LensItem {
+    pub clip: String,
+    pub lens: Lens,
+}
+
 #[derive(Debug, Clone)]
 pub enum Item {
     Path(PathItem),
@@ -334,6 +369,7 @@ pub enum Item {
     Use(UseItem),
     Glyphs(GlyphsItem),
     Text(Box<TextItem>),
+    Lens(Box<LensItem>),
     Other { clip: String, kind: String },
 }
 
@@ -342,7 +378,7 @@ impl Item {
         match self {
             Item::Path(p) => Some(&p.look),
             Item::Image(i) => Some(&i.look),
-            Item::Use(_) | Item::Glyphs(_) | Item::Text(_) | Item::Other { .. } => None,
+            Item::Use(_) | Item::Glyphs(_) | Item::Text(_) | Item::Lens(_) | Item::Other { .. } => None,
         }
     }
 
@@ -353,6 +389,7 @@ impl Item {
             Item::Use(u) => &u.clip,
             Item::Glyphs(g) => &g.clip,
             Item::Text(t) => &t.clip,
+            Item::Lens(l) => &l.clip,
             Item::Other { clip, .. } => clip,
         }
     }
@@ -364,6 +401,7 @@ impl Item {
             Item::Use(_) => "use",
             Item::Glyphs(_) => "glyphs",
             Item::Text(_) => "text",
+            Item::Lens(_) => "lens",
             Item::Other { kind, .. } => kind,
         }
     }
@@ -379,6 +417,7 @@ impl<'de> Deserialize<'de> for Item {
             "use" => serde_json::from_value(value).map(Item::Use).map_err(serde::de::Error::custom),
             "glyphs" => serde_json::from_value(value).map(Item::Glyphs).map_err(serde::de::Error::custom),
             "text" => serde_json::from_value(value).map(|t| Item::Text(Box::new(t))).map_err(serde::de::Error::custom),
+            "lens" => serde_json::from_value(value).map(|l| Item::Lens(Box::new(l))).map_err(serde::de::Error::custom),
             _ => Ok(Item::Other { clip: text("clip"), kind: text("kind") }),
         }
     }

@@ -41,7 +41,7 @@ export function blobBake(clip: BlobClip, frame: BlobFrame): BlobBake {
 
 const VERTEX = 'attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}';
 
-const FRAGMENT = `
+export const BLOB_FRAGMENT = `
 precision highp float;
 uniform sampler2D uContent;
 uniform vec2 uSize;
@@ -304,7 +304,7 @@ export function blobScript(bakes: readonly BlobBake[], duration: number): string
   if (!bakes.length) {
     return '';
   }
-  return `<script>(function(){${hotScope(BLOB_TIMELINE)}const VERTEX=${js(VERTEX)};const FRAGMENT=${js(FRAGMENT)};const ROW=${js(ROW)};const LIVE=${js(BLOB_LIVE)};const REDRAW=${js(BLOB_REDRAW)};const PLAN=(${paintPlan.toString()});const PAINT=(${paintOps.toString()});
+  return `<script>(function(){${hotScope(BLOB_TIMELINE)}const VERTEX=${js(VERTEX)};const FRAGMENT=${js(BLOB_FRAGMENT)};const ROW=${js(ROW)};const LIVE=${js(BLOB_LIVE)};const REDRAW=${js(BLOB_REDRAW)};const PLAN=(${paintPlan.toString()});const PAINT=(${paintOps.toString()});
 ${RUNTIME}
 const B=${js(bakes)};
 const items=B.map(adopt).filter(Boolean);

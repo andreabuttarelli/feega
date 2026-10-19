@@ -31,15 +31,18 @@ import { textPathAt, type OnPath } from '../hyperframes/text-path';
 import { paintOnPath } from './text/on-path';
 import { NO_TYPESET, paintText, planOf, TEXT_COMPONENTS, TextGap, type NativeFaces, type TextComponent, type TextPlan, type Typeset } from './text/painter';
 import { resolvedRequest, type FaceRule } from './text/fonts';
+import { lensAt, type Lens } from './lens';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
+export type { Lens } from './lens';
 export { FillRule, PaintKind, type Paint, type Stop };
 
 export enum ItemKind {
   Path = 'path',
   Image = 'image',
   Layer = 'layer',
-  Text = 'text'
+  Text = 'text',
+  Lens = 'lens'
 }
 
 export enum Unsupported {
@@ -77,7 +80,9 @@ export type Turn = { scale: number; rotation: number };
 
 export type TextItem = { kind: ItemKind.Text; clip: string; plan: TextPlan; turn: Turn; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
-export type Item = PathItem | ImageItem | LayerItem | TextItem;
+export type LensItem = { kind: ItemKind.Lens; clip: string; lens: Lens; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+
+export type Item = PathItem | ImageItem | LayerItem | TextItem | LensItem;
 
 export enum FilterKind {
   Css = 'css',
@@ -98,7 +103,7 @@ export type DisplayList = { width: number; height: number; background: Rgba | nu
 
 export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset };
 
-type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<TextItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
+type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<TextItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LensItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
 type Size = { width: number; height: number };
 type Partly = { content: Content[]; gaps: string[] };
 type Painted = Content[] | Partly | Unsupported;
@@ -253,6 +258,8 @@ const customPainter = ({ read, clip }: Env): Painted => {
   return { content: read.drawn.map((d) => (CONTENT_OF[d.kind] as (d: Drawn, clip: string) => Content)(d, clip.id)), gaps: read.gaps.map((g) => `${g.reason} ${g.element} ×${g.count}`) };
 };
 
+const lensPainter = ({ clip, stage, fps, time, css }: Env): Painted => [{ kind: ItemKind.Lens, lens: lensAt(clip, { ...stage, fps }, Math.round(time * fps), css), opacity: 1, matrix: IDENTITY }];
+
 const unturned: Placement = (props, frame) => ({ ...boxed(props, frame), turn: IDENTITY });
 
 const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }>> = {
@@ -262,7 +269,8 @@ const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }
   Video: { place: boxed, paint: videoPainter },
   Logo: { place: boxed, paint: logoPainter },
   ...Object.fromEntries(TEXT_COMPONENTS.map((c) => [c, { place: unturned, paint: textPainter }])),
-  Custom: { place: fullFrame, paint: customPainter }
+  Custom: { place: fullFrame, paint: customPainter },
+  LiquidBlob: { place: fullFrame, paint: lensPainter }
 };
 
 const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
