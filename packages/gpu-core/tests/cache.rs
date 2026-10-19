@@ -257,3 +257,22 @@ fn a_group_put_in_parts_draws_like_one_put_whole() {
 
     assert_eq!(kinds(&built), kinds(&whole));
 }
+
+#[test]
+fn a_plan_names_the_groups_whose_cache_it_finished() {
+    let mut lib = library(&["a", "b"]);
+
+    let first = lib.plan(&screen(&[("a", 1.0, 0.0), ("b", 1.0, 200.0)]), LIMITS);
+    let second = lib.plan(&screen(&[("a", 1.0, 0.0), ("b", 1.0, 200.0)]), LIMITS);
+
+    assert_eq!(first.finished, vec!["a".to_string()]);
+    assert_eq!(second.finished, vec!["b".to_string()]);
+}
+
+#[test]
+fn the_library_knows_the_size_of_a_group() {
+    let lib = library(&["a"]);
+
+    assert_eq!(lib.size_of("a"), Some((100.0, 50.0)));
+    assert_eq!(lib.size_of("nope"), None);
+}
