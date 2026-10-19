@@ -143,3 +143,27 @@ describe('a null from the selection', () => {
     expect(findClip(doc, 'caption')!.clip.parentOpacity).toBe(ParentOpacity.Ignore);
   });
 });
+
+describe('a 270-clip landing is indexed once, not once per clip', () => {
+  const CLIPS = 10_000;
+  const flat = { tracks: [{ kind: 'visual', clips: Array.from({ length: CLIPS }, (_, i) => ({ id: `c${i}`, parent: i ? 'c0' : undefined })) }] };
+
+  it('asking the ancestors of many clips stays linear in the doc size', () => {
+    const started = performance.now();
+    for (let i = 0; i < CLIPS; i += 5) {
+      ancestorsOf(flat, `c${i}`);
+    }
+
+    expect(performance.now() - started).toBeLessThan(300);
+  });
+
+  it('placing many clips in the world stays linear in the doc size', () => {
+    const posed = { tracks: [{ kind: 'visual', clips: flat.tracks[0].clips.map((c) => ({ ...c, from: 0, props: {}, transform: {}, keyframes: {} })) }] };
+    const started = performance.now();
+    for (let i = 0; i < CLIPS; i += 5) {
+      worldAt(posed, `c${i}`, 0, { width: W, height: H });
+    }
+
+    expect(performance.now() - started).toBeLessThan(300);
+  });
+});
