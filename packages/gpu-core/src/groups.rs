@@ -217,12 +217,23 @@ fn snapped(m: Affine) -> Affine {
 }
 
 fn cached_image(u: &UseItem, group: &DisplayList, scale: f64) -> Item {
+    texture_image(u, group, scale, cache_clip(&u.group))
+}
+
+fn texture_image(u: &UseItem, group: &DisplayList, scale: f64, clip: String) -> Item {
     let (w, h) = texels(group, scale);
     let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
     let matrix = snapped(times(u.matrix, [1.0 / scale, 0.0, 0.0, 1.0 / scale, 0.0, 0.0]));
     let look = Look { opacity: 1.0, matrix, blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, backdrop: None };
     let size = Size { width: w as f64, height: h as f64 };
-    Item::Image(ImageItem { clip: cache_clip(&u.group), src: cache_clip(&u.group), video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, clipped: true, inner: IDENTITY, look })
+    Item::Image(ImageItem { clip: clip.clone(), src: clip, video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, clipped: true, inner: IDENTITY, look })
+}
+
+fn stand_in(u: &UseItem, group: &DisplayList, building: Option<Building>) -> Option<Item> {
+    match building {
+        Some(b) => Some(texture_image(u, group, b.scale, building_clip(&u.group))),
+        None => group.background.map(|c| background(&u.clip, c, screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64)))),
+    }
 }
 
 fn partial(group: &str, (w, h): (u32, u32)) -> Item {
@@ -369,8 +380,10 @@ impl Library {
                     held.map(|h| h.scale)
                 }
             };
-            if let (true, Some(scale)) = (on_screen, shown) {
-                items.push(cached_image(u, group, scale));
+            match (on_screen, shown) {
+                (false, _) => {}
+                (true, Some(scale)) => items.push(cached_image(u, group, scale)),
+                (true, None) => items.extend(stand_in(u, group, self.building.get(&u.group).copied())),
             }
         }
         let gone: Vec<String> = self.held.keys().filter(|k| !seen.contains(*k)).cloned().collect();
