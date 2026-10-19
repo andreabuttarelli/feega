@@ -1,1 +1,1 @@
-export { load, actions } from '$lib/server/dashboard/pages/compose';
+export { actions } from '$lib/server/dashboard/pages/compose';
