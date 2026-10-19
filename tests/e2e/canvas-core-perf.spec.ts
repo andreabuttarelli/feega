@@ -15,6 +15,11 @@ const PAN_PX = 12;
 const ZOOM_STEPS = 24;
 const ZOOM_DELTA = 40;
 const SETTLE_MS = 1500;
+const PINCH_STEPS = 12;
+const PINCH_PX = 8;
+const PINCH_GAP = 60;
+
+type Zoom = (page: Page, centre: { x: number; y: number }, direction: 1 | -1) => Promise<void>;
 
 const ACCOUNT = () => ({ email: process.env.E2E_TEST_EMAIL!, password: process.env.E2E_TEST_PASSWORD! });
 
@@ -45,9 +50,40 @@ async function installProbe(page: Page) {
   });
 }
 
+const wheelZoom: Zoom = async (page, _centre, direction) => {
+  await page.keyboard.down('Control');
+  for (let i = 0; i < ZOOM_STEPS / 2; i++) {
+    await page.mouse.wheel(0, -direction * ZOOM_DELTA);
+  }
+  await page.keyboard.up('Control');
+};
+
+const pinchZoom: Zoom = async (page, centre, direction) => {
+  await page.evaluate(
+    ({ centre, direction, steps, px, gap }) => {
+      const fire = (type: string, pointerId: number, x: number, y: number) => {
+        const target = document.elementFromPoint(x, y) ?? document.body;
+        target.dispatchEvent(new PointerEvent(type, { pointerId, pointerType: 'touch', isPrimary: pointerId === 1, clientX: x, clientY: y, bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : 1 }));
+      };
+      const start = direction > 0 ? gap : gap + steps * px;
+      fire('pointerdown', 1, centre.x - start, centre.y);
+      fire('pointerdown', 2, centre.x + start, centre.y);
+      let spread = start;
+      for (let i = 0; i < steps; i++) {
+        spread += direction * px;
+        fire('pointermove', 1, centre.x - spread, centre.y);
+        fire('pointermove', 2, centre.x + spread, centre.y);
+      }
+      fire('pointerup', 2, centre.x + spread, centre.y);
+      fire('pointerup', 1, centre.x - spread, centre.y);
+    },
+    { centre, direction, steps: PINCH_STEPS, px: PINCH_PX, gap: PINCH_GAP }
+  );
+};
+
 const viewOf = (page: Page) => page.locator(SURFACE).first().getAttribute('data-view');
 
-async function drive(page: Page) {
+async function drive(page: Page, zoom: Zoom) {
   const before = await viewOf(page);
   const box = (await page.locator(SURFACE).first().boundingBox())!;
   const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
@@ -59,15 +95,9 @@ async function drive(page: Page) {
   await page.mouse.up({ button: 'middle' });
   const panned = await viewOf(page);
   expect(panned, 'pan moved the camera').not.toBe(before);
-  await page.keyboard.down('Control');
-  for (let i = 0; i < ZOOM_STEPS / 2; i++) {
-    await page.mouse.wheel(0, -ZOOM_DELTA);
-  }
+  await zoom(page, centre, 1);
   await expect.poll(() => viewOf(page), { message: 'zoom changed the camera' }).not.toBe(panned);
-  for (let i = 0; i < ZOOM_STEPS / 2; i++) {
-    await page.mouse.wheel(0, ZOOM_DELTA);
-  }
-  await page.keyboard.up('Control');
+  await zoom(page, centre, -1);
   await page.waitForTimeout(SETTLE_MS);
 }
 
@@ -93,7 +123,7 @@ test.describe('canvas core vs gpu perf @real', () => {
         await signInE2e(page, ACCOUNT());
         const firstPaintMs = await openCanvas(page, renderer);
         await installProbe(page);
-        await drive(page);
+        await drive(page, test.info().project.use.hasTouch ? pinchZoom : wheelZoom);
         rows.push({ browser: browserName, renderer, summary: summarise(await collect(page, firstPaintMs)) });
       } finally {
         await context.close();
