@@ -1,6 +1,7 @@
 use vello::wgpu;
 use vello::wgpu::util::DeviceExt;
 
+use crate::blob;
 use crate::filters::Runner;
 
 const GROUP: u32 = 8;
@@ -304,9 +305,10 @@ pub enum Op {
     Blur,
     Blend,
     Fold,
+    Blob,
 }
 
-const SOURCES: [(Op, &str); 13] = [
+const SOURCES: [(Op, &str); 14] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -320,6 +322,7 @@ const SOURCES: [(Op, &str); 13] = [
     (Op::Blur, BLUR),
     (Op::Blend, BLEND),
     (Op::Fold, FOLD),
+    (Op::Blob, blob::WGSL),
 ];
 
 pub struct FilterPasses {

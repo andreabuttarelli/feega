@@ -135,6 +135,10 @@ impl<R: Runner> Fx<'_, R> {
         self.blur(Self::plain(tex), sigma, sigma).tex
     }
 
+    pub fn refracted(&self, below: &R::Tex, params: &[f32]) -> R::Tex {
+        self.op(Op::Blob, below, below, params).tex
+    }
+
     pub fn masked(&self, body: &R::Tex, mask: &R::Tex) -> R::Tex {
         self.op(Op::Composite, body, mask, &[1.0, 0.0, 0.0, 0.0, 0.0]).tex
     }

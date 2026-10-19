@@ -3,6 +3,7 @@ use std::rc::Rc;
 use js_sys::Float32Array;
 use web_sys::{WebGl2RenderingContext as Gl, WebGlFramebuffer, WebGlProgram, WebGlShader, WebGlTexture};
 
+use crate::blob;
 use crate::filter_passes::Op;
 use crate::filters::Runner;
 
@@ -278,7 +279,7 @@ vec4 run(ivec2 xy) {
 const FLIP: &str = "
 vec4 run(ivec2 xy) { return texelFetch(a, ivec2(xy.x, textureSize(a, 0).y - 1 - xy.y), 0); }";
 
-const SOURCES: [(Op, &str); 13] = [
+const SOURCES: [(Op, &str); 14] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -292,6 +293,7 @@ const SOURCES: [(Op, &str); 13] = [
     (Op::Blur, BLUR),
     (Op::Blend, BLEND),
     (Op::Fold, FOLD),
+    (Op::Blob, blob::GLSL),
 ];
 
 pub struct GlTex {

@@ -138,6 +138,7 @@ const KINDS: Record<string, () => MotionDoc> = {
     const glass = shape(under, 'glass', { shape: 'rect', x: 0.5, y: 0.5, width: 0.4, height: 0.4, roundness: 0.1, fills: [{ type: 'solid', color: '#ffffff', opacity: 0.25 }] });
     return { ...glass, tracks: glass.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'glass' ? { ...c, effects: [{ id: 'e', kind: 'background-blur', enabled: true, params: { radius: 14 } }] } : c)) })) } as MotionDoc;
   },
+  blob: () => keys(clip(geometry.reduce((doc, [id, props]) => shape(doc, id, props), backdrop), 'LiquidBlob', 'drop', { diameter: 0.35, drops: 2, split: 0.12, splitAngle: 30 }), 'drop', 'centerX', 0.3, 0.7),
   title: () => clip(backdrop, 'Title', 'title', {}),
   text: () => clip(clip(backdrop, 'Text', 'body', { text: 'Body copy wraps inside its box and keeps   spaces.\nA second paragraph, left aligned.', align: 'left', width: 0.4, y: 0.4 }), 'Text', 'hug', { text: 'Auto width', sizing: 'auto', x: 0.3, y: 0.8, width: 0.2, height: 0.06 }),
   kicker: () => clip(clip(backdrop, 'Kicker', 'kicker', {}), 'Kicker', 'right', { text: 'Right aligned label', align: 'right', y: 0.6 }),

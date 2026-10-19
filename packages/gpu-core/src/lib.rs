@@ -1,3 +1,4 @@
+pub mod blob;
 pub mod canvas;
 pub mod colour;
 pub mod display_list;

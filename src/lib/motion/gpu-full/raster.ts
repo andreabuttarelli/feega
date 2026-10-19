@@ -1,4 +1,4 @@
-import { FillRule, ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type LayerItem, type Paint, type PathItem } from './display-list';
+import { FillRule, ItemKind, PaintKind, type BlobItem, type DisplayList, type ImageItem, type Item, type LayerItem, type Paint, type PathItem } from './display-list';
 import { imageRect, type Size } from './image-rect';
 import { gaussianKernel, MAX_TAPS } from './kernel';
 import { BLEND_FS, BLUR_FS, QUAD_VS, plain, program, texture } from './gl-kit';
@@ -7,6 +7,8 @@ import { BlendMode } from '../blend';
 import { MaskMode } from '../mask';
 import { CoverKind, RampKind, type MaskLayer } from './mask-layers';
 import { MAX_STOPS } from './paint';
+import { BLOB_FRAGMENT } from '../hyperframes/blob';
+import { ROW } from '../blob/shape';
 
 const MSAA = 8;
 const STENCIL_ALL = 0xff;
@@ -23,6 +25,9 @@ void main() {
   vec2 p = (u_matrix * vec3(a_pos, 1.0)).xy;
   gl_Position = vec4(p.x / u_frame.x * 2.0 - 1.0, 1.0 - p.y / u_frame.y * 2.0, 0.0, 1.0);
 }`;
+
+const BLOB_VS = `attribute vec2 a_pos;
+void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
 
 const PATH_FS = `#version 300 es
 precision highp float;
@@ -194,6 +199,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   const copyProgram = program(gl, QUAD_VS, COPY_FS);
   const imageProgram = program(gl, PATH_VS, IMAGE_FS);
   const blendProgram = program(gl, QUAD_VS, BLEND_FS);
+  const blobProgram = program(gl, BLOB_VS, BLOB_FRAGMENT);
   const textures = new Map<TexImageSource, WebGLTexture>();
   const main = target(gl, width, height, samples);
   const layer = target(gl, width, height, samples);
@@ -356,7 +362,8 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     [ItemKind.Path]: (item: PathItem, opacity) => fillPath(item, opacity),
     [ItemKind.Image]: drawImage,
     [ItemKind.Layer]: drawLayer,
-    [ItemKind.Text]: () => {}
+    [ItemKind.Text]: () => {},
+    [ItemKind.Blob]: () => {}
   };
 
   function drawItem(item: Item, opacity: number, pictures: Pictures) {
@@ -508,6 +515,49 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     scissored(item, () => composite(item, src, mask));
   }
 
+  function drawBlob(item: BlobItem) {
+    const r = item.row;
+    const at = (key: keyof typeof ROW, n: number) => r.slice(ROW[key], ROW[key] + n);
+    const p = blobProgram;
+    resolveInto(main);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, main.fbo);
+    gl.useProgram(p);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, main.texture);
+    gl.uniform1i(u(p, 'uContent'), 0);
+    gl.uniform2f(u(p, 'uSize'), width, height);
+    gl.uniform2fv(u(p, 'uCenter'), at('center', 2));
+    gl.uniform3fv(u(p, 'uDrop'), at('drops', 12));
+    gl.uniform3fv(u(p, 'uUnwarp'), at('unwarp', 3));
+    gl.uniform1f(u(p, 'uBlend'), r[ROW.blend]);
+    gl.uniform1f(u(p, 'uWobble'), r[ROW.wobble]);
+    gl.uniform1f(u(p, 'uWobbleSpeed'), r[ROW.wobbleSpeed]);
+    gl.uniform1f(u(p, 'uTime'), item.time);
+    gl.uniform1f(u(p, 'uSeed'), item.seed);
+    gl.uniform1f(u(p, 'uIor'), r[ROW.ior]);
+    gl.uniform1f(u(p, 'uDisp'), r[ROW.dispersion]);
+    gl.uniform1f(u(p, 'uFrost'), r[ROW.frost]);
+    gl.uniform1f(u(p, 'uRefl'), r[ROW.reflection]);
+    gl.uniform1f(u(p, 'uTintAmt'), r[ROW.tintAmount]);
+    gl.uniform1f(u(p, 'uPresence'), r[ROW.presence]);
+    gl.uniform3fv(u(p, 'uTint'), at('tint', 3));
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const [x, y, w, h] = at('box', 4);
+    const [x0, y0, x1, y1] = item.scissor ?? [0, 0, width, height];
+    const left = Math.max(Math.floor(x), Math.floor(x0), 0);
+    const top = Math.max(Math.floor(y), Math.floor(y0), 0);
+    const right = Math.min(Math.ceil(x + w), Math.ceil(x1), width);
+    const bottom = Math.min(Math.ceil(y + h), Math.ceil(y1), height);
+    if (right <= left || bottom <= top) {
+      return;
+    }
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(left, height - bottom, right - left, bottom - top);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.disable(gl.SCISSOR_TEST);
+  }
+
   function draw(list: DisplayList, pictures: Pictures = NO_PICTURES) {
     gl.viewport(0, 0, width, height);
     gl.bindFramebuffer(gl.FRAMEBUFFER, main.fbo);
@@ -517,6 +567,10 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     for (const item of list.items) {
+      if (item.kind === ItemKind.Blob) {
+        drawBlob(item);
+        continue;
+      }
       if (item.blur > 0 || item.blend !== BlendMode.Normal || item.masks || item.matte || item.filters || item.backdrop) {
         layered(item, pictures);
         continue;

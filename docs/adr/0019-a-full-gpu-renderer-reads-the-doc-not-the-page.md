@@ -50,7 +50,8 @@ Library components, as today's hybrid engine classifies them with default props:
 | Image, Logo, Video | GPU texture when an asset resolves | unsupported |
 | ProductCard, SocialMockup, CanvasMock, Composition, Particles, ShaderEffect | HTML | unsupported |
 | Model3D, Shape3D, Text3D, Logo3D, Device3D | HTML (Three canvas) | unsupported |
-| LiquidGlass, LiquidBlob | HTML backdrop group | unsupported |
+| LiquidGlass | HTML backdrop group | unsupported |
+| LiquidBlob | HTML backdrop group | drawn: a `blob` item refracts everything below it, same shader as HTML (TS reuses it; WGSL and GLSL ports in `gpu-core/src/blob.rs`) |
 | Custom | HTML | drawn within the declared DOM subset; canvases as texture layers; text and the rest named (`dom/read.ts`) |
 
 Clip features: transforms 2D, keyframes on transform/prop/param, parent chains, opacity, blur

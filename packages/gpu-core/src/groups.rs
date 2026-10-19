@@ -77,6 +77,7 @@ fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
     match item {
         Item::Path(p) => Item::Path(PathItem { look: look(&p.look), ..p.clone() }),
         Item::Image(i) => Item::Image(crate::display_list::ImageItem { look: look(&i.look), ..i.clone() }),
+        Item::Blob(b) => Item::Blob(crate::display_list::BlobItem { look: look(&b.look), ..b.clone() }),
         other => other.clone(),
     }
 }

@@ -31,6 +31,8 @@ import { textPathAt, type OnPath } from '../hyperframes/text-path';
 import { paintOnPath } from './text/on-path';
 import { NO_TYPESET, paintText, planOf, TEXT_COMPONENTS, TextGap, type NativeFaces, type TextComponent, type TextPlan, type Typeset } from './text/painter';
 import { resolvedRequest, type FaceRule } from './text/fonts';
+import { blobRows } from '../blob/pose';
+import { BLOB_NUMBERS } from '../blob/model';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
 export { FillRule, PaintKind, type Paint, type Stop };
@@ -39,7 +41,8 @@ export enum ItemKind {
   Path = 'path',
   Image = 'image',
   Layer = 'layer',
-  Text = 'text'
+  Text = 'text',
+  Blob = 'blob'
 }
 
 export enum Unsupported {
@@ -77,7 +80,9 @@ export type Turn = { scale: number; rotation: number };
 
 export type TextItem = { kind: ItemKind.Text; clip: string; plan: TextPlan; turn: Turn; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
-export type Item = PathItem | ImageItem | LayerItem | TextItem;
+export type BlobItem = { kind: ItemKind.Blob; clip: string; row: number[]; time: number; seed: number; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+
+export type Item = PathItem | ImageItem | LayerItem | TextItem | BlobItem;
 
 export enum FilterKind {
   Css = 'css',
@@ -354,6 +359,25 @@ export function prepare(doc: MotionDoc, tokens: BrandTokens, assets: Record<stri
 
 const NO_READS: DomReads = new Map();
 
+const BAKED = new WeakMap<BrandTokens, WeakMap<MotionClip, number[][]>>();
+
+function bakedRows(clip: MotionClip, doc: MotionDoc, tokens: BrandTokens): number[][] {
+  const byClip = BAKED.get(tokens) ?? BAKED.set(tokens, new WeakMap()).get(tokens)!;
+  const known = byClip.get(clip);
+  if (known) {
+    return known;
+  }
+  const rows = blobRows(clip, { width: doc.width, height: doc.height, fps: doc.fps }, (v) => resolveColor(v, tokens));
+  byClip.set(clip, rows);
+  return rows;
+}
+
+type FrameSpace = (clip: MotionClip, doc: MotionDoc, tokens: BrandTokens, frame: number) => Item;
+
+const FRAME_SPACE: Partial<Record<ComponentId, FrameSpace>> = {
+  LiquidBlob: (clip, doc, tokens, frame) => ({ kind: ItemKind.Blob, clip: clip.id, row: bakedRows(clip, doc, tokens)[frame - clip.from], time: (frame - clip.from) / doc.fps, seed: Number(clip.props.seed ?? BLOB_NUMBERS.seed.fallback), opacity: 1, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal })
+};
+
 export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: number, reads: DomReads = NO_READS): DisplayList {
   const asset = (id: unknown) => (typeof id === 'string' && id ? (assets[id] ?? null) : null);
   const css = (v: string) => resolveColor(v, tokens);
@@ -410,6 +434,11 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
   const bottomFirst = [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);
   for (const clip of bottomFirst.flatMap((t) => t.clips as MotionClip[])) {
     if (!shown(clip) || sources.has(clip.id)) {
+      continue;
+    }
+    const frameSpace = FRAME_SPACE[clip.component];
+    if (frameSpace) {
+      items.push(frameSpace(clip, doc, tokens, frame));
       continue;
     }
     const drawn = clipItems(clip);
