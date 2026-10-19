@@ -20,7 +20,8 @@ const tile: CardTile = {
   inputs: [],
   outputs: [{ type: 'text', state: PortState.Quiet }],
   label: 'Document',
-  icon: null
+  icon: null,
+  names: false
 };
 
 const xs = (c: number[][]) => c.flatMap((k) => k.filter((_, i) => i % 2 === 0));
@@ -53,6 +54,15 @@ describe('selection ring colour', () => {
 
     expect(colour(ring(tile))).toEqual(rgbaOf(CONNECTOR_STYLE.text.color));
     expect(colour(ring({ ...tile, outputs: [] }))).toEqual(rgbaOf(theme.accent));
+  });
+});
+
+describe('selected card', () => {
+  it('draws handles and port names when selected', () => {
+    const f = cardOnCanvas({ ...tile, ring: NodeChrome.Selected, handles: true, names: true }, theme, glyphs);
+
+    expect(f.list.items.filter((i) => i.clip === 'n:handle')).toHaveLength(8);
+    expect(f.list.items.some((i) => i.clip === 'n:port-name')).toBe(true);
   });
 });
 
