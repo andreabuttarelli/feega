@@ -51,7 +51,7 @@ Library components, as today's hybrid engine classifies them with default props:
 | ProductCard, SocialMockup, CanvasMock, Composition, Particles, ShaderEffect | HTML | unsupported |
 | Model3D, Shape3D, Text3D, Logo3D, Device3D | HTML (Three canvas) | unsupported |
 | LiquidGlass, LiquidBlob | HTML backdrop group | unsupported |
-| Custom | HTML | unsupported |
+| Custom | HTML | drawn within the declared DOM subset; canvases as texture layers; text and the rest named (`dom/read.ts`) |
 
 Clip features: transforms 2D, keyframes on transform/prop/param, parent chains, opacity, blur
 (transform + gaussian effect) are drawn. Not yet: 18 of 19 effects, masks/mattes, the 8
@@ -91,5 +91,10 @@ boxes, transforms, solid/gradient backgrounds, borders/radii, inline SVG paths/p
 spans — parsed from the component's output into display-list items; anything outside the subset
 stays named-unsupported. WebGL custom components (Three.js) composite their own canvas on the
 web; natively they need a JS+WebGL runtime and stay out of scope.
+
+Built (2026-10-19): the component runs in a sandboxed opaque-origin iframe; a probe posts the
+untransformed tree back per frame, `readTree` converts it (subset and gaps listed in
+`changelog/2026-10-19-gpu-full-custom.md`). The Three.js fixture reaches SSIM 1.0000; the two
+posters miss only their text, clipped photo groups and the `noise` clip effect.
 
 Ports of third-party code, when they happen, are recorded in `THIRD_PARTY_NOTICES.md`. None yet.
