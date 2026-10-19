@@ -179,6 +179,7 @@
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
   import { producedRuns } from '$lib/canvas/gen-history';
+  import { genTileView, type GenTileView } from '$lib/canvas/gen-tile-view';
   import { runQuoteOf, type RunQuote } from '$lib/canvas/run-quote';
   import { type Addable } from '$lib/canvas/addable';
   import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
@@ -2048,6 +2049,24 @@
     });
   }
 
+  function genViewFor(id: string): GenTileView | null {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    if (!row || !gen) {
+      return null;
+    }
+
+    const node = { ...gen, runs: runsByNode[id] ?? [] };
+    const revision = textEstimateRevision(id);
+    const estimate = textCostEstimates[id]?.revision === revision ? textCostEstimates[id] : undefined;
+    const variableTextInput = estimate?.variableInput ?? (gen.medium === 'text' && revision !== '[]');
+    const entry = mediumCatalogue[gen.medium];
+    const hasUpstreamText = hasUpstreamTextByNode[id] ?? false;
+    const quote = runQuoteOf({ node, choices: entry.choices, hasUpstreamText, variableTextInput, enhanceUnitCredits: entry.enhanceUnitCredits, estimatedTextInputTokens: estimate?.inputTokens, estimatedTextOutputTokens: estimate?.outputTokens });
+
+    return genTileView(node, quote, { hasUpstreamText, variableTextInput, loopQueued: loopQueuedByNode[id] ?? 0, loopVisible: loopAffordanceByNode[id]?.visible ?? false, loopCombinationCount: loopAffordanceByNode[id]?.combinationCount ?? 0 });
+  }
+
   function runNode(id: string) {
     const row = nodes.find((n) => n.id === id);
     const gen = row ? genOf(row) : null;
@@ -3441,6 +3460,7 @@
     onRunGraph={runGraph}
     stale={staleNodeIds}
     {runQuoteFor}
+    {genViewFor}
     onRunNode={runNode}
     {nodeSummaries}
     {modelChoicesFor}

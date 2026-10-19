@@ -91,6 +91,7 @@
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
+  import type { GenTileView } from '$lib/canvas/gen-tile-view';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { revealIn as revealDelay } from '$lib/canvas/gpu/reveal-gate';
@@ -100,7 +101,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
 
   const DOM_CAP = 6;
   const CORE = 'core';
@@ -220,13 +221,13 @@
       const card: CardTile = {
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
-        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.thumbsOf?.(t.id) ?? []),
+        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.thumbsOf?.(t.id) ?? [], props.genViewFor?.(t.id) ?? null),
         shot: coreShots.get(t.id) ?? null,
         ...portMarks(t),
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null
       };
-      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold), turn: turnOf(t), poster: t.kind === 'motion' }];
+      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold, text.gen), turn: turnOf(t), poster: t.kind === 'motion' }];
     });
   });
   const turnOf = (t: Tile) => (t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined);

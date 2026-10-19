@@ -24,7 +24,7 @@ export enum EdgeLook {
   Iterate = 'iterate'
 }
 
-export type CoreTheme = { paper: string; panel: string; line: string; ink: string; inkSoft: string; accent: string; wire: string; iterate: string };
+export type CoreTheme = { paper: string; panel: string; paper2: string; line: string; line2: string; chip: string; chipInk: string; ink: string; inkSoft: string; accent: string; wire: string; iterate: string };
 
 export type CorePeer = { id: string; name: string; color: string; at: { x: number; y: number } };
 
