@@ -39,6 +39,7 @@ impl TextCore {
         TextCore { fonts: Fonts::new() }
     }
 
+    #[wasm_bindgen(js_name = addFont)]
     pub fn add_font(&mut self, family: &str, bytes: &[u8]) -> Result<usize, JsValue> {
         let source = Source::from_bytes(bytes).map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         Ok(self.fonts.register(family, &source))
@@ -46,6 +47,16 @@ impl TextCore {
 
     pub fn covers(&self, font: usize, code_point: u32) -> bool {
         self.fonts.source(font).covers(code_point)
+    }
+
+    #[wasm_bindgen(js_name = axisTags)]
+    pub fn axis_tags(&self, font: usize) -> String {
+        self.fonts.source(font).axes().keys().cloned().collect::<Vec<_>>().join(",")
+    }
+
+    #[wasm_bindgen(js_name = axisRanges)]
+    pub fn axis_ranges(&self, font: usize) -> Vec<f32> {
+        self.fonts.source(font).axes().values().flat_map(|(min, max, fallback)| [*min, *max, *fallback]).collect()
     }
 
     pub fn metrics(&self, font: usize, tags: &str, values: &[f32]) -> Vec<f32> {
@@ -74,6 +85,7 @@ impl TextCore {
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[wasm_bindgen(js_name = layOut)]
     pub fn lay_out(&mut self, text: &str, family: &str, weight: f32, size: f32, tracking: f32, leading: f32, spaces: WebSpaces, wrap: WebWrap, room: f32) -> Vec<f32> {
         let spaces = match spaces {
             WebSpaces::Collapse => Spaces::Collapse,

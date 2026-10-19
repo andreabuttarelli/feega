@@ -31,7 +31,7 @@ const HTTP_PARTIAL = 206;
 const TIMEOUT_MS = 3_600_000;
 const APP_LANES = 4;
 const TYPES: Record<string, string> = { js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json', png: 'image/png', mp4: 'video/mp4', wasm: 'application/wasm' };
-const STATIC_ROUTES = ['/gpu-core/'];
+const STATIC_ROUTES = ['/gpu-core/', '/gpu-text/'];
 const LAUNCH = { channel: 'chromium', args: ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=metal', '--enable-gpu-rasterization', '--enable-unsafe-webgpu'] };
 
 const flags = new Map(process.argv.slice(2).map((a) => a.replace(/^--/, '').split('=') as [string, string]));
@@ -136,7 +136,7 @@ const server = await serve(await hostBundle(), assetFiles);
 const assets = Object.fromEntries([...ids].map((id) => [id, `${server.origin}${assetPath(id)}`]));
 const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets, origin: server.origin });
 const size = { width: doc.width, height: doc.height };
-const spec = { doc, assets, origin: server.origin };
+const spec = { doc, assets, origin: server.origin, faces: flags.get('faces') };
 const dir = join(OUT, name);
 mkdirSync(dir, { recursive: true });
 

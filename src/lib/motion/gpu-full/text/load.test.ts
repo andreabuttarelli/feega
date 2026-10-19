@@ -4,6 +4,7 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '../../doc';
 import { composeHtml } from '../../hyperframes/compose';
 import { addClip, type OpResult } from '../../timeline';
 import { BUILTIN_FONTS_URL, fontLoader } from './load';
+import { boxFace } from './test-face';
 import { bindVar, declareVar } from '../../interactive/vars';
 import { VarKind } from '../../interactive/var-model';
 
@@ -31,6 +32,22 @@ describe('loadFonts', () => {
     await fontLoader({ text: async () => CSS, bytes: async (url) => (fetched.push(url), new Uint8Array()) })(titled, {}, FEEGA_TOKENS);
 
     expect(fetched).toEqual(['https://g.test/latin.woff2']);
+  });
+
+  it('reads the files with the face engine it is given', async () => {
+    const read: Uint8Array[] = [];
+    const engine = async () => (bytes: Uint8Array) => (read.push(bytes), { axes: {}, covers: () => true, at: () => boxFace });
+    const book = await fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array([1]) }, engine)(titled, {}, FEEGA_TOKENS);
+
+    expect(read).toHaveLength(1);
+    expect(book({ family: 'DM Sans', weight: 400, italic: false, size: 10, axes: {} }, 0x48)?.face).toBe(boxFace);
+  });
+
+  it('starts the face engine only once a file is read', () => {
+    let started = 0;
+    fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array() }, async () => (started++, () => ({ axes: {}, covers: () => true, at: () => boxFace })));
+
+    expect(started).toBe(0);
   });
 
   it('asks for the fonts of clips inside a precomp', async () => {

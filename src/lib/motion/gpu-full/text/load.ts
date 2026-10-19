@@ -9,6 +9,10 @@ import { TEXT_COMPONENTS } from './painter';
 
 export const BUILTIN_FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
 
+export type Engine = () => Promise<(bytes: Uint8Array) => Source>;
+
+export const fontkitEngine: Engine = async () => fontkitSource;
+
 export type Reader = { text: (url: string) => Promise<string>; bytes: (url: string) => Promise<Uint8Array> };
 
 const web: Reader = {
@@ -35,9 +39,10 @@ const remembered = <T>(load: (url: string) => Promise<T>) => {
   };
 };
 
-export function fontLoader(read: Reader = web): (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook> {
+export function fontLoader(read: Reader = web, engine: Engine = fontkitEngine): (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook> {
   const sheet = remembered((url) => read.text(url).catch(() => ''));
-  const source = remembered((url) => read.bytes(url).then((bytes): [string, Source] => [url, fontkitSource(bytes)]).catch(() => null));
+  let made: ReturnType<Engine> | null = null;
+  const source = remembered((url) => Promise.all([read.bytes(url), (made ??= engine())]).then(([bytes, make]): [string, Source] => [url, make(bytes)]).catch(() => null));
   return async (raw, assets, tokens) => {
     const doc = preparedDoc({ doc: raw, tokens, assets });
     const google = googleFontsUrl(usedFaces(doc), doc.fonts);

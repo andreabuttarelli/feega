@@ -4,7 +4,7 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import { drawFrame, prepare, type Prepared } from '$lib/motion/gpu-full/display-list';
   import { NO_TYPESET, smoothingOf } from '$lib/motion/gpu-full/text/painter';
-  import { loadFonts } from '$lib/motion/gpu-full/text/load';
+  import { FACES_PARAM, faceEngineOf, loadFontsWith } from '$lib/motion/gpu-full/text/engines';
   import type { Raster } from '$lib/motion/gpu-full/raster';
   import { BACKENDS, type FullBackend } from '$lib/motion/gpu-full/backends';
   import { createMedia } from '$lib/motion/gpu-full/media';
@@ -22,7 +22,7 @@
 
   $effect(() => {
     let current = true;
-    void loadFonts(doc, assets, tokens).then((fonts) => current && (typeset = { fonts, smoothing: smoothingOf(navigator.userAgent) }));
+    void loadFontsWith(faceEngineOf(new URLSearchParams(location.search).get(FACES_PARAM)))(doc, assets, tokens).then((fonts) => current && (typeset = { fonts, smoothing: smoothingOf(navigator.userAgent) }));
     return () => {
       current = false;
     };
