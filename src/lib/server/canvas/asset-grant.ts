@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { env } from '$env/dynamic/private';
-import { ASSET_GRANT_PARAM, isCanvasAssetPath } from '$lib/canvas/asset-url';
+import { ASSET_GRANT_PARAM, isGrantable } from '$lib/canvas/asset-url';
 
 const CIPHER = 'aes-256-gcm';
 const IV_BYTES = 12;
@@ -40,7 +40,7 @@ export function openAssetGrant(grant: string): string | null {
 export function grantBearerOf(request: Request): string | null {
   const url = new URL(request.url);
   const grant = url.searchParams.get(ASSET_GRANT_PARAM);
-  if (request.method !== 'GET' || !grant || !isCanvasAssetPath(url.pathname)) {
+  if (request.method !== 'GET' || !grant || !isGrantable(url.pathname)) {
     return null;
   }
   return openAssetGrant(grant);

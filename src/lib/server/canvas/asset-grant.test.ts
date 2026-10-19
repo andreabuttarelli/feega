@@ -24,5 +24,7 @@ describe('an asset grant lets a media element load a canvas file for its user', 
     expect(grantBearerOf(new Request(`${ASSET}?size=256&grant=${grant}`))).toBe('jwt');
     expect(grantBearerOf(new Request(`https://feega.app/api/v1/me/root?grant=${grant}`))).toBeNull();
     expect(grantBearerOf(new Request(`${ASSET}?grant=${grant}`, { method: 'POST' }))).toBeNull();
+    expect(grantBearerOf(new Request(`https://feega.app/p/p1/c/c1/motion/n1/live?grant=${grant}`))).toBe('jwt');
+    expect(grantBearerOf(new Request(`https://feega.app/p/p1/c/c1/motion/n1/session?grant=${grant}`))).toBeNull();
   });
 });
