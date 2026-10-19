@@ -1742,6 +1742,7 @@
           data-testid="gpu-node"
           data-id={t.id}
           data-kind={t.kind}
+          data-core={coreDrawn.has(t.id) || undefined}
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
