@@ -1,9 +1,15 @@
 import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item } from './display-list';
 import type { Picture, Pictures, Raster } from './raster';
+import type { Affine } from '../affine';
+import type { Rgba } from './rgba';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
 
-type Attached = { draw: (list: string) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; free: () => void };
+type Attached = { draw: (list: string) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; drop_group: (key: string) => void; free: () => void };
+
+export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine };
+export type Screen = { width: number; height: number; background: Rgba | null; items: (Item | Use)[] };
+export type CoreRaster = Raster & { putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; dropGroup: (key: string) => void; drawScreen: (screen: Screen, pictures?: Pictures) => void };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
 
@@ -27,7 +33,7 @@ async function coreModule(): Promise<CoreModule> {
   return core;
 }
 
-function rasterOf(attached: Attached): Raster {
+function rasterOf(attached: Attached): CoreRaster {
   const uploaded = new Map<string, Picture['source']>();
   const stills = new Map<string, HTMLCanvasElement>();
 
@@ -35,7 +41,7 @@ function rasterOf(attached: Attached): Raster {
     const canvas = stills.get(clip) ?? stills.set(clip, document.createElement('canvas')).get(clip)!;
     canvas.width = picture.size.width;
     canvas.height = picture.size.height;
-    canvas.getContext('2d')!.drawImage(picture.source, 0, 0);
+    canvas.getContext('2d')!.drawImage(picture.source as CanvasImageSource, 0, 0);
     return canvas;
   }
 
@@ -51,16 +57,27 @@ function rasterOf(attached: Attached): Raster {
     uploaded.set(item.clip, picture.source);
   }
 
+  const drawn = (items: Item[]) => items.filter((i): i is Item => (i as Item | Use).kind !== 'use');
+
   return {
     draw: (list: DisplayList, pictures = NO_PICTURES) => {
       wanted(list.items).forEach((item) => upload(item, pictures));
       attached.draw(JSON.stringify(list));
     },
+    putGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
+      wanted(list.items).forEach((item) => upload(item, pictures));
+      attached.put_group(key, JSON.stringify(list));
+    },
+    dropGroup: (key: string) => attached.drop_group(key),
+    drawScreen: (screen: Screen, pictures = NO_PICTURES) => {
+      wanted(drawn(screen.items as Item[])).forEach((item) => upload(item, pictures));
+      attached.draw(JSON.stringify(screen));
+    },
     dispose: () => attached.free()
   };
 }
 
-export async function createCore(canvas: HTMLCanvasElement, width: number, height: number): Promise<Raster> {
+export async function createCore(canvas: HTMLCanvasElement, width: number, height: number): Promise<CoreRaster> {
   if (!('gpu' in navigator)) {
     throw new Error('webgpu unavailable');
   }
@@ -68,7 +85,7 @@ export async function createCore(canvas: HTMLCanvasElement, width: number, heigh
   return rasterOf(await core.WebCore.attach(canvas, width, height));
 }
 
-export async function createCoreGl(canvas: HTMLCanvasElement, width: number, height: number): Promise<Raster> {
+export async function createCoreGl(canvas: HTMLCanvasElement, width: number, height: number): Promise<CoreRaster> {
   const core = await coreModule();
   return rasterOf(core.WebGlCore.attach(canvas, width, height));
 }

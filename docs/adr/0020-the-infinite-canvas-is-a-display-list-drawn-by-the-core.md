@@ -85,3 +85,22 @@ become DOM only while focused — the overlay is placed from the same box the co
 Before/after per phase on the heavy canvas copy (project `e472ff3c…`, canvas `b5a892f3…`): fps
 while panning and zooming, GPU memory (texture bytes from `frame-stats`), time to first full
 frame, in Chrome desktop and the WebKit iPhone profile.
+
+## Core API for the canvas (gpu-core owns it)
+
+Folding the camera into every item in TS re-serialises and re-parses every frame's list on each
+pan. The core keeps frames instead:
+
+```
+raster.putGroup(key, frameList, pictures)   once per frame, again when its doc or playhead moves
+raster.dropGroup(key)                       when a frame leaves the LRU
+raster.drawScreen({ width, height, background, items: [...uses, ...chrome] }, pictures)
+  use = { kind: 'use', clip, group: key, matrix: camera · box }   one per frame on screen
+```
+
+A `use` is expanded in the core exactly as `canvasScene` places a frame: matrix into every item,
+masks and mattes, blur and feather scaled, the frame's screen rect as scissor, its background
+drawn as a rect. A pan is a few `use` matrices. A `use` of a group never put is reported as
+`<key> group` in the skipped list, never drawn wrong. Same API on WebGPU (`createCore`), WebGL2
+(`createCoreGl`) and native (`Renderer::put_group`). Next: `cache: true` on a `use` keeps a still
+frame as a texture at its on-screen scale.

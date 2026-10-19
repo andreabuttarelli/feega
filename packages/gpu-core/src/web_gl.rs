@@ -7,6 +7,7 @@ use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, WebGl2Rende
 
 use crate::canvas::{brush, Canvas};
 use crate::display_list::{parse, DisplayList, Paint, Rgba, Size};
+use crate::groups::{expand, report, Groups};
 use crate::gl_passes::{texture, GlRunner, Tex};
 use crate::layers::{prepare, Surface};
 use crate::scene::{build_into, Placed, Shelf};
@@ -128,6 +129,7 @@ pub struct WebGlCore {
     width: u32,
     height: u32,
     pictures: Shelf<GlPicture>,
+    groups: Groups,
 }
 
 #[wasm_bindgen]
@@ -137,7 +139,7 @@ impl WebGlCore {
         canvas.set_height(height);
         let (renderer, resources) = WebGlRenderer::new(&canvas);
         let runner = GlRunner::new(renderer.gl_context());
-        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, pictures: Shelf::new() }
+        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, pictures: Shelf::new(), groups: Groups::new() }
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -165,8 +167,17 @@ impl WebGlCore {
         Ok(())
     }
 
+    pub fn put_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
+        self.groups.put(key, parse(list_json).map_err(failed)?);
+        Ok(())
+    }
+
+    pub fn drop_group(&mut self, key: &str) {
+        self.groups.remove(key);
+    }
+
     pub fn draw(&mut self, list_json: &str) -> Result<String, JsValue> {
-        let list: DisplayList = parse(list_json).map_err(failed)?;
+        let (list, missing): (DisplayList, Vec<String>) = expand(&parse(list_json).map_err(failed)?, &self.groups);
         let mut surface = GlSurface { renderer: &mut self.renderer, resources: &mut self.resources, canvas: &mut self.canvas, runner: &self.runner, width: self.width, height: self.height, placed: Vec::new() };
         let layers = prepare(&mut surface, &list, &self.pictures)?;
         let skipped = std::cell::RefCell::new(Vec::new());
@@ -175,6 +186,6 @@ impl WebGlCore {
         for id in surface.placed {
             surface.renderer.destroy_image(surface.resources, id);
         }
-        Ok(skipped.iter().map(|s| format!("{} {}", s.clip, s.what)).collect::<Vec<_>>().join("\n"))
+        Ok(report(&skipped, &missing))
     }
 }

@@ -6,6 +6,7 @@ pub mod filter_passes;
 pub mod filters;
 #[cfg(target_arch = "wasm32")]
 pub mod gl_passes;
+pub mod groups;
 pub mod kernel;
 pub mod layers;
 pub mod pictures;
