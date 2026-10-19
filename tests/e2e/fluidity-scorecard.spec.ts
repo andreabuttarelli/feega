@@ -53,6 +53,11 @@ async function fixtureCanvas(db: SupabaseClient): Promise<{ projectId: string; c
   return { projectId: project.data.id, canvasId: canvas.data!.id };
 }
 
+async function liveNodeIds(db: SupabaseClient, canvasId: string): Promise<Set<string>> {
+  const { data } = await db.from('nodes').select('id').eq('canvas_id', canvasId).is('deleted_at', null);
+  return new Set((data ?? []).map((n) => n.id as string));
+}
+
 async function emptySpot(page: Page, size = { width: 260, height: 180 }): Promise<Box> {
   const spot = await page.evaluate((s) => {
     const free = (x: number, y: number) => document.elementFromPoint(x, y)?.classList.contains('svelte-flow__pane') ?? false;
@@ -107,38 +112,23 @@ function visible(b: Box | null): boolean {
   return !!b && b.width > 8 && b.x > IN_VIEW.left && b.y > IN_VIEW.top && b.x + b.width < VIEWPORT.width - IN_VIEW.right && b.y + b.height < VIEWPORT.height - IN_VIEW.bottom;
 }
 
-const WHEEL_ZOOM = 0.01;
-const ZOOM_TRIES = 4;
-const FILL_SHARE = 0.5;
-
 async function inView(page: Page, id: string): Promise<Box> {
   const now = await page.locator(nodeSel(id)).boundingBox({ timeout: 1000 }).catch(() => null);
   if (visible(now)) {
     return now!;
   }
+  await page.keyboard.press('Shift+Digit1');
+  await page.waitForTimeout(700);
+  const tiny = (await page.locator(nodeSel(id)).boundingBox())!;
+  await drag(page, { x: tiny.x - MARQUEE_PAD, y: tiny.y - MARQUEE_PAD }, { x: tiny.x + tiny.width + MARQUEE_PAD, y: tiny.y + tiny.height + MARQUEE_PAD }, 4);
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Shift+Digit2');
+  await page.waitForTimeout(500);
+  await page.keyboard.press('Minus');
+  await page.keyboard.press('Minus');
+  await page.waitForTimeout(700);
   await leaveEditor(page);
-  await zoomOnto(page, id);
   return (await page.locator(nodeSel(id)).boundingBox())!;
-}
-
-async function zoomOnto(page: Page, id: string) {
-  const area = { width: VIEWPORT.width - IN_VIEW.left - IN_VIEW.right, height: VIEWPORT.height - IN_VIEW.top - IN_VIEW.bottom };
-  const goal = { x: IN_VIEW.left + area.width / 2, y: IN_VIEW.top + area.height / 2 };
-  for (let i = 0; i < ZOOM_TRIES; i++) {
-    const b = (await page.locator(nodeSel(id)).boundingBox())!;
-    if (visible(b) && b.width > area.width * FILL_SHARE * 0.5) {
-      return;
-    }
-    const at = centre(b);
-    await page.mouse.move(goal.x, goal.y);
-    await page.mouse.wheel(at.x - goal.x, at.y - goal.y);
-    await page.waitForTimeout(120);
-    const scale = Math.min((area.width * FILL_SHARE) / b.width, (area.height * FILL_SHARE) / b.height);
-    await page.keyboard.down('Control');
-    await page.mouse.wheel(0, -Math.log(scale) / WHEEL_ZOOM);
-    await page.keyboard.up('Control');
-    await page.waitForTimeout(200);
-  }
 }
 
 const USER_HOVER_MS = 300;
@@ -150,12 +140,6 @@ async function approach(page: Page, at: { x: number; y: number }) {
   }
   await page.mouse.move(at.x, at.y, { steps: 4 });
   await page.waitForTimeout(hoverBeforeOpen);
-}
-
-async function editingInPlace(page: Page) {
-  await expect
-    .poll(async () => (await Promise.all(page.frames().map((f) => f.locator('[contenteditable]').count().catch(() => 0)))).some(Boolean), { timeout: OPEN_MS })
-    .toBe(true);
 }
 
 async function clickNode(page: Page, id: string) {
@@ -174,25 +158,30 @@ async function openNode(page: Page, id: string, how = Open.Single) {
   await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: OPEN_MS });
 }
 
-const CLIP_ROW = '.row.layer[data-layer]';
-
 async function pickFilledLayer(page: Page, only?: string): Promise<string> {
-  const rows = page.getByTestId('motion-editor').locator(CLIP_ROW);
+  const layers = page.getByTestId('layers');
+  if (!(await layers.isVisible())) {
+    await page.getByRole('button', { name: 'Layers', exact: true }).click();
+  }
   const swatch = page.getByTestId('motion-inspector').getByTestId('fill-swatch').first();
   if (only) {
-    await rows.and(page.locator(`[data-layer="${only}"]`)).first().locator('.head .layer-name').click();
+    await layers.locator(`[data-layer="${only}"]`).first().click();
     await expect(swatch).toBeVisible({ timeout: OPEN_MS });
     return only;
   }
-  const count = await rows.count();
+  const count = await layers.locator('[data-layer]').count();
   for (let i = count - 1; i >= 0; i--) {
-    const row = rows.nth(i);
-    await row.locator('.head .layer-name').click();
+    const layer = layers.locator('[data-layer]').nth(i);
+    const name = (await layer.getAttribute('data-layer'))!;
+    if (only && name !== only) {
+      continue;
+    }
+    await layer.click();
     if (await swatch.isVisible({ timeout: 500 }).catch(() => false)) {
-      return (await row.getAttribute('data-layer'))!;
+      return name;
     }
   }
-  throw new Error('no layer with a fill in this frame');
+  throw new Error(only ? `layer ${only} not found among ${count}` : 'no layer with a fill in this frame');
 }
 
 async function marquee(page: Page, ids: string[]) {
@@ -208,12 +197,11 @@ async function marquee(page: Page, ids: string[]) {
 const FRAME_TRIES = 6;
 
 async function frameWithFill(page: Page): Promise<{ id: string; layer: string }> {
+  await page.keyboard.press('Shift+Digit1');
+  await page.waitForTimeout(700);
   const frames = await page.locator(FRAME_NODE).evaluateAll((all) => all.map((e) => (e as HTMLElement).dataset.motionNode!).filter((id) => document.querySelector(`.svelte-flow__node[data-id="${id}"]`)));
-  for (const id of frames.filter((f) => !createdHere.has(f)).slice(0, FRAME_TRIES)) {
-    const opened = await openNode(page, id, Open.Double).then(() => true, () => false);
-    if (!opened) {
-      continue;
-    }
+  for (const id of frames.slice(0, FRAME_TRIES)) {
+    await openNode(page, id, Open.Double);
     const layer = await pickFilledLayer(page).catch(() => null);
     if (layer) {
       return { id, layer };
@@ -224,6 +212,8 @@ async function frameWithFill(page: Page): Promise<{ id: string; layer: string }>
 }
 
 async function anyInView(page: Page, selector: string, idOf: (el: Element) => string): Promise<string> {
+  await page.keyboard.press('Shift+Digit1');
+  await page.waitForTimeout(700);
   const id = await page.locator(selector).first().evaluate(idOf);
   await inView(page, id);
   return id;
@@ -240,14 +230,10 @@ async function drag(page: Page, from: { x: number; y: number }, to: { x: number;
   await page.mouse.up();
 }
 
-const createdHere = new Set<string>();
-
 async function newNode(page: Page, before: Set<string>): Promise<string> {
   await expect.poll(async () => (await page.locator('.svelte-flow__node[data-id]').evaluateAll((all) => all.map((e) => (e as HTMLElement).dataset.id!))).some((id) => !before.has(id)), { timeout: OPEN_MS }).toBe(true);
   const all = await page.locator('.svelte-flow__node[data-id]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.id!));
-  const id = all.find((id) => !before.has(id))!;
-  createdHere.add(id);
-  return id;
+  return all.find((id) => !before.has(id))!;
 }
 
 const domIds = async (page: Page) => new Set(await page.locator('.svelte-flow__node[data-id]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.id!)));
@@ -422,11 +408,11 @@ const STEPS: Step[] = [
       const before = await domIds(page);
       const spot = await emptySpot(page, { width: 200, height: 90 });
       await pickBarTool(page, 'text');
-      await drag(page, { x: spot.x + 20, y: spot.y + 20 }, { x: spot.x + spot.width - 20, y: spot.y + spot.height - 20 }, 4);
+      await page.mouse.click(spot.x + 40, spot.y + 40);
       const id = await newNode(page, before);
       ids.set('text', id);
       await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: OPEN_MS });
-      await editingInPlace(page);
+      await expect(page.locator('aside.props textarea').first()).toBeFocused({ timeout: OPEN_MS });
       await watch(TEXT_WATCHES);
       await page.keyboard.type(TYPED, { delay: 40 });
       const size = page.locator(TEXT_WATCHES[1].selector).first();
@@ -539,9 +525,12 @@ async function startPeer(peer: BrowserContext, path: string): Promise<() => Prom
   await page.goto(path, { waitUntil: 'load' });
   await expect(page.locator(SURFACE).first()).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(4000);
+  await page.keyboard.press('Shift+Digit1');
+  await page.waitForTimeout(600);
   const target = page.locator(GEN_NODE).last();
   const id = await target.evaluate((e) => (e as HTMLElement).dataset.id!);
-  await zoomOnto(page, id);
+  await target.click({ position: { x: 8, y: 8 } });
+  await page.keyboard.press('Shift+Digit2');
   const prompt = page.locator(`${contentSel(id)} textarea`).first();
   let on = true;
   const loop = (async () => {
@@ -631,7 +620,6 @@ async function runSession(page: Page, path: string): Promise<StepRun[]> {
   await expect(page.locator(SURFACE).first()).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(6000);
   page.setDefaultTimeout(OPEN_MS);
-  await page.getByRole('button', { name: 'Reject all' }).click({ timeout: 2000 }).catch(() => undefined);
   await page.locator(SURFACE).first().click({ position: { x: 5, y: 5 } });
   await page.keyboard.press('Shift+Digit0');
   await page.keyboard.press('Minus');
@@ -705,11 +693,11 @@ async function saveVideo(page: Page, name: string) {
   }
 }
 
-async function cleanup(db: SupabaseClient, canvasId: string) {
-  const created = [...createdHere];
-  createdHere.clear();
+async function cleanup(db: SupabaseClient, canvasId: string, before: Set<string>) {
+  const after = await liveNodeIds(db, canvasId);
+  const created = [...after].filter((id) => !before.has(id));
   if (created.length) {
-    await db.from('nodes').update({ deleted_at: new Date().toISOString() }).eq('canvas_id', canvasId).in('id', created);
+    await db.from('nodes').update({ deleted_at: new Date().toISOString() }).in('id', created);
   }
 }
 
@@ -722,6 +710,7 @@ test.describe('fluidity scorecard @real', () => {
       test(`${variant} on the heavy canvas, ${renderer} renderer`, async ({ browser, browserName }) => {
         const { db } = await testAccount();
         const { projectId, canvasId } = await fixtureCanvas(db);
+        const before = await liveNodeIds(db, canvasId);
         const name = `${browserName}-${renderer}-${variant}`;
         const path = `/p/${projectId}/c/${canvasId}${renderer === 'dom' ? '?renderer=dom' : ''}`;
         const context = await recordedContext(browser, browserName, name);
@@ -741,7 +730,7 @@ test.describe('fluidity scorecard @real', () => {
           await peer?.close();
           await context.close();
           await saveVideo(page, name);
-          await cleanup(db, canvasId);
+          await cleanup(db, canvasId, before);
         }
         writeRun({ browser: browserName, renderer, variant, steps: runs, mockedCalls: mocked.length, at: new Date().toISOString() });
         expect(verdictOf(runs, browserName), 'fluidity thresholds').toEqual([]);
