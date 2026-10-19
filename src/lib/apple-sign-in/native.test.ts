@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { nativeAppleSignIn, NativeAppleOutcome, APPLE_AUTHORIZE_COMMAND } from './native';
+import { nativeAppleSignIn, NativeAppleOutcome } from './native';
 
 describe('native Sign in with Apple', () => {
   it('Apple gets the hashed nonce, the server the raw one with the identity token', async () => {
@@ -8,9 +8,8 @@ describe('native Sign in with Apple', () => {
     let sentToSupabase: { provider: string; token: string; nonce: string } | null = null;
 
     const outcome = await nativeAppleSignIn({
-      invoke: async (command, args) => {
-        expect(command).toBe(APPLE_AUTHORIZE_COMMAND);
-        sentToApple = args.nonce;
+      authorize: async (nonce) => {
+        sentToApple = nonce;
         return { identityToken: 'id.jwt' };
       },
       submitIdToken: (credentials) => {
@@ -25,14 +24,14 @@ describe('native Sign in with Apple', () => {
   });
 
   it('a shell without the plugin falls back to the web flow', async () => {
-    const outcome = await nativeAppleSignIn({ invoke: null, submitIdToken: () => {} });
+    const outcome = await nativeAppleSignIn({ authorize: null, submitIdToken: () => {} });
     expect(outcome).toBe(NativeAppleOutcome.Unavailable);
   });
 
   it('a cancelled sheet submits nothing', async () => {
     let submitted = false;
     const outcome = await nativeAppleSignIn({
-      invoke: async () => {
+      authorize: async () => {
         throw new Error('cancelled');
       },
       submitIdToken: () => {

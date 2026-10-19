@@ -9,7 +9,9 @@
   import { detectInAppBrowser, androidIntentUrl, type InAppBrowser } from '$lib/in-app-browser';
   import { sanitizeWebsiteParam } from '$lib/website-param';
   import { legalHref } from '$lib/legal-links';
-  import { nativeAppleSignIn, tauriInvoke, NativeAppleOutcome, type AppleIdToken } from '$lib/apple-sign-in/native';
+  import { nativeAppleSignIn, NativeAppleOutcome, type AppleIdToken } from '$lib/apple-sign-in/native';
+  import { nativeBridge } from '$lib/native-bridge';
+  import { nativeKeys } from '$lib/native-keys';
   let { form, data } = $props();
   let loading = $state(false);
   let showPassword = $state(false);
@@ -80,8 +82,8 @@
   let appleIdToken = $state<AppleIdToken | null>(null);
 
   async function startApple(e: Event) {
-    const invoke = tauriInvoke(window);
-    if (!invoke) {
+    const authorize = nativeBridge(window, nativeKeys())?.appleAuthorize ?? null;
+    if (!authorize) {
       startOAuth(e);
       return;
     }
@@ -89,7 +91,7 @@
     e.preventDefault();
     loading = true;
     const outcome = await nativeAppleSignIn({
-      invoke,
+      authorize,
       submitIdToken: async (credentials) => {
         appleIdToken = credentials;
         await tick();

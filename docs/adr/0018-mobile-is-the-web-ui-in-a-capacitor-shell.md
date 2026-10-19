@@ -25,8 +25,11 @@ FeegaBridgeViewController (CAPBridgeViewController)
 
 - **One WebView, one session.** The web app signs in as it does in a browser; nothing is handed
   between native and web.
-- **Bundled build.** The target is the client-only static build that reads `/api/v1` with a
-  bearer token (another workstream). Until it lands the shell loads the hosted app.
+- **Bundled build.** `npm run bundle` (apps/mobile) builds `build:spa`, copies it into `www` and
+  sets `FeegaWebSource = bundle`: Capacitor then serves it from `capacitor://localhost`. Hosted
+  stays the default until media signed URLs and client-side login land in the static build.
+- **One page-side bridge.** `src/lib/native-bridge.ts` picks Tauri IPC or Capacitor plugins;
+  login (Apple), the store paywall, share and haptics call it, never a shell API directly.
 - **Native code is only what Capacitor can't do from the page:**
   - `FeegaPerf`: app memory footprint (`task_vm_info.phys_footprint`), and recovery when WebKit
     kills the web content process (logged, counted, page reloaded; never a dead white view). A
@@ -46,10 +49,10 @@ A WebView of a website is at risk. These native capabilities are what make it an
 | Capability | State |
 |---|---|
 | Sign in with Apple (native sheet) | plugin built, behind flag (needs paid account + Supabase Apple config) |
-| In-app purchases and restore (StoreKit via RevenueCat) | plugin installed, page wiring pending |
+| In-app purchases and restore (StoreKit via RevenueCat) | wired via `nativeBridge`; needs `PUBLIC_REVENUECAT_APPLE_KEY`, store products, `NATIVE_STORE_BILLING=on` |
 | Push notifications (generation finished, invites) | later, `@capacitor/push-notifications` |
-| Share sheet for exported videos and images | to add, `@capacitor/share` |
-| Haptics on canvas gestures | to add, `@capacitor/haptics` |
+| Share sheet | wired: canvas share link (`systemShare`); exported files still use Web Share |
+| Haptics | wired: timeline snap and long-press menus (`haptic`), native in the shell |
 | Offline: bundled UI, local-first canvas edits | with the static build |
 | Process-death recovery, memory probe | built |
 
