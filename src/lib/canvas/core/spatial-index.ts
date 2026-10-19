@@ -1,4 +1,5 @@
-import type { Point, Rect } from '$lib/canvas/gpu/camera';
+import type { Viewport } from '$lib/canvas/dot-grid';
+import { toWorld, type Point, type Rect, type Screen } from '$lib/canvas/gpu/camera';
 
 export type Area = { x: number; y: number; w: number; h: number };
 
@@ -42,6 +43,12 @@ export class SpatialIndex {
       .filter((order) => overlaps(this.#items[order], area))
       .sort((a, b) => a - b)
       .map((order) => this.#items[order].id);
+  }
+
+  visible(view: Viewport, screen: Screen): Set<string> {
+    const min = toWorld(view, { x: 0, y: 0 });
+    const max = toWorld(view, { x: screen.width, y: screen.height });
+    return new Set(this.within({ x: min.x, y: min.y, w: max.x - min.x, h: max.y - min.y }));
   }
 
   #insert(r: Rect, order: number) {
