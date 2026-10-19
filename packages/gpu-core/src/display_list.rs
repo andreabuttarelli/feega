@@ -172,11 +172,25 @@ pub struct UseItem {
     pub matrix: Affine,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct GlyphsItem {
+    pub clip: String,
+    pub font: String,
+    #[serde(default)]
+    pub coords: Vec<(String, f32)>,
+    pub size: f64,
+    pub glyphs: Vec<[f64; 3]>,
+    pub paint: Paint,
+    #[serde(flatten)]
+    pub look: Look,
+}
+
 #[derive(Debug, Clone)]
 pub enum Item {
     Path(PathItem),
     Image(ImageItem),
     Use(UseItem),
+    Glyphs(GlyphsItem),
     Other { clip: String, kind: String },
 }
 
@@ -185,7 +199,7 @@ impl Item {
         match self {
             Item::Path(p) => Some(&p.look),
             Item::Image(i) => Some(&i.look),
-            Item::Use(_) | Item::Other { .. } => None,
+            Item::Use(_) | Item::Glyphs(_) | Item::Other { .. } => None,
         }
     }
 
@@ -194,6 +208,7 @@ impl Item {
             Item::Path(p) => &p.clip,
             Item::Image(i) => &i.clip,
             Item::Use(u) => &u.clip,
+            Item::Glyphs(g) => &g.clip,
             Item::Other { clip, .. } => clip,
         }
     }
@@ -203,6 +218,7 @@ impl Item {
             Item::Path(_) => "path",
             Item::Image(_) => "image",
             Item::Use(_) => "use",
+            Item::Glyphs(_) => "glyphs",
             Item::Other { kind, .. } => kind,
         }
     }
@@ -216,6 +232,7 @@ impl<'de> Deserialize<'de> for Item {
             "path" => serde_json::from_value(value).map(Item::Path).map_err(serde::de::Error::custom),
             "image" => serde_json::from_value(value).map(Item::Image).map_err(serde::de::Error::custom),
             "use" => serde_json::from_value(value).map(Item::Use).map_err(serde::de::Error::custom),
+            "glyphs" => serde_json::from_value(value).map(Item::Glyphs).map_err(serde::de::Error::custom),
             _ => Ok(Item::Other { clip: text("clip"), kind: text("kind") }),
         }
     }

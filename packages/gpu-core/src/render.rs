@@ -2,7 +2,7 @@ use vello::wgpu;
 
 use crate::display_list::DisplayList;
 use crate::engine::Engine;
-use crate::groups::{expand, Groups};
+use crate::groups::Library;
 use crate::pictures::Pictures;
 use crate::Skipped;
 
@@ -13,7 +13,7 @@ pub struct Renderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     engine: Engine,
-    groups: Groups,
+    library: Library,
 }
 
 pub struct Rendered {
@@ -34,15 +34,19 @@ impl Renderer {
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).map_err(failed)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).map_err(failed)?;
         let engine = Engine::new(&device).map_err(failed)?;
-        Ok(Self { device, queue, engine, groups: Groups::new() })
+        Ok(Self { device, queue, engine, library: Library::new() })
     }
 
     pub fn put_group(&mut self, key: &str, list: DisplayList) {
-        self.groups.put(key, list);
+        self.library.put_group(key, &list);
+    }
+
+    pub fn put_font(&mut self, key: &str, source: gpu_text::Source) {
+        self.library.put_font(key, source);
     }
 
     pub fn render(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<Rendered, RenderError> {
-        let (list, missing) = expand(list, &self.groups);
+        let (list, missing) = self.library.resolve(list);
         let list = &list;
         let size = wgpu::Extent3d { width: list.width, height: list.height, depth_or_array_layers: 1 };
         let target = self.device.create_texture(&wgpu::TextureDescriptor {
@@ -57,7 +61,7 @@ impl Renderer {
         });
         let view = target.create_view(&wgpu::TextureViewDescriptor::default());
         let skipped = self.engine.draw(&self.device, &self.queue, list, pictures, &view).map_err(failed)?;
-        Ok(Rendered { pixels: self.read(&target, size)?, skipped: skipped.into_iter().chain(missing.into_iter().map(|g| Skipped { clip: g, what: "group".into() })).collect() })
+        Ok(Rendered { pixels: self.read(&target, size)?, skipped: [skipped, missing].concat() })
     }
 
     fn read(&self, target: &wgpu::Texture, size: wgpu::Extent3d) -> Result<Vec<u8>, RenderError> {
