@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resident } from './residency';
+import { CACHE_SHARE, cached, resident } from './residency';
 
 const view = { x: 0, y: 0, zoom: 1 };
 const screen = { width: 1000, height: 1000 };
@@ -22,5 +22,13 @@ describe('frame residency', () => {
   it('over budget, media frames beyond it are left out', () => {
     const bytes = 100 * 100 * 4;
     expect(resident([frame('a', 0, 1), frame('b', 200, 1)], view, screen, bytes).length).toBe(1);
+  });
+
+  it('caches frames whose texture at the current zoom fits the cache share of the budget', () => {
+    const texture = 200 * 200 * 4;
+    const frames = [frame('media', 0, 1), frame('a', 200, 0), frame('b', 400, 0)];
+
+    expect(cached(frames, { x: 0, y: 0, zoom: 2 }, screen, texture / CACHE_SHARE).map((f) => f.cache)).toEqual([true, false, false]);
+    expect(cached(frames, { x: 0, y: 0, zoom: 2 }, screen, (3 * texture) / CACHE_SHARE).every((f) => f.cache)).toBe(true);
   });
 });
