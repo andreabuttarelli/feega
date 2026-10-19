@@ -33,6 +33,7 @@
   import FlipHorizontal from '@lucide/svelte/icons/flip-horizontal-2';
   import FlipVertical from '@lucide/svelte/icons/flip-vertical-2';
   import ColorField from './ColorField.svelte';
+  import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
@@ -109,6 +110,7 @@
     shared = [],
     sharedWith = 0,
     partFill = null,
+    gesture = null,
     lead,
     mode = EditMode.Motion
   }: {
@@ -129,6 +131,7 @@
     shared?: readonly string[];
     sharedWith?: number;
     partFill?: Snippet | null;
+    gesture?: LiveGesture | null;
     lead?: Snippet;
     mode?: EditMode;
   } = $props();
@@ -551,9 +554,9 @@
     <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
-    <div class="stack" data-prop={field.key}><FillStack fills={elementFills(clip.component, clip.props)} adder={Adder.Section} {assets} {tokens} {upload} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><FillStack {gesture} fills={elementFills(clip.component, clip.props)} adder={Adder.Section} {assets} {tokens} {upload} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
   {:else if field.control === Control.Strokes}
-    <div class="stack" data-prop={field.key}><StrokeStack strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><StrokeStack {gesture} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
@@ -574,7 +577,7 @@
         {:else if field.control === Control.Toggle}
           <SegmentedField name={field.label} options={YES_NO} value={answerOf(value(field))} onchange={(v) => setProp(field, v === Answer.Yes)} />
         {:else if field.control === Control.Color}
-          <ColorField id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
+          <ColorField {gesture} id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
         {:else if field.control === Control.Asset}
           <MediaPicker label={field.label} value={typeof value(field) === 'string' && value(field) ? { kind: field.assetKind === AssetKind.Video ? MediaKind.Video : MediaKind.Image, assetId: String(value(field)) } : null} {assets} accept={acceptOf(field.assetKind)} uploader={upload} onpick={(pick) => setProp(field, pick?.assetId ?? null)} />
         {:else if field.control === Control.MediaItem}
@@ -892,7 +895,7 @@
                   {@const alphaKey = alphaKeyOf(effect)}
                   <div class="line" data-prop={prop.key}>
                     <span class="label">{afterDot(prop)}</span>
-                    <div class="control"><ColorField name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
+                    <div class="control"><ColorField {gesture} name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
                     {@render diamond(prop.key)}
                   </div>
                 {:else}

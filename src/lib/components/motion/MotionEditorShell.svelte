@@ -5,6 +5,7 @@
   import { localStore } from '$lib/browser-storage';
   import { painted } from '$lib/canvas/paint-wait';
   import { frameDocs } from '$lib/canvas/frame-docs.svelte';
+  import { liveEdits } from '$lib/motion/live-edit';
   import { FrameKind, frameChrome, freshText, openingSelection } from '$lib/canvas/motion-node';
   import { DRAWN_TEXT } from '$lib/motion/draw-create';
   import { groupClips, ungroupClip } from '$lib/motion/group';
@@ -523,8 +524,8 @@
   const composeFrame = lastComposed(composeHtml);
   const html = $derived(composeFrame({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   $effect(() => {
-    const root = history.present;
-    frameDocs.put(data.node.id, { version, html: composeFrame({ doc: root, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen }), width: root.width, height: root.height, fps: root.fps, durationInFrames: root.durationInFrames, clean: !history.past.length && !history.future.length });
+    const root = liveRoot ?? history.present;
+    frameDocs.put(data.node.id, { version, html: composeFrame({ doc: root, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen }), width: root.width, height: root.height, fps: root.fps, durationInFrames: root.durationInFrames, clean: !liveRoot && !history.past.length && !history.future.length });
   });
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
@@ -661,7 +662,20 @@
     }
   }
 
+  let liveRoot = $state.raw<MotionDoc | null>(null);
+  const live = liveEdits<MotionDoc>({
+    show: (next) => {
+      previewDoc = next;
+      liveRoot = next ? mergeView(history.present, compPath, next) : null;
+    },
+    record: (next, summary) => recordEdit(next, summary)
+  });
+
   function edit(next: MotionDoc, summary: string) {
+    live.edit(next, summary);
+  }
+
+  function recordEdit(next: MotionDoc, summary: string) {
     const now = Date.now();
     const root = mergeView(history.present, compPath, next);
     history = summary === lastEdit.summary && now - lastEdit.at < COALESCE_MS ? amend(history, root) : record(history, root);
@@ -2238,24 +2252,24 @@
       {#if selection.length}<AlignBar count={selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
-        <LookInspector {doc} onchange={edit} />
+        <LookInspector gesture={live} {doc} onchange={edit} />
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
-        <TemplateInspector {doc} clip={selected} {assets} upload={uploadMedia} onchange={edit} />
+        <TemplateInspector gesture={live} {doc} clip={selected} {assets} upload={uploadMedia} onchange={edit} />
       {:else if selected}
-        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
+        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel gesture={live} {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
-        {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} fonts={fontLibrary} onopen={enterComp} />
+        {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack gesture={live} fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
+        <MotionInspector gesture={live} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} fonts={fontLibrary} onopen={enterComp} />
         {#if typeof selected.props.x === 'number' && !selected.parent}<ConstraintsSection {doc} clip={selected} onchange={apply} />{/if}
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
-        {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
+        {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector gesture={live} {doc} onchange={edit} />{/if}
       {:else if view === PropertiesView.Multiple}
         <MultiInspector {doc} ids={selection} {frame} mode={editMode} onchange={edit} />
       {:else}
         <header class="frame-head" data-testid="selection-head"><FamilyIcon /><span>Frame</span></header>
-        <DocFields {doc} {assets} upload={uploadMedia} onchange={edit} />
+        <DocFields gesture={live} {doc} {assets} upload={uploadMedia} onchange={edit} />
         <div class="composition" data-testid="composition-inspector">
           <header class="composition-head"><span>Frame</span></header>
           <CompositionSettings {doc} onchange={apply} />

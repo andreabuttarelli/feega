@@ -5,11 +5,12 @@
   import { detachTemplate, instanceComp, keyFieldsOf, setTemplateValues, templateFields, type TemplateFieldValue } from '$lib/motion/template/library';
   import { FieldLayout, splitFields } from '$lib/motion/template/key-fields';
   import FieldForm from './FieldForm.svelte';
+  import type { LiveGesture } from '$lib/motion/live-edit';
   import type { MediaUploader } from './media-upload';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
-  let { doc, clip, assets, upload = null, onchange }: { doc: MotionDoc; clip: MotionClip; assets: Asset[]; upload?: MediaUploader | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, clip, assets, upload = null, gesture = null, onchange }: { gesture?: LiveGesture | null; doc: MotionDoc; clip: MotionClip; assets: Asset[]; upload?: MediaUploader | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   let error = $state('');
 
@@ -36,13 +37,13 @@
     </header>
 
     {#if split.key.length}
-      <div class="key" data-testid="key-fields"><FieldForm {doc} fields={split.key} {assets} {upload} {setValue} {onchange} layout={FieldLayout.Flat} /></div>
+      <div class="key" data-testid="key-fields"><FieldForm {gesture} {doc} fields={split.key} {assets} {upload} {setValue} {onchange} layout={FieldLayout.Flat} /></div>
     {/if}
 
     {#if split.advanced.length}
       <details class="advanced" data-testid="advanced-fields">
         <summary>Advanced</summary>
-        <FieldForm {doc} fields={split.advanced} {assets} {upload} {setValue} {onchange} />
+        <FieldForm {gesture} {doc} fields={split.advanced} {assets} {upload} {setValue} {onchange} />
       </details>
     {/if}
 

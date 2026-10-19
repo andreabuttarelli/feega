@@ -1,6 +1,7 @@
 <script lang="ts">
   import { localStore } from '$lib/browser-storage';
   import { onMount } from 'svelte';
+  import { colourDrag, type LiveGesture } from '$lib/motion/live-edit';
   import { BRAND_COLORS } from '$lib/motion/components';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import { COLOUR_FORMATS, ColourFormat, channelsOf, colourLabel, fromChannels, parseColour, readRecent, remember, type Channels } from '$lib/motion/colour-field';
@@ -14,9 +15,10 @@
     value,
     tokens,
     alpha = null,
+    gesture = null,
     onchange,
     onalpha
-  }: { id?: string; name: string; value: unknown; tokens: BrandTokens; alpha?: number | null; onchange: (value: string) => void; onalpha?: (alpha: number) => void } = $props();
+  }: { id?: string; gesture?: LiveGesture | null; name: string; value: unknown; tokens: BrandTokens; alpha?: number | null; onchange: (value: string) => void; onalpha?: (alpha: number) => void } = $props();
 
   type EyeDropperResult = { sRGBHex: string };
   type EyeDropperCtor = new () => { open: () => Promise<EyeDropperResult> };
@@ -79,6 +81,15 @@
     onchange(next);
   }
 
+  const wheel = colourDrag(gesture, (next) => onchange(next));
+
+  function drop(next: string) {
+    pick(next);
+    wheel.settle();
+  }
+
+  $effect(() => wheel.settle);
+
   function typed(input: HTMLInputElement) {
     const parsed = parseColour(input.value);
     if (parsed === null) {
@@ -90,12 +101,14 @@
 
   function closeOutside(e: PointerEvent) {
     if (open && root && !root.contains(e.target as Node)) {
+      wheel.settle();
       open = false;
     }
   }
 
   function closeOnEscape(e: KeyboardEvent) {
     if (e.key === 'Escape') {
+      wheel.cancel();
       open = false;
     }
   }
@@ -109,7 +122,7 @@
   {#if onalpha}<input class="alpha" type="text" inputmode="decimal" aria-label={`${name} opacity`} value={`${Math.round((alpha ?? 1) * PERCENT)}%`} onchange={(e) => setAlpha(e.currentTarget.value)} />{/if}
   {#if open}
     <div class="pop" role="dialog" aria-label={`${name} colours`} data-testid="colour-popover">
-      <input class="wheel" type="color" aria-label={`${name} picker`} value={pickerValue} onchange={(e) => pick(e.currentTarget.value)} />
+      <input class="wheel" type="color" aria-label={`${name} picker`} value={pickerValue} oninput={(e) => wheel.input(e.currentTarget.value)} onchange={(e) => drop(e.currentTarget.value)} />
       <div class="formats">
         <div class="switch" role="radiogroup" aria-label="Colour format">
           {#each COLOUR_FORMATS as f (f)}<button type="button" role="radio" aria-checked={format === f} class:on={format === f} onclick={() => (format = f)}>{FORMAT_LABEL[f]}</button>{/each}
