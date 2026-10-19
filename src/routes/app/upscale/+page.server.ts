@@ -1,1 +1,1 @@
-export { load, actions } from '$lib/server/dashboard/pages/upscale';
+export { actions } from '$lib/server/dashboard/pages/upscale';
