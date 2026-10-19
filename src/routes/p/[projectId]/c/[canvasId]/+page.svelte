@@ -3397,6 +3397,7 @@
   {#if viewOnly}<p class="view-only-badge" data-testid="view-only">View only</p>{/if}
   {#if Flow}
   <Flow
+    core={rendererOf(page.url, data.rendererSwitch) === Renderer.Core}
     mode={canvasMode}
     postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
