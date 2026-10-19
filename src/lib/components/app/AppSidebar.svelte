@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { signOutForm } from '$lib/auth/sign-out-form';
   import { apiEnhance } from '$lib/dashboard/api-enhance';
   import { chooseWorkspace, createWorkspace } from '$lib/dashboard/api';
   import { goto } from '$app/navigation';
@@ -132,7 +133,7 @@
       <span class="label">{labelOf(item.label)}</span>
     </button>
   {:else if item.kind === NavKind.Logout}
-    <form method="POST" action="/auth/signout">
+    <form method="POST" action="/auth/signout" use:signOutForm>
       <button type="submit" class="row">
         <item.icon size={ICON} strokeWidth={STROKE} />
         <span class="label">{labelOf(item.label)}</span>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { signOutForm } from '$lib/auth/sign-out-form';
   import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
   import { _ } from 'svelte-i18n';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -240,7 +241,7 @@
       <div class="menu-row theme-row"><span>Theme</span><ThemeSwitch /></div>
       <DropdownMenu.Item class="menu-row is-danger" variant="destructive">
         {#snippet child({ props })}
-          <form {...props} method="POST" action="/auth/signout">
+          <form {...props} method="POST" action="/auth/signout" use:signOutForm>
             <button type="submit" class="menu-logout">
               <LogOut size={16} />
               <span>{$_('app.shell.menu.logout')}</span>
