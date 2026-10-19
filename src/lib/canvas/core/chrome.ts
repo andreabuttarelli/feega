@@ -1,11 +1,8 @@
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
-import { rgbaOf, type Rgba } from '$lib/motion/gpu-full/rgba';
-import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
-import { ItemKind, type PathItem } from '$lib/motion/gpu-full/display-list';
-import { BlendMode } from '$lib/motion/blend';
-import { IDENTITY } from '$lib/motion/parent';
-import { Cap, Join, dashes, strokePolygons } from '$lib/motion/gpu-full/stroke';
+import type { PathItem } from '$lib/motion/gpu-full/display-list';
+import { dashes } from '$lib/motion/gpu-full/stroke';
+import { line, rect, solid } from './shapes';
 
 export enum ChromePart {
   Hover = 'hover',
@@ -13,7 +10,9 @@ export enum ChromePart {
   PortIn = 'port-in',
   PortOut = 'port-out',
   Handle = 'handle',
-  Label = 'label'
+  Label = 'label',
+  PortName = 'port-name',
+  Icon = 'icon'
 }
 
 export type Glyphs = (text: string, size: number) => { contours: number[][]; width: number };
@@ -31,6 +30,8 @@ export type ChromeTile = {
   inputs: readonly ConnectorType[];
   output: ConnectorType | null;
   label: string | null;
+  icon: number[][] | null;
+  names: boolean;
 };
 
 const RING_WIDTH = 2;
@@ -46,21 +47,19 @@ const LABEL_GAP = 4;
 const HOVER_COLOR = '#b14cff';
 const HANDLE_FILL = '#ffffff';
 const LABEL_COLOR = '#6e6e73';
+const ICON_SIZE = 12;
+const ICON_GAP = 5;
+const NAME_SIZE = 11;
+const NAME_GAP = 16;
 
-const rect = (x: number, y: number, w: number, h: number): number[] => [x, y, x + w, y, x + w, y + h, x, y + h];
-
-const solid = (css: string): Rgba => rgbaOf(css) ?? [0, 0, 0, 1];
-
-function item(t: ChromeTile, part: ChromePart, contours: number[][], color: string, opacity = 1): PathItem {
-  return { kind: ItemKind.Path, clip: `${t.id}:${part}`, contours, rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: solid(color) }, opacity, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal };
-}
+const item = (t: ChromeTile, part: ChromePart, contours: number[][], color: string, opacity = 1): PathItem => solid(`${t.id}:${part}`, contours, color, opacity);
 
 function outline(t: ChromeTile, width: number): number[] {
   const inset = RING_OFFSET + width / 2;
   return rect(t.x - inset, t.y - inset, t.width + 2 * inset, t.height + 2 * inset);
 }
 
-const band = (t: ChromeTile, width: number) => strokePolygons(outline(t, width), true, width, Cap.Butt, Join.Miter);
+const band = (t: ChromeTile, width: number) => line(outline(t, width), width, true);
 
 function hover(t: ChromeTile): PathItem[] {
   if (!t.hovered || t.ring !== NodeChrome.None) {
@@ -73,7 +72,7 @@ const RINGS: Record<NodeChrome, (t: ChromeTile) => PathItem[]> = {
   [NodeChrome.None]: () => [],
   [NodeChrome.Selected]: (t) => [item(t, ChromePart.Ring, band(t, RING_WIDTH), t.ringColor)],
   [NodeChrome.Editing]: (t) =>
-    dashes(outline(t, EDITING_WIDTH), true, DASH, DASH).map((d) => item(t, ChromePart.Ring, strokePolygons(d, false, EDITING_WIDTH, Cap.Butt, Join.Miter), t.ringColor, EDITING_OPACITY))
+    dashes(outline(t, EDITING_WIDTH), true, DASH, DASH).map((d) => item(t, ChromePart.Ring, line(d, EDITING_WIDTH), t.ringColor, EDITING_OPACITY))
 };
 
 const spaced = (t: ChromeTile, i: number, n: number) => t.y + ((i + 1) / (n + 1)) * t.height;
@@ -106,14 +105,30 @@ function handles(t: ChromeTile): PathItem[] {
   ]);
 }
 
+const shift = (contours: number[][], dx: number, dy: number) => contours.map((c) => c.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)));
+
 function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   if (!t.label) {
     return [];
   }
   const baseline = t.y - LABEL_GAP;
-  const { contours } = glyphs(t.label, LABEL_SIZE);
-  const placed = contours.map((c) => c.map((v, i) => (i % 2 === 0 ? v + t.x : v + baseline)));
-  return [item(t, ChromePart.Label, placed, LABEL_COLOR)];
+  const icon = t.icon ? [item(t, ChromePart.Icon, shift(t.icon, t.x, baseline - ICON_SIZE), LABEL_COLOR)] : [];
+  const left = t.icon ? t.x + ICON_SIZE + ICON_GAP : t.x;
+  return [...icon, item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE).contours, left, baseline), LABEL_COLOR)];
 }
 
-export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...hover(t), ...RINGS[t.ring](t), ...ports(t), ...handles(t), ...label(t, glyphs)];
+function name(t: ChromeTile, glyphs: Glyphs, type: ConnectorType, centre: number, side: ChromePart): PathItem {
+  const { contours, width } = glyphs(CONNECTOR_STYLE[type].label, NAME_SIZE);
+  const left = side === ChromePart.PortIn ? t.x - NAME_GAP - width : t.x + t.width + NAME_GAP;
+  return item(t, ChromePart.PortName, shift(contours, left, centre + NAME_SIZE / 2), CONNECTOR_STYLE[type].color);
+}
+
+function names(t: ChromeTile, glyphs: Glyphs): PathItem[] {
+  if (!t.names) {
+    return [];
+  }
+  const inputs = t.inputs.map((type, i) => name(t, glyphs, type, spaced(t, i, t.inputs.length), ChromePart.PortIn));
+  return t.output ? [...inputs, name(t, glyphs, t.output, t.y + t.height / 2, ChromePart.PortOut)] : inputs;
+}
+
+export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...hover(t), ...RINGS[t.ring](t), ...ports(t), ...names(t, glyphs), ...handles(t), ...label(t, glyphs)];
