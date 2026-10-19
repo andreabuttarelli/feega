@@ -3,7 +3,7 @@ use vello::kurbo::Rect;
 use crate::canvas::Canvas;
 use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
 use crate::filters::{reach as filter_reach, Fold, Fx, Reach, Runner};
-use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, Layers, Placed, Shelf};
+use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
 
 const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
 const REACH: f64 = 3.0;
@@ -36,11 +36,22 @@ fn snapped(r: Rect, frame: Rect) -> Rect {
     Rect::new(r.x0.floor(), r.y0.floor(), r.x1.ceil().max(r.x0.floor() + 1.0), r.y1.ceil().max(r.y0.floor() + 1.0))
 }
 
-pub fn prepare<S: Surface>(surface: &mut S, list: &DisplayList, pictures: &Shelf<Pic<S>>) -> Result<Layers<Pic<S>>, S::Error> {
-    prepare_items(surface, &list.items, list.background, pictures)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Blending {
+    #[default]
+    Native,
+    Composited,
 }
 
-fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option<Rgba>, pictures: &Shelf<Pic<S>>) -> Result<Layers<Pic<S>>, S::Error> {
+pub fn prepare<S: Surface>(surface: &mut S, list: &DisplayList, pictures: &Shelf<Pic<S>>, blending: Blending) -> Result<Layers<Pic<S>>, S::Error> {
+    prepare_items(surface, &list.items, list.background, pictures, blending)
+}
+
+fn composited_blend(item: &Item, blending: Blending) -> bool {
+    blending == Blending::Composited && item.look().is_some_and(|l| l.blend != "normal")
+}
+
+fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option<Rgba>, pictures: &Shelf<Pic<S>>, blending: Blending) -> Result<Layers<Pic<S>>, S::Error> {
     let mut layers = Layers::new();
     for (i, item) in items.iter().enumerate() {
         if let Item::Lens(lens) = item {
@@ -53,15 +64,32 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
             layers.behind.insert(i, layer);
         }
         if let Item::Group(group) = item {
-            let inner = prepare_items(surface, &group.items, None, pictures)?;
+            let inner = prepare_items(surface, &group.items, None, pictures, blending)?;
             layers.groups.insert(i, inner);
         }
         if layer_worthy(item) {
             let layer = body(surface, item, pictures, layers.groups.get(&i))?;
             layers.bodies.insert(i, layer);
         }
+        if composited_blend(item, blending) {
+            let layer = composited(surface, items, i, background, &layers, pictures)?;
+            layers.blended.insert(i, layer);
+        }
     }
     Ok(layers)
+}
+
+fn composited<S: Surface>(surface: &mut S, items: &[Item], at: usize, background: Option<Rgba>, layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>) -> Result<Placed<Pic<S>>, S::Error> {
+    let frame = surface.frame();
+    let look = items[at].look().expect("a drawable item");
+    let region = region(surface, &items[at], look, pictures);
+    let below = surface.paint(region, background, &|c| {
+        build_items(c, &items[..at], frame, pictures, layers);
+    })?;
+    let top = surface.paint(region, None, &|c| unblended(c, items, at, frame, pictures, layers))?;
+    let fx = Fx { runner: surface.runner() };
+    let texture = fx.blended(top, &below, &look.blend, look.opacity);
+    Ok(surface.place(texture, region))
 }
 
 fn behind<S: Surface>(surface: &mut S, items: &[Item], at: usize, background: Option<Rgba>, layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>, sigma: f64) -> Result<Placed<Pic<S>>, S::Error> {

@@ -3174,4 +3174,4 @@ in a half-pixel convention, not in timing.
 full-frame one. Hundreds of them (a custom component flattened, its group grain copied onto
 every child) exhaust the GPU silently. Bisect by slicing the group's children in
 `scripts/gpu-parity/host.ts`; a single child that flips the frame is a blend/layer bug instead
-(WebGL2 `multiply` inside a group, still open).
+(WebGL2 `multiply` inside a group: vello_hybrid wiped the backdrop; the GL core now composites blended layers itself, `Blending::Composited`).

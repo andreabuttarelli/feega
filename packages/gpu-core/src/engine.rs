@@ -6,13 +6,14 @@ use vello::{AaConfig, AaSupport, RenderParams, RendererOptions, Scene};
 use crate::display_list::{Cover, DisplayList, Item, Rgba};
 use crate::groups::Plan;
 use crate::filter_passes::{layer_texture, FilterPasses, WgpuRunner};
-use crate::layers::{prepare, Surface};
+use crate::layers::{prepare, Blending, Surface};
 use crate::pictures::Pictures;
 use crate::scene::{build, Placed};
 use crate::Skipped;
 
 pub struct Engine {
     pub vello: vello::Renderer,
+    pub blending: Blending,
     filters: FilterPasses,
 }
 
@@ -95,12 +96,12 @@ impl<'a> Surface for Gpu<'a> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, filters: FilterPasses::new(device) })
+        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device) })
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
         let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, drawn: drawn(list, pictures) };
-        let layers = prepare(&mut gpu, list, pictures)?;
+        let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let (scene, skipped) = build(list, pictures, &layers);
         let drawn = gpu.render(&scene, base(list.background), target, (list.width, list.height));
         for image in layers.into_images() {

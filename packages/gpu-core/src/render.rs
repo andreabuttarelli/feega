@@ -44,6 +44,11 @@ impl Renderer {
         Ok(Self { device, queue, engine, library: Library::new(), cached: Pictures::new(), limits })
     }
 
+    pub fn blending(mut self, blending: crate::layers::Blending) -> Self {
+        self.engine.blending = blending;
+        self
+    }
+
     pub fn put_group(&mut self, key: &str, list: DisplayList) {
         self.library.put_group(key, &list);
     }

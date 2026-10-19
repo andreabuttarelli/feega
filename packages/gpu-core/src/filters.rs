@@ -139,6 +139,13 @@ impl<R: Runner> Fx<'_, R> {
         self.op(Op::Lens, content, content, lens).tex
     }
 
+    pub fn blended(&self, top: R::Tex, bottom: &R::Tex, mode: &str, opacity: f32) -> R::Tex {
+        let mut fade = IDENTITY_MATRIX;
+        fade[18] = opacity;
+        let faded = self.matrix(&Self::plain(top), &fade);
+        self.blend(&faded, &Self::plain(bottom.clone()), mode).tex
+    }
+
     pub fn masked(&self, body: &R::Tex, mask: &R::Tex) -> R::Tex {
         self.op(Op::Composite, body, mask, &[1.0, 0.0, 0.0, 0.0, 0.0]).tex
     }
