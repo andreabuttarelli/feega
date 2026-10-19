@@ -3,6 +3,8 @@
   import Workflow from '@lucide/svelte/icons/workflow';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+  import Layers from '@lucide/svelte/icons/layers';
+  import Plus from '@lucide/svelte/icons/plus';
   import { MOBILE_ICON } from '$lib/canvas/mobile-chrome';
   import type { ChatBadge, MobileView } from '$lib/canvas/mobile-view';
 
@@ -10,8 +12,21 @@
     view,
     badge,
     onselect,
-    properties
-  }: { view: MobileView; badge: ChatBadge; onselect: (view: MobileView) => void; properties: { target: string | null; onopen: () => void } } = $props();
+    properties,
+    layers,
+    onlayers,
+    inserting,
+    oninsert
+  }: {
+    view: MobileView;
+    badge: ChatBadge;
+    onselect: (view: MobileView) => void;
+    properties: { target: string | null; onopen: () => void };
+    layers: boolean;
+    onlayers: () => void;
+    inserting: boolean;
+    oninsert: () => void;
+  } = $props();
 </script>
 
 <div class="view-switch" role="group" aria-label={$_('app.shell.mobile.switchView')} data-testid="mobile-view-switch">
@@ -24,6 +39,12 @@
     onclick={() => onselect('canvas')}
   >
     <Workflow size={MOBILE_ICON.size} strokeWidth={MOBILE_ICON.stroke} />
+  </button>
+  <button type="button" class="segment" aria-pressed={inserting} aria-label="Insert" data-testid="mobile-view-insert" onclick={oninsert}>
+    <Plus size={MOBILE_ICON.size} strokeWidth={MOBILE_ICON.stroke} />
+  </button>
+  <button type="button" class="segment" aria-pressed={layers} aria-label={$_('app.nav2.layers')} data-testid="mobile-view-layers" onclick={onlayers}>
+    <Layers size={MOBILE_ICON.size} strokeWidth={MOBILE_ICON.stroke} />
   </button>
   <button
     type="button"
