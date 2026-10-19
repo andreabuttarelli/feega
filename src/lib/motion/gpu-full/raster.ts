@@ -211,7 +211,8 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   const lensProgram = program(gl, LENS_VS, BLOB_FRAGMENT);
   const textures = new Map<TexImageSource, WebGLTexture>();
   const main = target(gl, width, height, samples);
-  const group = target(gl, width, height, samples);
+  const groups: Target[] = [];
+  let depth = 0;
   let dest = main;
   const layer = target(gl, width, height, samples);
   const ping = plain(gl, width, height);
@@ -616,12 +617,15 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
 
   function groupLayer(item: GroupItem, pictures: Pictures) {
     const outer = dest;
+    const group = (groups[depth] ??= target(gl, width, height, samples));
     dest = group;
+    depth++;
     gl.bindFramebuffer(gl.FRAMEBUFFER, group.fbo);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     item.items.forEach((inner, i) => paintItem(inner, item.items.slice(0, i), pictures));
     resolveInto(group);
+    depth--;
     dest = outer;
     const mask = item.masks || item.matte ? maskOf(item, pictures) : null;
     const filtered = item.filters ? filters.apply(group.texture, item.filters, item.space ?? [1, 0, 0, 1]) : group.texture;

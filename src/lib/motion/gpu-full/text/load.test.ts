@@ -50,6 +50,14 @@ describe('loadFonts', () => {
     expect(started).toBe(0);
   });
 
+  it('downloads the subsets a custom component writes, from its props and its source', async () => {
+    const ticked = must(addClip({ ...titled, components: { Card: { source: { html: '', css: '', js: "make('div', 'tick', box, 'Ā')" }, propsSchema: { type: 'object', properties: {} }, version: 1, check: null } } } as MotionDoc, { component: 'Custom', from: 0, durationInFrames: 30, props: { name: 'Card' } }, 'card'));
+    const fetched: string[] = [];
+    await fontLoader({ text: async () => CSS, bytes: async (url) => (fetched.push(url), new Uint8Array()) })(ticked, {}, FEEGA_TOKENS);
+
+    expect(fetched).toContain('https://g.test/ext.woff2');
+  });
+
   it('asks for the fonts of clips inside a precomp', async () => {
     const [clip] = titled.tracks.flatMap((t) => t.clips);
     const archivo = { family: 'Archivo', source: 'google', category: 'sans', italic: false, weights: [400], axes: [] };

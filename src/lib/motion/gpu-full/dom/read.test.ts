@@ -156,11 +156,62 @@ describe('readTree', () => {
     expect(readTree(tree(root(), clip, inside, outside)).gaps.map((g) => g.reason)).toEqual([DomGap.Clip]);
   });
 
-  it('multiplies opacity into a single painted leaf but refuses it over a group', () => {
+  it('multiplies opacity into a single painted leaf', () => {
     const faded = (n: number) => [el({ parent: 0, size: [50, 50], style: { opacity: '0.5' } }), ...Array.from({ length: n }, () => el({ parent: 1, size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } }))];
 
     expect(paths(tree(root(), ...faded(1)))[0].opacity).toBeCloseTo(0.5);
-    expect(readTree(tree(root(), ...faded(2))).gaps.map((g) => g.reason)).toEqual([DomGap.Opacity]);
+  });
+
+  it('fades a group whose items do not overlap item by item, which looks the same', () => {
+    const faded = el({ parent: 0, size: [50, 50], style: { opacity: '0.5' } });
+    const square = (x: number) => el({ parent: 1, at: [x, 0], size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
+
+    const read = readTree(tree(root(), faded, square(0), square(20)));
+
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn.map((d) => d.opacity)).toEqual([0.5, 0.5]);
+  });
+
+  it('fades overlapping items together, as one group', () => {
+    const faded = el({ parent: 0, size: [50, 50], style: { opacity: '0.5' } });
+    const square = () => el({ parent: 1, at: [0, 0], size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
+
+    const read = readTree(tree(root(), faded, square(), square()));
+
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn).toHaveLength(1);
+    expect(read.drawn[0]).toMatchObject({ kind: DrawnKind.Group, opacity: 0.5 });
+  });
+
+  it('casts each box shadow under the box, blurred by half its radius', () => {
+    const card = el({ parent: 0, at: [10, 10], size: [100, 50], style: { 'background-color': 'rgb(255, 255, 255)', 'box-shadow': 'rgba(0, 0, 0, 0.18) 0px 30px 80px 0px, rgba(0, 0, 0, 0.06) 0px 2px 6px 0px' } });
+
+    const read = readTree(tree(root(), card));
+    const [far, near2, box] = read.drawn as DrawnPath[];
+
+    expect(read.gaps).toEqual([]);
+    expect(far.paint).toEqual({ kind: PaintKind.Solid, color: [0, 0, 0, 0.06] });
+    expect(far.filters).toEqual([{ kind: FilterKind.Css, fns: [{ name: 'blur', args: ['3px'] }] }]);
+    expect(near(bounds(near2))).toEqual({ left: 10, top: 40, right: 110, bottom: 90 });
+    expect(box.paint).toEqual({ kind: PaintKind.Solid, color: [1, 1, 1, 1] });
+  });
+
+  it('stacks positioned siblings by z-index, negative ones under the flow', () => {
+    const box = (z: string, color: string) => el({ parent: 0, size: [10, 10], style: { position: 'absolute', 'z-index': z, 'background-color': color } });
+    const flow = el({ parent: 0, size: [10, 10], style: { 'background-color': 'rgb(0, 0, 255)' } });
+
+    const read = readTree(tree(root(), box('2', 'rgb(255, 0, 0)'), box('1', 'rgb(0, 255, 0)'), flow, box('-1', 'rgb(0, 0, 0)')));
+
+    expect(read.gaps).toEqual([]);
+    expect((read.drawn as DrawnPath[]).map((d) => (d.paint.kind === PaintKind.Solid ? d.paint.color.join() : ''))).toEqual(['0,0,0,1', '0,0,1,1', '0,1,0,1', '1,0,0,1']);
+  });
+
+  it('clips a box to an inset() clip path', () => {
+    const wiped = el({ parent: 0, at: [10, 10], size: [100, 40], style: { 'background-color': 'rgb(0, 0, 0)', 'clip-path': 'inset(0px 25% 10px 0px)' } });
+
+    const [item] = readTree(tree(root(), wiped)).drawn;
+
+    expect(item.masks?.[0].cover).toEqual({ kind: CoverKind.Path, contours: [[0, 0, 75, 0, 75, 30, 0, 30]], matrix: [1, 0, 0, 1, 10, 10] });
   });
 
   it('draws an svg fill without a stroke it cannot dash and names the stroke', () => {
