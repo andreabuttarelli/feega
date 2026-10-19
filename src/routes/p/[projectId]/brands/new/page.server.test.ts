@@ -35,7 +35,7 @@ vi.mock('$lib/server/credits', async () => {
   return { ...actual, gateOrgCredits: vi.fn(async () => undefined) };
 });
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/project-pages/brand-new');
 const { listMemberships } = await import('$lib/server/repos/orgs');
 const { runBrandAnalysis } = await import('$lib/server/brand-analysis');
 

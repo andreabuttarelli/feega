@@ -28,6 +28,13 @@ describe('a page action goes to the API when the page has a bearer twin', () => 
     expect(apiPathOf('/app/compose/n1?project=p1')).toBe('/api/v1/compose/n1?project=p1');
   });
 
+  it('every dashboard page and the project pages have one', () => {
+    expect(apiPathOf('/app/credits')).toBe('/api/v1/me/pages/credits');
+    expect(apiPathOf('/p/p1/influencers')).toBe('/api/v1/projects/p1/pages/influencers');
+    expect(apiPathOf('/p/p1/brands/new')).toBe('/api/v1/projects/p1/pages/brand-new');
+    expect(apiPathOf('/p/p1/assets?tab=all')).toBe('/api/v1/projects/p1/pages/assets?tab=all');
+  });
+
   it('any other page keeps its own action', () => {
     expect(apiPathOf('/render/t1')).toBeNull();
     expect(pageActionPath('/render/t1', 'slot')).toBe('/render/t1?/slot');

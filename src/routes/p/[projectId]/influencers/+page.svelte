@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
   import PageHead from '$lib/components/PageHead.svelte';
   import InfluencerBuilder from '$lib/components/canvas/builder/InfluencerBuilder.svelte';
   import { describeBuilderSelections, type BuilderSelections } from '$lib/canvas/influencer-builder-options';
@@ -81,7 +81,7 @@
     <form
       method="POST"
       action="?/generate"
-      use:enhance={() => {
+      use:apiEnhance={() => {
         submitting = true;
         return async ({ update }) => {
           submitting = false;
@@ -124,7 +124,7 @@
       method="POST"
       action="?/upload"
       enctype="multipart/form-data"
-      use:enhance={() => {
+      use:apiEnhance={() => {
         submitting = true;
         return async ({ update }) => {
           submitting = false;
