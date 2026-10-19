@@ -6,10 +6,9 @@ import { sampleTrack } from '../sample-track';
 import { IDENTITY, ParentOpacity, ancestorsOf, mul2d, transformAt, worldAt, type Affine } from '../parent';
 import { boxOf } from '../layout';
 import { preparedDoc } from '../hyperframes/compose';
-import type { SvgNode } from '../effects/registry';
 import { renderAt } from '../effects/render';
 import { effectOfKey } from '../effects/model';
-import { cssFunctions, unsupportedPrimitive, type CssFunction } from './filters';
+import { cssFunctions, FilterKind, unsupportedPrimitive, type Filter, type Linear } from './filters';
 import { BlendMode } from '../blend';
 import { mattePairs, MATTE_READ } from '../matte';
 import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, fillsOf, type Fill, type FillOf } from '../fill/model';
@@ -36,6 +35,7 @@ import { lensAt, type Lens } from './lens';
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
 export type { Lens } from './lens';
 export { FillRule, PaintKind, type Paint, type Stop };
+export { FilterKind, type Filter, type Linear };
 
 export enum ItemKind {
   Path = 'path',
@@ -43,7 +43,8 @@ export enum ItemKind {
   Layer = 'layer',
   Text = 'text',
   Lens = 'lens',
-  Glyphs = 'glyphs'
+  Glyphs = 'glyphs',
+  Group = 'group'
 }
 
 export enum Unsupported {
@@ -85,16 +86,10 @@ export type LensItem = { kind: ItemKind.Lens; clip: string; lens: Lens; opacity:
 
 export type GlyphsItem = { kind: ItemKind.Glyphs; clip: string; font: string; coords: [string, number][]; size: number; glyphs: [number, number, number][]; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
-export type Item = GlyphsItem | PathItem | ImageItem | LayerItem | TextItem | LensItem;
+export type GroupItem = { kind: ItemKind.Group; clip: string; items: Item[]; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
-export enum FilterKind {
-  Css = 'css',
-  Svg = 'svg'
-}
+export type Item = GlyphsItem | PathItem | ImageItem | LayerItem | TextItem | LensItem | GroupItem;
 
-export type Filter = { kind: FilterKind.Css; fns: CssFunction[] } | { kind: FilterKind.Svg; nodes: SvgNode[] };
-
-export type Linear = [number, number, number, number];
 
 export type MatteOf = { items: Item[]; luma: boolean; invert: boolean };
 
@@ -276,7 +271,20 @@ const CONTENT_OF: Record<DrawnKind, (d: never, clip: string) => Content> = {
   [DrawnKind.Layer]: (d: Extract<Drawn, { kind: DrawnKind.Layer }>, clip) => ({ kind: ItemKind.Layer, source: `${clip}:${d.layer}`, size: { width: d.width, height: d.height }, opacity: d.opacity, matrix: d.matrix })
 };
 
-const customPainter = ({ read, clip }: Env): Painted => {
+type Looked = { masks?: MaskLayer[]; filters?: Filter[]; space?: Linear; blend?: BlendMode };
+
+function ownLook(content: object, placed: Affine, clip: Looked): Looked {
+  const own = content as Looked;
+  const masks = own.masks?.map((m) => ({ ...m, cover: { ...m.cover, matrix: mul2d(placed, m.cover.matrix) } }));
+  const space = own.space ? (mul2d([placed[0], placed[1], placed[2], placed[3], 0, 0], [...own.space, 0, 0]).slice(0, 4) as Linear) : undefined;
+  return {
+    ...(masks ? { masks: [...(clip.masks ?? []), ...masks] } : {}),
+    ...(own.filters ? { filters: [...own.filters, ...(clip.filters ?? [])], space } : {}),
+    ...(own.blend ? { blend: own.blend } : {})
+  };
+}
+
+const customPainter =({ read, clip }: Env): Painted => {
   if (!read) {
     return Unsupported.Unread;
   }
@@ -436,12 +444,18 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     const read = pair ? MATTE_READ[pair.matte] : null;
     const extras = { ...(scissor ? { scissor } : {}), ...(filtered.filters.length ? { filters: filtered.filters, space: [world[0], world[1], world[2], world[3]] as Linear } : {}), ...(filtered.backdrop ? { backdrop: filtered.backdrop } : {}), ...(masks.length ? { masks } : {}), ...(read ? { matte: { items: matteItems, luma: read.weights !== null, invert: read.invert } } : {}) };
     const framed = (c: Content) => (c.kind === ItemKind.Image && c.clipped ? { matrix: mul2d(base, c.matrix), inner: moved } : { matrix: mul2d(placed, c.matrix) });
-    const full = (c: Content) => ({ ...c, clip: clip.id, opacity: alpha * c.opacity, ...framed(c), blur: blur + ('blur' in c ? (c.blur ?? 0) * scaleOf(placed) : 0), blend: clip.blend, ...extras });
+    const ownBlur = (c: Content) => ('blur' in c ? (c.blur ?? 0) * scaleOf(placed) : 0);
     const stenciled = (c: Content) => (c.kind === ItemKind.Image && c.stencil ? { matte: { items: c.stencil.map((m) => ({ ...m, clip: clip.id, matrix: mul2d(placed, m.matrix), blur: 0, blend: BlendMode.Normal }) as Item), luma: false, invert: false } } : {});
-    return content.map((c) => {
+    const bare = (c: Content) => {
       const { stencil: _stencil, ...own } = c as Content & { stencil?: unknown };
-      return { ...full(own as Content), ...stenciled(c) } as Item;
-    });
+      return own as Content;
+    };
+    const grouped = content.length > 1 && (Object.keys(extras).length > 0 || alpha < 1 || blur > 0 || clip.blend !== BlendMode.Normal);
+    if (!grouped) {
+      return content.map((c) => ({ ...bare(c), clip: clip.id, opacity: alpha * c.opacity, ...framed(c), blur: blur + ownBlur(c), blend: clip.blend, ...extras, ...ownLook(c, placed, extras), ...stenciled(c) }) as Item);
+    }
+    const items = content.map((c) => ({ ...bare(c), clip: clip.id, opacity: c.opacity, ...framed(c), blur: ownBlur(c), blend: BlendMode.Normal, ...ownLook(c, placed, {}), ...stenciled(c) }) as Item);
+    return [{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }];
   }
 
   const bottomFirst = [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);

@@ -42,6 +42,7 @@ function placed(item: Item, m: Affine, rect: Scissor, scale: number): Item {
     scissor: scissorThrough(m, rect, item.scissor),
     ...(masks ? { masks } : {}),
     ...(matte ? { matte } : {}),
+    ...(item.kind === ItemKind.Group ? { items: item.items.map((i) => placed(i, m, rect, scale)) } : {}),
     ...(item.space ? { space: linearThrough(m, item.space) } : {})
   };
 }

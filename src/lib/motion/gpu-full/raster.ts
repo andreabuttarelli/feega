@@ -1,4 +1,4 @@
-import { FillRule, ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type LayerItem, type LensItem, type Paint, type PathItem } from './display-list';
+import { FillRule, ItemKind, PaintKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem, type LensItem, type Paint, type PathItem } from './display-list';
 import { BLOB_FRAGMENT } from '../hyperframes/blob';
 import { imageRect, type Size } from './image-rect';
 import { gaussianKernel, MAX_TAPS } from './kernel';
@@ -199,6 +199,8 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   const lensProgram = program(gl, LENS_VS, BLOB_FRAGMENT);
   const textures = new Map<TexImageSource, WebGLTexture>();
   const main = target(gl, width, height, samples);
+  const group = target(gl, width, height, samples);
+  let dest = main;
   const layer = target(gl, width, height, samples);
   const ping = plain(gl, width, height);
   const pong = plain(gl, width, height);
@@ -361,7 +363,8 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     [ItemKind.Layer]: drawLayer,
     [ItemKind.Text]: () => {},
     [ItemKind.Lens]: () => {},
-    [ItemKind.Glyphs]: () => {}
+    [ItemKind.Glyphs]: () => {},
+    [ItemKind.Group]: (item: GroupItem, opacity, pictures) => item.items.forEach((i) => drawItem(i, opacity * i.opacity, pictures))
   };
 
   function drawItem(item: Item, opacity: number, pictures: Pictures) {
@@ -407,17 +410,17 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
 
   function composite(item: Item, src: WebGLTexture, mask: WebGLTexture | null) {
     if (item.blend === BlendMode.Normal) {
-      pass(copyProgram, src, main.fbo, () => {
+      pass(copyProgram, src, dest.fbo, () => {
         gl.uniform1f(u(copyProgram, 'u_opacity'), item.opacity);
         bindMask(copyProgram, mask);
       });
       return;
     }
-    resolveInto(main);
+    resolveInto(dest);
     gl.disable(gl.BLEND);
-    pass(blendProgram, src, main.fbo, () => {
+    pass(blendProgram, src, dest.fbo, () => {
       gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, main.texture);
+      gl.bindTexture(gl.TEXTURE_2D, dest.texture);
       gl.uniform1i(u(blendProgram, 'u_dst'), 1);
       gl.uniform1f(u(blendProgram, 'u_opacity'), item.opacity);
       gl.uniform1i(u(blendProgram, 'u_mode'), BLEND_MODE[item.blend]);
@@ -493,10 +496,10 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
       gl.uniform1f(u(copyProgram, 'u_opacity'), 1);
       bindMask(copyProgram, null);
     });
-    resolveInto(main);
-    const soft = blurTexture(main.texture, sigma);
+    resolveInto(dest);
+    const soft = blurTexture(dest.texture, sigma);
     gl.enable(gl.BLEND);
-    pass(copyProgram, soft, main.fbo, () => {
+    pass(copyProgram, soft, dest.fbo, () => {
       gl.uniform1f(u(copyProgram, 'u_opacity'), 1);
       bindMask(copyProgram, shade.texture);
     });
@@ -524,7 +527,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
       return;
     }
     intoLayer(() => below.forEach((i) => drawItem(i, i.opacity, pictures)));
-    gl.bindFramebuffer(gl.FRAMEBUFFER, main.fbo);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dest.fbo);
     gl.useProgram(lensProgram);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, layer.texture);
@@ -545,6 +548,38 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.disable(gl.SCISSOR_TEST);
   }
 
+  function paintItem(item: Item, below: Item[], pictures: Pictures) {
+    if (item.kind === ItemKind.Lens) {
+      lens(item, below, pictures);
+      return;
+    }
+    if (item.kind === ItemKind.Group) {
+      groupLayer(item, pictures);
+      return;
+    }
+    if (item.blur > 0 || item.blend !== BlendMode.Normal || item.masks || item.matte || item.filters || item.backdrop) {
+      layered(item, pictures);
+      return;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dest.fbo);
+    scissored(item, () => drawItem(item, item.opacity, pictures));
+  }
+
+  function groupLayer(item: GroupItem, pictures: Pictures) {
+    const outer = dest;
+    dest = group;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, group.fbo);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+    item.items.forEach((inner, i) => paintItem(inner, item.items.slice(0, i), pictures));
+    resolveInto(group);
+    dest = outer;
+    const mask = item.masks || item.matte ? maskOf(item, pictures) : null;
+    const filtered = item.filters ? filters.apply(group.texture, item.filters, item.space ?? [1, 0, 0, 1]) : group.texture;
+    const src = blurredFrom(item, filtered);
+    scissored(item, () => composite(item, src, mask));
+  }
+
   function draw(list: DisplayList, pictures: Pictures = NO_PICTURES) {
     gl.viewport(0, 0, width, height);
     gl.bindFramebuffer(gl.FRAMEBUFFER, main.fbo);
@@ -553,18 +588,8 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    for (const [index, item] of list.items.entries()) {
-      if (item.kind === ItemKind.Lens) {
-        lens(item, list.items.slice(0, index), pictures);
-        continue;
-      }
-      if (item.blur > 0 || item.blend !== BlendMode.Normal || item.masks || item.matte || item.filters || item.backdrop) {
-        layered(item, pictures);
-        continue;
-      }
-      gl.bindFramebuffer(gl.FRAMEBUFFER, main.fbo);
-      scissored(item, () => drawItem(item, item.opacity, pictures));
-    }
+    dest = main;
+    list.items.forEach((item, i) => paintItem(item, list.items.slice(0, i), pictures));
     resolveInto(main);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, main.resolve);
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
