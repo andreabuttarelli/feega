@@ -31,6 +31,46 @@ pub struct Within {
     pub outside: bool,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum MaskMode {
+    Add,
+    Subtract,
+    Intersect,
+    Difference,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum Ramp {
+    Linear,
+    Radial,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Cover {
+    Path { contours: Vec<Vec<f64>>, matrix: Affine },
+    Ramp { ramp: Ramp, contours: Vec<Vec<f64>>, matrix: Affine },
+    Picture { src: String, luma: bool, matrix: Affine },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MaskLayer {
+    pub mode: MaskMode,
+    pub invert: bool,
+    pub level: f32,
+    pub feather: f64,
+    pub cover: Cover,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Matte {
+    pub items: Vec<Item>,
+    pub luma: bool,
+    pub invert: bool,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Look {
     pub opacity: f32,
@@ -42,9 +82,9 @@ pub struct Look {
     #[serde(default)]
     pub scissor: Option<[f64; 4]>,
     #[serde(default)]
-    pub masks: Option<serde_json::Value>,
+    pub masks: Option<Vec<MaskLayer>>,
     #[serde(default)]
-    pub matte: Option<serde_json::Value>,
+    pub matte: Option<Matte>,
     #[serde(default)]
     pub filters: Option<serde_json::Value>,
     #[serde(default)]
@@ -95,6 +135,32 @@ pub enum Item {
     Path(PathItem),
     Image(ImageItem),
     Other { clip: String, kind: String },
+}
+
+impl Item {
+    pub fn look(&self) -> Option<&Look> {
+        match self {
+            Item::Path(p) => Some(&p.look),
+            Item::Image(i) => Some(&i.look),
+            Item::Other { .. } => None,
+        }
+    }
+
+    pub fn clip(&self) -> &str {
+        match self {
+            Item::Path(p) => &p.clip,
+            Item::Image(i) => &i.clip,
+            Item::Other { clip, .. } => clip,
+        }
+    }
+
+    pub fn kind(&self) -> &str {
+        match self {
+            Item::Path(_) => "path",
+            Item::Image(_) => "image",
+            Item::Other { kind, .. } => kind,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for Item {

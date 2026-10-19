@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use vello::kurbo::{Affine, BezPath, Point, Rect};
 use vello::peniko::{color::AlphaColor, BlendMode, Brush, Color, ColorStop, Compose, Fill, Gradient, ImageBrush, ImageData, ImageQuality, Mix};
 use vello::Scene;
 
-use crate::display_list::{DisplayList, FillRule, ImageItem, Item, Look, Paint, PathItem, Rgba, Size, Stop};
+use crate::display_list::{Cover, DisplayList, FillRule, ImageItem, Item, Look, Paint, PathItem, Ramp, Rgba, Size, Stop};
 use crate::pictures::{image_rect, Pictures};
 use crate::Skipped;
 
@@ -54,29 +56,6 @@ fn mix(name: &str) -> Mix {
         "color" => Mix::Color,
         "luminosity" => Mix::Luminosity,
         _ => Mix::Normal,
-    }
-}
-
-
-fn unsupported(look: &Look) -> Option<&'static str> {
-    let rules: [(bool, &'static str); 5] = [
-        (look.blur > 0.0, "blur"),
-        (look.scissor.is_some(), "wipe"),
-        (look.masks.is_some() || look.matte.is_some(), "mask"),
-        (look.filters.is_some(), "effect"),
-        (look.backdrop.is_some(), "backdrop"),
-    ];
-    rules.iter().find(|(hit, _)| *hit).map(|(_, what)| *what)
-}
-
-fn layered(scene: &mut Scene, look: &Look, frame: Rect, paint: impl FnOnce(&mut Scene)) {
-    let layer = look.opacity < 1.0 || look.blend != "normal";
-    if layer {
-        scene.push_layer(Fill::NonZero, BlendMode::new(mix(&look.blend), Compose::SrcOver), look.opacity, Affine::IDENTITY, &frame);
-    }
-    paint(scene);
-    if layer {
-        scene.pop_layer();
     }
 }
 
@@ -136,23 +115,124 @@ fn skip(skipped: &mut Vec<Skipped>, clip: &str, what: &str) {
     skipped.push(Skipped { clip: clip.into(), what: what.into() });
 }
 
-pub fn build(list: &DisplayList, pictures: &Pictures) -> (Scene, Vec<Skipped>) {
+fn unsupported(look: &Look) -> Option<&'static str> {
+    let rules: [(bool, &'static str); 2] = [(look.filters.is_some(), "effect"), (look.backdrop.is_some(), "backdrop")];
+    rules.iter().find(|(hit, _)| *hit).map(|(_, what)| *what)
+}
+
+pub fn needs_layer(look: &Look) -> bool {
+    look.blur > 0.0 || look.masks.is_some() || look.matte.is_some()
+}
+
+pub fn layer_worthy(item: &Item) -> bool {
+    item.look().is_some_and(|look| needs_layer(look) && unsupported(look).is_none())
+}
+
+fn layered(scene: &mut Scene, blend: &str, opacity: f32, frame: Rect, paint: impl FnOnce(&mut Scene)) {
+    let layer = opacity < 1.0 || blend != "normal";
+    if layer {
+        scene.push_layer(Fill::NonZero, BlendMode::new(mix(blend), Compose::SrcOver), opacity, Affine::IDENTITY, &frame);
+    }
+    paint(scene);
+    if layer {
+        scene.pop_layer();
+    }
+}
+
+fn scissored(scene: &mut Scene, look: &Look, paint: impl FnOnce(&mut Scene)) {
+    let Some([x0, y0, x1, y1]) = look.scissor else {
+        paint(scene);
+        return;
+    };
+    scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &Rect::new(x0, y0, x1, y1));
+    paint(scene);
+    scene.pop_layer();
+}
+
+fn content(scene: &mut Scene, item: &Item, pictures: &Pictures, frame: Rect) {
+    match item {
+        Item::Path(path) => draw(scene, path, frame),
+        Item::Image(image) => {
+            if let Some(data) = pictures.get(&image.clip) {
+                draw_image(scene, image, data);
+            }
+        }
+        Item::Other { .. } => {}
+    }
+}
+
+const WHITE: Rgba = [1.0, 1.0, 1.0, 1.0];
+const CLEAR: Rgba = [1.0, 1.0, 1.0, 0.0];
+
+fn ramp(kind: Ramp) -> Brush {
+    let stops = [ColorStop::from((0.0, colour(&WHITE))), ColorStop::from((1.0, colour(&CLEAR)))];
+    let gradient = match kind {
+        Ramp::Linear => Gradient::new_linear(Point::new(0.0, 0.5), Point::new(1.0, 0.5)),
+        Ramp::Radial => Gradient::new_radial(Point::new(0.5, 0.5), 0.5),
+    };
+    Brush::Gradient(gradient.with_stops(stops.as_slice()))
+}
+
+pub fn alone(item: &Item, pictures: &Pictures, frame: Rect) -> Scene {
+    let mut scene = Scene::new();
+    content(&mut scene, item, pictures, frame);
+    scene
+}
+
+pub fn cover(cover: &Cover, pictures: &Pictures) -> Scene {
+    let mut scene = Scene::new();
+    match cover {
+        Cover::Path { contours, matrix } => scene.fill(Fill::NonZero, Affine::new(*matrix), &Brush::Solid(colour(&WHITE)), None, &joined(contours)),
+        Cover::Ramp { ramp: kind, contours, matrix } => scene.fill(Fill::NonZero, Affine::new(*matrix), &ramp(*kind), None, &joined(contours)),
+        Cover::Picture { src, matrix, .. } => {
+            if let Some(image) = pictures.get(src) {
+                let texels = Affine::scale_non_uniform(1.0 / image.width as f64, 1.0 / image.height as f64);
+                let brush = ImageBrush::new(image.clone()).with_quality(ImageQuality::Medium);
+                scene.fill(Fill::NonZero, Affine::new(*matrix), &brush, Some(texels), &Rect::new(0.0, 0.0, 1.0, 1.0));
+            }
+        }
+    }
+    scene
+}
+
+pub fn plain(items: &[Item], pictures: &Pictures, frame: Rect) -> Scene {
+    let mut scene = Scene::new();
+    for item in items {
+        let opacity = item.look().map_or(1.0, |l| l.opacity);
+        layered(&mut scene, "normal", opacity, frame, |s| content(s, item, pictures, frame));
+    }
+    scene
+}
+
+pub type Layers = HashMap<usize, ImageData>;
+
+pub fn build(list: &DisplayList, pictures: &Pictures, layers: &Layers) -> (Scene, Vec<Skipped>) {
     let mut scene = Scene::new();
     let mut skipped = Vec::new();
     let frame = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
-    for item in &list.items {
-        match item {
-            Item::Path(path) => match unsupported(&path.look) {
-                Some(what) => skip(&mut skipped, &path.clip, what),
-                None => layered(&mut scene, &path.look, frame, |s| draw(s, path, frame)),
-            },
-            Item::Image(image) => match (unsupported(&image.look), pictures.get(&image.clip)) {
-                (Some(what), _) => skip(&mut skipped, &image.clip, what),
-                (None, None) => skip(&mut skipped, &image.clip, "image"),
-                (None, Some(data)) => layered(&mut scene, &image.look, frame, |s| draw_image(s, image, data)),
-            },
-            Item::Other { clip, kind } => skip(&mut skipped, clip, kind),
+    for (i, item) in list.items.iter().enumerate() {
+        let Some(look) = item.look() else {
+            skip(&mut skipped, item.clip(), item.kind());
+            continue;
+        };
+        if let Some(what) = unsupported(look) {
+            skip(&mut skipped, item.clip(), what);
+            continue;
         }
+        if needs_layer(look) {
+            match layers.get(&i) {
+                Some(image) => scissored(&mut scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| s.draw_image(&ImageBrush::new(image.clone()), Affine::IDENTITY))),
+                None => skip(&mut skipped, item.clip(), "layer"),
+            }
+            continue;
+        }
+        if let Item::Image(image) = item {
+            if !pictures.contains_key(&image.clip) {
+                skip(&mut skipped, item.clip(), "image");
+                continue;
+            }
+        }
+        scissored(&mut scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| content(s, item, pictures, frame)));
     }
     (scene, skipped)
 }

@@ -1,10 +1,9 @@
-use vello::peniko::{color::AlphaColor, Color};
 use vello::wgpu;
-use vello::{AaConfig, RenderParams, RendererOptions};
 
 use crate::display_list::DisplayList;
+use crate::engine::Engine;
 use crate::pictures::Pictures;
-use crate::scene::build;
+use crate::Skipped;
 
 const ROW_ALIGN: u32 = 256;
 const BYTES: u32 = 4;
@@ -12,7 +11,12 @@ const BYTES: u32 = 4;
 pub struct Renderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
-    vello: vello::Renderer,
+    engine: Engine,
+}
+
+pub struct Rendered {
+    pub pixels: Vec<u8>,
+    pub skipped: Vec<Skipped>,
 }
 
 #[derive(Debug)]
@@ -27,12 +31,11 @@ impl Renderer {
         let instance = wgpu::Instance::default();
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).map_err(failed)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).map_err(failed)?;
-        let vello = vello::Renderer::new(&device, RendererOptions { antialiasing_support: vello::AaSupport::area_only(), ..Default::default() }).map_err(failed)?;
-        Ok(Self { device, queue, vello })
+        let engine = Engine::new(&device).map_err(failed)?;
+        Ok(Self { device, queue, engine })
     }
 
-    pub fn render(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<Vec<u8>, RenderError> {
-        let (scene, _) = build(list, pictures);
+    pub fn render(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<Rendered, RenderError> {
         let size = wgpu::Extent3d { width: list.width, height: list.height, depth_or_array_layers: 1 };
         let target = self.device.create_texture(&wgpu::TextureDescriptor {
             label: None,
@@ -45,10 +48,8 @@ impl Renderer {
             view_formats: &[],
         });
         let view = target.create_view(&wgpu::TextureViewDescriptor::default());
-        let base: Color = list.background.map(AlphaColor::new).unwrap_or(Color::TRANSPARENT);
-        let params = RenderParams { base_color: base, width: list.width, height: list.height, antialiasing_method: AaConfig::Area };
-        self.vello.render_to_texture(&self.device, &self.queue, &scene, &view, &params).map_err(failed)?;
-        self.read(&target, size)
+        let skipped = self.engine.draw(&self.device, &self.queue, list, pictures, &view).map_err(failed)?;
+        Ok(Rendered { pixels: self.read(&target, size)?, skipped })
     }
 
     fn read(&self, target: &wgpu::Texture, size: wgpu::Extent3d) -> Result<Vec<u8>, RenderError> {

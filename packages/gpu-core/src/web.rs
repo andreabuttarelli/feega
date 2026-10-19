@@ -1,14 +1,12 @@
 use std::collections::HashMap;
 
-use vello::peniko::{color::AlphaColor, Color};
 use vello::wgpu;
-use vello::{AaConfig, AaSupport, RenderParams, RendererOptions};
 use wasm_bindgen::prelude::*;
 use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap};
 
 use crate::display_list::parse;
+use crate::engine::Engine;
 use crate::pictures::Pictures;
-use crate::scene::build;
 
 #[wasm_bindgen]
 pub struct WebCore {
@@ -16,11 +14,9 @@ pub struct WebCore {
     queue: wgpu::Queue,
     surface: wgpu::Surface<'static>,
     format: wgpu::TextureFormat,
-    renderer: vello::Renderer,
+    engine: Engine,
     blitter: wgpu::util::TextureBlitter,
     target: wgpu::Texture,
-    width: u32,
-    height: u32,
     pictures: Pictures,
     textures: HashMap<String, wgpu::Texture>,
 }
@@ -82,10 +78,10 @@ impl WebCore {
         let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default()).await.map_err(failed)?;
         let format = surface.get_capabilities(&adapter).formats.into_iter().find(|f| !f.is_srgb()).ok_or_else(|| failed("no linear surface format"))?;
         surface.configure(&device, &wgpu::SurfaceConfiguration { usage: wgpu::TextureUsages::RENDER_ATTACHMENT, format, width, height, present_mode: wgpu::PresentMode::Fifo, alpha_mode: wgpu::CompositeAlphaMode::Auto, view_formats: vec![], desired_maximum_frame_latency: 2, color_space: wgpu::SurfaceColorSpace::Auto });
-        let renderer = vello::Renderer::new(&device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() }).map_err(failed)?;
+        let engine = Engine::new(&device).map_err(failed)?;
         let blitter = wgpu::util::TextureBlitter::new(&device, format);
         let target = storage(&device, width, height);
-        Ok(WebCore { device, queue, surface, format, renderer, blitter, target, width, height, pictures: Pictures::new(), textures: HashMap::new() })
+        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -93,10 +89,10 @@ impl WebCore {
         let fits = self.textures.get(clip).is_some_and(|t| t.width() == width && t.height() == height);
         if !fits {
             if let Some(old) = self.pictures.remove(clip) {
-                self.renderer.unregister_texture(old);
+                self.engine.vello.unregister_texture(old);
             }
             let texture = upload_target(&self.device, width, height);
-            self.pictures.insert(clip.into(), self.renderer.register_texture(texture.clone()));
+            self.pictures.insert(clip.into(), self.engine.vello.register_texture(texture.clone()));
             self.textures.insert(clip.into(), texture);
         }
         let texture = &self.textures[clip];
@@ -105,17 +101,14 @@ impl WebCore {
             wgpu::CopyExternalImageDestInfo { texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All, color_space: wgpu::PredefinedColorSpace::Srgb, premultiplied_alpha: false },
             wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
         );
-        self.renderer.mark_override_image_dirty(&self.pictures[clip]);
+        self.engine.vello.mark_override_image_dirty(&self.pictures[clip]);
         Ok(())
     }
 
     pub fn draw(&mut self, list_json: &str) -> Result<String, JsValue> {
         let list = parse(list_json).map_err(failed)?;
-        let (scene, skipped) = build(&list, &self.pictures);
-        let base: Color = list.background.map(AlphaColor::new).unwrap_or(Color::TRANSPARENT);
         let view = self.target.create_view(&wgpu::TextureViewDescriptor::default());
-        let params = RenderParams { base_color: base, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
-        self.renderer.render_to_texture(&self.device, &self.queue, &scene, &view, &params).map_err(failed)?;
+        let skipped = self.engine.draw(&self.device, &self.queue, &list, &self.pictures, &view).map_err(failed)?;
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
             _ => return Err(failed("no surface texture")),
