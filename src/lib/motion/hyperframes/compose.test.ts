@@ -717,3 +717,12 @@ describe('transitions between clips', () => {
   });
 });
 
+
+describe('template texts in the preview', () => {
+  it('a template layer names its text fields, so the preview can find them where they are drawn', async () => {
+    const { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } = await import('../template/type-grid-poster/template');
+    const html = composeHtml({ doc: TYPE_GRID_POSTER_TEMPLATE.template.doc, tokens: FEEGA_TOKENS, assets: {} });
+
+    expect(html).toMatch(new RegExp(`data-clip="${TYPE_GRID_CLIP}"[^>]*data-texts="[^"]*footer2`));
+  });
+});
