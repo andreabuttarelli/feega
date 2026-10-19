@@ -9,6 +9,7 @@ import { pickBarTool } from './fixtures/canvas-bar';
 import { FluidProbe, Read, type Box, type PixelWatch, type Watch } from './fixtures/fluidity-probe';
 import { recordsVideo, scorecard, verdictOf, type SessionRun, type StepResult } from './fixtures/fluidity-report';
 
+const PROFILE = process.env.FLUID_PROFILE;
 const OUT = process.env.FLUID_OUT ?? join(homedir(), 'Documents', 'feega-videos', 'fluidity');
 const SLUG = process.env.FLUID_PROJECT_SLUG ?? 'gpu-fixture-0aef6d1a';
 const RENDERERS = (process.env.FLUID_RENDERERS ?? 'gpu,dom').split(',');
@@ -174,6 +175,7 @@ async function openNode(page: Page, id: string, how = Open.Single) {
   await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: OPEN_MS });
 }
 
+const LAYER_TRIES = 12;
 const CLIP_ROW = '.row.layer[data-layer]';
 
 async function pickFilledLayer(page: Page, only?: string): Promise<string> {
@@ -184,8 +186,8 @@ async function pickFilledLayer(page: Page, only?: string): Promise<string> {
     await expect(swatch).toBeVisible({ timeout: OPEN_MS });
     return only;
   }
-  const count = await rows.count();
-  for (let i = count - 1; i >= 0; i--) {
+  const count = Math.min(await rows.count(), LAYER_TRIES);
+  for (let i = 0; i < count; i++) {
     const row = rows.nth(i);
     await row.locator('.head .layer-name').click();
     if (await swatch.isVisible({ timeout: 500 }).catch(() => false)) {
@@ -206,10 +208,12 @@ async function marquee(page: Page, ids: string[]) {
 }
 
 const FRAME_TRIES = 6;
+const LANDING_FRAME = process.env.FLUID_LANDING ?? '546a6ab6-023a-443f-8add-aa7b667e8d08';
+const MOTION_FRAME = process.env.FLUID_FRAME ?? '09438658-e0c5-4d13-89b3-7aa08eb750cf';
 
 async function frameWithFill(page: Page): Promise<{ id: string; layer: string }> {
   const frames = await page.locator(FRAME_NODE).evaluateAll((all) => all.map((e) => (e as HTMLElement).dataset.motionNode!).filter((id) => document.querySelector(`.svelte-flow__node[data-id="${id}"]`)));
-  for (const id of frames.filter((f) => !createdHere.has(f)).slice(0, FRAME_TRIES)) {
+  for (const id of [MOTION_FRAME, ...frames.filter((f) => !createdHere.has(f) && f !== MOTION_FRAME)].slice(0, FRAME_TRIES)) {
     const opened = await openNode(page, id, Open.Double).then(() => true, () => false);
     if (!opened) {
       continue;
@@ -272,6 +276,13 @@ const TEXT_WATCHES: Watch[] = [
 const promptWatch = (id: string): Watch => ({ id: 'prompt', selector: `${contentSel(id)} textarea`, read: Read.Value });
 const boxWatch = (id: string, key = id): Watch => ({ id: `${key} box`, selector: nodeSel(id), read: Read.Box });
 const pixel = async (page: Page, id: string): Promise<PixelWatch> => ({ id, box: await boxOf(page, id), touched: true });
+
+const INSERTED = ['Generate text', 'Generate image', 'Generate video'];
+const INSPECTOR_EDITS: [string, string][] = [
+  ['Width', '220'],
+  ['Height', '140'],
+  ['Rotate Z', '5']
+];
 
 const STEPS: Step[] = [
   {
@@ -517,6 +528,142 @@ const STEPS: Step[] = [
       await clickNode(page, gen);
       return { touched: [gen, other.id], watches: [promptWatch(gen)], expected: [{ id: 'prompt', value: PROMPT }] };
     }
+  },
+  {
+    name: 'deselect',
+    drive: async ({ page, ids }) => {
+      const id = ids.get('box')!;
+      await leaveEditor(page);
+      await clickNode(page, id);
+      await leaveEditor(page);
+      await clickEmpty(page);
+      return { touched: [id] };
+    }
+  },
+  ...INSERTED.map(
+    (kind): Step => ({
+      name: `insert ${kind.toLowerCase()} node`,
+      drive: async ({ page, ids }) => {
+        await leaveEditor(page);
+        await clickEmpty(page);
+        const before = await domIds(page);
+        await page.getByTestId('add-bar').getByTestId('bar-mode').getByRole('radio', { name: 'Generate' }).click();
+        await page.getByTestId('add-bar').getByRole('button', { name: kind, exact: true }).click();
+        const id = await newNode(page, before);
+        ids.set(kind, id);
+        return { touched: [id] };
+      }
+    })
+  ),
+  {
+    name: 'context menu',
+    drive: async ({ page, ids }) => {
+      const id = ids.get('box')!;
+      await leaveEditor(page);
+      const b = await inView(page, id);
+      await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
+      await expect(page.getByTestId('canvas-menu')).toBeVisible({ timeout: OPEN_MS });
+      await page.keyboard.press('Escape');
+      await expect(page.getByTestId('canvas-menu')).toHaveCount(0, { timeout: OPEN_MS });
+      return { touched: [id] };
+    }
+  },
+  {
+    name: 'layers panel open / close',
+    drive: async ({ page }) => {
+      await leaveEditor(page);
+      const toggle = page.getByRole('button', { name: 'Layers', exact: true }).first();
+      await toggle.click();
+      await expect(page.getByTestId('layers')).toBeVisible({ timeout: OPEN_MS });
+      await toggle.click();
+      return { touched: [] };
+    }
+  },
+  {
+    name: 'frame drag',
+    drive: async ({ page, ids, watch }) => {
+      const id = ids.get('box')!;
+      await leaveEditor(page);
+      const b = await inView(page, id);
+      await watch([boxWatch(id, 'box')]);
+      await drag(page, { x: b.x + 6, y: b.y - 8 }, { x: b.x + 6 + MOVE_PX * 2, y: b.y - 8 + MOVE_PX }, 12);
+      return { touched: [id], watches: [boxWatch(id, 'box')] };
+    }
+  },
+  {
+    name: 'inspector fields',
+    drive: async ({ page, ids, watch }) => {
+      const id = ids.get('box')!;
+      await openNode(page, id);
+      await watch([WIDTH_WATCH, ROTATE_WATCH]);
+      for (const [label, value] of INSPECTOR_EDITS) {
+        const field = page.locator(`aside.props input.num[aria-label="${label}"]`).first();
+        await field.fill(value);
+        await field.press('Enter');
+      }
+      return { touched: [id], watches: [WIDTH_WATCH, ROTATE_WATCH] };
+    }
+  },
+  {
+    name: 'design / motion switch',
+    drive: async ({ page }) => {
+      await leaveEditor(page);
+      await openNode(page, MOTION_FRAME, Open.Double);
+      const modes = page.getByTestId('edit-mode');
+      await modes.locator('[data-mode="motion"]').click();
+      await expect(modes.locator('[data-mode="motion"]')).toHaveAttribute('aria-checked', 'true');
+      await modes.locator('[data-mode="design"]').click();
+      await expect(modes.locator('[data-mode="design"]')).toHaveAttribute('aria-checked', 'true');
+      await leaveEditor(page);
+      return { touched: [MOTION_FRAME] };
+    }
+  },
+  {
+    name: 'ungroup ⌘⇧G',
+    drive: async ({ page, ids }) => {
+      await leaveEditor(page);
+      await marquee(page, [ids.get('box')!, ids.get('copy')!]);
+      const before = await domIds(page);
+      await page.keyboard.press('ControlOrMeta+g');
+      const group = await newNode(page, before);
+      await leaveEditor(page);
+      await clickNode(page, group);
+      await leaveEditor(page);
+      await page.keyboard.press('ControlOrMeta+Shift+g');
+      await expect(page.locator(nodeSel(group))).toHaveCount(0, { timeout: OPEN_MS });
+      return { touched: [group] };
+    }
+  },
+  {
+    name: 'delete inserted nodes',
+    drive: async ({ page, ids }) => {
+      await leaveEditor(page);
+      const gone = INSERTED.map((k) => ids.get(k)).filter((id): id is string => !!id);
+      for (const id of gone) {
+        await clickNode(page, id);
+        await leaveEditor(page);
+        await page.keyboard.press('Backspace');
+        await expect(page.locator(nodeSel(id))).toHaveCount(0, { timeout: OPEN_MS });
+      }
+      return { touched: gone };
+    }
+  },
+  {
+    name: 'landing: select, open, edit, restore',
+    drive: async ({ page }) => {
+      await leaveEditor(page);
+      await clickNode(page, LANDING_FRAME);
+      await leaveEditor(page);
+      await openNode(page, LANDING_FRAME, Open.Double);
+      const x = page.locator('aside.props input.num[aria-label="X"]').first();
+      const was = await x.inputValue();
+      await x.fill(String(Number(was || 0) + 8));
+      await x.press('Enter');
+      await x.fill(was);
+      await x.press('Enter');
+      await leaveEditor(page);
+      return { touched: [LANDING_FRAME] };
+    }
   }
 ];
 
@@ -648,6 +795,10 @@ async function runSession(page: Page, path: string): Promise<StepRun[]> {
     const camera = step.name.startsWith('pan');
     const background = camera ? [] : await untouchedWatches(page, probe, everTouched);
     const began = Date.now();
+    const cdp = PROFILE && step.name.startsWith(PROFILE) ? await page.context().newCDPSession(page) : null;
+    await cdp?.send('Profiler.enable');
+    await cdp?.send('Profiler.setSamplingInterval', { interval: 100 });
+    await cdp?.send('Profiler.start');
     await probe.start([]);
     let outcome: Outcome | null = null;
     let error: string | null = null;
@@ -657,6 +808,10 @@ async function runSession(page: Page, path: string): Promise<StepRun[]> {
     } catch (err) {
       error = String(err).replace(/\x1b\[[0-9;]*m/g, '').split('\n').slice(0, 3).join(' ').slice(0, 240);
       await page.screenshot({ path: join(OUT, 'raw', `undriven-${STEPS.indexOf(step)}.png`) }).catch(() => undefined);
+    }
+    if (cdp) {
+      const { profile } = await cdp.send('Profiler.stop');
+      writeFileSync(join(OUT, `${STEPS.indexOf(step)}.cpuprofile`), JSON.stringify(profile));
     }
     const touched = new Set((outcome?.touched ?? []).filter(Boolean));
     const stillUntouched = background.filter((w) => ![...touched].some((id) => id.startsWith(w.id)));
