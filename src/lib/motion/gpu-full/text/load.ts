@@ -39,8 +39,8 @@ const remembered = <T>(load: (url: string) => Promise<T>) => {
 
 export function fontLoader(read: Reader = web, engine: Engine = fontkitEngine): (doc: MotionDoc, assets: Record<string, string>) => Promise<FaceBook> {
   const sheet = remembered((url) => read.text(url).catch(() => ''));
-  const made = engine();
-  const source = remembered((url) => Promise.all([read.bytes(url), made]).then(([bytes, make]): [string, Source] => [url, make(bytes)]).catch(() => null));
+  let made: ReturnType<Engine> | null = null;
+  const source = remembered((url) => Promise.all([read.bytes(url), (made ??= engine())]).then(([bytes, make]): [string, Source] => [url, make(bytes)]).catch(() => null));
   return async (doc, assets) => {
     const google = googleFontsUrl(usedFaces(doc), doc.fonts);
     const css = await Promise.all([BUILTIN_FONTS_URL, ...(google ? [google] : [])].map(sheet));

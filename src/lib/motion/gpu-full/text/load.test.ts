@@ -40,4 +40,11 @@ describe('loadFonts', () => {
     expect(read).toHaveLength(1);
     expect(book({ family: 'DM Sans', weight: 400, italic: false, size: 10, axes: {} }, 0x48)?.face).toBe(boxFace);
   });
+
+  it('starts the face engine only once a file is read', () => {
+    let started = 0;
+    fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array() }, async () => (started++, () => ({ axes: {}, covers: () => true, at: () => boxFace })));
+
+    expect(started).toBe(0);
+  });
 });
