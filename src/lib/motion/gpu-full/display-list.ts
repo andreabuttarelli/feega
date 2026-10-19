@@ -6,10 +6,9 @@ import { sampleTrack } from '../sample-track';
 import { IDENTITY, ParentOpacity, ancestorsOf, mul2d, transformAt, worldAt, type Affine } from '../parent';
 import { boxOf } from '../layout';
 import { preparedDoc } from '../hyperframes/compose';
-import type { SvgNode } from '../effects/registry';
 import { renderAt } from '../effects/render';
 import { effectOfKey } from '../effects/model';
-import { cssFunctions, unsupportedPrimitive, type CssFunction } from './filters';
+import { cssFunctions, FilterKind, unsupportedPrimitive, type Filter, type Linear } from './filters';
 import { BlendMode } from '../blend';
 import { mattePairs, MATTE_READ } from '../matte';
 import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, fillsOf, type Fill, type FillOf } from '../fill/model';
@@ -36,6 +35,7 @@ import { lensAt, type Lens } from './lens';
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
 export type { Lens } from './lens';
 export { FillRule, PaintKind, type Paint, type Stop };
+export { FilterKind, type Filter, type Linear };
 
 export enum ItemKind {
   Path = 'path',
@@ -84,14 +84,6 @@ export type LensItem = { kind: ItemKind.Lens; clip: string; lens: Lens; opacity:
 
 export type Item = PathItem | ImageItem | LayerItem | TextItem | LensItem;
 
-export enum FilterKind {
-  Css = 'css',
-  Svg = 'svg'
-}
-
-export type Filter = { kind: FilterKind.Css; fns: CssFunction[] } | { kind: FilterKind.Svg; nodes: SvgNode[] };
-
-export type Linear = [number, number, number, number];
 
 export type MatteOf = { items: Item[]; luma: boolean; invert: boolean };
 

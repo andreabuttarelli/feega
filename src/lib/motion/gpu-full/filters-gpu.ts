@@ -1,6 +1,6 @@
 import type { SvgNode } from '../effects/registry';
 import { BlendMode } from '../blend';
-import { FilterKind, type Filter, type Linear } from './display-list';
+import { FilterKind, type Filter, type Linear } from './filters';
 import { cssMatrix, IDENTITY_MATRIX, type CssFunction } from './filters';
 import { BLEND_FS, BLUR_FS, QUAD_VS, plain, program } from './gl-kit';
 import { gaussianKernel, MAX_TAPS } from './kernel';
