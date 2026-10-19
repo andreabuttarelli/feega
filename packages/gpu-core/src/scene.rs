@@ -116,12 +116,12 @@ fn skip(skipped: &mut Vec<Skipped>, clip: &str, what: &str) {
 }
 
 fn unsupported(look: &Look) -> Option<&'static str> {
-    let rules: [(bool, &'static str); 2] = [(look.filters.is_some(), "effect"), (look.backdrop.is_some(), "backdrop")];
+    let rules: [(bool, &'static str); 1] = [(look.backdrop.is_some(), "backdrop")];
     rules.iter().find(|(hit, _)| *hit).map(|(_, what)| *what)
 }
 
 pub fn needs_layer(look: &Look) -> bool {
-    look.blur > 0.0 || look.masks.is_some() || look.matte.is_some()
+    look.blur > 0.0 || look.masks.is_some() || look.matte.is_some() || look.filters.is_some()
 }
 
 pub fn layer_worthy(item: &Item) -> bool {

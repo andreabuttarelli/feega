@@ -4,14 +4,19 @@ use vello::wgpu;
 use vello::{AaConfig, AaSupport, RenderParams, RendererOptions, Scene};
 
 use crate::display_list::{Cover, DisplayList, Item, Look, MaskMode};
+use crate::filter_passes::FilterPasses;
+use crate::filters::Fx;
 use crate::passes::{layer_texture, Fold, Passes};
 use crate::pictures::Pictures;
 use crate::scene::{alone, build, cover, layer_worthy, plain, Layers};
 use crate::Skipped;
 
+const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
+
 pub struct Engine {
     pub vello: vello::Renderer,
     passes: Passes,
+    filters: FilterPasses,
 }
 
 pub type EngineError = vello::Error;
@@ -26,7 +31,7 @@ struct Gpu<'a> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, passes: Passes::new(device) })
+        Ok(Self { vello, passes: Passes::new(device), filters: FilterPasses::new(device) })
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
@@ -63,6 +68,10 @@ impl Engine {
         let frame = Rect::new(0.0, 0.0, gpu.width as f64, gpu.height as f64);
         let look = item.look().expect("a drawable item");
         let body = self.paint(gpu, &alone(item, pictures, frame))?;
+        let body = match &look.filters {
+            Some(filters) => Fx { device: gpu.device, queue: gpu.queue, passes: &self.filters }.apply(body, filters, look.space.unwrap_or(UNIT_SPACE)),
+            None => body,
+        };
         let body = self.passes.blur(gpu.device, gpu.queue, body, look.blur);
         Ok(match self.mask(gpu, look, pictures, frame)? {
             Some(mask) => self.passes.apply(gpu.device, gpu.queue, &body, &mask),
