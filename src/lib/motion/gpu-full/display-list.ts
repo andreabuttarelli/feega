@@ -16,8 +16,9 @@ import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, fi
 import { StrokeAlign, strokesOf, type Stroke } from '../stroke/model';
 import { Cap, Join, dashes, strokePolygons } from './stroke';
 import { shapeLayers, type ShapeLook } from '../shape/render';
+import { lookAt } from '../hyperframes/shapes';
 import { modifierFilter } from '../shape/modifiers';
-import { ShapeKind, modifierValues } from '../shape/schema';
+import { ShapeKind, modifierOfKey, modifierValues } from '../shape/schema';
 import { flatten, rectOutline, type Outline } from '../shape/geometry';
 import { rgbaOf, type Rgba } from './rgba';
 import { FillRule, PaintKind, type Paint, type Stop } from './paint';
@@ -107,6 +108,7 @@ type Painter = (env: Env) => Painted;
 const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment']);
 const DEPTH_KEYS: readonly TransformKey[] = ['z', 'rotateX', 'rotateY', 'skewX', 'skewY'];
 const DRAWN_SOURCES: ReadonlySet<Source> = new Set([Source.Transform, Source.Prop, Source.Param]);
+const SAMPLED_IN_PLACE: ReadonlySet<Source> = new Set([Source.Mask]);
 const SOLID_PATTERN = 'solid';
 const CENTRE = 0.5;
 const REMAPPED: ReadonlySet<ComponentId> = new Set(['Video']);
@@ -149,8 +151,8 @@ function strokeBands(s: Stroke, outline: Outline, unit: number): number[][] {
   return runs.flatMap((r) => strokePolygons(r.pts, r.closed, width, s.cap as Cap, s.join as Join));
 }
 
-function shapePainter({ props, size, unit, colour, time }: Env): Painted {
-  const look = props as unknown as ShapeLook;
+function shapePainter({ clip, props, size, unit, colour, time, fps }: Env): Painted {
+  const look = { ...(props as unknown as ShapeLook), modifiers: lookAt(clip, time * fps).modifiers };
   const fills = fillsOf(props).filter((f) => f.visible);
   const stack = look.modifiers.filter((m) => m.enabled).map((m) => ({ kind: m.kind, values: modifierValues(m) }));
   const problems: [boolean, Unsupported][] = [
@@ -265,9 +267,9 @@ const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }
 
 const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
 
-const drawnKey = (clip: MotionClip, key: string) => effectOfKey(key) !== null || animatorOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
+const drawnKey = (clip: MotionClip, key: string) => effectOfKey(key) !== null || animatorOfKey(key) !== null || modifierOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
 
-const drawnSource = (clip: MotionClip, source: Source | undefined) => (source !== undefined && DRAWN_SOURCES.has(source)) || (source === Source.Remap && REMAPPED.has(clip.component));
+const drawnSource = (clip: MotionClip, source: Source | undefined) => (source !== undefined && (DRAWN_SOURCES.has(source) || SAMPLED_IN_PLACE.has(source))) || (source === Source.Remap && REMAPPED.has(clip.component));
 
 const keyframedOutside = (clip: MotionClip) => Object.entries(clip.keyframes).some(([key, track]) => track.length > 0 && !drawnKey(clip, key));
 
