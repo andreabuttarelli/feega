@@ -811,6 +811,9 @@
     }
     const hit = hitAt(toWorld(view, local(e as PointerEvent)));
     const id = hit.kind === HitKind.Node ? hit.nodeId : null;
+    if (id) {
+      props.onNodeDoubled?.(id);
+    }
     const stage = id ? wrap?.querySelector<HTMLElement>(`[data-motion-node="${id}"] [data-frame-stage]`)?.getBoundingClientRect() : null;
     if (!id || !stage || stage.width <= 0 || stage.height <= 0) {
       return;

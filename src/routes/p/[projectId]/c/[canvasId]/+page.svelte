@@ -3399,6 +3399,7 @@
     onTemplate={insertTemplate}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     onNodeClicked={(id) => (dismissedMotion = dismissedAfterClick(dismissedMotion, id))}
+    onNodeDoubled={requestMotion}
     barContext={barContextOf(inlineMotion ? CanvasState.Editing : CanvasState.Browsing)}
     onUndo={undo}
     onRedo={redo}
