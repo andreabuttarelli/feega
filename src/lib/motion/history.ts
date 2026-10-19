@@ -1,7 +1,7 @@
 import type { MotionDoc } from './doc';
 import type { CustomSource } from './custom/component';
 import { applyOps, diffDoc } from './doc-ops';
-import { Agent } from './start-prompt';
+import { Agent } from './agent-state';
 
 export const HISTORY_LIMIT = 100;
 

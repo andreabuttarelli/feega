@@ -68,7 +68,7 @@
   import ZoomStage from '$lib/components/motion/ZoomStage.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
   import { CHECK_REQUEST, FRAMES_REQUEST, Head, Landing, adoptAgentAssets, agentDraft, landTurn, type AgentDraft, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
-  import { Agent, showsStart } from '$lib/motion/start-prompt';
+  import { Agent } from '$lib/motion/agent-state';
   import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
   import { decodeLuma } from '$lib/motion/custom/luma-decode';
   import { recordCheck } from '$lib/motion/custom/ops';
@@ -534,7 +534,6 @@
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
   const view = $derived(propertiesFor({ count: selection.length, clip: selected?.id ?? null, part: selectedPart }));
   const agent = $derived(agentBusy || draft ? Agent.Working : Agent.Idle);
-  const blank = $derived(!path.length && showsStart(doc, agentBusy ? Agent.Working : Agent.Idle));
 
   const OPEN_CHAT: Record<ChatPlace, () => void> = {
     [ChatPlace.Column]: () => relayout({ chat: Panel.Open, inspector: Panel.Open, side: Side.Chat }),
@@ -2240,16 +2239,6 @@
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
         {#if interactive}<VarsPanel {doc} bind:values={previewVars} clip={selected ?? null} onchange={edit} />{/if}
       </div>
-      {#if blank}
-        <div class="empty-state" data-testid="empty-state">
-          <p>Start with a template, a clip or a prompt</p>
-          <div class="empty-actions">
-            <button type="button" class="secondary" onclick={() => (templating = true)}>Template…</button>
-            <button type="button" class="secondary" onclick={() => (adding = true)}>Add element</button>
-            <button type="button" class="secondary" onclick={askAgent}>Ask the agent</button>
-          </div>
-        </div>
-      {/if}
     </section>
 
     <SideColumn place={sidePlace} widthPx={rightBar.width} onwidth={(px) => rightBar.resize(px)} oncommit={() => rightBar.keepWidth()}>
@@ -2826,35 +2815,6 @@
     background: var(--ui-surface);
     color: var(--ui-text-2);
     outline: none;
-  }
-
-  .empty-state {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--ui-space-3);
-    padding: var(--ui-space-6);
-    max-width: calc(100% - 32px);
-    background: var(--ui-raised);
-    box-shadow: 0 12px 32px rgb(0 0 0 / 0.1);
-    outline: none !important;
-  }
-
-  .empty-state p {
-    font-size: var(--ui-text-lg);
-    font-weight: 600;
-    text-align: center;
-  }
-
-  .empty-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--ui-space-2);
   }
 
   .composition {
