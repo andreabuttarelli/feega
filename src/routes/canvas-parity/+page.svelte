@@ -5,8 +5,10 @@
   import { Backend } from '$lib/canvas/gpu/backend';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { BACKENDS, FullBackend } from '$lib/motion/gpu-full/backends';
-  import { loadFonts } from '$lib/motion/gpu-full/text/load';
-  import type { MotionDoc } from '$lib/motion/doc';
+  import { faceBook, faceRules } from '$lib/motion/gpu-full/text/fonts';
+  import { fontkitSource } from '$lib/motion/gpu-full/text/fontkit-face';
+  import type { Item } from '$lib/motion/gpu-full/display-list';
+  import type { Affine } from '$lib/motion/parent';
   import { cardItems, type CoreCard } from '$lib/canvas/core/cards';
   import { glyphsOf } from '$lib/canvas/core/glyphs';
   import { ssim, type Pixels } from '$lib/canvas/core/ssim';
@@ -19,7 +21,7 @@
   const MARGIN = 30;
   const WEIGHT = 400;
   const BOLD = 600;
-  const EMPTY_DOC = { tracks: [], fonts: [] } as unknown as MotionDoc;
+  const APP_FONT = '/fonts/dm-sans-latin.woff2';
 
   const kinds = Object.keys(PARITY_SAMPLES) as (keyof typeof PARITY_SAMPLES)[];
   const width = COLUMNS * CELL.w;
@@ -41,6 +43,16 @@
     return ctx.getImageData(0, 0, b.w, b.h);
   }
 
+  async function appFonts() {
+    const url = new URL(APP_FONT, location.origin).href;
+    const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    const css = `@font-face { font-family: 'DM Sans'; font-weight: 100 1000; src: url('${url}'); }`;
+    return faceBook(faceRules(css), new Map([[url, fontkitSource(bytes)]]), []);
+  }
+
+  const scaled = (m: Affine, k: number): Affine => [m[0] * k, m[1] * k, m[2] * k, m[3] * k, m[4] * k, m[5] * k];
+  const atDensity = (items: Item[], k: number): Item[] => items.map((i) => ({ ...i, matrix: scaled(i.matrix, k) }));
+
   const scale = (source: CanvasImageSource) => (source as HTMLCanvasElement).width / width;
 
   onMount(async () => {
@@ -49,13 +61,14 @@
     const scene = await GpuScene.create(reference, Backend.WebGL, theme);
     scene.setCamera({ x: 0, y: 0, zoom: 1 });
     scene.setCards(cards.map((c): Card => ({ ...c, rotation: 0, hidden: false, snapshot: null, running: false, chrome: null })));
-    const book = await loadFonts(EMPTY_DOC, {});
+    const book = await appFonts();
+    const dpr = devicePixelRatio;
     const glyphs = glyphsOf(book, theme.font, WEIGHT);
     const bold = glyphsOf(book, theme.font, BOLD);
     const coreTheme = { ...theme, panel: theme.paper };
     const items = cards.flatMap((c: CoreCard) => cardItems(c, coreTheme, glyphs, bold));
-    const raster = await BACKENDS[backend](core, width, height);
-    raster.draw({ width, height, background: rgbaOf(theme.canvas), items, unsupported: [] });
+    const raster = await BACKENDS[backend](core, width * dpr, height * dpr);
+    raster.draw({ width: width * dpr, height: height * dpr, background: rgbaOf(theme.canvas), items: atDensity(items, dpr), unsupported: [] });
     (scene as unknown as { draw: () => void }).draw();
     scores = cards.map((c) => ({ kind: c.id, score: ssim(crop(scene.canvas, c), crop(core, c)) }));
     document.body.dataset.parity = JSON.stringify(scores);
@@ -67,9 +80,11 @@
   <canvas bind:this={core} style:width="{width}px" style:height="{height}px"></canvas>
 </div>
 <table data-testid="parity">
+  <tbody>
   {#each scores as s (s.kind)}
     <tr><td>{s.kind}</td><td>{s.score.toFixed(3)}</td></tr>
   {/each}
+  </tbody>
 </table>
 
 <style>

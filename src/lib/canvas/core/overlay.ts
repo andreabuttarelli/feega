@@ -33,7 +33,7 @@ const BADGE_STROKE = 1.5;
 const MARQUEE_FILL = 0.08;
 const OVERLAY_LINE = 1;
 const PEER_ARROW = [0, 0, 0, 16, 4.5, 12, 11, 12];
-const PEER_TAG = { x: 10, y: 16, h: 18, pad: 5, size: 11 };
+const PEER_TAG = { x: 10, y: 16, h: 18, pad: 5, size: 11, line: 14 };
 const PEER_TEXT = '#ffffff';
 const ROTATE = { size: 12, lift: 28, border: 2 };
 
@@ -72,10 +72,10 @@ export function guideItems(guides: readonly SnapGuide[], zoom: number, theme: Co
 
 export function peerItems(p: CorePeer, zoom: number, glyphs: Glyphs): PathItem[] {
   const at = (xs: number[]) => xs.map((v, i) => (i % 2 === 0 ? p.at.x + v / zoom : p.at.y + v / zoom));
-  const name = glyphs(p.name, PEER_TAG.size);
+  const name = glyphs(p.name, PEER_TAG.size, { leading: PEER_TAG.line / PEER_TAG.size });
   const pill = roundRect(PEER_TAG.x, PEER_TAG.y, name.width + 2 * PEER_TAG.pad, PEER_TAG.h, PEER_TAG.h / 2).map(at);
-  const baseline = PEER_TAG.y + (PEER_TAG.h + PEER_TAG.size) / 2;
-  const text = name.contours.map((c) => at(c.map((v, i) => (i % 2 === 0 ? v + PEER_TAG.x + PEER_TAG.pad : v + baseline))));
+  const top = PEER_TAG.y + (PEER_TAG.h - PEER_TAG.line) / 2;
+  const text = name.contours.map((c) => at(c.map((v, i) => (i % 2 === 0 ? v + PEER_TAG.x + PEER_TAG.pad : v + top))));
   return [solid(`${p.id}:${OverlayPart.PeerCursor}`, [at(PEER_ARROW)], p.color), solid(`${p.id}:${OverlayPart.PeerTag}`, pill, p.color), solid(`${p.id}:${OverlayPart.PeerTag}`, text, PEER_TEXT)];
 }
 

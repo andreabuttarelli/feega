@@ -11,11 +11,16 @@ const box = (contours: number[][]) => {
 const glyphs = glyphsOf(boxBook(), 'DM Sans', 400);
 
 describe('glyphsOf', () => {
-  it('sets one line on the baseline, glyphs rising above it, tracked -0.2px', () => {
-    const { contours, width } = glyphs('ab', 10);
+  it('anchors a line at its line-box top like CSS, the baseline centred in a 1.4 leading', () => {
+    const { contours, width, height } = glyphs('ab', 10);
 
     expect(width).toBeCloseTo(9.6);
-    expect(box(contours)).toEqual([0, -7, 9.8, 0]);
+    expect(height).toBe(14);
+    expect(box(contours)).toEqual([0, 3, 9.8, 10]);
+  });
+
+  it('takes the leading from the caller', () => {
+    expect(glyphs('ab', 10, { leading: 1 }).height).toBe(10);
   });
 
   it('wraps into the box and drops lines that do not fit', () => {

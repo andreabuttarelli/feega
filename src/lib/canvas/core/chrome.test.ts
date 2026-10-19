@@ -11,7 +11,7 @@ const box = (contours: number[][]) => {
   return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)].map((v) => Math.round(v));
 };
 
-const glyphs: Glyphs = (text, size) => ({ contours: [[0, -size, text.length * size, -size, text.length * size, 0, 0, 0]], width: text.length * size });
+const glyphs: Glyphs = (text, size) => ({ contours: [[0, 0, text.length * size, 0, text.length * size, size, 0, size]], width: text.length * size, height: size });
 
 const tile = (over: Partial<ChromeTile> = {}): ChromeTile => ({
   id: 'n1',
@@ -79,10 +79,10 @@ describe('tileChrome', () => {
     expect(ofPart(tile({ ring: NodeChrome.Selected }), ChromePart.Handle)).toHaveLength(0);
   });
 
-  it('writes the label above the tile, left-aligned, 4px clear of the top edge', () => {
+  it('writes the label in a 1.3 line box padded 2px, 4px above the tile, left-aligned', () => {
     const [label] = ofPart(tile({ label: 'Image' }), ChromePart.Label);
 
-    expect(box(label.contours)).toEqual([100, 184, 160, 196]);
+    expect(box(label.contours)).toEqual([100, 178, 160, 190]);
   });
 
   it('draws chrome above the ring order: hover, ring, ports, handles, label', () => {
@@ -105,7 +105,7 @@ describe('tileChrome', () => {
   it('puts the kind icon before the label and shifts the label past it', () => {
     const t = tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]] });
 
-    expect(box(ofPart(t, ChromePart.Icon)[0].contours)).toEqual([100, 184, 112, 196]);
-    expect(box(ofPart(t, ChromePart.Label)[0].contours)).toEqual([117, 184, 177, 196]);
+    expect(box(ofPart(t, ChromePart.Icon)[0].contours)).toEqual([100, 180, 112, 192]);
+    expect(box(ofPart(t, ChromePart.Label)[0].contours)).toEqual([117, 178, 177, 190]);
   });
 });
