@@ -3106,3 +3106,13 @@ device's `decodeEdge` means an image decoded full size (a non-`canvas-assets` UR
 by the server). Measure with `playwright-core` `webkit` + iPhone descriptor and `ps` RSS of the
 new `WebKit.GPU`/`WebContent` processes only (other worktrees run WebKit too). Playwright WebKit
 does not match `(pointer: coarse)`; `navigator.maxTouchPoints` does.
+
+## A phone page dies when a big frame opens in the editor
+
+**Signal:** WebKit iPhone emulation, `ps` RSS of the GPU process jumps past 1 GB within a second
+of opening a frame, with no new canvas or image. The preview iframe lays the frame out full size
+(1440×4735) and every `will-change` wrapper with `inset: 0` becomes a frame-sized layer at DPR 3.
+**Move:** the player iframe is opaque-origin, so `addInitScript` does not reach it; bisect with
+`page.on('framenavigated', f => f.addStyleTag(...))`. On a phone the preview drops layer hints
+(`previewHtml`, `memory-budget.ts`). RSS is noisy when the Mac is under memory pressure: compare
+several runs, not one.

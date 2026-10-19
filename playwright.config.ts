@@ -27,6 +27,7 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     ...(process.env.E2E_REAL_STACK === '1' ? [{ name: 'webkit-iphone', testMatch: /canvas-motion-(webgl|open)/, use: { ...devices['iPhone 15'] } }, { name: 'webkit', testMatch: /selection-outline|dashboard-nav|page-zoom-lock|gpu-canvas-no-scroll/, use: { ...devices['Desktop Safari'] } }] : []),
+    ...(process.env.E2E_HEAVY_PHONE === '1' ? [{ name: 'webkit-iphone-heavy', testMatch: /phone-heavy-frame-memory/ }] : []),
     ...(process.env.E2E_PERF === '1' ? [{ name: 'webkit-perf', testMatch: /canvas-frame-budget|canvas-stress|editor-scrub|fluidity-scorecard|canvas-inline-play|inline-editor-open/, use: { ...devices['Desktop Safari'] } }] : [])
   ],
   webServer: {
