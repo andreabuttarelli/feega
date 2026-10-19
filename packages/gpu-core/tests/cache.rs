@@ -61,6 +61,44 @@ fn a_zoom_past_the_threshold_draws_the_stale_texture_scaled_while_it_re_rasters(
     assert!(!next.pending);
 }
 
+fn held(group: &str, sx: f64, sy: f64) -> DisplayList {
+    parse(&format!(r#"{{ "width": 800, "height": 600, "background": null, "items": [{{ "kind": "use", "clip": "{group}", "group": "{group}", "matrix": [{sx}, 0, 0, {sy}, 0, 0], "cache": true, "hold": true }}] }}"#)).unwrap()
+}
+
+#[test]
+fn a_node_being_resized_stretches_its_texture_instead_of_re_rastering() {
+    let mut lib = library(&["a"]);
+    lib.plan(&screen(&[("a", 1.0, 0.0)]), LIMITS);
+
+    let stretched = lib.plan(&held("a", 2.0, 1.5), LIMITS);
+    assert!(stretched.rasters.is_empty());
+    assert_eq!(kinds(&stretched.screen), vec!["image"]);
+    let Item::Image(image) = &stretched.screen.items[0] else { panic!() };
+    assert_eq!((image.look.matrix[0], image.look.matrix[3]), (2.0, 1.5));
+
+    assert_eq!(lib.plan(&screen(&[("a", 2.0, 0.0)]), LIMITS).rasters.len(), 1);
+}
+
+#[test]
+fn a_node_being_resized_past_the_cache_side_is_rastered_once_at_the_largest_scale_that_fits() {
+    let mut lib = library(&["a"]);
+    let small = Limits { side: 150, ..LIMITS };
+
+    let first = lib.plan(&held("a", 3.0, 3.0), small);
+    assert_eq!(first.rasters.len(), 1);
+    assert_eq!((first.rasters[0].list.width, first.rasters[0].list.height), (150, 75));
+    assert_eq!(kinds(&first.screen), vec!["image"]);
+
+    assert!(lib.plan(&held("a", 3.2, 3.0), small).rasters.is_empty());
+}
+
+#[test]
+fn a_node_being_resized_without_a_texture_yet_is_rastered() {
+    let mut lib = library(&["a"]);
+
+    assert_eq!(lib.plan(&held("a", 2.0, 1.5), LIMITS).rasters.len(), 1);
+}
+
 #[test]
 fn a_small_zoom_keeps_the_texture() {
     let mut lib = library(&["a"]);

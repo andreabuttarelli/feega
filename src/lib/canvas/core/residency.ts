@@ -22,3 +22,5 @@ export function cached(frames: readonly HeldFrame[], view: Viewport, screen: Scr
   const fits = new Set(textured(frames.map((f) => ({ id: f.id, ...f.box, bytes: textureBytes(f, view) })), view, screen, budget * CACHE_SHARE));
   return frames.map((f) => ({ ...f, cache: fits.has(f.id) }));
 }
+
+export const heldWhileEdited = (frames: readonly HeldFrame[], edited: ReadonlySet<string>): HeldFrame[] => frames.map((f) => (edited.has(f.id) ? { ...f, cache: true, hold: true } : f));

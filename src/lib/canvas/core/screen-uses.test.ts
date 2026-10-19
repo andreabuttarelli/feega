@@ -27,6 +27,12 @@ describe('screen uses', () => {
   it('asks the core to cache a still frame', () => {
     const [use] = screenUses([{ ...frame('a', 0), cache: true }], { x: 0, y: 0, zoom: 1 }, SCREEN, null).items;
     expect(use).toMatchObject({ group: 'a:1', cache: true });
+    expect(use).not.toHaveProperty('hold');
+  });
+
+  it('a held frame asks the core to keep its texture while it is edited', () => {
+    const [use] = screenUses([{ ...frame('a', 0), cache: true, hold: true }], { x: 0, y: 0, zoom: 1 }, SCREEN, null).items;
+    expect(use).toMatchObject({ cache: true, hold: true });
   });
 
   it('sends cached frames within a screen of the viewport so the core rasters them ahead', () => {
