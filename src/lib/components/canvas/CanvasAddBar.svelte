@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { followDocks } from '$lib/canvas/dock-lift';
   import { localStore } from '$lib/browser-storage';
   import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
@@ -42,19 +43,12 @@
       timelinePx = 0;
       return;
     }
-    let frame = 0;
     const bottomDocks = () => [...(timeline ? [timeline] : []), ...document.querySelectorAll<HTMLElement>('[data-dock="timeline"]')].filter((el) => el !== barEl);
-    const follow = () => {
-      const bottom = host.getBoundingClientRect().bottom;
-      const tops = bottomDocks().map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0 && r.top < bottom).map((r) => bottom - r.top);
-      const px = Math.max(0, Math.round(Math.max(0, ...tops)));
+    return followDocks(host, bottomDocks, (px) => {
       if (px !== timelinePx) {
         timelinePx = px;
       }
-      frame = requestAnimationFrame(follow);
-    };
-    follow();
-    return () => cancelAnimationFrame(frame);
+    });
   });
 
   let showMore = $state(false);
