@@ -69,6 +69,29 @@ async function pan(page: Page): Promise<{ fps: number; worstMs: number }> {
   return { fps: Math.round((stamps.length / PAN_MS) * 1000), worstMs: Math.round(Math.max(...gaps)) };
 }
 
+const COVER_POLL_MS = 50;
+const COVER_LIMIT_MS = 30_000;
+
+async function covered(page: Page, t0: number, drawnMs: number): Promise<{ coveredMs: number | null; wholeMs: number | null; holesAt1s: string | null }> {
+  const core = page.locator('[data-testid=core-canvas]');
+  let coveredMs: number | null = null;
+  let holesAt1s: string | null = null;
+  while (Date.now() - t0 < COVER_LIMIT_MS) {
+    const [holes, standing] = (await core.count()) ? [await core.getAttribute('data-holes'), await core.getAttribute('data-standing-in')] : [null, null];
+    const at = Date.now() - t0;
+    if (holesAt1s === null && at - drawnMs >= 1000) {
+      holesAt1s = holes;
+      await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${page.context().browser()?.browserType().name()}-1s.png` });
+    }
+    coveredMs ??= holes === '0' ? at - drawnMs : null;
+    if (standing === '0' && holes === '0') {
+      return { coveredMs, wholeMs: at - drawnMs, holesAt1s: holesAt1s ?? holes };
+    }
+    await page.waitForTimeout(COVER_POLL_MS);
+  }
+  return { coveredMs, wholeMs: null, holesAt1s, standingIn: await core.getAttribute('data-standing-in') };
+}
+
 async function run(target: Target, renderer: string) {
   const before = pidsOf(BROWSER_PROCESSES[target]);
   const browser = await LAUNCH[target]();
@@ -80,6 +103,7 @@ async function run(target: Target, renderer: string) {
   await page.getByRole('button', { name: 'Reject all' }).click({ timeout: 8000 }).catch(() => undefined);
   await page.locator('[data-renderer]:not([data-renderer="pending"])').first().waitFor({ timeout: 30_000 });
   const firstMs = Date.now() - t0;
+  const cover = renderer === 'core' ? await covered(page, t0, firstMs) : null;
   await page.waitForTimeout(SETTLE_MS);
   const idleMb = rssMb(mine());
   const pixiTextureMb = Math.round(((await page.evaluate('window.__gpuCanvas?.textures?.().bytes ?? 0')) as number) / 1024 / 1024);
@@ -91,12 +115,12 @@ async function run(target: Target, renderer: string) {
   const backend = await page.locator('[data-renderer]').first().getAttribute('data-renderer');
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}.png` });
   await browser.close();
-  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, pixiTextureMb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion };
+  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, ...cover, pixiTextureMb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion };
 }
 
 const targets = (process.env.BENCH_TARGETS ?? `${Target.Chrome},${Target.IPhone}`).split(',') as Target[];
 for (const target of targets) {
-  for (const renderer of ['', 'core']) {
+  for (const renderer of (process.env.BENCH_RENDERERS ?? ',core').split(',')) {
     console.log(JSON.stringify(await run(target, renderer)));
   }
 }

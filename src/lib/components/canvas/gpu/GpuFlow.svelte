@@ -234,6 +234,8 @@
       return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold), turn, poster: t.kind === 'motion' }];
     });
   });
+  const coreBlanks = $derived(coreOn ? placed.filter(drawsCard).map((t) => ({ id: t.id, box: { x: t.x, y: t.y, w: t.w, h: t.h }, turn: t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined })) : []);
+  const coreTheme = $derived(coreLook ? { ...coreLook, panel: coreLook.paper } : null);
   const posterCards = $derived(coreCards.filter((c) => c.poster));
   const nodeCards = $derived(coreCards.filter((c) => !c.poster));
   const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
@@ -1734,7 +1736,7 @@
     data-owns-pinch
   >
     {#if coreOn}
-      <CoreFrames frames={coreFrames} cards={nodeCards} posters={posterCards} overlay={coreOverlay} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={coreOff} />
+      <CoreFrames frames={coreFrames} cards={nodeCards} posters={posterCards} blanks={coreBlanks} theme={coreTheme} overlay={coreOverlay} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={coreOff} />
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">

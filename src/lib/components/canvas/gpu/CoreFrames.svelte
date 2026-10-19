@@ -13,20 +13,27 @@
   import { resident, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { screenUses, type Turn } from '$lib/canvas/core/screen-uses';
+  import { visibleIds } from '$lib/canvas/gpu/camera';
   import { throughCamera } from '$lib/canvas/core/world-overlay';
   import type { PathItem } from '$lib/motion/gpu-full/display-list';
   import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
-  import { postersFor } from '$lib/canvas/core/frame-poster';
+  import { blankCard, choose, nearestFirst, withoutPictures } from '$lib/canvas/core/placeholder';
+  import type { CoreTheme } from '$lib/canvas/core/overlay';
+  import type { Box } from '$lib/canvas/core/canvas-scene';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
+  type Blank = { id: string; box: Box; turn?: Turn };
+
   type Source = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens };
 
-  let { frames, cards = [], posters = [], overlay = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, cards = [], posters = [], blanks = [], theme = null, overlay = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; posters?: CoreCard[]; blanks?: Blank[]; theme?: CoreTheme | null; overlay?: PathItem[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const BACKENDS = [createCore, createCoreGl];
+  const LOADS_AT_ONCE = 4;
+  const PUTS_PER_PAINT = 6;
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let backend = $state(0);
@@ -54,13 +61,17 @@
     lists = new Map(lists).set(keyOf(f), onStage(list, f.kind));
   }
 
+  let loading = $state(0);
+
   $effect(() => {
     const seen = new SpatialIndex(frames.map((f) => ({ id: f.id, ...f.box }))).visible(view, area);
-    for (const f of frames) {
-      if (seen.has(f.id) && !asked.has(keyOf(f))) {
-        asked.add(keyOf(f));
-        void load(f).catch((e: unknown) => console.warn('[canvas] core frame not loaded', f.id, e));
-      }
+    const due = nearestFirst(frames.filter((f) => seen.has(f.id) && !asked.has(keyOf(f))), view, area).slice(0, Math.max(0, LOADS_AT_ONCE - loading));
+    for (const f of due) {
+      asked.add(keyOf(f));
+      loading += 1;
+      void load(f)
+        .catch((e: unknown) => console.warn('[canvas] core frame not loaded', f.id, e))
+        .finally(() => (loading -= 1));
     }
   });
 
@@ -73,15 +84,16 @@
       return list && drawsWhole(list) ? [{ id: f.id, group: keyOf(f), box: f.box, size: { width: list.width, height: list.height }, images: imagesIn(list) }] : [];
     })
   );
-  const shownCards = $derived([...cards, ...postersFor(posters, new Set(framePuts.map((f) => f.id)))]);
+  const shownCards = $derived([...cards, ...posters]);
 
   $effect(() => {
-    for (const c of shownCards) {
+    for (const c of nearestFirst(shownCards.map((c) => ({ ...c, box: c.frame.box })), view, area)) {
       if (!cardLists.has(c.key) && !readying.has(c.key)) {
         readying.add(c.key);
         void media.ready(c.frame.list).then((readiness) => {
-          if (readiness === Readiness.Whole) {
-            cardLists = new Map(cardLists).set(c.key, c.frame.list);
+          const look = theme;
+          if (readiness === Readiness.Whole || look) {
+            cardLists = new Map(cardLists).set(c.key, readiness === Readiness.Whole || !look ? c.frame.list : withoutPictures(c.frame.list, look, (i) => !media.pictures(i)));
           }
         });
       }
@@ -91,13 +103,44 @@
   const cardPuts = $derived(shownCards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, images: imagesIn(c.frame.list), turn: c.turn }] : [])));
 
   const whole = $derived([...cardPuts, ...framePuts]);
-  const listOf = (group: string) => cardLists.get(group) ?? lists.get(group)!;
   const textureBytes = BUDGET[currentDevice()].textureBytes;
   const held = $derived(resident(whole, view, area, textureBytes));
 
   $effect(() => {
     onready(new Set(held.map((f) => f.id)));
   });
+
+  const stand = new Map<string, DisplayList>();
+  const standIn = (group: string, make: () => DisplayList) => stand.get(group) ?? stand.set(group, make()).get(group)!;
+  const bareKey = (key: string) => `${key}#bare`;
+  const blankKey = (b: Blank) => `${b.id}#blank:${b.box.w}x${b.box.h}`;
+  const sized = (id: string, group: string, box: Box, list: DisplayList, turn?: Turn): HeldFrame => ({ id, group, box, size: { width: list.width, height: list.height }, images: 0, turn });
+
+  const nodes = $derived.by(() => {
+    const look = theme;
+    const best = new Map<string, HeldFrame[]>();
+    const add = (f: HeldFrame) => best.set(f.id, [...(best.get(f.id) ?? []), f]);
+    const resting = new Set(held.map((f) => f.group));
+    for (const f of [...framePuts, ...cardPuts].filter((f) => resting.has(f.group))) {
+      add(f);
+    }
+    if (look) {
+      for (const c of shownCards) {
+        add(sized(c.frame.id, bareKey(c.key), c.frame.box, standIn(bareKey(c.key), () => withoutPictures(c.frame.list, look)), c.turn));
+      }
+      for (const b of blanks) {
+        add(sized(b.id, blankKey(b), b.box, standIn(blankKey(b), () => blankCard(b.box, look)), b.turn));
+      }
+    }
+    const used = new Set([...best.values()].flat().map((f) => f.group));
+    for (const group of [...stand.keys()].filter((g) => !used.has(g))) {
+      stand.delete(group);
+    }
+    const order = [...blanks.map((b) => b.id), ...best.keys()];
+    return [...new Set(order)].map((id) => best.get(id) ?? []);
+  });
+
+  const listOf = (group: string) => stand.get(group) ?? cardLists.get(group) ?? lists.get(group)!;
 
   $effect(() => {
     const target = canvas;
@@ -142,7 +185,9 @@
     if (!into) {
       return false;
     }
-    const shown = held;
+    const ranked = nearestFirst(nodes.flatMap((layers) => (layers.length ? [{ box: layers[0].box, layers }] : [])), view, area);
+    const picked = new Map(choose(ranked.map((n) => n.layers), put, PUTS_PER_PAINT).map((f) => [f.id, f]));
+    const shown = nodes.flatMap((layers) => (layers.length && picked.has(layers[0].id) ? [picked.get(layers[0].id)!] : []));
     const keep = new Set(shown.map((f) => f.group));
     for (const group of [...put].filter((g) => !keep.has(g))) {
       into.dropGroup(group);
@@ -155,13 +200,17 @@
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const screen = screenUses(shown, at, { width: area.width * resolution, height: area.height * resolution }, null);
     into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, media.pictures);
-    return false;
+    const ids = new Set(shown.map((f) => f.id));
+    const onView = visibleIds(blanks.map((b) => ({ id: b.id, ...b.box })), view, area);
+    canvas?.setAttribute('data-holes', String([...onView].filter((id) => !ids.has(id)).length));
+    canvas?.setAttribute('data-standing-in', String(shown.filter((f) => onView.has(f.id) && stand.has(f.group)).length));
+    return nodes.some((layers) => layers.length > 0 && !put.has(layers[0].group));
   }
 
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame));
 
   $effect(() => {
-    void [raster, held, overlay, view.x, view.y, view.zoom, area.width, area.height];
+    void [raster, nodes, overlay, view.x, view.y, view.zoom, area.width, area.height];
     pacer.invalidate();
   });
 
