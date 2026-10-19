@@ -157,6 +157,7 @@
   import { InspectorTab } from '$lib/motion/inspector';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
+  import { lastComposed } from '$lib/motion/hyperframes/compose-once';
   import type { FramePoint } from '$lib/motion/hyperframes/frame-tap';
   import { liveComponents } from '$lib/motion/custom/determinism';
   import { feegaTrailer } from '$lib/motion/trailer';
@@ -511,10 +512,11 @@
   let tiltX = $state(0);
   let previewVars = $state<VarValues>({});
   let tiltY = $state(0);
-  const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
+  const composeFrame = lastComposed(composeHtml);
+  const html = $derived(composeFrame({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   $effect(() => {
     const root = history.present;
-    frameDocs.put(data.node.id, { version, html: composeHtml({ doc: root, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen }), width: root.width, height: root.height, fps: root.fps, durationInFrames: root.durationInFrames, clean: !history.past.length && !history.future.length });
+    frameDocs.put(data.node.id, { version, html: composeFrame({ doc: root, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen }), width: root.width, height: root.height, fps: root.fps, durationInFrames: root.durationInFrames, clean: !history.past.length && !history.future.length });
   });
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
