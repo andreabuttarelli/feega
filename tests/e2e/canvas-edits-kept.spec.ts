@@ -91,7 +91,7 @@ async function stillRed(page: Page, tile: Locator) {
 const SERVER_LAG_MS = 700;
 
 async function slowServer(page: Page) {
-  await page.route(/\?\/|\/session$/, async (route) => {
+  await page.route(/\?\/|[?&]action=|\/session$/, async (route) => {
     await new Promise((resolve) => setTimeout(resolve, SERVER_LAG_MS));
     await route.continue();
   });

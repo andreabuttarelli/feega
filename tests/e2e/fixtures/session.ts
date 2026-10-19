@@ -262,7 +262,7 @@ async function gotoOnce(page: Page, path: string) {
   }
 }
 
-const MODEL_SPEND = /\/api\/v1\/projects\/[^/]+\/(motion\/[^/]+\/)?agent$|\/api\/v1\/org\/nodes\/[^/]+\/generate$|\/prompts\/enhance$|\?\/run$/;
+const MODEL_SPEND = /\/api\/v1\/projects\/[^/]+\/(motion\/[^/]+\/)?agent$|\/api\/v1\/org\/nodes\/[^/]+\/generate$|\/prompts\/enhance$|\?\/run$|\/canvases\/[^/]+\?action=run(&|$)/;
 const SPEND_ALLOWED = process.env.E2E_ALLOW_SPEND === '1';
 
 export async function refuseModelSpend(page: Page): Promise<string[]> {

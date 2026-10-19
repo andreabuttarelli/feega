@@ -35,7 +35,7 @@
   import { LineAction, createOpQueue, keepLines } from '$lib/canvas/op-queue';
   import { idbShelf, openOutbox, type Outbox } from '$lib/canvas/outbox';
   import { syncOf } from '$lib/canvas/sync-status';
-  import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
+  import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
@@ -53,7 +53,6 @@
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
-  import { deserialize } from '$app/forms';
   import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
   import { page, updated } from '$app/state';
   import { track } from '$lib/analytics';
@@ -1641,31 +1640,22 @@
     if (rows) { commits.publish(rows); }
   }
 
+  const canvasRoute = $derived({ projectId: data.projectId, canvasId: data.canvas.id });
+
   async function send(
     action: string,
     fields: Record<string, string | number | File | string[]>
   ): Promise<ActionAnswer> {
-    let res: Response;
+    let answer: ActionAnswer;
     try {
-      res = await fetch(canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action), {
-        method: 'POST',
-        headers: { 'x-sveltekit-action': 'true' },
-        body: formOf(fields)
-      });
+      answer = await postCanvasAction(canvasRoute, action, formOf(fields));
     } catch (cause) {
       console.warn(`canvas action ${action}: network`, cause);
       return { type: 'network' };
     }
 
-    const text = await res.text();
-    try {
-      const answer = deserialize(text) as ActionAnswer;
-      announceCommit(action, fields, answer);
-      return answer;
-    } catch {
-      console.warn(`canvas action ${action}: unreadable ${res.status}`, text.slice(0, 500));
-      return { type: 'error', status: res.status };
-    }
+    announceCommit(action, fields, answer);
+    return answer;
   }
 
   function announce(action: string, reason: SaveFailure, detail: unknown) {
@@ -3367,7 +3357,7 @@
   {#if Flow}
   <Flow
     mode={canvasMode}
-    actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
+    postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
     {edges}
     onMove={move}

@@ -5,7 +5,7 @@
    * Debounced e cancellato a ogni cambio di selezione: un clic veloce fra nodi diversi non deve
    * far arrivare in ordine sbagliato una risposta partita per un nodo che non è più selezionato.
    */
-  import { deserialize } from '$app/forms';
+  import type { ActionResult } from '@sveltejs/kit';
   import Sparkles from '@lucide/svelte/icons/sparkles';
   import { clampCentre } from '$lib/canvas/toolbar-position';
 
@@ -24,14 +24,14 @@
     box,
     zoom = 1,
     nodeId,
-    actionUrl,
+    postAction,
     onpick
   }: {
     box: { x: number; y: number; width: number; height: number } | null;
     zoom?: number;
     /** Il nodo unico selezionato — niente suggerimenti su una selezione multipla. */
     nodeId: string | null;
-    actionUrl: (action: string) => string;
+    postAction: (action: string, form: FormData) => Promise<ActionResult>;
     onpick?: (suggestion: Suggestion) => void;
   } = $props();
 
@@ -55,14 +55,9 @@
       body.set('node_id', id);
 
       try {
-        const res = await fetch(actionUrl('suggestNextStep'), {
-          method: 'POST',
-          headers: { 'x-sveltekit-action': 'true' },
-          body
-        });
+        const result = await postAction('suggestNextStep', body);
         if (thisRequest !== requestId) return;
 
-        const result = deserialize(await res.text());
         if (result.type !== 'success') {
           suggestions = [];
           return;

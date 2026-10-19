@@ -11,7 +11,7 @@ const PROMPT_PLACEHOLDER = 'What should it be about…';
 const LOADING_SELECTORS = '[aria-busy="true"], .is-spinning';
 
 async function slowServer(page: Page) {
-  await page.route(/\?\/|\/session$/, async (route) => {
+  await page.route(/\?\/|[?&]action=|\/session$/, async (route) => {
     await new Promise((resolve) => setTimeout(resolve, SERVER_LAG_MS));
     await route.continue();
   });
@@ -29,7 +29,7 @@ function formFields(body: string): Map<string, string> {
 
 async function stopBeforeSpending(page: Page, action: string, admin: SupabaseClient, nodeId: string): Promise<Sent[]> {
   const sent: Sent[] = [];
-  await page.route(new RegExp(`\\?/${action}$`), async (route) => {
+  await page.route(new RegExp(`[?&]action=${action}(&|$)`), async (route) => {
     const fields = formFields(route.request().postData() ?? '');
     const row = await nodeRow(admin, nodeId);
     sent.push({ fields, version: Number(fields.get('version')), dbVersion: row.version, dbData: row.data });
