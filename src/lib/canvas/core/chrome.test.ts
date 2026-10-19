@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 import { rgbaOf } from '$lib/motion/gpu-full/rgba';
-import { PaintKind } from '$lib/motion/gpu-full/paint';
+import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
 import { tileChrome, ChromePart, type ChromeTile, type Glyphs } from './chrome';
 
 const box = (contours: number[][]) => {
@@ -107,5 +107,18 @@ describe('tileChrome', () => {
 
     expect(box(ofPart(t, ChromePart.Icon)[0].contours)).toEqual([100, 180, 112, 192]);
     expect(box(ofPart(t, ChromePart.Label)[0].contours)).toEqual([117, 178, 177, 190]);
+  });
+
+  it('fills the icon strokes as a union, so overlapping round joins never cancel', () => {
+    const [icon] = ofPart(tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]] }), ChromePart.Icon);
+
+    expect(icon.rule).toBe(FillRule.Union);
+  });
+
+  it('sets the label untracked, as the canvas label is', () => {
+    const asked: (number | undefined)[] = [];
+    tileChrome(tile({ label: 'Image' }), (text, size, set) => (asked.push(set?.tracking), glyphs(text, size, set)));
+
+    expect(asked).toEqual([0]);
   });
 });

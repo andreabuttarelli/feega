@@ -1,6 +1,11 @@
 import type { NodeType } from '$lib/canvas/node-data';
 
-export const PARITY_SAMPLES: Record<NodeType, Record<string, unknown>> = {
+export type ParitySample = { name: string; kind: NodeType; data: Record<string, unknown>; thumbs?: string[] };
+
+const PHOTO = '/login-visual.webp';
+const WIDE = '/og.png';
+
+const BY_KIND: Record<NodeType, Record<string, unknown>> = {
   text: { prompt: 'Write a launch tweet for a coffee brand', model: 'Fast text' },
   image: { prompt: 'A red bicycle against a white wall', model: 'Image model' },
   video: { prompt: 'Slow dolly in on a city at night', running: true },
@@ -21,3 +26,12 @@ export const PARITY_SAMPLES: Record<NodeType, Record<string, unknown>> = {
   calendar: { anchor: '2026-10', view: 'month' },
   studio_batch: {}
 };
+
+const MEDIA: ParitySample[] = [
+  { name: 'image upload', kind: 'image', data: { assetId: PHOTO } },
+  { name: 'image generated', kind: 'image', data: { output_asset_id: WIDE, model: 'Image model' } },
+  { name: 'effects output', kind: 'effects', data: { refId: PHOTO } },
+  { name: 'feed thumbs', kind: 'social_account_feed', data: { handle: 'studio', platform: 'instagram' }, thumbs: [PHOTO, WIDE, PHOTO] }
+];
+
+export const PARITY_SAMPLES: ParitySample[] = [...(Object.entries(BY_KIND) as [NodeType, Record<string, unknown>][]).map(([kind, data]) => ({ name: kind, kind, data })), ...MEDIA];

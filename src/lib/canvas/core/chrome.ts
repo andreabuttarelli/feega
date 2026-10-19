@@ -2,6 +2,7 @@ import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '$lib/motion/gpu-full/display-list';
 import { dashes } from '$lib/motion/gpu-full/stroke';
+import { FillRule } from '$lib/motion/gpu-full/paint';
 import { line, rect, solid } from './shapes';
 
 export enum ChromePart {
@@ -15,7 +16,7 @@ export enum ChromePart {
   Icon = 'icon'
 }
 
-export type TextSet = { width?: number; height?: number; leading?: number };
+export type TextSet = { width?: number; height?: number; leading?: number; tracking?: number };
 
 export type Glyphs = (text: string, size: number, set?: TextSet) => { contours: number[][]; width: number; height: number };
 
@@ -118,9 +119,9 @@ function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   }
   const line = LABEL_SIZE * LABEL_LEADING;
   const top = t.y - LABEL_GAP - LABEL_PAD - line;
-  const icon = t.icon ? [item(t, ChromePart.Icon, shift(t.icon, t.x, top + (line - ICON_SIZE) / 2), LABEL_COLOR)] : [];
+  const icon = t.icon ? [{ ...item(t, ChromePart.Icon, shift(t.icon, t.x, top + (line - ICON_SIZE) / 2), LABEL_COLOR), rule: FillRule.Union }] : [];
   const left = t.icon ? t.x + ICON_SIZE + ICON_GAP : t.x;
-  return [...icon, item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE, { leading: LABEL_LEADING }).contours, left, top), LABEL_COLOR)];
+  return [...icon, item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE, { leading: LABEL_LEADING, tracking: 0 }).contours, left, top), LABEL_COLOR)];
 }
 
 function name(t: ChromeTile, glyphs: Glyphs, type: ConnectorType, centre: number, side: ChromePart): PathItem {

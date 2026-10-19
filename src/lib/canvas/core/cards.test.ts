@@ -17,7 +17,7 @@ const box = (contours: number[][]) => {
 };
 const asset = (id: string) => `https://cdn/${id}`;
 const card = (kind: string, data: Record<string, unknown>, over: Partial<CoreCard> = {}): CoreCard => ({ id: 'n', x: 0, y: 0, w: 200, h: 100, face: faceOf({ id: 'n', kind }, data, asset), ...over });
-const part = (items: Item[], p: CardPart) => items.filter((i) => i.clip === `n:${p}`);
+const part = (items: Item[], p: CardPart) => items.filter((i) => i.clip === `n:${p}` || i.clip.startsWith(`n:${p}:`));
 const paths = (items: Item[], p: CardPart) => part(items, p) as PathItem[];
 
 describe('cardItems', () => {
@@ -86,5 +86,12 @@ describe('cardItems', () => {
     const [title] = paths(cardItems(card('iframe', { url: 'x' }), theme, glyphs, bold), CardPart.Title);
 
     expect(box(title.contours)).toEqual([14, 14, 15, 15]);
+  });
+
+  it('gives each picture its own clip, since the engine keys textures by clip', () => {
+    const c = { ...card('social_account_feed', {}), face: faceOf({ id: 'n', kind: 'social_account_feed' }, {}, asset, ['t1', 't2', 't3']), w: 300, h: 300 };
+    const clips = cardItems(c, theme, glyphs).filter((i) => i.kind === ItemKind.Image).map((i) => i.clip);
+
+    expect(new Set(clips).size).toBe(3);
   });
 });
