@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/environment', () => ({ building: false }));
+vi.mock('$app/environment', () => ({ building: false, browser: false }));
 vi.mock('$env/dynamic/public', () => ({ env: { PUBLIC_APP_URL: 'https://oh.feega.app' } }));
 
 const { reroute } = await import('./hooks');
