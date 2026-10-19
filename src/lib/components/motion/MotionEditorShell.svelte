@@ -51,7 +51,7 @@
   import LayersIcon from '@lucide/svelte/icons/layers';
   import PlusIcon from '@lucide/svelte/icons/plus';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
-  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, OpensOn, defaultTimelinePx, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, OpensOn, defaultTimelinePx, Panel, Side, flip, readLayout, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import { Lens, addLens } from '$lib/motion/glass/ops';
@@ -135,6 +135,7 @@
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import BarSlot from '$lib/components/brand-agent/BarSlot.svelte';
+  import { rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
   import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
@@ -1051,7 +1052,7 @@
   });
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
-      frameBar.sidePx = docked && sideOpen ? sideWidth(layout.sidePx, width) : 0;
+      frameBar.sidePx = docked && sideOpen ? rightBar.width : 0;
     }
   });
 
@@ -2115,7 +2116,7 @@
     />
   {/if}
 
-  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
+  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${rightBar.width}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
     <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
       <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
@@ -2159,7 +2160,7 @@
       {/if}
     </section>
 
-    <SideColumn place={chatPlace} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})}>
+    <SideColumn place={chatPlace} widthPx={rightBar.width} onwidth={(px) => rightBar.resize(px)} oncommit={() => rightBar.keepWidth()}>
     {#snippet properties()}
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>

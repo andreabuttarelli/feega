@@ -14,6 +14,12 @@ pane stays mounted and stows (`display: none`) only when its `BarSlot` reports `
 i.e. once the editor has claimed; the editor claims on mount. Discarded: a fixed shell-level bar
 that never moves (bigger refactor of both layouts; the claim order gives the same guarantee).
 
+**One width, one look.** The canvas pane read `readChatPanelPx` (280-560), the editor column
+`layout.sidePx` (min 320, half the window): two widths. Both now read `rightBar.width`, resized
+and saved through the host. The tabs inherited type and ink from the slot; the bar now sets the
+editor's (`--sans`, `--ui-ink`, `--ui-ink-2/3`), so the segmented control is the editor's
+everywhere. Entering a frame only adds the Properties tab.
+
 **Tests.** `right-bar-paint.test.ts` (compiled CSS); e2e `right-bar-persists.spec.ts` compares
 the computed background on canvas and editor, light and dark (`@real`); `right-bar-handoff.test.ts`; e2e samples every frame from the click to the timeline
 (same node, on screen, opaque, scroll kept, stream uninterrupted).

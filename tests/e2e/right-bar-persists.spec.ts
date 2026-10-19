@@ -119,13 +119,15 @@ test.describe('the right bar is one instance across canvas and motion editor @re
     await page.evaluate(() => {
       const bar = document.querySelector('[data-testid=right-bar]')!;
       const log = bar.querySelector('[role=log]')!;
+      const tabs = bar.querySelector('[role=tablist]');
+      const width = bar.getBoundingClientRect().width;
       const samples: string[] = [];
       const sample = () => {
         const now = document.querySelector('[data-testid=right-bar]');
         const box = now?.getBoundingClientRect();
         const paint = now ? getComputedStyle(now).backgroundColor : '';
         const shown = !!box && box.width > 0 && box.left >= 0 && box.right <= innerWidth + 1;
-        if (now !== bar || !shown || /rgba\(.*, 0\)|transparent/.test(paint) || log.scrollTop === 0) {
+        if (now !== bar || !shown || box?.width !== width || now.querySelector('[role=tablist]') !== tabs || /rgba\(.*, 0\)|transparent/.test(paint) || log.scrollTop === 0) {
           samples.push(`${now === bar} ${box?.left}-${box?.width} ${paint} ${log.scrollTop}`);
         }
         if (!document.querySelector('[aria-label=Timeline]')?.getBoundingClientRect().height) {
@@ -139,7 +141,7 @@ test.describe('the right bar is one instance across canvas and motion editor @re
     await page.locator(`.svelte-flow__node[data-id="${frameId}"]`).getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
     await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible({ timeout: 15_000 });
 
-    expect(await page.evaluate(() => (window as unknown as { __barSamples: string[] }).__barSamples), 'every frame: same node, on screen, opaque, scroll kept').toEqual([]);
+    expect(await page.evaluate(() => (window as unknown as { __barSamples: string[] }).__barSamples), 'every frame: same node, same width, same tabs, on screen, opaque, scroll kept').toEqual([]);
     await expectStreamGoesOn(page, 'through the handoff');
   });
 

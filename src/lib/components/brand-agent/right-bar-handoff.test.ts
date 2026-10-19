@@ -15,4 +15,10 @@ describe('the right bar never goes back to the park between canvas and editor', 
   it('the editor claims the bar as soon as it mounts, not when its panels are due', () => {
     expect(editor).not.toMatch(/\{#if panelsDue\}(?:(?!\{\/if\})[^\n])*<BarSlot/);
   });
+
+  it('one width for the bar: canvas pane and editor column both read it from the bar host', () => {
+    expect(canvasPane).toMatch(/--chat-w: \$\{rightBar\.width\}px/);
+    expect(editor).toMatch(/--side-w: \$\{rightBar\.width\}px/);
+    expect(editor).toMatch(/<SideColumn [^>]*widthPx=\{rightBar\.width\}/);
+  });
 });

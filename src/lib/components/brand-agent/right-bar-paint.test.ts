@@ -10,4 +10,9 @@ describe('right bar paint', () => {
   it('paints its own background, so no slot it moves into leaves it transparent', () => {
     expect(ownRule).toMatch(/background:\s*var\(--ui-wash\)/);
   });
+
+  it('carries the editor type and ink, so its tabs read the same in every slot', () => {
+    expect(ownRule).toMatch(/font-family:\s*var\(--sans\)/);
+    expect(ownRule).toMatch(/color:\s*var\(--ui-ink\)/);
+  });
 });
