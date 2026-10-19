@@ -1,4 +1,4 @@
-import { Application, Color, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite, VideoSource } from 'pixi8';
+import { Application, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite, VideoSource } from 'pixi8';
 import type { Viewport } from '../dot-grid';
 import { MOTION_NODE_BAR_H } from '../motion-node';
 import { AssetSize, sized } from '../asset-url';
@@ -15,6 +15,7 @@ import { Backend } from './backend';
 import { ChromeLayer } from './chrome-layer';
 import type { IdleChrome } from './idle-chrome';
 import { grownBacking } from './backing-size';
+import type { Theme } from './theme';
 
 export { Backend };
 
@@ -31,7 +32,6 @@ export type Overlay = {
   peers: Peer[];
 };
 
-export type Theme = { canvas: string; dot: string; paper: string; line: string; ink: string; inkSoft: string; accent: string; iterate: string; wire: string; font: string };
 
 const PAD = 14;
 const LABEL_SIZE = 12;
@@ -801,39 +801,6 @@ export class GpuScene {
       layer.addChild(c);
     }
   }
-}
-
-const WIRE_INK_SHARE = 0.45;
-
-function mix(a: string, b: string, share: number): string {
-  try {
-    return blend(a, b, share);
-  } catch {
-    return a;
-  }
-}
-
-function blend(a: string, b: string, share: number): string {
-  const ca = new Color(a).toRgb();
-  const cb = new Color(b).toRgb();
-  return new Color({ r: (ca.r * share + cb.r * (1 - share)) * 255, g: (ca.g * share + cb.g * (1 - share)) * 255, b: (ca.b * share + cb.b * (1 - share)) * 255 }).toHex();
-}
-
-export function themeOf(el: HTMLElement): Theme {
-  const css = getComputedStyle(el);
-  const v = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
-  return {
-    canvas: v('--ui-canvas', '#ebebeb'),
-    dot: v('--ui-canvas-dot', '#c8c8c8'),
-    paper: v('--paper', '#ffffff'),
-    line: v('--line', '#e5e5e5'),
-    ink: v('--ink', '#1d1d1f'),
-    inkSoft: v('--ink-soft', '#6e6e73'),
-    accent: v('--accent', '#7c5cff'),
-    iterate: v('--ui-wire-iterate', '#d97706'),
-    wire: mix(v('--ink-soft', '#6e6e73'), v('--paper', '#ffffff'), WIRE_INK_SHARE),
-    font: (v('--sans', 'DM Sans').split(',')[0] || 'DM Sans').replace(/['"]/g, '').trim()
-  };
 }
 
 export type { TextureCache };

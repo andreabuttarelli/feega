@@ -10,7 +10,10 @@ export type Command = { op: Op; at: number[] };
 
 export type Shaped = { glyph: number; advance: number; dx: number; dy: number; chars: number };
 
+export type FaceKey = { font: string; coords: [string, number][] };
+
 export type Face = {
+  key?: FaceKey;
   unitsPerEm: number;
   ascent: number;
   descent: number;

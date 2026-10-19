@@ -82,7 +82,8 @@
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Fling, type Glide } from '$lib/canvas/core/inertia';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
-  import { GpuScene, GridPlace, themeOf, type Card } from '$lib/canvas/gpu/scene';
+  import type { GpuScene, Card } from '$lib/canvas/gpu/scene';
+  import { themeOf } from '$lib/canvas/gpu/theme';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { Counter, count, exposeLoss, exposeReveal, exposeSettled, recordFrame } from '$lib/canvas/gpu/frame-stats';
@@ -95,13 +96,13 @@
   import { CANVAS_LOAD_EVENT, LoadKind, claimLoad, loadTiming } from '$lib/canvas/gpu/load-timing';
   import { engineOf } from '$lib/motion/engine';
   import { track } from '$lib/analytics';
-  import { getFontEmbedCSS, toCanvas } from 'html-to-image';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
   let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
 
   const DOM_CAP = 6;
+  const CORE = 'core';
   const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
   const SHELF_TICK_MS = 5000;
   const MOVE_SLOP_PX = 3;
@@ -204,7 +205,7 @@
     }
   });
   const coreLook = $derived(wrap ? themeOf(wrap) : null);
-  const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && t.kind !== 'motion' && !handedOver(t);
+  const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
   const coreCards = $derived.by(() => {
     const text = coreType;
     const look = coreLook;
@@ -230,9 +231,11 @@
         names: on
       };
       const turn = t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined;
-      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold), turn }];
+      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold), turn, poster: t.kind === 'motion' }];
     });
   });
+  const posterCards = $derived(coreCards.filter((c) => c.poster));
+  const nodeCards = $derived(coreCards.filter((c) => !c.poster));
   const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
   let domShows = $state(new Set<string>());
   const handedOver = (t: Tile) => domIds.has(t.id) && (t.kind !== 'motion' || domShows.has(t.id));
@@ -408,6 +411,9 @@
     if (domIds.has(t.id)) {
       return t.kind !== 'motion' || domDrawn(t.id);
     }
+    if (coreOn) {
+      return coreDrawn.has(t.id);
+    }
     if (snapshotKind(t)) {
       return shown.has(t.id) || !looking.has(t.id);
     }
@@ -418,7 +424,7 @@
 
   $effect(() => {
     void revealTick;
-    if (revealed || !scene) {
+    if (revealed || !(scene || coreOn)) {
       return;
     }
     if (!area.width || (tiles.length && !fitted)) {
@@ -434,7 +440,7 @@
     if (!wait) {
       revealed = true;
       exposeReveal(Math.round(performance.now() - openedAt), missing);
-      loadTimer = spec.chrome ? canvasLoadTiming(scene.backend) : null;
+      loadTimer = spec.chrome ? canvasLoadTiming(scene?.backend ?? CORE) : null;
       loadTimer?.revealed(missing.length, performance.now() - openedAt);
       return;
     }
@@ -556,6 +562,7 @@
       const el = host.querySelector<HTMLElement>('.snapshot-node');
       try {
         if (el && scene) {
+          const { getFontEmbedCSS, toCanvas } = await import('html-to-image');
           fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
           const options = { pixelRatio: SNAPSHOT_PIXEL_RATIO, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL };
           const foreign = [...el.querySelectorAll('img')].some((img) => crossOrigin(img.currentSrc || img.src));
@@ -585,7 +592,7 @@
 
   let parked = $state(new Map<string, number>());
   let shelfClock = $state(0);
-  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock).slice(0, BUDGET[currentDevice()].posterShelf)));
+  const shelf = $derived(new Set(coreOn ? [] : shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock).slice(0, BUDGET[currentDevice()].posterShelf)));
   const shelfSince = new Map<string, number>();
   $effect(() => {
     const now = Date.now();
@@ -699,10 +706,6 @@
   });
 
   $effect(() => {
-    scene?.placeGrid(coreOn ? GridPlace.UnderCore : GridPlace.Scene);
-  });
-
-  $effect(() => {
     const incoming = tiles;
     untrack(() => adoptNew(incoming));
   });
@@ -718,7 +721,7 @@
     if (gone.length) {
       select(selected.filter((id) => known.has(id)));
     }
-    if (!fitted && scene && incoming.length) {
+    if (!fitted && (scene || coreOn) && incoming.length) {
       fitted = true;
       fitTo(incoming);
     }
@@ -1324,7 +1327,10 @@
           glyphs: coreType.glyphs,
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
-          rotate: coreRotate
+          rotate: coreRotate,
+          ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
+          hovered: hovered && !selected.includes(hovered) ? (byId.get(hovered) ?? null) : null,
+          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {}))
         })
       : []
   );
@@ -1629,7 +1635,8 @@
       area = { width: surface!.clientWidth, height: surface!.clientHeight };
     });
     const start = (backend: Backend) =>
-      GpuScene.create(surface!, backend, themeOf(wrap!))
+      import('$lib/canvas/gpu/scene')
+        .then(({ GpuScene }) => GpuScene.create(surface!, backend, themeOf(wrap!)))
         .then((s) => {
           if (!alive) {
             s.destroy();
@@ -1670,13 +1677,27 @@
       }
       void start(next);
     };
-    void start(backendOf(page.url));
+    bootScene = () => void start(backendOf(page.url));
+    if (coreOn) {
+      observer.observe(surface!);
+      props.onFlow?.(toFlow);
+    } else {
+      bootScene();
+    }
     return () => {
       alive = false;
       observer.disconnect();
       built?.destroy();
     };
   });
+
+  let bootScene: (() => void) | null = null;
+  function coreOff(why: string) {
+    console.warn(`[canvas] core off: ${why}`);
+    coreOn = false;
+    coreDrawn = new Set();
+    bootScene?.();
+  }
 
   function fitView(boxes: Box[]): Viewport {
     const b = boundsOf(boxes)!;
@@ -1696,7 +1717,7 @@
 }} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? (coreOn ? CORE : 'pending')} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
   <div
     class="surface svelte-flow__pane"
     bind:this={surface}
@@ -1713,8 +1734,8 @@
     class:panning={space}
     data-owns-pinch
   >
-    {#if coreOn && scene}
-      <CoreFrames frames={coreFrames} cards={coreCards} overlay={coreOverlay} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={(why) => { console.warn(`[canvas] core off: ${why}`); coreOn = false; coreDrawn = new Set(); }} />
+    {#if coreOn}
+      <CoreFrames frames={coreFrames} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={coreOff} />
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
@@ -1755,7 +1776,7 @@
           {#if !domIds.has(t.id) && t.kind === 'motion'}
             {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
-              <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage data-drawn={drawn.has(t.id)}>
+              <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage data-drawn={drawn.has(t.id) || coreDrawn.has(t.id)}>
                 {#if t.poster}
                   <div class="frame-standin-poster" data-testid="motion-node-poster"></div>
                 {/if}
@@ -1809,7 +1830,7 @@
   <PageZoomLock zoom={pageZoom} />
 
   {#if dev}
-    <RendererBadge renderer={scene?.backend ?? 'starting'} reason={lossNote} />
+    <RendererBadge renderer={scene?.backend ?? (coreOn ? CORE : 'starting')} reason={lossNote} />
   {/if}
 
   {#if refusal}
@@ -1820,7 +1841,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && scene && props.barContext === BarContext.Canvas && frameBar.tool !== DrawTool.Select}
+  {#if props.onDraw && (scene || coreOn) && props.barContext === BarContext.Canvas && frameBar.tool !== DrawTool.Select}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}

@@ -31,6 +31,7 @@ import { paintOnPath } from './text/on-path';
 import { NO_TYPESET, paintText, planOf, TEXT_COMPONENTS, TextGap, type NativeFaces, type TextComponent, type TextPlan, type Typeset } from './text/painter';
 import { resolvedRequest, type FaceRule } from './text/fonts';
 import { lensAt, type Lens } from './lens';
+import { screenFrames } from '../device-screen';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
 export type { Lens } from './lens';
@@ -43,6 +44,7 @@ export enum ItemKind {
   Layer = 'layer',
   Text = 'text',
   Lens = 'lens',
+  Glyphs = 'glyphs',
   Group = 'group'
 }
 
@@ -83,9 +85,11 @@ export type TextItem = { kind: ItemKind.Text; clip: string; plan: TextPlan; turn
 
 export type LensItem = { kind: ItemKind.Lens; clip: string; lens: Lens; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
+export type GlyphsItem = { kind: ItemKind.Glyphs; clip: string; font: string; coords: [string, number][]; size: number; glyphs: [number, number, number][]; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+
 export type GroupItem = { kind: ItemKind.Group; clip: string; items: Item[]; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
-export type Item = PathItem | ImageItem | LayerItem | TextItem | LensItem | GroupItem;
+export type Item = GlyphsItem | PathItem | ImageItem | LayerItem | TextItem | LensItem | GroupItem;
 
 
 export type MatteOf = { items: Item[]; luma: boolean; invert: boolean };
@@ -98,7 +102,10 @@ export type DisplayList = { width: number; height: number; background: Rgba | nu
 
 export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset };
 
-type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<TextItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LensItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
+type PathContent = Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number };
+type ImageContent = Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { stencil?: PathContent[] };
+type GlyphsContent = Omit<GlyphsItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number };
+type Content = PathContent | ImageContent | GlyphsContent | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<TextItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LensItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
 type Size = { width: number; height: number };
 type Partly = { content: Content[]; gaps: string[] };
 type Painted = Content[] | Partly | Unsupported;
@@ -201,32 +208,51 @@ const logoPainter = ({ props, size, asset, logo }: Env): Painted => {
   return src ? [picture(src, size, { fit: 'width', clipped: false })] : Unsupported.Text;
 };
 
+const NATIVE_FILLS: ReadonlySet<string> = new Set([PaintKind.Solid, PaintKind.Linear, PaintKind.Radial]);
+
+const textAsset = (asset: Env['asset']) => (id: string) => asset(id);
+
 const TEXT_GAP: Record<TextGap, Unsupported> = { [TextGap.Font]: Unsupported.Font, [TextGap.Glyph]: Unsupported.Glyph, [TextGap.Fill]: Unsupported.Fill };
 
 function nativeText(env: Env, native: NativeFaces): Painted {
   const { clip, animators, props, box, stage, css, time, fps, still, typeset } = env;
-  const plan = planOf({ component: clip.component as TextComponent, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
+  const plan = planOf({ component: clip.component as TextComponent, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators, asset: textAsset(env.asset) });
   if (typeof plan === 'string') {
     return TEXT_GAP[plan];
+  }
+  if (!plan.fills.every((f) => NATIVE_FILLS.has(f.kind)) || plan.animation?.looks.some((l) => (l.spacing ?? 0) !== 0)) {
+    return outlinedText(env);
   }
   const turn = { scale: Number(props.scale ?? 1), rotation: Number(props.rotation ?? 0) };
   return [{ kind: ItemKind.Text, plan: { ...plan, request: resolvedRequest(plan.request, native.registry) }, turn, opacity: 1, matrix: IDENTITY }];
 }
 
 function textPainter(env: Env): Painted {
+  return env.typeset.native && !env.onPath ? nativeText(env, env.typeset.native) : outlinedText(env);
+}
+
+function outlinedText(env: Env): Painted {
   const { clip, animators, onPath, props, box, stage, css, time, fps, still, typeset } = env;
-  if (typeset.native && !onPath) {
-    return nativeText(env, typeset.native);
-  }
   const component = clip.component as TextComponent;
-  const painted = onPath ? paintOnPath({ component, ...typeset, props, stage, box, colour: css, animators, onPath }) : paintText({ component, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
+  const painted = onPath ? paintOnPath({ component, ...typeset, props, stage, box, colour: css, animators, onPath }) : paintText({ component, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators, asset: textAsset(env.asset) });
   if (typeof painted === 'string') {
     return TEXT_GAP[painted];
   }
   const { frame, inks } = painted;
   const scale = Number(props.scale ?? 1);
   const turn = scaleAbout(frame.left + frame.width / 2, frame.top + frame.height / 2, Number(props.rotation ?? 0), scale);
-  return inks.map((ink) => ({ kind: ItemKind.Path as const, contours: ink.contours, rule: ink.rule, paint: ink.paint, opacity: ink.opacity, matrix: mul2d(turn, ink.matrix), blur: ink.blur * scale }));
+  return inks.map((ink): Content => {
+    const path: PathContent = { kind: ItemKind.Path, contours: ink.contours, rule: ink.rule, paint: ink.paint, opacity: ink.opacity, matrix: mul2d(turn, ink.matrix), blur: ink.blur * scale };
+    if (ink.run) {
+      return { kind: ItemKind.Glyphs, ...ink.run, paint: ink.paint, opacity: ink.opacity, matrix: path.matrix, blur: path.blur };
+    }
+    if (!ink.picture) {
+      return path;
+    }
+    const [l, t, r, b] = ink.picture.area;
+    const stencil: PathContent = { ...path, paint: { kind: PaintKind.Solid, color: [1, 1, 1, 1] }, opacity: 1 };
+    return { ...(picture(ink.picture.src, { width: r - l, height: b - t }, { fit: ink.picture.fit, focus: ink.picture.focus, clipped: false, opacity: ink.opacity, matrix: mul2d(path.matrix, [1, 0, 0, 1, l, t]) }) as ImageContent), stencil: [stencil] };
+  });
 }
 
 type Box = { left: number; top: number; width: number; height: number };
@@ -268,6 +294,16 @@ const customPainter =({ read, clip }: Env): Painted => {
 
 const lensPainter = ({ clip, stage, fps, time, css }: Env): Painted => [{ kind: ItemKind.Lens, lens: lensAt(clip, { ...stage, fps }, Math.round(time * fps), css), opacity: 1, matrix: IDENTITY }];
 
+export const SCREEN_GAP = 'screen composition on a 3D face';
+
+const devicePainter = (env: Env): Painted => {
+  const read = customPainter(env);
+  if (typeof read === 'string' || Array.isArray(read) || !env.props.screenComp) {
+    return read;
+  }
+  return { ...read, gaps: [...read.gaps, SCREEN_GAP] };
+};
+
 const unturned: Placement = (props, frame) => ({ ...boxed(props, frame), turn: IDENTITY });
 
 const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }>> = {
@@ -278,8 +314,11 @@ const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }
   Logo: { place: boxed, paint: logoPainter },
   ...Object.fromEntries(TEXT_COMPONENTS.map((c) => [c, { place: unturned, paint: textPainter }])),
   Custom: { place: fullFrame, paint: customPainter },
-  LiquidBlob: { place: fullFrame, paint: lensPainter }
+  LiquidBlob: { place: fullFrame, paint: lensPainter },
+  Device3D: { place: fullFrame, paint: devicePainter }
 };
+
+const SELF_ANIMATED: ReadonlySet<ComponentId> = new Set(['Device3D']);
 
 const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
 
@@ -291,10 +330,9 @@ const keyframedOutside = (clip: MotionClip) => Object.entries(clip.keyframes).so
 
 const CLIP_LIMITS: [Unsupported, (clip: MotionClip) => boolean][] = [
   [Unsupported.Component, (clip) => !PAINTERS[clip.component]],
-  [Unsupported.Animator, (clip) => clip.animators.some((a) => a.values.tracking !== undefined)],
   [Unsupported.Shader, (clip) => clip.shaders.length > 0],
   [Unsupported.Space3d, (clip) => keyed(clip, DEPTH_KEYS)],
-  [Unsupported.Keyframe, keyframedOutside]
+  [Unsupported.Keyframe, (clip) => !SELF_ANIMATED.has(clip.component) && keyframedOutside(clip)]
 ];
 
 function propsAt(clip: MotionClip, frame: number, colour: (v: string) => string): Record<string, unknown> {
@@ -378,6 +416,8 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
   const byId = new Map(doc.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
   const pairs = new Map(mattePairs(doc).map((p) => [p.target, p]));
   const sources = new Set([...pairs.values()].map((p) => p.source));
+  const screens = screenFrames(doc).map((s) => s.prefix);
+  const onScreen = (clip: MotionClip) => screens.some((prefix) => clip.id.startsWith(prefix));
   const items: Item[] = [];
   const unsupported: Gap[] = [];
   const shown = (clip: MotionClip) => frame >= clip.from && frame < clip.from + clip.durationInFrames && !NO_PAINT.has(clip.component);
@@ -421,17 +461,22 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     const extras = { ...(scissor ? { scissor } : {}), ...(filtered.filters.length ? { filters: filtered.filters, space: [world[0], world[1], world[2], world[3]] as Linear } : {}), ...(filtered.backdrop ? { backdrop: filtered.backdrop } : {}), ...(masks.length ? { masks } : {}), ...(read ? { matte: { items: matteItems, luma: read.weights !== null, invert: read.invert } } : {}) };
     const framed = (c: Content) => (c.kind === ItemKind.Image && c.clipped ? { matrix: mul2d(base, c.matrix), inner: moved } : { matrix: mul2d(placed, c.matrix) });
     const ownBlur = (c: Content) => ('blur' in c ? (c.blur ?? 0) * scaleOf(placed) : 0);
+    const stenciled = (c: Content) => (c.kind === ItemKind.Image && c.stencil ? { matte: { items: c.stencil.map((m) => ({ ...m, clip: clip.id, matrix: mul2d(placed, m.matrix), blur: 0, blend: BlendMode.Normal }) as Item), luma: false, invert: false } } : {});
+    const bare = (c: Content) => {
+      const { stencil: _stencil, ...own } = c as Content & { stencil?: unknown };
+      return own as Content;
+    };
     const grouped = content.length > 1 && (Object.keys(extras).length > 0 || alpha < 1 || blur > 0 || clip.blend !== BlendMode.Normal);
     if (!grouped) {
-      return content.map((c) => ({ ...c, clip: clip.id, opacity: alpha * c.opacity, ...framed(c), blur: blur + ownBlur(c), blend: clip.blend, ...extras, ...ownLook(c, placed, extras) }) as Item);
+      return content.map((c) => ({ ...bare(c), clip: clip.id, opacity: alpha * c.opacity, ...framed(c), blur: blur + ownBlur(c), blend: clip.blend, ...extras, ...ownLook(c, placed, extras), ...stenciled(c) }) as Item);
     }
-    const items = content.map((c) => ({ ...c, clip: clip.id, opacity: c.opacity, ...framed(c), blur: ownBlur(c), blend: BlendMode.Normal, ...ownLook(c, placed, {}) }) as Item);
+    const items = content.map((c) => ({ ...bare(c), clip: clip.id, opacity: c.opacity, ...framed(c), blur: ownBlur(c), blend: BlendMode.Normal, ...ownLook(c, placed, {}), ...stenciled(c) }) as Item);
     return [{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }];
   }
 
   const bottomFirst = [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);
   for (const clip of bottomFirst.flatMap((t) => t.clips as MotionClip[])) {
-    if (!shown(clip) || sources.has(clip.id)) {
+    if (!shown(clip) || sources.has(clip.id) || onScreen(clip)) {
       continue;
     }
     const drawn = clipItems(clip);

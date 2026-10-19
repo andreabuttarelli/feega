@@ -363,6 +363,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     [ItemKind.Layer]: drawLayer,
     [ItemKind.Text]: () => {},
     [ItemKind.Lens]: () => {},
+    [ItemKind.Glyphs]: () => {},
     [ItemKind.Group]: (item: GroupItem, opacity, pictures) => item.items.forEach((i) => drawItem(i, opacity * i.opacity, pictures))
   };
 

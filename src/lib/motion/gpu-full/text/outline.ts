@@ -156,3 +156,20 @@ export function clipped(contours: number[][], [left, top, right, bottom]: Rect):
   const edges = [vertical(left, 1), vertical(right, -1), horizontal(top, 1), horizontal(bottom, -1)];
   return contours.map((c) => edges.reduce(cut, c)).filter((c) => c.length >= 6);
 }
+
+const side = (ax: number, ay: number, bx: number, by: number, x: number, y: number) => (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+
+const halfPlane = (ax: number, ay: number, bx: number, by: number, keep: number): Edge => ({
+  inside: (x, y) => side(ax, ay, bx, by, x, y) * keep >= 0,
+  cross: (px, py, qx, qy) => {
+    const t = side(ax, ay, bx, by, px, py) / (side(ax, ay, bx, by, px, py) - side(ax, ay, bx, by, qx, qy));
+    return [px + (qx - px) * t, py + (qy - py) * t];
+  }
+});
+
+export function within(contours: number[][], polygon: number[]): number[][] {
+  const n = polygon.length / 2;
+  const keep = Math.sign(area(polygon)) || 1;
+  const edges = Array.from({ length: n }, (_, i) => halfPlane(polygon[i * 2], polygon[i * 2 + 1], polygon[((i + 1) % n) * 2], polygon[((i + 1) % n) * 2 + 1], keep));
+  return contours.map((c) => edges.reduce(cut, c)).filter((c) => c.length >= 6);
+}

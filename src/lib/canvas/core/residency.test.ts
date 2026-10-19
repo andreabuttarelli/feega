@@ -3,7 +3,7 @@ import { resident } from './residency';
 
 const view = { x: 0, y: 0, zoom: 1 };
 const screen = { width: 1000, height: 1000 };
-const frame = (id: string, x: number, images: number) => ({ id, group: `${id}:1`, box: { x, y: 0, w: 100, h: 100 }, size: { width: 100, height: 100 }, images });
+const frame = (id: string, x: number, images: number, imageEdge = 100) => ({ id, group: `${id}:1`, box: { x, y: 0, w: 100, h: 100 }, size: { width: 100, height: 100 }, bytes: images * imageEdge * imageEdge * 4 });
 
 describe('frame residency', () => {
   it('vector frames stay resident wherever they are', () => {
@@ -12,6 +12,11 @@ describe('frame residency', () => {
 
   it('media frames are resident only on screen', () => {
     expect(resident([frame('on', 0, 1), frame('off', 9000, 1)], view, screen, 1e9).map((f) => f.id)).toEqual(['on']);
+  });
+
+  it('counts the bytes of its pictures, not its whole doc once per picture', () => {
+    const tall = { ...frame('landing', 0, 0), size: { width: 1440, height: 5000 }, bytes: 2 * 400 * 300 * 4 };
+    expect(resident([tall], view, screen, 1_000_000).map((f) => f.id)).toEqual(['landing']);
   });
 
   it('over budget, media frames beyond it are left out', () => {

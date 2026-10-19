@@ -504,7 +504,7 @@ export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead 
 
   const visit = (i: number, outer: Scope): Drawn[] => {
     const node = nodes[i];
-    const refusal = REFUSALS.find(([, hit]) => hit(node.style));
+    const refusal = REFUSALS.find(([gap, hit]) => !(gap === DomGap.Order && node.parent === NO_INDEX) && hit(node.style));
     const view = viewportOf(node, outer.viewport);
     if (refusal || !view) {
       gap(node, refusal ? refusal[0] : DomGap.Geometry);

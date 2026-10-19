@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use vello::kurbo::{Affine as Matrix, Point, Rect};
 
-use crate::display_list::{Affine, DisplayList, FillRule, Item, Look, Paint, PathItem, UseItem};
+use crate::display_list::{Affine, DisplayList, FillRule, Item, Lens, LensItem, Look, Paint, PathItem, UseItem};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::glyphs::{outline, Fonts};
 #[cfg(not(target_arch = "wasm32"))]
@@ -50,6 +50,33 @@ fn scale_of(m: Affine) -> f64 {
     m[0].hypot(m[1]).min(m[2].hypot(m[3]))
 }
 
+fn moved_lens(lens: &Lens, m: Affine, frame: Rect, scale: f64) -> Lens {
+    let t = Matrix::new(m);
+    let point = |x: f32, y: f32| {
+        let p = t * Point::new(x as f64, y as f64);
+        [p.x as f32, p.y as f32]
+    };
+    let k = scale as f32;
+    let mut drops = lens.drops;
+    for d in drops.chunks_exact_mut(3) {
+        let [x, y] = point(d[0], d[1]);
+        d[0] = x;
+        d[1] = y;
+        d[2] *= k;
+    }
+    let [x, y, w, h] = lens.area.map(f64::from);
+    let area = screen_rect(m, Rect::new(x, y, x + w, y + h)).intersect(frame);
+    Lens {
+        center: point(lens.center[0], lens.center[1]),
+        drops,
+        blend: lens.blend * k,
+        wobble: lens.wobble * k,
+        frost: lens.frost * k,
+        area: [area.x0 as f32, area.y0 as f32, area.width().max(0.0) as f32, area.height().max(0.0) as f32],
+        ..lens.clone()
+    }
+}
+
 fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
     let look = |look: &Look| {
         let own = look.scissor.map(|[x0, y0, x1, y1]| screen_rect(m, Rect::new(x0, y0, x1, y1)));
@@ -77,6 +104,7 @@ fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
     match item {
         Item::Path(p) => Item::Path(PathItem { look: look(&p.look), ..p.clone() }),
         Item::Image(i) => Item::Image(crate::display_list::ImageItem { look: look(&i.look), ..i.clone() }),
+        Item::Lens(l) => Item::Lens(Box::new(LensItem { lens: moved_lens(&l.lens, m, frame, scale), ..(**l).clone() })),
         other => other.clone(),
     }
 }
@@ -93,11 +121,19 @@ fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect) -> Ite
     })
 }
 
-fn used(u: &UseItem, group: &DisplayList) -> Vec<Item> {
+fn used(u: &UseItem, group: &DisplayList, start: usize) -> Vec<Item> {
     let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
     let scale = scale_of(u.matrix);
     let back = group.background.map(|c| background(&u.clip, c, frame));
-    back.into_iter().chain(group.items.iter().map(|i| placed(i, u.matrix, frame, scale))).collect()
+    let first = start + back.iter().count();
+    let items = group.items.iter().map(|i| match placed(i, u.matrix, frame, scale) {
+        Item::Lens(mut l) => {
+            l.under += first;
+            Item::Lens(l)
+        }
+        other => other,
+    });
+    back.into_iter().chain(items).collect()
 }
 
 pub fn report(skipped: &[Skipped]) -> String {
@@ -167,7 +203,10 @@ pub fn expand(list: &DisplayList, groups: &Groups) -> (DisplayList, Vec<String>)
             continue;
         };
         match groups.get(&u.group) {
-            Some(group) => items.extend(used(u, group)),
+            Some(group) => {
+                let start = items.len();
+                items.extend(used(u, group, start));
+            }
             None => missing.push(u.group.clone()),
         }
     }
