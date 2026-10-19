@@ -1,3 +1,4 @@
+pub mod canvas;
 pub mod colour;
 pub mod display_list;
 pub mod engine;
@@ -12,6 +13,8 @@ pub mod scene;
 pub mod turbulence;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
+#[cfg(target_arch = "wasm32")]
+pub mod web_gl;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Skipped {

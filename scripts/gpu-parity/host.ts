@@ -86,6 +86,7 @@ async function fullShots(input: ShotsInput, backend: FullBackend): Promise<Shots
 
 const gpuFullShots = (input: ShotsInput) => fullShots(input, FullBackend.WebGl2);
 const gpuCoreShots = (input: ShotsInput) => fullShots(input, FullBackend.Core);
+const gpuCoreGlShots = (input: ShotsInput) => fullShots(input, FullBackend.CoreGl);
 
 async function encode(input: ExportInput, render: (onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>) => Promise<void>): Promise<ExportResult> {
   const start = performance.now();
@@ -198,4 +199,4 @@ async function liveSeek(t: number) {
   await new Promise((r) => setTimeout(r, 400));
 }
 
-Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, gpuCoreShots, htmlExport, gpuExport, htmlPreview, gpuPreview });
+Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, gpuCoreShots, gpuCoreGlShots, htmlExport, gpuExport, htmlPreview, gpuPreview });

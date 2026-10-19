@@ -2,14 +2,15 @@ export enum RenderEngine {
   Html = 'html',
   Gpu = 'gpu',
   GpuFull = 'gpu-full',
-  GpuCore = 'gpu-core'
+  GpuCore = 'gpu-core',
+  GpuCoreGl = 'gpu-core-gl'
 }
 
 const PARAM = 'engine';
 
 export const KILL_FLAG = 'motion-engine-html';
 
-const ASKED: ReadonlySet<string> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull, RenderEngine.GpuCore]);
+const ASKED: ReadonlySet<string> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull, RenderEngine.GpuCore, RenderEngine.GpuCoreGl]);
 
 export const killSwitch = (env: string | undefined, flagged: boolean): boolean => env === RenderEngine.Html || flagged;
 

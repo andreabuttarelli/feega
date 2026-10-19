@@ -4,7 +4,8 @@ import type { Picture, Pictures, Raster } from './raster';
 const CORE_URL = '/gpu-core/gpu_core.js';
 
 type Attached = { draw: (list: string) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; free: () => void };
-type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: (canvas: HTMLCanvasElement, width: number, height: number) => Promise<Attached> } };
+type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
+type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
 
 const NO_PICTURES: Pictures = () => null;
 
@@ -20,13 +21,13 @@ function wanted(items: Item[]): ImageItem[] {
 
 const moving = (picture: Picture) => typeof HTMLVideoElement !== 'undefined' && picture.source instanceof HTMLVideoElement;
 
-export async function createCore(canvas: HTMLCanvasElement, width: number, height: number): Promise<Raster> {
-  if (!('gpu' in navigator)) {
-    throw new Error('webgpu unavailable');
-  }
+async function coreModule(): Promise<CoreModule> {
   const core = (await import(/* @vite-ignore */ CORE_URL)) as CoreModule;
   await core.default();
-  const attached = await core.WebCore.attach(canvas, width, height);
+  return core;
+}
+
+function rasterOf(attached: Attached): Raster {
   const uploaded = new Map<string, Picture['source']>();
 
   function upload(item: ImageItem, pictures: Pictures) {
@@ -48,4 +49,17 @@ export async function createCore(canvas: HTMLCanvasElement, width: number, heigh
     },
     dispose: () => attached.free()
   };
+}
+
+export async function createCore(canvas: HTMLCanvasElement, width: number, height: number): Promise<Raster> {
+  if (!('gpu' in navigator)) {
+    throw new Error('webgpu unavailable');
+  }
+  const core = await coreModule();
+  return rasterOf(await core.WebCore.attach(canvas, width, height));
+}
+
+export async function createCoreGl(canvas: HTMLCanvasElement, width: number, height: number): Promise<Raster> {
+  const core = await coreModule();
+  return rasterOf(core.WebGlCore.attach(canvas, width, height));
 }
