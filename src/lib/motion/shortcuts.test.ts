@@ -207,6 +207,12 @@ describe('mask keys', () => {
   });
 });
 
+describe('outline stroke key', () => {
+  it('⌥⌘O outlines the stroke of the selected shape', () => {
+    expect(press('ø', { mod: true, alt: true, code: 'KeyO' })).toBe(Command.OutlineStroke);
+  });
+});
+
 describe('flatten key', () => {
   it('⌘E flattens the selected shapes, E alone still switches the mode', () => {
     expect(press('e', { mod: true, code: 'KeyE' })).toBe(Command.Flatten);

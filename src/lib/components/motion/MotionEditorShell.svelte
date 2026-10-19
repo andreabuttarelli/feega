@@ -88,6 +88,7 @@
   import { Flip, flipClips } from '$lib/motion/layer-props';
   import { matchingLayers } from '$lib/motion/select-matching';
   import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
+  import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
   import { Copied, elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
@@ -1598,6 +1599,7 @@
     [Command.Subtract]: () => combine(BooleanOp.Subtract),
     [Command.Intersect]: () => combine(BooleanOp.Intersect),
     [Command.Exclude]: () => combine(BooleanOp.Exclude),
+    [Command.OutlineStroke]: () => apply(outlineStrokes(doc, selection, frame, newId), 'Outlined the stroke'),
     [Command.Flatten]: () => reshape(flattenShapes(doc, selection, frame), 'Flattened shapes'),
     [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
     [Command.AlignLeft]: () => selection.length && alignTo(Edge.Left),
@@ -1620,7 +1622,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.Union, Action.SelectMatching, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.Union, Action.SelectMatching, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.Subtract, Action.Intersect, Action.Exclude, Action.OutlineStroke, Action.Flatten, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
