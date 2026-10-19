@@ -201,7 +201,7 @@
 <ChatLeaveGuard {projectId} />
 {#if browser}<RightBar {projectId} viewOnly={!canEdit} />{/if}
 
-<div class="project-shell ui-app" class:is-editing={inlineStage.editing} class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-mode={data.project.mode}>
+<div class="project-shell safe-shell ui-app" class:is-editing={inlineStage.editing} class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-safe={isMobile ? 'sides' : undefined} data-mode={data.project.mode}>
   {#if isMobile}
     <MobileTopBar
       {projectId}
