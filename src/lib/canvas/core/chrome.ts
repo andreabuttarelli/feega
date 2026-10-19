@@ -1,11 +1,8 @@
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
-import { rgbaOf, type Rgba } from '$lib/motion/gpu-full/rgba';
-import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
-import { ItemKind, type PathItem } from '$lib/motion/gpu-full/display-list';
-import { BlendMode } from '$lib/motion/blend';
-import { IDENTITY } from '$lib/motion/parent';
-import { Cap, Join, dashes, strokePolygons } from '$lib/motion/gpu-full/stroke';
+import type { PathItem } from '$lib/motion/gpu-full/display-list';
+import { dashes } from '$lib/motion/gpu-full/stroke';
+import { line, rect, solid } from './shapes';
 
 export enum ChromePart {
   Hover = 'hover',
@@ -47,20 +44,14 @@ const HOVER_COLOR = '#b14cff';
 const HANDLE_FILL = '#ffffff';
 const LABEL_COLOR = '#6e6e73';
 
-const rect = (x: number, y: number, w: number, h: number): number[] => [x, y, x + w, y, x + w, y + h, x, y + h];
-
-const solid = (css: string): Rgba => rgbaOf(css) ?? [0, 0, 0, 1];
-
-function item(t: ChromeTile, part: ChromePart, contours: number[][], color: string, opacity = 1): PathItem {
-  return { kind: ItemKind.Path, clip: `${t.id}:${part}`, contours, rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: solid(color) }, opacity, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal };
-}
+const item = (t: ChromeTile, part: ChromePart, contours: number[][], color: string, opacity = 1): PathItem => solid(`${t.id}:${part}`, contours, color, opacity);
 
 function outline(t: ChromeTile, width: number): number[] {
   const inset = RING_OFFSET + width / 2;
   return rect(t.x - inset, t.y - inset, t.width + 2 * inset, t.height + 2 * inset);
 }
 
-const band = (t: ChromeTile, width: number) => strokePolygons(outline(t, width), true, width, Cap.Butt, Join.Miter);
+const band = (t: ChromeTile, width: number) => line(outline(t, width), width, true);
 
 function hover(t: ChromeTile): PathItem[] {
   if (!t.hovered || t.ring !== NodeChrome.None) {
@@ -73,7 +64,7 @@ const RINGS: Record<NodeChrome, (t: ChromeTile) => PathItem[]> = {
   [NodeChrome.None]: () => [],
   [NodeChrome.Selected]: (t) => [item(t, ChromePart.Ring, band(t, RING_WIDTH), t.ringColor)],
   [NodeChrome.Editing]: (t) =>
-    dashes(outline(t, EDITING_WIDTH), true, DASH, DASH).map((d) => item(t, ChromePart.Ring, strokePolygons(d, false, EDITING_WIDTH, Cap.Butt, Join.Miter), t.ringColor, EDITING_OPACITY))
+    dashes(outline(t, EDITING_WIDTH), true, DASH, DASH).map((d) => item(t, ChromePart.Ring, line(d, EDITING_WIDTH), t.ringColor, EDITING_OPACITY))
 };
 
 const spaced = (t: ChromeTile, i: number, n: number) => t.y + ((i + 1) / (n + 1)) * t.height;
