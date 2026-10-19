@@ -15,7 +15,7 @@
   import { screenUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { throughCamera } from '$lib/canvas/core/world-overlay';
   import type { PathItem } from '$lib/motion/gpu-full/display-list';
-  import { drawsWhole, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
@@ -46,7 +46,7 @@
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing: smoothingOf(navigator.userAgent) });
     const list = drawFrame(prepared, stillFrame(source.doc));
     await media.ready(list);
-    lists = new Map(lists).set(keyOf(f), list);
+    lists = new Map(lists).set(keyOf(f), onStage(list, f.kind));
   }
 
   $effect(() => {

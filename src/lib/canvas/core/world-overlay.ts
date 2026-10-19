@@ -3,13 +3,19 @@ import type { PathItem } from '$lib/motion/gpu-full/display-list';
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
-import { EdgeLook, edgeItems, guideItems, marqueeItems, type CoreTheme } from './overlay';
+import { EdgeLook, edgeItems, guideItems, marqueeItems, peerItems, rotateItems, type CorePeer, type CoreTheme } from './overlay';
+import type { Glyphs } from './chrome';
+import { line, rect, solid } from './shapes';
 
 const ITERATE = 'iterate';
+const PEER_OUTLINE_PX = 2;
+const PEER_OUTLINE = 'peer-outline';
+
+export type PeerOutline = { key: string; box: Box; color: string };
 
 export type Wire = { id: string; source: string; target: string; mode?: string };
 
-export type WorldOverlay = { curves: readonly { edge: Wire; curve: Curve }[]; selected: readonly string[]; selectedEdge: string | null; marquee: Box | null; guides: readonly SnapGuide[]; zoom: number; theme: CoreTheme };
+export type WorldOverlay = { curves: readonly { edge: Wire; curve: Curve }[]; selected: readonly string[]; selectedEdge: string | null; marquee: Box | null; guides: readonly SnapGuide[]; zoom: number; theme: CoreTheme; glyphs: Glyphs; peers: readonly CorePeer[]; outlines: readonly PeerOutline[]; rotate: readonly { id: string; box: Box }[] };
 
 export function edgeLook(edge: Wire, selected: readonly string[], selectedEdge: string | null): EdgeLook {
   if (edge.mode === ITERATE) {
@@ -23,7 +29,10 @@ export function overlayOf(o: WorldOverlay): PathItem[] {
   return [
     ...o.curves.flatMap((c) => edgeItems(c.edge.id, c.curve, edgeLook(c.edge, o.selected, o.selectedEdge), o.theme)),
     ...(o.marquee ? marqueeItems(o.marquee, o.zoom, o.theme) : []),
-    ...guideItems(o.guides, o.zoom, o.theme)
+    ...guideItems(o.guides, o.zoom, o.theme),
+    ...o.outlines.map((p) => solid(`${p.key}:${PEER_OUTLINE}`, line(rect(p.box.x, p.box.y, p.box.w, p.box.h), PEER_OUTLINE_PX / o.zoom, true), p.color)),
+    ...o.peers.flatMap((p) => peerItems(p, o.zoom, o.glyphs)),
+    ...o.rotate.flatMap((r) => rotateItems(r.id, r.box, o.theme))
   ];
 }
 
