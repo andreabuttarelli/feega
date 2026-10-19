@@ -97,9 +97,11 @@ const gpuCoreGlShots = (input: ShotsInput) => fullShots(input, FullBackend.CoreG
 async function coreExportShots(input: ShotsInput, backend: FullBackend): Promise<ShotsResult> {
   const doc = input.spec.doc as MotionDoc;
   const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets, { fonts: await loadFontsWith(faceEngineOf(input.spec.faces))(doc, input.spec.assets, FEEGA_TOKENS), smoothing: smoothingOf(navigator.userAgent) });
+  const custom = await mountCustomReads(host(), composer(input.spec), prepared);
   const pngs: string[] = [];
   const start = performance.now();
-  const done = await renderOnCore(prepared, backend, input.times, async (bitmap) => void pngs.push(await png(bitmap, input.width, input.height)), new AbortController().signal);
+  const done = await renderOnCore(prepared, backend, input.times, async (bitmap) => void pngs.push(await png(bitmap, input.width, input.height)), new AbortController().signal, custom);
+  custom.dispose();
   if (!done) {
     throw new Error('core export fell back to HTML');
   }

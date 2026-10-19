@@ -110,6 +110,8 @@ fn wanted(items: &[Item]) -> Vec<Wanted> {
             let own = match item {
                 Item::Image(image) if image.video => vec![Wanted::Moving(image.clip.clone(), image.src.clone(), image.media_time)],
                 Item::Image(image) => vec![Wanted::Still(image.clip.clone(), image.src.clone())],
+                Item::Layer(layer) => vec![Wanted::Still(layer.source.clone(), layer.source.clone())],
+                Item::Group(group) => wanted(&group.items),
                 _ => vec![],
             };
             let look = item.look();

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use gpu_text::{Command, Op, Source};
 use vello::kurbo::{flatten, Affine, BezPath, PathEl, Point};
 
-use crate::display_list::{DisplayList, FillRule, GlyphsItem, Item, PathItem};
+use crate::display_list::{DisplayList, FillRule, GlyphsItem, GroupItem, Item, PathItem};
 
 const TOLERANCE_PX: f64 = 0.05;
 
@@ -75,10 +75,8 @@ fn outlined(run: &GlyphsItem, source: &Source) -> Item {
     Item::Path(PathItem { clip: run.clip.clone(), contours, rule: FillRule::NonZero, paint: run.paint.clone(), within: None, look: run.look.clone() })
 }
 
-pub fn outline(list: &DisplayList, fonts: &Fonts) -> (DisplayList, Vec<String>) {
-    let mut missing = vec![];
-    let items = list
-        .items
+fn outlined_items(items: &[Item], fonts: &Fonts, missing: &mut Vec<String>) -> Vec<Item> {
+    items
         .iter()
         .map(|item| match item {
             Item::Glyphs(run) => match fonts.sources.get(&run.font) {
@@ -88,8 +86,14 @@ pub fn outline(list: &DisplayList, fonts: &Fonts) -> (DisplayList, Vec<String>) 
                     Item::Other { clip: run.clip.clone(), kind: "glyphs".into() }
                 }
             },
+            Item::Group(group) => Item::Group(Box::new(GroupItem { clip: group.clip.clone(), items: outlined_items(&group.items, fonts, missing), look: group.look.clone() })),
             other => other.clone(),
         })
-        .collect();
+        .collect()
+}
+
+pub fn outline(list: &DisplayList, fonts: &Fonts) -> (DisplayList, Vec<String>) {
+    let mut missing = vec![];
+    let items = outlined_items(&list.items, fonts, &mut missing);
     (DisplayList { items, ..list.clone_empty() }, missing)
 }

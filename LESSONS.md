@@ -3165,3 +3165,13 @@ backdrop), so a rebuilt atlas recopies it; once per frame is not enough. Guarded
 grain 0.93). **Move:** compare against `--ref=live` and encode the variable you suspect into the
 asset (frame number as luma) before touching a renderer; both gaps were in the capture path or
 in a half-pixel convention, not in timing.
+
+## A core frame that comes out blank, with no error, is usually texture memory
+
+**Signal:** `--under=gpu-core` draws some frames and leaves others black or background-only,
+`not drawn: none`, no console error. **Move:** count the layer-worthy items in the frame's list
+(filters, masks, blur): each one gets its own texture, and a filtered item used to get a
+full-frame one. Hundreds of them (a custom component flattened, its group grain copied onto
+every child) exhaust the GPU silently. Bisect by slicing the group's children in
+`scripts/gpu-parity/host.ts`; a single child that flips the frame is a blend/layer bug instead
+(WebGL2 `multiply` inside a group, still open).

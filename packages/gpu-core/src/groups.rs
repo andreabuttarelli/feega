@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use vello::kurbo::{Affine as Matrix, Point, Rect};
 
-use crate::display_list::{Affine, DisplayList, FillRule, ImageItem, Item, Lens, LensItem, Look, Paint, PathItem, Size, UseItem};
+use crate::display_list::{Affine, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Lens, LensItem, Look, Paint, PathItem, Size, UseItem};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::glyphs::{outline, Fonts};
 #[cfg(not(target_arch = "wasm32"))]
@@ -109,7 +109,9 @@ fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
     };
     match item {
         Item::Path(p) => Item::Path(PathItem { look: look(&p.look), ..p.clone() }),
-        Item::Image(i) => Item::Image(crate::display_list::ImageItem { look: look(&i.look), ..i.clone() }),
+        Item::Image(i) => Item::Image(ImageItem { look: look(&i.look), ..i.clone() }),
+        Item::Layer(l) => Item::Layer(LayerItem { look: look(&l.look), ..l.clone() }),
+        Item::Group(g) => Item::Group(Box::new(GroupItem { clip: g.clip.clone(), items: g.items.iter().map(|i| placed(i, m, frame, scale)).collect(), look: look(&g.look) })),
         Item::Lens(l) => Item::Lens(Box::new(LensItem { lens: moved_lens(&l.lens, m, frame, scale), ..(**l).clone() })),
         other => other.clone(),
     }
