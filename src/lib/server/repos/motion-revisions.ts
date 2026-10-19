@@ -28,7 +28,51 @@ function headOf(row: RevisionRow): MotionHead | null {
   return { version: Number(row.version), doc: parsed.doc, summary: row.summary, actorKind: row.actor_kind };
 }
 
-export async function readHead(db: Db, input: { orgId: string; nodeId: string }): Promise<MotionHead | null> {
+const HEADS_KEPT = 64;
+
+export type HeadCache = Map<string, MotionHead>;
+
+export const headCache = (): HeadCache => new Map();
+
+async function headVersion(db: Db, input: { orgId: string; nodeId: string }): Promise<number | null> {
+  const { data, error } = await db
+    .from('motion_revisions')
+    .select('version')
+    .eq('org_id', input.orgId)
+    .eq('node_id', input.nodeId)
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data ? Number((data as { version: number }).version) : null;
+}
+
+function kept(cache: HeadCache, key: string, head: MotionHead): MotionHead {
+  cache.delete(key);
+  cache.set(key, head);
+  if (cache.size > HEADS_KEPT) {
+    cache.delete(cache.keys().next().value!);
+  }
+  return structuredClone(head);
+}
+
+export async function readHead(db: Db, input: { orgId: string; nodeId: string }, cache?: HeadCache): Promise<MotionHead | null> {
+  if (!cache) {
+    return readFullHead(db, input);
+  }
+  const key = `${input.orgId}:${input.nodeId}`;
+  const known = cache.get(key);
+  if (known && (await headVersion(db, input)) === known.version) {
+    return kept(cache, key, known);
+  }
+  const head = await readFullHead(db, input);
+  return head ? kept(cache, key, head) : null;
+}
+
+async function readFullHead(db: Db, input: { orgId: string; nodeId: string }): Promise<MotionHead | null> {
   const { data, error } = await db
     .from('motion_revisions')
     .select('version, doc, summary, actor_kind')
