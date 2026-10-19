@@ -126,6 +126,7 @@
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHead } from '$lib/canvas/frame-outlines';
+  import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { framesToWarm } from '$lib/canvas/warm-frames';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
@@ -1803,14 +1804,15 @@
   }
 
   let componentPickFor = $state<string | null>(null);
-  const componentItems = $derived(componentCatalogue(data.componentTemplates));
+  const componentTemplates = $derived([...BUILTIN_TEMPLATES, ...data.orgTemplates]);
+  const componentItems = $derived(componentCatalogue(componentTemplates));
   const componentPicking = $derived.by(() => {
     const row = componentPickFor ? nodes.find((n) => n.id === componentPickFor) : null;
     return row ? compositionOf(row) : null;
   });
 
   function componentDraft(nodeId: string, templateId: string, format: MotionFormat): Instance | null {
-    const entry = data.componentTemplates.find((t) => t.id === templateId);
+    const entry = componentTemplates.find((t) => t.id === templateId);
     const made = entry ? composedTemplate(entry, { format, values: {} }, compositionCards(nodeId, edges, nodes), sequentialIds()) : null;
     return made?.ok ? made : null;
   }
@@ -1840,7 +1842,7 @@
   }
 
   function frameDraft(templateId: string, format: MotionFormat): Instance | null {
-    const entry = data.componentTemplates.find((t) => t.id === templateId);
+    const entry = componentTemplates.find((t) => t.id === templateId);
     const made = entry ? composedTemplate(entry, { format, values: {} }, [], sequentialIds()) : null;
     return made?.ok ? made : null;
   }
@@ -1861,7 +1863,7 @@
     const frameSize = { w: probe.size.width ?? 0, h: probe.size.height ?? 0 };
     const spot = placeNear(at, frameSize, occupiedRects());
     const id = crypto.randomUUID();
-    const name = data.componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
+    const name = componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
     const values = frameValues(templateId, draft);
     const poster = Object.keys(values).length ? null : item?.preview?.poster;
     if (poster) {
@@ -3646,7 +3648,7 @@
             {cards}
             assets={cardAssets(cards)}
             composeIn={{ project: data.projectId, canvas: data.canvas.id }}
-            templates={data.componentTemplates}
+            templates={componentTemplates}
             onpatch={(patch) => write(id, patch, SaveTiming.Now)}
             onpickcomponent={() => (componentPickFor = id)}
           />

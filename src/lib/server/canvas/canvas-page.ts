@@ -214,12 +214,12 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
 
   const connections = await canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch, previews] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, orgTemplates, handoff, outlines, killSwitch, previews] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
     firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length }),
-    templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
+    templateLibrary(db, { orgId, actor: userActor({ userId }) }).own(),
     chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
     canvasOutlines(db, { orgId, nodes }),
     rendererSwitch(),
@@ -248,7 +248,7 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     mode,
     projectBrandId,
     onboarding,
-    componentTemplates,
+    orgTemplates,
     outlines,
     cardPreviews: previews
   };
