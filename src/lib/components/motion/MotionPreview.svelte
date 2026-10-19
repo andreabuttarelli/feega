@@ -372,9 +372,14 @@
   }
 
   async function renderOnCoreOf(spec: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> }, backend: FullBackend, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<boolean> {
-    const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('$lib/motion/gpu-full/display-list'), import('$lib/motion/gpu-full/text/load'), import('$lib/motion/gpu-full/text/painter')]);
+    const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }, { mountCustomReads }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('$lib/motion/gpu-full/display-list'), import('$lib/motion/gpu-full/text/load'), import('$lib/motion/gpu-full/text/painter'), import('$lib/motion/gpu-full/dom/custom')]);
     const prepared = prepare(spec.doc, spec.tokens, spec.assets, { fonts: await loadFonts(spec.doc, spec.assets, spec.tokens), smoothing: smoothingOf(navigator.userAgent) });
-    return renderOnCore(prepared, backend, times, onFrame, signal);
+    const custom = await mountCustomReads(host ?? document.body, gpuCompose ?? (() => html), prepared);
+    try {
+      return await renderOnCore(prepared, backend, times, onFrame, signal, custom);
+    } finally {
+      custom.dispose();
+    }
   }
 
   export async function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast, prefer: RenderEngine = engine): Promise<void> {

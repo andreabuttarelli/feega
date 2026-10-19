@@ -2,7 +2,6 @@ import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item, type 
 import type { Picture, Pictures, Raster } from './raster';
 import type { Affine } from '../affine';
 import type { Rgba } from './rgba';
-import { ungrouped } from './ungroup';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
 
@@ -15,22 +14,19 @@ export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pict
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
 
+type PictureItem = ImageItem | LayerItem;
+
 const NO_PICTURES: Pictures = () => null;
-
-const UNTURNED: Affine = [1, 0, 0, 1, 0, 0];
-
-const asPicture = (l: LayerItem): ImageItem & { source: string } => ({ ...l, kind: ItemKind.Image, clip: l.source, src: l.source, video: false, mediaTime: 0, fit: 'fill', focus: [0.5, 0.5], zoom: 1, clipped: true, inner: UNTURNED });
-
-export const forCore = (item: Item): Item => (item.kind === ItemKind.Layer ? asPicture(item) : item);
-
-const drawable = (list: DisplayList): DisplayList => ({ ...list, items: list.items.map(forCore) });
 
 const coverPicture = (src: string) => ({ kind: ItemKind.Image, clip: src, src, video: false }) as ImageItem;
 
-function wanted(items: Item[]): ImageItem[] {
+export const pictureKey = (item: PictureItem): string => (item.kind === ItemKind.Layer ? item.source : item.clip);
+
+export function wantedPictures(items: Item[]): PictureItem[] {
   return items.flatMap((i) => [
-    ...(i.kind === ItemKind.Image ? [i] : []),
-    ...wanted(i.matte?.items ?? []),
+    ...(i.kind === ItemKind.Image || i.kind === ItemKind.Layer ? [i] : []),
+    ...(i.kind === ItemKind.Group ? wantedPictures(i.items) : []),
+    ...wantedPictures(i.matte?.items ?? []),
     ...(i.masks ?? []).flatMap((m) => (m.cover.kind === CoverKind.Picture ? [coverPicture(m.cover.src)] : []))
   ]);
 }
@@ -65,43 +61,39 @@ function rasterOf(attached: Attached): CoreRaster {
     return canvas;
   }
 
-  function upload(item: ImageItem, pictures: Pictures) {
+  function upload(item: PictureItem, pictures: Pictures) {
     const picture = pictures(item);
     if (!picture) {
       return;
     }
-    if (uploaded.get(item.clip) === picture.source && !moving(picture)) {
+    const key = pictureKey(item);
+    if (uploaded.get(key) === picture.source && !moving(picture)) {
       return;
     }
-    attached.picture(item.clip, moving(picture) ? still(item.clip, picture) : picture.source, picture.size.width, picture.size.height);
-    uploaded.set(item.clip, picture.source);
+    attached.picture(key, moving(picture) ? still(key, picture) : picture.source, picture.size.width, picture.size.height);
+    uploaded.set(key, picture.source);
   }
-
-  const flat = <T extends { items: (Item | Use)[] }>(list: T): T => ({ ...list, items: ungrouped(list.items as Item[]) });
 
   const drawn = (items: Item[]) => items.filter((i): i is Item => (i as Item | Use).kind !== 'use');
 
   return {
-    draw: (raw: DisplayList, pictures = NO_PICTURES) => {
-      const list = drawable(raw);
-      wanted(list.items).forEach((item) => upload(item, pictures));
-      return attached.draw(JSON.stringify(flat(list))).split('\n').filter(Boolean);
+    draw: (list: DisplayList, pictures = NO_PICTURES) => {
+      wantedPictures(list.items).forEach((item) => upload(item, pictures));
+      return attached.draw(JSON.stringify(list)).split('\n').filter(Boolean);
     },
-    putGroup: (key: string, raw: DisplayList, pictures = NO_PICTURES) => {
-      const list = drawable(raw);
-      wanted(list.items).forEach((item) => upload(item, pictures));
-      attached.put_group(key, JSON.stringify(flat(list)));
+    putGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
+      wantedPictures(list.items).forEach((item) => upload(item, pictures));
+      attached.put_group(key, JSON.stringify(list));
     },
-    appendGroup: (key: string, raw: DisplayList, pictures = NO_PICTURES) => {
-      const list = drawable(raw);
-      wanted(list.items).forEach((item) => upload(item, pictures));
-      attached.append_group(key, JSON.stringify(flat(list)));
+    appendGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
+      wantedPictures(list.items).forEach((item) => upload(item, pictures));
+      attached.append_group(key, JSON.stringify(list));
     },
     dropGroup: (key: string) => attached.drop_group(key),
-    upload: (list: DisplayList, pictures: Pictures) => wanted(list.items).forEach((item) => upload(item, pictures)),
+    upload: (list: DisplayList, pictures: Pictures) => wantedPictures(list.items).forEach((item) => upload(item, pictures)),
     drawScreen: (screen: Screen, pictures = NO_PICTURES) => {
-      wanted(drawn(screen.items as Item[])).forEach((item) => upload(item, pictures));
-      attached.draw(JSON.stringify(flat(screen)));
+      wantedPictures(drawn(screen.items as Item[])).forEach((item) => upload(item, pictures));
+      attached.draw(JSON.stringify(screen));
       return attached.cache_pending();
     },
     cacheBytes: () => attached.cache_bytes(),

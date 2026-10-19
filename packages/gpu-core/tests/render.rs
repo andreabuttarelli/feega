@@ -5,7 +5,7 @@ const SQUARE: &str = r#"{
   "items": [
     { "kind": "path", "clip": "card", "contours": [[16, 16, 48, 16, 48, 48, 16, 48]], "rule": "nonzero",
       "paint": { "kind": "solid", "color": [1, 0, 0, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blur": 0, "blend": "normal" },
-    { "kind": "layer", "clip": "pic" }
+    { "kind": "layer", "clip": "pic", "source": "pic:canvas", "size": { "width": 8, "height": 8 }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blur": 0, "blend": "normal" }
   ]
 }"#;
 
@@ -17,7 +17,7 @@ fn parses_the_display_list_the_web_engine_writes() {
 }
 
 #[test]
-fn names_the_items_it_does_not_draw_yet() {
+fn names_a_layer_whose_picture_never_arrived() {
     let (_, skipped) = build(&parse(SQUARE).unwrap(), &Pictures::new(), &Layers::new());
 
     assert_eq!(skipped, vec![Skipped { clip: "pic".into(), what: "layer".into() }]);

@@ -383,3 +383,52 @@ fn scale(space: Linear) -> f64 {
 fn vector(space: Linear, dx: f64, dy: f64) -> (f64, f64) {
     (space[0] * dx + space[2] * dy, space[1] * dx + space[3] * dy)
 }
+
+const SIGMAS: f64 = 3.0;
+const SVG_REGION_SHARE: f64 = 0.1;
+const SVG_OWN_REGION: [&str; 5] = ["x", "y", "width", "height", "filterUnits"];
+const FRAME_SPACE_PRIMITIVES: [&str; 5] = ["feTurbulence", "feTile", "feImage", "feDiffuseLighting", "feSpecularLighting"];
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Reach {
+    pub share: f64,
+    pub px: f64,
+}
+
+impl Reach {
+    fn plus(self, other: Reach) -> Reach {
+        Reach { share: self.share + other.share, px: self.px + other.px }
+    }
+}
+
+fn css_reach(f: &CssFunction, space: Linear) -> Option<f64> {
+    let s = scale(space);
+    let px = |i: usize| f.args.get(i).and_then(|v| leading_number(v)).unwrap_or(0.0);
+    if css_matrix(&f.name, 1.0).is_some() {
+        return Some(0.0);
+    }
+    match f.name.as_str() {
+        "blur" => Some(px(0) * s * SIGMAS),
+        "drop-shadow" => {
+            let (dx, dy) = vector(space, px(0), px(1));
+            Some(dx.abs().max(dy.abs()) + px(2) * HALF * s * SIGMAS)
+        }
+        _ => None,
+    }
+}
+
+fn svg_reach(filter: &SvgNode) -> Option<Reach> {
+    let own_region = SVG_OWN_REGION.iter().any(|k| filter.attrs.contains_key(*k));
+    let frame_space = filter.children.iter().any(|c| FRAME_SPACE_PRIMITIVES.contains(&c.tag.as_str()));
+    (!own_region && !frame_space).then_some(Reach { share: SVG_REGION_SHARE, px: 0.0 })
+}
+
+pub fn reach(filters: &[Filter], space: Linear) -> Option<Reach> {
+    filters.iter().try_fold(Reach::default(), |acc, f| {
+        let own = match f {
+            Filter::Css { fns } => fns.iter().map(|f| css_reach(f, space)).sum::<Option<f64>>().map(|px| Reach { share: 0.0, px }),
+            Filter::Svg { nodes } => nodes.iter().map(svg_reach).try_fold(Reach::default(), |a, r| r.map(|r| a.plus(r))),
+        };
+        own.map(|r| acc.plus(r))
+    })
+}

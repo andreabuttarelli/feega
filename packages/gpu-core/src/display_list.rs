@@ -366,10 +366,29 @@ pub struct LensItem {
     pub under: usize,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct LayerItem {
+    pub clip: String,
+    pub source: String,
+    pub size: Size,
+    #[serde(flatten)]
+    pub look: Look,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GroupItem {
+    pub clip: String,
+    pub items: Vec<Item>,
+    #[serde(flatten)]
+    pub look: Look,
+}
+
 #[derive(Debug, Clone)]
 pub enum Item {
     Path(PathItem),
     Image(ImageItem),
+    Layer(LayerItem),
+    Group(Box<GroupItem>),
     Use(UseItem),
     Glyphs(GlyphsItem),
     Text(Box<TextItem>),
@@ -382,6 +401,8 @@ impl Item {
         match self {
             Item::Path(p) => Some(&p.look),
             Item::Image(i) => Some(&i.look),
+            Item::Layer(l) => Some(&l.look),
+            Item::Group(g) => Some(&g.look),
             Item::Use(_) | Item::Glyphs(_) | Item::Text(_) | Item::Lens(_) | Item::Other { .. } => None,
         }
     }
@@ -390,6 +411,8 @@ impl Item {
         match self {
             Item::Path(p) => &p.clip,
             Item::Image(i) => &i.clip,
+            Item::Layer(l) => &l.clip,
+            Item::Group(g) => &g.clip,
             Item::Use(u) => &u.clip,
             Item::Glyphs(g) => &g.clip,
             Item::Text(t) => &t.clip,
@@ -402,6 +425,8 @@ impl Item {
         match self {
             Item::Path(_) => "path",
             Item::Image(_) => "image",
+            Item::Layer(_) => "layer",
+            Item::Group(_) => "group",
             Item::Use(_) => "use",
             Item::Glyphs(_) => "glyphs",
             Item::Text(_) => "text",
@@ -418,6 +443,8 @@ impl<'de> Deserialize<'de> for Item {
         match text("kind").as_str() {
             "path" => serde_json::from_value(value).map(Item::Path).map_err(serde::de::Error::custom),
             "image" => serde_json::from_value(value).map(Item::Image).map_err(serde::de::Error::custom),
+            "layer" => serde_json::from_value(value).map(Item::Layer).map_err(serde::de::Error::custom),
+            "group" => serde_json::from_value(value).map(|g| Item::Group(Box::new(g))).map_err(serde::de::Error::custom),
             "use" => serde_json::from_value(value).map(Item::Use).map_err(serde::de::Error::custom),
             "glyphs" => serde_json::from_value(value).map(Item::Glyphs).map_err(serde::de::Error::custom),
             "text" => serde_json::from_value(value).map(|t| Item::Text(Box::new(t))).map_err(serde::de::Error::custom),
