@@ -4,12 +4,13 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import { drawFrame, prepare, type Prepared } from '$lib/motion/gpu-full/display-list';
   import { createRaster, type Raster } from '$lib/motion/gpu-full/raster';
+  import { createMedia } from '$lib/motion/gpu-full/media';
 
-  let { doc, tokens, time, onfallback }: { doc: MotionDoc; tokens: BrandTokens; time: () => number; onfallback: (reason: unknown) => void } = $props();
+  let { doc, tokens, assets, time, onfallback }: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; time: () => number; onfallback: (reason: unknown) => void } = $props();
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let gaps = $state(0);
-  const prepared = $derived(prepare(doc, tokens));
+  const prepared = $derived(prepare(doc, tokens, assets));
 
   $effect(() => {
     const target = canvas;
@@ -23,24 +24,31 @@
       onfallback(e);
       return;
     }
+    const media = createMedia();
     let drawn: [Prepared | null, number] = [null, -1];
+    let busy = false;
     let loop = 0;
     const tick = () => {
       loop = requestAnimationFrame(tick);
       const now = prepared;
       const frame = Math.round(time() * now.doc.fps);
-      if (drawn[0] === now && drawn[1] === frame) {
+      if (busy || (drawn[0] === now && drawn[1] === frame)) {
         return;
       }
       drawn = [now, frame];
       const list = drawFrame(now, frame);
       gaps = list.unsupported.length;
-      raster.draw(list);
+      busy = true;
+      void media.ready(list).then(() => {
+        busy = false;
+        raster.draw(list, media.pictures);
+      });
     };
     loop = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(loop);
       raster.dispose();
+      media.dispose();
     };
   });
 </script>

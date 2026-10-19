@@ -10,6 +10,7 @@ import { composeHtml } from '$lib/motion/hyperframes/compose';
 import type { MotionDoc } from '$lib/motion/doc';
 import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
 import { createRaster } from '$lib/motion/gpu-full/raster';
+import { createMedia } from '$lib/motion/gpu-full/media';
 import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
 
 const composer = (spec: Spec) => (only?: ReadonlySet<string>) => composeHtml({ doc: spec.doc as MotionDoc, tokens: FEEGA_TOKENS, assets: spec.assets, origin: spec.origin, only });
@@ -61,7 +62,8 @@ async function gpuShots(input: ShotsInput): Promise<ShotsResult> {
 
 async function gpuFullShots(input: ShotsInput): Promise<ShotsResult> {
   const doc = input.spec.doc as MotionDoc;
-  const prepared = prepare(doc, FEEGA_TOKENS);
+  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets);
+  const media = createMedia();
   const canvas = document.createElement('canvas');
   const raster = createRaster(canvas, input.width, input.height);
   const pngs: string[] = [];
@@ -70,11 +72,13 @@ async function gpuFullShots(input: ShotsInput): Promise<ShotsResult> {
   for (const t of input.times) {
     const list = drawFrame(prepared, Math.round(t * doc.fps));
     list.unsupported.forEach((g) => gaps.set(g.clip, `${g.component}:${g.reason}`));
-    raster.draw(list);
+    await media.ready(list);
+    raster.draw(list, media.pictures);
     pngs.push(await png(canvas, input.width, input.height));
   }
   const out = { pngs, ms: performance.now() - start, backend: 'gpu-full webgl2', runs: 0, stats: [], unsupported: [...gaps].map(([clip, why]) => `${clip} ${why}`) };
   raster.dispose();
+  media.dispose();
   return out;
 }
 

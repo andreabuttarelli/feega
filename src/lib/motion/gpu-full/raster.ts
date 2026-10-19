@@ -1,4 +1,5 @@
-import { FillRule, PaintKind, type DisplayList, type Paint, type PathItem } from './display-list';
+import { FillRule, ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type Paint, type PathItem } from './display-list';
+import { imageRect, type Size } from './image-rect';
 import { gaussianKernel, MAX_TAPS } from './kernel';
 
 const MAX_STOPS = 8;
@@ -50,6 +51,19 @@ void main() {
   outColor = vec4(c.rgb * a, a);
 }`;
 
+const IMAGE_FS = `#version 300 es
+precision highp float;
+in vec2 v_local;
+uniform sampler2D u_src;
+uniform vec4 u_rect;
+uniform float u_opacity;
+out vec4 outColor;
+void main() {
+  vec2 uv = (v_local - u_rect.xy) / u_rect.zw;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) { discard; }
+  outColor = texture(u_src, uv) * u_opacity;
+}`;
+
 const QUAD_VS = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
@@ -88,7 +102,13 @@ const PAINT_KIND: Record<PaintKind, number> = { [PaintKind.Solid]: 0, [PaintKind
 
 type Target = { fbo: WebGLFramebuffer; resolve: WebGLFramebuffer; texture: WebGLTexture; buffers: WebGLRenderbuffer[] };
 
-export type Raster = { draw: (list: DisplayList) => void; dispose: () => void };
+export type Picture = { source: TexImageSource; size: Size };
+
+export type Pictures = (item: ImageItem) => Picture | null;
+
+export type Raster = { draw: (list: DisplayList, pictures?: Pictures) => void; dispose: () => void };
+
+const NO_PICTURES: Pictures = () => null;
 
 function program(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
   const p = gl.createProgram()!;
@@ -172,6 +192,8 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   const pathProgram = program(gl, PATH_VS, PATH_FS);
   const blurProgram = program(gl, QUAD_VS, BLUR_FS);
   const copyProgram = program(gl, QUAD_VS, COPY_FS);
+  const imageProgram = program(gl, PATH_VS, IMAGE_FS);
+  const textures = new Map<TexImageSource, WebGLTexture>();
   const main = target(gl, width, height, samples);
   const layer = target(gl, width, height, samples);
   const ping = plain(gl, width, height);
@@ -256,11 +278,58 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
-  function blurred(item: PathItem) {
+  function textureOf(source: TexImageSource): WebGLTexture {
+    const known = textures.get(source);
+    const tex = known ?? gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    if (!known || source instanceof HTMLVideoElement) {
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      textures.set(source, tex);
+    }
+    return tex;
+  }
+
+  function drawImage(item: ImageItem, opacity: number, pictures: Pictures) {
+    const picture = pictures(item);
+    if (!picture) {
+      return;
+    }
+    const m = item.matrix;
+    const r = imageRect(item.size, picture.size, item.fit, item.focus, item.zoom);
+    const { width: w, height: h } = item.size;
+    gl.useProgram(imageProgram);
+    gl.uniformMatrix3fv(u(imageProgram, 'u_matrix'), false, [m[0], m[1], 0, m[2], m[3], 0, m[4], m[5], 1]);
+    gl.uniform2f(u(imageProgram, 'u_frame'), width, height);
+    gl.uniform4f(u(imageProgram, 'u_rect'), r.x, r.y, r.width, r.height);
+    gl.uniform1f(u(imageProgram, 'u_opacity'), opacity);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, textureOf(picture.source));
+    gl.uniform1i(u(imageProgram, 'u_src'), 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const [x0, y0, x1, y1] = item.clipped ? [0, 0, w, h] : [Math.min(0, r.x), Math.min(0, r.y), Math.max(w, r.x + r.width), Math.max(h, r.y + r.height)];
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([x0, y0, x1, y0, x1, y1, x0, y0, x1, y1, x0, y1]), gl.STREAM_DRAW);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  function drawItem(item: Item, opacity: number, pictures: Pictures) {
+    if (item.kind === ItemKind.Image) {
+      drawImage(item, opacity, pictures);
+      return;
+    }
+    fillPath(item, opacity);
+  }
+
+  function blurred(item: Item, pictures: Pictures) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.fbo);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    fillPath(item, 1);
+    drawItem(item, 1, pictures);
     resolveInto(layer);
     const { weights, step } = gaussianKernel(item.blur);
     const blur = (dir: [number, number]) => () => {
@@ -275,7 +344,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     pass(copyProgram, pong.texture, main.fbo, () => gl.uniform1f(u(copyProgram, 'u_opacity'), item.opacity));
   }
 
-  function draw(list: DisplayList) {
+  function draw(list: DisplayList, pictures: Pictures = NO_PICTURES) {
     gl.viewport(0, 0, width, height);
     gl.bindFramebuffer(gl.FRAMEBUFFER, main.fbo);
     const [r, g, b, a] = list.background ?? [0, 0, 0, 0];
@@ -285,11 +354,11 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     for (const item of list.items) {
       if (item.blur > 0) {
-        blurred(item);
+        blurred(item, pictures);
         continue;
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, main.fbo);
-      fillPath(item, item.opacity);
+      drawItem(item, item.opacity, pictures);
     }
     resolveInto(main);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, main.resolve);
