@@ -3,7 +3,8 @@ import type { RequestHandler } from './$types';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findCanvasForUser } from '$lib/server/canvas/lookup';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
-import { findMotionNode } from '$lib/server/motion/editor';
+import { findMotionNode, motionTokens } from '$lib/server/motion/editor';
+import { listProjects } from '$lib/server/repos/projects';
 import { motionSource } from '$lib/server/motion/sources';
 
 const HTTP_UNAUTHORIZED = 401;
@@ -26,5 +27,6 @@ export const GET: RequestHandler = async ({ locals, params }) => {
   if (!source) {
     throw error(HTTP_NOT_FOUND, 'This motion editor has nothing to show');
   }
-  return json(source);
+  const brandId = (await listProjects(db, found.orgId)).find((p) => p.id === params.projectId)?.brandId ?? null;
+  return json({ ...source, tokens: await motionTokens(db, { orgId: found.orgId, brandId }) });
 };

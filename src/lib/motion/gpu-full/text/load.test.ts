@@ -5,6 +5,8 @@ import { composeHtml } from '../../hyperframes/compose';
 import { addClip, type OpResult } from '../../timeline';
 import { BUILTIN_FONTS_URL, fontLoader } from './load';
 import { boxFace } from './test-face';
+import { bindVar, declareVar } from '../../interactive/vars';
+import { VarKind } from '../../interactive/var-model';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -27,7 +29,7 @@ describe('loadFonts', () => {
 
   it('downloads only the subsets the clips have characters in', async () => {
     const fetched: string[] = [];
-    await fontLoader({ text: async () => CSS, bytes: async (url) => (fetched.push(url), new Uint8Array()) })(titled, {});
+    await fontLoader({ text: async () => CSS, bytes: async (url) => (fetched.push(url), new Uint8Array()) })(titled, {}, FEEGA_TOKENS);
 
     expect(fetched).toEqual(['https://g.test/latin.woff2']);
   });
@@ -35,7 +37,7 @@ describe('loadFonts', () => {
   it('reads the files with the face engine it is given', async () => {
     const read: Uint8Array[] = [];
     const engine = async () => (bytes: Uint8Array) => (read.push(bytes), { axes: {}, covers: () => true, at: () => boxFace });
-    const book = await fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array([1]) }, engine)(titled, {});
+    const book = await fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array([1]) }, engine)(titled, {}, FEEGA_TOKENS);
 
     expect(read).toHaveLength(1);
     expect(book({ family: 'DM Sans', weight: 400, italic: false, size: 10, axes: {} }, 0x48)?.face).toBe(boxFace);
@@ -46,5 +48,28 @@ describe('loadFonts', () => {
     fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array() }, async () => (started++, () => ({ axes: {}, covers: () => true, at: () => boxFace })));
 
     expect(started).toBe(0);
+  });
+
+  it('asks for the fonts of clips inside a precomp', async () => {
+    const [clip] = titled.tracks.flatMap((t) => t.clips);
+    const archivo = { family: 'Archivo', source: 'google', category: 'sans', italic: false, weights: [400], axes: [] };
+    const inner = { ...titled.tracks[0], clips: [{ ...clip, props: { ...clip.props, font: 'Archivo' } }] };
+    const nested = { ...titled, fonts: [archivo], comps: { c1: { name: 'c1', durationInFrames: 30, tracks: [inner] } }, tracks: titled.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, component: 'Precomp', props: { comp: 'c1' } })) })) } as unknown as MotionDoc;
+    const sheets: string[] = [];
+    await fontLoader({ text: async (url) => (sheets.push(url), ''), bytes: async () => new Uint8Array() })(nested, {}, FEEGA_TOKENS);
+
+    expect(sheets.some((url) => url.includes('family=Archivo'))).toBe(true);
+  });
+
+  it('loads the subset of every character a bound variable shows, euro and beyond Latin-1', async () => {
+    const SUBSETS = `${CSS}
+/* symbols */ @font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 400; src: url(https://g.test/euro.woff2); unicode-range: U+20AC, U+2122; }`;
+    const kicked = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Kicker', from: 0, durationInFrames: 30, props: { text: 'price' } }, 'k'));
+    const declared = must(declareVar(kicked, { name: 'price', kind: VarKind.String, default: '€ 129 ™ Ā' }));
+    const bound = must(bindVar(declared, { var: 'price', clip: 'k', prop: 'text' }));
+    const fetched: string[] = [];
+    await fontLoader({ text: async () => SUBSETS, bytes: async (url) => (fetched.push(url), new Uint8Array()) })(bound, {}, FEEGA_TOKENS);
+
+    expect(fetched.sort()).toEqual(['https://g.test/euro.woff2', 'https://g.test/ext.woff2', 'https://g.test/latin.woff2']);
   });
 });

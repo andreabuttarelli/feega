@@ -1,0 +1,258 @@
+{
+  "appPolicies": {
+    "eula": "",
+    "policies": [
+      {
+        "locale": "en_US",
+        "policyText": "",
+        "policyURL": ""
+      }
+    ]
+  },
+  "identifier": "F3E6A1C2",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "7.99",
+      "familyShareable": false,
+      "internalID": "600000001",
+      "localizations": [
+        {
+          "description": "A one-time pack of 800 credits that never expire",
+          "displayName": "800 credits",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "feega_pack_8",
+      "referenceName": "Pack 8",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "15.99",
+      "familyShareable": false,
+      "internalID": "600000002",
+      "localizations": [
+        {
+          "description": "A one-time pack of 1600 credits that never expire",
+          "displayName": "1600 credits",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "feega_pack_16",
+      "referenceName": "Pack 16",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "31.99",
+      "familyShareable": false,
+      "internalID": "600000003",
+      "localizations": [
+        {
+          "description": "A one-time pack of 3200 credits that never expire",
+          "displayName": "3200 credits",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "feega_pack_32",
+      "referenceName": "Pack 32",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "63.99",
+      "familyShareable": false,
+      "internalID": "600000004",
+      "localizations": [
+        {
+          "description": "A one-time pack of 6400 credits that never expire",
+          "displayName": "6400 credits",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "feega_pack_64",
+      "referenceName": "Pack 64",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "127.99",
+      "familyShareable": false,
+      "internalID": "600000005",
+      "localizations": [
+        {
+          "description": "A one-time pack of 12800 credits that never expire",
+          "displayName": "12800 credits",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "feega_pack_128",
+      "referenceName": "Pack 128",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "255.99",
+      "familyShareable": false,
+      "internalID": "600000006",
+      "localizations": [
+        {
+          "description": "A one-time pack of 25600 credits that never expire",
+          "displayName": "25600 credits",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "feega_pack_256",
+      "referenceName": "Pack 256",
+      "type": "Consumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "6700000000",
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "21000001",
+      "localizations": [],
+      "name": "feega",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "7.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "700000007",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "800 credits every month",
+              "displayName": "feega 8",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "feega_monthly_8",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Monthly 8",
+          "subscriptionGroupID": "21000001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "15.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "700000008",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "1600 credits every month",
+              "displayName": "feega 16",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "feega_monthly_16",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Monthly 16",
+          "subscriptionGroupID": "21000001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "31.99",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "700000009",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "3200 credits every month",
+              "displayName": "feega 32",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "feega_monthly_32",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Monthly 32",
+          "subscriptionGroupID": "21000001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "63.99",
+          "familyShareable": false,
+          "groupNumber": 4,
+          "internalID": "700000010",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "6400 credits every month",
+              "displayName": "feega 64",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "feega_monthly_64",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Monthly 64",
+          "subscriptionGroupID": "21000001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "127.99",
+          "familyShareable": false,
+          "groupNumber": 5,
+          "internalID": "700000011",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "12800 credits every month",
+              "displayName": "feega 128",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "feega_monthly_128",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Monthly 128",
+          "subscriptionGroupID": "21000001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "255.99",
+          "familyShareable": false,
+          "groupNumber": 6,
+          "internalID": "700000012",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "25600 credits every month",
+              "displayName": "feega 256",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "feega_monthly_256",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Monthly 256",
+          "subscriptionGroupID": "21000001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}

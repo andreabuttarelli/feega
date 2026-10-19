@@ -139,4 +139,11 @@ describe('tileChrome', () => {
     expect(box(ofPart(t, ChromePart.PortRing)[0].contours)).toEqual([398, 268, 412, 282]);
     expect(ofPart(t, ChromePart.PortName)).toHaveLength(1);
   });
+
+  it('clips the label to the tile width, as the canvas masks it', () => {
+    const [label] = ofPart(tile({ label: 'A very long name for a node' }), ChromePart.Label);
+
+    expect(label.scissor?.[0]).toBe(100);
+    expect(label.scissor?.[2]).toBe(400);
+  });
 });

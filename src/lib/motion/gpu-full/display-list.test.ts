@@ -45,6 +45,16 @@ const corners = (item: PathItem | undefined) => {
   return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
 };
 
+describe('keyframed modifiers', () => {
+  it('repeats a shape as many times as its keyframed copies say at the frame', () => {
+    const repeated = patch(withCard, 'card', { props: { ...cardProps, modifiers: [{ id: 'r', kind: 'repeater', enabled: true, params: { copies: 1, offsetX: 0.2, offsetY: 0 } }] }, keyframes: { 'mod.r.copies': [{ frame: 0, value: 1, ease: 'linear' }, { frame: 10, value: 5, ease: 'linear' }] } });
+    const drawn = list(repeated, 10);
+
+    expect(drawn.unsupported).toEqual([]);
+    expect(drawn.items.filter((i) => i.clip === 'card')).toHaveLength(5);
+  });
+});
+
 describe('displayListAt', () => {
   it('paints the brand background as a full-frame rectangle in the token colour', () => {
     const bg = pathOf(withBg, 'bg');

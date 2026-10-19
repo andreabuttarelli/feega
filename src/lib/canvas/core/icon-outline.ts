@@ -18,7 +18,7 @@ const ARITY: Record<string, number> = { m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4
 const isFlag = (cmd: string, index: number) => cmd === 'a' && (index % ARITY.a === 3 || index % ARITY.a === 4);
 
 function tokens(d: string): string[] {
-  const queue = d.match(TOKEN) ?? [];
+  const queue: string[] = [...(d.match(TOKEN) ?? [])];
   const out: string[] = [];
   let cmd = '';
   let index = 0;

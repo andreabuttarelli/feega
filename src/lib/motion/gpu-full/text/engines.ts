@@ -1,5 +1,6 @@
 import type { FaceBook } from './face';
 import type { MotionDoc } from '../../doc';
+import type { BrandTokens } from '../../brand';
 import { fontkitEngine, fontLoader } from './load';
 import { rustEngine } from './text-core-web';
 
@@ -10,7 +11,7 @@ export enum FaceEngine {
 
 export const FACES_PARAM = 'faces';
 
-const LOADERS: Record<FaceEngine, (doc: MotionDoc, assets: Record<string, string>) => Promise<FaceBook>> = {
+const LOADERS: Record<FaceEngine, (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook>> = {
   [FaceEngine.Fontkit]: fontLoader(undefined, fontkitEngine),
   [FaceEngine.Rust]: fontLoader(undefined, rustEngine)
 };

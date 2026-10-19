@@ -68,6 +68,11 @@ function dotTexture(theme: Theme): Texture {
   return Texture.from(c);
 }
 
+export enum GridPlace {
+  Scene = 'scene',
+  UnderCore = 'under-core'
+}
+
 export enum Fit {
   Cover = 'cover',
   Contain = 'contain'
@@ -208,6 +213,11 @@ export class GpuScene {
 
   invalidate() {
     this.dirty = true;
+  }
+
+  placeGrid(place: GridPlace) {
+    this.grid.visible = place === GridPlace.Scene;
+    this.invalidate();
   }
 
   setCamera(view: Viewport) {
@@ -375,6 +385,9 @@ export class GpuScene {
     }
     if (!next.media) {
       this.destroyBuilt(old);
+      if (old.media) {
+        this.textures.drop(this.imageUrl(old.media.url));
+      }
       return;
     }
     if (!this.ready.delete(old.id)) {

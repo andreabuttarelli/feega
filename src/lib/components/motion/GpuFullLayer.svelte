@@ -22,7 +22,7 @@
 
   $effect(() => {
     let current = true;
-    void loadFontsWith(faceEngineOf(new URLSearchParams(location.search).get(FACES_PARAM)))(doc, assets).then((fonts) => current && (typeset = { fonts, smoothing: smoothingOf(navigator.userAgent) }));
+    void loadFontsWith(faceEngineOf(new URLSearchParams(location.search).get(FACES_PARAM)))(doc, assets, tokens).then((fonts) => current && (typeset = { fonts, smoothing: smoothingOf(navigator.userAgent) }));
     return () => {
       current = false;
     };

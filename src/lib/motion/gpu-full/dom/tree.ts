@@ -2,6 +2,7 @@ export const DOM_READ_REQUEST = 'feega:dom-read';
 export const DOM_READ_REPLY = 'feega:dom-read-reply';
 export const CUSTOM_ROOT_PREFIX = 'cc-';
 export const NO_INDEX = -1;
+export const TEXT_PAD = 16;
 
 export const READ_STYLES = [
   'display',
@@ -43,6 +44,7 @@ export const READ_STYLES = [
   'font-family',
   'font-size',
   'font-weight',
+  'font-style',
   'line-height',
   'letter-spacing',
   'white-space',
@@ -60,6 +62,10 @@ export const READ_ATTRS = ['points', 'd', 'x', 'y', 'width', 'height', 'rx', 'ry
 export type ReadStyle = (typeof READ_STYLES)[number];
 export type ReadAttr = (typeof READ_ATTRS)[number];
 
+export type TextLine = { chars: string[]; xs: number[]; top: number; height: number };
+
+export type TextRaster = { layer: number; width: number; height: number };
+
 export type RawNode = {
   tag: string;
   svg: boolean;
@@ -69,6 +75,8 @@ export type RawNode = {
   style: Partial<Record<ReadStyle, string>>;
   attrs: Partial<Record<ReadAttr, string>>;
   text: string;
+  lines: TextLine[];
+  raster: TextRaster | null;
   layer: number;
 };
 

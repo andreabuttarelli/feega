@@ -1,8 +1,8 @@
 import { js } from '../../hyperframes/html';
 import { COMPOSITION_ID } from '../../hyperframes/capture';
-import { CUSTOM_ROOT_PREFIX, DOM_READ_REPLY, DOM_READ_REQUEST, NO_INDEX, READ_ATTRS, READ_STYLES, type DomReadRequest, type RawNode, type RawTree } from './tree';
+import { CUSTOM_ROOT_PREFIX, DOM_READ_REPLY, DOM_READ_REQUEST, NO_INDEX, TEXT_PAD, READ_ATTRS, READ_STYLES, type DomReadRequest, type RawNode, type RawTree, type TextLine, type TextRaster } from './tree';
 
-type ProbeConfig = { request: string; reply: string; timeline: string; prefix: string; none: number; styles: readonly string[]; attrs: readonly string[] };
+type ProbeConfig = { request: string; reply: string; timeline: string; prefix: string; none: number; pad: number; styles: readonly string[]; attrs: readonly string[] };
 
 type Seekable = { pause: () => void; seek: (t: number) => void };
 
@@ -19,14 +19,69 @@ export function domProbe(cfg: ProbeConfig) {
       .join('')
       .trim();
 
-  const untransformedRects = (elements: Element[]) => {
+  const untransformed = <T>(measure: () => T): T => {
     const sheet = document.createElement('style');
     sheet.id = UNTRANSFORMED;
     sheet.textContent = '*{transform:none!important;translate:none!important;rotate:none!important;scale:none!important}';
     document.head.appendChild(sheet);
-    const rects = elements.map((el) => el.getBoundingClientRect());
+    const out = measure();
     sheet.remove();
-    return rects;
+    return out;
+  };
+
+  const linesOf = (el: Element, box: DOMRect): TextLine[] => {
+    const lines: TextLine[] = [];
+    const range = document.createRange();
+    for (const node of el.childNodes) {
+      if (node.nodeType !== Node.TEXT_NODE) {
+        continue;
+      }
+      let offset = 0;
+      for (const char of node.textContent ?? '') {
+        const start = offset;
+        offset += char.length;
+        if (!char.trim()) {
+          continue;
+        }
+        range.setStart(node, start);
+        range.setEnd(node, offset);
+        const rect = range.getClientRects()[0];
+        if (!rect || !rect.width) {
+          continue;
+        }
+        const top = rect.top - box.top;
+        const last = lines[lines.length - 1];
+        const line = last && top + rect.height / 2 < last.top + last.height ? last : lines[lines.push({ chars: [], xs: [], top, height: rect.height }) - 1];
+        line.chars.push(char);
+        line.xs.push(rect.left - box.left);
+      }
+    }
+    return lines;
+  };
+
+  const CASES: Record<string, (c: string) => string> = { uppercase: (c) => c.toUpperCase(), lowercase: (c) => c.toLowerCase() };
+  const unquoted = (family: string) => family.trim().replace(/^["']|["']$/g, '');
+
+  const webFamilies = () => new Set([...document.fonts].filter((f) => f.status === 'loaded').map((f) => unquoted(f.family)));
+
+  const rasterOf = (computed: CSSStyleDeclaration, lines: TextLine[], box: DOMRect, layers: Promise<ImageBitmap>[]): TextRaster => {
+    const size = parseFloat(computed.fontSize) || 0;
+    const right = Math.max(box.width, ...lines.map((l) => (l.xs[l.xs.length - 1] ?? 0) + 2 * size));
+    const bottom = Math.max(box.height, ...lines.map((l) => l.top + l.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(right) + 2 * cfg.pad;
+    canvas.height = Math.ceil(bottom) + 2 * cfg.pad;
+    const pen = canvas.getContext('2d') as CanvasRenderingContext2D;
+    pen.font = `${computed.fontStyle} ${computed.fontWeight} ${computed.fontSize} ${computed.fontFamily}`;
+    pen.fillStyle = computed.color;
+    const cased = CASES[computed.textTransform] ?? ((c: string) => c);
+    for (const line of lines) {
+      line.chars.forEach((raw, i) => {
+        const char = cased(raw);
+        pen.fillText(char, cfg.pad + line.xs[i], cfg.pad + line.top + pen.measureText(char).fontBoundingBoxAscent);
+      });
+    }
+    return { layer: layers.push(createImageBitmap(canvas)) - 1, width: canvas.width, height: canvas.height };
   };
 
   const read = (root: HTMLElement, layers: Promise<ImageBitmap>[]): RawTree => {
@@ -45,7 +100,7 @@ export function domProbe(cfg: ProbeConfig) {
       const attrs = Object.fromEntries(cfg.attrs.flatMap((k) => (el.hasAttribute(k) ? [[k, el.getAttribute(k) ?? '']] : [])));
       const layer = el instanceof HTMLCanvasElement ? layers.push(createImageBitmap(el)) - 1 : cfg.none;
       const text = tag === 'text' ? (el.textContent ?? '').trim() : ownText(el);
-      nodes.push({ tag, svg: !(el instanceof HTMLElement), parent, at: null, size: [0, 0], style, attrs, text, layer });
+      nodes.push({ tag, svg: !(el instanceof HTMLElement), parent, at: null, size: [0, 0], style, attrs, text, lines: [], raster: null, layer });
       elements.push(el);
       const me = nodes.length - 1;
       for (const child of el.children) {
@@ -53,7 +108,19 @@ export function domProbe(cfg: ProbeConfig) {
       }
     };
     visit(root, cfg.none);
-    const rects = untransformedRects(elements);
+    const rects = untransformed(() => {
+      const boxes = elements.map((el) => el.getBoundingClientRect());
+      const web = webFamilies();
+      elements.forEach((el, i) => {
+        if (!(el instanceof HTMLElement) || !nodes[i].text) {
+          return;
+        }
+        const computed = getComputedStyle(el);
+        nodes[i].lines = linesOf(el, boxes[i]);
+        nodes[i].raster = web.has(unquoted(computed.fontFamily.split(',')[0])) ? null : rasterOf(computed, nodes[i].lines, boxes[i], layers);
+      });
+      return boxes;
+    });
     nodes.forEach((node, i) => {
       if (!boxed(elements[i])) {
         return;
@@ -99,6 +166,6 @@ export function domProbe(cfg: ProbeConfig) {
 }
 
 export function domProbeScript(): string {
-  const cfg: ProbeConfig = { request: DOM_READ_REQUEST, reply: DOM_READ_REPLY, timeline: COMPOSITION_ID, prefix: CUSTOM_ROOT_PREFIX, none: NO_INDEX, styles: READ_STYLES, attrs: READ_ATTRS };
+  const cfg: ProbeConfig = { request: DOM_READ_REQUEST, reply: DOM_READ_REPLY, timeline: COMPOSITION_ID, prefix: CUSTOM_ROOT_PREFIX, none: NO_INDEX, pad: TEXT_PAD, styles: READ_STYLES, attrs: READ_ATTRS };
   return `<script>(${domProbe.toString()})(${js(cfg)});</script>`;
 }

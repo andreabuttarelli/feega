@@ -1,4 +1,5 @@
-import { FillRule, ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type LayerItem, type Paint, type PathItem } from './display-list';
+import { FillRule, ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type LayerItem, type LensItem, type Paint, type PathItem } from './display-list';
+import { BLOB_FRAGMENT } from '../hyperframes/blob';
 import { imageRect, type Size } from './image-rect';
 import { gaussianKernel, MAX_TAPS } from './kernel';
 import { BLEND_FS, BLUR_FS, QUAD_VS, plain, program, texture } from './gl-kit';
@@ -9,6 +10,7 @@ import { CoverKind, RampKind, type MaskLayer } from './mask-layers';
 import { MAX_STOPS } from './paint';
 
 const MSAA = 8;
+const LENS_VS = 'attribute vec2 a_pos;void main(){gl_Position=vec4(a_pos,0.0,1.0);}';
 const STENCIL_ALL = 0xff;
 const CLIP_BIT = 0x80;
 const COVER_BITS = 0x7f;
@@ -194,6 +196,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   const copyProgram = program(gl, QUAD_VS, COPY_FS);
   const imageProgram = program(gl, PATH_VS, IMAGE_FS);
   const blendProgram = program(gl, QUAD_VS, BLEND_FS);
+  const lensProgram = program(gl, LENS_VS, BLOB_FRAGMENT);
   const textures = new Map<TexImageSource, WebGLTexture>();
   const main = target(gl, width, height, samples);
   const layer = target(gl, width, height, samples);
@@ -355,7 +358,9 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   const DRAW: Record<ItemKind, (item: never, opacity: number, pictures: Pictures) => void> = {
     [ItemKind.Path]: (item: PathItem, opacity) => fillPath(item, opacity),
     [ItemKind.Image]: drawImage,
-    [ItemKind.Layer]: drawLayer
+    [ItemKind.Layer]: drawLayer,
+    [ItemKind.Text]: () => {},
+    [ItemKind.Lens]: () => {}
   };
 
   function drawItem(item: Item, opacity: number, pictures: Pictures) {
@@ -507,6 +512,38 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     scissored(item, () => composite(item, src, mask));
   }
 
+  function lens(item: LensItem, below: Item[], pictures: Pictures) {
+    const l = item.lens;
+    const [x, y, w, h] = l.box;
+    const left = Math.max(Math.floor(x), 0);
+    const top = Math.max(Math.floor(y), 0);
+    const right = Math.min(Math.ceil(x + w), width);
+    const bottom = Math.min(Math.ceil(y + h), height);
+    if (right <= left || bottom <= top || l.presence <= 0) {
+      return;
+    }
+    intoLayer(() => below.forEach((i) => drawItem(i, i.opacity, pictures)));
+    gl.bindFramebuffer(gl.FRAMEBUFFER, main.fbo);
+    gl.useProgram(lensProgram);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, layer.texture);
+    const at = (name: string) => u(lensProgram, name);
+    gl.uniform1i(at('uContent'), 0);
+    gl.uniform2f(at('uSize'), width, height);
+    gl.uniform2fv(at('uCenter'), l.center);
+    gl.uniform3fv(at('uDrop'), l.drops);
+    gl.uniform3fv(at('uUnwarp'), l.unwarp);
+    gl.uniform3fv(at('uTint'), l.tint);
+    const scalars: [string, number][] = [['uBlend', l.blend], ['uWobble', l.wobble], ['uWobbleSpeed', l.wobbleSpeed], ['uTime', l.time], ['uSeed', l.seed], ['uIor', l.ior], ['uDisp', l.dispersion], ['uFrost', l.frost], ['uRefl', l.reflection], ['uTintAmt', l.tintAmount], ['uPresence', l.presence]];
+    scalars.forEach(([name, value]) => gl.uniform1f(at(name), value));
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(left, height - bottom, right - left, bottom - top);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.disable(gl.SCISSOR_TEST);
+  }
+
   function draw(list: DisplayList, pictures: Pictures = NO_PICTURES) {
     gl.viewport(0, 0, width, height);
     gl.bindFramebuffer(gl.FRAMEBUFFER, main.fbo);
@@ -515,7 +552,11 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    for (const item of list.items) {
+    for (const [index, item] of list.items.entries()) {
+      if (item.kind === ItemKind.Lens) {
+        lens(item, list.items.slice(0, index), pictures);
+        continue;
+      }
       if (item.blur > 0 || item.blend !== BlendMode.Normal || item.masks || item.matte || item.filters || item.backdrop) {
         layered(item, pictures);
         continue;
