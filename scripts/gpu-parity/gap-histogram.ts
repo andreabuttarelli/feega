@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { env } from '../_shims/env-private';
 import type { Db } from '$lib/server/db/client';
@@ -14,6 +15,10 @@ import { histogram, reasonOf, type FrameGaps } from './histogram';
 const MOTION = 'motion';
 const WHY = process.argv.includes('--why');
 const WHY_CHARS = 600;
+const DUMP = process.argv.find((a) => a.startsWith('--dump='))?.slice('--dump='.length) ?? null;
+if (DUMP) {
+  mkdirSync(DUMP, { recursive: true });
+}
 const fixture = JSON.parse(readFileSync(new URL('../../tests/e2e/fixtures/heavy-canvas-landings.json', import.meta.url), 'utf8')) as { projectId: string; canvasId: string; landings: { key: string; desktop: { nodeId: string }; mobile: { nodeId: string } }[] };
 const landingIds = new Set(fixture.landings.flatMap((l) => [l.desktop.nodeId, l.mobile.nodeId]));
 
@@ -47,6 +52,9 @@ for (const nodeId of ids) {
   const prepared = prepare(source.doc, tokens, source.assets, { fonts, smoothing: Smoothing.Plain });
   const list = drawFrame(prepared, Math.round(posterSecond(source.doc) * source.doc.fps));
   frames.push({ id: nodeId, gaps: list.unsupported });
+  if (DUMP) {
+    writeFileSync(join(DUMP, `${nodeId}.json`), JSON.stringify(source.doc));
+  }
   const clips = new Map(prepared.doc.tracks.flatMap((t) => t.clips).map((c) => [c.id, c]));
   for (const gap of list.unsupported.filter((g) => WHY && reasonOf(g) !== 'custom')) {
     const clip = clips.get(gap.clip)!;
