@@ -1,4 +1,4 @@
-import { load as projectShell } from '../../../../../../p/[projectId]/+layout.server';
+import { load as projectShell } from '$lib/server/projects/project-shell';
 import { load as settingsShell } from '$lib/server/settings/shell';
 import { bearerEvent, type Bearer } from '$lib/server/api/bearer-page';
 

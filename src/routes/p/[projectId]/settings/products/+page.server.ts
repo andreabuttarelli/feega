@@ -1,9 +1,11 @@
 import type { PageServerLoad } from './$types';
+import { load as projectShell } from '$lib/server/projects/project-shell';
 
 const PRODUCT_COLUMNS = 'id, title, price, currency, images, available, store_url, platform';
 
-export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
-  const { brand } = await parent();
+export const load: PageServerLoad = async (event) => {
+  const { locals: { supabase } } = event;
+  const { brand } = await projectShell(event);
   if (!brand) {
     return { products: [] };
   }
