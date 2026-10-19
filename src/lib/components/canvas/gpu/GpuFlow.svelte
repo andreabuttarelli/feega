@@ -316,7 +316,7 @@
   let shelfHost = $state<HTMLDivElement | null>(null);
   let fontCss: string | null = null;
 
-  const snapshotKind = (t: Tile) => !!t.kind && t.kind !== 'motion' && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
+  const snapshotKind = (t: Tile) => !coreOn && !!t.kind && t.kind !== 'motion' && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
   const shotKeyOf = (id: string) => {
     const t = byId.get(id);
     return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.thumbsOf?.(id) ?? []) : '';
