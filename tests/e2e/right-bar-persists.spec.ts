@@ -111,6 +111,21 @@ test.describe('the right bar is one instance across canvas and motion editor @re
     await expect(page.getByTestId('right-bar').getByTestId('side-tab-properties')).toHaveCount(0);
   });
 
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`${scheme}: the bar paints the same opaque background on the canvas and in the editor`, async ({ page, session }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+      const paint = () => page.getByTestId('right-bar').evaluate((el) => getComputedStyle(el).backgroundColor);
+      const onCanvas = await paint();
+
+      await page.locator(`.svelte-flow__node[data-id="${frameId}"]`).getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
+      await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
+
+      expect(onCanvas, 'opaque, not transparent').not.toMatch(/rgba\(.*, 0\)|transparent/);
+      expect(await paint()).toBe(onCanvas);
+    });
+  }
+
   test('phone: the chat sheet of the editor is the same chat as the canvas one', async ({ page, session }) => {
     test.setTimeout(120_000);
     await page.setViewportSize(PHONE);

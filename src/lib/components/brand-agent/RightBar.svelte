@@ -129,6 +129,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    background: var(--ui-wash);
     visibility: visible;
     pointer-events: auto;
   }
