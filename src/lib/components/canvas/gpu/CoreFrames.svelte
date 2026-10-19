@@ -28,6 +28,7 @@
   const BACKENDS = [createCore, createCoreGl];
 
   let canvas = $state<HTMLCanvasElement | null>(null);
+  let backend = $state(0);
   let raster = $state<CoreRaster | null>(null);
   let lists = $state(new Map<string, DisplayList>());
   const asked = new Set<string>();
@@ -106,20 +107,28 @@
     }
     let gone = false;
     let made: CoreRaster | null = null;
-    const attempt = (i: number): Promise<void> =>
-      BACKENDS[i](target, width, height).then(
-        (r) => {
-          made = r;
-          if (gone) {
-            r.dispose();
-            return;
-          }
-          put.clear();
-          raster = r;
-        },
-        (e: unknown) => (i + 1 < BACKENDS.length ? attempt(i + 1) : onfallback(e instanceof Error ? e.message : String(e)))
-      );
-    void attempt(0);
+    const tried = backend;
+    void BACKENDS[tried](target, width, height).then(
+      (r) => {
+        made = r;
+        if (gone) {
+          r.dispose();
+          return;
+        }
+        put.clear();
+        raster = r;
+      },
+      (e: unknown) => {
+        if (gone) {
+          return;
+        }
+        if (tried + 1 < BACKENDS.length) {
+          backend = tried + 1;
+          return;
+        }
+        onfallback(e instanceof Error ? e.message : String(e));
+      }
+    );
     return () => {
       gone = true;
       raster = null;
@@ -158,7 +167,9 @@
   $effect(() => () => media.dispose());
 </script>
 
-<canvas class="core-frames" bind:this={canvas} style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+{#key backend}
+  <canvas class="core-frames" bind:this={canvas} style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+{/key}
 
 <style>
   .core-frames {
