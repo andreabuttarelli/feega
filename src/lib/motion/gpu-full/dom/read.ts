@@ -4,10 +4,13 @@ import { ellipseOutline, flatten, parsePath, rectOutline, type Outline } from '.
 import { FillRule, MAX_STOPS, PaintKind, type Paint } from '../paint';
 import { rgbaOf } from '../rgba';
 import { cornerOf, isNone, lengthOf, linearGradient, splitTop, tileOf, transformOf, type Size } from './css';
-import { NO_INDEX, type RawNode, type RawTree } from './tree';
+import { NO_INDEX, TEXT_PAD, type RawNode, type RawTree, type TextLine } from './tree';
+import { Ligatures } from '../text/face';
+import { glyphContours, moved, NO_TYPESET, SMOOTHING, type Typeset } from '../text/painter';
 
 export enum DomGap {
   Text = 'text',
+  Font = 'font',
   Media = 'media',
   Element = 'element',
   Filter = 'filter',
@@ -38,11 +41,14 @@ export type DomGapCount = { element: string; reason: DomGap; count: number };
 export type DomRead = { drawn: Drawn[]; gaps: DomGapCount[] };
 
 type Own = { drawn: Drawn[]; gaps: DomGap[] };
-type Scope = { matrix: Affine; viewport: Size };
+type Scope = { matrix: Affine; viewport: Size; typeset: Typeset };
 type Style = RawNode['style'];
 type BoxShape = { round: true; radii: number[] } | { round: false; ellipse: true };
 type Painter = (node: RawNode, scope: Scope) => Own;
 
+const CASES: Record<string, (c: string) => string> = { '': (c) => c, none: (c) => c, uppercase: (c) => c.toUpperCase(), lowercase: (c) => c.toLowerCase() };
+const ITALIC = new Set(['italic', 'oblique']);
+const REGULAR = 400;
 const SPILL_TOLERANCE = 0.5;
 const UNIT_EPSILON = 1e-6;
 const HIDDEN = new Set(['hidden', 'collapse']);
@@ -274,6 +280,39 @@ const shapePainter =
     return { drawn: [path(flat(outline), solid(color), scope.matrix, rule, fillOpacity)], gaps: stroke };
   };
 
+const familyOf = (s: Style) => (splitTop(s['font-family'] ?? '')[0] ?? '').replace(/^["']|["']$/g, '');
+
+function textOf(node: RawNode, scope: Scope): Own {
+  const s = node.style;
+  const cased = CASES[s['text-transform'] ?? ''];
+  const color = rgbaOf(s.color ?? '');
+  if (node.raster) {
+    const { layer, width, height } = node.raster;
+    return { drawn: [{ kind: DrawnKind.Layer, layer, width, height, opacity: 1, matrix: mul2d(scope.matrix, [1, 0, 0, 1, -TEXT_PAD, -TEXT_PAD]) }], gaps: [] };
+  }
+  if (!node.lines.length || !cased || !color) {
+    return nothing(DomGap.Text);
+  }
+  const size = px(s['font-size']);
+  const request = { family: familyOf(s), weight: Number(s['font-weight']) || REGULAR, italic: ITALIC.has(s['font-style'] ?? ''), size, axes: {} };
+  const smoothing = SMOOTHING[scope.typeset.smoothing];
+  const drawn: Drawn[] = [];
+  const gaps: DomGap[] = [];
+  const glyph = (line: TextLine, char: string, x: number) => {
+    const resolved = scope.typeset.fonts(request, char.codePointAt(0)!);
+    if (!resolved) {
+      gaps.push(DomGap.Font);
+      return;
+    }
+    const { face, skew } = resolved;
+    const baseline = line.top + (line.height * face.ascent) / (face.ascent + face.descent) - smoothing.rise;
+    const [shaped] = face.shape(char, Ligatures.Off);
+    drawn.push(path(moved(glyphContours(face, shaped.glyph, size, skew, smoothing.darken(size)), x, baseline), solid(color), scope.matrix));
+  };
+  node.lines.forEach((line) => line.chars.forEach((c, i) => glyph(line, cased(c), line.xs[i])));
+  return { drawn, gaps };
+}
+
 const PAINTERS: Record<string, Painter> = {
   canvas: layerPainter,
   svg: groupPainter,
@@ -330,7 +369,7 @@ function spills(items: Drawn[], matrix: Affine, size: Size): boolean {
   });
 }
 
-export function readTree(tree: RawTree): DomRead {
+export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead {
   const { nodes } = tree;
   const children = nodes.map(() => [] as number[]);
   nodes.forEach((n, i) => (n.parent === NO_INDEX ? undefined : children[n.parent].push(i)));
@@ -353,20 +392,18 @@ export function readTree(tree: RawTree): DomRead {
     const [x, y] = node.at ?? [0, 0];
     const matrix = mul2d(mul2d(outer.matrix, [1, 0, 0, 1, x, y]), transformOf(node.style.transform, node.style['transform-origin']) as Affine);
     const visible = !HIDDEN.has(node.style.visibility ?? '');
-    const own = visible ? painterOf(node)(node, { matrix, viewport: outer.viewport }) : nothing();
-    own.gaps.forEach((reason) => gap(node, reason));
-    if (visible && node.text) {
-      gap(node, DomGap.Text);
-    }
+    const own = visible ? painterOf(node)(node, { ...outer, matrix }) : nothing();
+    const text = visible && node.text ? textOf(node, { ...outer, matrix }) : nothing();
+    [...own.gaps, ...text.gaps].forEach((reason) => gap(node, reason));
     const order = node.svg ? children[i] : [...children[i].filter((c) => !layered(nodes[c])), ...children[i].filter((c) => layered(nodes[c]))];
-    const inner = { matrix: mul2d(matrix, view.fit), viewport: view.viewport };
+    const inner = { ...outer, matrix: mul2d(matrix, view.fit), viewport: view.viewport };
     const kids = order.flatMap((c) => visit(c, inner));
     const size = { w: node.size[0], h: node.size[1] };
     if (CLIPPING.has(node.style.overflow ?? '') && node.at && kids.length && spills(kids, matrix, size)) {
       gap(node, DomGap.Clip);
       return [];
     }
-    const items = [...own.drawn, ...kids];
+    const items = [...own.drawn, ...text.drawn, ...kids];
     const opacity = opacityOf(node.style);
     if (opacity < 1 && items.length > 1) {
       gap(node, DomGap.Opacity);
@@ -375,6 +412,6 @@ export function readTree(tree: RawTree): DomRead {
     return items.map((d) => ({ ...d, opacity: d.opacity * opacity }));
   };
 
-  const drawn = nodes.length ? visit(0, { matrix: [1, 0, 0, 1, 0, 0], viewport: { w: tree.width, h: tree.height } }) : [];
+  const drawn = nodes.length ? visit(0, { matrix: [1, 0, 0, 1, 0, 0], viewport: { w: tree.width, h: tree.height }, typeset }) : [];
   return { drawn, gaps: [...gaps.values()] };
 }
