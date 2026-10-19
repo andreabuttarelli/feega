@@ -1,5 +1,6 @@
 <script lang="ts">
   import { pressMenu, type Point } from '$lib/motion/press-menu';
+  import { haptic } from '$lib/native-actions';
   import { PickMode } from '$lib/motion/clip-bar';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
@@ -322,7 +323,7 @@
 
   function markSnap(at: number | null) {
     if (at !== null && at !== guide && pointer === Pointer.Coarse) {
-      navigator.vibrate?.(SNAP_HAPTIC_MS);
+      haptic(SNAP_HAPTIC_MS);
     }
     guide = at;
   }
