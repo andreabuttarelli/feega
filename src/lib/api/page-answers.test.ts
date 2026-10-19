@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pageActionOf } from './page-answers';
+import { pageActionOf, pageLoadOf } from './page-answers';
 
 describe('what a page answer over bearer means to its client', () => {
   it('a success is the body, unwrapped', () => {
@@ -17,5 +17,11 @@ describe('what a page answer over bearer means to its client', () => {
 
   it('a server error stays an error with its message, so a busy database is told apart', () => {
     expect(pageActionOf(503, { error: 'db_busy' })).toEqual({ type: 'error', status: 503, error: { message: 'db_busy' } });
+  });
+
+  it('a load answer is the body; a load error keeps status and message; an expired session goes to login', () => {
+    expect(pageLoadOf(200, { canvas: { id: 'c1' } })).toEqual({ canvas: { id: 'c1' } });
+    expect(() => pageLoadOf(404, { error: 'gone' })).toThrow(expect.objectContaining({ status: 404, body: { message: 'gone' } }));
+    expect(() => pageLoadOf(401, { error: 'invalid_token' })).toThrow(expect.objectContaining({ status: 303, location: '/login' }));
   });
 });
