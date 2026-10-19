@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { REAL_STACK, signInE2e } from './fixtures/session';
 import { comparison, summarise, type RawRun, type Row } from '../../scripts/canvas-core-perf/summary';
 
@@ -45,7 +45,10 @@ async function installProbe(page: Page) {
   });
 }
 
+const viewOf = (page: Page) => page.locator(SURFACE).first().getAttribute('data-view');
+
 async function drive(page: Page) {
+  const before = await viewOf(page);
   const box = (await page.locator(SURFACE).first().boundingBox())!;
   const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   await page.mouse.move(centre.x, centre.y);
@@ -54,9 +57,15 @@ async function drive(page: Page) {
     await page.mouse.move(centre.x - i * PAN_PX, centre.y - i * PAN_PX);
   }
   await page.mouse.up({ button: 'middle' });
+  const panned = await viewOf(page);
+  expect(panned, 'pan moved the camera').not.toBe(before);
   await page.keyboard.down('Control');
-  for (let i = 0; i < ZOOM_STEPS; i++) {
-    await page.mouse.wheel(0, i < ZOOM_STEPS / 2 ? -ZOOM_DELTA : ZOOM_DELTA);
+  for (let i = 0; i < ZOOM_STEPS / 2; i++) {
+    await page.mouse.wheel(0, -ZOOM_DELTA);
+  }
+  await expect.poll(() => viewOf(page), { message: 'zoom changed the camera' }).not.toBe(panned);
+  for (let i = 0; i < ZOOM_STEPS / 2; i++) {
+    await page.mouse.wheel(0, ZOOM_DELTA);
   }
   await page.keyboard.up('Control');
   await page.waitForTimeout(SETTLE_MS);
