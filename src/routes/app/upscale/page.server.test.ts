@@ -38,7 +38,7 @@ vi.mock('$lib/server/repos/canvas', () => ({
 const startUpscale = vi.fn(async () => ({ ok: true, canvasId: 'c-up', nodeId: 'n-up' }) as { ok: boolean; canvasId?: string; nodeId?: string; error?: string });
 vi.mock('$lib/server/upscale/start', () => ({ startUpscale, UPSCALE_START_DEPS: {} }));
 
-const { load, actions } = await import('./+page.server');
+const { load, actions } = await import('$lib/server/dashboard/pages/upscale');
 
 function form(fields: Record<string, string>) {
   const body = new FormData();

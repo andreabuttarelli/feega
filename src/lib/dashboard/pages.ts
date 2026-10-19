@@ -4,7 +4,8 @@ export enum DashboardPage {
   Templates = 'templates',
   Motion = 'motion',
   Credits = 'credits',
-  Compose = 'compose'
+  Compose = 'compose',
+  Upscale = 'upscale'
 }
 
 export const PAGE_PATH: Record<DashboardPage, string> = {
@@ -13,7 +14,8 @@ export const PAGE_PATH: Record<DashboardPage, string> = {
   [DashboardPage.Templates]: '/app/templates',
   [DashboardPage.Motion]: '/app/motion',
   [DashboardPage.Credits]: '/app/credits',
-  [DashboardPage.Compose]: '/app/compose'
+  [DashboardPage.Compose]: '/app/compose',
+  [DashboardPage.Upscale]: '/app/upscale'
 };
 
 export function pageAt(pathname: string): DashboardPage | null {

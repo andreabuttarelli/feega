@@ -1,7 +1,7 @@
 <script lang="ts">
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { onDestroy } from 'svelte';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import { goto, invalidateAll } from '$app/navigation';
   import PageHead from '$lib/components/PageHead.svelte';
   import BeforeAfter from '$lib/components/upscale/BeforeAfter.svelte';
@@ -126,8 +126,7 @@
       for (const [k, v] of Object.entries(fields)) {
         body.set(k, v);
       }
-      const res = await fetch('?/start', { method: 'POST', headers: { 'x-sveltekit-action': 'true' }, body });
-      const result = deserialize(await res.text());
+      const result = await postPageAction('/app/upscale', 'start', body);
       if (result.type === 'redirect') {
         picked = null;
         probe = null;
