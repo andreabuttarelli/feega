@@ -76,7 +76,12 @@ export class RightBarHost {
 
 export const rightBar = new RightBarHost();
 
-type Movable = Element & { moveBefore?: (node: Node, child: Node | null) => void };
+export function portalInto(node: HTMLElement, target: HTMLElement) {
+  target.appendChild(node);
+  return { destroy: () => node.remove() };
+}
+
+type Movable =Element & { moveBefore?: (node: Node, child: Node | null) => void };
 
 export function moveKeepingScroll(node: HTMLElement, target: HTMLElement, offsets: ReadonlyMap<Element, number>) {
   if (node.parentElement === target) {
