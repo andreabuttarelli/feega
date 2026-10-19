@@ -12,6 +12,7 @@ import { createPins } from './texture-pins';
 import { Backend } from './backend';
 import { ChromeLayer } from './chrome-layer';
 import type { IdleChrome } from './idle-chrome';
+import { grownBacking } from './backing-size';
 
 export { Backend };
 
@@ -104,6 +105,7 @@ function cover(tex: Texture, w: number, h: number): Texture {
 export class GpuScene {
   readonly backend: Backend;
   private app: Application;
+  private host: HTMLElement;
   private theme: Theme;
   private grid: TilingSprite;
   private world = new Container();
@@ -132,8 +134,9 @@ export class GpuScene {
   private uploaded = new WeakSet<object>();
   private dim: { body: number; edges: number } | null = null;
 
-  private constructor(app: Application, theme: Theme) {
+  private constructor(app: Application, theme: Theme, host: HTMLElement) {
     this.app = app;
+    this.host = host;
     this.theme = theme;
     this.backend = app.renderer.name === 'webgpu' ? Backend.WebGPU : Backend.WebGL;
     this.grid = new TilingSprite({ texture: dotTexture(theme), width: app.screen.width, height: app.screen.height });
@@ -176,7 +179,8 @@ export class GpuScene {
     const app = new Application();
     await app.init({
       preference,
-      resizeTo: host,
+      width: host.clientWidth,
+      height: host.clientHeight,
       antialias: BUDGET[currentDevice()].antialias,
       autoDensity: true,
       resolution: rendererResolution(devicePixelRatio, currentDevice()),
@@ -188,7 +192,7 @@ export class GpuScene {
     host.appendChild(app.canvas);
     app.canvas.dataset.testid = 'gpu-canvas';
     app.canvas.dataset.backend = app.renderer.name;
-    return new GpuScene(app, theme);
+    return new GpuScene(app, theme, host);
   }
 
   get canvas(): HTMLCanvasElement {
@@ -281,7 +285,10 @@ export class GpuScene {
   }
 
   resize() {
-    this.app.resize();
+    const grown = grownBacking({ width: this.host.clientWidth, height: this.host.clientHeight }, this.app.screen);
+    if (grown) {
+      this.app.renderer.resize(grown.width, grown.height);
+    }
     this.grid.width = this.app.screen.width;
     this.grid.height = this.app.screen.height;
     this.cull();
