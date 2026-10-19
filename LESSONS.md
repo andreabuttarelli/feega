@@ -3098,3 +3098,11 @@ Signal: Space or Play moves the playhead to a fixed frame, and the timecode flip
 
 ### Every e2e spec fails at collection with "needs an import attribute of type: json"
 Signal: `npx playwright test` lists 0 tests; the error names a `.json` under `src/lib`. Cause: a spec imports an app module (`frame-custom-size.spec.ts` → `timeline`/`editor-mount` → `still.ts`), and a new import in that chain reaches a module that imports JSON without `with { type: 'json' }`, which Playwright's Node loader rejects. Move: keep modules that e2e specs import free of JSON-importing dependencies; check with `npx playwright test --list` before pushing.
+
+### A GPU canvas that crashes Safari on iPhone: count texture bytes, not image downloads
+**Signal:** the tab reloads by itself on iPhone; images downloaded total ~10 MB. **Move:**
+`window.__gpuCanvas.textures()` lists texture bytes and the largest sources; a source above the
+device's `decodeEdge` means an image decoded full size (a non-`canvas-assets` URL is not resized
+by the server). Measure with `playwright-core` `webkit` + iPhone descriptor and `ps` RSS of the
+new `WebKit.GPU`/`WebContent` processes only (other worktrees run WebKit too). Playwright WebKit
+does not match `(pointer: coarse)`; `navigator.maxTouchPoints` does.
