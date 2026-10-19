@@ -76,16 +76,31 @@ function revenueCatStore(purchases: Plugin, apiKey: string): StoreBridge {
   };
 }
 
+function storeKitStore(storeKit: Plugin): StoreBridge {
+  return {
+    purchase: (appUserId, productId) => storeKit.purchase({ appUserId, productId }) as Promise<StorePurchase>,
+    restore: (appUserId) => storeKit.restore({ appUserId }) as Promise<StorePurchase>
+  };
+}
+
+function storeOf(purchases: Plugin | null, storeKit: Plugin | null, revenueCatKey: string): StoreBridge | null {
+  if (purchases && revenueCatKey) {
+    return revenueCatStore(purchases, revenueCatKey);
+  }
+  return storeKit ? storeKitStore(storeKit) : null;
+}
+
 function capacitorBridge(plugins: Record<string, unknown>, keys: NativeKeys): NativeBridge {
   const plugin = (name: string) => (plugins[name] as Plugin | undefined) ?? null;
   const apple = plugin('FeegaAppleSignIn');
   const purchases = plugin('Purchases');
+  const storeKit = plugin('FeegaStoreKit');
   const share = plugin('Share');
   const haptics = plugin('Haptics');
 
   return {
     appleAuthorize: apple ? (nonce) => apple.authorize({ nonce }) as Promise<{ identityToken: string }> : null,
-    store: purchases && keys.revenueCatKey ? revenueCatStore(purchases, keys.revenueCatKey) : null,
+    store: storeOf(purchases, storeKit, keys.revenueCatKey),
     share: share ? async (item) => void (await share.share(item)) : null,
     haptic: haptics ? () => void haptics.impact({ style: 'LIGHT' }).catch(() => {}) : null
   };

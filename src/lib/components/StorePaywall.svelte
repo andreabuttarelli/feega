@@ -21,19 +21,22 @@
   } = $props();
 
   const bridge = nativeBridge(globalThis, nativeKeys())?.store ?? null;
+  const Outcome = { None: 'none', Purchased: 'purchased', Failed: 'failed' } as const;
+
   let busy = $state(false);
-  let failed = $state(false);
+  let outcome = $state<(typeof Outcome)[keyof typeof Outcome]>(Outcome.None);
 
   async function run(action: () => Promise<StorePurchase>) {
     busy = true;
-    failed = false;
+    outcome = Outcome.None;
     try {
       const result = await action();
       if (result.purchased) {
+        outcome = Outcome.Purchased;
         onPurchased();
       }
     } catch {
-      failed = true;
+      outcome = Outcome.Failed;
     } finally {
       busy = false;
     }
@@ -43,8 +46,10 @@
 {#if !bridge}
   <span class="text-[0.8125rem] text-muted-foreground">{$_('app.account.billing.storeUnavailable')}</span>
 {:else}
-  {#if failed}
+  {#if outcome === Outcome.Failed}
     <Notice tone="error">{$_('app.account.billing.storeFailed')}</Notice>
+  {:else if outcome === Outcome.Purchased}
+    <Notice tone="success">{$_('app.account.billing.storePurchased')}</Notice>
   {/if}
   <table class="ladder">
     <tbody>

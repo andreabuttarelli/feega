@@ -52,7 +52,7 @@ A WebView of a website is at risk. These native capabilities are what make it an
 | Capability | State |
 |---|---|
 | Sign in with Apple (native sheet) | plugin built, behind flag (needs paid account + Supabase Apple config) |
-| In-app purchases and restore (StoreKit via RevenueCat) | wired via `nativeBridge`; needs `PUBLIC_REVENUECAT_APPLE_KEY`, store products, `NATIVE_STORE_BILLING=on` |
+| In-app purchases and restore (StoreKit via RevenueCat) | wired via `nativeBridge`; Debug buys from `Products.storekit` through `FeegaStoreKit` until `PUBLIC_REVENUECAT_APPLE_KEY` is set; needs store products, `NATIVE_STORE_BILLING=on` |
 | Push notifications (generation finished, invites) | later, `@capacitor/push-notifications` |
 | Share sheet | wired: canvas share link (`systemShare`); exported files still use Web Share |
 | Haptics | wired: timeline snap and long-press menus (`haptic`), native in the shell |
