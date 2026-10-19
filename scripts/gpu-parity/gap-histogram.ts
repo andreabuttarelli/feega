@@ -48,7 +48,7 @@ for (const nodeId of ids) {
   if (!source) {
     continue;
   }
-  const fonts = await loadFonts(source.doc, source.assets);
+  const fonts = await loadFonts(source.doc, source.assets, tokens);
   const prepared = prepare(source.doc, tokens, source.assets, { fonts, smoothing: Smoothing.Plain });
   const list = drawFrame(prepared, Math.round(posterSecond(source.doc) * source.doc.fps));
   frames.push({ id: nodeId, gaps: list.unsupported });

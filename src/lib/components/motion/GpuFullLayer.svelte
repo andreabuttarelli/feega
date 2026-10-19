@@ -22,7 +22,7 @@
 
   $effect(() => {
     let current = true;
-    void loadFonts(doc, assets).then((fonts) => current && (typeset = { fonts, smoothing: smoothingOf(navigator.userAgent) }));
+    void loadFonts(doc, assets, tokens).then((fonts) => current && (typeset = { fonts, smoothing: smoothingOf(navigator.userAgent) }));
     return () => {
       current = false;
     };

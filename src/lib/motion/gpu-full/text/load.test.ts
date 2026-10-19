@@ -4,6 +4,8 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '../../doc';
 import { composeHtml } from '../../hyperframes/compose';
 import { addClip, type OpResult } from '../../timeline';
 import { BUILTIN_FONTS_URL, fontLoader } from './load';
+import { bindVar, declareVar } from '../../interactive/vars';
+import { VarKind } from '../../interactive/var-model';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -26,7 +28,7 @@ describe('loadFonts', () => {
 
   it('downloads only the subsets the clips have characters in', async () => {
     const fetched: string[] = [];
-    await fontLoader({ text: async () => CSS, bytes: async (url) => (fetched.push(url), new Uint8Array()) })(titled, {});
+    await fontLoader({ text: async () => CSS, bytes: async (url) => (fetched.push(url), new Uint8Array()) })(titled, {}, FEEGA_TOKENS);
 
     expect(fetched).toEqual(['https://g.test/latin.woff2']);
   });
@@ -37,8 +39,20 @@ describe('loadFonts', () => {
     const inner = { ...titled.tracks[0], clips: [{ ...clip, props: { ...clip.props, font: 'Archivo' } }] };
     const nested = { ...titled, fonts: [archivo], comps: { c1: { name: 'c1', durationInFrames: 30, tracks: [inner] } }, tracks: titled.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, component: 'Precomp', props: { comp: 'c1' } })) })) } as unknown as MotionDoc;
     const sheets: string[] = [];
-    await fontLoader({ text: async (url) => (sheets.push(url), ''), bytes: async () => new Uint8Array() })(nested, {});
+    await fontLoader({ text: async (url) => (sheets.push(url), ''), bytes: async () => new Uint8Array() })(nested, {}, FEEGA_TOKENS);
 
     expect(sheets.some((url) => url.includes('family=Archivo'))).toBe(true);
+  });
+
+  it('loads the subset of every character a bound variable shows, euro and beyond Latin-1', async () => {
+    const SUBSETS = `${CSS}
+/* symbols */ @font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 400; src: url(https://g.test/euro.woff2); unicode-range: U+20AC, U+2122; }`;
+    const kicked = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Kicker', from: 0, durationInFrames: 30, props: { text: 'price' } }, 'k'));
+    const declared = must(declareVar(kicked, { name: 'price', kind: VarKind.String, default: '€ 129 ™ Ā' }));
+    const bound = must(bindVar(declared, { var: 'price', clip: 'k', prop: 'text' }));
+    const fetched: string[] = [];
+    await fontLoader({ text: async () => SUBSETS, bytes: async (url) => (fetched.push(url), new Uint8Array()) })(bound, {}, FEEGA_TOKENS);
+
+    expect(fetched.sort()).toEqual(['https://g.test/euro.woff2', 'https://g.test/ext.woff2', 'https://g.test/latin.woff2']);
   });
 });

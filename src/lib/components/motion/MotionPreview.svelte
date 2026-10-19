@@ -373,7 +373,7 @@
 
   async function renderOnCoreOf(spec: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> }, backend: FullBackend, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<boolean> {
     const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('$lib/motion/gpu-full/display-list'), import('$lib/motion/gpu-full/text/load'), import('$lib/motion/gpu-full/text/painter')]);
-    const prepared = prepare(spec.doc, spec.tokens, spec.assets, { fonts: await loadFonts(spec.doc, spec.assets), smoothing: smoothingOf(navigator.userAgent) });
+    const prepared = prepare(spec.doc, spec.tokens, spec.assets, { fonts: await loadFonts(spec.doc, spec.assets, spec.tokens), smoothing: smoothingOf(navigator.userAgent) });
     return renderOnCore(prepared, backend, times, onFrame, signal);
   }
 

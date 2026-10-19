@@ -1,6 +1,7 @@
+import { preparedDoc } from '../../hyperframes/compose';
+import type { BrandTokens } from '../../brand';
 import { googleFontsUrl, uploadFaceCss, usedFaces } from '../../fonts/model';
 import type { MotionDoc } from '../../doc';
-import { flattenComps } from '../../precomp';
 import type { FaceBook } from './face';
 import { faceBook, faceRules, type FaceRule, type Source } from './fonts';
 import { fontkitSource } from './fontkit-face';
@@ -34,11 +35,11 @@ const remembered = <T>(load: (url: string) => Promise<T>) => {
   };
 };
 
-export function fontLoader(read: Reader = web): (doc: MotionDoc, assets: Record<string, string>) => Promise<FaceBook> {
+export function fontLoader(read: Reader = web): (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook> {
   const sheet = remembered((url) => read.text(url).catch(() => ''));
   const source = remembered((url) => read.bytes(url).then((bytes): [string, Source] => [url, fontkitSource(bytes)]).catch(() => null));
-  return async (raw, assets) => {
-    const doc = flattenComps(raw);
+  return async (raw, assets, tokens) => {
+    const doc = preparedDoc({ doc: raw, tokens, assets });
     const google = googleFontsUrl(usedFaces(doc), doc.fonts);
     const css = await Promise.all([BUILTIN_FONTS_URL, ...(google ? [google] : [])].map(sheet));
     const rules = [...css, uploadFaceCss(doc.fonts, assets)].flatMap(faceRules);

@@ -57,7 +57,7 @@ if (!verdict.ok) {
 }
 const doc = verdict.doc;
 const assets = { ...(flags.has('placeholders') ? await placeholders(assetIds(doc), flags.get('placeholders')!) : {}), ...given(flags.get('assets')) };
-const prepared = prepare(doc, FEEGA_TOKENS, assets, { fonts: await fontLoader(files)(doc, assets), smoothing: smoothingOf(flags.get('user-agent') ?? '') });
+const prepared = prepare(doc, FEEGA_TOKENS, assets, { fonts: await fontLoader(files)(doc, assets, FEEGA_TOKENS), smoothing: smoothingOf(flags.get('user-agent') ?? '') });
 const spread = Number(flags.get('spread') ?? 0);
 const frames = spread ? Array.from({ length: spread }, (_, i) => Math.round((Math.floor(((i + 0.5) * doc.durationInFrames) / spread) / doc.fps) * doc.fps)) : Array.from({ length: doc.durationInFrames }, (_, i) => i);
 const lists = join(mkdtempSync(join(tmpdir(), 'native-export-')), 'frames.jsonl');
