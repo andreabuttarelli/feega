@@ -221,7 +221,7 @@
     }
   });
   const coreLook = $derived(wrap ? themeOf(wrap) : null);
-  const drawsCard = (t: Tile) => t.kind !== 'motion' && claimed(t);
+  const drawsCard = (t: Tile) => t.kind !== 'motion' && claimedByCore(t, { ...coreState, refused: new Set() });
   const coreCards = $derived.by(() => {
     const text = coreType;
     const look = coreLook;

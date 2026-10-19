@@ -102,7 +102,9 @@
 
   $effect(() => {
     const partial = frames.filter((f) => lists.has(keyOf(f)) && !drawsWhole(lists.get(keyOf(f))!)).map((f) => f.id);
-    onready(new Set(held.map((f) => f.id)), new Set([...failed, ...partial]));
+    const drawn = new Set(held.map((f) => f.id));
+    const shed = whole.filter((f) => !drawn.has(f.id)).map((f) => f.id);
+    onready(drawn, new Set([...failed, ...partial, ...shed]));
   });
 
   $effect(() => {
