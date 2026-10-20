@@ -173,6 +173,18 @@ Free.
 (login url, email, session expiry; never the password). `forget_app_account` (`{ project_id }`) deletes it
 and its session. Free.
 
+## Edit and view
+
+| MCP | CLI |
+|-----|-----|
+| `edit` | (none: `feega canvas`, `feega motion tool` and `feega motion op` reach the same ops) |
+| `view` | (none: `feega motion frames` draws a frame) |
+
+`edit({ org, op, target?, element?, input?, version?, project_id?, ops? })` runs one op or, with op
+`batch`, up to 500 `ops` mixing canvas ops, frame tools and frame editor actions. Op `describe`
+lists them all and gives strict schemas. `view({ org, op, input })` reads: `canvas_summary`, `get`,
+`activity`, `snapshot` (image content).
+
 ## Canvas ops
 
 | MCP | CLI |

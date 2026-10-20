@@ -9,6 +9,8 @@ import { listCanvasEvents } from '$lib/server/repos/canvas-events';
 import { runningRuns } from '$lib/server/repos/node-runs';
 import { readHead } from '$lib/server/repos/motion-revisions';
 import { FramesFailure, motionFrames } from '$lib/server/motion/agent-frames';
+import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
+import { FramesSource, fetchRemoteFrames, framesSource, remoteRenderUrl } from './frames-source';
 import type { MotionDoc } from '$lib/motion/doc';
 import { detailOf, elementsOf, summarizeCanvas } from './canvas-summary';
 import type { Answer } from './runners';
@@ -36,7 +38,7 @@ export const VIEW_OPS = {
   [ViewOp.CanvasSummary]: { summary: 'Compact outline of a canvas: every node (id, type, title, place, size, wiring, last run status) and, for each frame, the tree of its elements (id, kind, name, bounds, text).', input: z.object({ canvas_id: canvasId }).strict() },
   [ViewOp.Get]: { summary: 'Full detail of one node (`id`), or of one element of a frame (`id` = element, `frame_id` = its frame): data, props, transform, keyframes.', input: z.object({ id: z.string().min(1), frame_id: z.string().optional() }).strict() },
   [ViewOp.Activity]: { summary: 'What is happening on a canvas now: recent structural events (who, what, when), runs still working, and presence.', input: z.object({ canvas_id: canvasId, since: z.string().optional().describe('ISO time; only newer events') }).strict() },
-  [ViewOp.Snapshot]: { summary: 'An image of one frame at a time (seconds, default 0), returned as an image. Needs the server renderer; a whole canvas, a region or a single element cannot be drawn alone: snapshot their frame.', input: z.object({ node_id: z.string().min(1), element_id: z.string().optional(), canvas_id: z.string().optional(), region: z.unknown().optional(), time: z.number().min(0).optional(), width: z.number().int().min(64).optional() }).strict() }
+  [ViewOp.Snapshot]: { summary: 'An image of one frame at a time (seconds, default 0), returned as an image. Drawn by the server renderer, or by the remote one when this server has none; a whole canvas, a region or a single element cannot be drawn alone: snapshot their frame.', input: z.object({ node_id: z.string().min(1), element_id: z.string().optional(), canvas_id: z.string().optional(), region: z.unknown().optional(), time: z.number().min(0).optional(), width: z.number().int().min(64).optional() }).strict() }
 } as const;
 
 export const isViewOp = (name: string): name is ViewOp => Object.hasOwn(VIEW_OPS, name);
@@ -109,17 +111,23 @@ async function activity(caller: OrgCaller, input: { canvas_id: string; since?: s
   };
 }
 
-async function snapshot(caller: OrgCaller, input: z.infer<(typeof VIEW_OPS)[ViewOp.Snapshot]['input']>): Promise<Answer> {
+export type ViewContext = { bearer: string; ownOrigin: string; org?: string };
+
+async function snapshot(caller: OrgCaller, input: z.infer<(typeof VIEW_OPS)[ViewOp.Snapshot]['input']>, via: ViewContext): Promise<Answer> {
   if (input.element_id || input.region !== undefined || !input.node_id) {
     return refusal(HTTP_BAD_REQUEST, 'snapshot_unsupported', { fix: 'Snapshot a frame by `node_id`; an element or a region is seen inside its frame. canvas_summary gives the outline in words.' });
+  }
+  const remoteUrl = remoteRenderUrl(process.env);
+  if (framesSource({ open: serverFramesOpen(), remoteUrl, ownOrigin: via.ownOrigin }) === FramesSource.Remote) {
+    return fetchRemoteFrames(remoteUrl!, { nodeId: input.node_id, times: [input.time ?? 0], width: input.width, bearer: via.bearer, org: via.org });
   }
   const answer = await motionFrames(caller.db, { orgId: caller.orgId, nodeId: input.node_id }, { times: [input.time ?? 0], size: input.width });
   return answer.ok ? { status: HTTP_OK, body: answer.body } : refusal(FRAMES_STATUS[answer.failure], answer.failure, { detail: answer.detail, fix: answer.failure === FramesFailure.Closed ? 'Use canvas_summary for the structure, or open the frame editor.' : undefined });
 }
 
-const RUN = { [ViewOp.CanvasSummary]: canvasSummary, [ViewOp.Get]: getOne, [ViewOp.Activity]: activity, [ViewOp.Snapshot]: snapshot } as Record<ViewOp, (c: OrgCaller, i: never) => Promise<Answer>>;
+const RUN = { [ViewOp.CanvasSummary]: canvasSummary, [ViewOp.Get]: getOne, [ViewOp.Activity]: activity, [ViewOp.Snapshot]: snapshot } as Record<ViewOp, (c: OrgCaller, i: never, via: ViewContext) => Promise<Answer>>;
 
-export async function runView(caller: OrgCaller, op: ViewOp, input: Record<string, unknown>): Promise<Answer> {
+export async function runView(caller: OrgCaller, op: ViewOp, input: Record<string, unknown>, via: ViewContext): Promise<Answer> {
   const parsed = VIEW_OPS[op].input.safeParse(input);
   if (!parsed.success) {
     return refusal(HTTP_BAD_REQUEST, 'invalid_input', { issues: parsed.error.issues });
@@ -130,5 +138,5 @@ export async function runView(caller: OrgCaller, op: ViewOp, input: Record<strin
   if (hidden) {
     return { status: hidden.status, body: await hidden.json() };
   }
-  return RUN[op](caller, parsed.data as never);
+  return RUN[op](caller, parsed.data as never, via);
 }

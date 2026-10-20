@@ -12,6 +12,7 @@ import { registerGalleryTools } from './tools/gallery.ts';
 import { registerLayoutTools } from './tools/layouts.ts';
 import { registerAppAccountTools } from './tools/app-account.ts';
 import { registerOrgTools } from './tools/orgs.ts';
+import { registerEditTools } from './tools/edit.ts';
 
 /**
  * Il client la mostra da solo al handshake, una volta per sessione, PRIMA di ogni descrizione e
@@ -25,7 +26,7 @@ import { registerOrgTools } from './tools/orgs.ts';
 const MCP_INSTRUCTION_LINES = [
   'feega is an infinite canvas of typed nodes that people, chat or MCP agents drive.',
   'Reads cost nothing; READING IS ONE TOOL: `query`. Every table, org-scoped. Name `columns`; `offset` is the next page; `count: "exact"` when the number IS the answer; `embed` brings a related table along.',
-  'Generic writes on every table: `insert_row`, `update_row`, `delete_row`; `canvas_tool`: the chat\'s checked canvas ops. `describe_node_types` gives the JSON Schema `nodes.data` must match per `type` before you insert or update one.',
+  'Change a canvas with `edit` only (op + `target`/`element` ids; `describe` lists every op, `batch` mixes canvas and frame ops); see it with `view` (canvas_summary, get, activity, snapshot). `canvas_tool`, `motion_tool`, `motion_editor_op` are deprecated aliases of `edit`. Generic writes on every table: `insert_row`, `update_row`, `delete_row`. `describe_node_types` gives the JSON Schema `nodes.data` must match per `type` before you insert or update one.',
   '`run_node_generation` is the canvas Generate button: fills an existing node, never creates one; no `model` = default; `medium` must match the node\'s type; a video comes back `queued`. `apply_effects`/`make_effects_pair` render effects (`list_effects`; custom: `write_effect`, `patch_effect`), free. `enhance_prompt` improves a prompt. `run_node_loop` queues every combination of a node\'s inputs (`preview_node_loop` free, `cancel_node_loop` stops it); confirm >50, refused >1000.',
   'A project needs no brand; never guess one: attach one only to publish.',
   '`get_media`: show `preview_url`, give `full_url`.',
@@ -154,6 +155,7 @@ export function createFeegaMcpServer(): McpServer {
   registerLayoutTools(server);
   registerAppAccountTools(server);
   registerOrgTools(server);
+  registerEditTools(server);
 
   return server;
 }

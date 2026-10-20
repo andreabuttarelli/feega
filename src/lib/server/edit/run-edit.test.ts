@@ -107,6 +107,32 @@ describe('a batch mixes canvas and frame ops', () => {
     expect(seen.frame).toHaveLength(1);
   });
 
+  it('a canvas op that answers 200 with an error body still stops the batch', async () => {
+    const { made, seen } = ports({ canvas: async () => ({ status: 200, body: { error: 'node_not_found', message: 'No live node.' } }) });
+
+    const answer = await runEdit(made, {
+      projectId: 'p1',
+      steps: [
+        { op: 'move_node', target: 'n9', input: { x: 1, y: 1 } },
+        { op: 'add_shape', target: 'f1', input: { kind: 'rect' } }
+      ]
+    });
+
+    expect(answer.body).toMatchObject({ applied: 0, failed: 0 });
+    expect(answer.status).toBe(422);
+    expect(seen.frame).toHaveLength(0);
+  });
+
+  it('a canvas op that answers outcome invalid or conflict stops the batch too', async () => {
+    for (const outcome of ['invalid', 'conflict']) {
+      const { made } = ports({ canvas: async () => ({ status: 200, body: { outcome, message: 'no' } }) });
+
+      const answer = await runEdit(made, { projectId: 'p1', steps: [{ op: 'create_node' }, { op: 'create_node' }] });
+
+      expect(answer.body).toMatchObject({ applied: 0, failed: 0 });
+    }
+  });
+
   it('a refused frame group reports the op inside it that refused', async () => {
     const { made } = ports({ frame: async () => ({ status: 422, body: { error: 'tool_refused', index: 1, detail: 'no such clip' } }) });
 

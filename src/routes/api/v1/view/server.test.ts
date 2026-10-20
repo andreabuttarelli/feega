@@ -36,6 +36,7 @@ const post = (body: unknown) => {
 const doc = (): MotionDoc => ({ ...newMotionDoc(MotionFormat.Portrait), tracks: [{ id: 't1', name: 'Layers', kind: 'visual', clips: [{ id: 'c1', component: 'Title', from: 0, durationInFrames: 60, props: { text: 'Hello', x: 0.5, y: 0.5, width: 0.5, height: 0.2 } }] } as never] });
 
 beforeEach(async () => {
+  process.env.REMOTE_RENDER_URL = 'off';
   const fake = revisionsDb();
   state.db = fake.db;
   state.framesOpen = false;
@@ -74,7 +75,21 @@ describe('POST /api/v1/view lets an outside agent see the canvas', () => {
     expect(body.events).toEqual([]);
   });
 
-  it('snapshot says plainly when the server renderer is closed, and refuses an element alone', async () => {
+  it('snapshot draws at the remote renderer when this server has none', async () => {
+    delete process.env.REMOTE_RENDER_URL;
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => (asked.push(url), new Response(JSON.stringify({ frames: [{ time: 0, mime: 'image/jpeg', data: 'AA' }] }), { status: 200 })));
+
+    const res = await post({ op: 'snapshot', input: { node_id: NODE } });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ frames: [{ data: 'AA' }] });
+    expect(asked).toEqual([`https://oh.feega.app/api/v1/motion/${NODE}/frames`]);
+    vi.unstubAllGlobals();
+  });
+
+  it('snapshot says plainly when no renderer is reachable, and refuses an element alone', async () => {
+    process.env.REMOTE_RENDER_URL = 'off';
     const closed = await post({ op: 'snapshot', input: { node_id: NODE } });
     const element = await post({ op: 'snapshot', input: { node_id: NODE, element_id: 'c1' } });
 

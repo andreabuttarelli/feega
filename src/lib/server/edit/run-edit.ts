@@ -30,7 +30,17 @@ const ELEMENT_FILL: Record<string, (id: string) => unknown> = {
 
 const refusal = (error: string, extra: Record<string, unknown> = {}): Answer => ({ status: HTTP_BAD_REQUEST, body: { error, ...extra } });
 
-const succeeded = (answer: Answer) => answer.status >= HTTP_OK && answer.status < HTTP_OK + 100;
+const HTTP_UNPROCESSABLE = 422;
+const REFUSING_OUTCOMES = ['invalid', 'conflict', 'not_found', 'refused'];
+
+const bodyRefuses = (body: unknown) => {
+  const { error, outcome } = (body ?? {}) as { error?: unknown; outcome?: unknown };
+  return typeof error === 'string' || (typeof outcome === 'string' && REFUSING_OUTCOMES.includes(outcome));
+};
+
+const httpOk = (answer: Answer) => answer.status >= HTTP_OK && answer.status < HTTP_OK + 100;
+
+const succeeded = (answer: Answer) => httpOk(answer) && !bodyRefuses(answer.body);
 
 async function filled(ports: EditPorts, op: EditOp, step: EditStep): Promise<Record<string, unknown>> {
   const input = { ...step.input };
@@ -135,7 +145,7 @@ export async function runEdit(ports: EditPorts, ask: EditAsk): Promise<Answer> {
     const answer = await runGroup(ports, ask, group);
     if (!succeeded(answer)) {
       const inside = (answer.body as { index?: number }).index ?? 0;
-      return { status: answer.status, body: { applied: results.length, failed: group.first + inside, error: answer.body, results } };
+      return { status: httpOk(answer) ? HTTP_UNPROCESSABLE : answer.status, body: { applied: results.length, failed: group.first + inside, error: answer.body, results } };
     }
     results.push(...resultsOf(group, answer));
   }

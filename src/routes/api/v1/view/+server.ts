@@ -42,6 +42,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json({ error: 'unknown_op', fix: 'Call op "describe".', ...listing() }, { status: HTTP_BAD_REQUEST });
   }
 
-  const answer = await runView(resolved.caller, op, input);
+  const via = { bearer: bearer ?? '', ownOrigin: url.origin, org: url.searchParams.get('org') ?? undefined };
+  const answer = await runView(resolved.caller, op, input, via);
   return json(answer.body, { status: answer.status });
 };
