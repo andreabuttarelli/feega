@@ -3,7 +3,7 @@ import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 import type { PortTile } from '$lib/canvas/gpu/geometry';
 import type { Box, FrameOnCanvas } from './canvas-scene';
 import { cardItems } from './cards';
-import type { GenIcons } from './gen-card';
+import type { CardIcons } from './card-kit';
 import { PortState, tileChrome, type Glyphs, type PortMark } from './chrome';
 import type { CoreTheme } from './overlay';
 
@@ -26,7 +26,7 @@ export enum CardLayer {
   Face = 'face'
 }
 
-export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: GenIcons | null = null, layer = CardLayer.Whole): FrameOnCanvas {
+export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null, layer = CardLayer.Whole): FrameOnCanvas {
   const [x, y] = [CHROME_REACH.side, CHROME_REACH.top];
   const w = t.box.w + 2 * CHROME_REACH.side;
   const h = t.box.h + CHROME_REACH.top + CHROME_REACH.bottom;
@@ -39,7 +39,7 @@ export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold
   };
 }
 
-export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: GenIcons | null = null): (t: CardTile, layer?: CardLayer) => FrameOnCanvas {
+export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null): (t: CardTile, layer?: CardLayer) => FrameOnCanvas {
   const drawn = new Map<string, { key: string; frame: FrameOnCanvas }>();
   return (t, layer = CardLayer.Whole) => {
     const key = `${layer}:${cardKey(t)}`;
