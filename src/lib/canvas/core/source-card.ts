@@ -1,6 +1,6 @@
 import type { Item } from '$lib/motion/gpu-full/display-list';
 import { TileBadge, type SourceTile } from '$lib/canvas/source-thumbs';
-import { BORDER, CardPart, Fit, at, image, panel, text, type Ctx } from './card-kit';
+import { BORDER, CardPart, Fit, at, image, measure, panel, write, type Ctx } from './card-kit';
 import { rect, solid } from './shapes';
 
 const HEAD = { padX: 9, padY: 7, line: 16, title: 11.5, count: 10.5, icon: 13, gap: 6 };
@@ -24,25 +24,25 @@ function icon(x: Ctx, part: CardPart, contours: number[][], left: number, top: n
 }
 
 function head(x: Ctx): Item[] {
-  const { c, theme, icons, glyphs } = x;
+  const { c, theme, icons } = x;
   const f = c.face;
   const mark = f.kind ? icons?.head.get(f.kind) : undefined;
-  const count = f.count ? glyphs(f.count, HEAD.count).width : 0;
+  const count = f.count ? measure(x, f.count, HEAD.count) : 0;
   const titleLeft = HEAD.padX + (mark ? HEAD.icon + HEAD.gap : 0);
   const titleWidth = c.w - HEAD.padX - titleLeft - (count ? count + HEAD.gap : 0);
   const middle = HEAD.padY + (HEAD.line - HEAD.title) / 2 - 1;
   return [
     ...(mark ? icon(x, CardPart.Head, mark, HEAD.padX, HEAD.padY + (HEAD.line - HEAD.icon) / 2, theme.ink) : []),
-    ...text(x, CardPart.Title, f.title, HEAD.title, theme.ink, titleLeft, middle, titleWidth, HEAD.title),
-    ...text(x, CardPart.Head, f.count, HEAD.count, theme.inkSoft, c.w - HEAD.padX - count, HEAD.padY + (HEAD.line - HEAD.count) / 2 - 1, null),
+    ...write(x, CardPart.Title, f.title, HEAD.title, theme.ink, titleLeft, middle, titleWidth, HEAD.title),
+    ...write(x, CardPart.Head, f.count, HEAD.count, theme.inkSoft, c.w - HEAD.padX - count, HEAD.padY + (HEAD.line - HEAD.count) / 2 - 1, null),
     solid(x.clip(CardPart.Head), at(c, [rect(0, HEAD_H - BORDER, c.w, BORDER)]), theme.line)
   ];
 }
 
 function centred(x: Ctx, part: CardPart, s: string, size: number, colour: string, top: number, width: number): Item[] {
-  const own = x.glyphs(s, size).width;
+  const own = measure(x, s, size);
   const left = own < width ? (x.c.w - own) / 2 : (x.c.w - width) / 2;
-  return text(x, part, s, size, colour, left, top, width, size * 4);
+  return write(x, part, s, size, colour, left, top, width, size * 4);
 }
 
 function empty(x: Ctx): Item[] {
@@ -65,13 +65,13 @@ function badge(x: Ctx, kind: TileBadge, left: number, top: number): Item[] {
 }
 
 function sale(x: Ctx, label: string, left: number, top: number): Item[] {
-  const width = x.bold(label, SALE.size).width + SALE.padX * 2;
-  return [solid(x.clip(CardPart.Sale), at(x.c, [rect(left, top, width, SALE.height)]), SALE.fill), ...text(x, CardPart.Sale, label, SALE.size, SCRIM.ink, left + SALE.padX, top + (SALE.height - SALE.size) / 2 - 1, null)];
+  const width = measure(x, label, SALE.size, 'bold') + SALE.padX * 2;
+  return [solid(x.clip(CardPart.Sale), at(x.c, [rect(left, top, width, SALE.height)]), SALE.fill), ...write(x, CardPart.Sale, label, SALE.size, SCRIM.ink, left + SALE.padX, top + (SALE.height - SALE.size) / 2 - 1, null)];
 }
 
 function caption(x: Ctx, label: string, left: number, top: number, cell: number): Item[] {
   const band = top + cell - CAPTION.height;
-  return [solid(x.clip(CardPart.Caption), at(x.c, [rect(left, band, cell, CAPTION.height)]), SCRIM.fill, SCRIM.alpha), ...text(x, CardPart.Caption, label, CAPTION.size, SCRIM.ink, left + CAPTION.padX, band + (CAPTION.height - CAPTION.size) / 2 - 1, cell - CAPTION.padX * 2, CAPTION.size)];
+  return [solid(x.clip(CardPart.Caption), at(x.c, [rect(left, band, cell, CAPTION.height)]), SCRIM.fill, SCRIM.alpha), ...write(x, CardPart.Caption, label, CAPTION.size, SCRIM.ink, left + CAPTION.padX, band + (CAPTION.height - CAPTION.size) / 2 - 1, cell - CAPTION.padX * 2, CAPTION.size)];
 }
 
 function tile(x: Ctx, t: SourceTile, i: number, at0: { left: number; top: number; cell: number }): Item[] {
@@ -116,7 +116,7 @@ export function personItems(x: Ctx): Item[] {
     ...panel(x),
     ...photo,
     solid(x.clip(CardPart.Info), at(c, [rect(0, top, c.w, BORDER)]), theme.line),
-    ...text(x, CardPart.Title, f.title || f.label || '', PERSON.name, theme.ink, PERSON.padX, top + BORDER + PERSON.padY, c.w - PERSON.padX * 2, PERSON.name),
-    ...text(x, CardPart.Subtitle, `${views} ${views === 1 ? 'view' : 'views'}`, PERSON.views, theme.inkSoft, PERSON.padX, top + BORDER + PERSON.padY + PERSON.name * PERSON.line + PERSON.gap, c.w - PERSON.padX * 2, PERSON.views)
+    ...write(x, CardPart.Title, f.title || f.label || '', PERSON.name, theme.ink, PERSON.padX, top + BORDER + PERSON.padY, c.w - PERSON.padX * 2, PERSON.name),
+    ...write(x, CardPart.Subtitle, `${views} ${views === 1 ? 'view' : 'views'}`, PERSON.views, theme.inkSoft, PERSON.padX, top + BORDER + PERSON.padY + PERSON.name * PERSON.line + PERSON.gap, c.w - PERSON.padX * 2, PERSON.views)
   ];
 }

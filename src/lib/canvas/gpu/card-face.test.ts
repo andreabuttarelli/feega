@@ -66,6 +66,13 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
     expect(store({})).toMatchObject({ title: 'Products', empty: 'Select the node to enter the store address.' });
   });
 
+  it('kinds the default canvas draws as an empty node carry their name and what they wait for', () => {
+    expect(faceOf({ id: 'a', kind: 'ads' }, { page_name: 'x' }, asset)).toMatchObject({ surface: Surface.Empty, title: 'Ads', subtitle: 'Search a brand or a keyword to see its ads.' });
+    expect(faceOf({ id: 'c', kind: 'calendar' }, {}, asset)).toMatchObject({ surface: Surface.Empty, title: 'Calendar' });
+    expect(faceOf({ id: 'p', kind: 'social_post_mockup' }, { general: { caption: 'x' } }, asset)).toMatchObject({ surface: Surface.Empty, title: 'Post preview' });
+    expect(faceOf({ id: 's', kind: 'studio_batch' }, {}, asset)).toMatchObject({ surface: Surface.Pick, title: 'Open Photo studio' });
+  });
+
   it('an influencer carries its name, its cover and its number of views', () => {
     const face = faceOf({ id: 'i', kind: 'influencer' }, {}, asset, { tiles: [{ thumb: 'a', caption: null, badge: null, sale: null }, { thumb: 'b', caption: null, badge: null, sale: null }], total: 2, name: 'Giulia' });
 

@@ -1,5 +1,6 @@
 import { FrameKind } from '../motion-node';
 import { NODE_KIND_LABEL, NameTag } from '../node-label';
+import { NODE_EMPTY_HINT } from '../node-empty';
 import { isNodeType, type NodeType } from '../node-data';
 import { isUploadedNodeRow } from '../uploaded-node';
 import type { Poster } from '../poster-lod';
@@ -15,6 +16,8 @@ export enum Surface {
   Source = 'source',
   Preview = 'preview',
   Person = 'person',
+  Empty = 'empty',
+  Pick = 'pick',
   List = 'list',
   Doc = 'doc',
   Blank = 'blank'
@@ -75,6 +78,10 @@ const source =
   (title: (d: Data) => string, subtitle: (d: Data) => string = () => ''): Draw =>
   (d) => ({ surface: Surface.Source, title: title(d), subtitle: subtitle(d) });
 
+const hollow =
+  (kind: NodeType): Draw =>
+  () => ({ surface: Surface.Empty, title: NODE_KIND_LABEL[kind], subtitle: NODE_EMPTY_HINT[kind] });
+
 const feedTitle = (d: Data): string => (str(d.handle).trim() ? `@${str(d.handle)} · ${str(d.platform) || 'instagram'}` : 'Feed social');
 
 const productsTitle = (d: Data): string => (str(d.url).trim() ? str(d.url).replace(/^https?:\/\//, '').replace(/\/$/, '') : 'Products');
@@ -130,16 +137,16 @@ const FACES: Record<NodeType, Draw> = {
   doc: (d) => ({ surface: Surface.Doc, text: str(d.content), pills: ['Read', 'Write'], count: d.public === true ? 'Revoke' : 'Public link' }),
   iframe: source((d) => str(d.url) || 'HTML'),
   social_account_feed: preview(feedTitle, 'Select the node to choose the account.', 'No posts yet. Select the node to sync.', (d) => str(d.handle).trim() !== ''),
-  social_post_mockup: (d) => ({ surface: Surface.Text, text: str((d.general as Data | undefined)?.caption) }),
+  social_post_mockup: hollow('social_post_mockup'),
   products: preview(productsTitle, 'Select the node to enter the store address.', 'No products yet. Select the node to sync.', (d) => str(d.url).trim() !== ''),
-  ads: source((d) => str(d.page_name) || str(d.search_terms), (d) => str(d.country)),
+  ads: hollow('ads'),
   influencer: (_d, _a, _t, view) => ({ surface: Surface.Person, title: view?.name ?? '', tiles: view?.tiles.slice(0, 1) ?? [], count: String(view?.total ?? 0) }),
   list: listFace,
   select: source((d) => `#${typeof d.index === 'number' ? d.index : 1}`),
   effects: (d, asset) => ({ surface: Surface.Source, media: ref(d) ? { url: asset(ref(d)!), video: false } : null }),
   composition: (d, asset) => ({ surface: Surface.Source, media: ref(d) ? { url: asset(ref(d)!), video: true } : null }),
-  calendar: source((d) => str(d.anchor), (d) => str(d.view)),
-  studio_batch: source(() => '')
+  calendar: hollow('calendar'),
+  studio_batch: () => ({ surface: Surface.Pick, title: 'Open Photo studio' })
 };
 
 const BLANK: CardFace = {

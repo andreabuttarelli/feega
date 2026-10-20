@@ -19,7 +19,7 @@ const box = (contours: number[][]) => {
 };
 const asset = (id: string) => `https://cdn/${id}`;
 const view = (thumbs: string[], total = thumbs.length): SourceView => ({ tiles: thumbs.map((thumb) => ({ thumb, caption: null, badge: null, sale: null })), total, name: null });
-const icons: CardIcons = { references: [], credit: [], head: new Map(), layers: [[0, 0, 5, 0, 5, 5]], play: [[0, 0, 5, 0, 5, 5]], person: [] };
+const icons: CardIcons = { references: [], credit: [], head: new Map(), badge: new Map(), layers: [[0, 0, 5, 0, 5, 5]], play: [[0, 0, 5, 0, 5, 5]], person: [] };
 const card = (kind: string, data: Record<string, unknown>, over: Partial<CoreCard> = {}): CoreCard => ({ id: 'n', x: 0, y: 0, w: 200, h: 100, face: faceOf({ id: 'n', kind }, data, asset), ...over });
 const part = (items: Item[], p: CardPart) => items.filter((i) => i.clip === `n:${p}` || i.clip.startsWith(`n:${p}:`));
 const paths = (items: Item[], p: CardPart) => part(items, p) as PathItem[];
@@ -103,6 +103,32 @@ describe('cardItems', () => {
 
     expect(part(items, CardPart.Thumb)).toHaveLength(0);
     expect(part(items, CardPart.Empty)).toHaveLength(1);
+  });
+
+  it('draws a kind with nothing to show as a dashed card with a badge, its name and what it waits for', () => {
+    const c = { ...card('ads', {}), w: 300, h: 200 };
+    const items = cardItems(c, theme, glyphs, glyphs, { ...icons, badge: new Map([['ads', [[0, 0, 4, 0, 4, 4]]]]) });
+
+    expect(paths(items, CardPart.Panel)[1].contours.length).toBeGreaterThan(10);
+    expect(box(paths(items, CardPart.Badge)[0].contours)).toEqual([130, 38, 170, 78]);
+    expect(paths(items, CardPart.Title)).toHaveLength(1);
+    expect(paths(items, CardPart.Empty)).toHaveLength(3);
+  });
+
+  it('wraps the hint of an empty card in lines no wider than 28 characters, each centred', () => {
+    const c = { ...card('calendar', {}), w: 600, h: 300 };
+    const rows = paths(cardItems(c, theme, glyphs), CardPart.Empty);
+
+    expect(rows.length).toBeGreaterThan(1);
+    rows.forEach((r) => expect(box(r.contours)[0] + box(r.contours)[2]).toBeCloseTo(600, -1));
+  });
+
+  it('draws the studio batch pick state as an icon over an underlined link', () => {
+    const c = { ...card('studio_batch', {}), w: 300, h: 200 };
+    const items = cardItems(c, theme, glyphs, glyphs, { ...icons, badge: new Map([['studio_batch', [[0, 0, 4, 0, 4, 4]]]]) });
+
+    expect(paths(items, CardPart.Badge)).toHaveLength(1);
+    expect(paths(items, CardPart.Empty)).toHaveLength(2);
   });
 
   it('draws an influencer as a cover over a name and views band', () => {

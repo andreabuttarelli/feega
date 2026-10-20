@@ -62,7 +62,7 @@ export const RUNNING = 'Running…';
 export const AUTO_MODEL = 'Auto';
 export const CENTRE: [number, number] = [0.5, 0.5];
 
-export type SourceIcons = { head: ReadonlyMap<NodeType, number[][]>; layers: number[][]; play: number[][]; person: number[][] };
+export type SourceIcons = { head: ReadonlyMap<NodeType, number[][]>; badge: ReadonlyMap<NodeType, number[][]>; layers: number[][]; play: number[][]; person: number[][] };
 
 export type CardIcons = GenIcons & SourceIcons;
 
@@ -88,14 +88,20 @@ export function panel(x: Ctx, raised = true): Item[] {
   ];
 }
 
-export function text(x: Ctx, part: CardPart, s: string, size: number, colour: string, left: number, top: number, width: number | null, height = size): Item[] {
+export function text(x: Ctx, part: CardPart, s: string, size: number, colour: string, left: number, top: number, width: number | null, height = size, tracking?: number): Item[] {
   if (!s) {
     return [];
   }
-  const set = width === null ? undefined : { width, height };
+  const set = width === null ? { tracking } : { width, height, tracking };
   const contours = at(x.c, (BOLD_PARTS.has(part) ? x.bold : x.glyphs)(s, size, set).contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + left : v + top))));
   return [{ ...solid(x.clip(part), contours, colour), scissor: [x.c.x, x.c.y, x.c.x + x.c.w, x.c.y + x.c.h] }];
 }
+
+export const UI_TRACKING = -0.8;
+
+export const write = (x: Ctx, part: CardPart, s: string, size: number, colour: string, left: number, top: number, width: number | null, height = size): Item[] => text(x, part, s, size, colour, left, top, width, height, UI_TRACKING);
+
+export const measure = (x: Ctx, s: string, size: number, weight: 'regular' | 'bold' = 'regular'): number => (weight === 'bold' ? x.bold : x.glyphs)(s, size, { tracking: UI_TRACKING }).width;
 
 export const body = (x: Ctx, s: string, top: number, bottom = PAD) => text(x, CardPart.Body, s, BODY_SIZE, x.theme.ink, PAD, top, x.c.w - PAD * 2, x.c.h - top - bottom);
 
