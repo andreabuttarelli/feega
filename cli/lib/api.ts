@@ -47,6 +47,22 @@ export async function request<T>(path: string, token: string, opts?: RequestInit
   return res.json() as Promise<T>;
 }
 
+export type RawAnswer = { status: number; body: unknown };
+
+export async function requestRaw(path: string, token: string, opts?: RequestInit): Promise<RawAnswer> {
+  const tool = toolCall.getStore();
+  const res = await fetch(`${appUrl()}${path}`, {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(tool ? { [TOOL_HEADER]: tool } : {}), ...opts?.headers },
+  });
+  const text = await res.text().catch(() => '');
+  try {
+    return { status: res.status, body: JSON.parse(text) };
+  } catch {
+    return { status: res.status, body: text };
+  }
+}
+
 function get<T>(path: string, token: string): Promise<T> {
   return request<T>(path, token);
 }

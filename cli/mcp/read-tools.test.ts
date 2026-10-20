@@ -94,11 +94,13 @@ const RESTANO = [
   'get_render',
   'list_orgs',
   'list_team',
-  'team_op'
+  'team_op',
+  'edit',
+  'view'
 ];
 
-describe('la superficie MCP è le quaranta dichiarate', () => {
-  test('tools/list è esattamente questi quaranta nomi', async () => {
+describe('la superficie MCP è quella dichiarata', () => {
+  test('tools/list è esattamente questi nomi', async () => {
     const names = (await tools()).map((t) => t.name).sort();
 
     expect(names).toEqual([...RESTANO].sort());

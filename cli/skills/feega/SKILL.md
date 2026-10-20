@@ -143,6 +143,26 @@ workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists
 
 Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
 
+## Edit and see a canvas: `edit` and `view`
+
+`edit` is the one way to change a canvas, its nodes, free elements, frames and what is inside a frame.
+You never pick an endpoint: the server routes by `op`. Call op `describe` first: `{}` lists every
+op (name, family canvas|frame|editor, access, one line), `{ op }` or `{ ops: [...] }` give strict
+JSON input schemas, `{ schemas: true }` gives all of them. One op: `{ op, target?, element?, input?,
+version?, project_id? }`; `target` is the node or frame id, `element` an element id inside that
+frame, and they fill the id fields of the op's input unless you set them. Batch: op `batch` with
+`ops: [...]`, canvas and frame ops mixed, run in order; consecutive ops on one frame are one
+revision, all or none; across steps nothing is atomic: it stops at the first failure and answers
+`applied` and `failed`. A name in two registries keeps the canvas op, the frame tool becomes
+`frame_<name>`, the editor action `editor_<name>`. `canvas_tool`, `motion_tool` and
+`motion_editor_op` are deprecated aliases of `edit`.
+
+`view` reads the canvas: `canvas_summary { canvas_id }` (every node with place, size, wiring, run
+status, and each frame's element tree with bounds and text), `get { id, frame_id? }` (one node or
+element in full), `activity { canvas_id, since? }` (recent events and running runs; presence is not
+readable from the server), `snapshot { node_id, time?, width? }` (the frame as an image; needs the
+server renderer and says `server_frames_unavailable` when it is closed).
+
 ## Work a canvas with the chat's checks
 
 `canvas_tool` runs the project chat's own canvas ops on one `project_id`: `op` names it, `input`

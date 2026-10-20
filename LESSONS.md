@@ -3185,3 +3185,6 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## A panel portaled out of its parent loses the parent's scoped CSS
 
 **Signal:** a flex column that scrolls on its own page does not scroll once moved into the right bar (`use:portalInto`): `scrollHeight` equals `clientHeight` at a height taller than the bar, and the bar's overflow clips it. **Move:** a Svelte rule like `.docked .pane` needs `.docked` as a DOM ancestor, which a portal removes; put the layout on the element itself (`.pane.in-bar`). Measure with a wheel over the bar, not `scrollIntoView`, which scrolls the clipping ancestors and passes.
+
+## A canvas op that fails still answers 200
+**Signal:** a batch over `POST /api/v1/edit` reported `applied: 3` although a `move_node` on a missing node came back `{ error: 'node_not_found' }`. **Move:** canvas ops signal refusal in the body (`error`, or `outcome` invalid/conflict/not_found), not in the HTTP status; anything that sequences ops reads both (`run-edit.ts`). A dev server also keeps serving the old module after an edit under `$lib/server`: restart it before believing a live run.

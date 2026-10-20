@@ -11,7 +11,7 @@ export function registerCanvasTools(server: McpServer) {
     {
       title: 'Work a project canvas',
       description:
-        'The canvas ops of the project chat, on one project (`project_id`), with `input` in camelCase. First call op "describe" with {} for every op with one line, or {op} for its strict JSON input schema. Frames and stills: draw_frame, then edit inside with motion_tool. ' +
+        'Deprecated, use `edit`. The canvas ops of the project chat, on one project (`project_id`), with `input` in camelCase. First call op "describe" with {} for every op with one line, or {op} for its strict JSON input schema. Frames and stills: draw_frame, then edit inside with motion_tool. ' +
         'Reads: list_canvases {}, estimate_text_cost {canvasId,nodeId,prompt?,model?} (token estimate of a text run), suggest_next_steps {canvasId,nodeId}, list_nodes {canvasId}, canvas_snapshot {canvasId} (nodes, connections, runs, products, socialPosts, influencers, revision), canvas_revision {canvasId} (live revision, or canvas/project gone), list_runs {nodeId}, list_models {medium} (models this project can run: provider, credits, uncensored, and routes[] — one per provider that serves it, for run_node provider), preview_node_loop {nodeId}, ' +
         'preview_run_graph {graph:"downstream",nodeId} | {graph:"stale",canvasId,nodeIds?} (ordered steps + credits: quote before run_graph). ' +
         'Writes, free: create_node {canvasId,type,x,y,displayName?,data?} (data per describe_node_types), update_node {nodeId,data} (only changed fields, null removes), ' +
