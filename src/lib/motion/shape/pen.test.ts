@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parsePath, pathData, type Outline } from './geometry';
-import { Handle, Mirror, addPoint, insertPoint, segmentHit, deletePoint, dragHandle, movePoint, toggleClosed } from './pen';
+import { Handle, Mirror, addPoint, insertPoint, segmentHit, deletePoint, dragHandle, movePoint, toggleClosed, toggleSmooth } from './pen';
 
 const read = (d: string): Outline => {
   const o = parsePath(d);
@@ -77,5 +77,27 @@ describe('adding a point on a segment', () => {
     const { outline, ref } = insertPoint(read('M0 0L1 0L1 1Z'), { contour: 0, index: 2, t: 0.5 });
     expect(ref).toEqual({ contour: 0, index: 3 });
     expect(outline[0].vertices[3].p).toEqual([0.5, 0.5]);
+  });
+
+  it('alt-click smooths a corner along the line between its neighbours, and a second one makes it a corner again', () => {
+    const smooth = toggleSmooth(read('M0 0L1 1L2 0'), { contour: 0, index: 1 });
+    const [, mid] = smooth[0].vertices;
+
+    expect(mid.in[1]).toBe(mid.p[1]);
+    expect(mid.out[1]).toBe(mid.p[1]);
+    expect(mid.out[0]).toBeGreaterThan(mid.p[0]);
+    expect(mid.in[0]).toBeLessThan(mid.p[0]);
+    expect(pathData(toggleSmooth(smooth, { contour: 0, index: 1 }))).toBe('M0 0L1 1L2 0');
+  });
+
+  it('an end point with one neighbour smooths along its only segment', () => {
+    const [start] = toggleSmooth(read('M0 0L2 0'), { contour: 0, index: 0 })[0].vertices;
+
+    expect(start.out[1]).toBe(0);
+    expect(start.out[0]).toBeGreaterThan(0);
+  });
+
+  it('a lone point stays a corner', () => {
+    expect(pathData(toggleSmooth(read('M0 0'), { contour: 0, index: 0 }))).toBe('M0 0');
   });
 });

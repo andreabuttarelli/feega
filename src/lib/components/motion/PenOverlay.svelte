@@ -1,20 +1,23 @@
 <script lang="ts">
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { mapOutline, parsePath, pathData, type Outline, type Pt } from '$lib/motion/shape/geometry';
-  import { Handle, Mirror, addPoint, deletePoint, dragHandle, insertPoint, movePoint, segmentHit, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
+  import { Handle, Mirror, addPoint, deletePoint, dragHandle, insertPoint, movePoint, segmentHit, toggleClosed, toggleSmooth, type PointRef } from '$lib/motion/shape/pen';
   import { setPath } from '$lib/motion/shape/ops';
   import { pathSpace } from '$lib/motion/shape/space';
   import { isTyping } from '$lib/motion/shortcuts';
+  import type { Guide } from '$lib/motion/scene-select';
+  import { pointBounds, snapPoint, snapReach, snapTargets } from '$lib/motion/shape/vector-edit';
 
-  let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, clip, frame, onchange, onexit }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void; onexit: () => void } = $props();
 
-  type Grab = { kind: 'point'; ref: PointRef; from: Pt } | { kind: 'handle'; ref: PointRef; handle: Handle } | { kind: 'new'; ref: PointRef };
+  type Grab = { kind: 'point'; ref: PointRef; from: Pt; origin: Pt } | { kind: 'handle'; ref: PointRef; handle: Handle } | { kind: 'new'; ref: PointRef };
 
   let host = $state<HTMLDivElement | null>(null);
   let pen = $state(false);
   let selected = $state<PointRef | null>(null);
   let grab = $state<Grab | null>(null);
   let live = $state<Outline | null>(null);
+  let guides = $state<Guide[]>([]);
 
   const space = $derived(pathSpace(doc, clip.id, frame));
   const saved = $derived.by(() => {
@@ -52,14 +55,13 @@
 
   function startPoint(e: PointerEvent, ref: PointRef) {
     e.stopPropagation();
+    selected = ref;
     if (e.altKey) {
-      commit(deletePoint(outline, ref), 'Deleted a path point');
-      selected = null;
+      commit(toggleSmooth(outline, ref), 'Toggled a point between corner and smooth');
       return;
     }
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    selected = ref;
-    grab = { kind: 'point', ref, from: local(e) };
+    grab = { kind: 'point', ref, from: local(e), origin: outline[ref.contour].vertices[ref.index].p };
   }
 
   function startHandle(e: PointerEvent, ref: PointRef, handle: Handle) {
@@ -81,14 +83,48 @@
     commit(next.outline, 'Added a path point');
   }
 
-  function deleteSelected(e: KeyboardEvent) {
-    if (!selected || (e.key !== 'Backspace' && e.key !== 'Delete') || isTyping(e.target as HTMLElement | null)) {
+  function keys(e: KeyboardEvent) {
+    if (isTyping(e.target as HTMLElement | null)) {
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (pen) {
+        pen = false;
+        return;
+      }
+      onexit();
+      return;
+    }
+    if (!selected || (e.key !== 'Backspace' && e.key !== 'Delete')) {
       return;
     }
     e.preventDefault();
     e.stopPropagation();
     commit(deletePoint(outline, selected), 'Deleted a path point');
     selected = null;
+  }
+
+  function pressOutside(e: PointerEvent) {
+    const target = e.target as Element | null;
+    if (pen || !target || target.closest('[data-vector-edit]') || !host?.parentElement?.contains(target)) {
+      return;
+    }
+    onexit();
+  }
+
+  const targets = $derived(snapTargets(doc, clip.id, frame));
+
+  function snapped(raw: Pt, held: PointRef, e: PointerEvent): Pt {
+    if (e.metaKey || e.ctrlKey) {
+      guides = [];
+      return raw;
+    }
+    const own = saved.flatMap((c, ci) => c.vertices.flatMap((v, vi) => (ci === held.contour && vi === held.index ? [] : [pointBounds(space.toFrame(v.p))])));
+    const result = snapPoint(space.toFrame(raw), [...targets, ...own], { width: doc.width, height: doc.height }, snapReach(doc.width, host!.getBoundingClientRect().width));
+    guides = result.guides;
+    return space.toLocal(result.point);
   }
 
   function place(e: PointerEvent) {
@@ -110,7 +146,8 @@
     }
     const at = local(e);
     if (grab.kind === 'point') {
-      live = movePoint(saved, grab.ref, [at[0] - grab.from[0], at[1] - grab.from[1]]);
+      const to = snapped([grab.origin[0] + at[0] - grab.from[0], grab.origin[1] + at[1] - grab.from[1]], grab.ref, e);
+      live = movePoint(saved, grab.ref, [to[0] - grab.origin[0], to[1] - grab.origin[1]]);
       return;
     }
     live = dragHandle(live ?? saved, grab.ref, grab.kind === 'handle' ? grab.handle : Handle.Out, at, e.altKey ? Mirror.Broken : Mirror.Mirrored);
@@ -121,6 +158,7 @@
     const kind = grab?.kind;
     grab = null;
     live = null;
+    guides = [];
     if (done && kind) {
       commit(done, kind === 'new' ? 'Added a path point' : 'Edited the path');
     }
@@ -132,12 +170,15 @@
   };
 </script>
 
-<svelte:window onkeydowncapture={deleteSelected} />
+<svelte:window onkeydowncapture={keys} onpointerdowncapture={pressOutside} />
 
-<div class="overlay" class:pen bind:this={host} data-testid="pen-overlay" role="presentation" onpointerdown={place} onpointermove={move} onpointerup={end} onpointercancel={end}>
+<div class="overlay" class:pen bind:this={host} data-vector-edit data-testid="pen-overlay" role="presentation" onpointerdown={place} onpointermove={move} onpointerup={end} onpointercancel={end}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     <polygon class="frame" points={UNIT_BOX.map((p) => space.toFrame(p).join(',')).join(' ')} />
     <path class="outline" d={pathData(framed)} />
+    {#each guides as g (g.axis + g.at)}
+      {#if g.axis === 'x'}<line class="guide" x1={g.at} y1="0" x2={g.at} y2={doc.height} />{:else}<line class="guide" x1="0" y1={g.at} x2={doc.width} y2={g.at} />{/if}
+    {/each}
     <path class="hit" role="presentation" data-testid="pen-path" d={pathData(framed)} onpointerdown={insertOnPath} />
     {#if selected}
       {#each handles(selected) as [, h] (h.join())}
@@ -191,6 +232,12 @@
     width: 100%;
     height: 100%;
     overflow: visible;
+  }
+
+  .guide {
+    stroke: #ff3d7f;
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
   }
 
   .frame,

@@ -2,6 +2,7 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { fitTexts, freeTextFit, resizedFreeText, type HostShare } from '$lib/motion/text-fit';
   import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
+  import { canEditPoints, enterPointEdit } from '$lib/motion/shape/vector-edit';
   import { toVector } from '$lib/motion/vector/ops';
   import { localStore } from '$lib/browser-storage';
   import { painted } from '$lib/canvas/paint-wait';
@@ -533,6 +534,14 @@
   });
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
+  let vectorEdit = $state<string | null>(null);
+  const editingPoints = $derived(selected !== null && selected.id === vectorEdit && canEditPoints(selected));
+
+  $effect(() => {
+    if (vectorEdit !== null && selected?.id !== vectorEdit) {
+      vectorEdit = null;
+    }
+  });
   const view = $derived(propertiesFor({ count: selection.length, clip: selected?.id ?? null, part: selectedPart }));
   const agent = $derived(agentBusy || draft ? Agent.Working : Agent.Idle);
 
@@ -723,6 +732,21 @@
     }
     notice = '';
     edit(result.doc, summary);
+  }
+
+  function enterVectorEdit() {
+    if (!selected || !canEditPoints(selected) || playing) {
+      return;
+    }
+    const entered = enterPointEdit(doc, selected);
+    if (!entered.ok) {
+      notice = entered.error;
+      return;
+    }
+    if (entered.doc !== doc) {
+      edit(entered.doc, 'Edited the shape as a path');
+    }
+    vectorEdit = selected.id;
   }
 
   async function outlineSelectedText() {
@@ -1174,6 +1198,7 @@
 
   async function drawn(id: string) {
     selection = [id];
+    vectorEdit = findClip(history.present, id)?.clip.props.shape === 'path' ? id : null;
     typeInto = findClip(history.present, id)?.clip.component === DRAWN_TEXT ? id : null;
     await painted(DRAWN_SETTLE_FRAMES);
     frameBar.tool = DrawTool.Select;
@@ -2214,7 +2239,7 @@
   {/if}
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${rightBar.width}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && (!sideOpen || barSeat === BarSeat.InPlace)} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
-    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
+    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost} ondblclick={enterVectorEdit}>
       {#snippet player()}
       <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} fullDoc={{ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls }} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if outlineView === OutlineView.On}<OutlineOverlay doc={previewDoc ?? doc} {frame} boxes={spaceBoxes()} />{/if}
@@ -2225,8 +2250,8 @@
         {#if !playing}<SelectionOverlay bind:this={overlay} {scaleMode} mode={editMode} layoutBounds={guidesShown ? guideSnapBounds(doc) : []} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost && onhostdrag ? hostDragged : null} onframemove={frameChrome(data.node.kind ?? FrameKind.Frame).press === FramePress.Move ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
         {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
-        {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
-        {#if selected?.component === 'Shape' && selected.props.shape === 'vector' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<VectorOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
+        {#if editingPoints && selected?.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} onexit={() => (vectorEdit = null)} />{/if}
+        {#if editingPoints && selected?.props.shape === 'vector' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<VectorOverlay {doc} clip={selected} {frame} onchange={edit} onexit={() => (vectorEdit = null)} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay doc={previewDoc ?? doc} {frame} clip={findClip(withAutoLayout(previewDoc ?? doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
         {#if selected?.autoLayout && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
