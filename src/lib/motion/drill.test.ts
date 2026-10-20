@@ -33,10 +33,15 @@ describe('a press on a frame selected on the canvas', () => {
     expect(pressOf(Depth.Frame, FramePress.Move, Under.Child)).toBe(Press.Pick);
   });
 
-  it('moves the whole frame when the pointer is on its bare background', () => {
-    expect(pressOf(Depth.Frame, FramePress.Move, Under.Bare)).toBe(Press.MoveFrame);
-    expect(pressOf(Depth.Clip, FramePress.Move, Under.Bare)).toBe(Press.MoveFrame);
-    expect(pressOf(Depth.Part, FramePress.Move, Under.Bare)).toBe(Press.MoveFrame);
+  it('sweeps a marquee from the background of a frame that has children', () => {
+    expect(pressOf(Depth.Frame, FramePress.Move, Under.Bare)).toBe(Press.Marquee);
+    expect(pressOf(Depth.Clip, FramePress.Move, Under.Bare)).toBe(Press.Marquee);
+    expect(pressOf(Depth.Part, FramePress.Move, Under.Bare)).toBe(Press.Marquee);
+  });
+
+  it('moves the whole frame when it has nothing to sweep', () => {
+    expect(pressOf(Depth.Frame, FramePress.Move, Under.Empty)).toBe(Press.MoveFrame);
+    expect(pressOf(Depth.Clip, FramePress.Move, Under.Empty)).toBe(Press.MoveFrame);
   });
 
   it('picks a child once inside, whatever the depth', () => {
@@ -45,8 +50,8 @@ describe('a press on a frame selected on the canvas', () => {
   });
 
   it('never moves the host of a node that does not move on press', () => {
-    expect(pressOf(Depth.Frame, FramePress.Pick, Under.Bare)).toBe(Press.Pick);
-    expect(pressOf(Depth.Clip, FramePress.Pick, Under.Bare)).toBe(Press.Pick);
+    expect(pressOf(Depth.Frame, FramePress.Pick, Under.Empty)).toBe(Press.Marquee);
+    expect(pressOf(Depth.Clip, FramePress.Pick, Under.Bare)).toBe(Press.Marquee);
   });
 });
 
