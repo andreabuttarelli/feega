@@ -2,6 +2,8 @@ import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { reachableCaller } from '$lib/server/org-data/reach';
 import { FramesFailure, motionFrames } from '$lib/server/motion/agent-frames';
+import { remoteFramesWhenClosed } from '$lib/server/edit/frames-source';
+import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { MAX_FRAME_SIZE } from '$lib/server/motion/server-frames';
 import type { RequestHandler } from './$types';
 
@@ -32,6 +34,12 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const body = bodySchema.safeParse(await request.json().catch(() => ({})));
   if (!body.success) {
     return json({ error: FramesFailure.BadTimes, detail: body.error.issues[0]?.message }, { status: HTTP_BAD_REQUEST });
+  }
+
+  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  const remote = bearer ? await remoteFramesWhenClosed({ nodeId: params.nodeId ?? '', times: body.data.times, width: body.data.width }, { bearer, ownOrigin: url.origin, org: url.searchParams.get('org') ?? undefined, open: serverFramesOpen() }) : null;
+  if (remote) {
+    return json(remote.body, { status: remote.status });
   }
 
   const { db, orgId } = caller;

@@ -40,3 +40,13 @@ export async function fetchRemoteFrames(baseUrl: string, ask: RemoteFramesAsk, f
     return { status: HTTP_BAD_GATEWAY, body: { error: 'remote_render_unreachable', detail: `the remote renderer at ${baseUrl} did not answer` } };
   }
 }
+
+export type FramesCaller = { bearer: string; ownOrigin: string; org?: string };
+
+export async function remoteFramesWhenClosed(ask: { nodeId: string; times: number[]; width?: number }, via: FramesCaller & { open: boolean }, env: Env = process.env): Promise<Answer | null> {
+  const remoteUrl = remoteRenderUrl(env);
+  if (framesSource({ open: via.open, remoteUrl, ownOrigin: via.ownOrigin }) !== FramesSource.Remote) {
+    return null;
+  }
+  return fetchRemoteFrames(remoteUrl as string, { ...ask, bearer: via.bearer, org: via.org });
+}
