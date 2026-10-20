@@ -9,7 +9,7 @@ import { elementName } from '$lib/motion/element-name';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import { MoveOutcome, created, deleted, refused, type FrameStore, type Moved, type Place, type StoredFrame } from './move-element';
 
-export const groupAskSchema = z.object({ ids: z.array(z.string().min(1)).min(2).max(50) }).strict();
+export const groupAskSchema = z.object({ ids: z.array(z.string().min(1)).min(2).max(50), id: z.string().uuid().optional() }).strict();
 
 const GROUP_NAME = 'Group';
 
@@ -78,7 +78,7 @@ async function splitPicked(store: FrameStore, members: Members, ids: readonly st
   return { free, joined };
 }
 
-export async function groupElements(store: FrameStore, members: Members, place: Place, ids: readonly string[]): Promise<Moved> {
+export async function groupElements(store: FrameStore, members: Members, place: Place, ids: readonly string[], id?: string): Promise<Moved> {
   const { free: sources, joined } = await splitPicked(store, members, ids);
   if (sources.length + joined.length < 2) {
     return refused(MoveOutcome.Invalid, 'pick two or more things on the canvas to group');
@@ -95,7 +95,7 @@ export async function groupElements(store: FrameStore, members: Members, place: 
 
   const shaped = elementNodeOf(bounds, FrameKind.Group);
   const at = { x: bounds.left, y: bounds.top };
-  const groupId = await store.create({ ...place, ...at }, doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: GROUP_NAME });
+  const groupId = await store.create({ ...place, ...at, id }, doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: GROUP_NAME });
   await Promise.all(sources.map((s) => store.remove(s.nodeId)));
   if (joined.length) {
     await members.sendBack(groupId);

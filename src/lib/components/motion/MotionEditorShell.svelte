@@ -1,17 +1,19 @@
 <script lang="ts">
-  import { fitTexts, freeTextFit, resizedFreeText } from '$lib/motion/text-fit';
+  import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
+  import { fitTexts, freeTextFit, resizedFreeText, type HostShare } from '$lib/motion/text-fit';
   import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
   import { toVector } from '$lib/motion/vector/ops';
   import { localStore } from '$lib/browser-storage';
   import { painted } from '$lib/canvas/paint-wait';
   import { frameDocs } from '$lib/canvas/frame-docs.svelte';
+  import { liveEdits } from '$lib/motion/live-edit';
   import { FrameKind, frameChrome, freshText, openingSelection } from '$lib/canvas/motion-node';
   import { DRAWN_TEXT } from '$lib/motion/draw-create';
   import { groupClips, ungroupClip } from '$lib/motion/group';
   import { onMount, tick, untrack } from 'svelte';
   import { clipSeek } from '$lib/motion/storyboard';
   import { POSTER_WIDTH, posterFormat, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import { replaceState } from '$app/navigation';
   import { page } from '$app/state';
   import { RenderEngine, engineFlag } from '$lib/motion/gpu/engine-flag';
@@ -19,10 +21,11 @@
   import { CaptureProfile } from '$lib/motion/export/capture-profile';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { headMoved, watchMotionNode } from '$lib/realtime/motion-channel';
-  import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { canvasMediaUploader } from '$lib/canvas/media-uploader';
   import type { MediaUploader } from './media-upload';
-  import { registerUpload } from '$lib/motion/fonts/ops';
+  import { registerUpload, setFont } from '$lib/motion/fonts/ops';
+  import { FONT_FILE, MAX_FONT_MB, fontFamilies, missingUploads, type FontFamily, type FontFile, type FontLibrary, type FontUploaded } from '$lib/motion/fonts/library';
+  import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
   import Plus from '@lucide/svelte/icons/plus';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
@@ -44,9 +47,14 @@
   import { PickMode, clipActions, parentChoices } from '$lib/motion/clip-bar';
   import type { Point } from '$lib/motion/press-menu';
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
-  import { Detent, nearestDetent, nextDetent, sheetHeight } from '$lib/motion/sheet-detents';
+  import { Detent, fitHeight, nearestDetent, readSheetPx, settleHeight, sheetHeight, tapHeight, writeSheetPx } from '$lib/motion/sheet-detents';
+  import LayersPanel from '$lib/components/canvas/LayersPanel.svelte';
+  import { Density } from '$lib/canvas/layer-density';
+  import { PhoneSheetKind, phoneSheets } from '$lib/canvas/phone-sheets.svelte';
+  import LayersIcon from '@lucide/svelte/icons/layers';
+  import PlusIcon from '@lucide/svelte/icons/plus';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
-  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, OpensOn, defaultTimelinePx, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, OpensOn, defaultTimelinePx, Panel, Side, flip, readLayout, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import { Lens, addLens } from '$lib/motion/glass/ops';
@@ -60,7 +68,7 @@
   import ZoomStage from '$lib/components/motion/ZoomStage.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
   import { CHECK_REQUEST, FRAMES_REQUEST, Head, Landing, adoptAgentAssets, agentDraft, landTurn, type AgentDraft, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
-  import { Agent, showsStart } from '$lib/motion/start-prompt';
+  import { Agent } from '$lib/motion/agent-state';
   import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
   import { decodeLuma } from '$lib/motion/custom/luma-decode';
   import { recordCheck } from '$lib/motion/custom/ops';
@@ -130,6 +138,7 @@
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import BarSlot from '$lib/components/brand-agent/BarSlot.svelte';
+  import { BarSeat, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
   import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
@@ -138,6 +147,7 @@
   import {
     ClipEdge,
     Direction,
+    TOP_LEFT_ANCHOR,
     addClip,
     addTrack,
     adjacentKeyframe,
@@ -211,10 +221,10 @@
 
   const phoneMore = (item: BarItem) => viewport === Viewport.Phone && ON_PHONE[item] === PhonePlace.More;
 
-  const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
+  const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent', Layers: 'layers' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: { width: number; height: number }) => void) | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onsheet = () => {}, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onsheet?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: HostShare) => void) | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
@@ -243,7 +253,6 @@
   const peers = $derived(presence ? peersIn(marks, data.node.id, presence.self.userId, clock) : []);
   let notice = $state('');
   const supabase = createSupabaseBrowserClient();
-  const UPLOAD_WEIGHT = 400;
   const uploadToProject = canvasMediaUploader(supabase, { orgId: data.orgId, projectId: data.projectId, canvasId: data.canvas.id });
   const uploadMedia: MediaUploader = async (file, progress) => {
     const outcome = await uploadToProject(file, progress);
@@ -273,7 +282,8 @@
   const analysing = new Set<string>();
   let sheet = $state<Sheet>(Sheet.None);
   let detent = $state(Detent.Half);
-  let openAt = Detent.Half;
+  let openAt: Detent | null = null;
+  let sheetPxSet = $state<number | null>(null);
   let sheetDrag = $state<{ y: number; from: number; height: number } | null>(null);
   let stageEl = $state<HTMLElement | null>(null);
   let selectedPart = $state<string | null>(null);
@@ -296,7 +306,8 @@
   let display = $state(TimeDisplay.Timecode);
   let width = $state(1440);
   let hostWidth = $state(0);
-  const viewport = $derived(viewportOf(rules.measure === Measure.Host && hostWidth ? hostWidth : width));
+  const barSeat = $derived(mount === Mount.Canvas && viewportOf(width) === Viewport.Desktop ? BarSeat.InPlace : BarSeat.Own);
+  const viewport = $derived(barSeat === BarSeat.InPlace ? Viewport.Desktop : viewportOf(rules.measure === Measure.Host && hostWidth ? hostWidth : width));
   const chatPlace = $derived(CHAT_PLACE[viewport]);
   let moreOpen = $state(false);
   let menuOpen = $state(false);
@@ -315,7 +326,6 @@
       frameBar.editMode = editMode;
     }
   });
-  const unanimated = $derived(editMode === EditMode.Motion && doc.tracks.every((t) => t.clips.every((c) => !Object.keys(c.keyframes).length)));
 
   function setMode(next: EditMode) {
     if (next === EditMode.Motion && !timelineFits(doc)) {
@@ -496,6 +506,7 @@
 
   const compPath = $derived(path.map((p) => p.comp));
   const doc = $derived(viewOf(draft?.doc ?? history.present, compPath));
+  const unanimated = $derived(editMode === EditMode.Motion && doc.tracks.every((t) => t.clips.every((c) => !Object.keys(c.keyframes).length)));
   const mode = $derived(docMode(history.present));
 
   $effect(() => {
@@ -506,8 +517,9 @@
     }
   });
   const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
-  const assets = $derived([...madeAssets, ...data.assets]);
+  const assets = $derived([...madeAssets, ...data.assets].filter((a) => !goneFonts.includes(a.id)));
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
+  const missingFonts = $derived(missingUploads(doc.fonts, assetUrls));
   let interactive = $state(false);
   let tiltX = $state(0);
   let previewVars = $state<VarValues>({});
@@ -515,14 +527,13 @@
   const composeFrame = lastComposed(composeHtml);
   const html = $derived(composeFrame({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   $effect(() => {
-    const root = history.present;
-    frameDocs.put(data.node.id, { version, html: composeFrame({ doc: root, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen }), width: root.width, height: root.height, fps: root.fps, durationInFrames: root.durationInFrames, clean: !history.past.length && !history.future.length });
+    const root = liveRoot ?? history.present;
+    frameDocs.put(data.node.id, { version, html: composeFrame({ doc: root, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen }), width: root.width, height: root.height, fps: root.fps, durationInFrames: root.durationInFrames, clean: !liveRoot && !history.past.length && !history.future.length });
   });
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
   const view = $derived(propertiesFor({ count: selection.length, clip: selected?.id ?? null, part: selectedPart }));
   const agent = $derived(agentBusy || draft ? Agent.Working : Agent.Idle);
-  const blank = $derived(!path.length && showsStart(doc, agentBusy ? Agent.Working : Agent.Idle));
 
   const OPEN_CHAT: Record<ChatPlace, () => void> = {
     [ChatPlace.Column]: () => relayout({ chat: Panel.Open, inspector: Panel.Open, side: Side.Chat }),
@@ -565,7 +576,7 @@
 
   const poster = posterJob(
     () => preview?.still(posterSecond(history.present), POSTER_WIDTH, posterFormat(history.present.background)) ?? Promise.resolve(''),
-    (jpeg, shotAt) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)), revision: String(shotAt) }),
+    (jpeg, shotAt) => sendPoster(editorUrl, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)), revision: String(shotAt) }),
     () => version
   );
   let posterVersion = data.node.posterAssetId ? data.head.version : -1;
@@ -626,8 +637,7 @@
     for (const id of ids) {
       form.append('assetId', id);
     }
-    const res = await fetch(`${editorUrl}?/analyze`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(editorUrl, 'analyze', form);
     if (result.type === 'success') {
       analyses = { ...analyses, ...((result.data as { analyses: Record<string, AudioAnalysis> }).analyses ?? {}) };
     }
@@ -653,7 +663,20 @@
     }
   }
 
+  let liveRoot = $state.raw<MotionDoc | null>(null);
+  const live = liveEdits<MotionDoc>({
+    show: (next) => {
+      previewDoc = next;
+      liveRoot = next ? mergeView(history.present, compPath, next) : null;
+    },
+    record: (next, summary) => recordEdit(next, summary)
+  });
+
   function edit(next: MotionDoc, summary: string) {
+    live.edit(next, summary);
+  }
+
+  function recordEdit(next: MotionDoc, summary: string) {
     const now = Date.now();
     const root = mergeView(history.present, compPath, next);
     history = summary === lastEdit.summary && now - lastEdit.at < COALESCE_MS ? amend(history, root) : record(history, root);
@@ -741,8 +764,7 @@
     form.set('version', String(version));
     form.set('summary', unsavedSummary);
     frameDocs.sending(data.node.id);
-    const res = await fetch(`${editorUrl}?/ops`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(editorUrl, 'ops', form);
     saving = false;
 
     if (result.type === 'success') {
@@ -766,34 +788,103 @@
     }
   }
 
-  const FONT_EXTENSION = /\.(ttf|otf|woff2?)$/i;
+  let fontFamiliesHere = $state<FontFamily[]>(data.fonts);
+  let goneFonts = $state<string[]>([]);
+  const MB = 1024 * 1024;
 
-  function familyOf(fileName: string): string {
-    const base = fileName.replace(FONT_EXTENSION, '').replace(/[^A-Za-z0-9 \-]+/g, ' ').trim();
-    return (base || 'Uploaded font').slice(0, 60);
-  }
-
-  async function uploadFont(file: File): Promise<string | null> {
-    const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
+  async function storeFont(file: File): Promise<{ ok: true; font: FontFile; family: FontFamily } | { ok: false; error: string }> {
+    if (!FONT_FILE.test(file.name)) {
+      return { ok: false, error: 'Not a font: upload a TTF, OTF, WOFF or WOFF2 file' };
+    }
+    if (file.size > MAX_FONT_MB * MB) {
+      return { ok: false, error: `A font file is at most ${MAX_FONT_MB}MB` };
+    }
+    const path = `${orgFontPrefix(data.orgId)}${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
     const up = await supabase.storage.from('canvas-assets').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
     if (up.error) {
-      return up.error.message;
+      return { ok: false, error: up.error.message };
     }
     const form = new FormData();
     form.set('path', path);
-    const res = await fetch(`${editorUrl}?/uploadFont`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await editorAction('uploadFont', form);
     if (result.type !== 'success' || !result.data?.asset) {
-      return result.type === 'failure' ? String(result.data?.error ?? 'Upload refused') : 'Upload failed';
+      return { ok: false, error: result.type === 'failure' ? String(result.data?.error ?? 'Upload refused') : 'Upload failed' };
     }
-    const asset = result.data.asset as MotionEditorData['assets'][number];
-    madeAssets = [asset, ...madeAssets];
-    const registered = registerUpload(doc, { assetId: asset.id, family: familyOf(file.name), weights: [UPLOAD_WEIGHT], italic: false });
+    const font = result.data.font as FontFile;
+    madeAssets = [result.data.asset as MotionEditorData['assets'][number], ...madeAssets];
+    fontFamiliesHere = fontFamilies([...fontFamiliesHere.flatMap((f) => f.variants.map((v) => ({ ...v, family: f.family }))), font]);
+    return { ok: true, font, family: fontFamiliesHere.find((f) => f.family === font.family)! };
+  }
+
+  async function uploadFont(file: File): Promise<FontUploaded> {
+    const stored = await storeFont(file);
+    return stored.ok ? { ok: true, family: stored.font.family } : stored;
+  }
+
+  async function dropFont(file: File) {
+    const stored = await storeFont(file);
+    if (!stored.ok) {
+      notice = stored.error;
+      return;
+    }
+    const registered = registerUpload(doc, stored.family);
     if (!registered.ok) {
-      return registered.error;
+      notice = `${stored.font.family} is in the uploaded fonts; ${registered.error}`;
+      return;
     }
-    edit(registered.doc, `Uploaded the font ${familyOf(file.name)}`);
+    const target = selected && 'font' in selected.props ? setFont(registered.doc, selected.id, { family: stored.font.family }, []) : registered;
+    edit(target.ok ? target.doc : registered.doc, `Uploaded the font ${stored.font.family}`);
+    notice = `${stored.font.family} is in the uploaded fonts.`;
+  }
+
+  async function renameFont(family: string, to: string): Promise<string | null> {
+    const form = new FormData();
+    form.set('family', family);
+    form.set('to', to);
+    const result = await editorAction('renameFont', form);
+    if (result.type !== 'success') {
+      return result.type === 'failure' ? String(result.data?.error ?? 'Rename refused') : 'Rename failed';
+    }
+    fontFamiliesHere = fontFamiliesHere.map((f) => (f.family === family ? { ...f, family: to } : f));
     return null;
+  }
+
+  async function removeFontFamily(family: string): Promise<string | null> {
+    const form = new FormData();
+    form.set('family', family);
+    const result = await editorAction('deleteFont', form);
+    if (result.type !== 'success') {
+      return result.type === 'failure' ? String(result.data?.error ?? 'Delete refused') : 'Delete failed';
+    }
+    const gone = fontFamiliesHere.find((f) => f.family === family)?.variants.map((v) => v.assetId) ?? [];
+    goneFonts = [...goneFonts, ...gone];
+    fontFamiliesHere = fontFamiliesHere.filter((f) => f.family !== family);
+    return null;
+  }
+
+  const fontLibrary: FontLibrary = {
+    get families() {
+      return fontFamiliesHere;
+    },
+    get missing() {
+      return missingFonts;
+    },
+    upload: uploadFont,
+    rename: renameFont,
+    remove: removeFontFamily
+  };
+
+  function fontFileIn(event: DragEvent): File | null {
+    return [...(event.dataTransfer?.files ?? [])].find((f) => FONT_FILE.test(f.name)) ?? null;
+  }
+
+  function dropFontFile(event: DragEvent) {
+    const file = fontFileIn(event);
+    if (!file) {
+      return;
+    }
+    event.preventDefault();
+    void dropFont(file);
   }
 
   async function moveOut(out: ElementOut, phase: DragPhase) {
@@ -854,18 +945,45 @@
   function peekChat() {
     if (sheet === Sheet.Agent) {
       detent = Detent.Peek;
+      sheetPxSet = null;
     }
   }
 
   const transport = $derived(transportOf(viewport, sheet === Sheet.Agent ? detent : null));
   const floorPx = $derived(sheetFloor(transport));
   const sheetRoom = () => ({ viewport: viewportH, stageBottom: stageEl?.getBoundingClientRect().bottom ?? 0, floor: floorPx });
-  const sheetPx = $derived(sheetDrag?.height ?? (viewportH ? sheetHeight(detent, sheetRoom()) : 0));
+  const sheetPx = $derived(sheetDrag?.height ?? (viewportH ? fitHeight(sheetPxSet ?? sheetHeight(detent, sheetRoom()), sheetRoom()) : 0));
 
   $effect(() => {
     void sheet;
-    detent = openAt;
-    openAt = Detent.Half;
+    void sheetPx;
+    if (!sheetDrag) {
+      untrack(onsheet);
+    }
+  });
+
+  $effect(() => {
+    const shown = sheet;
+    untrack(() => openSheet(shown));
+  });
+
+  function openSheet(shown: Sheet) {
+    const remembered = openAt ? null : readSheetPx(localStore(), shown);
+    sheetPxSet = remembered;
+    detent = openAt ?? (remembered !== null && viewportH ? nearestDetent(remembered, sheetRoom()) : Detent.Half);
+    openAt = null;
+  }
+
+  $effect(() => {
+    if (sheet !== Sheet.None) {
+      untrack(() => phoneSheets.close(PhoneSheetKind.Insert));
+    }
+  });
+
+  $effect(() => {
+    if (phoneSheets.shown === PhoneSheetKind.Insert) {
+      untrack(() => (sheet = Sheet.None));
+    }
   });
 
   function grabSheet(e: PointerEvent) {
@@ -884,8 +1002,11 @@
       return;
     }
     const moved = !isTap({ x: 0, y: sheetDrag.y }, { x: 0, y: e.clientY });
-    detent = moved ? nearestDetent(sheetDrag.height, sheetRoom()) : nextDetent(detent);
+    const room = sheetRoom();
+    sheetPxSet = moved ? settleHeight(sheetDrag.height, room) : tapHeight(sheetPx, room);
+    detent = nearestDetent(sheetPxSet, room);
     sheetDrag = null;
+    writeSheetPx(localStore(), sheet, sheetPxSet);
   }
 
   const LAND: Record<Landing, (shown: AgentDraft) => void> = {
@@ -1023,7 +1144,7 @@
   });
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
-      frameBar.sidePx = docked && sideOpen ? sideWidth(layout.sidePx, width) : 0;
+      frameBar.sidePx = docked && sideOpen && barSeat === BarSeat.Own ? rightBar.width : 0;
     }
   });
 
@@ -1062,7 +1183,7 @@
   function add(component: ComponentId) {
     adding = false;
     const id = newId();
-    apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame }, id), `Added ${COMPONENTS[component].label}`);
+    apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame, transform: TOP_LEFT_ANCHOR }, id), `Added ${COMPONENTS[component].label}`);
     selection = [id];
   }
 
@@ -1165,8 +1286,7 @@
     const form = new FormData();
     form.set('doc', JSON.stringify(withTemplate));
     form.set('clipId', clipId);
-    const res = await fetch(`${editorUrl}?/templateSounds`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(editorUrl, 'templateSounds', form);
     if (result.type !== 'success') {
       notice = 'The template is in; its sounds could not be added.';
       return;
@@ -1280,8 +1400,7 @@
   let revisions = $state<Revision[]>([]);
 
   async function editorAction(name: string, form = new FormData()) {
-    const res = await fetch(`${editorUrl}?/${name}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    return deserialize(await res.text());
+    return await postPageAction(editorUrl, name, form);
   }
 
   type Fork = { id: string; frameId: string; name: string; baseVersion: number };
@@ -1585,7 +1704,8 @@
     [ChatPlace.Drawer]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent),
     [ChatPlace.Sheet]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)
   };
-  const docked = $derived(chatPlace === ChatPlace.Column);
+  const sidePlace = $derived(barSeat === BarSeat.InPlace ? ChatPlace.Column : chatPlace);
+  const docked = $derived(sidePlace === ChatPlace.Column);
   const barProperties = {
     get shown() {
       return layout.side === Side.Properties;
@@ -1893,7 +2013,7 @@
 <svelte:head>{#if rules.ownsTitle}<title>{data.node.name ?? 'Frame'} · Frame editor</title>{/if}</svelte:head>
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
-<div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} data-sheet={sheet === Sheet.None ? undefined : detent} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
+<div class="editor" ondragover={(e) => e.dataTransfer?.types.includes('Files') && e.preventDefault()} ondrop={dropFontFile} bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} data-sheet={sheet === Sheet.None ? undefined : detent} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
   <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost} use:claimsWidth={barHost}>
     <div class="group lead" {...dockOf(Part.Bar)}>
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
@@ -2043,7 +2163,7 @@
       fallbackRender={htmlExportFrames}
       tokens={data.tokens}
       {analyses}
-      server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}` }}
+      server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => canvasAssetUrl(data.projectId, data.canvas.id, id, AssetSize.Full) }}
       onpresets={() => ((exporting = false), (interactive = true))}
       onclose={() => (exporting = false)}
     />
@@ -2077,7 +2197,7 @@
       {version}
       saved={saveState === SaveState.Saved}
       batch={data.batch}
-      assetHref={(id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}`}
+      assetHref={(id: string) => canvasAssetUrl(data.projectId, data.canvas.id, id, AssetSize.Full)}
       {assetUrls}
       scope={{ orgId: data.orgId, projectId: data.projectId, nodeId: data.node.id }}
       framesFor={docFrames}
@@ -2087,10 +2207,10 @@
     />
   {/if}
 
-  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
+  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${rightBar.width}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && (!sideOpen || barSeat === BarSeat.InPlace)} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
     <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
-      <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
+      <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} fullDoc={{ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls }} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if outlineView === OutlineView.On}<OutlineOverlay doc={previewDoc ?? doc} {frame} boxes={spaceBoxes()} />{/if}
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
@@ -2119,19 +2239,9 @@
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
         {#if interactive}<VarsPanel {doc} bind:values={previewVars} clip={selected ?? null} onchange={edit} />{/if}
       </div>
-      {#if blank}
-        <div class="empty-state" data-testid="empty-state">
-          <p>Start with a template, a clip or a prompt</p>
-          <div class="empty-actions">
-            <button type="button" class="secondary" onclick={() => (templating = true)}>Template…</button>
-            <button type="button" class="secondary" onclick={() => (adding = true)}>Add element</button>
-            <button type="button" class="secondary" onclick={askAgent}>Ask the agent</button>
-          </div>
-        </div>
-      {/if}
     </section>
 
-    <SideColumn place={chatPlace} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})}>
+    <SideColumn place={sidePlace} widthPx={rightBar.width} onwidth={(px) => rightBar.resize(px)} oncommit={() => rightBar.keepWidth()}>
     {#snippet properties()}
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
@@ -2139,24 +2249,24 @@
       {#if selection.length}<AlignBar count={selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
-        <LookInspector {doc} onchange={edit} />
+        <LookInspector gesture={live} {doc} onchange={edit} />
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
-        <TemplateInspector {doc} clip={selected} {assets} upload={uploadMedia} onchange={edit} />
+        <TemplateInspector gesture={live} {doc} clip={selected} {assets} upload={uploadMedia} onchange={edit} />
       {:else if selected}
-        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
+        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel gesture={live} {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
-        {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack gesture={live} fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
+        <MotionInspector gesture={live} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} fonts={fontLibrary} onopen={enterComp} />
         {#if typeof selected.props.x === 'number' && !selected.parent}<ConstraintsSection {doc} clip={selected} onchange={apply} />{/if}
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
-        {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
+        {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector gesture={live} {doc} onchange={edit} />{/if}
       {:else if view === PropertiesView.Multiple}
         <MultiInspector {doc} ids={selection} {frame} mode={editMode} onchange={edit} />
       {:else}
         <header class="frame-head" data-testid="selection-head"><FamilyIcon /><span>Frame</span></header>
-        <DocFields {doc} {assets} upload={uploadMedia} onchange={edit} />
+        <DocFields gesture={live} {doc} {assets} upload={uploadMedia} onchange={edit} />
         <div class="composition" data-testid="composition-inspector">
           <header class="composition-head"><span>Frame</span></header>
           <CompositionSettings {doc} onchange={apply} />
@@ -2169,10 +2279,16 @@
     {#snippet chat()}
     <aside class="chat" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Chat</span><span class="editing" data-testid="chat-editing">{editingLabel(editingName)}</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
-      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} /><BarSlot reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} properties={docked ? barProperties : undefined} />{/if}
+      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} />{/if}<BarSlot reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} properties={docked ? barProperties : undefined} seat={barSeat} />
     </aside>
     {/snippet}
     </SideColumn>
+    {#if viewport === Viewport.Phone}
+    <aside class="layers-sheet" class:open={sheet === Sheet.Layers} aria-label="Layers">
+      <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Layers</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
+      {#if sheet === Sheet.Layers}<div class="sheet-body"><LayersPanel density={Density.Touch} /></div>{/if}
+    </aside>
+    {/if}
 
     <section class="timeline-area" class:gone={!controlShown(doc, VideoControl.Timeline)} bind:this={timelineEl} bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
@@ -2222,6 +2338,7 @@
         {/if}
         <IconButton action={Action.Snap} size={14} caption={Caption.Wide} pressed={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)} />
         {#if notice}<span class="notice" role="status">{notice}</span>{/if}
+        {#if missingFonts.length}<span class="notice" role="status" data-testid="fonts-missing">Missing font{missingFonts.length > 1 ? 's' : ''}: {missingFonts.join(', ')}. A fallback is showing.</span>{/if}
         <span class="spacer"></span>
         <div class="popover-anchor">
           <IconButton action={Action.More} size={14} aria-expanded={toolsOpen} data-testid="timeline-more" onclick={() => (toolsOpen = !toolsOpen)} />
@@ -2240,6 +2357,8 @@
   </div>
 
   <nav class="tabs" bind:this={tabsEl} {...dockOf(Part.Tabs)} aria-label="Panels">
+    <button type="button" class="icon-tab" class:on={phoneSheets.shown === PhoneSheetKind.Insert} aria-pressed={phoneSheets.shown === PhoneSheetKind.Insert} aria-label="Insert" data-testid="phone-tab-insert" onclick={() => phoneSheets.toggle(PhoneSheetKind.Insert)}><PlusIcon size={18} aria-hidden="true" /></button>
+    <button type="button" class:on={sheet === Sheet.Layers} aria-pressed={sheet === Sheet.Layers} data-testid="phone-tab-layers" onclick={() => (sheet = sheet === Sheet.Layers ? Sheet.None : Sheet.Layers)}><LayersIcon size={18} aria-hidden="true" />Layers</button>
     <button type="button" class:on={sheet === Sheet.Properties} aria-pressed={sheet === Sheet.Properties} data-testid="phone-tab-properties" onclick={() => (sheet = sheet === Sheet.Properties ? Sheet.None : Sheet.Properties)}><SlidersHorizontal size={18} aria-hidden="true" />Properties</button>
     <button type="button" class:on={sheet === Sheet.Agent} aria-pressed={sheet === Sheet.Agent} data-testid="phone-tab-chat" onclick={() => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)}><MessageCircle size={18} aria-hidden="true" />Chat</button>
   </nav>
@@ -2698,35 +2817,6 @@
     outline: none;
   }
 
-  .empty-state {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--ui-space-3);
-    padding: var(--ui-space-6);
-    max-width: calc(100% - 32px);
-    background: var(--ui-raised);
-    box-shadow: 0 12px 32px rgb(0 0 0 / 0.1);
-    outline: none !important;
-  }
-
-  .empty-state p {
-    font-size: var(--ui-text-lg);
-    font-weight: 600;
-    text-align: center;
-  }
-
-  .empty-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--ui-space-2);
-  }
-
   .composition {
     padding: 0 var(--ui-space-4) var(--ui-space-4);
   }
@@ -3153,6 +3243,7 @@
   }
 
   [data-viewport='phone']:not([data-dragging]) .props,
+  [data-viewport='phone']:not([data-dragging]) .layers-sheet,
   [data-viewport='phone']:not([data-dragging]) .chat {
     transition: bottom 160ms ease, height 160ms ease;
   }
@@ -3222,13 +3313,15 @@
   }
 
   [data-viewport='phone'] .props,
+  [data-viewport='phone'] .layers-sheet,
   [data-viewport='phone'] .chat {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--sheet-floor);
+    bottom: calc(var(--sheet-floor) + env(safe-area-inset-bottom, 0px));
     height: var(--sheet-h);
-    z-index: 30;
+    z-index: 80;
+    border-radius: var(--ui-radius-lg) var(--ui-radius-lg) 0 0;
     display: none;
     flex-direction: column;
     background: var(--ui-raised);
@@ -3236,12 +3329,38 @@
   }
 
   [data-viewport='phone'] .props.open,
+  [data-viewport='phone'] .layers-sheet.open,
   [data-viewport='phone'] .chat.open {
     display: flex;
   }
 
   [data-viewport='phone'] .props.open {
-    overflow: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: var(--ui-space-4);
+  }
+
+  [data-viewport='phone'] .props > .sheet-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: inherit;
+  }
+
+  .layers-sheet {
+    display: none;
+  }
+
+  .layers-sheet .sheet-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 8px 8px;
+  }
+
+  .editor[data-mount='canvas'] .layers-sheet {
+    background: var(--ui-bg);
   }
 
   .grabber {
@@ -3314,6 +3433,10 @@
     font-size: 13px;
     font-weight: 500;
     color: var(--ui-text-2);
+  }
+
+  .tabs button.icon-tab {
+    flex: 0 0 44px;
   }
 
   .tabs button.on {

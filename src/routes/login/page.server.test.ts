@@ -20,6 +20,7 @@ function run(path: string) {
   const url = new URL(`${ORIGIN}${path}`);
   const event = {
     url,
+    request: new Request(url),
     cookies: {
       get: () => undefined,
       delete: () => undefined

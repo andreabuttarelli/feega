@@ -31,7 +31,7 @@ vi.mock('$lib/server/cli-auth', async (original) => ({ ...(await original<object
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => state.kit.client }));
 vi.mock('$lib/server/offerable-models', () => ({ offerableSlotChoices: vi.fn(async () => ({ choices: [], synced: true })) }));
 
-const projectLayout = await import('../../../../../../p/[projectId]/+layout.server');
+const projectLayout = await import('$lib/server/projects/project-shell');
 const settingsLayout = await import('$lib/server/settings/shell');
 const ROUTES: Record<SettingsSection, () => Promise<{ load?: (e: never) => unknown; actions?: Record<string, (e: never) => unknown> }>> = {
   [SettingsSection.Project]: () => import('$lib/server/settings/pages/project'),
@@ -41,7 +41,8 @@ const ROUTES: Record<SettingsSection, () => Promise<{ load?: (e: never) => unkno
   [SettingsSection.Content]: () => import('$lib/server/settings/pages/content'),
   [SettingsSection.Team]: () => import('$lib/server/settings/pages/team'),
   [SettingsSection.ApiKeys]: () => import('$lib/server/settings/pages/api-keys'),
-  [SettingsSection.Danger]: () => import('$lib/server/settings/pages/danger')
+  [SettingsSection.Danger]: () => import('$lib/server/settings/pages/danger'),
+  [SettingsSection.Products]: () => import('$lib/server/settings/pages/products')
 };
 const shellApi = await import('./+server');
 const sectionApi = await import('./[section]/+server');

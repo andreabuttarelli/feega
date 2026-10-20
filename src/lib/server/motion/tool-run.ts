@@ -1,3 +1,4 @@
+import { orgFontFamilies } from './font-upload';
 import { asSchema, type Tool } from 'ai';
 import { nameVersion, namedRevisions } from './version-names';
 import type { Db } from '$lib/server/db/client';
@@ -7,6 +8,7 @@ import { Checkpoint, readRevision } from '$lib/server/repos/motion-revisions';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { savedMotionWith } from './agent-embed';
+import { embedAction } from './embed';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { assetUrls, motionAssets, motionTokens, type MotionAsset } from './editor';
 import { OpsOutcome, commitDoc } from './frame-ops';
@@ -130,7 +132,9 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
     templates: templateLibrary(db, { orgId: scope.orgId, actor }),
     revisions: { list: () => namedRevisions(db, nodeScope), read: async (v) => (await readRevision(db, { ...nodeScope, version: v }))?.doc ?? null, name: async (v, name) => (await nameVersion(db, { ...nodeScope, version: v, name, actor })).named },
     exportStill: async (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens: await tokens(), assets }),
-    moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId)
+    moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId),
+    fonts: () => orgFontFamilies(db, scope.orgId),
+    embed: async (action) => embedAction(db, { nodeId: scope.nodeId, doc: session.doc, tokens: await tokens(), assetUrls: assetUrls(assets), title: saved.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()), mode: saved.project.mode }, action)
   }, frames);
   return { saved, session, tools, actor, nodeScope };
 }

@@ -37,3 +37,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Turbulence lattice from the W3C filter effects reference (W3C Software and Document License)
+
+Source: the `feTurbulence` reference implementation in the W3C Filter Effects Module Level 1
+(https://www.w3.org/TR/filter-effects-1/#feTurbulenceElement). The seeded random generator, the
+lattice/gradient set-up and the stitching arithmetic are reimplemented in
+`src/lib/motion/gpu-full/turbulence.ts` and in the noise shader of
+`src/lib/motion/gpu-full/filters-gpu.ts`, so the GPU grain matches what browsers draw.
+
+Copyright © 2018 W3C® (MIT, ERCIM, Keio, Beihang). Used under the W3C Software and Document
+License: https://www.w3.org/Consortium/Legal/2015/copyright-software-and-document

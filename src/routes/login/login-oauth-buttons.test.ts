@@ -12,4 +12,9 @@ describe('la login offre Google e GitHub', () => {
   it('GitHub resta', () => {
     expect(page).toMatch(/action="\?\/github"/);
   });
+
+  it('Apple only renders when the server allows it', () => {
+    expect(page).toMatch(/\{#if data\.appleSignIn\}\s*<form method="POST" action="\?\/apple"/);
+    expect(page).toMatch(/\{#if data\.appleSignIn\}\s*<form method="POST" action="\?\/appleIdToken"/);
+  });
 });

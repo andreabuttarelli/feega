@@ -1,4 +1,5 @@
 <script lang="ts" module>
+  import type { HostShare } from '$lib/motion/text-fit';
   import { earlyFetch } from '$lib/canvas/early-fetch';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
 
@@ -46,7 +47,7 @@
   import { track } from '$lib/analytics';
   import type { CanvasUndo, HostDrag, MoveOut } from '$lib/canvas/canvas-drop';
 
-  let { projectId, canvasId, nodeId, revision = 0, leaving = false, onclose, onframe, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; revision?: number; leaving?: boolean; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: { width: number; height: number }) => void) | null; canvasundo?: CanvasUndo | null } = $props();
+  let { projectId, canvasId, nodeId, revision = 0, leaving = false, onclose, onframe, onreveal, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; revision?: number; leaving?: boolean; onclose: () => void; onframe: (free: Insets) => void; onreveal: (free: Insets) => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: HostShare) => void) | null; canvasundo?: CanvasUndo | null } = $props();
 
   const opensOn = untrack(() => (get(propertiesRequest) === nodeId ? OpensOn.Properties : OpensOn.Stage));
   propertiesRequest.set(null);
@@ -124,28 +125,41 @@
     inlineStage.ready(nodeId);
   }
 
-  $effect(() => {
-    if (!session) {
-      return;
+  function measuredFree(): Insets | null {
+    const flow = document.querySelector('.svelte-flow, [data-canvas-surface]')?.getBoundingClientRect();
+    if (!flow) {
+      return null;
     }
+    const docked = [...document.querySelectorAll<HTMLElement>(`[${DOCK_ATTR}]`)].map((el) => {
+      const r = el.getBoundingClientRect();
+      return { dock: el.getAttribute(DOCK_ATTR) as Dock, box: { left: r.left - flow.left, top: r.top - flow.top, right: r.right - flow.left, bottom: r.bottom - flow.top } };
+    });
+    return freeArea({ width: flow.width, height: flow.height }, docked);
+  }
+
+  function settled(send: (free: Insets) => void): () => void {
     const timer = setTimeout(() => {
-      const flow = document.querySelector('.svelte-flow, [data-canvas-surface]')?.getBoundingClientRect();
-      if (!flow) {
-        return;
+      const free = measuredFree();
+      if (free) {
+        send(free);
       }
-      const docked = [...document.querySelectorAll<HTMLElement>(`[${DOCK_ATTR}]`)].map((el) => {
-        const r = el.getBoundingClientRect();
-        return { dock: el.getAttribute(DOCK_ATTR) as Dock, box: { left: r.left - flow.left, top: r.top - flow.top, right: r.right - flow.left, bottom: r.bottom - flow.top } };
-      });
-      onframe(freeArea({ width: flow.width, height: flow.height }, docked));
     }, SETTLE_MS);
     return () => clearTimeout(timer);
-  });
+  }
+
+  $effect(() => (session ? settled(onframe) : undefined));
+
+  let revealDue = () => {};
+
+  function sheetMoved() {
+    revealDue();
+    revealDue = settled(onreveal);
+  }
 </script>
 
 {#if session}
   <div class="inline" class:leaving data-leaving={leaving || undefined}>
-    <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {onhostdrag} {onhostfit} {canvasundo} {opensOn} />
+    <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} onsheet={sheetMoved} {onmoveout} {onhostdrag} {onhostfit} {canvasundo} {opensOn} />
   </div>
 {:else if failed}
   <p class="inline-status" role="status">This video could not be opened here. <a href={editorPath}>Open the editor</a></p>

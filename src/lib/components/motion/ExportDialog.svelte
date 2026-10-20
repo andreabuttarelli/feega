@@ -16,7 +16,7 @@
   import type { FrameSize } from './MotionPreview.svelte';
   import { liveNote, stillStandIns, unverified } from '$lib/motion/custom/determinism';
   import { CheckState } from '$lib/motion/custom/component';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import { HOLD_BUFFER, renderQuote } from '$lib/motion/render-quote';
   import { EXPORT_FORMATS, ExportFormat, FORMAT, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
   import { FRAME_RATES } from '$lib/motion/design';
@@ -162,8 +162,7 @@
   const STAGE_PHASE: Record<BrowserStage, Phase> = { [BrowserStage.Mixing]: Phase.Mixing, [BrowserStage.Rendering]: Phase.Rendering };
 
   async function postAction(name: string, form: FormData): Promise<{ ok: boolean; data: Record<string, unknown> }> {
-    const res = await fetch(`${editorUrl}?/${name}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(editorUrl, name, form);
     if (result.type === 'success') {
       return { ok: true, data: (result.data ?? {}) as Record<string, unknown> };
     }

@@ -1,3 +1,4 @@
+import { CHAT_PANEL, readChatPanelPx, writeChatPanelPx } from '$lib/shell-prefs';
 import type { ChatPrefill } from './chat-prefill';
 import type { StreamData } from './chat-session.svelte';
 
@@ -17,7 +18,12 @@ export type BarBinding = {
   readonly properties?: BarProperties;
 };
 
-export type BarClaim = { readonly element: HTMLElement; readonly binding: BarBinding };
+export type BarClaim = { readonly element: HTMLElement | null; readonly binding: BarBinding };
+
+export enum BarSeat {
+  Own = 'own',
+  InPlace = 'in-place'
+}
 
 const SHARED_TABS = [BarTab.Chat, BarTab.Guide] as const;
 
@@ -28,9 +34,14 @@ export class RightBarHost {
   prefill = $state.raw<ChatPrefill | null>(null);
   reload = $state(0);
   propertiesPane = $state.raw<HTMLElement | null>(null);
+  width = $state(readChatPanelPx());
 
   get active(): BarClaim | null {
     return this.#claims.at(-1) ?? null;
+  }
+
+  get holder(): BarClaim | null {
+    return this.#claims.findLast((c) => c.element !== null) ?? null;
   }
 
   get tabs(): BarTab[] {
@@ -41,7 +52,7 @@ export class RightBarHost {
     return this.active?.binding.properties?.shown ? BarTab.Properties : this.#picked;
   }
 
-  claim(element: HTMLElement, binding: BarBinding): BarClaim {
+  claim(element: HTMLElement | null, binding: BarBinding): BarClaim {
     const claim = { element, binding };
     this.#claims = [...this.#claims, claim];
     return claim;
@@ -71,6 +82,14 @@ export class RightBarHost {
 
   refresh() {
     this.reload++;
+  }
+
+  resize(px: number) {
+    this.width = Math.min(CHAT_PANEL.MAX, Math.max(CHAT_PANEL.MIN, Math.round(px)));
+  }
+
+  keepWidth() {
+    writeChatPanelPx(this.width);
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Surface, faceOf } from './card-face';
+import { Surface, faceOf, handedToCore } from './card-face';
 import { PosterSource } from '../poster-lod';
 import { NODE_KIND_LABEL, NameTag } from '../node-label';
 
@@ -49,5 +49,12 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
   it('a source carries the thumbs of what it read', () => {
     expect(faceOf({ id: 'f', kind: 'social_account_feed', tag: NameTag.Shown }, { platform: 'instagram', handle: 'nike' }, asset, ['t1', 't2']).thumbs).toEqual(['t1', 't2']);
     expect(faceOf({ id: 'd', kind: 'doc', tag: NameTag.Shown }, { content: '' }, asset).thumbs).toEqual([]);
+  });
+});
+
+describe('a face the core draws', () => {
+  it('drops its poster and live media, so Pixi holds no texture for it', () => {
+    const face = faceOf({ id: 'f', kind: 'motion', poster: { url: 'p.jpg' } as never }, {}, (id) => id, []);
+    expect(handedToCore(face)).toMatchObject({ media: null, live: null, surface: face.surface });
   });
 });

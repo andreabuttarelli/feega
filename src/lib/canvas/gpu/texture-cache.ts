@@ -2,14 +2,16 @@ import { ImageSource, Texture } from 'pixi8';
 import { createLru } from './lru';
 import { Counter, count, reportPending } from './frame-stats';
 import { BUDGET, decodeSize, type Device } from './memory-budget';
+import type { UploadQueue } from './upload-queue';
 import { bytesOf } from './texture-bytes';
 
 export type TextureCache = {
   want: (url: string, ready: (tex: Texture) => void) => () => void;
+  drop: (url: string) => void;
   clear: () => void;
 };
 
-type Hooks = { changed: () => void; device: Device; pinned: (url: string) => boolean; evicted: (url: string) => void };
+type Hooks = { changed: () => void; device: Device; pinned: (url: string) => boolean; evicted: (url: string) => void; decode: (url: string, edge: number) => Promise<ImageBitmap>; queue: UploadQueue; upload: (tex: Texture) => void };
 
 export async function fitBitmap(full: ImageBitmap, device: Device): Promise<ImageBitmap> {
   const size = decodeSize(full.width, full.height, device);
@@ -19,24 +21,7 @@ export async function fitBitmap(full: ImageBitmap, device: Device): Promise<Imag
   return createImageBitmap(full, { resizeWidth: size.width, resizeHeight: size.height, resizeQuality: 'high' });
 }
 
-async function decodeFitting(blob: Blob, device: Device): Promise<ImageBitmap> {
-  const full = await createImageBitmap(blob);
-  const fitted = await fitBitmap(full, device);
-  if (fitted !== full) {
-    full.close();
-  }
-  return fitted;
-}
-
-async function load(url: string, device: Device): Promise<ImageBitmap> {
-  const res = await fetch(url, { credentials: 'same-origin', mode: 'cors' });
-  if (!res.ok) {
-    throw new Error(`${res.status} ${url}`);
-  }
-  return decodeFitting(await res.blob(), device);
-}
-
-export function createTextureCache({ changed, device, pinned, evicted }: Hooks): TextureCache {
+export function createTextureCache({ changed, device, pinned, evicted, decode, queue, upload }: Hooks): TextureCache {
   const lru = createLru<Texture>(
     BUDGET[device].textureBytes,
     (url, tex) => {
@@ -63,21 +48,28 @@ export function createTextureCache({ changed, device, pinned, evicted }: Hooks):
       pending.set(url, fresh);
       count(Counter.Fetch);
       reportPending(pending.size);
-      load(url, device)
-        .then((bitmap) => {
-          const tex = new Texture({ source: new ImageSource({ resource: bitmap, autoGenerateMipmaps: true }) });
-          lru.set(url, tex, bytesOf({ pixelWidth: bitmap.width, pixelHeight: bitmap.height, autoGenerateMipmaps: true }));
-          for (const r of fresh) {
-            r(tex);
-          }
-          changed();
-        })
-        .catch(() => {})
-        .finally(() => {
-          pending.delete(url);
-          reportPending(pending.size);
-        });
+      const settle = () => {
+        pending.delete(url);
+        reportPending(pending.size);
+      };
+      decode(url, BUDGET[device].decodeEdge)
+        .then((bitmap) =>
+          queue.push(url, () => {
+            const tex = new Texture({ source: new ImageSource({ resource: bitmap, autoGenerateMipmaps: true }) });
+            upload(tex);
+            lru.set(url, tex, bytesOf({ pixelWidth: bitmap.width, pixelHeight: bitmap.height, autoGenerateMipmaps: true }));
+            for (const r of fresh) {
+              r(tex);
+            }
+            settle();
+            changed();
+          })
+        )
+        .catch(settle);
       return () => fresh.delete(ready);
+    },
+    drop(url) {
+      lru.drop(url);
     },
     clear() {
       lru.clear();

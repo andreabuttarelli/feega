@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
   import TieredImage from './TieredImage.svelte';
   import Orbit from '@lucide/svelte/icons/orbit';
   import { assetUrlsPath, staleMotions, type CompositionNode, type MotionCard, type UpstreamCard } from '$lib/canvas/composition-node';
@@ -129,7 +130,7 @@
     {#if node.template && onpatch}
       <button type="button" class="composition-action nodrag" data-testid="clear-component" title="Back to the media layout" onclick={() => onpatch({ template: null })}>Layout</button>
     {/if}
-    <form bind:this={form} method="POST" action="/app/compose?/fromNode" class="nodrag">
+    <form bind:this={form} method="POST" action="/app/compose?/fromNode" use:apiEnhance class="nodrag">
       <input type="hidden" name="project" value={composeIn.project} />
       <input type="hidden" name="canvas" value={composeIn.canvas} />
       <input type="hidden" name="node" value={node.id} />

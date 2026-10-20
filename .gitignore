@@ -104,3 +104,4 @@ bun.lock
 
 /static/motion-libs/
 tests/e2e/.auth/
+/build-spa

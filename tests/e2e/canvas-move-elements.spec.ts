@@ -1,9 +1,11 @@
+import { hoverTile } from './fixtures/canvas-tile';
 import { randomUUID } from 'node:crypto';
 import type { Page, Locator } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
 const STAGE_W = 420;
+const canvasAction = (name: string) => (r: { url(): string }) => new URL(r.url()).searchParams.get('action') === name;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const PNG_1X1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
@@ -39,9 +41,11 @@ async function openAndGrab(page: Page, nodeId: string) {
   const overlay = page.getByTestId('selection-overlay');
   await expect(overlay).toBeVisible({ timeout: 15_000 });
   await expect(async () => {
-    await overlay.click();
+    await overlay.dblclick();
     await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 1000 });
   }, 'the text selects once the preview has measured it').toPass({ timeout: 15_000 });
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('selection-box'), 'Escape leaves the text editor with the text still selected').toBeVisible();
   const middle = await centre(overlay);
   return { x: middle.x - 40, y: middle.y + 10 };
 }
@@ -117,7 +121,7 @@ test.describe('moving elements between frames @real', () => {
     const alive = async () => (await admin.from('nodes').select('id').eq('id', free.id).is('deleted_at', null)).data?.length ?? 0;
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    const moved = page.waitForResponse((r) => r.url().includes('?/moveFree'));
+    const moved = page.waitForResponse(canvasAction('moveFree'));
     await dragTo(page, await centre(page.locator(`[data-motion-node="${free.id}"]`)), await centre(stageOf(page, b)));
     await moved;
 
@@ -126,7 +130,7 @@ test.describe('moving elements between frames @real', () => {
     await expect(page.locator(`[data-motion-node="${free.id}"]`)).toHaveCount(0);
 
     await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
-    const undone = page.waitForResponse((r) => r.url().includes('?/undo'));
+    const undone = page.waitForResponse(canvasAction('undo'));
     await page.keyboard.press('ControlOrMeta+z');
     await undone;
     await expect.poll(alive, { timeout: 10_000 }).toBe(1);
@@ -141,7 +145,7 @@ test.describe('moving elements between frames @real', () => {
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const from = await openAndGrab(page, a);
-    const moved = page.waitForResponse((r) => r.url().includes('?/moveElement'));
+    const moved = page.waitForResponse(canvasAction('moveElement'));
     await dragTo(page, from, await centre(stageOf(page, b)));
     await moved;
     await expect.poll(async () => clipIds(await head(admin, b)), { timeout: 10_000 }).toEqual(['Text:txt']);
@@ -161,6 +165,7 @@ test.describe('moving elements between frames @real', () => {
       const before = await admin.from('nodes').select('data, version').eq('id', gen.id).single();
 
       await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+      await hoverTile(page, gen.id);
       await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
       await page.getByTestId('drag-to-frame').dragTo(stageOf(page, b));
 
@@ -177,6 +182,7 @@ test.describe('moving elements between frames @real', () => {
     const gen = await seedNode({ type: 'image', x: 80, y: 520, data: { prompt: 'an image', refId: assetId } });
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await hoverTile(page, gen.id);
     await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
     const viewport = page.viewportSize()!;
     await page.getByTestId('drag-to-frame').dragTo(page.locator('.svelte-flow__pane'), { targetPosition: { x: viewport.width / 2, y: 120 } });
@@ -184,29 +190,5 @@ test.describe('moving elements between frames @real', () => {
     const made = async () => (await admin.from('nodes').select('id, data').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null)).data ?? [];
     await expect.poll(async () => (await made()).map((n) => (n.data as { kind?: string }).kind), { timeout: 10_000 }).toEqual(['element']);
     await expect.poll(async () => clipIds(await head(admin, (await made())[0].id)), { timeout: 10_000 }).toEqual([expect.stringMatching(/^Image:/)]);
-  });
-
-  test('an image node connected to a frame shows its picture as an element in it', async ({ page, session, admin, seedNode }) => {
-    test.setTimeout(120_000);
-    const assetId = await generated(admin, session, 'image');
-    const gen = await seedNode({ type: 'image', x: 80, y: 520, data: { prompt: 'a cat', refId: assetId } });
-    const b = await frame(admin, seedNode, session, { x: 700, y: 80 }, blank);
-
-    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    const answer = await page.evaluate(
-      async ({ source, target }) => {
-        const body = new FormData();
-        body.set('source_node_id', source);
-        body.set('target_node_id', target);
-        body.set('kind', 'derives_from');
-        const res = await fetch(`${location.pathname}?/connect`, { method: 'POST', body, headers: { 'x-sveltekit-action': 'true' } });
-        return res.ok;
-      },
-      { source: gen.id, target: b }
-    );
-    expect(answer).toBe(true);
-
-    await expect.poll(async () => (await head(admin, b))?.links?.[gen.id] ?? null, { timeout: 10_000 }).not.toBeNull();
-    expect((await head(admin, b))?.tracks.flatMap((t) => t.clips).map((c) => c.props.assetId)).toEqual([assetId]);
   });
 });

@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad as PageServerLoad } from '@sveltejs/kit';
 import { orgCreditBalance } from '$lib/server/credits';
-import { billedCreditsFor, CREDIT_LADDER } from '$lib/credit-ladder';
+import { billedCreditsFor, CREDIT_LADDER, rungForLookupKey } from '$lib/credit-ladder';
 import { orgBillingById } from '$lib/server/org-billing';
 import { billingGrantsReady } from '$lib/server/billing-readiness';
 import {
@@ -12,13 +12,15 @@ import {
   buyOneTime
 } from '$lib/server/settings-actions';
 import { checkoutOutcomeOf } from '$lib/billing-path';
+import { billingChannelOf, storeBillingOf } from '$lib/billing-channel';
+import { env } from '$env/dynamic/private';
 
 const stripeApi = () => import('$lib/server/stripe');
 
 type OrgRow = { id: string; name: string; stripe_customer_id: string | null };
 type BrandRow = { id: string; name: string; slug: string };
 
-export const load = async ({ parent, url, locals: { supabase } }: Parameters<PageServerLoad>[0]) => {
+export const load = async ({ parent, url, request, locals: { supabase } }: Parameters<PageServerLoad>[0]) => {
   const {
     data: { user }
   } = await supabase.auth.getUser();
@@ -71,11 +73,30 @@ export const load = async ({ parent, url, locals: { supabase } }: Parameters<Pag
     currentPlanUsd,
     checkoutOutcome: checkoutOutcomeOf(url),
     isOwner: (membership as { role?: string } | null)?.role === 'owner',
-    purchasesReady
+    purchasesReady,
+    billingChannel: billingChannelOf(request.headers.get('user-agent'), storeBillingOf(env.NATIVE_STORE_BILLING))
   };
 };
 
+type StorePlanRow = { store_plan_product: string | null; store_plan_expires_at: string | null };
+
+async function storePlanOf(supabase: App.Locals['supabase'], orgId: string): Promise<number | null> {
+  const { data } = await supabase
+    .from('orgs')
+    .select('store_plan_product, store_plan_expires_at')
+    .eq('id', orgId)
+    .maybeSingle();
+  const plan = data as StorePlanRow | null;
+  const active = plan?.store_plan_expires_at && new Date(plan.store_plan_expires_at).getTime() > Date.now();
+  return active ? (rungForLookupKey(plan.store_plan_product)?.price ?? null) : null;
+}
+
 async function currentPlanOf(supabase: App.Locals['supabase'], orgId: string): Promise<number | null> {
+  const storePlan = await storePlanOf(supabase, orgId);
+  if (storePlan) {
+    return storePlan;
+  }
+
   const billing = await orgBillingById(supabase, orgId);
   if (!billing?.subscriptionId) {
     return null;

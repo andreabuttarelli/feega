@@ -20,6 +20,11 @@ describe('renderer flag', () => {
     expect(rendererOf(at('?renderer=webgpu'), Switch.ForceDom)).toBe(Renderer.Dom);
   });
 
+  it('?renderer=core opts into the engine canvas, the kill switch still wins', () => {
+    expect(rendererOf(at('?renderer=core'), Switch.Open)).toBe(Renderer.Core);
+    expect(rendererOf(at('?renderer=core'), Switch.ForceDom)).toBe(Renderer.Dom);
+  });
+
   it('webgl forces the fallback backend, anything else prefers WebGPU', () => {
     expect(backendOf(at('?renderer=webgl'))).toBe(Backend.WebGL);
     expect(backendOf(at(''))).toBe(Backend.WebGPU);

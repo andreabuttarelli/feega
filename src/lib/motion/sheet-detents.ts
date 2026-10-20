@@ -25,3 +25,33 @@ export function nearestDetent(height: number, room: SheetRoom): Detent {
 }
 
 export const nextDetent = (detent: Detent): Detent => ORDER[(ORDER.indexOf(detent) + 1) % ORDER.length];
+
+export const SNAP_PX = 40;
+const MEMORY_KEY = 'feega:sheet-px:';
+
+const stops = (room: SheetRoom): number[] => ORDER.map((d) => sheetHeight(d, room));
+
+export function fitHeight(height: number, room: SheetRoom): number {
+  const [peek, , full] = stops(room);
+  return Math.min(full, Math.max(peek, height));
+}
+
+export function settleHeight(height: number, room: SheetRoom): number {
+  const near = stops(room).find((stop) => Math.abs(stop - height) < SNAP_PX);
+  return near ?? fitHeight(height, room);
+}
+
+export const tapHeight = (height: number, room: SheetRoom): number => sheetHeight(nextDetent(nearestDetent(height, room)), room);
+
+export function readSheetPx(store: Storage | null, sheet: string): number | null {
+  const px = Number(store?.getItem(MEMORY_KEY + sheet) ?? NaN);
+  return Number.isFinite(px) ? px : null;
+}
+
+export function writeSheetPx(store: Storage | null, sheet: string, px: number) {
+  try {
+    store?.setItem(MEMORY_KEY + sheet, String(Math.round(px)));
+  } catch {
+    return;
+  }
+}

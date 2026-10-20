@@ -1,0 +1,104 @@
+.landing {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 160px 20px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.landing h1 {
+  font-size: 37px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 400;
+}
+
+.landing .intro {
+  margin-top: 24px;
+}
+
+.landing .landing-cta {
+  display: inline-block;
+  margin-top: 24px;
+  padding: 14px 24px;
+  background: #ff4400;
+  color: #000;
+}
+
+.landing .fine {
+  margin-top: 24px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.landing .hero-image {
+  width: 100%;
+  height: var(--hero);
+  margin-top: 64px;
+  object-fit: cover;
+}
+
+.landing section {
+  margin-top: 64px;
+}
+
+.landing h2 {
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+  font-weight: 400;
+}
+
+.landing h2 + * {
+  margin-top: 20px;
+}
+
+.landing .body p + p,
+.landing .body p + h3,
+.landing .body h3 + p {
+  margin-top: 20px;
+}
+
+.landing .body h3 {
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+.landing .body strong {
+  font-weight: inherit;
+}
+
+.landing .examples {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px 12px;
+}
+
+.landing .examples img {
+  width: 100%;
+  height: var(--example);
+  object-fit: cover;
+}
+
+.landing figcaption {
+  margin-top: 8px;
+  opacity: 0.7;
+}
+
+.landing section .landing-cta {
+  margin-top: 20px;
+}
+
+@media (min-width: 1200px) {
+  .landing {
+    font-size: 16px;
+  }
+
+  .landing h1 {
+    font-size: 58px;
+  }
+
+  .landing h2 {
+    font-size: 38px;
+  }
+}

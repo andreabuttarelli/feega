@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { keepTextSize } from '$lib/motion/text-fit';
+  import { hostFit, keepTextSize, type HostShare } from '$lib/motion/text-fit';
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
   import { localStore } from '$lib/browser-storage';
@@ -26,7 +26,7 @@
   import { onCanvasReveal } from '$lib/canvas/canvas-reveal';
   import { DROPPED_EDIT_NOTICE, Trigger, VERDICT_NOTICE, Verdict, carryNotice, changedElsewhere, judge, takeNotice, type RemoteState } from '$lib/canvas/staleness';
   import { keepSame } from '$lib/canvas/snapshot-keep';
-  import { AssetSize, sized } from '$lib/canvas/asset-url';
+  import { AssetSize, canvasAssetUrl, sized } from '$lib/canvas/asset-url';
   import TieredImage from '$lib/components/canvas/TieredImage.svelte';
   import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
@@ -35,7 +35,7 @@
   import { LineAction, createOpQueue, keepLines } from '$lib/canvas/op-queue';
   import { idbShelf, openOutbox, type Outbox } from '$lib/canvas/outbox';
   import { syncOf } from '$lib/canvas/sync-status';
-  import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
+  import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
@@ -53,7 +53,6 @@
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
-  import { deserialize } from '$app/forms';
   import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
   import { page, updated } from '$app/state';
   import { track } from '$lib/analytics';
@@ -103,6 +102,7 @@
   import { templateFields } from '$lib/motion/template/library';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
+  import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
   import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
@@ -114,7 +114,7 @@
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, frameResize, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, frameResize, heightFollowsDoc, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
@@ -127,6 +127,7 @@
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHead } from '$lib/canvas/frame-outlines';
+  import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { framesToWarm } from '$lib/canvas/warm-frames';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
@@ -159,6 +160,8 @@
     type WiredListSource
   } from '$lib/canvas/list-node';
   import { verdictForUpload, canvasUploadPrefix } from '$lib/canvas/upload-kind';
+  import { FONT_FILE } from '$lib/motion/fonts/library';
+  import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
   import { isUploadedNodeRow, uploadedNodeOf } from '$lib/canvas/uploaded-node';
   import { genNodeSize, startRun, unlockRun, type GenNode as GenNodeState, type GenMedium, type ModelChoice } from '$lib/canvas/gen-node';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
@@ -390,13 +393,13 @@
 
   const fittedHosts = new Map<string, string>();
 
-  function fitHost(id: string | null, share: { width: number; height: number }) {
+  function fitHost(id: string | null, share: HostShare) {
     const row = id ? nodes.find((n) => n.id === id) : null;
     const settled = row ? `${row.w}x${row.h}@${motionOf(row)?.docHeadRevision ?? 0}` : "";
-    if (!row || fittedHosts.get(row.id) === settled) {
+    const next = row ? hostFit(row, share) : null;
+    if (!row || !next || fittedHosts.get(row.id) === settled) {
       return;
     }
-    const next = { w: Math.round(row.w * share.width), h: Math.round(row.h * share.height) };
     fittedHosts.set(row.id, `${next.w}x${next.h}@${motionOf(row)?.docHeadRevision ?? 0}`);
     void resize(row.id, next.w, next.h);
   }
@@ -441,13 +444,23 @@
     }
   }
 
-  async function regroup(action: string, fields: Record<string, string>) {
-    const res = await post(action, fields);
-    if (res?.outcome !== 'done') {
-      return;
-    }
-    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
-    await refresh();
+  const regroups = inOrder();
+  let regrouping = 0;
+
+  function regroup(action: string, fields: Record<string, string>) {
+    regrouping += 1;
+    void regroups(async () => {
+      await places.flush();
+      const res = await post(action, fields);
+      if (res?.outcome === 'done') {
+        pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+      }
+    }).finally(() => {
+      regrouping -= 1;
+      if (!regrouping) {
+        void refresh();
+      }
+    });
   }
 
   function rotateGroupBy(id: string, degrees: number) {
@@ -472,14 +485,18 @@
   }
 
   function groupElements(ids: string[]) {
-    if (ids.length > 1) {
-      void regroup('groupElements', { ids: JSON.stringify(ids) });
+    if (ids.length < 2) {
+      return;
     }
+    const id = crypto.randomUUID();
+    nodes = groupedLocally(nodes, ids, id, (record) => toTile(record));
+    regroup('groupElements', { ids: JSON.stringify(ids), node_id: id });
   }
 
   function ungroupElements(ids: string[]) {
     for (const id of ids) {
-      void regroup('ungroupElement', { id });
+      nodes = ungroupedLocally(nodes, id);
+      regroup('ungroupElement', { id });
     }
   }
 
@@ -986,7 +1003,7 @@
   }
 
   function assetUrl(refId: string | null): string | null {
-    return refId ? `/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}` : null;
+    return refId ? canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full) : null;
   }
 
   function cardAssets(cards: ReturnType<typeof compositionCards>): Record<string, string> {
@@ -1149,7 +1166,7 @@
   }
 
   let domReason = $state<string | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Dom ? (data.rendererSwitch === Switch.ForceDom ? 'kill switch' : '?renderer=dom') : null);
-  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Gpu ? null : (CanvasFlow as unknown as typeof GpuFlow));
+  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) !== Renderer.Dom ? null : (CanvasFlow as unknown as typeof GpuFlow));
   $effect(() => {
     if (Flow) {
       return;
@@ -1166,6 +1183,7 @@
   }
 
   let failed = $state<string | null>(null);
+  let fontAdded = $state<string | null>(null);
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
   let topPeers = $state<HTMLElement | null>(null);
@@ -1390,7 +1408,7 @@
   $effect(() => {
     const [id] = selectedIds;
     if (selectedIds.length === 1 && untrack(() => nodes.find((n) => n.id === id))?.type === 'motion') {
-      prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
+      untrack(() => warmMotion(id));
     }
   });
 
@@ -1641,31 +1659,22 @@
     if (rows) { commits.publish(rows); }
   }
 
+  const canvasRoute = $derived({ projectId: data.projectId, canvasId: data.canvas.id });
+
   async function send(
     action: string,
     fields: Record<string, string | number | File | string[]>
   ): Promise<ActionAnswer> {
-    let res: Response;
+    let answer: ActionAnswer;
     try {
-      res = await fetch(canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action), {
-        method: 'POST',
-        headers: { 'x-sveltekit-action': 'true' },
-        body: formOf(fields)
-      });
+      answer = await postCanvasAction(canvasRoute, action, formOf(fields));
     } catch (cause) {
       console.warn(`canvas action ${action}: network`, cause);
       return { type: 'network' };
     }
 
-    const text = await res.text();
-    try {
-      const answer = deserialize(text) as ActionAnswer;
-      announceCommit(action, fields, answer);
-      return answer;
-    } catch {
-      console.warn(`canvas action ${action}: unreadable ${res.status}`, text.slice(0, 500));
-      return { type: 'error', status: res.status };
-    }
+    announceCommit(action, fields, answer);
+    return answer;
   }
 
   function announce(action: string, reason: SaveFailure, detail: unknown) {
@@ -1725,7 +1734,25 @@
    */
   const supabase = createSupabaseBrowserClient();
 
+  async function uploadFontFile(file: File) {
+    const path = `${orgFontPrefix(data.orgId)}${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
+    const up = await supabase.storage.from('canvas-assets').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+    if (up.error) {
+      failed = up.error.message;
+      return;
+    }
+    const result = await post('uploadFont', { path });
+    const font = result?.font as { family?: string } | undefined;
+    if (font?.family) {
+      fontAdded = `${font.family} is in the uploaded fonts: pick it in any text's font menu.`;
+    }
+  }
+
   async function upload(file: File) {
+    if (FONT_FILE.test(file.name)) {
+      await uploadFontFile(file);
+      return;
+    }
     const verdict = verdictForUpload(file.type, file.name, file.size);
     if (!verdict.ok) {
       failed = verdict.why;
@@ -1792,14 +1819,15 @@
   }
 
   let componentPickFor = $state<string | null>(null);
-  const componentItems = $derived(componentCatalogue(data.componentTemplates));
+  const componentTemplates = $derived([...BUILTIN_TEMPLATES, ...data.orgTemplates]);
+  const componentItems = $derived(componentCatalogue(componentTemplates));
   const componentPicking = $derived.by(() => {
     const row = componentPickFor ? nodes.find((n) => n.id === componentPickFor) : null;
     return row ? compositionOf(row) : null;
   });
 
   function componentDraft(nodeId: string, templateId: string, format: MotionFormat): Instance | null {
-    const entry = data.componentTemplates.find((t) => t.id === templateId);
+    const entry = componentTemplates.find((t) => t.id === templateId);
     const made = entry ? composedTemplate(entry, { format, values: {} }, compositionCards(nodeId, edges, nodes), sequentialIds()) : null;
     return made?.ok ? made : null;
   }
@@ -1829,7 +1857,7 @@
   }
 
   function frameDraft(templateId: string, format: MotionFormat): Instance | null {
-    const entry = data.componentTemplates.find((t) => t.id === templateId);
+    const entry = componentTemplates.find((t) => t.id === templateId);
     const made = entry ? composedTemplate(entry, { format, values: {} }, [], sequentialIds()) : null;
     return made?.ok ? made : null;
   }
@@ -1850,7 +1878,7 @@
     const frameSize = { w: probe.size.width ?? 0, h: probe.size.height ?? 0 };
     const spot = placeNear(at, frameSize, occupiedRects());
     const id = crypto.randomUUID();
-    const name = data.componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
+    const name = componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
     const values = frameValues(templateId, draft);
     const poster = Object.keys(values).length ? null : item?.preview?.poster;
     if (poster) {
@@ -2319,10 +2347,11 @@
   $effect(() => {
     const open = layersSource.video;
     const row = open ? untrack(() => nodes.find((node) => node.id === open.nodeId)) : null;
-    if (!open || !row) {
+    const motion = row ? motionOf(row) : null;
+    if (!open || !row || !motion || !heightFollowsDoc(motion)) {
       return;
     }
-    const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motionOf(row)?.kind);
+    const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motion.kind);
     if (Math.abs(fit.h - row.h) > FIT_SLACK_PX) {
       void storeSize(row.id, fit.w, fit.h);
     }
@@ -2594,7 +2623,6 @@
         return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), ...frameLook(n) }));
       },
       outlinesUrl: `/p/${data.projectId}/c/${data.canvas.id}/frame-outlines`,
-      outlines: data.outlines,
       previewUrl: (nodeId) => motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId }),
       get selected() {
         return selectedIds;
@@ -3324,6 +3352,9 @@
       {/if}
     </p>
   {/if}
+  {#if fontAdded}
+    <p class="warning" role="status" data-testid="font-added">{fontAdded}</p>
+  {/if}
   {#if reloadOffered}
     <p class="warning reload" role="status">
       {VERDICT_NOTICE[Verdict.OfferReload]}
@@ -3366,8 +3397,9 @@
   {#if viewOnly}<p class="view-only-badge" data-testid="view-only">View only</p>{/if}
   {#if Flow}
   <Flow
+    core={rendererOf(page.url, data.rendererSwitch) === Renderer.Core}
     mode={canvasMode}
-    actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
+    postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
     {edges}
     onMove={move}
@@ -3398,6 +3430,7 @@
     onTemplate={insertTemplate}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     onNodeClicked={(id) => (dismissedMotion = dismissedAfterClick(dismissedMotion, id))}
+    onNodeDoubled={requestMotion}
     barContext={barContextOf(inlineMotion ? CanvasState.Editing : CanvasState.Browsing)}
     onUndo={undo}
     onRedo={redo}
@@ -3516,22 +3549,22 @@
                 </div>
               {:else if gen.medium === 'model3d'}
                 <Model3dViewer
-                  src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`}
+                  src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)}
                   nodeId={id}
-                  poster={typeof row.data.posterRefId === 'string' ? `/p/${data.projectId}/c/${data.canvas.id}/assets/${row.data.posterRefId}` : null}
+                  poster={typeof row.data.posterRefId === 'string' ? canvasAssetUrl(data.projectId, data.canvas.id, row.data.posterRefId, AssetSize.Full) : null}
                   onrender={(views) => renderModelViews(id, views)}
                 />
               {:else if gen.medium === 'audio'}
                 <AudioResult nodeId={id} {...audioUrlsOf(row)} files={audioFilesOf(row, gen.params.targetLanguage ?? null)} />
               {:else if gen.medium === 'video'}
-                <LiveVideo src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} {selected} controls />
+                <LiveVideo src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} {selected} controls />
                 <div class="gen-download">
-                  <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
+                  <NodeDownload kind="video" sourceUrl={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {:else}
-                <TieredImage src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} alt={gen.prompt} />
+                <TieredImage src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} alt={gen.prompt} />
                 <div class="gen-download">
-                  <NodeDownload kind="image" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
+                  <NodeDownload kind="image" sourceUrl={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {/if}
             {/snippet}
@@ -3556,7 +3589,7 @@
                 references={referencesOf(row.data)}
                 catalogue={data.references.catalogue}
                 media={data.references.media}
-                assetUrl={(assetId) => sized(`/p/${data.projectId}/c/${data.canvas.id}/assets/${assetId}`, AssetSize.Thumb)}
+                assetUrl={(assetId) => sized(canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full), AssetSize.Thumb)}
                 onchange={(next) => void write(id, { references: next })}
               />
               {/if}
@@ -3630,7 +3663,7 @@
             {cards}
             assets={cardAssets(cards)}
             composeIn={{ project: data.projectId, canvas: data.canvas.id }}
-            templates={data.componentTemplates}
+            templates={componentTemplates}
             onpatch={(patch) => write(id, patch, SaveTiming.Now)}
             onpickcomponent={() => (componentPickFor = id)}
           />
@@ -3657,7 +3690,7 @@
   {/if}
   {#if editingMotion}
     {#key editingMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} onhostdrag={hostDrag} onhostfit={(share) => fitHost(editingMotion, share)} {canvasundo} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onreveal={(free) => editingMotion && focusOn([editingMotion], free, FocusMode.Reveal)} onmoveout={moveOut} onhostdrag={hostDrag} onhostfit={(share) => fitHost(editingMotion, share)} {canvasundo} />
     {/key}
   {/if}
 

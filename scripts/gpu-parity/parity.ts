@@ -13,7 +13,8 @@ import { MOTION_LIBS_ROUTE } from '$lib/motion/libs/catalog';
 import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
 import base from '../vite-node.config';
 import { libraryPath } from '../motion-libs';
-import { luma, psnr, ssim } from './metrics';
+import { differing, luma, psnr, ssim } from './metrics';
+import { VIDEO_ASSET, assetPath, placeholder, placeholderVideo } from './assets';
 import type { ExportInput, ExportResult, PreviewInput, PreviewResult, ShotsInput, ShotsResult } from './probe';
 
 enum Mode {
@@ -26,10 +27,11 @@ const ROOT = resolve(import.meta.dirname, '../..');
 const OUT = resolve(process.env.PARITY_OUT ?? join(homedir(), 'Documents/feega-videos/gpu-motion'));
 const HTTP_OK = 200;
 const HTTP_NOT_FOUND = 404;
+const HTTP_PARTIAL = 206;
 const TIMEOUT_MS = 3_600_000;
 const APP_LANES = 4;
-const ASSET_SIZE = { width: 1600, height: 1000 };
-const TYPES: Record<string, string> = { js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json', png: 'image/png' };
+const TYPES: Record<string, string> = { js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json', png: 'image/png', mp4: 'video/mp4', wasm: 'application/wasm' };
+const STATIC_ROUTES = ['/gpu-core/', '/gpu-text/'];
 const LAUNCH = { channel: 'chromium', args: ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=metal', '--enable-gpu-rasterization', '--enable-unsafe-webgpu'] };
 
 const flags = new Map(process.argv.slice(2).map((a) => a.replace(/^--/, '').split('=') as [string, string]));
@@ -41,6 +43,9 @@ const seconds = Number(flags.get('seconds') ?? 6);
 const displayWidth = flags.has('display') ? Number(flags.get('display')) : null;
 const scaleFactor = Number(flags.get('dpr') ?? 1);
 const engineName = flags.get('engine') ?? 'chromium';
+const SHOTS: Record<string, string> = { html: 'htmlShots', gpu: 'gpuShots', 'gpu-full': 'gpuFullShots', 'gpu-core': 'gpuCoreShots', 'gpu-core-gl': 'gpuCoreGlShots', 'core-export': 'coreExportShots', 'core-export-gl': 'coreExportGlShots' };
+const PIXEL_TOLERANCE = 8;
+const under = SHOTS[flags.get('under') ?? 'gpu'];
 const name = flags.get('name') ?? docPath.split('/').pop()?.replace(/\.(doc\.)?json$/, '') ?? 'doc';
 
 async function hostBundle(): Promise<string> {
@@ -64,14 +69,8 @@ function assetIds(value: unknown, into = new Set<string>()): Set<string> {
   return into;
 }
 
-async function placeholder(id: string): Promise<Buffer> {
-  const hue = [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ASSET_SIZE.width}" height="${ASSET_SIZE.height}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,55%)"/><stop offset="1" stop-color="hsl(${(hue + 120) % 360},60%,25%)"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><circle cx="520" cy="420" r="260" fill="hsl(${(hue + 60) % 360},80%,70%)" opacity="0.8"/><rect x="900" y="560" width="520" height="300" fill="#fff" opacity="0.85"/><path d="M0 1000 L800 600 L1600 1000Z" fill="#111" opacity="0.5"/></svg>`;
-  return sharp(Buffer.from(svg)).png().toBuffer();
-}
-
 function serve(script: string, assets: Map<string, Buffer>): Promise<{ url: string; origin: string; close: () => void }> {
-  const page = `<!doctype html><html><body style="margin:0;background:#000"><div id="host" style="position:relative;width:1920px;height:1080px;overflow:hidden"></div><script src="/host.js"></script></body></html>`;
+  const page = `<!doctype html><html><body style="margin:0;background:#000"><div id="host" style="position:relative;width:4096px;height:4096px;overflow:hidden"></div><script src="/host.js"></script></body></html>`;
   const server = createServer((req, res: ServerResponse) => {
     const pathname = new URL(req.url ?? '/', 'http://parity').pathname;
     if (pathname.startsWith(MOTION_LIBS_ROUTE)) {
@@ -83,9 +82,22 @@ function serve(script: string, assets: Map<string, Buffer>): Promise<{ url: stri
       res.writeHead(HTTP_OK, { 'content-type': TYPES[file.split('.').pop() ?? ''] ?? 'text/plain', 'access-control-allow-origin': '*' }).end(readFileSync(file));
       return;
     }
+    if (STATIC_ROUTES.some((r) => pathname.startsWith(r))) {
+      const file = join(ROOT, 'static', pathname);
+      res.writeHead(existsSync(file) ? HTTP_OK : HTTP_NOT_FOUND, { 'content-type': TYPES[file.split('.').pop() ?? ''] ?? 'text/plain' }).end(existsSync(file) ? readFileSync(file) : undefined);
+      return;
+    }
     const asset = assets.get(pathname);
     if (asset) {
-      res.writeHead(HTTP_OK, { 'content-type': TYPES.png, 'access-control-allow-origin': '*' }).end(asset);
+      const type = TYPES[pathname.split('.').pop() ?? ''] ?? TYPES.png;
+      const range = /bytes=(\d+)-(\d*)/.exec(req.headers.range ?? '');
+      if (range) {
+        const start = Number(range[1]);
+        const end = range[2] ? Number(range[2]) : asset.length - 1;
+        res.writeHead(HTTP_PARTIAL, { 'content-type': type, 'access-control-allow-origin': '*', 'accept-ranges': 'bytes', 'content-range': `bytes ${start}-${end}/${asset.length}`, 'content-length': end - start + 1 }).end(asset.subarray(start, end + 1));
+        return;
+      }
+      res.writeHead(HTTP_OK, { 'content-type': type, 'access-control-allow-origin': '*', 'accept-ranges': 'bytes' }).end(asset);
       return;
     }
     if (pathname === '/host.js') {
@@ -118,18 +130,18 @@ const doc = verdict.doc;
 const ids = assetIds(doc);
 const assetFiles = new Map<string, Buffer>();
 for (const id of ids) {
-  assetFiles.set(`/assets/${id}.png`, await placeholder(id));
+  assetFiles.set(assetPath(id), VIDEO_ASSET.test(id) ? placeholderVideo() : await placeholder(id));
 }
 const server = await serve(await hostBundle(), assetFiles);
-const assets = Object.fromEntries([...ids].map((id) => [id, `${server.origin}/assets/${id}.png`]));
+const assets = Object.fromEntries([...ids].map((id) => [id, `${server.origin}${assetPath(id)}`]));
 const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets, origin: server.origin });
 const size = { width: doc.width, height: doc.height };
-const spec = { doc, assets, origin: server.origin };
+const spec = { doc, assets, origin: server.origin, faces: flags.get('faces') };
 const dir = join(OUT, name);
 mkdirSync(dir, { recursive: true });
 
 const browser = engineName === 'webkit' ? await webkit.launch({ headless: mode !== Mode.Preview }) : await chromium.launch({ ...LAUNCH, headless: mode !== Mode.Preview });
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: scaleFactor });
+const page = await browser.newPage({ viewport: { width: Math.max(1920, doc.width), height: Math.max(1080, doc.height) }, deviceScaleFactor: scaleFactor });
 page.setDefaultTimeout(TIMEOUT_MS);
 page.on('pageerror', (e) => console.error('pageerror', e.message));
 page.on('console', (m) => (m.type() === 'error' ? console.error('console', m.text().slice(0, 300)) : undefined));
@@ -154,24 +166,24 @@ if (mode === Mode.Parity) {
   const shots: ShotsInput = { html, spec, times, width: Math.round(doc.width * res), height: Math.round(doc.height * res), preference, ...(displayWidth ? { displayWidth } : {}) };
   const before = flags.get('ref') === 'live' ? await liveShots(times, shots) : await call<ShotsInput, ShotsResult>('htmlShots', shots);
   console.log(`html engine ${(before.ms / times.length).toFixed(0)} ms/frame`);
-  const after = await call<ShotsInput, ShotsResult>('gpuShots', shots);
+  const after = await call<ShotsInput, ShotsResult>(under, shots);
   const framesDir = join(dir, 'frames');
   rmSync(framesDir, { recursive: true, force: true });
   mkdirSync(framesDir, { recursive: true });
-  const rows: { t: number; ssim: number; psnr: number }[] = [];
+  const rows: { t: number; ssim: number; psnr: number; off: number }[] = [];
   for (let i = 0; i < times.length; i++) {
     const a = await rgba(before.pngs[i]);
     const b = await rgba(after.pngs[i]);
     const la = luma(a.pixels);
     const lb = luma(b.pixels);
-    rows.push({ t: times[i], ssim: ssim(la, lb, a.width, a.height), psnr: psnr(la, lb) });
+    rows.push({ t: times[i], ssim: ssim(la, lb, a.width, a.height), psnr: psnr(la, lb), off: differing(a.pixels, b.pixels, PIXEL_TOLERANCE) });
     writeFileSync(join(framesDir, `html-${String(i).padStart(3, '0')}.png`), Buffer.from(before.pngs[i], 'base64'));
     writeFileSync(join(framesDir, `gpu-${String(i).padStart(3, '0')}.png`), Buffer.from(after.pngs[i], 'base64'));
   }
   const fmt = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : 'inf');
   const worst = rows.reduce((w, r) => (r.ssim < w.ssim ? r : w), rows[0]);
   const mean = rows.reduce((s, r) => s + r.ssim, 0) / rows.length;
-  const report = [`# ${name} — backend ${after.backend}, ${after.runs} html runs`, '', '| t (s) | SSIM | PSNR dB |', '|---|---|---|', ...rows.map((r) => `| ${r.t.toFixed(2)} | ${r.ssim.toFixed(4)} | ${fmt(r.psnr)} |`), '', `mean SSIM ${mean.toFixed(4)}, worst ${worst.ssim.toFixed(4)} at ${worst.t.toFixed(2)} s`, `stats ${JSON.stringify(after.stats.slice(0, 3))}`].join('\n');
+  const report = [`# ${name} — backend ${after.backend}, ${after.runs} html runs`, '', '| t (s) | SSIM | PSNR dB | pixels off |', '|---|---|---|---|', ...rows.map((r) => `| ${r.t.toFixed(2)} | ${r.ssim.toFixed(4)} | ${fmt(r.psnr)} | ${(r.off * 100).toFixed(2)}% |`), '', `mean SSIM ${mean.toFixed(4)}, worst ${worst.ssim.toFixed(4)} at ${worst.t.toFixed(2)} s`, `stats ${JSON.stringify(after.stats.slice(0, 3))}`, `not drawn: ${after.unsupported?.join(', ') || 'none'}`].join('\n');
   writeFileSync(join(dir, 'parity.md'), report);
   console.log(report);
   const ff = (args: string[]) => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...args]);

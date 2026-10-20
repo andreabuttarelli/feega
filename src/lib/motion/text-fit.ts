@@ -27,14 +27,24 @@ export function fitTexts(doc: MotionDoc, boxes: Record<string, PxBox>): MotionDo
   return changed ? { ...doc, tracks } : null;
 }
 
-export function freeTextFit(doc: MotionDoc, boxes: Record<string, PxBox>): { width: number; height: number } | null {
+export type HostShare = { width: number; height: number; stage: { width: number; height: number } };
+
+const SHAPE_SLACK = 0.01;
+
+export function hostFit(node: { w: number; h: number }, share: HostShare): { w: number; h: number } | null {
+  const reshaped = Math.abs((node.w / node.h) / (share.stage.width / share.stage.height) - 1) > SHAPE_SLACK;
+  const next = { w: Math.round(node.w * share.width), h: Math.round(node.h * share.height) };
+  return reshaped || (next.w === node.w && next.h === node.h) ? null : next;
+}
+
+export function freeTextFit(doc: MotionDoc, boxes: Record<string, PxBox>): HostShare | null {
   const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]);
   const [only] = clips;
   if (clips.length !== 1) {
     return null;
   }
   const next = fitted(only, boxes[only.id], doc);
-  return next ? { width: Number(next.props.width), height: Number(next.props.height) } : null;
+  return next ? { width: Number(next.props.width), height: Number(next.props.height), stage: { width: doc.width, height: doc.height } } : null;
 }
 
 const sizingOf = (clip: MotionClip) => ((clip.props as { sizing?: TextSizing }).sizing ?? TextSizing.Fixed);

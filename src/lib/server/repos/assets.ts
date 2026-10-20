@@ -1,4 +1,5 @@
 import type { Db } from '$lib/server/db/client';
+import { FONT_MIME_TYPES } from '$lib/motion/fonts/library';
 import type { Database } from '$lib/database.types';
 
 /**
@@ -101,6 +102,31 @@ export async function listOrgAssets(db: Db, orgId: string): Promise<Asset[]> {
     throw error;
   }
   return (data ?? []).map(toAsset);
+}
+
+export async function listFontAssets(db: Db, scope: { orgId: string; limit: number }): Promise<Asset[]> {
+  const { data, error } = await db
+    .from('assets')
+    .select(ASSET_COLUMNS)
+    .eq('org_id', scope.orgId)
+    .eq('type', 'document')
+    .in('mime_type', FONT_MIME_TYPES)
+    .order('created_at', { ascending: false })
+    .limit(scope.limit);
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(toAsset);
+}
+
+export async function setAssetContent(db: Db, input: { orgId: string; assetId: string; content: string }): Promise<number> {
+  const { data, error } = await db.from('assets').update({ content: input.content }).eq('org_id', input.orgId).eq('id', input.assetId).select('id');
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).length;
 }
 
 export async function findAsset(

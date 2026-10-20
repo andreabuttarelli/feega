@@ -1,3 +1,4 @@
+import { orgFontFamilies } from './font-upload';
 import { styleOf } from '$lib/motion/style';
 import { nameVersion, namedRevisions } from './version-names';
 import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
@@ -47,9 +48,9 @@ import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { appAccountKept, liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
 import { ATTACHMENT_PORTS } from '$lib/server/chat-attachments/register';
-import { EmbedAction, createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from '$lib/server/motion/motion-tools';
+import { createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from '$lib/server/motion/motion-tools';
 import type { MotionAsset } from '$lib/server/motion/editor';
-import { publishEmbed, removeEmbed } from '$lib/server/motion/embed';
+import { embedAction } from '$lib/server/motion/embed';
 import type { ProjectMode } from '$lib/project-mode';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
@@ -361,6 +362,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
     fontAdvance: readFontAdvance,
+    fonts: () => orgFontFamilies(db, orgId),
     inspect: frameStats,
     seam: async () => {
       const end = session.doc.durationInFrames / session.doc.fps;
@@ -418,14 +420,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, quality, actor });
       return { ok: true, render_url: renderPagePath(link.token), expires_at: link.expiresAt, credits: BROWSER_RENDER_CREDITS };
     },
-    embed: async (action) => {
-      const nodeId = motion.record.id;
-      const EMBED_RUN: Record<EmbedAction, () => Promise<Record<string, unknown>>> = {
-        [EmbedAction.Publish]: () => publishEmbed(db, { nodeId, doc: session.doc, tokens, assetUrls: assetUrls(assets), title: motion.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()), mode: project.mode }),
-        [EmbedAction.Unpublish]: () => removeEmbed(db, nodeId)
-      };
-      return EMBED_RUN[action]();
-    },
+    embed: (action) => embedAction(db, { nodeId: motion.record.id, doc: session.doc, tokens, assetUrls: assetUrls(assets), title: motion.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()), mode: project.mode }, action),
     batch: async ({ rows }) => {
       if (session.edits.length) {
         return { ok: false, error: 'this turn has unsaved edits: the batch renders the saved video, so finish the turn and run render_batch in the next one' };

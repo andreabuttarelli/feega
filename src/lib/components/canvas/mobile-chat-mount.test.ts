@@ -18,9 +18,8 @@ describe('su mobile la chat resta montata anche quando si guarda la tela', () =>
     expect(layout).not.toMatch(/CanvasMobileTabs|CanvasMobileMore/);
   });
 
-  it('la tela dietro la chat resta nel layout: display none su WebKit la ridisegna e ridecodifica a ogni ritorno', () => {
-    const hiddenView = layout.match(/\.mobile-view\.is-hidden\s*\{([^}]*)\}/);
-    expect(hiddenView?.[1]).toMatch(/visibility:\s*hidden/);
-    expect(hiddenView?.[1]).not.toMatch(/display:\s*none/);
+  it('la chat è un foglio sopra la tela: la tela dietro non si nasconde mai', () => {
+    expect(mobileBranch).toMatch(/<PhoneSheet name="canvas-chat"[^\n]*testid="mobile-chat"/);
+    expect(layout).not.toMatch(/\.mobile-view\.is-hidden/);
   });
 });

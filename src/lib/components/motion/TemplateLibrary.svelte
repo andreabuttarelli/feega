@@ -2,7 +2,7 @@
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
   import X from '@lucide/svelte/icons/x';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import MotionPreview from './MotionPreview.svelte';
   import { newMotionDoc, MotionFormat, type MotionDoc } from '$lib/motion/doc';
   import { FIELD_TYPE_LABEL } from '$lib/motion/template/field-model';
@@ -69,8 +69,7 @@
     form.set('name', name);
     form.set('description', description);
     form.set('posterFrame', String(frame));
-    const res = await fetch(`${editorUrl}?/saveTemplate`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(editorUrl, 'saveTemplate', form);
     if (result.type !== 'success') {
       error = String((result.type === 'failure' ? result.data?.error : null) ?? 'The template could not be saved.');
       return;
@@ -83,8 +82,8 @@
   async function remove(id: string) {
     const form = new FormData();
     form.set('id', id);
-    const res = await fetch(`${editorUrl}?/deleteTemplate`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    if (deserialize(await res.text()).type === 'success') {
+    const result = await postPageAction(editorUrl, 'deleteTemplate', form);
+    if (result.type === 'success') {
       onremoved(id);
     }
   }

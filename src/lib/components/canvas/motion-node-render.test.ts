@@ -21,6 +21,17 @@ describe('a frame opening in the editor', () => {
   });
 });
 
+describe('an empty frame on the canvas', () => {
+  it('is its bare stage: no empty-state icon, no label, no buttons', () => {
+    const body = html(NodeMode.Preview, null);
+
+    expect(body).toContain('data-testid="motion-node-stage"');
+    expect(body).not.toContain('class="empty');
+    expect(body).not.toContain('<svg');
+    expect(body).not.toContain('<button');
+  });
+});
+
 describe('a free element on the canvas', () => {
   const element = { ...node, kind: 'element' } as unknown as Node;
   const body = (posterUrl: string | null) => render(MotionNode, { props: { node: element, href: '/e', previewUrl: '/p', posterUrl, nodeMode: NodeMode.Preview } }).body;

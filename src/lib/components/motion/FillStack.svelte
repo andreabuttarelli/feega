@@ -5,6 +5,7 @@
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import { FILL_LABEL, FILL_TYPES, FillType, IMAGE_FITS, addFill, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '$lib/motion/fill/model';
   import ColorField from './ColorField.svelte';
+  import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import MediaPicker from './MediaPicker.svelte';
@@ -13,7 +14,7 @@
 
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
 
-  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, onchange }: { fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, onchange }: { gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const ICON = cn('inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-ui-icon hover:bg-ui-wash hover:text-ui-text', FOCUS_RING);
@@ -119,7 +120,7 @@
 {#snippet colour(name: string, value: string, write: (next: string) => void)}
   {@const { base, alpha } = colourAlpha(value)}
   <div class="flex min-w-0 items-center gap-1">
-    <div class="min-w-0 flex-1"><ColorField {name} value={base} {tokens} onchange={(next) => write(recolour(next, alpha))} /></div>
+    <div class="min-w-0 flex-1"><ColorField {name} {gesture} value={base} {tokens} onchange={(next) => write(recolour(next, alpha))} /></div>
     <input class={cn(FIELD_INPUT, 'w-12')} type="number" min="0" max="100" step="1" data-testid="fill-alpha" aria-label={`${name} alpha`} title="Alpha %" value={pct(alpha)} onchange={(e) => write(recolour(base, percentOf(e)))} />
   </div>
 {/snippet}

@@ -11,7 +11,7 @@ const state = vi.hoisted(() => ({ writeAllowed: true, db: null as unknown, scree
 
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => ({ caller: { db: state.db, orgId: ORG, userId: 'u-1', writeAllowed: state.writeAllowed } }) }));
 vi.mock('$lib/server/repos/motion-templates', () => ({ listOrgTemplates: async () => [], insertOrgTemplate: vi.fn(), deleteOrgTemplate: vi.fn() }));
-vi.mock('$lib/server/repos/assets', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/assets')>()), listProjectAssets: async () => (state.assetsAsked(), []) }));
+vi.mock('$lib/server/repos/assets', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/assets')>()), listFontAssets: async () => [], listProjectAssets: async () => (state.assetsAsked(), []) }));
 vi.mock('$lib/server/canvas/sign-media', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/canvas/sign-media')>()), signAssetPaths: async () => new Map(), createAssetSigningDb: () => ({}) }));
 vi.mock('$lib/server/repos/projects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/projects')>()),
@@ -93,6 +93,17 @@ describe('POST /api/v1/motion/:node/tools runs one motion tool of the chat agent
 
     expect(third.version).toBe(4);
     expect(state.rows.map((r) => [r.version, r.actor_kind])).toEqual([[1, 'user'], [4, 'agent']]);
+  });
+
+  it('publish_embed hosts the video an outside agent edits', async () => {
+    const uploaded: string[] = [];
+    Object.assign(state.db as object, { storage: { from: () => ({ upload: async (path: string) => (uploaded.push(path), { error: null }) }) } });
+
+    const res = await post(NODE, { tool: 'publish_embed', input: {} });
+    const body = await res.json();
+
+    expect(body.output).toMatchObject({ ok: true });
+    expect(uploaded).toEqual([`${NODE}.html`]);
   });
 
   it('a read tool answers and saves nothing', async () => {

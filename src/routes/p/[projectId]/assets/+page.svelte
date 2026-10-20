@@ -5,7 +5,7 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Notice } from '$lib/components/ui/notice';
   import { EmptyState } from '$lib/components/ui/empty-state';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import { invalidateAll } from '$app/navigation';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { verdictForUpload, canvasUploadPrefix } from '$lib/canvas/upload-kind';
@@ -77,12 +77,7 @@
       body.set('mime_type', file.type);
       body.set('bytes', String(file.size));
 
-      const res = await fetch('?/upload', {
-        method: 'POST',
-        headers: { 'x-sveltekit-action': 'true' },
-        body
-      });
-      const result = deserialize(await res.text());
+      const result = await postPageAction(location.pathname, 'upload', body);
       if (result.type !== 'success') {
         uploadError = 'Upload failed';
         return;

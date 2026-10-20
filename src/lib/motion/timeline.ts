@@ -83,7 +83,10 @@ export type NewClip = {
   props?: Record<string, unknown>;
   transitionIn?: Edge;
   transitionOut?: Edge;
+  transform?: Transform;
 };
+
+export const TOP_LEFT_ANCHOR: Transform = { anchorX: 0, anchorY: 0 };
 
 type Span = { from: number; durationInFrames?: number };
 
@@ -116,7 +119,8 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     component: input.component,
     props: props.props,
     transitionIn: input.transitionIn ?? NO_EDGE,
-    transitionOut: input.transitionOut ?? NO_EDGE
+    transitionOut: input.transitionOut ?? NO_EDGE,
+    ...(input.transform ? { transform: { ...input.transform } } : {})
   });
 
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)) });

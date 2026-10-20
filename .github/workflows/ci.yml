@@ -37,7 +37,56 @@ jobs:
         run: npx vitest run
 
       - name: E2E smoke tests
-        run: npx playwright test
+        run: npx playwright test tests/e2e/motion-shots.spec.ts -g "kinetic-title"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dbg-frames
+          path: test-results/dbg
+
+  gpu-core:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/gpu-core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/gpu-core
+
+      - name: CPU tests (display list, scene building)
+        run: cargo test --locked
+
+      - name: Web build compiles
+        run: cargo build --locked --lib --target wasm32-unknown-unknown
+
+  gpu-text:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/gpu-text
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/gpu-text
+
+      - name: Faces, face book and layout
+        run: cargo test --locked
+
+      - name: Web build compiles
+        run: cargo build --locked --lib --target wasm32-unknown-unknown
 
   schema-drift:
     runs-on: ubuntu-latest

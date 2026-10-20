@@ -1,6 +1,7 @@
-import { deserialize } from '$app/forms';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
+import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
+import { postCanvasAction } from '$lib/canvas/canvas-api';
 import { MediaKind, kindOfFile } from '$lib/motion/media/pick';
 import type { LibraryMedia, MediaUploader } from '$lib/components/motion/media-upload';
 
@@ -24,8 +25,7 @@ type At = { orgId: string; projectId: string; canvasId: string };
 async function registered(at: At, action: string, fields: Record<string, string>): Promise<{ id: string } | { error: string }> {
   const form = new FormData();
   Object.entries(fields).forEach(([k, v]) => form.set(k, v));
-  const res = await fetch(`/p/${at.projectId}/c/${at.canvasId}?/${action}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-  const result = deserialize(await res.text());
+  const result = await postCanvasAction(at, action, form);
   const id = result.type === 'success' ? (result.data?.asset as { id?: string } | undefined)?.id : undefined;
   if (id) {
     return { id };
@@ -63,7 +63,7 @@ export function canvasMediaUploader(supabase: SupabaseClient, at: At): MediaUplo
 
     const media = (await projectMedia(at)).find((m) => m.id === outcome.id);
     const label = linked ? (media?.label ?? source.href) : source.name;
-    return { ok: true, asset: { id: outcome.id, kind: (media?.kind as MediaKind | undefined) ?? kind ?? MediaKind.Image, label, previewUrl: `/p/${at.projectId}/c/${at.canvasId}/assets/${outcome.id}`, url: media?.url ?? null } };
+    return { ok: true, asset: { id: outcome.id, kind: (media?.kind as MediaKind | undefined) ?? kind ?? MediaKind.Image, label, previewUrl: canvasAssetUrl(at.projectId, at.canvasId, outcome.id, AssetSize.Full), url: media?.url ?? null } };
   };
 }
 
@@ -82,5 +82,5 @@ export async function projectMedia(at: { projectId: string; canvasId: string }):
   const { assets } = (await res.json()) as { assets: AssetRow[] };
   return assets
     .filter((a) => MEDIA_TYPES.has(a.type))
-    .map((a) => ({ id: a.id, kind: a.type, label: labelOf(a), previewUrl: `/p/${at.projectId}/c/${at.canvasId}/assets/${a.id}`, url: a.signedUrl, seconds: a.durationS }));
+    .map((a) => ({ id: a.id, kind: a.type, label: labelOf(a), previewUrl: canvasAssetUrl(at.projectId, at.canvasId, a.id, AssetSize.Full), url: a.signedUrl, seconds: a.durationS }));
 }

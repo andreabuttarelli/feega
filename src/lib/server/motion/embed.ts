@@ -5,6 +5,7 @@ import type { ProjectMode } from '$lib/project-mode';
 import { embedSettings, embedSource, embedUrl, hostedPage, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
 import { embedSnippet, type EmbedSettings } from '$lib/motion/interactive/loader';
 import { assetOf, hostAssets, type HostedAsset } from './embed-assets';
+import { EmbedAction } from './motion-tools';
 
 export const EMBED_BUCKET = 'embeds';
 const EMBED_TYPE = 'text/html';
@@ -48,6 +49,14 @@ export async function publishEmbed(db: Db, input: EmbedPublish, origin = embedOr
 
   const url = embedUrl(origin, input.nodeId);
   return { ok: true, url, snippet: embedSnippet(origin, input.nodeId) };
+}
+
+export function embedAction(db: Db, input: EmbedPublish, action: EmbedAction): Promise<Record<string, unknown>> {
+  const run: Record<EmbedAction, () => Promise<Record<string, unknown>>> = {
+    [EmbedAction.Publish]: () => publishEmbed(db, input),
+    [EmbedAction.Unpublish]: () => removeEmbed(db, input.nodeId)
+  };
+  return run[action]();
 }
 
 export async function embedSlot(db: Db, nodeId: string, mode: ProjectMode): Promise<EmbedSlot> {

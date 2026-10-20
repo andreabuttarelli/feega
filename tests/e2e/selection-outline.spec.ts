@@ -59,7 +59,7 @@ async function zoomTo(page: Page, target: number) {
 }
 
 const posterSaved = (page: Page) =>
-  page.waitForResponse((r) => r.url().includes('?/poster'), {
+  page.waitForResponse((r) => new URL(r.url()).searchParams.get('action') === 'poster', {
     timeout: 30_000
   });
 

@@ -33,6 +33,7 @@
   import FlipHorizontal from '@lucide/svelte/icons/flip-horizontal-2';
   import FlipVertical from '@lucide/svelte/icons/flip-vertical-2';
   import ColorField from './ColorField.svelte';
+  import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
@@ -59,7 +60,8 @@
   import TextPathSection from './TextPathSection.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
-  import { registerFont, setFont } from '$lib/motion/fonts/ops';
+  import { registerFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+  import type { FontLibrary } from '$lib/motion/fonts/library';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
   import type { CustomSource } from '$lib/motion/custom/component';
@@ -101,13 +103,14 @@
     composeHref = null,
     tab = $bindable<InspectorTab>(InspectorTab.Properties),
     onchange,
-    onuploadfont,
+    fonts = null,
     upload = null,
     onopen,
     focus = null,
     shared = [],
     sharedWith = 0,
     partFill = null,
+    gesture = null,
     lead,
     mode = EditMode.Motion
   }: {
@@ -121,13 +124,14 @@
     composeHref?: string | null;
     tab?: InspectorTab;
     onchange: (doc: MotionDoc, summary: string) => void;
-    onuploadfont?: (file: File) => Promise<string | null>;
+    fonts?: FontLibrary | null;
     upload?: MediaUploader | null;
     onopen?: (comp: string) => void;
     focus?: readonly string[] | null;
     shared?: readonly string[];
     sharedWith?: number;
     partFill?: Snippet | null;
+    gesture?: LiveGesture | null;
     lead?: Snippet;
     mode?: EditMode;
   } = $props();
@@ -225,12 +229,13 @@
     commit(setProps(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
   }
 
-  function pickFont(field: Field, family: string, catalogue: CatalogueFont[]) {
+  function pickFont(field: Field, asked: string, catalogue: CatalogueFont[]) {
+    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
     if (clip.component !== 'Custom') {
-      commit(setFont(doc, clip.id, { family }, catalogue), `Set the font to ${family}`);
+      commit(setFont(base, clip.id, { family }, catalogue), `Set the font to ${family}`);
       return;
     }
-    const registered = registerFont(doc, family, catalogue);
+    const registered = registerFont(base, family, catalogue);
     commit(registered.ok ? setProps(registered.doc, clip.id, { [field.key]: family }) : registered, `Set ${field.label.toLowerCase()} to ${family}`);
   }
 
@@ -549,9 +554,9 @@
     <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
-    <div class="stack" data-prop={field.key}><FillStack fills={elementFills(clip.component, clip.props)} adder={Adder.Section} {assets} {tokens} {upload} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><FillStack {gesture} fills={elementFills(clip.component, clip.props)} adder={Adder.Section} {assets} {tokens} {upload} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
   {:else if field.control === Control.Strokes}
-    <div class="stack" data-prop={field.key}><StrokeStack strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><StrokeStack {gesture} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
@@ -572,7 +577,7 @@
         {:else if field.control === Control.Toggle}
           <SegmentedField name={field.label} options={YES_NO} value={answerOf(value(field))} onchange={(v) => setProp(field, v === Answer.Yes)} />
         {:else if field.control === Control.Color}
-          <ColorField id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
+          <ColorField {gesture} id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
         {:else if field.control === Control.Asset}
           <MediaPicker label={field.label} value={typeof value(field) === 'string' && value(field) ? { kind: field.assetKind === AssetKind.Video ? MediaKind.Video : MediaKind.Image, assetId: String(value(field)) } : null} {assets} accept={acceptOf(field.assetKind)} uploader={upload} onpick={(pick) => setProp(field, pick?.assetId ?? null)} />
         {:else if field.control === Control.MediaItem}
@@ -580,7 +585,7 @@
         {:else if field.control === Control.MediaList}
           <MediaListField label={field.label} value={value(field)} {assets} {upload} onchange={(list) => setProp(field, list)} />
         {:else if field.control === Control.Font}
-          <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} onupload={onuploadfont} />
+          <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} library={fonts} />
         {:else if field.control === Control.Comp}
           <div class="comp">
             <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
@@ -890,7 +895,7 @@
                   {@const alphaKey = alphaKeyOf(effect)}
                   <div class="line" data-prop={prop.key}>
                     <span class="label">{afterDot(prop)}</span>
-                    <div class="control"><ColorField name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
+                    <div class="control"><ColorField {gesture} name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
                     {@render diamond(prop.key)}
                   </div>
                 {:else}

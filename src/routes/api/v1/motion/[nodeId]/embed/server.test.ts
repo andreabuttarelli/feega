@@ -9,7 +9,9 @@ const store = vi.hoisted(() => ({
   head: 2 as number | null,
   mode: 'standard',
   playback: 'autoplay',
-  files: new Map<string, string>()
+  files: new Map<string, string>(),
+  projectAssets: [] as Record<string, unknown>[],
+  fetched: [] as string[]
 }));
 
 const bucket = {
@@ -37,7 +39,8 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
       : null
 }));
 vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'p-1', brandId: null, mode: store.mode }) }));
-vi.mock('$lib/server/repos/assets', () => ({ listProjectAssets: async () => [] }));
+vi.mock('$lib/server/repos/assets', () => ({
+  listFontAssets: async () => [], listProjectAssets: async () => store.projectAssets }));
 vi.mock('$lib/server/canvas/sign-media', () => ({ createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/motion-revisions')>()),
@@ -61,7 +64,9 @@ const call = (handler: Handler, method: string, path = 'embed') => {
 };
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', async () => new Response('window.lib=1;', { headers: { 'content-type': 'text/javascript' } }));
+  store.projectAssets = [];
+  store.fetched = [];
+  vi.stubGlobal('fetch', async (url: string) => (store.fetched.push(String(url)), new Response('window.lib=1;', { headers: { 'content-type': 'text/javascript' } })));
   store.caller = { db: { storage: { from: () => bucket } }, orgId: ORG, userId: 'u-1', apiKeyId: 'key-1', writeAllowed: true };
   store.head = 2;
   store.mode = ProjectMode.Standard;
@@ -79,6 +84,16 @@ describe('/api/v1/motion/[nodeId]/embed', () => {
     expect(body.snippet).toBe(`<script src="https://feega.app/embed.js" async></script>\n<feega-motion src="${NODE}"></feega-motion>`);
     expect(body.revision).toBe(2);
     expect(store.files.get(`${NODE}.html`)).toContain('application/feega-embed+json');
+  });
+
+  it('never downloads a project asset the video does not use', async () => {
+    const unused = 'https://cdn.example/unused-video.mp4';
+    store.projectAssets = [{ id: '99999999-2222-4333-8444-555555555555', type: 'video', source: 'uploaded', url: unused, createdAt: '2026-10-01T00:00:00Z', durationS: 600, width: 1920, height: 1080 }];
+
+    const res = await call(route.POST as Handler, 'POST');
+
+    expect(res.status).toBe(200);
+    expect(store.fetched).not.toContain(unused);
   });
 
   it('hands the React and Flutter snippets for the same video', async () => {

@@ -16,6 +16,19 @@ describe('one right bar, claimed by whichever surface is showing it', () => {
     expect(host.active).toBeNull();
   });
 
+  it('a surface that seats the bar in place takes its binding without moving it', () => {
+    const host = new RightBarHost();
+    const canvasEl = el('canvas');
+    host.claim(canvasEl, {});
+    const onbusy = () => {};
+    const editor = host.claim(null, { onbusy });
+
+    expect(host.holder?.element).toBe(canvasEl);
+    expect(host.active?.binding.onbusy).toBe(onbusy);
+    host.release(editor);
+    expect(host.holder?.element).toBe(canvasEl);
+  });
+
   it('a surface released out of order does not steal the bar from the one on top', () => {
     const host = new RightBarHost();
     const canvas = host.claim(el('canvas'), {});

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
 import { importCanvasLink, registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
+import { saveFontUpload } from '$lib/server/motion/font-upload';
 import { isOutputHandle } from '$lib/canvas/select-outputs';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoadEvent } from '@sveltejs/kit';
@@ -53,7 +54,6 @@ import { ShowRun, removeNodes, resizeOnCanvas, shareDoc, showRun, type RunShown 
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { templateLibrary } from '$lib/server/motion/templates';
-import { canvasOutlines } from '$lib/server/motion/frame-outlines';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
@@ -203,26 +203,25 @@ async function spendOnVoice<T>(
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, listed, catalogue, shareToken, references] = await Promise.all([
+  const [nodes, listed, catalogue, shareToken, references, orgTemplates, handoff, killSwitch, previews] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
     projectCatalogue(db, { orgId, mode }),
     readCanvasShare(db, { orgId, canvasId }),
-    referenceLibrary(db, { orgId, projectId: canvas.projectId })
+    referenceLibrary(db, { orgId, projectId: canvas.projectId }),
+    templateLibrary(db, { orgId, actor: userActor({ userId }) }).own(),
+    chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
+    rendererSwitch(),
+    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
   ]);
 
   const connections = await canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch, previews] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
-    firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length }),
-    templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
-    chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
-    canvasOutlines(db, { orgId, nodes }),
-    rendererSwitch(),
-    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
+    firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length })
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
@@ -247,8 +246,7 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     mode,
     projectBrandId,
     onboarding,
-    componentTemplates,
-    outlines,
+    orgTemplates,
     cardPreviews: previews
   };
 };
@@ -520,6 +518,11 @@ export const actions: Actions<CanvasParams> = {
       if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
       throw cause;
     }
+  },
+  uploadFont: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, path: String((await request.formData()).get('path') ?? '') });
+    return saved.ok ? { font: saved.font } : fail(400, { error: saved.error });
   },
   importLink: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
@@ -1216,11 +1219,12 @@ export const actions: Actions<CanvasParams> = {
 
   groupElements: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    const ask = groupAskSchema.safeParse({ ids: jsonField(await request.formData(), 'ids') });
+    const form = await request.formData();
+    const ask = groupAskSchema.safeParse({ ids: jsonField(form, 'ids'), id: String(form.get('node_id') ?? '') || undefined });
     if (!ask.success) {
       return fail(400, { error: 'invalid group' });
     }
-    return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids));
+    return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
   },
 
   restack: async ({ request, params, locals }) => {
@@ -1589,3 +1593,5 @@ export const actions: Actions<CanvasParams> = {
   }
 
 };
+
+export type CanvasPageData = Awaited<ReturnType<typeof load>>;

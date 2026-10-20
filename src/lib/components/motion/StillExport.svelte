@@ -1,7 +1,7 @@
 <script lang="ts">
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import type { MotionDoc } from '$lib/motion/doc';
   import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, attachmentUrl, stillExport } from '$lib/motion/still-model';
 
@@ -23,8 +23,7 @@
     const form = new FormData();
     form.set('format', format);
     form.set('scale', String(scale));
-    const res = await fetch(`${editorUrl}?/still`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await postPageAction(editorUrl, 'still', form);
     working = false;
     if (result.type === 'success' && result.data) {
       made = result.data as Made;

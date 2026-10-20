@@ -78,10 +78,9 @@ test.describe('a poster text edited in place is kept @real', () => {
       const box = (await overlay.boundingBox())!;
       const title = { x: box.width * 0.4, y: box.height * 0.1 };
       await expect(async () => {
-        await overlay.click({ position: title });
+        await overlay.dblclick({ position: title });
         await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 1000 });
       }).toPass({ timeout: 15_000 });
-      await overlay.dblclick({ position: title });
       await overlay.dblclick({ position: title });
 
       const frame = page.frameLocator(`[data-testid="motion-preview"] iframe`).first();

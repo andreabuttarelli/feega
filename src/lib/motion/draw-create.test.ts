@@ -28,6 +28,14 @@ describe('creating an element by drawing inside a frame', () => {
     expect(clip.props).toMatchObject({ shape: 'rect', ...BOX });
   });
 
+  it('a drawn element pivots from its top-left corner', () => {
+    const inFrame = findClip(ok(drawClip(video(), DrawTool.Rectangle, BOX, 0, 'r1')), 'r1')!.clip;
+    const onCanvas = drawnElement({ tool: DrawTool.Rectangle, box: { left: 100, top: 50, width: 300, height: 100 } }, 'r2');
+
+    expect(inFrame.transform).toEqual({ anchorX: 0, anchorY: 0 });
+    expect(onCanvas.ok && findClip(onCanvas.doc, 'r2')!.clip.transform).toEqual({ anchorX: 0, anchorY: 0 });
+  });
+
   it('an ellipse is an ellipse Shape, a text is a Text clip, both on the box', () => {
     expect(findClip(ok(drawClip(video(), DrawTool.Ellipse, BOX, 0, 'e1')), 'e1')!.clip.props).toMatchObject({ shape: 'ellipse', ...BOX });
     const text = findClip(ok(drawClip(video(), DrawTool.Text, BOX, 0, 't1')), 't1')!.clip;

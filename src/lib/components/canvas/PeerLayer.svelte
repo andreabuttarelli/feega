@@ -1,27 +1,13 @@
 <script lang="ts">
   import type { CanvasPeer } from '$lib/realtime/canvas-presence';
   import { displayName } from '$lib/realtime/frame-presence';
+  import { peerOutlines, type PeerRect } from '$lib/canvas/peer-outlines';
 
-  type Rect = { x: number; y: number; w: number; h: number };
-
-  let { peers, rectOf, zoom }: { peers: CanvasPeer[]; rectOf: (id: string) => Rect | null; zoom: number } = $props();
+  let { peers, rectOf, zoom, outlined = true }: { peers: CanvasPeer[]; rectOf: (id: string) => PeerRect | null; zoom: number; outlined?: boolean } = $props();
 
   const OUTLINE_PX = 2;
 
-  function boxesOf(peer: CanvasPeer) {
-    const moving = new Map(peer.live.map((box) => [box.id, box]));
-    return [...new Set([...peer.selection, ...moving.keys()])].flatMap((id) => {
-      const rect = rectOf(id);
-      const box = moving.get(id);
-      if (!rect && !(box?.w && box.h)) {
-        return [];
-      }
-      const at = { x: box?.x ?? rect!.x, y: box?.y ?? rect!.y, w: box?.w ?? rect!.w, h: box?.h ?? rect!.h };
-      return [{ key: `${peer.sessionId}:${id}`, rect: at, colour: peer.colour, live: !!box }];
-    });
-  }
-
-  const outlines = $derived(peers.flatMap(boxesOf));
+  const outlines = $derived(outlined ? peerOutlines(peers, rectOf) : []);
 </script>
 
 <div class="peers" data-testid="peer-layer" style:--inverse={1 / zoom}>

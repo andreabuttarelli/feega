@@ -20,11 +20,14 @@ const redirect = vi.fn((status: number, location: string) => {
 
 vi.mock('@sveltejs/kit', async (orig) => ({ ...(await orig<object>()), redirect, error: vi.fn() }));
 
+const projectShell = vi.fn();
+vi.mock('$lib/server/projects/project-shell', () => ({ load: projectShell }));
+
 async function loadHome(canvases: Array<{ id: string }>, projectId = 'proj1') {
-	const mod = await import('./+page.server');
+	const mod = await import('$lib/server/projects/home');
+	projectShell.mockResolvedValue({ project: { id: projectId }, org: { id: 'org1' }, canvases });
 	try {
 		await (mod.load as (e: unknown) => Promise<unknown>)({
-			parent: async () => ({ project: { id: projectId }, org: { id: 'org1' }, canvases }),
 			locals: { db: async () => fakeDb({ canvases: [] }).db }
 		});
 		return { redirected: null as null | { status: number; location: string } };
@@ -52,16 +55,11 @@ describe('la home del progetto rimanda alla prima tela del progetto', () => {
 	});
 });
 
-/**
- * Il redirect non basta a far esistere la rotta. SvelteKit costruisce il manifest
- * dai file: senza né `+page.server.ts` né `+page.svelte`, `/p/<id>` non è una rotta, e il
- * 404 nasce in `resolve()` PRIMA che un solo `load` parta — layout compreso. Un test sul solo
- * load della pagina resta verde mentre la home è irraggiungibile per tutti: è già successo.
- */
+const PAGE_FILES = new Set(['+page.ts', '+page.server.ts', '+page.svelte']);
 const projectRouteDir = fileURLToPath(new URL('.', import.meta.url));
 
 function pageFilesIn(dir: string): string[] {
-	return readdirSync(join(projectRouteDir, dir)).filter((f) => f === '+page.server.ts' || f === '+page.svelte');
+	return readdirSync(join(projectRouteDir, dir)).filter((f) => PAGE_FILES.has(f));
 }
 
 describe('/p/[projectId] è una rotta, non solo un guscio', () => {

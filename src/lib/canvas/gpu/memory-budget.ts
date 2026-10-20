@@ -24,3 +24,19 @@ export function decodeSize(width: number, height: number, device: Device): { wid
   const scale = Math.min(1, BUDGET[device].decodeEdge / Math.max(width, height));
   return { width: Math.round(width * scale), height: Math.round(height * scale) };
 }
+
+const FLAT_LAYERS = '<style>*{will-change:auto!important}</style>';
+const HEAD_END = '</head>';
+
+const LAYER_PIXELS = 500_000_000;
+const HINTED_CLIP = /class="[^"]*\b(fx|kf|ks)\b/g;
+
+const layerPixels = (html: string, size: { width: number; height: number }) => (html.match(HINTED_CLIP)?.length ?? 0) * size.width * size.height;
+
+export function previewHtml(html: string, size: { width: number; height: number }): string {
+  if (layerPixels(html, size) <= LAYER_PIXELS) {
+    return html;
+  }
+  const end = html.indexOf(HEAD_END);
+  return end < 0 ? FLAT_LAYERS + html : html.slice(0, end) + FLAT_LAYERS + html.slice(end);
+}

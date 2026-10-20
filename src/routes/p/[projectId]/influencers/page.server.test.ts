@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { actions, load } from './+page.server';
+import { actions, load } from '$lib/server/project-pages/influencers';
 import { fakeDb } from '$lib/server/db/fake-db';
 
 const ORG = 'org-1';

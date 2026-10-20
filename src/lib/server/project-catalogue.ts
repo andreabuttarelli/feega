@@ -6,8 +6,22 @@ import { catalogueIn, type ProjectMode } from '$lib/project-mode';
 import { canvasModelCatalogue } from './canvas-catalogue';
 import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from './uncensored-access';
 
+const LISTED_CATALOGUE_TTL_MS = 60_000;
+
+let listed: { at: number; catalogue: ReturnType<typeof canvasModelCatalogue> } | null = null;
+
+function listedCatalogue() {
+  if (listed && Date.now() - listed.at < LISTED_CATALOGUE_TTL_MS) {
+    return listed.catalogue;
+  }
+  const catalogue = canvasModelCatalogue();
+  listed = { at: Date.now(), catalogue };
+  catalogue.catch(() => (listed = null));
+  return catalogue;
+}
+
 export async function projectCatalogue(db: Db, scope: { orgId: string; mode: ProjectMode }) {
-  const [full, access] = await Promise.all([canvasModelCatalogue(), uncensoredAccess(db, scope.orgId).catch(() => NO_UNCENSORED_ACCESS)]);
+  const [full, access] = await Promise.all([listedCatalogue(), uncensoredAccess(db, scope.orgId).catch(() => NO_UNCENSORED_ACCESS)]);
   return catalogueIn(scope.mode, visibleCatalogue(full, access));
 }
 

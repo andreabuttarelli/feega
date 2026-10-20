@@ -22,21 +22,20 @@ test.describe('motion agent live edits @real', () => {
       return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: edited });
     });
     page.on('request', (req) => {
-      if (req.url().includes('?/ops')) {
+      if (new URL(req.url()).searchParams.get('action') === 'ops') {
         saved.push(req.postData() ?? '');
       }
     });
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
-    await expect(page.getByTestId('empty-state')).toBeVisible();
+    await expect(page.getByTestId('empty-state')).toHaveCount(0);
 
     const input = page.getByLabel('Agent', { exact: true }).locator('textarea');
     await input.fill('a title');
     await input.press('Enter');
 
-    await expect(page.getByTestId('empty-state')).toBeHidden();
     await page.waitForTimeout(PAST_HEAD_POLL_MS);
-    await expect(page.getByTestId('empty-state')).toBeHidden();
+    await expect(page.getByTestId('empty-state')).toHaveCount(0);
     await expect.poll(() => saved.some((body) => body.includes('Motion'))).toBe(true);
   });
 });

@@ -5,6 +5,7 @@ import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
 import { FramePress } from '$lib/motion/drill';
+import { grantedPath } from './asset-url';
 
 export enum FrameKind {
   Frame = 'frame',
@@ -70,9 +71,9 @@ export function storyboardOf(data: Record<string, unknown>): StoryboardLink | nu
 export const MOTION_NODE_BAR_H = 0;
 
 const BAR_H: Record<FrameKind, Record<NodeMode, number>> = {
-  [FrameKind.Frame]: { [NodeMode.Preview]: MOTION_NODE_BAR_H, [NodeMode.Edit]: 0 },
-  [FrameKind.Element]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0 },
-  [FrameKind.Group]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0 }
+  [FrameKind.Frame]: { [NodeMode.Preview]: MOTION_NODE_BAR_H, [NodeMode.Edit]: 0, [NodeMode.Leaving]: 0 },
+  [FrameKind.Element]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0, [NodeMode.Leaving]: 0 },
+  [FrameKind.Group]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0, [NodeMode.Leaving]: 0 }
 };
 
 const MOTION_STAGE_WIDTH: Record<MotionFormat, number> = {
@@ -117,6 +118,8 @@ enum Sizing {
 const FREE_KIND: ReadonlySet<FrameKind> = new Set([FrameKind.Element]);
 
 const sizingOf = (node: Pick<MotionNode, 'kind' | 'format'>): Sizing => ((node.kind === FrameKind.Frame && node.format === MotionFormat.Custom) || FREE_KIND.has(node.kind) ? Sizing.Free : Sizing.Fixed);
+
+export const heightFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>): boolean => sizingOf(node) === Sizing.Fixed;
 
 export type FrameResize = { w: number; h: number; picture: Picture | null };
 
@@ -172,11 +175,11 @@ export function motionSourcePath(input: { projectId: string; canvasId: string; n
 }
 
 export function motionPreviewPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
-  return `${motionEditorPath(input)}/preview`;
+  return grantedPath(`${motionEditorPath(input)}/preview`);
 }
 
 export function motionLivePath(input: { projectId: string; canvasId: string; nodeId: string }): string {
-  return `${motionEditorPath(input)}/live`;
+  return grantedPath(`${motionEditorPath(input)}/live`);
 }
 
 export function storyboardPath(projectId: string, data: Record<string, unknown>): string | null {

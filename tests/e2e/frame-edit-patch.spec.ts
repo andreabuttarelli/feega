@@ -7,7 +7,7 @@ const PORTRAIT = { format: '4:5', docHeadRevision: 1, posterAssetId: null, lastR
 const DESKTOP = { width: 1440, height: 900 };
 const ECHO_SETTLE_MS = 5_000;
 const LINE = 'poster#lines:1';
-const RELOADING = /\?\/(snapshot|head)$/;
+const RELOADING = /[?&]action=(snapshot|head)(&|$)/;
 
 type PosterDoc = { tracks: { clips: { id: string; props: { lines?: string } }[] }[] };
 

@@ -7,6 +7,7 @@ import { ORG_COOKIE } from '$lib/server/tenancy/context';
 
 const OK = 200;
 const UNAUTHORIZED = 401;
+const NOT_FOUND = 404;
 
 export const ORG_PARAM = 'org';
 export const ACTION_PARAM = 'action';
@@ -54,7 +55,7 @@ export function pageEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePat
 }
 
 function withVerifiedUser(db: Db, user: User): Db {
-  const auth = { getUser: async () => ({ data: { user }, error: null }) };
+  const auth = { getUser: async () => ({ data: { user }, error: null }), signOut: async () => ({ error: null }) };
   return Object.assign(Object.create(db) as Db, { auth });
 }
 
@@ -83,4 +84,24 @@ export async function bareAnswerOf(run: () => Promise<unknown>): Promise<Respons
   }
   const body = (await enveloped.json()) as { data?: unknown; redirect?: string };
   return json(body.redirect ? { redirect: body.redirect } : (body.data ?? null), { status: OK });
+}
+
+export type PageHandler = (event: never) => unknown;
+
+export async function servePage(request: Request, url: URL, pagePath: string, params: Record<string, string>, handler: PageHandler | undefined): Promise<Response> {
+  if (!handler) {
+    return json({ error: 'not_found' }, { status: NOT_FOUND });
+  }
+
+  const bearer = await bearerOf(request);
+  if (bearer instanceof Response) {
+    return bearer;
+  }
+
+  const event = pageEvent(bearer, request, url, pagePath, params);
+  return bareAnswerOf(async () => handler(event as never));
+}
+
+export function actionOf(actions: object, url: URL): PageHandler | undefined {
+  return (actions as Record<string, PageHandler>)[url.searchParams.get(ACTION_PARAM) ?? ''];
 }

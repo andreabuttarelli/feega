@@ -111,6 +111,55 @@ test.describe('the right bar is one instance across canvas and motion editor @re
     await expect(page.getByTestId('right-bar').getByTestId('side-tab-properties')).toHaveCount(0);
   });
 
+  test('desktop: from the click to the timeline the bar never leaves, flickers or loses its paint', async ({ page, session }) => {
+    test.setTimeout(120_000);
+    await page.addInitScript(heldChatStream);
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await startTurn(page);
+    await page.evaluate(() => {
+      const bar = document.querySelector('[data-testid=right-bar]')!;
+      const log = bar.querySelector('[role=log]')!;
+      const tabs = bar.querySelector('[role=tablist]');
+      const width = bar.getBoundingClientRect().width;
+      const samples: string[] = [];
+      const sample = () => {
+        const now = document.querySelector('[data-testid=right-bar]');
+        const box = now?.getBoundingClientRect();
+        const paint = now ? getComputedStyle(now).backgroundColor : '';
+        const shown = !!box && box.width > 0 && box.left >= 0 && box.right <= innerWidth + 1;
+        if (now !== bar || !shown || box?.width !== width || now.querySelector('[role=tablist]') !== tabs || /rgba\(.*, 0\)|transparent/.test(paint) || log.scrollTop === 0) {
+          samples.push(`${now === bar} ${box?.left}-${box?.width} ${paint} ${log.scrollTop}`);
+        }
+        if (!document.querySelector('[aria-label=Timeline]')?.getBoundingClientRect().height) {
+          requestAnimationFrame(sample);
+        }
+      };
+      Object.assign(window, { __barSamples: samples });
+      requestAnimationFrame(sample);
+    });
+
+    await page.locator(`.svelte-flow__node[data-id="${frameId}"]`).getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
+    await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible({ timeout: 15_000 });
+
+    expect(await page.evaluate(() => (window as unknown as { __barSamples: string[] }).__barSamples), 'every frame: same node, same width, same tabs, on screen, opaque, scroll kept').toEqual([]);
+    await expectStreamGoesOn(page, 'through the handoff');
+  });
+
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`${scheme}: the bar paints the same opaque background on the canvas and in the editor`, async ({ page, session }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+      const paint = () => page.getByTestId('right-bar').evaluate((el) => getComputedStyle(el).backgroundColor);
+      const onCanvas = await paint();
+
+      await page.locator(`.svelte-flow__node[data-id="${frameId}"]`).getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
+      await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
+
+      expect(onCanvas, 'opaque, not transparent').not.toMatch(/rgba\(.*, 0\)|transparent/);
+      expect(await paint()).toBe(onCanvas);
+    });
+  }
+
   test('phone: the chat sheet of the editor is the same chat as the canvas one', async ({ page, session }) => {
     test.setTimeout(120_000);
     await page.setViewportSize(PHONE);
@@ -122,7 +171,7 @@ test.describe('the right bar is one instance across canvas and motion editor @re
     await page.getByRole('button', { name: 'Canvas', exact: true }).click();
     const stage = page.getByTestId('motion-node-stage').first();
     await stage.click({ position: { x: 60, y: 10 } });
-    await stage.getByTestId('open-motion-editor').click();
+    await stage.dblclick({ position: { x: 60, y: 10 } });
     await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
     await page.getByTestId('phone-tab-chat').click();
     await expectSameBar(page);

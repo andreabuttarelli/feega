@@ -27,7 +27,7 @@ vi.mock('$lib/server/repos/assets', () => ({ listProjectAssets }));
 const signedAssets = vi.fn(async (_db: unknown, _org: string, ids: string[]) => ({ assets: new Map(), urls: Object.fromEntries(ids.map((id) => [id, `https://cdn.test/${id}`])) }));
 vi.mock('$lib/server/studio/studio-media', () => ({ signedAssets }));
 
-const { load, actions } = await import('./+page.server');
+const { load, actions } = await import('$lib/server/dashboard/pages/compose');
 
 function form(fields: Record<string, string>) {
   const body = new FormData();

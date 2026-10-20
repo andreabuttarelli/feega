@@ -321,10 +321,11 @@ draws the still frame (or `time`) at full size and returns `{ asset_id, url, wid
 `motion_editor_op({ org, node_id, op, input })` runs one action of the frame editor page on the
 video, through the same server function, with the same status and body:
 `POST /api/v1/motion/{node_id}/ops` `{ op, input }`. Reads: `editor_session {briefIds?}` (the
-whole page load), `read_head`, `render_status`,
+whole page load), `read_head`, `render_status`, `list_fonts` (the org's uploaded font families),
 `batch_status`. Writes (a read-only key is 403): `save_doc {version, doc, summary?}` (409 with the
 head when stale), `apply_ops {version, ops, summary?}`, `record_export {path, width, height,
-seconds}` and `upload_font {path}` (files the Supabase session already put in storage),
+seconds}` and `upload_font {path}` (files the Supabase session already put in storage; fonts go
+under `<orgId>/fonts/` and join the org library), `rename_font {family, to}`, `delete_font {family}`,
 `analyze_sounds {assetIds}`, `template_sounds {doc, clipId}`, `save_template {doc, name,
 description, compId?, posterFrame?}`. A canvas the caller cannot open, or an uncensored workspace
 still locked, is 404. Spending credits (402 when none are left): `generate_sound {sound: voice|music, text,

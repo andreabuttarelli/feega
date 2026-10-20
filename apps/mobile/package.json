@@ -1,0 +1,24 @@
+{
+  "name": "feega-mobile",
+  "private": true,
+  "version": "0.1.0",
+  "description": "feega for iPhone, iPad and Android: native screens, canvas and editor in a Capacitor WebView",
+  "scripts": {
+    "wire": "ruby scripts/wire-xcode.rb",
+    "sync": "cap sync",
+    "bundle": "bash scripts/bundle.sh",
+    "ios:sim": "xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO build",
+    "ios:test": "xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15 Pro' -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO test"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/share": "8.0.3",
+    "@revenuecat/purchases-capacitor": "13.7.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

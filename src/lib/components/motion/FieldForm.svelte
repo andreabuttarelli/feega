@@ -8,6 +8,8 @@
   import { PropFormat } from '$lib/motion/custom/component';
   import { MediaAccept, MediaKind, acceptOf, itemOfPick, pickOfItem, type MediaPick } from '$lib/motion/media/pick';
   import MediaPicker from './MediaPicker.svelte';
+  import type { LiveGesture } from '$lib/motion/live-edit';
+  import { liveColour } from './live-colour';
   import MediaListField from './MediaListField.svelte';
   import type { MediaUploader } from './media-upload';
 
@@ -21,8 +23,10 @@
     setValue,
     onchange,
     upload = null,
+    gesture = null,
     layout = FieldLayout.Grouped
   }: {
+    gesture?: LiveGesture | null;
     doc: MotionDoc;
     fields: TemplateFieldValue[];
     assets: Asset[];
@@ -81,7 +85,7 @@
       <textarea rows="2" value={String(f.value ?? '')} onchange={(e) => set(f, e.currentTarget.value)}></textarea>
     {:else if f.type === FieldType.Color}
       <span class="colour">
-        <input type="color" value={HEX_VALUE.test(String(f.value)) ? String(f.value).slice(0, 7) : '#000000'} onchange={(e) => set(f, e.currentTarget.value)} />
+        <input type="color" value={HEX_VALUE.test(String(f.value)) ? String(f.value).slice(0, 7) : '#000000'} use:liveColour={{ gesture, apply: (value) => set(f, value) }} />
         <output>{HEX_VALUE.test(String(f.value)) ? f.value : 'none'}</output>
       </span>
     {:else if f.type === FieldType.Number && ranged(f)}

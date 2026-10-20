@@ -1,4 +1,5 @@
 import { VIEWING_TOOLS } from '$lib/chat-stream-events';
+import { grantedPath } from '$lib/canvas/asset-url';
 
 export type ToolStatus = 'running' | 'done' | 'error';
 
@@ -115,6 +116,6 @@ export function viewedPicturesOf(call: ToolCall, projectId: string, canvasId: st
 
 export function viewedHref(path: string, projectId: string, canvasId: string): string | null {
   const match = path.match(VIEWED_PATH);
-  return match ? `/p/${projectId}/c/${canvasId}/web-views/${match[1]}/${match[2]}` : null;
+  return match ? grantedPath(`/p/${projectId}/c/${canvasId}/web-views/${match[1]}/${match[2]}`) : null;
 }
 

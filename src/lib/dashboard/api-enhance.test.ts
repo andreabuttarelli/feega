@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/forms', () => ({ applyAction: vi.fn() }));
-vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidate: vi.fn() }));
-vi.mock('$app/state', () => ({ page: { url: new URL('https://x/app') } }));
-vi.mock('./api', () => ({ postAction: vi.fn() }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidate: vi.fn(), invalidateAll: vi.fn() }));
+vi.mock('$lib/api/page-action', () => ({ hasTwin: vi.fn(), postPageAction: vi.fn() }));
 
 const { actionTarget } = await import('./api-enhance');
 

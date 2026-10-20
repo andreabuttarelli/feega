@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitTexts, freeTextFit, keepTextSize, resizedTexts, resizedFreeText } from './text-fit';
+import { fitTexts, freeTextFit, hostFit, keepTextSize, resizedTexts, resizedFreeText } from './text-fit';
 import { setProps } from './timeline';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, type OpResult } from './timeline';
@@ -29,8 +29,16 @@ describe('a free text is its own box', () => {
   const free = (sizing: string) => ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'Hi', sizing, x: 0.5, y: 0.5, width: 1, height: 1 } }, 'tx'));
 
   it('asks its host to take the measured share of the stage instead of moving the text inside', () => {
-    expect(freeTextFit(free('auto'), { tx: { left: 0, top: 0, width: 960, height: 1080 } })).toEqual({ width: 0.5, height: 1 });
-    expect(freeTextFit(free('auto-height'), { tx: { left: 0, top: 0, width: 1920, height: 540 } })).toEqual({ width: 1, height: 0.5 });
+    expect(freeTextFit(free('auto'), { tx: { left: 0, top: 0, width: 960, height: 1080 } })).toEqual({ width: 0.5, height: 1, stage: { width: 1920, height: 1080 } });
+    expect(freeTextFit(free('auto-height'), { tx: { left: 0, top: 0, width: 1920, height: 540 } })).toEqual({ width: 1, height: 0.5, stage: { width: 1920, height: 1080 } });
+  });
+
+  it('the host takes the share only while it still has the shape of the stage that was measured', () => {
+    const share = { width: 1, height: 0.5, stage: { width: 600, height: 200 } };
+
+    expect(hostFit({ w: 300, h: 100 }, share)).toEqual({ w: 300, h: 50 });
+    expect(hostFit({ w: 300, h: 50 }, share)).toBeNull();
+    expect(hostFit({ w: 300, h: 50 }, { width: 1, height: 1.004, stage: { width: 1920, height: 320 } }), 'a fit that changes nothing is not a resize').toBeNull();
   });
 
   it('stays put when it fits or is fixed', () => {

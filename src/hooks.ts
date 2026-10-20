@@ -1,6 +1,9 @@
 import type { Reroute } from '@sveltejs/kit';
-import { building } from '$app/environment';
+import { browser, building } from '$app/environment';
+import { bundleApiBase } from '$lib/api/bundle-fetch';
+import { bundleAuthRoute } from '$lib/auth/bundle-auth';
 import { env as publicEnv } from '$env/dynamic/public';
+import { isSiteHost } from '$lib/site/host';
 
 // Multi-tenant blog hosting: any request arriving on a host that ISN'T the main feega app (i.e. a
 // brand's own custom domain pointed here via CNAME) is served from the `_site` route group, which
@@ -19,6 +22,14 @@ function isAppHost(h: string): boolean {
 }
 
 export const reroute: Reroute = ({ url }) => {
+  if (browser && bundleApiBase()) {
+    return bundleAuthRoute(url.pathname) ?? undefined;
+  }
+
+  if (isSiteHost(url)) {
+    return;
+  }
+
   // Never reroute during build/prerender: the prerender origin host (sveltekit-prerender) isn't the
   // app host, so it would wrongly get treated as a blog host and 404 real app pages. Blog hosting is
   // a runtime-only concern.

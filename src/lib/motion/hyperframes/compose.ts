@@ -644,11 +644,19 @@ function onlyClips(doc: MotionDoc, only: ReadonlySet<string> | undefined): Motio
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).filter(kept) })) };
 }
 
+const shownDoc = (raw: ComposeInput): MotionDoc => withAutoLayout(withoutHidden(boundDoc(withVars(raw.doc, raw.vars))));
+
+const liveDoc = (raw: ComposeInput, shown: MotionDoc): MotionDoc => bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), raw.only)));
+
+const bakedDoc = (raw: ComposeInput, live: MotionDoc): MotionDoc => bakePhysics(bakeExpressions(live, raw.analyses));
+
+export const preparedDoc = (raw: ComposeInput): MotionDoc => bakedDoc(raw, liveDoc(raw, shownDoc(raw)));
+
 export function composeHtml(raw: ComposeInput): string {
-  const shown = withAutoLayout(withoutHidden(boundDoc(withVars(raw.doc, raw.vars))));
+  const shown = shownDoc(raw);
   const junctions = junctionTweens(shown, junctionPairs(shown));
-  const prepared = bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), raw.only)));
-  const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };
+  const prepared = liveDoc(raw, shown);
+  const input = { ...raw, doc: bakedDoc(raw, prepared) };
   const { doc, tokens } = input;
   const delivery: Delivery = { origin: raw.origin ?? defaultOrigin(), inlined: raw.inlined ?? {}, modules: raw.modules ?? {}, runtime: raw.runtime ?? RuntimeDelivery.Inline };
   const scale = raw.scale ?? 1;
@@ -808,3 +816,5 @@ const LIVE_SCRIPT: Record<Liveness, (input: SpecInput, delivery: Delivery) => st
 function scriptJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
+
+export { HIDDEN as EDGE_HIDDEN, SHOWN as EDGE_SHOWN, MOVE as MOVES };

@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import type { ChatPrefill } from './chat-prefill';
   import type { StreamData } from './chat-session.svelte';
-  import { rightBar, type BarBinding, type BarProperties } from './right-bar-host.svelte';
+  import { BarSeat, rightBar, type BarBinding, type BarProperties } from './right-bar-host.svelte';
 
   let {
     context,
@@ -11,7 +11,8 @@
     onbusy,
     prefill = null,
     reload = 0,
-    properties
+    properties,
+    seat = BarSeat.Own
   }: {
     context?: () => Record<string, unknown>;
     onturnend?: () => void;
@@ -20,6 +21,7 @@
     prefill?: ChatPrefill | null;
     reload?: number;
     properties?: BarProperties;
+    seat?: BarSeat;
   } = $props();
 
   let slot = $state<HTMLDivElement | null>(null);
@@ -43,10 +45,11 @@
   };
 
   $effect(() => {
-    if (!slot) {
+    const element = seat === BarSeat.Own ? slot : null;
+    if (seat === BarSeat.Own && !element) {
       return;
     }
-    const claim = untrack(() => rightBar.claim(slot!, binding));
+    const claim = untrack(() => rightBar.claim(element, binding));
     return () => rightBar.release(claim);
   });
 
@@ -67,7 +70,7 @@
   });
 </script>
 
-<div class="bar-slot" bind:this={slot} data-testid="bar-slot"></div>
+{#if seat === BarSeat.Own}<div class="bar-slot" bind:this={slot} data-testid="bar-slot"></div>{/if}
 
 <style>
   .bar-slot {

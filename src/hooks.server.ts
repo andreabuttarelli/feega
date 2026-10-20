@@ -8,12 +8,17 @@ import { outlivesTurn } from '$lib/server/session-life';
 import { markRlsScoped } from '$lib/server/rls-client';
 import { createUserDb, type Db } from '$lib/server/db/client';
 import { env as publicEnv } from '$env/dynamic/public';
+import { env as privateEnv } from '$env/dynamic/private';
 import type { Handle } from '@sveltejs/kit';
 import { withBrandContext, withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { redirectFor } from '$lib/server/host-redirects';
+import { corsPreflight, extraOrigins, withCors } from '$lib/server/api-cors';
+import { SessionSource, bearerSession, bearerTokenOf, sessionSourceOf } from '$lib/server/bearer-session';
+import { grantBearerOf } from '$lib/server/canvas/asset-grant';
+import { SiteVisibility, rootShowsSite, siteVisibility } from '$lib/site/visibility';
 import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
@@ -90,10 +95,37 @@ async function brandIdFromSlug(slug: string): Promise<string | null> {
 // see $lib/server/csrf for why.
 const PERMANENT_REDIRECT = 308;
 
+const cors: Handle = async ({ event, resolve }) => {
+  const extra = extraOrigins(privateEnv.API_EXTRA_ORIGINS);
+  const preflight = corsPreflight(event.request, extra);
+  if (preflight) {
+    return preflight;
+  }
+  return withCors(event.request, await resolve(event), extra);
+};
+
 const hostRedirect: Handle = async ({ event, resolve }) => {
   const target = redirectFor(event.url);
   if (target) {
     throw redirect(PERMANENT_REDIRECT, target);
+  }
+  return resolve(event);
+};
+
+const SITE_ROUTES = '/(site)';
+const NOT_FOUND = 404;
+
+function siteEnv() {
+  return { vercelEnv: privateEnv.VERCEL_ENV, flag: publicEnv.PUBLIC_SITE_ENABLED };
+}
+
+export function siteShown(): boolean {
+  return siteVisibility(siteEnv()) === SiteVisibility.Shown;
+}
+
+export const siteGate: Handle = async ({ event, resolve }) => {
+  if (event.route.id?.startsWith(SITE_ROUTES) && !siteShown()) {
+    throw error(NOT_FOUND);
   }
   return resolve(event);
 };
@@ -150,13 +182,16 @@ async function refuseSocialPublishing(event: RequestEvent): Promise<void> {
   }
 }
 
-export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
+export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
+  const requestBearer = bearerTokenOf(event.request) ?? grantBearerOf(event.request);
+  const source = sessionSourceOf(event.request, event.url);
   event.locals.supabase = markRlsScoped(createServerClient(publicEnv.PUBLIC_SUPABASE_URL, publicEnv.PUBLIC_SUPABASE_ANON_KEY, {
+    ...(requestBearer ? { global: { headers: { Authorization: `Bearer ${requestBearer}` } } } : {}),
     cookies: {
-      getAll: () => validSessionCookies(event.cookies.getAll()),
+      getAll: () => (source === SessionSource.Cookie ? validSessionCookies(event.cookies.getAll()) : []),
       setAll: (cookiesToSet: CookieToSet[]) => {
         cookiesToSet.forEach(({ name, value, options }) => {
           try {
@@ -176,8 +211,11 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
 
   // getSession() is local (cookie → JWT). getUser() hits GoTrue — cache it across SPA
   // navigations on this isolate so every in-brand click is not a 300–800ms auth RTT.
+  const verifyBearer = async (token: string) => (await import('$lib/server/nav-cache')).verifiedToken(createUserDb(token), token);
   let cachedSession: ReturnType<typeof getSession> | null = null;
   const getSession = async () => {
+    if (requestBearer) return bearerSession(requestBearer, verifyBearer);
+    if (source === SessionSource.None) return { session: null, user: null };
     const {
       data: { session: stored }
     } = await event.locals.supabase.auth.getSession();
@@ -206,7 +244,7 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
 
   seedMetaClickCookies(event.cookies, event.url, event.route.id);
 
-  if (isRootPath(event.url.pathname)) {
+  if (isRootPath(event.url.pathname) && !rootShowsSite(event.url, siteEnv())) {
     rememberCampaign(event.cookies, event.url);
     if (event.url.searchParams.has('code') || event.url.searchParams.has('error_description')) {
       throw redirect(303, `/auth/callback${event.url.search}`);

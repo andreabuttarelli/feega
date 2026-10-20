@@ -7,7 +7,6 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
-  import { readChatPanelPx, writeChatPanelPx, CHAT_PANEL } from '$lib/shell-prefs';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
   import { replaceState } from '$app/navigation';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
@@ -17,7 +16,6 @@
 
   let { open }: { open: boolean } = $props();
 
-  let widthPx = $state(readChatPanelPx());
   let prefill = $state<ChatPrefill | null>(null);
 
   $effect(() => {
@@ -34,20 +32,20 @@
   function onResizeStart(e: PointerEvent) {
     e.preventDefault();
     const startX = e.clientX;
-    const startW = widthPx;
+    const startW = rightBar.width;
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
 
     const onMove = (ev: PointerEvent) => {
       const next = startW - (ev.clientX - startX);
-      widthPx = Math.min(CHAT_PANEL.MAX, Math.max(CHAT_PANEL.MIN, Math.round(next)));
+      rightBar.resize(next);
     };
     const onUp = () => {
       target.releasePointerCapture(e.pointerId);
       target.removeEventListener('pointermove', onMove);
       target.removeEventListener('pointerup', onUp);
       target.removeEventListener('pointercancel', onUp);
-      writeChatPanelPx(widthPx);
+      rightBar.keepWidth();
     };
     target.addEventListener('pointermove', onMove);
     target.addEventListener('pointerup', onUp);
@@ -56,7 +54,7 @@
 </script>
 
 {#if open}
-  <div class="chat-pane" style={`--chat-w: ${widthPx}px;`}>
+  <div class="chat-pane" style={`--chat-w: ${rightBar.width}px;`}>
     <div
       class="chat-resize-handle"
       role="separator"
@@ -110,7 +108,9 @@
 
   @media (max-width: 767px) {
     .chat-pane {
+      flex: 1 1 auto;
       width: 100%;
+      height: auto;
       border-left: 0;
       background: var(--ui-panel);
     }

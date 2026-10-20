@@ -19,6 +19,11 @@
   import { RenderEngine } from '$lib/motion/gpu/engine-flag';
   import { EditEnd, TEXT_EDIT, type TextEditMessage } from '$lib/motion/hyperframes/text-edit';
   import GpuLayer from './GpuLayer.svelte';
+  import GpuFullLayer from './GpuFullLayer.svelte';
+  import { FullBackend } from '$lib/motion/gpu-full/backends';
+  import type { BrandTokens } from '$lib/motion/brand';
+  import type { MotionDoc } from '$lib/motion/doc';
+  import { previewHtml } from '$lib/canvas/gpu/memory-budget';
   import type { Compose } from '$lib/motion/gpu/engine';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
@@ -46,8 +51,14 @@
     background = Background.Brand,
     engine = RenderEngine.Html,
     gpuCompose = null,
+    fullDoc = null,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; fullDoc?: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> } | null; children?: Snippet } = $props();
+
+  const DRAWN_OVER: ReadonlySet<RenderEngine> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull, RenderEngine.GpuCore, RenderEngine.GpuCoreGl]);
+
+  const FULL_BACKEND: Partial<Record<RenderEngine, FullBackend>> = { [RenderEngine.GpuFull]: FullBackend.WebGl2, [RenderEngine.GpuCore]: FullBackend.Core, [RenderEngine.GpuCoreGl]: FullBackend.CoreGl };
+  const FULL_ENGINES: ReadonlySet<RenderEngine> = new Set(Object.keys(FULL_BACKEND) as RenderEngine[]);
 
   let pointer = $state<InputValues>({});
   let exportedOn = $state<RenderEngine | null>(null);
@@ -98,7 +109,7 @@
       return;
     }
     ready = false;
-    player.setAttribute('srcdoc', next);
+    player.setAttribute('srcdoc', previewHtml(next, { width, height }));
   }
 
   function announceDrawn() {
@@ -131,7 +142,7 @@
       el.style.width = '100%';
       el.style.height = '100%';
       el.style.background = PLAYER_BACKDROP[background];
-      el.style.opacity = engine === RenderEngine.Gpu ? '0' : '';
+      el.style.opacity = DRAWN_OVER.has(engine) ? '0' : '';
       el.muted = muted;
       el.loop = loop;
       el.addEventListener('ready', () => {
@@ -320,7 +331,7 @@
           textEditing = false;
           player?.iframeElement?.blur();
           window.focus();
-          if (player && engine === RenderEngine.Gpu) {
+          if (player && DRAWN_OVER.has(engine)) {
             player.style.opacity = '0';
           }
         }
@@ -360,8 +371,24 @@
     }
   }
 
+  async function renderOnCoreOf(spec: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> }, backend: FullBackend, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<boolean> {
+    const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }, { mountCustomReads }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('$lib/motion/gpu-full/display-list'), import('$lib/motion/gpu-full/text/load'), import('$lib/motion/gpu-full/text/painter'), import('$lib/motion/gpu-full/dom/custom')]);
+    const prepared = prepare(spec.doc, spec.tokens, spec.assets, { fonts: await loadFonts(spec.doc, spec.assets, spec.tokens), smoothing: smoothingOf(navigator.userAgent) });
+    const custom = await mountCustomReads(host ?? document.body, gpuCompose ?? (() => html), prepared);
+    try {
+      return await renderOnCore(prepared, backend, times, onFrame, signal, custom);
+    } finally {
+      custom.dispose();
+    }
+  }
+
   export async function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast, prefer: RenderEngine = engine): Promise<void> {
     const { settle, lanes } = CAPTURE_PROFILES[profile];
+    const core = FULL_BACKEND[prefer];
+    if (core && core !== FullBackend.WebGl2 && fullDoc && source === html && size.width === width && size.height === height && (await renderOnCoreOf(fullDoc, core, times, onFrame, signal))) {
+      exportedOn = prefer;
+      return;
+    }
     exportedOn = RenderEngine.Gpu;
     if (prefer === RenderEngine.Gpu && gpuCompose && source === html && size.width === width && size.height === height && width % 2 === 0 && height % 2 === 0 && (await renderOnGpu(gpuCompose, times, onFrame, signal, lanes()))) {
       return;
@@ -432,6 +459,13 @@
   {#if engine === RenderEngine.Gpu && gpuCompose}
     <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
       <GpuLayer {html} compose={gpuCompose} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+    </div>
+  {/if}
+  {#if FULL_ENGINES.has(engine) && fullDoc}
+    <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
+      {#key `${fullDoc.doc.width}x${fullDoc.doc.height}`}
+        <GpuFullLayer backend={FULL_BACKEND[engine] ?? FullBackend.WebGl2} doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} compose={gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+      {/key}
     </div>
   {/if}
   {@render children?.()}

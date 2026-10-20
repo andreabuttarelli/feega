@@ -9,6 +9,8 @@ import { takeOAuthReturn } from '$lib/server/oauth';
 import { INVITE_ERROR_PARAM, INVITE_PARAM, inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
 import { signInErrorIn } from './sign-in-error';
 import { NATIVE_AUTH_BASE, isNativeShell } from '$lib/native-shell';
+import { appleSignInFlag, appleSignInShown } from '$lib/apple-sign-in/visibility';
+import { env } from '$env/dynamic/private';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -31,13 +33,23 @@ function inviteErrorIn(url: URL): InviteError | null {
   return INVITE_ERRORS.find((known) => known === code) ?? null;
 }
 
-export const load: PageServerLoad = async ({ url, cookies, locals: { safeGetSession, db } }) => {
+const NOT_FOUND = 404;
+
+function appleSignInHere(url: URL, request: Request): boolean {
+  return appleSignInShown({
+    host: url.host,
+    userAgent: request.headers.get('user-agent'),
+    flag: appleSignInFlag(env.APPLE_SIGN_IN)
+  });
+}
+
+export const load: PageServerLoad = async ({ url, request, cookies, locals: { safeGetSession, db } }) => {
   const cliPort = url.searchParams.get('cli_port') ?? '';
   const cliState = url.searchParams.get('cli_state') ?? '';
   const inviteToken = inviteTokenIn(url.searchParams);
   const inviteError = inviteErrorIn(url);
   const signInError = signInErrorIn(url);
-  const page = { cliPort, cliState, inviteToken, inviteError, signInError, homeHref: null as string | null, preferSignup: preferSignup(url) };
+  const page = { cliPort, cliState, inviteToken, inviteError, signInError, homeHref: null as string | null, preferSignup: preferSignup(url), appleSignIn: appleSignInHere(url, request) };
 
   const { session, user } = await safeGetSession();
   const client = session && user ? await db() : null;
@@ -172,7 +184,29 @@ export const actions: Actions = {
   // GitHub / Google OAuth. Returns a provider URL to bounce through; the PKCE verifier is stashed in
   // cookies by the SSR client, and /auth/callback exchanges the code on return.
   github: (event) => oauthSignIn(event, 'github'),
-  google: (event) => oauthSignIn(event, 'google')
+  google: (event) => oauthSignIn(event, 'google'),
+
+  apple: (event) => (appleSignInHere(event.url, event.request) ? oauthSignIn(event, 'apple') : fail(NOT_FOUND)),
+
+  appleIdToken: async ({ request, url, cookies, locals }) => {
+    if (!appleSignInHere(url, request)) {
+      return fail(NOT_FOUND);
+    }
+
+    const data = await request.formData();
+    const token = String(data.get('token') ?? '');
+    const nonce = String(data.get('nonce') ?? '');
+    if (!token || !nonce) {
+      return fail(400, { error: 'Missing Apple identity token' });
+    }
+
+    const { error } = await locals.supabase.auth.signInWithIdToken({ provider: 'apple', token, nonce });
+    if (error) {
+      return fail(400, { error: error.message });
+    }
+
+    return routeAfterAuth(data, String(data.get('cli_port') ?? ''), String(data.get('cli_state') ?? ''), cookies, locals);
+  }
 };
 
 function resetPasswordPath(inviteToken: string | null): string {
@@ -192,7 +226,7 @@ function buildRedirectTo(authBase: string, cliPort: string, cliState: string, in
 }
 
 // Shared OAuth kickoff: ask Supabase for the provider URL and bounce the browser there.
-async function oauthSignIn({ request, locals: { supabase }, url }: RequestEvent, provider: 'github' | 'google') {
+async function oauthSignIn({ request, locals: { supabase }, url }: RequestEvent, provider: 'github' | 'google' | 'apple') {
   const data = await request.formData();
   const cliPort = String(data.get('cli_port') ?? '');
   const cliState = String(data.get('cli_state') ?? '');

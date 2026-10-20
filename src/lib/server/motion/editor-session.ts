@@ -1,3 +1,4 @@
+import { orgFontFamilies } from './font-upload';
 import { forkOf } from './branch-store';
 import { canvasScope, motionOrThrow, nodeLookup, type CanvasScope } from './editor-scope';
 import { motionAssets, motionTokens, newHead } from './editor';
@@ -35,7 +36,7 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
   const nodeScope = { orgId: found.orgId, nodeId: params.nodeId };
   const farm = motionRenderFarm();
   const uploadLimit = farm ? knownRenderLimit() : null;
-  const [lookup, savedHead, tokens, assets, runs, templates, gallery, briefAttachments] = await Promise.all([
+  const [lookup, savedHead, tokens, assets, runs, templates, gallery, briefAttachments, fonts] = await Promise.all([
     phases.time('node', nodeLookup(canvas, params.nodeId)),
     phases.time('head', readHead(db, nodeScope, HEADS)),
     phases.time('tokens', motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId })),
@@ -43,7 +44,8 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
     phases.time('runs', listNodeRuns(db, nodeScope)),
     phases.time('templates', libraryOf({ db, orgId: found.orgId, userId }).own()),
     phases.time('gallery', editorGallery(db, nodeScope)),
-    briefIds.length ? phases.time('brief', loadAttachments(db, { orgId: found.orgId, projectId: params.projectId, ids: briefIds })) : []
+    briefIds.length ? phases.time('brief', loadAttachments(db, { orgId: found.orgId, projectId: params.projectId, ids: briefIds })) : [],
+    phases.time('fonts', orgFontFamilies(db, found.orgId))
   ]);
   const scope = motionOrThrow(canvas, lookup);
   const head = savedHead ?? newHead(scope.motion.node);
@@ -56,6 +58,7 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
     head: { version: head.version, doc: head.doc },
     tokens,
     assets,
+    fonts,
     serverRender: { configured: farm !== null && serverRenderOpen(), latest: renderView(runs), queue: renderQueue(), uploadLimit },
     batch: batchView(runs),
     templates,

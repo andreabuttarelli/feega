@@ -7,12 +7,13 @@
   import { PartAction, PartKind, parsePart, partKind, partLabel, partText, runPart, writePartText } from '$lib/motion/poster-parts';
   import { markedPoster, photoStack, setPhotoFills } from '$lib/motion/poster-lines';
   import FillStack from './FillStack.svelte';
+  import type { LiveGesture } from '$lib/motion/live-edit';
   import type { BrandTokens } from '$lib/motion/brand';
   import type { MediaUploader } from './media-upload';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
-  let { doc, clip, part, assets, tokens, upload = null, onchange }: { doc: MotionDoc; clip: MotionClip; part: string; assets: Asset[]; tokens: BrandTokens; upload?: MediaUploader | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, clip, part, assets, tokens, upload = null, gesture = null, onchange }: { gesture?: LiveGesture | null; doc: MotionDoc; clip: MotionClip; part: string; assets: Asset[]; tokens: BrandTokens; upload?: MediaUploader | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const kind = $derived(partKind(doc, clip, part));
   const index = $derived(parsePart(part).index ?? 0);
@@ -40,7 +41,7 @@
 
 {#snippet photoBody()}
   <div data-testid="part-photo">
-    <FillStack title="Fill" fills={photoStack(media, index)} {assets} {tokens} {upload} onchange={(fills, summary) => writeMedia(setPhotoFills(media, index, fills), summary)} />
+    <FillStack {gesture} title="Fill" fills={photoStack(media, index)} {assets} {tokens} {upload} onchange={(fills, summary) => writeMedia(setPhotoFills(media, index, fills), summary)} />
   </div>
   <button type="button" class="delete" data-testid="part-delete" onclick={remove}><Trash size={12} /> Delete photo</button>
 {/snippet}

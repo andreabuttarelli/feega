@@ -191,6 +191,7 @@
 
 <div
   class="zoom-stage"
+  data-owns-pinch
   class:hand={spaceHeld || drag !== null}
   bind:this={host}
   role="presentation"

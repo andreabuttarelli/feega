@@ -8,6 +8,13 @@ import type { Backend } from '$lib/canvas/gpu/backend';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { composeHtml } from '$lib/motion/hyperframes/compose';
 import type { MotionDoc } from '$lib/motion/doc';
+import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
+import { createMedia } from '$lib/motion/gpu-full/media';
+import { faceEngineOf, loadFontsWith } from '$lib/motion/gpu-full/text/engines';
+import { mountCustomReads } from '$lib/motion/gpu-full/dom/custom';
+import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
+import { BACKENDS, FullBackend } from '$lib/motion/gpu-full/backends';
+import { renderOnCore } from '$lib/motion/gpu-full/core-export';
 import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
 
 const composer = (spec: Spec) => (only?: ReadonlySet<string>) => composeHtml({ doc: spec.doc as MotionDoc, tokens: FEEGA_TOKENS, assets: spec.assets, origin: spec.origin, only });
@@ -55,6 +62,50 @@ async function gpuShots(input: ShotsInput): Promise<ShotsResult> {
   const out = { pngs, ms: performance.now() - start, backend: engine.backend, runs: engine.runs.length, stats };
   engine.dispose();
   return out;
+}
+
+async function fullShots(input: ShotsInput, backend: FullBackend): Promise<ShotsResult> {
+  const doc = input.spec.doc as MotionDoc;
+  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets, { fonts: await loadFontsWith(faceEngineOf(input.spec.faces))(doc, input.spec.assets, FEEGA_TOKENS), smoothing: smoothingOf(navigator.userAgent) });
+  const media = createMedia();
+  const custom = await mountCustomReads(host(), composer(input.spec), prepared);
+  const canvas = document.createElement('canvas');
+  const raster = await BACKENDS[backend](canvas, input.width, input.height);
+  const pngs: string[] = [];
+  const gaps = new Map<string, string>();
+  const start = performance.now();
+  for (const t of input.times) {
+    const frame = Math.round(t * doc.fps);
+    const read = await custom.readAt(frame);
+    const list = drawFrame(prepared, frame, read.reads);
+    list.unsupported.forEach((g) => gaps.set(`${g.clip} ${g.component}:${g.reason}${g.detail ? ` ${g.detail}` : ''}`, ''));
+    await media.ready(list);
+    raster.draw(list, (item) => read.picture(item) ?? media.pictures(item));
+    pngs.push(await png(canvas, input.width, input.height));
+  }
+  const out = { pngs, ms: performance.now() - start, backend: `gpu-full ${backend}`, runs: 0, stats: [], unsupported: [...gaps.keys()] };
+  raster.dispose();
+  media.dispose();
+  custom.dispose();
+  return out;
+}
+
+const gpuFullShots = (input: ShotsInput) => fullShots(input, FullBackend.WebGl2);
+const gpuCoreShots = (input: ShotsInput) => fullShots(input, FullBackend.Core);
+const gpuCoreGlShots = (input: ShotsInput) => fullShots(input, FullBackend.CoreGl);
+
+async function coreExportShots(input: ShotsInput, backend: FullBackend): Promise<ShotsResult> {
+  const doc = input.spec.doc as MotionDoc;
+  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets, { fonts: await loadFontsWith(faceEngineOf(input.spec.faces))(doc, input.spec.assets, FEEGA_TOKENS), smoothing: smoothingOf(navigator.userAgent) });
+  const custom = await mountCustomReads(host(), composer(input.spec), prepared);
+  const pngs: string[] = [];
+  const start = performance.now();
+  const done = await renderOnCore(prepared, backend, input.times, async (bitmap) => void pngs.push(await png(bitmap, input.width, input.height)), new AbortController().signal, custom);
+  custom.dispose();
+  if (!done) {
+    throw new Error('core export fell back to HTML');
+  }
+  return { pngs, ms: performance.now() - start, backend: `core export ${backend}`, runs: 0, stats: [] };
 }
 
 async function encode(input: ExportInput, render: (onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>) => Promise<void>): Promise<ExportResult> {
@@ -168,4 +219,4 @@ async function liveSeek(t: number) {
   await new Promise((r) => setTimeout(r, 400));
 }
 
-Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, htmlExport, gpuExport, htmlPreview, gpuPreview });
+Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, gpuCoreShots, gpuCoreGlShots, coreExportShots: (i: ShotsInput) => coreExportShots(i, FullBackend.Core), coreExportGlShots: (i: ShotsInput) => coreExportShots(i, FullBackend.CoreGl), htmlExport, gpuExport, htmlPreview, gpuPreview });

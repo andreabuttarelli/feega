@@ -33,7 +33,7 @@ vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => loo
 vi.mock('$lib/server/canvas/sign-media', async (real) => ({ ...(await real<object>()), createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: () => reachable() }));
 
-const { actions, load } = await import('./+page.server');
+const { actions, load } = await import('$lib/server/frame-editor/editor-page');
 const { POST } = await import('../../../../../../api/v1/motion/[nodeId]/ops/+server');
 const { POST: POST_POSTER } = await import('../../../../../../api/v1/motion/[nodeId]/poster/+server');
 

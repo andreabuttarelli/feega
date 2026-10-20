@@ -13,7 +13,6 @@
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Gesture } from '$lib/motion/drill';
   import { onMount, tick, untrack } from 'svelte';
-  import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import FrameHover from './FrameHover.svelte';
   import FrameLiveControls from './FrameLiveControls.svelte';
@@ -22,7 +21,7 @@
   import { Background, FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
   import { NodeMode, Paint, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
-  import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
+  import { DRAWN_EVENT, TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
   import { posterDue, tiles } from '$lib/canvas/live-tiles.svelte';
@@ -70,6 +69,7 @@
   const shownPoster = $derived(posterCurrent(local) && decodedPoster === poster ? decodedPoster : null);
   let loadedPoster = $state<string | null>(null);
   const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster && loadedPoster === poster));
+  const shows = $derived(ownDrawn || (!!shownPoster && loadedPoster === shownPoster));
   const playerUp = $derived(mounted && !!preview);
   const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
 
@@ -205,6 +205,12 @@
   });
 
   $effect(() => {
+    if (shows) {
+      root?.dispatchEvent(new CustomEvent(TILE_PAINTED, { bubbles: true }));
+    }
+  });
+
+  $effect(() => {
     if (nodeMode === NodeMode.Leaving && painted) {
       inlineStage.landed(node.id);
     }
@@ -236,6 +242,12 @@
     };
   });
 
+  async function posterPainted(img: HTMLImageElement) {
+    const src = shownPoster;
+    await img.decode().catch(() => undefined);
+    loadedPoster = src;
+  }
+
   async function decoded(src: string) {
     const img = new Image();
     img.src = src;
@@ -251,7 +263,7 @@
     posters.set(key, shot);
     slots = releaseCapture(slots, node.id);
     if (shot) {
-      void sendPoster(`${href}?/poster`, shot, { width: String(width), height: String(Math.round((width * source.height) / source.width)), revision: String(revision) }).catch(() => undefined);
+      void sendPoster(href, shot, { width: String(width), height: String(Math.round((width * source.height) / source.width)), revision: String(revision) }).catch(() => undefined);
     }
   }
 
@@ -282,26 +294,22 @@
   data-testid="motion-node"
   data-motion-node={node.id}
   data-mode={mode}
+  data-shows={shows}
   style={`--bar-h: ${MOTION_NODE_BAR_H}px;`}
   bind:this={root}
 >
   <div class="stage" data-testid="motion-node-stage" data-frame-stage>
     {#if layers.own || mounted}
       {#if shownPoster && !(playerUp && ownDrawn)}
-        <img class="poster" class:under={playerUp} class:kept={!layers.own} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" onload={() => (loadedPoster = shownPoster)} />
+        <img class="poster" class:under={playerUp} class:kept={!layers.own} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" onload={(e) => void posterPainted(e.currentTarget as HTMLImageElement)} />
       {/if}
       {#if mounted && preview}
-        <div class="own" class:kept={!layers.own} data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing muted={true} loop={false} /></div>
+        <div class="own" class:kept={!layers.own} class:veiled={!ownDrawn} data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing muted={true} loop={false} /></div>
       {:else if shownPoster}
       {:else if !previewing}
         <div class="skeleton" data-testid="motion-node-skeleton"></div>
       {:else if !chrome.bar}
         <div class="placeholder" data-testid="element-placeholder"></div>
-      {:else}
-        <div class="empty">
-          <Clapperboard size={28} />
-          <span class="format">{size.label}</span>
-        </div>
       {/if}
     {/if}
     {#if !previewing}<div class="host" class:nodrag={layers.editor} class:nopan={layers.editor} data-testid="motion-node-editing" bind:this={host}></div>{/if}
@@ -342,6 +350,10 @@
 
   .kept {
     visibility: hidden;
+  }
+
+  .own.veiled {
+    opacity: 0;
   }
 
   .own {
@@ -389,22 +401,6 @@
     position: absolute;
     inset: 0;
     background: var(--ui-field, #f2f2f2);
-  }
-
-  .empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .format {
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-  }
-
-  .format {
-    color: var(--ui-accent);
   }
 
 </style>

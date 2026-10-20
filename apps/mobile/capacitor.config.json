@@ -1,0 +1,12 @@
+{
+  "appId": "app.feega.mobile",
+  "appName": "feega",
+  "webDir": "www",
+  "server": {
+    "allowNavigation": ["oh.feega.app", "feega.app", "localhost"]
+  },
+  "ios": {
+    "contentInset": "never",
+    "limitsNavigationsToAppBoundDomains": false
+  }
+}

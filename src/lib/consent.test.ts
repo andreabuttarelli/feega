@@ -62,6 +62,18 @@ describe('la scelta sta in un cookie di prima parte con versione e data', () => 
     expect(applied).toHaveLength(0);
   });
 
+  it('nella shell nativa niente banner e nessun tracker: vale solo il necessario finché la persona non sceglie', async () => {
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone) FeegaNative/mobile' });
+    const { initConsent, showBanner } = await import('./consent');
+    initConsent();
+    vi.unstubAllGlobals();
+
+    let shown = true;
+    showBanner.subscribe((v) => (shown = v))();
+    expect(shown).toBe(false);
+    expect(applied).toHaveLength(0);
+  });
+
   it('una scelta valida non chiede di nuovo e viene applicata', async () => {
     const { saveConsent, initConsent, showBanner } = await import('./consent');
     saveConsent({ analytics: true, marketing: false });

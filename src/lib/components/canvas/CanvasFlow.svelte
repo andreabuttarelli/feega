@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ActionResult } from '@sveltejs/kit';
   const MIN_ZOOM = 0.05;
   import { dragOffset, type Offset } from '$lib/canvas/duplicate-plan';
   import { focusEdges } from '$lib/canvas/edge-focus';
@@ -147,7 +148,7 @@
   };
 
   let {
-    actionUrl,
+    postAction,
     tiles = [],
     edges: incomingEdges = [],
     onMove,
@@ -204,7 +205,7 @@
     follow = null,
     tile
   }: {
-    actionUrl?: (action: string) => string;
+    postAction?: (action: string, form: FormData) => Promise<ActionResult>;
     tiles?: Tile[];
     /** Le linee già in `brand_canvas_edges`, pronte per il disegno. */
     edges?: FlowEdge[];
@@ -265,6 +266,7 @@
     onTemplate?: (id: string, at: { x: number; y: number }) => void;
     onFrameTemplates?: (at: { x: number; y: number }) => void;
     onNodeClicked?: (id: string) => void;
+    onNodeDoubled?: (id: string) => void;
     barContext?: BarContext;
     onDraw?: (drawn: DrawnWire) => Promise<void>;
     onDrawFrame?: (target: { box: CanvasBox } | { at: { x: number; y: number } }) => Promise<void>;
@@ -813,9 +815,11 @@
    * Qualcosa lasciato cadere sulla tela. `ondragover` con `preventDefault` non è cerimonia: senza,
    * il browser rifiuta il rilascio e il trascinamento finisce in un nulla di fatto.
    */
+  const OS_FILES = 'Files';
+
   function onDragOver(e: DragEvent) {
     const types = e.dataTransfer?.types ?? [];
-    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT].some((type) => types.includes(type))) return;
+    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, OS_FILES].some((type) => types.includes(type))) return;
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'copy';
   }
@@ -828,6 +832,12 @@
    */
   function onDrop(e: DragEvent) {
     if (!toFlow) return;
+    const files = [...(e.dataTransfer?.files ?? [])];
+    if (files.length && onUpload) {
+      e.preventDefault();
+      files.forEach((file) => onUpload(file));
+      return;
+    }
 
     const output = e.dataTransfer?.getData(CANVAS_DRAG_OUTPUT);
     if (output) {
@@ -1046,8 +1056,8 @@
     onpropertychange={(patch) => onPropertyChange?.(selection.ids, patch)}
   />
 
-  {#if actionUrl}
-    <NextStepChips {actionUrl} box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
+  {#if postAction}
+    <NextStepChips {postAction} box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
   {/if}
   {/if}
 

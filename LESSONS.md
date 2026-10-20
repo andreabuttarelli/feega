@@ -4,6 +4,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Un e2e che trascina un elemento in un frame non si muove: il punto di presa era sul bordo
+Segnale: il clic seleziona l'elemento (`selection-box` visibile) ma il trascinamento non cambia il documento salvato. Causa: la presa calcolata come quota dello stage meno un offset in pixel cadeva sul bordo del box, dove stanno le maniglie. Mossa: prendere il punto dal `boundingBox()` di `selection-box` (un quarto della larghezza, a metà altezza), mai da una quota dello stage. Con un worktree nuovo, `node_modules` del checkout principale può essere rotto (`intl-messageformat/lib/src/core` mancante): `npm ci` nel worktree, non un symlink.
+
 ### In Safari l'anteprima gira a 30 fps mentre la pagina è a 60
 Segnale: `editor-scrub-budget.spec.ts` in WebKit dà host 60 fps e iframe 30 (play e scrub, ogni
 via di seek). WebKit limita il rAF degli iframe cross-origin mai toccati dall'utente a 30 fps
@@ -561,6 +564,14 @@ propagazione prima. Mossa: `addEventListener('dblclick', …)` diretto sull'elem
 
 ## Test: distinguere il tuo difetto dal rumore
 
+### Un test "lento a intermittenza" può non essere lento affatto
+Segnale: un test con budget di tempo fallisce in CI in 70–90 ms. Leggi l'errore, non il nome:
+`cursor-smoothness` falliva per `Page.captureScreenshot: Unable to capture screenshot` (nessun
+frame ancora nel compositor), non per jolt. Mossa: `gh run view <id> --log-failed` sulle run
+rosse prima di toccare soglie. E un budget in ms assoluti su un runner GitHub oscilla 2× (shader
+1080p: 27–62 ms, stesso codice): si misura in rapporto a un riferimento nella stessa pagina,
+interlacciato, mediana.
+
 ### CI rossa con zero test falliti è una promessa non attesa, non un test tuo
 `Test Files 649 passed | Tests 7259 passed | Errors 1 error`, e il job esce comunque 1. Non
 cercare il test rosso: non esiste. Vitest conta come fallimento anche una `Unhandled Rejection`
@@ -653,6 +664,15 @@ fresca (`signThumbnailUrls` lo ricorda), e un redirect a una firma non è `no-st
 `toHaveBeenCalledWith` con 6 argomenti contro un executor passato a 7 (dev ha aggiunto la riga `job`): fallisce nel merge senza che nessuno abbia toccato il file. Mossa: nel riesame di un merge, fai girare PRIMA i test dei file in conflitto — sono gli unici che fanno da spec su entrambi i lati.
 
 ## Testare la piattaforma nel browser: worker locale ed ambiente
+
+### Lo screenshot della preview motion è nero, l'export PNG locale scade
+Due segnali, stesso giro e2e. (1) `screenshot()` della regione Preview (o dell'iframe) dà un
+quadrato nero anche con il testo visibile nel DOM dell'iframe. Mossa: misurare dentro l'iframe —
+`document.fonts`, lo stile calcolato, o i glifi ridisegnati su un `<canvas>` con quel `font` —
+invece di fotografare la pagina. (2) `?/exportSelection` con `CHROMIUM_PATH` locale torna
+`Waiting failed: 20000ms exceeded` anche per `canvas-export.spec.ts` intatto: è il renderer locale,
+non il tuo diff. Mossa: la parte export gira solo dove il renderer risponde (`E2E_SERVER_EXPORT=1`)
+e il report la dichiara `unrun`.
 
 ### Un import dinamico può tornare dopo che il canvas è già morto
 
@@ -3106,3 +3126,58 @@ device's `decodeEdge` means an image decoded full size (a non-`canvas-assets` UR
 by the server). Measure with `playwright-core` `webkit` + iPhone descriptor and `ps` RSS of the
 new `WebKit.GPU`/`WebContent` processes only (other worktrees run WebKit too). Playwright WebKit
 does not match `(pointer: coarse)`; `navigator.maxTouchPoints` does.
+
+## A phone page dies when a big frame opens in the editor
+
+**Signal:** WebKit iPhone emulation, `ps` RSS of the GPU process jumps past 1 GB within a second
+of opening a frame, with no new canvas or image. The preview iframe lays the frame out full size
+(1440×4735) and every `will-change` wrapper with `inset: 0` becomes a frame-sized layer at DPR 3.
+**Move:** the player iframe is opaque-origin, so `addInitScript` does not reach it; bisect with
+`page.on('framenavigated', f => f.addStyleTag(...))`. On a phone the preview drops layer hints
+(`previewHtml`, `memory-budget.ts`). RSS is noisy when the Mac is under memory pressure: compare
+several runs, not one.
+
+## `/app` throws `first_child_getter.call` in WebKit on `vite dev`, Chromium is fine
+Signal: WebKit/WKWebView only, error "in AppSidebar.svelte"; `node_modules/.vite/deps` holds two
+chunks with `var first_child_getter`, one imported both with and without `?v=` (two instances of
+the Svelte runtime from a later, runtime-discovered optimize pass). A dev server with a fresh deps
+cache does not reproduce it. Move: restart dev with `vite dev --force`. Excluding `@lucide/svelte`
+from `optimizeDeps` is not the fix: the barrel import then loads ~4.000 modules.
+
+## Playback "unwatchable on iPad" but 60 fps in WebKit iPad emulation
+
+**Signal:** a real iPad reports a stuttering preview; Playwright WebKit with the iPad descriptor
+on a Mac shows 59 fps p50 inside the preview iframe with or without `will-change`. The Mac's
+compositor hides the cost of repainting the whole frame every tick.
+**Move:** don't expect an fps number from emulation to go red; assert the mechanism (hinted
+layers in the preview iframe while it plays, `ipad-playback-fps.spec.ts`) and log fps beside it.
+Layer hints drop only past a budget (`layerPixels`), never for a whole device class.
+
+## gpu-core: a GPU picture draws on the first frames, then vanishes
+
+**Signal:** a picture (mask cover, image) shows in the first frame and is black after, on WebGPU
+and natively alike. Happens once full-frame layers grow vello's image atlas between scenes.
+**Move:** `Engine::render` marks every picture dirty before every vello render (frame, layer,
+backdrop), so a rebuilt atlas recopies it; once per frame is not enough. Guarded by
+`a_picture_mask_survives_frames_that_grow_the_image_atlas` and
+`a_picture_under_a_backdrop_stays_drawn_frame_after_frame`.
+
+## A GPU parity gap that both backends share is usually the reference
+
+**Signal:** two independent renderers score the same SSIM against the HTML capture (video 0.96,
+grain 0.93). **Move:** compare against `--ref=live` and encode the variable you suspect into the
+asset (frame number as luma) before touching a renderer; both gaps were in the capture path or
+in a half-pixel convention, not in timing.
+
+## A core frame that comes out blank, with no error, is usually texture memory
+
+**Signal:** `--under=gpu-core` draws some frames and leaves others black or background-only,
+`not drawn: none`, no console error. **Move:** count the layer-worthy items in the frame's list
+(filters, masks, blur): each one gets its own texture, and a filtered item used to get a
+full-frame one. Hundreds of them (a custom component flattened, its group grain copied onto
+every child) exhaust the GPU silently. Bisect by slicing the group's children in
+`scripts/gpu-parity/host.ts`; a single child that flips the frame is a blend/layer bug instead
+(WebGL2 `multiply` inside a group: vello_hybrid wiped the backdrop; the GL core now composites blended layers itself, `Blending::Composited`).
+
+## `coveredMs` of the core canvas bench jumps from ~1 s to ~7 s
+Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports covered in 6–8 s; the default `gpu,core` order reports ~1 s on the same code. The first run on a fresh dev server pays vite compiles and cold `/source` responses. Move: compare runs in the same order (default `gpu,core`, or a warm-up first), one server restart per A/B variant.

@@ -182,7 +182,7 @@ frame by double-click is still a missing row in `DRILL`.
 | Enter | — | the top clip | its first part | edit the text |
 | Esc, ⇧Enter | — | close the frame | the frame | the clip |
 
-Empty space inside the frame, or its title, selects the frame. Dragging a closed frame (its title, its empty area or a child) moves the whole frame; only a click without movement selects the child. Hover never reopens or re-renders a node: a
+Empty space inside the frame, or its title, selects the frame. Dragging a frame by its title or its empty area moves the whole frame; a click on a child selects it, and once the frame is selected a drag that starts on a child moves that child (snapping to the frame edges, centre and siblings). The first drag on a frame that is not yet selected still moves the frame. Hover never reopens or re-renders a node: a
 closed frame measures its children once, on the first pointer enter. Layers follows: the
 selected row scrolls into view, hover lights the row and the row lights the canvas.
 Loading shows skeletons, never spinners in the middle of a page. Errors say what happened and

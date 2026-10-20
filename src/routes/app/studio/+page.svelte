@@ -1,6 +1,6 @@
 <script lang="ts">
   import PageTitle from '$lib/components/PageTitle.svelte';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import type { ActionResult } from '@sveltejs/kit';
   import { goto, invalidateAll } from '$app/navigation';
   import { ArrowLeft, Check } from '@lucide/svelte';
@@ -67,8 +67,7 @@
   }
 
   async function post(action: string, body: FormData) {
-    const res = await fetch(`${actionBase}&/${action}`, { method: 'POST', headers: { 'x-sveltekit-action': 'true' }, body });
-    return deserialize(await res.text());
+    return postPageAction(actionBase, action, body);
   }
 
   async function addPhoto(photo: Checked) {

@@ -44,7 +44,7 @@
   });
 
   $effect(() => {
-    const target = rightBar.active?.element ?? park;
+    const target = rightBar.holder?.element ?? park;
     if (!bar || !target) {
       return;
     }
@@ -129,6 +129,11 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    background: var(--ui-wash);
+    color: var(--ui-ink);
+    font-family: var(--sans);
+    --ui-ink-2: var(--ui-text-2);
+    --ui-ink-3: var(--ui-text-3);
     visibility: visible;
     pointer-events: auto;
   }

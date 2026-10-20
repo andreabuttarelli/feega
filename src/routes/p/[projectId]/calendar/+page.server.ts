@@ -9,11 +9,13 @@ import { deliveryStatus, scheduleDelivery, cancelDelivery } from '$lib/server/re
 import { buildCalendarData } from './calendar-load';
 import { monthOf } from './calendar-month';
 import type { Db } from '$lib/server/db/client';
+import { load as projectShell } from '$lib/server/projects/project-shell';
 
 const NOT_FOUND = 404;
 
-export const load: PageServerLoad = async ({ parent, locals, url }) => {
-  const { org } = await parent();
+export const load: PageServerLoad = async (event) => {
+  const { locals, url } = event;
+  const { org } = await projectShell(event);
   const db = await locals.db();
   if (!db) throw error(500, 'sessione senza client');
 

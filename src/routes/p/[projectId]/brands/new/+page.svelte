@@ -9,7 +9,7 @@
    * per sbaglio in un'altra scheda non lo sovrascrive, e chiudere la scheda lo dimentica (un
    * brand a metà non deve restare per sempre in un cassetto).
    */
-  import { enhance } from '$app/forms';
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount, onDestroy } from 'svelte';
@@ -277,7 +277,7 @@
       <form
         method="POST"
         action="?/analyze"
-        use:enhance={withBusy((result) => applyAnalysis(result))}
+        use:apiEnhance={withBusy((result) => applyAnalysis(result))}
       >
         {#if !busy}
           <input name="url" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="example.com" bind:value={draft.website} />
@@ -449,7 +449,7 @@
       <form
         method="POST"
         action="?/create"
-        use:enhance={() => {
+        use:apiEnhance={() => {
           busy = true;
           error = null;
           return async ({ result }) => {

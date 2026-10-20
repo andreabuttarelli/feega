@@ -9,13 +9,15 @@ import {
 import { canAffordSeat } from '$lib/server/social-connections';
 import { BILLING_PATH } from '$lib/billing-path';
 import { brandSlugOf } from '$lib/server/tenancy/brand-slug';
+import { load as projectShell } from '$lib/server/projects/project-shell';
 
 // LinkedIn headless connect — the page Zernio redirects back to after OAuth. It carries a one-time
 // pendingDataToken; we exchange it for the OAuth payload (consuming it) and let the user pick their
 // personal profile or one of the Company Pages they admin. The chosen tempToken/userProfile are
 // carried into the `select` action via the form, since the token can't be fetched twice.
-export const load: PageServerLoad = async ({ params, url, parent, locals: { supabase } }) => {
-  await parent(); // ensures the brand layout (auth + brand resolution) has run
+export const load: PageServerLoad = async (event) => {
+  const { params, url, locals: { supabase } } = event;
+  await projectShell(event);
   const dest = url.searchParams.get('return') === 'activate' ? 'activate' : 'settings';
   // Zernio appends the one-time token to our redirect URL; accept the documented name and fallbacks.
   const token =
