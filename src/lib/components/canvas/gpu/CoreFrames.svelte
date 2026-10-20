@@ -107,6 +107,7 @@
   let liveGroup = $state(new Map<string, string>());
   const liveBuilt = new Map<string, LiveDoc>();
   const liveGeneration = new Map<string, number>();
+  const liveAtRevision = new Map<string, number>();
   const groupOf = (f: FrameAt) => liveGroup.get(f.id) ?? keyOf(f);
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
@@ -119,6 +120,7 @@
     const key = `${f.id}:live${generation}`;
     lists = new Map(lists).set(key, onStage(built.list, f.kind));
     liveGroup = new Map(liveGroup).set(f.id, key);
+    liveAtRevision.set(f.id, f.revision);
   }
 
   $effect(() => {
@@ -131,6 +133,10 @@
     }
     for (const id of [...liveGroup.keys()].filter((id) => !live.has(id))) {
       liveBuilt.delete(id);
+      const saved = frames.find((f) => f.id === id);
+      if (saved && saved.revision === liveAtRevision.get(id)) {
+        continue;
+      }
       const next = new Map(liveGroup);
       next.delete(id);
       liveGroup = next;
