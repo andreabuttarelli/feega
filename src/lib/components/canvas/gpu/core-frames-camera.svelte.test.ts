@@ -58,4 +58,20 @@ describe('CoreFrames camera', () => {
     expect(calls.patches.length).toBe(sent);
     expect(calls.overlays).toBe(overlays);
   });
+
+  it('a node the live editor shows is left out of the core, and drawn again when it hands back', async () => {
+    const props = $state({ frames: [], cards: [card], hidden: new Set(['c1']), view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    calls.patches.length = 0;
+    calls.cameras.length = 0;
+    app = mount(CoreFrames, { target: document.body, props });
+    flushSync();
+    await vi.waitFor(() => expect(calls.cameras.length).toBeGreaterThan(0));
+    const put = () => calls.patches.flatMap((p) => (p as { put: { clip: string }[] }).put.map((u) => u.clip));
+    expect(put()).not.toContain('c1');
+
+    props.hidden = new Set();
+    flushSync();
+
+    await vi.waitFor(() => expect(put()).toContain('c1'));
+  });
 });
