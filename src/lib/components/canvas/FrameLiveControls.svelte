@@ -10,8 +10,22 @@
 
   const ON_LIVE: Record<LiveEvent, (m: LiveMessage) => void> = {
     [LiveEvent.Escape]: () => frameLive.stop(),
-    [LiveEvent.Wheel]: (m) => handWheel(m)
+    [LiveEvent.Wheel]: (m) => handWheel(m),
+    [LiveEvent.GestureStart]: (m) => handGesture(m),
+    [LiveEvent.GestureChange]: (m) => handGesture(m),
+    [LiveEvent.GestureEnd]: (m) => handGesture(m)
   };
+
+  function handGesture(m: LiveMessage) {
+    const el = frame;
+    if (!el?.parentElement) {
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    const scale = rect.width / Math.max(el.offsetWidth, 1);
+    const at = { clientX: rect.left + (m.x ?? 0) * scale, clientY: rect.top + (m.y ?? 0) * scale, scale: m.scale ?? 1 };
+    el.parentElement.dispatchEvent(Object.assign(new Event(m.event, { bubbles: true, cancelable: true }), at));
+  }
 
   function handWheel(m: LiveMessage) {
     const el = frame;
