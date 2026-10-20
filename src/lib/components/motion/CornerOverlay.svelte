@@ -1,13 +1,13 @@
 <script lang="ts">
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { boxOf } from '$lib/motion/layout';
-  import { cornerAt, cornerInset, cornerInward, roundnessFromInset } from '$lib/motion/draw-tool';
+  import { cornerInset, roundnessFromInset } from '$lib/motion/draw-tool';
+  import { cornerHandleAt, cornerLocalPoint } from '$lib/motion/corner-handles';
   import { cornerRadii, withCorner, type Corners, type Pt } from '$lib/motion/shape/geometry';
   import { setProps } from '$lib/motion/timeline';
 
-  let { doc, clip, onchange }: { doc: MotionDoc; clip: MotionClip; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
-  const HANDLE_GAP = 0.08;
   const CORNERS = [0, 1, 2, 3] as const;
   const NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const;
 
@@ -16,20 +16,17 @@
   let grab = $state<{ index: number; all: boolean } | null>(null);
 
   const box = $derived(boxOf(clip.props as { x: number; y: number; width: number; height: number }, doc));
-  const short = $derived(Math.min(box.width, box.height));
   const roundness = $derived(Number(clip.props.roundness ?? 0));
   const radii = $derived(live ?? cornerRadii(roundness, (clip.props.corners as number[] | undefined) ?? []));
 
   function handleAt(index: number): string {
-    const [cx, cy] = cornerAt(box, index);
-    const [sx, sy] = cornerInward(index);
-    const reach = Math.max(radii[index] * short, HANDLE_GAP * short);
-    return `left: ${((cx + sx * reach) / doc.width) * 100}%; top: ${((cy + sy * reach) / doc.height) * 100}%;`;
+    const [x, y] = cornerHandleAt(doc, clip, frame, index, radii);
+    return `left: ${(x / doc.width) * 100}%; top: ${(y / doc.height) * 100}%;`;
   }
 
   function local(e: PointerEvent): Pt {
     const rect = host!.getBoundingClientRect();
-    return [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
+    return cornerLocalPoint(doc, clip, frame, [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height]);
   }
 
   function begin(e: PointerEvent, index: number) {
