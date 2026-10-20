@@ -16,7 +16,7 @@
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
-  import { Depth, FramePress, Gesture, Press, drill, levelOf, pressOf, type Level, type Probe } from '$lib/motion/drill';
+  import { Depth, FramePress, Gesture, Press, Under, drill, levelOf, pressOf, type Level, type Probe } from '$lib/motion/drill';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Bounds, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
@@ -356,14 +356,11 @@
     }
     const asked = asking ? ask() : null;
     asking = false;
-    const framePicked = pressOf(Depth.Frame, framePress) === Press.MoveFrame;
-    const selectsFrame = framePicked && asked?.gesture === Gesture.Click;
-    if (asked && !selectsFrame && (!selection.length || asked.gesture === Gesture.Double)) {
+    if (asked && (!selection.length || asked.gesture === Gesture.Double)) {
       drillAsked(asked);
       return;
     }
-    if (!pendingPick || framePicked) {
-      pendingPick = null;
+    if (!pendingPick) {
       return;
     }
     const at = pendingPick;
@@ -411,7 +408,8 @@
     const p = local(e);
     const from = level();
     froms = [froms.at(-1) ?? from, from];
-    if (pressOf(from.depth, framePress) === Press.MoveFrame) {
+    const under = liveStack(p).length ? Under.Child : Under.Bare;
+    if (pressOf(from.depth, framePress, under) === Press.MoveFrame) {
       host!.setPointerCapture(e.pointerId);
       grab = { grip: Grip.Move, handle: 0, clipId: '', from: p, start: client(e), pointer: e.pointerId, whole: true, travelled: false };
       return;
@@ -528,12 +526,17 @@
     const grip = grab?.grip;
     const clipId = grab?.clipId;
     const hosting = hostGesture(grab, e);
+    const stillOnBare = !!grab?.whole && !grab.travelled;
     const reordered = done && grip === Grip.Move && grab && e ? reorderAt(doc, grab.clipId, local(e)) : null;
     const outside = grab && e ? leaving(e) : null;
     out = false;
     grab = null;
     live = null;
     onpreview(null);
+    if (stillOnBare) {
+      land(levelOf({ open: true, clip: null, part: null }));
+      return;
+    }
     if (hosting) {
       hosting.send(hosting.move, hosting.to, DragPhase.Drop);
       return;

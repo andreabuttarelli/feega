@@ -24,14 +24,22 @@ export enum Press {
   MoveFrame = 'move-frame'
 }
 
-const PRESS: Record<Depth, Record<FramePress, Press>> = {
-  [Depth.Canvas]: { [FramePress.Pick]: Press.Pick, [FramePress.Move]: Press.Pick },
-  [Depth.Frame]: { [FramePress.Pick]: Press.Pick, [FramePress.Move]: Press.MoveFrame },
-  [Depth.Clip]: { [FramePress.Pick]: Press.Pick, [FramePress.Move]: Press.Pick },
-  [Depth.Part]: { [FramePress.Pick]: Press.Pick, [FramePress.Move]: Press.Pick }
+export enum Under {
+  Child = 'child',
+  Bare = 'bare'
+}
+
+const PICK_ALWAYS: Record<Under, Press> = { [Under.Child]: Press.Pick, [Under.Bare]: Press.Pick };
+const MOVE_ON_BARE: Record<Under, Press> = { [Under.Child]: Press.Pick, [Under.Bare]: Press.MoveFrame };
+
+const PRESS: Record<Depth, Record<FramePress, Record<Under, Press>>> = {
+  [Depth.Canvas]: { [FramePress.Pick]: PICK_ALWAYS, [FramePress.Move]: PICK_ALWAYS },
+  [Depth.Frame]: { [FramePress.Pick]: PICK_ALWAYS, [FramePress.Move]: MOVE_ON_BARE },
+  [Depth.Clip]: { [FramePress.Pick]: PICK_ALWAYS, [FramePress.Move]: MOVE_ON_BARE },
+  [Depth.Part]: { [FramePress.Pick]: PICK_ALWAYS, [FramePress.Move]: MOVE_ON_BARE }
 };
 
-export const pressOf = (depth: Depth, frame: FramePress): Press => PRESS[depth][frame];
+export const pressOf = (depth: Depth, frame: FramePress, under: Under): Press => PRESS[depth][frame][under];
 
 export type Level = { depth: Depth; clip: string | null; part: string | null };
 
