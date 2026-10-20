@@ -89,8 +89,9 @@
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { Counter, count, exposeLoss, exposeReveal, exposeSettled, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
+  import { POSTER_WIDTH } from '$lib/motion/poster-capture';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
-  import { baseRatio, cellBox, cellBytes, cellCss, cellKey, detailRatio, neededCells, type Cell } from '$lib/canvas/gpu/detail-plan';
+  import { baseRatio, cellBox, cellBytes, cellCss, cellKey, detailRatio, neededCells, softPosters, type Cell } from '$lib/canvas/gpu/detail-plan';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
@@ -194,9 +195,13 @@
       sticky = keep;
     }
   });
+  const LIVE_POSTER_CAP = 3;
+  let settledView = $state<Viewport | null>(null);
   const domIds = $derived.by(() => {
     const liveFrames = domPainted(placed.filter((t) => t.kind === 'motion' && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
-    const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
+    const posters = placed.filter((t) => t.kind === 'motion' && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
+    const sharp = BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
+    const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
@@ -568,7 +573,6 @@
   let detailJob = $state<DetailJob | null>(null);
   const tried = new Set<string>();
   const triedKey = (id: string, ratio: number, c: Cell) => `${id}|${ratio}|${cellKey(c)}`;
-  let settledView = $state<Viewport | null>(null);
   $effect(() => {
     const v = view;
     const t = setTimeout(() => {

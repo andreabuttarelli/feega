@@ -52,3 +52,20 @@ export function neededCells(tile: Box, view: Box, size: number): Cell[] {
 }
 
 export const cellBytes = (box: Box, ratio: number) => Math.round(box.w * ratio) * Math.round(box.h * ratio) * 4;
+
+const POSTER_SOFTNESS = 1.5;
+
+type Tile = Box & { id: string };
+
+const onScreen = (t: Box, v: Box) => Math.max(0, Math.min(t.x + t.w, v.x + v.w) - Math.max(t.x, v.x)) * Math.max(0, Math.min(t.y + t.h, v.y + v.h) - Math.max(t.y, v.y));
+
+export function softPosters(tiles: readonly Tile[], view: { x: number; y: number; zoom: number }, screen: { width: number; height: number }, dpr: number, posterWidth: number, cap: number): string[] {
+  const world = { x: -view.x / view.zoom, y: -view.y / view.zoom, w: screen.width / view.zoom, h: screen.height / view.zoom };
+  return tiles
+    .filter((t) => (view.zoom * dpr * t.w) / posterWidth > POSTER_SOFTNESS)
+    .map((t) => ({ id: t.id, seen: onScreen(t, world) }))
+    .filter((t) => t.seen > 0)
+    .sort((a, b) => b.seen - a.seen)
+    .slice(0, cap)
+    .map((t) => t.id);
+}
