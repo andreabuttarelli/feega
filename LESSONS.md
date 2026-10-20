@@ -3181,3 +3181,7 @@ every child) exhaust the GPU silently. Bisect by slicing the group's children in
 
 ## `coveredMs` of the core canvas bench jumps from ~1 s to ~7 s
 Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports covered in 6–8 s; the default `gpu,core` order reports ~1 s on the same code. The first run on a fresh dev server pays vite compiles and cold `/source` responses. Move: compare runs in the same order (default `gpu,core`, or a warm-up first), one server restart per A/B variant.
+
+## A panel portaled out of its parent loses the parent's scoped CSS
+
+**Signal:** a flex column that scrolls on its own page does not scroll once moved into the right bar (`use:portalInto`): `scrollHeight` equals `clientHeight` at a height taller than the bar, and the bar's overflow clips it. **Move:** a Svelte rule like `.docked .pane` needs `.docked` as a DOM ancestor, which a portal removes; put the layout on the element itself (`.pane.in-bar`). Measure with a wheel over the bar, not `scrollIntoView`, which scrolls the clipping ancestors and passes.

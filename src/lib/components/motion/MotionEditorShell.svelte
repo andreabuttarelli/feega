@@ -2853,6 +2853,7 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .chat {
