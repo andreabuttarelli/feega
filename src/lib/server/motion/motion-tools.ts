@@ -155,7 +155,7 @@ import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCamer
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
-import { leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout } from '$lib/motion/layout/ops';
+import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '$lib/motion/layout/model';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
@@ -1614,10 +1614,20 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    frame_clips: tool({
+      description: 'Frame the selection, like the editor Frame selection: wraps those visual clips in a transparent rectangle Shape drawn directly under them and parents them to it, without auto layout; children stay where they are. Returns container_id.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
+      execute: async ({ clip_ids }) => {
+        const id = deps.newId();
+        const out = apply(wrapInFrame(session.doc, clip_ids, id, deps.newId()), `framed ${clip_ids.length} clip(s)`);
+        return out.ok ? { ...out, container_id: id } : out;
+      }
+    }),
+
     set_auto_layout: tool({
-      description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, padding {top,right,bottom,left} px, justify start|center|end|space-between on the main axis, align start|center|end on the cross axis, order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent).',
+      description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, padding {top,right,bottom,left} px, justify start|center|end|space-between on the main axis, align start|center|end on the cross axis, order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent and the boxes the layout gave them).',
       inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
-      execute: async ({ clip_id, off, ...patch }) => apply(setAutoLayout(session.doc, clip_id, off ? null : patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
+      execute: async ({ clip_id, off, ...patch }) => apply(off ? removeAutoLayout(session.doc, clip_id) : setAutoLayout(session.doc, clip_id, patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
     }),
 
     set_layout_item: tool({

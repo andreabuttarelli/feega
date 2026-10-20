@@ -187,6 +187,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Group]: motion('precompose'),
   [Command.Ungroup]: motion('ungroup'),
   [Command.AutoLayout]: motion('add_auto_layout'),
+  [Command.FrameSelection]: motion('frame_clips'),
   [Command.UseAsMask]: motion('use_as_mask'),
   [Command.EditAsVector]: motion('to_vector'),
   [Command.BringForward]: motion('arrange_layers'),
