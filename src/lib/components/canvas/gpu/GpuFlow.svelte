@@ -199,9 +199,9 @@
   const LIVE_POSTER_CAP = 3;
   let settledView = $state<Viewport | null>(null);
   const domIds = $derived.by(() => {
-    const liveFrames = domPainted(placed.filter((t) => t.kind === 'motion' && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
+    const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => t.kind === 'motion' && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
     const posters = placed.filter((t) => t.kind === 'motion' && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
-    const sharp = BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
+    const sharp = !coreOn && BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
     const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
