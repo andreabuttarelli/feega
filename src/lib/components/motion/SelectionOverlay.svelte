@@ -256,7 +256,10 @@
       }
     };
     typing = null;
-    void edittext(textTarget(clipId, target), point, (typed) => (typing = () => typedInto(typed))).then((typed) => {
+    void edittext(textTarget(clipId, target), point, (typed) => {
+      typing = () => typedInto(typed);
+      void remeasure();
+    }).then((typed) => {
       typing = null;
       if (turn === editTurn) {
         inPlace = false;
