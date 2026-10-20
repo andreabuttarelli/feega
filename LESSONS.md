@@ -4,6 +4,10 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### An effect that publishes into a `$state` map loops once it runs per edit
+
+**Signal:** `effect_update_depth_exceeded` in the console, the UI stops updating after the first keystroke, the stack points at an `$effect` calling `liveDocs.set`. **Move:** the setter read `this.map` to copy it, so the effect depended on what it wrote; read it with `untrack` inside the setter. Vitest runs the server build of Svelte, where effects do not run: only a real browser shows it.
+
 ### Un e2e che trascina un elemento in un frame non si muove: il punto di presa era sul bordo
 Segnale: il clic seleziona l'elemento (`selection-box` visibile) ma il trascinamento non cambia il documento salvato. Causa: la presa calcolata come quota dello stage meno un offset in pixel cadeva sul bordo del box, dove stanno le maniglie. Mossa: prendere il punto dal `boundingBox()` di `selection-box` (un quarto della larghezza, a metà altezza), mai da una quota dello stage. Con un worktree nuovo, `node_modules` del checkout principale può essere rotto (`intl-messageformat/lib/src/core` mancante): `npm ci` nel worktree, non un symlink.
 

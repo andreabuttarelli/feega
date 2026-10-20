@@ -18,6 +18,7 @@ import { rgbaOf, type Rgba } from '../rgba';
 import type { Face, FaceBook, Request } from './face';
 import type { FaceRule } from './fonts';
 import type { FontFace } from '../../fonts/model';
+import { caretLines, type CaretLine } from './caret';
 import { layOut, NO_EXTRA, Shaping, Spaces, type Extra, type Flow, type Glyph, type Laid, type Line, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
@@ -585,4 +586,24 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
 export function paintText(env: TextEnv): Painted | TextGap {
   const plan = planOf(env);
   return typeof plan === 'string' ? plan : inksOf(plan, env.fonts, env.output);
+}
+
+export type Caret = { lines: CaretLine[]; left: number; top: number; width: number; height: number };
+
+export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
+  const { laid, room } = place(plan, fonts);
+  if (!laid.blocks.some((b) => b.lines.length) || laid.ascent + laid.descent === 0) {
+    return TextGap.Font;
+  }
+  if (laid.missing) {
+    return TextGap.Glyph;
+  }
+  const top = plan.frame.top + (plan.frame.anchor === Anchor.Centre ? (plan.frame.height - laid.height) / 2 : 0);
+  return {
+    lines: caretLines(laid, plan.paragraphs, { room, align: plan.align, top: 0 }),
+    left: plan.frame.left,
+    top,
+    width: plan.frame.hugs ? laid.width : plan.frame.width,
+    height: plan.frame.anchor === Anchor.Top ? laid.height : plan.frame.height
+  };
 }

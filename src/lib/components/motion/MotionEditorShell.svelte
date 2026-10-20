@@ -192,6 +192,7 @@
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { liveDocs } from '$lib/canvas/core/live-docs.svelte';
+  import { caretSource } from '$lib/canvas/core/text-caret';
   import { claimsWidth } from '$lib/canvas/claim-width';
   import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -691,7 +692,10 @@
     live.edit(next, summary);
   }
 
+  const textCaret = caretSource(() => data.tokens, () => assetUrls);
+
   let userEdited = $state(false);
+  let typingInCore = $state(false);
 
   $effect(() => {
     if (!userEdited || rules.stage !== Stage.Node) {
@@ -724,7 +728,7 @@
 
   $effect(() => {
     const boxes = stageBoxes;
-    if (!userEdited || playing || draft || untrack(() => preview?.isTextEditing())) {
+    if (!userEdited || playing || draft || typingInCore || untrack(() => preview?.isTextEditing())) {
       return;
     }
     if (onhostfit && (data.node.kind ?? FrameKind.Frame) === FrameKind.Element) {
@@ -2291,7 +2295,7 @@
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
         {#if !playing}<PixelGridOverlay width={doc.width} height={doc.height} toggle={pixelGrid} />{/if}
         {#if guidesShown && doc.layoutGuides?.length && !playing}<LayoutGuidesOverlay {doc} />{/if}
-        {#if !playing}<SelectionOverlay bind:this={overlay} {scaleMode} mode={editMode} layoutBounds={guidesShown ? guideSnapBounds(doc) : []} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost && onhostdrag ? hostDragged : null} onframemove={frameChrome(data.node.kind ?? FrameKind.Frame).press === FramePress.Move ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} {scaleMode} mode={editMode} layoutBounds={guidesShown ? guideSnapBounds(doc) : []} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} caret={textCaret} ontyping={(on) => (typingInCore = on)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost && onhostdrag ? hostDragged : null} onframemove={frameChrome(data.node.kind ?? FrameKind.Frame).press === FramePress.Move ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
         {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if editingPoints && selected?.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} onexit={() => (vectorEdit = null)} />{/if}
