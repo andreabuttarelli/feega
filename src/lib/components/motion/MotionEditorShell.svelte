@@ -698,6 +698,7 @@
   }
 
   const TEXT_FIT_SUMMARY = 'Fitted a text box to its words';
+  const HOST_FIT_QUIET_MS = 300;
 
   const hostDragged: HostDrag = (move, to, phase) => {
     onhostdrag?.(move, to, phase);
@@ -713,11 +714,14 @@
       return;
     }
     if (onhostfit && (data.node.kind ?? FrameKind.Frame) === FrameKind.Element) {
-      const share = untrack(() => freeTextFit(doc, boxes));
-      if (share) {
-        setTimeout(() => onhostfit?.(share), 0);
-      }
-      return;
+      const measuredOn = untrack(() => ({ width: doc.width, height: doc.height }));
+      const timer = setTimeout(() => {
+        const share = untrack(() => (doc.width === measuredOn.width && doc.height === measuredOn.height ? freeTextFit(doc, boxes) : null));
+        if (share) {
+          onhostfit?.(share);
+        }
+      }, HOST_FIT_QUIET_MS);
+      return () => clearTimeout(timer);
     }
     const next = untrack(() => fitTexts(doc, boxes));
     if (next) {

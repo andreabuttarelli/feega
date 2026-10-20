@@ -290,7 +290,8 @@
         if (e.source !== target || m?.type !== MEASURE_REPLY || m.id !== id) {
           return;
         }
-        settle(m.boxes);
+        const stale = m.stage && (m.stage.width !== width || m.stage.height !== height);
+        settle(stale ? {} : m.boxes);
       };
       const timer = setTimeout(() => settle({}), MEASURE_TIMEOUT_MS);
       window.addEventListener('message', onMessage);
