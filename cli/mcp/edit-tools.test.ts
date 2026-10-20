@@ -108,7 +108,7 @@ describe('edit: one tool for the canvas and the frames', () => {
     const tools = (await rpc('tools/list', {})).result?.tools ?? [];
 
     for (const name of ['canvas_tool', 'motion_tool', 'motion_editor_op']) {
-      expect(tools.find((t) => t.name === name)?.description).toStartWith('Deprecated, use `edit`');
+      expect(tools.find((t) => t.name === name)?.description).toMatch(/^Deprecated, use `edit`/);
     }
   });
 });
