@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Device, BUDGET, decodeSize, previewHtml, rendererResolution } from './memory-budget';
+import { Device, BUDGET, decodeSize, snapshotSize, previewHtml, rendererResolution } from './memory-budget';
 import { bytesOf } from './texture-bytes';
 
 const MB = 1024 * 1024;
@@ -57,5 +57,17 @@ describe('memory budget — a heavy canvas fits an iPhone WebContent process', (
   it('a 110-clip motion frame keeps its layer hints, or playback repaints the whole frame every tick', () => {
     const html = clips(110);
     expect(previewHtml(html, MOTION)).toBe(html);
+  });
+});
+
+describe('snapshots keep a tall landing page readable', () => {
+  it('a 2880 x 12000 snapshot of a 1440 x 6000 frame keeps more than 2048 px of height', () => {
+    expect(snapshotSize(2880, 12000, Device.Desktop).height).toBeGreaterThan(BUDGET[Device.Desktop].decodeEdge);
+  });
+
+  it('a snapshot never exceeds the snapshot edge and keeps its aspect', () => {
+    const s = snapshotSize(2880, 12000, Device.Desktop);
+    expect(s.height).toBe(BUDGET[Device.Desktop].snapshotEdge);
+    expect(s.width).toBe(Math.round(2880 * (s.height / 12000)));
   });
 });
