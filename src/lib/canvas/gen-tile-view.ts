@@ -1,4 +1,5 @@
 import { formatCredits } from '$lib/components/credit-amount-format';
+import { audioFormOf, type AudioField } from './audio-form';
 import { shownIndex } from './gen-history';
 import { runStateOf, type GenMedium, type GenNode, type RunState } from './gen-node';
 import { loopCreditsOf, type RunQuote } from './run-quote';
@@ -27,6 +28,7 @@ export type GenTileView = {
   loop: (GenButton & { cancel: boolean }) | null;
   runs: number;
   shown: number;
+  form: AudioField[];
 };
 
 export const PROMPT_PLACEHOLDER: Record<GenMedium, string> = {
@@ -77,6 +79,7 @@ export function genTileView(node: GenNode, quote: RunQuote, x: GenTileExtras): G
     run: { label: quote.label, credits: approx(quote.credits), variable: quote.variable, enabled: quote.enabled },
     loop: loopOf(quote, x),
     runs: node.runs.length,
-    shown: shownIndex(node)
+    shown: shownIndex(node),
+    form: node.medium === 'audio' ? audioFormOf(node) : []
   };
 }

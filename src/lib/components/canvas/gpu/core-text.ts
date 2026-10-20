@@ -18,6 +18,7 @@ import ChevronRight from '@lucide/svelte/icons/chevron-right';
 import HelpCircle from '@lucide/svelte/icons/help-circle';
 import Plus from '@lucide/svelte/icons/plus';
 import ImageIcon from '@lucide/svelte/icons/image';
+import ChevronDown from '@lucide/svelte/icons/chevron-down';
 import Camera from '@lucide/svelte/icons/camera';
 
 const APP_FONT = '/fonts/dm-sans-latin.woff2';
@@ -59,6 +60,6 @@ export async function coreText(kinds: readonly NodeType[]): Promise<CoreText> {
   const head = new Map(await Promise.all(kinds.map(async (k) => [k, iconContours(await iconNodes(NODE_KIND_ICON[k]), HEAD_PX, HEAD_STROKE)] as const)));
   const badge = new Map(await Promise.all(kinds.map(async (k) => [k, iconContours(await iconNodes(NODE_KIND_ICON[k]), BADGE_ICON_PX, BADGE_ICON_STROKE)] as const)));
   const ui = Object.fromEntries(await Promise.all(UI_GLYPHS.map(async ([name, icon, px, stroke]) => [name, iconContours(await iconNodes(icon), px, stroke)] as const))) as Record<UiGlyph, number[][]>;
-  const gen = { head, badge, ui, layers: iconContours(await iconNodes(Layers), BADGE_PX, BADGE_STROKE), play: iconContours(await iconNodes(Play), BADGE_PX, BADGE_STROKE), person: iconContours(await iconNodes(UserRound), PERSON_PX, PERSON_STROKE), references: iconContours(await iconNodes(ImagePlus), REFERENCES_PX, REFERENCES_STROKE), credit: iconContours(await iconNodes(CircleDollarSign), CREDIT_PX, CREDIT_STROKE) };
+  const gen = { chevron: iconContours(await iconNodes(ChevronDown), 12, 2), voicePlay: iconContours(await iconNodes(Play), 12, 2), head, badge, ui, layers: iconContours(await iconNodes(Layers), BADGE_PX, BADGE_STROKE), play: iconContours(await iconNodes(Play), BADGE_PX, BADGE_STROKE), person: iconContours(await iconNodes(UserRound), PERSON_PX, PERSON_STROKE), references: iconContours(await iconNodes(ImagePlus), REFERENCES_PX, REFERENCES_STROKE), credit: iconContours(await iconNodes(CircleDollarSign), CREDIT_PX, CREDIT_STROKE) };
   return { glyphs: glyphsOf(book, FAMILY, REGULAR), bold: glyphsOf(book, FAMILY, BOLD), icons, gen };
 }
