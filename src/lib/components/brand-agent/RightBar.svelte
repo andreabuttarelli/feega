@@ -129,7 +129,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: var(--ui-wash);
+    background: var(--grey-0);
     color: var(--ui-ink);
     font-family: var(--sans);
     --ui-ink-2: var(--ui-text-2);
