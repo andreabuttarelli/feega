@@ -62,3 +62,22 @@ describe('a drill asked on a closed frame', () => {
     expect(asks.take('a')?.from).toBe(Depth.Canvas);
   });
 });
+
+describe('a press that is still held when the editor opens', () => {
+  const drag = { pointer: 7, client: { x: 10, y: 20 } };
+
+  it('hands the held pointer to the editor with the ask', () => {
+    const asks = drillRequests(() => 0);
+    asks.request('a', { x: 0.4, y: 0.1 }, Gesture.Click, Depth.Canvas, drag);
+
+    expect(asks.take('a')).toEqual({ at: { x: 0.4, y: 0.1 }, gesture: Gesture.Click, from: Depth.Canvas, drag });
+  });
+
+  it('forgets the pointer once it is released before the editor opens', () => {
+    const asks = drillRequests(() => 0);
+    asks.request('a', { x: 0.4, y: 0.1 }, Gesture.Click, Depth.Canvas, drag);
+    asks.release('a');
+
+    expect(asks.take('a')).toEqual({ at: { x: 0.4, y: 0.1 }, gesture: Gesture.Click, from: Depth.Canvas });
+  });
+});
