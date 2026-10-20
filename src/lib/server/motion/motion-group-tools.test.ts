@@ -36,6 +36,14 @@ describe('arrange_space on a whole selection', () => {
     }
   });
 
+  it('scale_group stretches one axis when factor_y differs', async () => {
+    const { run, session, ids } = await setup();
+
+    await run('arrange_space', { clip_ids: ids, op: 'scale_group', factor: 2, factor_y: 1 });
+    expect(transformAt(findClip(session.doc, ids[0])!.clip, 'scaleY', 0)).toBeCloseTo(1, 6);
+    expect(transformAt(findClip(session.doc, ids[0])!.clip, 'scaleX', 0)).toBeCloseTo(2, 6);
+  });
+
   it('scale_group needs a factor and rotate_group needs degrees', async () => {
     const { run, ids } = await setup();
 

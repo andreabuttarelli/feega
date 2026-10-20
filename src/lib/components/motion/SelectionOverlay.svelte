@@ -19,7 +19,7 @@
   import { Depth, FramePress, Gesture, Press, Under, drill, levelOf, pressOf, type Level, type Probe } from '$lib/motion/drill';
   import type { OpResult } from '$lib/motion/timeline';
   import { EditMode } from '$lib/motion/edit-mode';
-  import { pullFactor, rotateAround, scaleAround, turnedBy } from '$lib/motion/group-transform';
+  import { resizeFactors, rotateAround, scaleAroundXY, snappedHandle, turnedBy } from '$lib/motion/group-transform';
   import { groupMove, rectOf, swept, toggled, unionBounds } from '$lib/motion/multi-select';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Bounds, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
@@ -80,7 +80,7 @@
   const EMPTY_RETRIES = 20;
   const ROTATE_REACH_PX = 44;
   const ROTATE_STEP_DEG = 15;
-  const MIN_FACTOR = 0.01;
+  const SIDE_UNIT = 0.5;
 
   const SUMMARY: Record<Grip, string> = {
     [Grip.Move]: 'Moved in the preview',
@@ -527,10 +527,14 @@
       const turn = turnedBy(centreOf(box), g.from, at);
       return { result: rotateAround(laid, g.group, frame, centreOf(box), e.shiftKey ? Math.round(turn / ROTATE_STEP_DEG) * ROTATE_STEP_DEG : turn, mode), guides: [] };
     }
-    const anchor = e.altKey ? centreOf(box) : corners[(g.handle + 2) % 4].at;
-    const factor = Math.max(pullFactor(anchor, corners[g.handle].at, at), MIN_FACTOR);
-    return { result: scaleAround(laid, g.group, frame, anchor, factor, mode), guides: [] };
+    const { unit, at: handleAt } = corners[g.handle];
+    const dragged: Pt = [handleAt[0] + at[0] - g.from[0], handleAt[1] + at[1] - g.from[1]];
+    const snapped = snappedHandle(dragged, [unit[0] !== SIDE_UNIT, unit[1] !== SIDE_UNIT], [...othersThan(g.group), ...layoutBounds], { width: doc.width, height: doc.height }, snapReach());
+    const { anchor, fx, fy } = resizeFactors(box, unit, snapped.point, e.shiftKey, e.altKey);
+    return { result: scaleAroundXY(laid, g.group, frame, anchor, fx, fy, mode), guides: snapped.guides };
   }
+
+  const axisLocked = ([dx, dy]: Pt): Pt => (Math.abs(dx) >= Math.abs(dy) ? [dx, 0] : [0, dy]);
 
   function moveGroup(g: Grab & { group: string[] }, e: PointerEvent) {
     const to = client(e);
@@ -548,7 +552,7 @@
       }
       return;
     }
-    const { result, guides } = groupMove({ doc: laid, ids: g.group, frame, mode, offset: [at[0] - g.from[0], at[1] - g.from[1]], box, others: [...othersThan(g.group), ...layoutBounds], size: { width: doc.width, height: doc.height }, reach: snapReach() });
+    const { result, guides } = groupMove({ doc: laid, ids: g.group, frame, mode, offset: e.shiftKey ? axisLocked([at[0] - g.from[0], at[1] - g.from[1]]) : [at[0] - g.from[0], at[1] - g.from[1]], box, others: [...othersThan(g.group), ...layoutBounds], size: { width: doc.width, height: doc.height }, reach: snapReach() });
     if (!result.ok) {
       return;
     }
@@ -735,11 +739,12 @@
   {/if}
   {#if groupBounds}
     {@const groupQuad = boundsQuad(groupBounds)}
-    {@const corners = handlesOf(groupQuad).slice(0, 4)}
+    {@const all = handlesOf(groupQuad)}
+    {@const corners = all.slice(0, 4)}
     {#each corners as h, i (i)}
       <button type="button" class="target rotate" aria-label="Rotate selection" style={outward(groupQuad, h.at)} onpointerdown={(e) => beginGroup(e, Grip.Rotate, i)}></button>
     {/each}
-    {#each corners as h, i (i)}
+    {#each all as h, i (i)}
       <button type="button" class="target scale" aria-label="Scale selection" data-handle={i} style={pct(h.at)} onpointerdown={(e) => beginGroup(e, Grip.Scale, i)}><span></span></button>
     {/each}
   {/if}
