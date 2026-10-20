@@ -25,12 +25,13 @@
   import type { Pictures } from '$lib/motion/gpu-full/raster';
   import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
+  import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
@@ -79,7 +80,10 @@
     if (!res.ok) {
       return null;
     }
-    const source = (await res.json()) as FrameDoc;
+    return buildSource(f, (await res.json()) as FrameDoc);
+  }
+
+  async function buildSource(f: FrameAt, source: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
     const still = stillFrame(source.doc);
@@ -99,6 +103,45 @@
     }
     lists = new Map(lists).set(keyOf(f), onStage(built.list, f.kind));
   }
+
+  let liveGroup = $state(new Map<string, string>());
+  const liveBuilt = new Map<string, LiveDoc>();
+  const liveGeneration = new Map<string, number>();
+  const liveAtRevision = new Map<string, number>();
+  const groupOf = (f: FrameAt) => liveGroup.get(f.id) ?? keyOf(f);
+
+  async function rebuildLive(f: FrameAt, source: LiveDoc) {
+    const generation = (liveGeneration.get(f.id) ?? 0) + 1;
+    liveGeneration.set(f.id, generation);
+    const built = await buildSource(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
+    if (!built || liveGeneration.get(f.id) !== generation || (await media.ready(built.list)) === Readiness.Partial || liveGeneration.get(f.id) !== generation) {
+      return;
+    }
+    const key = `${f.id}:live${generation}`;
+    lists = new Map(lists).set(key, onStage(built.list, f.kind));
+    liveGroup = new Map(liveGroup).set(f.id, key);
+    liveAtRevision.set(f.id, f.revision);
+  }
+
+  $effect(() => {
+    for (const f of frames) {
+      const source = live.get(f.id);
+      if (source && liveBuilt.get(f.id) !== source) {
+        liveBuilt.set(f.id, source);
+        void rebuildLive(f, source);
+      }
+    }
+    for (const id of [...liveGroup.keys()].filter((id) => !live.has(id))) {
+      liveBuilt.delete(id);
+      const saved = frames.find((f) => f.id === id);
+      if (saved && saved.revision === liveAtRevision.get(id)) {
+        continue;
+      }
+      const next = new Map(liveGroup);
+      next.delete(id);
+      liveGroup = next;
+    }
+  });
 
   let inFlight = $state(0);
   let settledFrames = $state(new Set<string>());
@@ -126,8 +169,8 @@
 
   const framePuts = $derived(
     frames.flatMap((f): HeldFrame[] => {
-      const list = lists.get(keyOf(f));
-      return list && drawsWhole(list) ? [{ id: f.id, group: keyOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items) }] : [];
+      const list = lists.get(groupOf(f));
+      return list && drawsWhole(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items) }] : [];
     })
   );
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));

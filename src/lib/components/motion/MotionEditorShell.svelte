@@ -191,6 +191,7 @@
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { liveDocs } from '$lib/canvas/core/live-docs.svelte';
   import { claimsWidth } from '$lib/canvas/claim-width';
   import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -690,7 +691,19 @@
     live.edit(next, summary);
   }
 
+  let userEdited = $state(false);
+
+  $effect(() => {
+    if (!userEdited || rules.stage !== Stage.Node) {
+      return;
+    }
+    liveDocs.set(data.node.id, { doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls });
+  });
+
+  $effect(() => () => liveDocs.clear(data.node.id));
+
   function recordEdit(next: MotionDoc, summary: string) {
+    userEdited = true;
     const now = Date.now();
     const root = mergeView(history.present, compPath, next);
     history = summary === lastEdit.summary && now - lastEdit.at < COALESCE_MS ? amend(history, root) : record(history, root);
@@ -711,7 +724,7 @@
 
   $effect(() => {
     const boxes = stageBoxes;
-    if (playing || draft || untrack(() => preview?.isTextEditing())) {
+    if (!userEdited || playing || draft || untrack(() => preview?.isTextEditing())) {
       return;
     }
     if (onhostfit && (data.node.kind ?? FrameKind.Frame) === FrameKind.Element) {
