@@ -16,12 +16,15 @@
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
+  import type { HeldPointer } from '$lib/canvas/frame-drill';
   import { Depth, FramePress, Gesture, Press, Under, drill, levelOf, pressOf, type Level, type Probe } from '$lib/motion/drill';
   import type { OpResult } from '$lib/motion/timeline';
   import { EditMode } from '$lib/motion/edit-mode';
   import { resizeFactors, rotateAround, scaleAroundXY, snappedHandle, turnedBy } from '$lib/motion/group-transform';
   import { groupMove, rectOf, swept, toggled, unionBounds } from '$lib/motion/multi-select';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Bounds, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
+
+  type Asked = { at: Pt | null; gesture: Gesture; from: Depth; drag?: HeldPointer };
 
   let {
     doc,
@@ -55,7 +58,7 @@
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
     pickAt?: Pt | null;
-    ask?: () => { at: Pt | null; gesture: Gesture; from: Depth } | null;
+    ask?: () => Asked | null;
     part?: string | null;
     onparts?: (parts: Record<string, string[]>) => void;
     onboxes?: (boxes: Boxes) => void;
@@ -359,9 +362,20 @@
     editPart({ depth: Depth.Clip, clip: clipId, part: null });
   }
 
-  export function drillAsked(asked: { at: Pt | null; gesture: Gesture; from: Depth }) {
+  function carryHeldPress(held: HeldPointer, landed: Level) {
+    if (landed.depth !== Depth.Clip || !landed.clip) {
+      return;
+    }
+    host!.setPointerCapture(held.pointer);
+    grab = { grip: Grip.Move, handle: 0, clipId: landed.clip, from: localAt(held.client), start: held.client, pointer: held.pointer, whole: false, travelled: false };
+  }
+
+  export function drillAsked(asked: Asked) {
     editAt = asked.at ? { x: asked.at[0] / doc.width, y: asked.at[1] / doc.height } : null;
-    step(asked.gesture, asked.at, { depth: asked.from, clip: null, part: null });
+    const landed = step(asked.gesture, asked.at, { depth: asked.from, clip: null, part: null });
+    if (asked.drag) {
+      carryHeldPress(asked.drag, landed);
+    }
   }
 
   function pickPending() {
@@ -395,10 +409,12 @@
 
   const client = (e: PointerEvent): ClientPt => ({ x: e.clientX, y: e.clientY });
 
-  function local(e: PointerEvent): Pt {
+  function localAt(at: ClientPt): Pt {
     const rect = host!.getBoundingClientRect();
-    return [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
+    return [((at.x - rect.left) / rect.width) * doc.width, ((at.y - rect.top) / rect.height) * doc.height];
   }
+
+  const local = (e: PointerEvent): Pt => localAt(client(e));
 
   function snapReach(): number {
     const rect = host!.getBoundingClientRect();
