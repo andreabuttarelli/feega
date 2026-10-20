@@ -113,25 +113,6 @@ export type BrandSummary = {
   id: string;
   name: string;
   slug: string;
-  pendingCount: number;
-};
-
-export type AdCampaignSummary = {
-  id: string;
-  name: string;
-  objective: string;
-  budgetType: string;
-  budgetAmount: number;
-  status: string;
-  approvedAt: string | null;
-};
-
-export type BrandDetail = {
-  brand: BrandSummary;
-  pendingCount: number;
-  productCount: number;
-  accountCount: number;
-  logoUrl: string | null;
 };
 
 export type MediaItem = {
@@ -171,7 +152,6 @@ function mediaPath(q: MediaQuery): string {
 export const api = {
   // Brands
   listBrands: (t: string) => get<BrandSummary[]>('/api/v1/brands', t),
-  getBrand: (t: string, slug: string) => get<BrandDetail>(`/api/v1/brands/${slug}`, t),
 
   // ── Products ──────────────────────────────────────────────────────────
   listProducts: (t: string, slug: string) =>
@@ -184,24 +164,6 @@ export const api = {
       synced: number;
       rejected: { title: string; reason: string }[];
     }>(`/api/v1/brands/${slug}/products`, t),
-
-  // ── Ads ───────────────────────────────────────────────────────────────
-
-  listAdCampaigns: (t: string, brandId: string) =>
-    get<{ campaigns: AdCampaignSummary[] }>(`/api/v1/org/ads/campaigns?brand_id=${encodeURIComponent(brandId)}`, t),
-
-  approveAdCampaign: (t: string, id: string) =>
-    post<{ campaign?: AdCampaignSummary; error?: string; message?: string }>(
-      `/api/v1/org/ads/campaigns/${encodeURIComponent(id)}/approve`,
-      t
-    ),
-
-  setAdCampaignStatus: (t: string, id: string, next: 'active' | 'paused') =>
-    post<{ ok: boolean; error?: string; detail?: string }>(
-      `/api/v1/org/ads/campaigns/${encodeURIComponent(id)}/status`,
-      t,
-      { next }
-    ),
 
   getMedia: (t: string, q: MediaQuery) => get<Media>(mediaPath(q), t),
 

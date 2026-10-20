@@ -90,18 +90,14 @@ const KEPT_ON_PURPOSE: Record<string, string> = {
 
 /**
  * Non tutti i tool nascono dal registro: la superficie MCP reale oggi è cablata a mano in
- * `cli/mcp/tools/{posts,ads,org-data}.ts` (`list_posts`, `create_post`, `set_post_status`,
- * `list_ad_campaigns`, `create_ad_campaign`, `approve_ad_campaign`, `set_ad_campaign_status`, `query`, `insert_row`,
+ * `cli/mcp/tools/{posts,org-data}.ts` (`list_posts`, `create_post`, `set_post_status`,
+ * `query`, `insert_row`,
  * `update_row`, `delete_row`, `describe_node_types`) e non passa più da `BRAND_ENDPOINTS`.
  */
 const HAND_REGISTERED = [
   'list_posts',
   'create_post',
   'set_post_status',
-  'list_ad_campaigns',
-  'create_ad_campaign',
-  'approve_ad_campaign',
-  'set_ad_campaign_status',
   'query',
   'insert_row',
   'update_row',
