@@ -17,7 +17,9 @@
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
   import { Depth, FramePress, Gesture, Press, Under, drill, levelOf, pressOf, type Level, type Probe } from '$lib/motion/drill';
+  import type { OpResult } from '$lib/motion/timeline';
   import { EditMode } from '$lib/motion/edit-mode';
+  import { pullFactor, rotateAround, scaleAround, turnedBy } from '$lib/motion/group-transform';
   import { groupMove, rectOf, swept, toggled, unionBounds } from '$lib/motion/multi-select';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Bounds, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
@@ -77,6 +79,8 @@
   const SETTLE_MS = 300;
   const EMPTY_RETRIES = 20;
   const ROTATE_REACH_PX = 44;
+  const ROTATE_STEP_DEG = 15;
+  const MIN_FACTOR = 0.01;
 
   const SUMMARY: Record<Grip, string> = {
     [Grip.Move]: 'Moved in the preview',
@@ -411,6 +415,12 @@
     grab = { grip, handle, clipId, from: local(e), start: client(e), pointer: e.pointerId, whole: false, travelled: false };
   }
 
+  function beginGroup(e: PointerEvent, grip: Grip, handle: number) {
+    e.stopPropagation();
+    host!.setPointerCapture(e.pointerId);
+    grab = { grip, handle, clipId: '', from: local(e), start: client(e), pointer: e.pointerId, whole: false, travelled: false, group: [...members] };
+  }
+
   let lastPress: Pt | null = null;
 
   function press(e: PointerEvent) {
@@ -508,6 +518,20 @@
     }
   }
 
+  const centreOf = (b: Bounds): Pt => [(b.left + b.right) / 2, (b.top + b.bottom) / 2];
+
+  function groupTransform(g: Grab & { group: string[] }, box: Bounds, e: PointerEvent): { result: OpResult; guides: Guide[] } {
+    const corners = handlesOf(boundsQuad(box));
+    const at = local(e);
+    if (g.grip === Grip.Rotate) {
+      const turn = turnedBy(centreOf(box), g.from, at);
+      return { result: rotateAround(laid, g.group, frame, centreOf(box), e.shiftKey ? Math.round(turn / ROTATE_STEP_DEG) * ROTATE_STEP_DEG : turn, mode), guides: [] };
+    }
+    const anchor = e.altKey ? centreOf(box) : corners[(g.handle + 2) % 4].at;
+    const factor = Math.max(pullFactor(anchor, corners[g.handle].at, at), MIN_FACTOR);
+    return { result: scaleAround(laid, g.group, frame, anchor, factor, mode), guides: [] };
+  }
+
   function moveGroup(g: Grab & { group: string[] }, e: PointerEvent) {
     const to = client(e);
     g.travelled ||= Math.hypot(to.x - g.start.x, to.y - g.start.y) >= FRAME_SLOP_PX;
@@ -516,6 +540,14 @@
     }
     const at = local(e);
     const box = unionBounds(g.group.map((id) => aabb(quadOf(laid, id, frame, boxes[id]))));
+    if (g.grip !== Grip.Move) {
+      const turned = groupTransform(g, box, e);
+      if (turned.result.ok) {
+        live = { doc: turned.result.doc, patch: {}, guides: turned.guides, gaps: [] };
+        onpreview(turned.result.doc);
+      }
+      return;
+    }
     const { result, guides } = groupMove({ doc: laid, ids: g.group, frame, mode, offset: [at[0] - g.from[0], at[1] - g.from[1]], box, others: [...othersThan(g.group), ...layoutBounds], size: { width: doc.width, height: doc.height }, reach: snapReach() });
     if (!result.ok) {
       return;
@@ -617,10 +649,10 @@
     live = null;
     onpreview(null);
     if (groupGrab) {
-      if (!groupGrab.travelled) {
+      if (!groupGrab.travelled && groupGrab.grip === Grip.Move) {
         onselect([groupGrab.clipId]);
       } else if (done) {
-        onchange(done.doc, `Moved ${groupGrab.group!.length} layers in the preview`);
+        onchange(done.doc, `${SUMMARY[groupGrab.grip]} (${groupGrab.group!.length} layers)`);
       }
       return;
     }
@@ -700,6 +732,16 @@
   {/if}
   {#if outlinedPart}
     <div class="outlined-part" data-testid="layer-hover-part" style={boxStyle(outlinedPart)}></div>
+  {/if}
+  {#if groupBounds}
+    {@const groupQuad = boundsQuad(groupBounds)}
+    {@const corners = handlesOf(groupQuad).slice(0, 4)}
+    {#each corners as h, i (i)}
+      <button type="button" class="target rotate" aria-label="Rotate selection" style={outward(groupQuad, h.at)} onpointerdown={(e) => beginGroup(e, Grip.Rotate, i)}></button>
+    {/each}
+    {#each corners as h, i (i)}
+      <button type="button" class="target scale" aria-label="Scale selection" data-handle={i} style={pct(h.at)} onpointerdown={(e) => beginGroup(e, Grip.Scale, i)}><span></span></button>
+    {/each}
   {/if}
   {#if quad && clip}
     {@const handles = chrome.handles ? handlesOf(quad) : []}
