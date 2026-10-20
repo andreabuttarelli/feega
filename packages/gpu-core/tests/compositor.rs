@@ -140,3 +140,68 @@ fn an_edit_repaints_only_its_bounds() {
     assert_eq!(frame.outcome, Some(Outcome::Partial));
     assert_eq!(fake.painted[1].0, Rect::new(74.0, 74.0, 186.0, 126.0));
 }
+
+const TALL: &str = r#"{ "width": 1440, "height": 2800, "background": [0, 0, 1, 1], "items": [
+  { "kind": "path", "contours": [[100, 1400, 700, 1400, 700, 1500, 100, 1500]], "rule": "nonzero", "paint": { "kind": "solid", "color": [1, 1, 1, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "clip": "bar", "blur": 0, "blend": "normal" }
+] }"#;
+
+fn tall_scene() -> (Compositor, Library) {
+    let mut library = Library::new();
+    library.put_group("g", &parse(TALL).unwrap());
+    let mut c = Compositor::new(800, 600);
+    let patch = parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0] }], "drop": [] }"#).unwrap();
+    c.patch(patch, &library);
+    (c, library)
+}
+
+fn visible_bars(fake: &Fake) -> usize {
+    let (_, _, items) = fake.painted.last().unwrap();
+    items.iter().filter(|i| matches!(i, Item::Path(p) if p.clip == "bar")).count()
+}
+
+#[test]
+fn a_tall_frame_zoomed_in_draws_what_is_inside_the_viewport_after_the_zoom_settles() {
+    for zoom in [2.0, 3.0, 4.0] {
+        let (mut c, mut lib) = tall_scene();
+        let mut fake = Fake::default();
+        c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+        let camera = at(-300.0 * zoom, -1400.0 * zoom, zoom);
+
+        c.frame(&mut fake, &mut lib, camera, 16.0, &mut || 0.0).unwrap();
+        c.frame(&mut fake, &mut lib, camera, 400.0, &mut || 0.0).unwrap();
+
+        assert_eq!(visible_bars(&fake), 1, "zoom {zoom}");
+    }
+}
+
+fn busy_group() -> String {
+    let bars: Vec<String> = (0..2500).map(|i| format!(r#"{{ "kind": "path", "contours": [[0, {y}, 100, {y}, 100, {y2}, 0, {y2}]], "rule": "nonzero", "paint": {{ "kind": "solid", "color": [1, 1, 1, 1] }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "clip": "b{i}", "blur": 0, "blend": "normal" }}"#, y = i, y2 = i + 1)).collect();
+    format!(r#"{{ "width": 1440, "height": 2800, "background": [0, 0, 1, 1], "items": [{}] }}"#, bars.join(","))
+}
+
+#[test]
+fn a_cached_frame_that_is_still_building_when_the_zoom_settles_ends_up_drawn() {
+    let mut library = Library::new();
+    library.put_group("g", &parse(&busy_group()).unwrap());
+    let mut c = Compositor::new(800, 600);
+    let patch = parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true }], "drop": [] }"#).unwrap();
+    c.patch(patch, &library);
+    let mut fake = Fake::default();
+    c.frame(&mut fake, &mut library, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+    let camera = at(-200.0, -1000.0, 1.4);
+    c.frame(&mut fake, &mut library, camera, 16.0, &mut || 0.0).unwrap();
+
+    let mut now = 400.0;
+    let mut drawn = false;
+    for _ in 0..30 {
+        let frame = c.frame(&mut fake, &mut library, camera, now, &mut || 0.0).unwrap();
+        now += 16.0;
+        let (_, _, items) = fake.painted.last().unwrap();
+        drawn |= items.iter().any(|i| matches!(i, Item::Image(img) if img.clip.starts_with("cache:g")));
+        if !frame.pending && drawn {
+            break;
+        }
+    }
+
+    assert!(drawn, "the finished cache was never drawn into the screen");
+}

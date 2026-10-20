@@ -25,6 +25,7 @@
   import type { Pictures } from '$lib/motion/gpu-full/raster';
   import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
+  import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
@@ -277,6 +278,71 @@
     return part.items.length + 1;
   }
 
+  const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreDebug');
+  const MAX_LISTED = 12;
+  const OVERSCAN_SHARE = 8;
+  const OVERSCAN_MAX = 128;
+  let debugSignature = '';
+  let debugMoving = false;
+  let debugFacts: NodeFacts[] = [];
+  let hud = $state('');
+  let pointer = { x: 0, y: 0 };
+
+  const onScreen = (b: { x: number; y: number; w: number; h: number }) => b.x * view.zoom + view.x < area.width && (b.x + b.w) * view.zoom + view.x > 0 && b.y * view.zoom + view.y < area.height && (b.y + b.h) * view.zoom + view.y > 0;
+
+  function debugFrame(outcome: string, skipped: string[], shown: HeldFrame[]) {
+    const drawn = new Map(shown.map((f) => [f.id, f]));
+    const readyIds = new Map(real.map((f) => [f.id, f]));
+    debugFacts = chains.map((c) => {
+      const id = c[0].id;
+      const box = placeholders.get(id)!.box;
+      return factsOf(id, { onScreen: onScreen(box), hidden: hidden.has(id), drawn: drawn.get(id) ?? null, ready: readyIds.has(id), candidates: { ready: readyIds.get(id) ?? null, previous: drawnLast.get(id) ?? null, blocks: blocksById.get(id) ?? null, placeholder: c[c.length - 1] } });
+    });
+    const moving = gesture.active();
+    const overscan = Math.min(Math.floor((Math.min(area.width, area.height) * resolution) / OVERSCAN_SHARE), OVERSCAN_MAX);
+    const refine = `${Math.round(area.width * resolution) + 2 * overscan}x${Math.round(area.height * resolution) + 2 * overscan}`;
+    const header = `zoom=${view.zoom.toFixed(3)} view=${Math.round(view.x)},${Math.round(view.y)} area=${Math.round(area.width)}x${Math.round(area.height)} retained=${refine} outcome=${outcome} cacheBytes=${cacheBytes} held=${held.length} pictured=${pictured.size} put=${put.size}`;
+    const signature = signatureOf(debugFacts);
+    if (debugMoving && !moving) {
+      console.info(`[core] gesture end ${header}`);
+      undrawn(debugFacts).slice(0, MAX_LISTED).forEach((f) => console.warn(`[core]   ${describe(f)}`));
+    }
+    if (signature !== debugSignature) {
+      debugSignature = signature;
+      console.warn(`[core] ${signature ? 'undrawn on screen' : 'all drawn again'} ${header}`);
+      undrawn(debugFacts).slice(0, MAX_LISTED).forEach((f) => console.warn(`[core]   ${describe(f)}`));
+    }
+    if (skipped.length) {
+      console.warn(`[core] skipped ${skipped.slice(0, 6).join(' | ')}`);
+    }
+    debugMoving = moving;
+    hud = hudText(header);
+  }
+
+  function hudText(header: string): string {
+    const world = { x: (pointer.x - view.x) / view.zoom, y: (pointer.y - view.y) / view.zoom };
+    const under = [...placeholders.values()].reverse().find((p) => world.x >= p.box.x && world.x <= p.box.x + p.box.w && world.y >= p.box.y && world.y <= p.box.y + p.box.h);
+    const facts = under ? debugFacts.find((f) => f.id === under.id) : null;
+    return `${header}\n${facts ? describe(facts) : 'no node under cursor'}`;
+  }
+
+  $effect(() => {
+    if (!DEBUG) {
+      return;
+    }
+    const fail = (e: ErrorEvent | PromiseRejectionEvent) => console.error('[core] error', 'message' in e ? e.message : e.reason);
+    const move = (e: PointerEvent) => (pointer = { x: e.clientX, y: e.clientY });
+    window.addEventListener('error', fail);
+    window.addEventListener('unhandledrejection', fail);
+    window.addEventListener('pointermove', move);
+    void (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<{ limits: Record<string, number> } | null> } }).gpu?.requestAdapter().then((a) => a && console.info('[core] adapter maxTextureDimension2D', a.limits.maxTextureDimension2D, 'maxBufferSize', a.limits.maxBufferSize));
+    return () => {
+      window.removeEventListener('error', fail);
+      window.removeEventListener('unhandledrejection', fail);
+      window.removeEventListener('pointermove', move);
+    };
+  });
+
   function paint(): boolean {
     const into = raster;
     if (!into) {
@@ -327,10 +393,13 @@
       into.setOverlay(overlay);
     }
     into.setCamera(at.x, at.y, at.zoom);
-    const { outcome, pending } = into.frame(performance.now());
+    const { outcome, pending, skipped } = into.frame(performance.now());
     painted[outcome]++;
     paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
     cacheBytes = into.cacheBytes();
+    if (DEBUG) {
+      debugFrame(outcome, skipped, shown);
+    }
     return pending || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
   }
 
@@ -380,6 +449,9 @@
 
 </script>
 
+{#if DEBUG}
+  <pre class="core-hud">{hud}</pre>
+{/if}
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
 <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {#key backend}
@@ -392,6 +464,21 @@
     inset: 0;
     overflow: hidden;
     pointer-events: none;
+  }
+
+  .core-hud {
+    position: fixed;
+    left: 56px;
+    bottom: 12px;
+    z-index: 50;
+    margin: 0;
+    padding: 6px 8px;
+    max-width: 70vw;
+    font: 11px/1.4 ui-monospace, monospace;
+    color: #fff;
+    background: rgb(0 0 0 / 0.7);
+    pointer-events: none;
+    white-space: pre-wrap;
   }
 
   .core-grid {
