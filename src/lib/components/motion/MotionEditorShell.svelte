@@ -2221,7 +2221,7 @@
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'vector' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<VectorOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
-        {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={findClip(withAutoLayout(doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
+        {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay doc={previewDoc ?? doc} {frame} clip={findClip(withAutoLayout(previewDoc ?? doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
         {#if selected?.autoLayout && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
@@ -2853,6 +2853,7 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .chat {

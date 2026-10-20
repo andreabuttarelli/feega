@@ -98,6 +98,12 @@
     flex-direction: column;
   }
 
+  .pane.in-bar {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
   .docked .pane[hidden] {
     display: none;
   }
