@@ -198,6 +198,22 @@ fn a_wipe_cuts_the_item_at_its_scissor() {
 
 #[cfg(feature = "gpu")]
 #[test]
+fn a_remembered_layer_is_drawn_as_it_was_and_replaced_when_it_changes() {
+    let soft = square(r#", "blur": 6"#);
+    let softer = square(r#", "blur": 9"#);
+    let mut shared = gpu_core::render::Renderer::new().expect("a GPU adapter");
+    let first = shared.render(&parse(&soft).unwrap(), &Pictures::new()).unwrap().pixels;
+    let other = shared.render(&parse(&softer).unwrap(), &Pictures::new()).unwrap().pixels;
+    let again = shared.render(&parse(&soft).unwrap(), &Pictures::new()).unwrap().pixels;
+
+    assert_eq!(first, render(&soft));
+    assert_eq!(other, render(&softer));
+    assert_ne!(first, other);
+    assert_eq!(again, first);
+}
+
+#[cfg(feature = "gpu")]
+#[test]
 fn a_frame_after_a_blurred_one_matches_a_fresh_renderer() {
     let blurred = square(r#", "blur": 6"#);
     let plain = square(RECT_MASK);

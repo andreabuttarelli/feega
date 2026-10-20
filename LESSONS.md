@@ -3200,3 +3200,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## A gpu-core layer-heavy frame is slow with idle CPU
 
 **Signal:** `?engine=gpu-core` drops frames (presents/s well under rAF fps) on docs with blur, masks or filters while the main thread is idle. **Move:** `cargo run --release --example frame_cost -- <display list json>` in `packages/gpu-core` (dump a list with `scripts/bench/dump-list.ts`) gives GPU time per frame without readback. Cost was per-pass texture allocation and initialisation, not texel math: pooling the textures cut a 16-filter frame from 54 to 42 ms, while tiling or downscaling the blur added passes and got slower.
+
+## A static layer is repainted every frame
+
+**Signal:** a doc with a few moving paths and several blurred or masked layers that do not move still costs 10-50 ms per core frame. **Move:** `scripts/bench/dump-list.ts <doc> <out.json> <frames...>` and compare layered items between frames (identical JSON means a cache hit is possible); the engine keeps finished layer textures for path-only items (`LayerCache` in `engine.rs`). Pictures, text and backdrop layers must stay uncached: their inputs change without the item changing.
