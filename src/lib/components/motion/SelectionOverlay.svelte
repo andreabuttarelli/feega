@@ -3,6 +3,10 @@
   import { textTarget } from '$lib/motion/hyperframes/text-edit';
   import { clipChrome } from '$lib/canvas/selection-chrome';
   import { onMount, untrack } from 'svelte';
+  import CoreTextEdit from '$lib/components/motion/CoreTextEdit.svelte';
+  import type { CaretSource } from '$lib/canvas/core/text-caret';
+  import type { TextCaret } from '$lib/motion/gpu-full/display-list';
+  import { laidAsTyped } from '$lib/motion/gpu-full/text/caret';
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import { DragPhase, isOutside, type ElementOut, type HostDrag, type HostMove, hostShift, hostTurn } from '$lib/canvas/canvas-drop';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
@@ -46,6 +50,8 @@
     onframemove = null,
     onmenu = null,
     edittext = null,
+    caret = null,
+    ontyping = () => {},
     layoutBounds = [],
     scaleMode = ScaleMode.Resize,
     mode = EditMode.Motion
@@ -69,6 +75,8 @@
     onframemove?: HostDrag | null;
     onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
     edittext?: ((selector: string, at: { x: number; y: number } | null, oninput: (text: string) => void) => Promise<string | null>) | null;
+    caret?: CaretSource | null;
+    ontyping?: (typing: boolean) => void;
     scaleMode?: ScaleMode;
     mode?: EditMode;
     layoutBounds?: Bounds[];
@@ -84,6 +92,8 @@
   const ROTATE_REACH_PX = 44;
   const ROTATE_STEP_DEG = 15;
   const SIDE_UNIT = 0.5;
+  const CORE_TEXT_ATTRIBUTE = 'data-core-text';
+  const CORE_SURFACE = '[data-canvas-surface][data-renderer="core"]';
 
   const SUMMARY: Record<Grip, string> = {
     [Grip.Move]: 'Moved in the preview',
@@ -228,6 +238,9 @@
   });
 
   function double(e: MouseEvent) {
+    if (core) {
+      return;
+    }
     const [x, y] = local(e as PointerEvent);
     editAt = { x: x / doc.width, y: y / doc.height };
     step(Gesture.Double, local(e as PointerEvent), froms[0] ?? level());
@@ -247,6 +260,64 @@
       return;
     }
     const clipId = clip.id;
+    if (caret && host?.ownerDocument.querySelector(CORE_SURFACE) && target === CLIP_TEXT) {
+      void openCore(clipId, target, text, point).then((opened) => {
+        if (!opened) {
+          domEdit(clipId, target, text, point);
+        }
+      });
+      return;
+    }
+    domEdit(clipId, target, text, point);
+  }
+
+  type CoreEdit = { clipId: string; part: string; text: string; first: TextCaret; at: Pt | null };
+
+  let core = $state<CoreEdit | null>(null);
+  let coreEditor = $state<ReturnType<typeof CoreTextEdit> | null>(null);
+
+  async function openCore(clipId: string, part: string, text: string, point: { x: number; y: number } | null): Promise<boolean> {
+    const first = await caret!(doc, clipId);
+    if (!first || !laidAsTyped(text, first.text, first.paragraphs, first.flow)) {
+      return false;
+    }
+    core = { clipId, part, text, first, at: point ? [point.x * doc.width, point.y * doc.height] : null };
+    ontyping(true);
+    return true;
+  }
+
+  $effect(() => {
+    const stage = host?.parentElement;
+    if (!core || !stage) {
+      return;
+    }
+    stage.setAttribute(CORE_TEXT_ATTRIBUTE, '');
+    return () => stage.removeAttribute(CORE_TEXT_ATTRIBUTE);
+  });
+
+  function writeCore(at: CoreEdit, typed: string) {
+    const result = writePartText(doc, at.clipId, at.part, typed);
+    if (result.ok) {
+      onchange(result.doc, 'Edited text on the canvas');
+    }
+  }
+
+  function typeCore(typed: string) {
+    if (core) {
+      writeCore(core, typed);
+    }
+  }
+
+  function endCore(typed: string | null) {
+    const was = core;
+    core = null;
+    ontyping(false);
+    if (was && typed !== null) {
+      writeCore(was, typed);
+    }
+  }
+
+  function domEdit(clipId: string, target: string, text: string, point: { x: number; y: number } | null) {
     const turn = ++editTurn;
     inPlace = true;
     const typedInto = (typed: string) => {
@@ -259,7 +330,7 @@
       }
     };
     typing = null;
-    void edittext(textTarget(clipId, target), point, (typed) => {
+    void edittext!(textTarget(clipId, target), point, (typed) => {
       typing = () => typedInto(typed);
       void remeasure();
     }).then((typed) => {
@@ -281,7 +352,11 @@
     pending?.();
   }
 
-  onMount(() => flushTyping);
+  onMount(() => {
+    return () => {
+        flushTyping();
+    };
+  });
 
   function commitPart(text: string) {
     const was = editing;
@@ -444,6 +519,10 @@
 
   function press(e: PointerEvent) {
     menu = null;
+    if (coreEditor?.down(e, local(e))) {
+      host!.setPointerCapture(e.pointerId);
+      return;
+    }
     const p = local(e);
     const from = level();
     froms = [froms.at(-1) ?? from, from];
@@ -580,6 +659,10 @@
   }
 
   function move(e: PointerEvent) {
+    if (coreEditor?.active()) {
+      coreEditor.drag(local(e));
+      return;
+    }
     if (sweep) {
       sweepTo(e);
       return;
@@ -655,6 +738,9 @@
   }
 
   function end(e: PointerEvent | null) {
+    if (coreEditor?.release()) {
+      return;
+    }
     if (sweep) {
       endSweep();
       return;
@@ -814,9 +900,16 @@
     {/if}
     {#if live}<output class="readout">{readout(clip.component as ComponentId, live.patch, doc)}</output>{/if}
   {/if}
+  {#if core && caret}
+    <CoreTextEdit bind:this={coreEditor} {doc} clipId={core.clipId} text={core.text} first={core.first} {caret} at={core.at} ontype={typeCore} onend={endCore} />
+  {/if}
 </div>
 
 <style>
+  :global([data-core-text] > .host) {
+    visibility: hidden;
+  }
+
   .overlay.typing {
     pointer-events: none;
   }

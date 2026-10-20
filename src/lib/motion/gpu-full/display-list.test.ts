@@ -5,8 +5,9 @@ import { Ease, TransitionKind } from '../design';
 import { addClip, setKeyframes, type OpResult } from '../timeline';
 import { FillType } from '../fill/model';
 import { BlendMode } from '../blend';
-import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, Unsupported, type ImageItem, type PathItem } from './display-list';
+import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, textCaretAt, Unsupported, type ImageItem, type PathItem } from './display-list';
 import { apply2d } from '../affine';
+import { caretRect } from './text/caret';
 import { boxBook, boxFace } from './text/test-face';
 import { Smoothing, TextOutput } from './text/painter';
 import { addAnimator } from '../text-animators/ops';
@@ -228,5 +229,50 @@ describe('displayListAt', () => {
 
     expect(at(10).unsupported).toEqual([]);
     expect(at(10).items.length).toBeGreaterThan(at(0).items.length);
+  });
+});
+
+describe('textCaretAt', () => {
+  const stops = (props: Record<string, unknown>) => {
+    const titled = must(addClip(withBg, { component: 'Title', from: 0, durationInFrames: 90, props: { text: 'ab', ...props } }, 'title'));
+    const caret = textCaretAt(prepare(titled, FEEGA_TOKENS, {}, boxType), 60, 'title')!;
+    const at = (offset: number) => {
+      const place = caretRect(caret.lines, offset);
+      return apply2d(caret.matrix, [place.x, place.top + place.height / 2])[0];
+    };
+    const inks = displayListAt(titled, 60, FEEGA_TOKENS, boxType).items.filter((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'title');
+    const lefts = inks.flatMap((ink) => ink.contours.map((c) => Math.min(...c.filter((_, k) => k % 2 === 0).map((x) => apply2d(ink.matrix, [x, 0])[0]))));
+    return { caret: [at(0), at(1)].sort((x, y) => x - y), ink: lefts.sort((x, y) => x - y) };
+  };
+
+  it('puts the caret stops on the left edges of the drawn glyphs', () => {
+    const { caret, ink } = stops({ align: 'left', x: 0.1, width: 0.3 });
+
+    expect(caret[0]).toBeCloseTo(ink[0], 3);
+    expect(caret[1]).toBeCloseTo(ink[1], 3);
+  });
+
+  it('follows a scaled title like the glyphs do', () => {
+    const { caret, ink } = stops({ align: 'center', x: 0.2, width: 0.3, scale: 1.5 });
+
+    expect(caret[0]).toBeCloseTo(ink[0], 3);
+    expect(caret[1]).toBeCloseTo(ink[1], 3);
+  });
+
+  it('draws the caret box around the glyph ink, top to bottom', () => {
+    const titled = must(addClip(withBg, { component: 'Title', from: 0, durationInFrames: 90, props: { text: 'ab', align: 'left', x: 0.1, width: 0.3 } }, 'title'));
+    const caret = textCaretAt(prepare(titled, FEEGA_TOKENS, {}, boxType), 60, 'title')!;
+    const place = caretRect(caret.lines, 0);
+    const [, top] = apply2d(caret.matrix, [place.x, place.top]);
+    const [, bottom] = apply2d(caret.matrix, [place.x, place.top + place.height]);
+    const ink = corners(displayListAt(titled, 60, FEEGA_TOKENS, boxType).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'title'));
+
+    expect(top).toBeLessThanOrEqual(ink.top);
+    expect(bottom).toBeGreaterThanOrEqual(ink.bottom);
+    expect(ink.top - top).toBeLessThan(bottom - top);
+  });
+
+  it('is null for a clip that is not text', () => {
+    expect(textCaretAt(prepare(withCard, FEEGA_TOKENS, {}, boxType), 0, 'card')).toBeNull();
   });
 });

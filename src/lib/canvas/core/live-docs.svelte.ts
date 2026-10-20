@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 import type { MotionDoc } from '$lib/motion/doc';
 import type { BrandTokens } from '$lib/motion/brand';
 
@@ -7,14 +8,15 @@ class LiveDocs {
   map = $state(new Map<string, LiveDoc>());
 
   set(id: string, live: LiveDoc) {
-    this.map = new Map(this.map).set(id, live);
+    this.map = new Map(untrack(() => this.map)).set(id, live);
   }
 
   clear(id: string) {
-    if (!this.map.has(id)) {
+    const current = untrack(() => this.map);
+    if (!current.has(id)) {
       return;
     }
-    const next = new Map(this.map);
+    const next = new Map(current);
     next.delete(id);
     this.map = next;
   }
