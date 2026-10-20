@@ -23,6 +23,8 @@ const REFERENCES_PX = 14;
 const REFERENCES_STROKE = 1.7;
 const CREDIT_PX = 12.6;
 const CREDIT_STROKE = 1.8;
+const BADGE_ICON_PX = 20;
+const BADGE_ICON_STROKE = 1.6;
 const HEAD_PX = 13;
 const HEAD_STROKE = 1.8;
 const BADGE_PX = 11;
@@ -39,6 +41,7 @@ export async function coreText(kinds: readonly NodeType[]): Promise<CoreText> {
   const book = faceBook(faceRules(css), new Map([[url, fontkitSource(bytes)]]), []);
   const icons = new Map(await Promise.all(kinds.map(async (k) => [k, iconContours(await iconNodes(NODE_KIND_ICON[k]), ICON_PX, ICON_STROKE)] as const)));
   const head = new Map(await Promise.all(kinds.map(async (k) => [k, iconContours(await iconNodes(NODE_KIND_ICON[k]), HEAD_PX, HEAD_STROKE)] as const)));
-  const gen = { head, layers: iconContours(await iconNodes(Layers), BADGE_PX, BADGE_STROKE), play: iconContours(await iconNodes(Play), BADGE_PX, BADGE_STROKE), person: iconContours(await iconNodes(UserRound), PERSON_PX, PERSON_STROKE), references: iconContours(await iconNodes(ImagePlus), REFERENCES_PX, REFERENCES_STROKE), credit: iconContours(await iconNodes(CircleDollarSign), CREDIT_PX, CREDIT_STROKE) };
+  const badge = new Map(await Promise.all(kinds.map(async (k) => [k, iconContours(await iconNodes(NODE_KIND_ICON[k]), BADGE_ICON_PX, BADGE_ICON_STROKE)] as const)));
+  const gen = { head, badge, layers: iconContours(await iconNodes(Layers), BADGE_PX, BADGE_STROKE), play: iconContours(await iconNodes(Play), BADGE_PX, BADGE_STROKE), person: iconContours(await iconNodes(UserRound), PERSON_PX, PERSON_STROKE), references: iconContours(await iconNodes(ImagePlus), REFERENCES_PX, REFERENCES_STROKE), credit: iconContours(await iconNodes(CircleDollarSign), CREDIT_PX, CREDIT_STROKE) };
   return { glyphs: glyphsOf(book, FAMILY, REGULAR), bold: glyphsOf(book, FAMILY, BOLD), icons, gen };
 }

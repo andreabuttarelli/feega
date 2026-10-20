@@ -4,6 +4,7 @@ import { Surface, type CardFace } from '$lib/canvas/gpu/card-face';
 import type { Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
 import { circle, rect, solid } from './shapes';
+import { emptyItems, pickItems } from './empty-card';
 import { personItems, previewItems } from './source-card';
 import { genBody, genItems, genMark } from './gen-card';
 import { BODY_SIZE, BORDER, CardPart, DONE, ERROR, FOOTER_LINES, Fit, HEAD_H, HEAD_SIZE, PAD, ROW_GAP, ROW_H, ROW_THUMB, DOT_RADIUS, PILL_H, PILL_PAD, PROMPT_HINT, RUNNING, AUTO_MODEL, STAGE, STATUS_RADIUS, STATUS_TEXT_GAP, THUMB_GAP, at, body, image, panel, text, whole, type CardIcons, type CoreCard, type Ctx } from './card-kit';
@@ -111,6 +112,8 @@ const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
   [Surface.Source]: source,
   [Surface.Preview]: previewItems,
   [Surface.Person]: personItems,
+  [Surface.Empty]: emptyItems,
+  [Surface.Pick]: pickItems,
   [Surface.List]: list,
   [Surface.Doc]: doc,
   [Surface.Blank]: (x) => panel(x)
