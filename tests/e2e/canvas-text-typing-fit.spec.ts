@@ -5,6 +5,7 @@ const PHRASE = 'Ciao, come stai oggi amico mio';
 const KEY_GAP_MS = 120;
 const SETTLE_MS = 2500;
 const FIT_SLACK_PX = 12;
+const SELECTION_SLACK_PX = 30;
 
 test.describe('typing a free text @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
@@ -23,6 +24,7 @@ test.describe('typing a free text @real', () => {
     await page.keyboard.type(PHRASE, { delay: KEY_GAP_MS });
     const typed = await field.evaluate((el) => ({ words: el.getBoundingClientRect().width, stage: el.ownerDocument.getElementById('root')!.offsetWidth }));
     const wordsInNode = (typed.words * Number(before!.width)) / typed.stage;
+    await expect.poll(async () => Math.abs((await page.getByTestId('selection-box').boundingBox())!.width - wordsInNode), { message: 'the selection box follows the typed text' }).toBeLessThanOrEqual(SELECTION_SLACK_PX);
 
     await page.keyboard.press('Escape');
     await page.waitForTimeout(SETTLE_MS);

@@ -3,7 +3,7 @@ import type { Viewport } from '../dot-grid';
 import { MOTION_NODE_BAR_H } from '../motion-node';
 import { AssetSize, sized } from '../asset-url';
 import { Surface, type CardFace, type Media } from './card-face';
-import type { Box, Curve } from './geometry';
+import { containedIn, type Box, type Curve } from './geometry';
 import { createTextureCache, fitBitmap, type TextureCache } from './texture-cache';
 import { createUploadQueue, type UploadQueue } from './upload-queue';
 import { textureDecoder } from './texture-decoder';
@@ -702,8 +702,10 @@ export class GpuScene {
     const snap = c.snapshot ? this.snapshots.get(c.id) : undefined;
     if (snap && snap.key === c.snapshot) {
       const sprite = new Sprite(snap.tex);
-      sprite.width = c.w;
-      sprite.height = c.h;
+      const fitted = containedIn({ w: snap.tex.width, h: snap.tex.height }, { x: 0, y: 0, w: c.w, h: c.h });
+      sprite.position.set(fitted.x, fitted.y);
+      sprite.width = fitted.w;
+      sprite.height = fitted.h;
       root.addChild(sprite);
       b.body = sprite;
       b.media = { url: snap.key, video: false };
