@@ -21,6 +21,12 @@ pub trait Surface {
     fn paint(&mut self, region: Rect, base: Option<Rgba>, draw: &dyn Fn(&mut Self::Canvas)) -> Result<Tex<Self>, Self::Error>;
     fn runner(&self) -> &Self::Runner;
     fn place(&mut self, texture: Tex<Self>, region: Rect) -> Placed<Pic<Self>>;
+
+    fn recall(&mut self, _item: &Item) -> Option<Placed<Pic<Self>>> {
+        None
+    }
+
+    fn remember(&mut self, _item: &Item, _placed: &Placed<Pic<Self>>) {}
 }
 
 fn reach(sigma: f64) -> f64 {
@@ -63,12 +69,20 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
             let layer = behind(surface, items, i, background, &layers, pictures, sigma)?;
             layers.behind.insert(i, layer);
         }
-        if let Item::Group(group) = item {
+        let recalled = if layer_worthy(item) { surface.recall(item) } else { None };
+        if let (Item::Group(group), None) = (item, &recalled) {
             let inner = prepare_items(surface, &group.items, None, pictures, blending)?;
             layers.groups.insert(i, inner);
         }
         if layer_worthy(item) {
-            let layer = body(surface, item, pictures, layers.groups.get(&i))?;
+            let layer = match recalled {
+                Some(layer) => layer,
+                None => {
+                    let made = body(surface, item, pictures, layers.groups.get(&i))?;
+                    surface.remember(item, &made);
+                    made
+                }
+            };
             layers.bodies.insert(i, layer);
         }
         if composited_blend(item, blending) {
