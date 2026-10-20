@@ -88,8 +88,8 @@ export const TRANSFORM = {
   skewX: { label: 'Skew X', min: -80, max: 80, step: 1, fallback: 0 },
   skewY: { label: 'Skew Y', min: -80, max: 80, step: 1, fallback: 0 },
   perspective: { label: 'Perspective', min: 100, max: 10000, step: 10, fallback: 1200 },
-  anchorX: { label: 'Anchor X', min: 0, max: 1, step: 0.01, fallback: 0.5 },
-  anchorY: { label: 'Anchor Y', min: 0, max: 1, step: 0.01, fallback: 0.5 },
+  anchorX: { label: 'Pivot X', min: 0, max: 1, step: 0.01, fallback: 0.5 },
+  anchorY: { label: 'Pivot Y', min: 0, max: 1, step: 0.01, fallback: 0.5 },
   opacity: { label: 'Opacity', min: 0, max: 1, step: 0.01, fallback: 1 },
   blur: { label: 'Blur', min: 0, max: 100, step: 0.5, fallback: 0 }
 } as const satisfies Record<string, Range>;

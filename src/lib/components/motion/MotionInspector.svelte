@@ -17,9 +17,9 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { EditMode, designWarning, editIn } from '$lib/motion/edit-mode';
   import { InspectorTab, clipFieldGroups, keyAt, keyedField, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
-  import { setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
+  import { setMask, setProps, setTiming, setTrackMatte, setTransition, Side, type OpResult } from '$lib/motion/timeline';
   import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
-  import { ANIMATABLE, Source, isAnimatable, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
+  import { ANIMATABLE, Source, isAnimatable, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
   import NumberField from './NumberField.svelte';
   import Dial from './Dial.svelte';
   import InspectorSection from './InspectorSection.svelte';
@@ -28,10 +28,9 @@
   import { DIAL_KEYS, Part, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
   import { clipName as layerName, setClipFlags } from '$lib/motion/organize';
-  import { Flip, flipPatch } from '$lib/motion/layer-props';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
-  import FlipHorizontal from '@lucide/svelte/icons/flip-horizontal-2';
-  import FlipVertical from '@lucide/svelte/icons/flip-vertical-2';
+  import PositionSection from '$lib/components/motion/PositionSection.svelte';
+  import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
@@ -112,7 +111,8 @@
     partFill = null,
     gesture = null,
     lead,
-    mode = EditMode.Motion
+    mode = EditMode.Motion,
+    onalign
   }: {
     doc: MotionDoc;
     analyses?: Record<string, AudioAnalysis>;
@@ -134,6 +134,7 @@
     gesture?: LiveGesture | null;
     lead?: Snippet;
     mode?: EditMode;
+    onalign?: (edge: AlignEdge) => void;
   } = $props();
 
   function leaveOnEscape(e: KeyboardEvent) {
@@ -142,7 +143,6 @@
     }
   }
 
-  const ANCHOR_STOPS = [0, 0.5, 1] as const;
   const CORNER_NAMES = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left'] as const;
   const PERCENT = 100;
   const CORNER_PERCENT_MAX = 50;
@@ -202,7 +202,6 @@
   const layerProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Layer && p.key !== 'opacity'));
   const opacityProp = $derived(transformProps.find((p) => p.key === 'opacity') ?? null);
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
-  const flip = (axis: Flip) => commit(setTransform(doc, clip.id, flipPatch({ scaleX: Number(shown('scaleX') ?? 1), scaleY: Number(shown('scaleY') ?? 1) }, axis)), 'Flipped the layer');
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
   const sceneProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Scene));
@@ -652,18 +651,8 @@
   {@render groupFields(Section.Layout)}
   {#if layoutProps.length}
     <div class="stackable" data-testid="transform-section">
+      <PositionSection {doc} {clip} onchange={commit} onalign={(edge) => onalign?.(edge)} />
       {@render animGrid(layoutProps)}
-      <div class="line">
-        <span class="label">Anchor</span>
-        <div class="anchor" role="group" aria-label="Anchor">
-          {#each ANCHOR_STOPS as ay (ay)}
-            {#each ANCHOR_STOPS as ax (ax)}
-              {@const on = (clip.transform.anchorX ?? TRANSFORM.anchorX.fallback) === ax && (clip.transform.anchorY ?? TRANSFORM.anchorY.fallback) === ay}
-              <button type="button" class:on aria-label={`Anchor ${ax} ${ay}`} onclick={() => commit(setTransform(doc, clip.id, { anchorX: ax, anchorY: ay }), 'Moved the anchor')}></button>
-            {/each}
-          {/each}
-        </div>
-      </div>
     </div>
   {/if}
 {/snippet}
@@ -683,11 +672,6 @@
   {#if layerProps.length}<div class="stackable" data-testid="layer-transform">{@render animGrid(layerProps)}</div>{/if}
   {@render groupFields(Section.Layer)}
   {#if visual && !focus}
-    <div class="line" data-testid="flip-section">
-      <span class="label">Flip</span>
-      <ShellIconButton label="Flip horizontal" data-testid="flip-horizontal" onclick={() => flip(Flip.Horizontal)}><FlipHorizontal /></ShellIconButton>
-      <ShellIconButton label="Flip vertical" data-testid="flip-vertical" onclick={() => flip(Flip.Vertical)}><FlipVertical /></ShellIconButton>
-    </div>
     {#if hasChildren}
       <div class="line" data-prop="clipContent">
         <span class="label">Clip content</span>
@@ -1475,28 +1459,6 @@
   .key[data-mark='animated']::before {
     border-color: var(--ui-accent);
     background: linear-gradient(135deg, var(--ui-accent) 50%, transparent 50%);
-  }
-
-  .anchor {
-    display: grid;
-    grid-template-columns: repeat(3, 8px);
-    gap: 4px;
-    padding: 4px;
-    background: var(--ui-input);
-  }
-
-  .anchor button {
-    width: 8px;
-    height: 8px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: var(--ui-divider-strong);
-  }
-
-  .anchor button.on {
-    background: var(--ui-accent);
-    border-color: var(--ui-accent);
   }
 
   .checks {
