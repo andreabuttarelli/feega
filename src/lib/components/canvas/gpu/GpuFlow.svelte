@@ -90,6 +90,7 @@
   import { Counter, count, exposeLoss, exposeReveal, exposeSettled, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
+  import { baseRatio, cellBox, cellBytes, cellCss, cellKey, detailRatio, neededCells, type Cell } from '$lib/canvas/gpu/detail-plan';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
@@ -517,10 +518,34 @@
     focusLive = (e.target as HTMLElement | null)?.closest<HTMLElement>('.gpu-dom-node')?.dataset.id ?? null;
   }
 
+  const shelfReady = async (host: HTMLElement) => {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await quiet();
+    for (const img of host.querySelectorAll('img')) {
+      img.loading = 'eager';
+    }
+    await withTimeout(Promise.all([...host.querySelectorAll('img')].map((img) => img.decode().catch(() => undefined))), SNAPSHOT_TIMEOUT_MS).catch(() => undefined);
+    await new Promise((r) => setTimeout(r, SNAPSHOT_SETTLE_MS));
+  };
+
+  const capture = async (el: HTMLElement, extra: Record<string, unknown>) => {
+    const { getFontEmbedCSS, toCanvas } = await import('html-to-image');
+    fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
+    const options = { ...extra, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL };
+    const foreign = [...el.querySelectorAll('img')].some((img) => crossOrigin(img.currentSrc || img.src));
+    const keep = (n: Node) => !(n instanceof HTMLImageElement && crossOrigin(n.currentSrc || n.src));
+    await quiet();
+    const canvas = await withTimeout(toCanvas(el, foreign ? { ...options, filter: keep } : options), SNAPSHOT_TIMEOUT_MS);
+    if (foreign && tainted(canvas)) {
+      throw new Error('tainted snapshot');
+    }
+    return canvas;
+  };
+
   let schedulerTick = $state(0);
   $effect(() => {
     void schedulerTick;
-    if (shotJob || !shootsTiles() || !BUDGET[currentDevice()].shootsSnapshots) {
+    if (shotJob || detailJob || !shootsTiles() || !BUDGET[currentDevice()].shootsSnapshots) {
       return;
     }
     if (performance.now() < busyUntil) {
@@ -537,6 +562,110 @@
   });
 
   let shotMount = $state<string | null>(null);
+
+  type DetailJob = { id: string; key: string; ratio: number; size: number; cell: Cell };
+  const DETAIL_SETTLE_MS = 200;
+  let detailJob = $state<DetailJob | null>(null);
+  const tried = new Set<string>();
+  const triedKey = (id: string, ratio: number, c: Cell) => `${id}|${ratio}|${cellKey(c)}`;
+  let settledView = $state<Viewport | null>(null);
+  $effect(() => {
+    const v = view;
+    const t = setTimeout(() => {
+      tried.clear();
+      settledView = v;
+    }, DETAIL_SETTLE_MS);
+    return () => clearTimeout(t);
+  });
+
+  const nextDetail = (s: GpuScene, v: Viewport): DetailJob | null => {
+    const screen = screenSize();
+    const dpr = window.devicePixelRatio || 1;
+    const worldView = { x: -v.x / v.zoom, y: -v.y / v.zoom, w: screen.width / v.zoom, h: screen.height / v.zoom };
+    const seen = visibleIds(placed.filter(snapshotKind), v, area);
+    let spent = s.detailBytes();
+    for (const id of s.detailIds()) {
+      if (!seen.has(id) || domIds.has(id)) {
+        s.dropDetail(id);
+      }
+    }
+    spent = s.detailBytes();
+    const budget = BUDGET[currentDevice()].detailBytes;
+    const centre = { x: worldView.x + worldView.w / 2, y: worldView.y + worldView.h / 2 };
+    const candidates = placed.filter((t) => seen.has(t.id) && !domIds.has(t.id) && pictured.get(t.id) === shotKeyOf(t.id)).sort((a, b) => Math.hypot(a.x + a.w / 2 - centre.x, a.y + a.h / 2 - centre.y) - Math.hypot(b.x + b.w / 2 - centre.x, b.y + b.h / 2 - centre.y));
+    for (const t of candidates) {
+      const ratio = detailRatio(v.zoom, dpr, baseRatio(t, SNAPSHOT_PIXEL_RATIO, BUDGET[currentDevice()].snapshotEdge));
+      if (!ratio) {
+        s.dropDetail(t.id);
+        continue;
+      }
+      const key = shotKeyOf(t.id);
+      const have = s.detailOf(t.id);
+      const size = cellCss(ratio);
+      const same = have && have.ratio === ratio && have.key === key ? have : null;
+      const missing = neededCells(t, worldView, size).filter((c) => !same?.cells.has(cellKey(c)) && !tried.has(triedKey(t.id, ratio, c)));
+      if (!missing.length) {
+        s.trimDetail(t.id);
+        continue;
+      }
+      const cell = missing[0];
+      if (spent + cellBytes(cellBox({ x: 0, y: 0, w: t.w, h: t.h }, size, cell), ratio) > budget) {
+        continue;
+      }
+      return { id: t.id, key, ratio, size, cell };
+    }
+    return null;
+  };
+
+  $effect(() => {
+    const v = settledView;
+    void schedulerTick;
+    void detailJob;
+    void shotJob;
+    void pictured;
+    if (!v || !scene || detailJob || shotJob || !BUDGET[currentDevice()].shootsSnapshots) {
+      return;
+    }
+    if (performance.now() < busyUntil) {
+      const t = setTimeout(() => schedulerTick++, BUSY_MS);
+      return () => clearTimeout(t);
+    }
+    detailJob = untrack(() => nextDetail(scene!, v));
+  });
+
+  $effect(() => {
+    const job = detailJob;
+    const host = shelfHost;
+    if (!job || !host) {
+      return;
+    }
+    let cancelled = false;
+    tried.add(triedKey(job.id, job.ratio, job.cell));
+    void (async () => {
+      try {
+        await shelfReady(host);
+        const el = host.querySelector<HTMLElement>('.snapshot-node');
+        const box = cellBox({ x: 0, y: 0, w: byId.get(job.id)?.w ?? 0, h: byId.get(job.id)?.h ?? 0 }, job.size, job.cell);
+        if (cancelled || !el || !scene || shotKeyOf(job.id) !== job.key) {
+          return;
+        }
+        const style = { transform: `translate(${-box.x}px, ${-box.y}px)`, transformOrigin: 'top left' };
+        const canvas = await capture(el, { pixelRatio: job.ratio, width: box.w, height: box.h, style });
+        if (!cancelled && scene && shotKeyOf(job.id) === job.key) {
+          await scene.addDetailCell(job.id, job.key, job.ratio, job.size, job.cell, await createImageBitmap(canvas));
+          count(Counter.Snapshot);
+        }
+      } catch (err) {
+        console.warn(`[canvas] detail ${job.id}`, err);
+      }
+      if (!cancelled) {
+        detailJob = null;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  });
 
   $effect(() => {
     const id = shotJob;
@@ -578,29 +707,14 @@
     const key = untrack(() => shotKeyOf(id));
     let cancelled = false;
     void (async () => {
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await quiet();
-      for (const img of host.querySelectorAll('img')) {
-        img.loading = 'eager';
-      }
-      await withTimeout(Promise.all([...host.querySelectorAll('img')].map((img) => img.decode().catch(() => undefined))), SNAPSHOT_TIMEOUT_MS).catch(() => undefined);
-      await new Promise((r) => setTimeout(r, SNAPSHOT_SETTLE_MS));
+      await shelfReady(host);
       if (cancelled) {
         return;
       }
       const el = host.querySelector<HTMLElement>('.snapshot-node');
       try {
         if (el && shootsTiles()) {
-          const { getFontEmbedCSS, toCanvas } = await import('html-to-image');
-          fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
-          const options = { pixelRatio: SNAPSHOT_PIXEL_RATIO, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL };
-          const foreign = [...el.querySelectorAll('img')].some((img) => crossOrigin(img.currentSrc || img.src));
-          const keep = (n: Node) => !(n instanceof HTMLImageElement && crossOrigin(n.currentSrc || n.src));
-          await quiet();
-          const canvas = await withTimeout(toCanvas(el, foreign ? { ...options, filter: keep } : options), SNAPSHOT_TIMEOUT_MS);
-          if (foreign && tainted(canvas)) {
-            throw new Error('tainted snapshot');
-          }
+          const canvas = await capture(el, { pixelRatio: SNAPSHOT_PIXEL_RATIO });
           showSnapshot(id, key, await createImageBitmap(canvas));
           void storeSnapshot(id, key, canvas).then((blob) => publish(id, key, blob));
           count(Counter.Snapshot);
@@ -1834,9 +1948,9 @@
 
 
   <div class="snapshot-shelf" aria-hidden="true" bind:this={shelfHost}>
-    {#if shotMount && byId.get(shotMount)}
-      {@const t = byId.get(shotMount)!}
-      {#key shotMount}
+    {#if (shotMount ?? detailJob?.id) && byId.get((shotMount ?? detailJob?.id)!)}
+      {@const t = byId.get((shotMount ?? detailJob?.id)!)!}
+      {#key t.id}
         <div class="snapshot-node" data-snapshot={t.id} style={`width:${t.w}px;height:${t.h}px`}>
           <NodeBoundary>
             {@render props.tile({ id: t.id, selected: false })}

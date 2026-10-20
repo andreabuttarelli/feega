@@ -5,11 +5,11 @@ export enum Device {
   Phone = 'phone'
 }
 
-type Budget = { textureBytes: number; decodeEdge: number; snapshotEdge: number; maxResolution: number; antialias: boolean; posterShelf: number; shootsSnapshots: boolean };
+type Budget = { textureBytes: number; decodeEdge: number; snapshotEdge: number; detailBytes: number; maxResolution: number; antialias: boolean; posterShelf: number; shootsSnapshots: boolean };
 
 export const BUDGET: Record<Device, Budget> = {
-  [Device.Desktop]: { textureBytes: 256 * MB, decodeEdge: 2048, snapshotEdge: 8192, maxResolution: Infinity, antialias: true, posterShelf: 2, shootsSnapshots: true },
-  [Device.Phone]: { textureBytes: 128 * MB, decodeEdge: 512, snapshotEdge: 512, maxResolution: 2, antialias: false, posterShelf: 0, shootsSnapshots: false }
+  [Device.Desktop]: { textureBytes: 256 * MB, decodeEdge: 2048, snapshotEdge: 8192, detailBytes: 192 * MB, maxResolution: Infinity, antialias: true, posterShelf: 2, shootsSnapshots: true },
+  [Device.Phone]: { textureBytes: 128 * MB, decodeEdge: 512, snapshotEdge: 512, detailBytes: 0, maxResolution: 2, antialias: false, posterShelf: 0, shootsSnapshots: false }
 };
 
 const COARSE_POINTER = '(pointer: coarse)';
