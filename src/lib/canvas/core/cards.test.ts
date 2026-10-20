@@ -71,15 +71,6 @@ describe('cardItems', () => {
     expect(thumbs[0].size.width).toBeCloseTo((300 - 28 - 8) / 3);
   });
 
-  it('draws the tile picture over the whole card instead of the sketch once the tile was pictured', () => {
-    const items = cardItems(card('image', { prompt: 'a cat', output_asset_id: 'o1' }, { shot: 'blob:tile' }), theme, glyphs);
-    const [shot] = part(items, CardPart.Shot) as ImageItem[];
-
-    expect(shot.src).toBe('blob:tile');
-    expect(shot.size).toEqual({ width: 200, height: 100 });
-    expect(part(items, CardPart.Status)).toEqual([]);
-    expect(part(items, CardPart.Media)).toEqual([]);
-  });
 
   it('moves every item by the card position', () => {
     const [, paper] = paths(cardItems(card('doc', {}, { x: 50, y: 70 }), theme, glyphs), CardPart.Panel);
@@ -109,5 +100,26 @@ describe('cardItems', () => {
     const [body] = paths(cardItems(card('doc', { content: 'x'.repeat(500) }, { x: 10, y: 20 }), theme, glyphs), CardPart.Body);
 
     expect(body.scissor).toEqual([10, 20, 210, 120]);
+  });
+
+  it('draws a list as a header with its count and one row per item that fits', () => {
+    const items = cardItems(card('list', { itemKind: 'text', items: [{ text: 'one' }, { text: 'two' }, { text: 'three' }, { text: 'four' }, { text: 'five' }] }, { h: 120 }), theme, glyphs);
+
+    expect(paths(items, CardPart.Head).length).toBeGreaterThan(1);
+    expect(new Set(paths(items, CardPart.Row).map((r) => r.clip))).toEqual(new Set(['n:row']));
+    expect(paths(items, CardPart.Row)).toHaveLength(4);
+  });
+
+  it('puts a thumbnail and a status dot on an image list row', () => {
+    const items = cardItems(card('list', { itemKind: 'image', items: [{ url: 'u1', status: 'done' }] }, { h: 120 }), theme, glyphs);
+
+    expect((part(items, CardPart.Thumb) as ImageItem[]).some((i) => i.kind === ItemKind.Image && i.src === 'u1')).toBe(true);
+    expect(paths(items, CardPart.Status)).toHaveLength(1);
+  });
+
+  it('never draws a snapshot of a node: the card is always its own vectors', () => {
+    const items = cardItems(card('doc', { content: 'hi' }), theme, glyphs);
+
+    expect(items.every((i) => i.kind !== ItemKind.Image)).toBe(true);
   });
 });

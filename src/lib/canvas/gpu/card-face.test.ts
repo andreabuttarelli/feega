@@ -33,7 +33,7 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
   });
 
   it('a document shows its text, a display name wins over the type label', () => {
-    expect(faceOf({ id: 'd', kind: 'doc', tag: NameTag.Shown, displayName: 'Brief' }, { content: '# Hi\nthere' }, asset)).toMatchObject({ surface: Surface.Text, label: 'Brief', text: '# Hi\nthere' });
+    expect(faceOf({ id: 'd', kind: 'doc', tag: NameTag.Shown, displayName: 'Brief' }, { content: '# Hi\nthere' }, asset)).toMatchObject({ surface: Surface.Doc, label: 'Brief', text: '# Hi\nthere', pills: ['Read', 'Write'], count: 'Public link' });
   });
 
   it('sources show what they read from', () => {
@@ -56,5 +56,15 @@ describe('a face the core draws', () => {
   it('drops its poster and live media, so Pixi holds no texture for it', () => {
     const face = faceOf({ id: 'f', kind: 'motion', poster: { url: 'p.jpg' } as never }, {}, (id) => id, []);
     expect(handedToCore(face)).toMatchObject({ media: null, live: null, surface: face.surface });
+  });
+
+  it('a list shows one row per item, with its thumbnail when it holds images', () => {
+    const face = faceOf({ id: 'l', kind: 'list' }, { itemKind: 'image', items: [{ url: 'u1', status: 'done' }, { asset_id: 'a2', label: 'Two' }] }, asset);
+
+    expect(face).toMatchObject({ surface: Surface.List, pills: ['Images'], count: '2' });
+    expect(face.rows).toEqual([
+      { lead: '1', text: '1', thumb: 'u1', status: 'done' },
+      { lead: '2', text: 'Two', thumb: asset('a2'), status: null }
+    ]);
   });
 });

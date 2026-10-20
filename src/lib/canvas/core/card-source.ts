@@ -11,7 +11,6 @@ export type CardTile = {
   id: string;
   box: Box;
   face: CardFace;
-  shot: string | null;
   inputs: readonly PortMark[];
   outputs: readonly PortMark[];
   label: string | null;
@@ -26,7 +25,7 @@ export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold
   const [x, y] = [CHROME_REACH.side, CHROME_REACH.top];
   const w = t.box.w + 2 * CHROME_REACH.side;
   const h = t.box.h + CHROME_REACH.top + CHROME_REACH.bottom;
-  const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face, shot: t.shot }, theme, glyphs, bold, icons);
+  const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face }, theme, glyphs, bold, icons);
   const chrome = tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon }, glyphs);
   return {
     id: t.id,
@@ -59,5 +58,5 @@ export function portMarks(t: PortTile): { inputs: PortMark[]; outputs: PortMark[
 }
 
 export function cardKey(t: CardTile): string {
-  return `${t.id}:${JSON.stringify([t.box.w, t.box.h, t.face, t.shot, t.inputs, t.outputs, t.label])}`;
+  return `${t.id}:${JSON.stringify([t.box.w, t.box.h, t.face, t.inputs, t.outputs, t.label])}`;
 }

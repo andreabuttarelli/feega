@@ -229,7 +229,6 @@
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.thumbsOf?.(t.id) ?? [], props.genViewFor?.(t.id) ?? null),
-        shot: coreShots.get(t.id) ?? null,
         ...portMarks(t),
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null
@@ -354,21 +353,9 @@
   };
   let shown = $state(new Map<string, string>());
   const shotOf = (id: string) => shown.get(id) ?? null;
-  let coreShots = $state(new Map<string, string>());
-  const shootsTiles = () => !!scene || coreOn;
+  const shootsTiles = () => !!scene;
   const showSnapshot = (id: string, key: string, bitmap: ImageBitmap) => {
-    if (scene) {
-      void scene.setSnapshot(id, key, bitmap).then(() => (shown = new Map(shown).set(id, key)));
-      return;
-    }
-    void blobOf(bitmap).then((blob) => {
-      const before = coreShots.get(id);
-      coreShots = new Map(coreShots).set(id, URL.createObjectURL(blob));
-      shown = new Map(shown).set(id, key);
-      if (before) {
-        URL.revokeObjectURL(before);
-      }
-    });
+    void scene?.setSnapshot(id, key, bitmap).then(() => (shown = new Map(shown).set(id, key)));
   };
   const preloaded = new Set<string>();
   let looking = $state(new Set<string>());
