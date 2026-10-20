@@ -23,7 +23,7 @@
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
   import type { Pictures } from '$lib/motion/gpu-full/raster';
-  import { Stand, fillOrder, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, fillOrder, lastShown, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
@@ -156,10 +156,14 @@
   const cardBlocks = $derived(new Map(shownCards.filter((c) => !cardLists.has(c.key)).map((c) => [blocksGroup(c.key), { card: c, list: withoutPictures(c.frame.list, look) }])));
   const blocksById = $derived(new Map([...cardBlocks.entries()].map(([group, { card }]) => [card.frame.id, { id: card.frame.id, group, box: card.frame.box, size: { width: card.frame.list.width, height: card.frame.list.height }, bytes: 0, ...(card.turn ? { turn: card.turn } : {}) }])));
 
+  const rebuilding = $derived(new Set([...shownCards.filter((c) => !cardLists.has(c.key)).map((c) => c.frame.id), ...frames.filter((f) => !lists.has(keyOf(f))).map((f) => f.id)]));
+  let shownBefore = new Map<string, HeldFrame>();
   const held = $derived.by(() => {
     const ready = new Map(real.map((f) => [f.id, f]));
+    shownBefore = lastShown(shownBefore, real, rebuilding);
     return [...placeholders.values()].flatMap((p) => {
-      const shown = standIn<HeldFrame>([ready.get(p.id), blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...(p.turn ? { turn: p.turn } : {}) }]);
+      const before = shownBefore.get(p.id);
+      const shown = standIn<HeldFrame>([ready.get(p.id), before && { ...before, box: p.box, ...(p.turn ? { turn: p.turn } : {}) }, blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...(p.turn ? { turn: p.turn } : {}) }]);
       return shown ? [shown] : [];
     });
   });
@@ -328,6 +332,7 @@
   });
 
   $effect(() => () => media.dispose());
+
 </script>
 
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>

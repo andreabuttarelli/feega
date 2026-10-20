@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind, type DisplayList, type Item } from '$lib/motion/gpu-full/display-list';
 import { BlendMode } from '$lib/motion/blend';
-import { Stand, fillOrder, placeholder, standIn, withoutPictures, type Look } from './placeholders';
+import { Stand, fillOrder, lastShown, placeholder, standIn, withoutPictures, type Look } from './placeholders';
 
 const LOOK: Look = { paper: '#ffffff', line: '#e5e5e5' };
 const box = (x: number) => ({ x, y: 0, w: 200, h: 100 });
@@ -51,5 +51,24 @@ describe('pictures not there', () => {
 
   it('keeps the pictures that loaded and blocks only the ones that failed', () => {
     expect(withoutPictures(listOf([picture('ok'), picture('gone')]), LOOK, (i) => i.clip === 'gone').items.map((i) => i.kind)).toEqual([ItemKind.Image, ItemKind.Path]);
+  });
+});
+
+describe('what stays on screen while a node rebuilds', () => {
+  const held = (id: string, group: string) => ({ id, group, box: box(0), size: { width: 200, height: 100 } });
+
+  it('keeps the last real picture of a node whose new version is still being built', () => {
+    const first = lastShown(new Map(), [held('a', 'a:1')], new Set());
+    expect(lastShown(first, [], new Set(['a'])).get('a')?.group).toBe('a:1');
+  });
+
+  it('lets a ready version replace the old one', () => {
+    const first = lastShown(new Map(), [held('a', 'a:1')], new Set());
+    expect(lastShown(first, [held('a', 'a:2')], new Set(['a'])).get('a')?.group).toBe('a:2');
+  });
+
+  it('forgets a node that is not rebuilding, so evicted textures stay evicted', () => {
+    const first = lastShown(new Map(), [held('a', 'a:1')], new Set());
+    expect(lastShown(first, [], new Set()).has('a')).toBe(false);
   });
 });

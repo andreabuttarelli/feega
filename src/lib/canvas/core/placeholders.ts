@@ -28,6 +28,17 @@ export function placeholder(stand: Stand, size: Size, look: Look): { group: stri
 
 export const standIn = <T>(layers: readonly (T | null | undefined)[]): T | null => layers.find((l) => l != null) ?? null;
 
+export function lastShown<T extends { id: string }>(previous: ReadonlyMap<string, T>, ready: readonly T[], rebuilding: ReadonlySet<string>): Map<string, T> {
+  const next = new Map(ready.map((f) => [f.id, f]));
+  for (const id of rebuilding) {
+    const old = previous.get(id);
+    if (old && !next.has(id)) {
+      next.set(id, old);
+    }
+  }
+  return next;
+}
+
 export function fillOrder<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {
   const centre = { x: (screen.width / 2 - view.x) / view.zoom, y: (screen.height / 2 - view.y) / view.zoom };
   const half = { w: screen.width / 2 / view.zoom, h: screen.height / 2 / view.zoom };

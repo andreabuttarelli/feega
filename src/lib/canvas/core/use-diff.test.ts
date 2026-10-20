@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Use } from '$lib/motion/gpu-full/core-web';
 import type { PathItem } from '$lib/motion/gpu-full/display-list';
 import { SentOverlay, SentUses } from './use-diff';
@@ -11,6 +11,19 @@ describe('sent overlay', () => {
     expect(sent.changed([ring])).toBe(true);
     expect(sent.changed([{ ...ring }])).toBe(false);
     expect(sent.changed([{ ...ring, clip: 's' }])).toBe(true);
+  });
+
+  it('does not read the items again when the same array comes back', () => {
+    const sent = new SentOverlay();
+    const items = [{ kind: 'path', clip: 'r', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem];
+    const read = vi.spyOn(JSON, 'stringify');
+
+    sent.changed(items);
+    read.mockClear();
+
+    expect(sent.changed(items)).toBe(false);
+    expect(read).not.toHaveBeenCalled();
+    read.mockRestore();
   });
 });
 

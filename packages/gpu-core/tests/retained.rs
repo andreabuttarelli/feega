@@ -218,3 +218,15 @@ fn a_region_larger_than_the_scratch_target_is_split_into_tiles() {
     assert_eq!(area(&parts), 950.0 * 750.0);
     assert!(parts.iter().all(|p| p.width() <= 800.0 && p.height() <= 600.0));
 }
+
+#[test]
+fn a_zoom_out_that_uncovers_the_view_rasters_rough_while_the_gesture_runs() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+
+    let Step::Raster(mid) = rendered(&mut r, at(200.0, 150.0, 0.5), 16.0) else { panic!("a raster") };
+    assert_eq!(mid.quality, Quality::Rough);
+
+    let Step::Raster(settled) = rendered(&mut r, at(200.0, 150.0, 0.5), 300.0) else { panic!("a raster") };
+    assert_eq!(settled.quality, Quality::Sharp);
+}

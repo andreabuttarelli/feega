@@ -5,8 +5,13 @@ const same = (a: Use, b: Use) => a.group === b.group && Boolean(a.cache) === Boo
 
 export class SentOverlay {
   #sent: string | null = null;
+  #items: readonly PathItem[] | null = null;
 
   changed(items: readonly PathItem[]): boolean {
+    if (items === this.#items) {
+      return false;
+    }
+    this.#items = items;
     const json = JSON.stringify(items);
     const changed = json !== this.#sent;
     this.#sent = json;

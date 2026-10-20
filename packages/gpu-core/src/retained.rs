@@ -287,7 +287,8 @@ impl Retained {
             if gesture && self.covers(c) {
                 return self.present(c);
             }
-            return self.full(c, self.refined());
+            let quality = if gesture { Quality::Rough } else { self.refined() };
+            return self.full(c, quality);
         }
         if held.quality == Quality::Rough {
             if gesture {
