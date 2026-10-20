@@ -28,7 +28,7 @@
   import { IconButton, IconSize, Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import { Density, ROW_STEP_PX } from '$lib/canvas/layer-density';
-  import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayer, dropPlace, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropPlace, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -145,10 +145,11 @@
 
   let renaming = $state<string | null>(null);
   let dragged = $state<string | null>(null);
+  let block = $state<string[]>([]);
   let landing = $state<{ key: string; place: Place } | null>(null);
 
   function over(row: LayerRow, e: DragEvent) {
-    if (!dragged || !editable(row) || row.id === dragged) {
+    if (!dragged || !editable(row) || block.includes(row.id)) {
       landing = null;
       return;
     }
@@ -235,12 +236,14 @@
   function drop(row: LayerRow) {
     const from = dragged;
     const place = landing?.place;
+    const moving = block;
     dragged = null;
+    block = [];
     landing = null;
-    if (!video || !from || !place || from === row.id) {
+    if (!video || !from || !place || moving.includes(row.id)) {
       return;
     }
-    video.edit(dropLayer(video.doc, from, row.id, place), 'Moved a layer');
+    video.edit(dropLayers(video.doc, moving, row.id, place, frameRows(video.doc, video.nodeId).map((r) => r.id)), moving.length > 1 ? `Moved ${moving.length} layers` : 'Moved a layer');
   }
 
   let menu = $state<{ x: number; y: number } | null>(null);
@@ -295,11 +298,11 @@
       onpointerleave={() => layersSource.hover(null)}
       onkeydown={(e) => e.key === 'Enter' && choose(row, e as unknown as MouseEvent)}
       ondblclick={() => row.kind === LayerKind.Track && !row.nested && (renaming = row.id)}
-      ondragstart={(e) => ((dragged = row.id), e.dataTransfer?.setData('text/plain', row.id))}
+      ondragstart={(e) => ((dragged = row.id), (block = isPicked(row) && picked.length > 1 ? [...picked] : [row.id]), e.dataTransfer?.setData('text/plain', row.id))}
       data-drop={landing?.key === row.key ? landing.place : undefined}
       ondragover={(e) => over(row, e)}
       ondragleave={() => landing?.key === row.key && (landing = null)}
-      ondragend={() => ((dragged = null), (landing = null))}
+      ondragend={() => ((dragged = null), (block = []), (landing = null))}
       ondrop={() => drop(row)}
       oncontextmenu={(e) => openMenu(row, e)}
     >
