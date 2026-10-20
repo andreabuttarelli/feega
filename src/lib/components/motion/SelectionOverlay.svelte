@@ -17,6 +17,8 @@
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
   import { Depth, FramePress, Gesture, Press, Under, drill, levelOf, pressOf, type Level, type Probe } from '$lib/motion/drill';
+  import { EditMode } from '$lib/motion/edit-mode';
+  import { groupMove, rectOf, swept, toggled, unionBounds } from '$lib/motion/multi-select';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Bounds, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
@@ -40,7 +42,8 @@
     onmenu = null,
     edittext = null,
     layoutBounds = [],
-    scaleMode = ScaleMode.Resize
+    scaleMode = ScaleMode.Resize,
+    mode = EditMode.Motion
   }: {
     doc: MotionDoc;
     frame: number;
@@ -62,6 +65,7 @@
     onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
     edittext?: ((selector: string, at: { x: number; y: number } | null, oninput: (text: string) => void) => Promise<string | null>) | null;
     scaleMode?: ScaleMode;
+    mode?: EditMode;
     layoutBounds?: Bounds[];
   } = $props();
 
@@ -82,7 +86,8 @@
   };
 
   const chrome = $derived(clipChrome(part));
-  type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; start: ClientPt; pointer: number; whole: boolean; travelled: boolean };
+  type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; start: ClientPt; pointer: number; whole: boolean; travelled: boolean; group?: string[] };
+  type Sweep = { from: Pt; to: Pt; base: string[]; start: ClientPt; moved: boolean };
   const FRAME_SLOP_PX = 4;
   const framePress = $derived(onframemove ? FramePress.Move : FramePress.Pick);
   type ClientPt = { x: number; y: number };
@@ -91,6 +96,7 @@
   let boxes = $state<Boxes>(untrack(() => guessedBoxes(withAutoLayout(doc))));
   let hover = $state<string | null>(null);
   let grab = $state<Grab | null>(null);
+  let sweep = $state<Sweep | null>(null);
   let live = $state<{ doc: MotionDoc; patch: Transform; guides: Guide[]; gaps: Gap[] } | null>(null);
 
   const laid = $derived(withAutoLayout(doc));
@@ -99,6 +105,10 @@
   const clip = $derived<MotionClip | null>(selected ? (findClip(shown, selected)?.clip ?? null) : null);
   const onFrame = (c: MotionClip) => frame >= c.from && frame < c.from + c.durationInFrames;
   const quad = $derived(clip && boxes[clip.id] && onFrame(clip) ? quadOf(shown, clip.id, frame, boxes[clip.id]) : null);
+  const members = $derived(selection.length > 1 ? selection.filter((id) => boxes[id] && findClip(shown, id) && onFrame(findClip(shown, id)!.clip)) : []);
+  const memberQuads = $derived(members.map((id) => quadOf(shown, id, frame, boxes[id])));
+  const groupBounds = $derived(memberQuads.length > 1 ? unionBounds(memberQuads.map(aabb)) : null);
+  const sweepBounds = $derived(sweep?.moved ? rectOf(sweep.from, sweep.to) : null);
   const hoverQuad = $derived(hover && hover !== selected && !hover.includes(PART_SEP) && boxes[hover] ? quadOf(shown, hover, frame, boxes[hover]) : null);
   const hoverPart = $derived(hover && hover.includes(PART_SEP) && hover !== `${selected}${PART_SEP}${part}` ? (boxes[hover] ?? null) : null);
   const anchor = $derived(quad && clip ? anchorOf(shown, clip.id, frame) : null);
@@ -408,8 +418,25 @@
     const p = local(e);
     const from = level();
     froms = [froms.at(-1) ?? from, from];
-    const under = liveStack(p).length ? Under.Child : Under.Bare;
-    if (pressOf(from.depth, framePress, under) === Press.MoveFrame) {
+    const stack = liveStack(p);
+    if (e.shiftKey && stack[0]) {
+      part = null;
+      onselect(toggled(selection, stack[0]));
+      return;
+    }
+    if (members.length > 1 && members.includes(stack[0])) {
+      host!.setPointerCapture(e.pointerId);
+      grab = { grip: Grip.Move, handle: 0, clipId: stack[0], from: p, start: client(e), pointer: e.pointerId, whole: false, travelled: false, group: [...members] };
+      return;
+    }
+    const under = stack.length ? Under.Child : liveStack(null).length ? Under.Bare : Under.Empty;
+    const response = pressOf(from.depth, framePress, under);
+    if (response === Press.Marquee) {
+      host!.setPointerCapture(e.pointerId);
+      sweep = { from: p, to: p, base: e.shiftKey ? [...selection] : [], start: client(e), moved: false };
+      return;
+    }
+    if (response === Press.MoveFrame) {
       host!.setPointerCapture(e.pointerId);
       grab = { grip: Grip.Move, handle: 0, clipId: '', from: p, start: client(e), pointer: e.pointerId, whole: true, travelled: false };
       return;
@@ -431,9 +458,11 @@
     return target.part ? `${target.clip}${PART_SEP}${target.part}` : target.clip;
   }
 
-  function others(clipId: string) {
+  const others = (clipId: string) => othersThan([clipId]);
+
+  function othersThan(ids: readonly string[]) {
     return Object.keys(boxes)
-      .filter((id) => id !== clipId && findClip(doc, id) && onFrame(findClip(doc, id)!.clip))
+      .filter((id) => !ids.includes(id) && findClip(doc, id) && onFrame(findClip(doc, id)!.clip))
       .map((id) => aabb(quadOf(laid, id, frame, boxes[id])));
   }
 
@@ -462,9 +491,50 @@
     }
   }
 
+  function sweepTo(e: PointerEvent) {
+    if (!sweep) {
+      return;
+    }
+    const to = client(e);
+    sweep.moved ||= Math.hypot(to.x - sweep.start.x, to.y - sweep.start.y) >= FRAME_SLOP_PX;
+    sweep.to = local(e);
+    if (!sweep.moved) {
+      return;
+    }
+    const hits = swept(Object.fromEntries(Object.keys(boxes).filter((id) => findClip(laid, id) && onFrame(findClip(laid, id)!.clip)).map((id) => [id, aabb(quadOf(laid, id, frame, boxes[id]))])), rectOf(sweep.from, sweep.to), sweep.base);
+    if (hits.join() !== selection.join()) {
+      part = null;
+      onselect(hits);
+    }
+  }
+
+  function moveGroup(g: Grab & { group: string[] }, e: PointerEvent) {
+    const to = client(e);
+    g.travelled ||= Math.hypot(to.x - g.start.x, to.y - g.start.y) >= FRAME_SLOP_PX;
+    if (!g.travelled) {
+      return;
+    }
+    const at = local(e);
+    const box = unionBounds(g.group.map((id) => aabb(quadOf(laid, id, frame, boxes[id]))));
+    const { result, guides } = groupMove({ doc: laid, ids: g.group, frame, mode, offset: [at[0] - g.from[0], at[1] - g.from[1]], box, others: [...othersThan(g.group), ...layoutBounds], size: { width: doc.width, height: doc.height }, reach: snapReach() });
+    if (!result.ok) {
+      return;
+    }
+    live = { doc: result.doc, patch: {}, guides, gaps: [] };
+    onpreview(result.doc);
+  }
+
   function move(e: PointerEvent) {
+    if (sweep) {
+      sweepTo(e);
+      return;
+    }
     if (!grab) {
       hoverFrom(e);
+      return;
+    }
+    if (grab.group) {
+      moveGroup({ ...grab, group: grab.group }, e);
       return;
     }
     const hosted = hostGesture(grab, e);
@@ -521,11 +591,24 @@
 
   const baking = (grip: Grip) => grip === Grip.Scale && scaleMode === ScaleMode.Scale;
 
+  function endSweep() {
+    const done = sweep;
+    sweep = null;
+    if (done && !done.moved && !done.base.length) {
+      land(levelOf({ open: true, clip: null, part: null }));
+    }
+  }
+
   function end(e: PointerEvent | null) {
+    if (sweep) {
+      endSweep();
+      return;
+    }
     const done = live;
     const grip = grab?.grip;
     const clipId = grab?.clipId;
     const hosting = hostGesture(grab, e);
+    const groupGrab = grab?.group ? grab : null;
     const stillOnBare = !!grab?.whole && !grab.travelled;
     const reordered = done && grip === Grip.Move && grab && e ? reorderAt(doc, grab.clipId, local(e)) : null;
     const outside = grab && e ? leaving(e) : null;
@@ -533,6 +616,14 @@
     grab = null;
     live = null;
     onpreview(null);
+    if (groupGrab) {
+      if (!groupGrab.travelled) {
+        onselect([groupGrab.clipId]);
+      } else if (done) {
+        onchange(done.doc, `Moved ${groupGrab.group!.length} layers in the preview`);
+      }
+      return;
+    }
     if (stillOnBare) {
       land(levelOf({ open: true, clip: null, part: null }));
       return;
@@ -562,6 +653,12 @@
   }
 
   const pct = ([x, y]: Pt) => `left: ${(x / doc.width) * 100}%; top: ${(y / doc.height) * 100}%;`;
+  const boundsQuad = (b: Bounds): Quad => [
+    [b.left, b.top],
+    [b.right, b.top],
+    [b.right, b.bottom],
+    [b.left, b.bottom]
+  ];
   const points = (q: Quad) => q.map((p) => p.join(',')).join(' ');
 
   function outward(q: Quad, corner: Pt): string {
@@ -578,6 +675,9 @@
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} data-testid="hover-box" />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
+    {#each memberQuads as q, i (members[i])}<polygon class="box member" points={points(q)} data-testid="member-box" />{/each}
+    {#if groupBounds}<polygon class="box group" points={points(boundsQuad(groupBounds))} data-testid="group-box" />{/if}
+    {#if sweepBounds}<polygon class="sweep" points={points(boundsQuad(sweepBounds))} data-testid="marquee" />{/if}
     {#if quad}<polygon class="box" class:passive={!chrome.handles} points={points(quad)} data-testid="selection-box" data-ring={chrome.ring} />{/if}
     {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
       {#if g.axis === 'x'}<line class="gap" x1={g.from} y1={g.at} x2={g.to} y2={g.at} />{:else}<line class="gap" x1={g.at} y1={g.from} x2={g.at} y2={g.to} />{/if}
@@ -681,6 +781,18 @@
   .box {
     stroke: var(--ui-accent);
     stroke-width: 1.5px;
+  }
+
+  .box.member {
+    stroke-width: 1px;
+    opacity: 0.7;
+  }
+
+  .sweep {
+    fill: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+    stroke: var(--ui-accent);
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
   }
 
   .box.passive {
