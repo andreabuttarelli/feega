@@ -93,6 +93,7 @@
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { baseRatio, cellBox, cellBytes, cellCss, cellKey, detailRatio, neededCells, softPosters, type Cell } from '$lib/canvas/gpu/detail-plan';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
+  import type { GenTileView } from '$lib/canvas/gen-tile-view';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { revealIn as revealDelay } from '$lib/canvas/gpu/reveal-gate';
@@ -102,7 +103,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
 
   const DOM_CAP = 6;
   const CORE = 'core';
@@ -216,7 +217,7 @@
   });
   const coreLook = $derived(wrap ? themeOf(wrap) : null);
   const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
-  const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold) : null);
+  const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
   const coreCards = $derived.by(() => {
     const text = coreType;
     const draw = drawCard;
@@ -227,7 +228,7 @@
       const card: CardTile = {
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
-        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.thumbsOf?.(t.id) ?? []),
+        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.thumbsOf?.(t.id) ?? [], props.genViewFor?.(t.id) ?? null),
         shot: coreShots.get(t.id) ?? null,
         ...portMarks(t),
         label: labelOf(t),

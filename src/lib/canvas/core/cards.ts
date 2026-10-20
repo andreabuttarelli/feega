@@ -7,6 +7,7 @@ import type { Box } from '$lib/canvas/gpu/geometry';
 import type { Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
 import { circle, line, rect, solid } from './shapes';
+import { genBody, genItems, genMark, type GenIcons } from './gen-card';
 
 export enum CardPart {
   Panel = 'panel',
@@ -47,7 +48,7 @@ const RUNNING = 'Running…';
 const AUTO_MODEL = 'Auto';
 const CENTRE: [number, number] = [0.5, 0.5];
 
-type Ctx = { c: CoreCard; theme: CoreTheme; glyphs: Glyphs; bold: Glyphs; clip: (p: CardPart) => string };
+type Ctx = { c: CoreCard; theme: CoreTheme; glyphs: Glyphs; bold: Glyphs; icons: GenIcons | null; clip: (p: CardPart) => string };
 
 const at = (c: CoreCard, contours: number[][]) => contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + c.x : v + c.y)));
 
@@ -79,6 +80,17 @@ function text(x: Ctx, part: CardPart, s: string, size: number, colour: string, l
 const body = (x: Ctx, s: string, top: number, bottom = PAD) => text(x, CardPart.Body, s, BODY_SIZE, x.theme.ink, PAD, top, x.c.w - PAD * 2, x.c.h - top - bottom);
 
 const statusColour = (f: CardFace, theme: CoreTheme) => (f.error ? ERROR : f.running ? theme.accent : f.media ? DONE : theme.line);
+
+function live(x: Ctx): Item[] | null {
+  const { c, icons } = x;
+  const gen = c.face.gen;
+  if (!gen || !icons) {
+    return null;
+  }
+  const media = c.face.media && gen.state === 'done' ? [image(x, CardPart.Media, c.face.media, genBody(c, gen), Fit.Contain)] : [];
+  const kit = { theme: x.theme, glyphs: x.glyphs, bold: x.bold, icons };
+  return [...genItems(c, gen, kit), ...media, ...genMark(c, gen, kit)];
+}
 
 function generate(x: Ctx): Item[] {
   const { c, theme } = x;
@@ -138,7 +150,11 @@ const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
 
 const pictured = (x: Ctx, shot: string): Item[] => [...panel(x), { ...image(x, CardPart.Shot, { url: shot, video: false }, whole(x.c), Fit.Cover), clip: `${x.clip(CardPart.Shot)}:${shot}` }];
 
-export function cardItems(c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): Item[] {
-  const x: Ctx = { c, theme, glyphs, bold, clip: (p) => `${c.id}:${p}` };
+export function cardItems(c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: GenIcons | null = null): Item[] {
+  const x: Ctx = { c, theme, glyphs, bold, icons, clip: (p) => `${c.id}:${p}` };
+  const drawn = live(x);
+  if (drawn) {
+    return drawn;
+  }
   return c.shot ? pictured(x, c.shot) : SURFACES[c.face.surface](x);
 }

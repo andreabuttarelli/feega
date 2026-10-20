@@ -3,6 +3,7 @@ import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 import type { PortTile } from '$lib/canvas/gpu/geometry';
 import type { Box, FrameOnCanvas } from './canvas-scene';
 import { cardItems } from './cards';
+import type { GenIcons } from './gen-card';
 import { PortState, tileChrome, type Glyphs, type PortMark } from './chrome';
 import type { CoreTheme } from './overlay';
 
@@ -21,11 +22,11 @@ export const CHROME_REACH = { top: 24, side: 96, bottom: 4 };
 
 export const ringColour = (t: Pick<CardTile, 'outputs'>, theme: Pick<CoreTheme, 'accent'>): string => (t.outputs.length ? CONNECTOR_STYLE[t.outputs[0].type].color : theme.accent);
 
-export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): FrameOnCanvas {
+export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: GenIcons | null = null): FrameOnCanvas {
   const [x, y] = [CHROME_REACH.side, CHROME_REACH.top];
   const w = t.box.w + 2 * CHROME_REACH.side;
   const h = t.box.h + CHROME_REACH.top + CHROME_REACH.bottom;
-  const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face, shot: t.shot }, theme, glyphs, bold);
+  const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face, shot: t.shot }, theme, glyphs, bold, icons);
   const chrome = tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon }, glyphs);
   return {
     id: t.id,
@@ -34,12 +35,12 @@ export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold
   };
 }
 
-export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): (t: CardTile) => FrameOnCanvas {
+export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: GenIcons | null = null): (t: CardTile) => FrameOnCanvas {
   const drawn = new Map<string, { key: string; frame: FrameOnCanvas }>();
   return (t) => {
     const key = cardKey(t);
     const hit = drawn.get(t.id);
-    const frame = hit?.key === key ? hit.frame : cardOnCanvas(t, theme, glyphs, bold);
+    const frame = hit?.key === key ? hit.frame : cardOnCanvas(t, theme, glyphs, bold, icons);
     drawn.set(t.id, { key, frame });
     return { ...frame, box: { ...frame.box, x: t.box.x - CHROME_REACH.side, y: t.box.y - CHROME_REACH.top } };
   };
