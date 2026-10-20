@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Layer, Why, factsOf, layerOf, signatureOf, undrawn, type Candidates, type Situation } from './core-debug';
 
 const candidates: Candidates = { ready: { group: 'f:2' }, previous: { group: 'f:1' }, blocks: null, placeholder: { group: 'placeholder:frame:10x10' } };
-const base: Situation = { onScreen: true, hidden: false, drawn: { group: 'f:2' }, ready: true, candidates };
+const base: Situation = { onScreen: true, drawn: { group: 'f:2' }, ready: true, candidates };
 
 describe('core debug facts', () => {
   it('names which layer was drawn', () => {
@@ -18,7 +18,6 @@ describe('core debug facts', () => {
   });
 
   it('says why an on-screen node is not drawn', () => {
-    expect(factsOf('f', { ...base, hidden: true }).why).toBe(Why.LiveEditor);
     expect(factsOf('f', { ...base, drawn: { group: 'placeholder:frame:10x10' } }).why).toBe(Why.NotUploaded);
     expect(factsOf('f', { ...base, drawn: null, ready: false }).why).toBe(Why.Evicted);
     expect(factsOf('f', { ...base, onScreen: false }).why).toBe(Why.Offscreen);

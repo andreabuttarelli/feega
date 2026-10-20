@@ -8,7 +8,6 @@ export enum Layer {
 
 export enum Why {
   Drawn = 'drawn',
-  LiveEditor = 'live editor',
   NotUploaded = 'not uploaded',
   Evicted = 'not resident (loading or evicted)',
   Offscreen = 'offscreen'
@@ -34,16 +33,13 @@ export function layerOf(drawn: Named | null, candidates: Candidates): Layer {
   return KINDS.find(([, key]) => candidates[key]?.group === drawn.group)?.[0] ?? Layer.None;
 }
 
-export type Situation = { onScreen: boolean; hidden: boolean; drawn: Named | null; ready: boolean; candidates: Candidates };
+export type Situation = { onScreen: boolean; drawn: Named | null; ready: boolean; candidates: Candidates };
 
 export function factsOf(id: string, s: Situation): NodeFacts {
   const layer = layerOf(s.drawn, s.candidates);
   const group = s.drawn?.group ?? null;
   if (!s.onScreen) {
     return { id, layer, why: Why.Offscreen, group };
-  }
-  if (s.hidden) {
-    return { id, layer, why: Why.LiveEditor, group };
   }
   if (layer === Layer.Real || layer === Layer.Previous) {
     return { id, layer, why: Why.Drawn, group };
