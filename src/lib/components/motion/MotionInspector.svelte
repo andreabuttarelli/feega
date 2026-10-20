@@ -30,7 +30,7 @@
   import { clipName as layerName, setClipFlags } from '$lib/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
   import PositionSection from '$lib/components/motion/PositionSection.svelte';
-  import type { Edge } from '$lib/motion/space';
+  import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
@@ -134,7 +134,7 @@
     gesture?: LiveGesture | null;
     lead?: Snippet;
     mode?: EditMode;
-    onalign?: (edge: Edge) => void;
+    onalign?: (edge: AlignEdge) => void;
   } = $props();
 
   function leaveOnEscape(e: KeyboardEvent) {
