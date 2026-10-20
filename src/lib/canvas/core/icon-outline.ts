@@ -196,9 +196,29 @@ const SHAPES: Record<string, (a: Record<string, string | number>) => Polyline[]>
   polygon: (a) => [{ points: pairs(a.points), closed: true }]
 };
 
+function area(contour: number[]): number {
+  let twice = 0;
+  for (let i = 0; i < contour.length; i += 2) {
+    const j = (i + 2) % contour.length;
+    twice += contour[i] * contour[j + 1] - contour[j] * contour[i + 1];
+  }
+  return twice / 2;
+}
+
+function turnedForward(contour: number[]): number[] {
+  if (area(contour) >= 0) {
+    return contour;
+  }
+  const out: number[] = [];
+  for (let i = contour.length - 2; i >= 0; i -= 2) {
+    out.push(contour[i], contour[i + 1]);
+  }
+  return out;
+}
+
 export function iconContours(nodes: readonly IconNode[], size: number, strokeWidth: number): number[][] {
   const k = size / ICON_UNITS;
-  return nodes.flatMap(([tag, attrs]) =>
-    (SHAPES[tag]?.(attrs) ?? []).flatMap((l) => strokePolygons(l.points.map((v) => v * k), l.closed, strokeWidth * k, Cap.Round, Join.Round))
-  );
+  return nodes
+    .flatMap(([tag, attrs]) => (SHAPES[tag]?.(attrs) ?? []).flatMap((l) => strokePolygons(l.points.map((v) => v * k), l.closed, strokeWidth * k, Cap.Round, Join.Round)))
+    .map(turnedForward);
 }

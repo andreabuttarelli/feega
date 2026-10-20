@@ -507,7 +507,7 @@
       clearTimeout(hoverTimer);
       hoverTimer = null;
     }
-    if (!id || !byId.get(id) || !snapshotKind(byId.get(id)!)) {
+    if (coreOn || !id || !byId.get(id) || !snapshotKind(byId.get(id)!)) {
       untrack(() => {
         if (hoverLive && !wrap?.querySelector(`.gpu-dom-node[data-id="${hoverLive}"]:hover, .gpu-dom-node[data-id="${hoverLive}"]:focus-within`)) {
           hoverLive = null;
