@@ -51,10 +51,6 @@ const RESTANO = [
   'update_row',
   'delete_row',
   'describe_node_types',
-  'list_ad_campaigns',
-  'create_ad_campaign',
-  'approve_ad_campaign',
-  'set_ad_campaign_status',
   'run_node_generation',
   'apply_effects',
   'make_effects_pair',
@@ -98,11 +94,13 @@ const RESTANO = [
   'get_render',
   'list_orgs',
   'list_team',
-  'team_op'
+  'team_op',
+  'edit',
+  'view'
 ];
 
-describe('la superficie MCP è le quaranta dichiarate', () => {
-  test('tools/list è esattamente questi quaranta nomi', async () => {
+describe('la superficie MCP è quella dichiarata', () => {
+  test('tools/list è esattamente questi nomi', async () => {
     const names = (await tools()).map((t) => t.name).sort();
 
     expect(names).toEqual([...RESTANO].sort());
@@ -116,7 +114,7 @@ describe('la superficie MCP è le quaranta dichiarate', () => {
 
   test('le sei letture sono annotate readOnlyHint', async () => {
     const all = await tools();
-    const reads = ['query', 'describe_node_types', 'list_ad_campaigns', 'preview_node_loop', 'get_media'];
+    const reads = ['query', 'describe_node_types', 'preview_node_loop', 'get_media'];
 
     for (const name of reads) {
       const tool = all.find((t) => t.name === name) as { annotations?: { readOnlyHint?: boolean } } | undefined;

@@ -113,7 +113,8 @@ const hostRedirect: Handle = async ({ event, resolve }) => {
 };
 
 const SITE_ROUTES = '/(site)';
-const NOT_FOUND = 404;
+const SEE_OTHER = 303;
+const APP_HOME = '/app';
 
 function siteEnv() {
   return { vercelEnv: privateEnv.VERCEL_ENV, flag: publicEnv.PUBLIC_SITE_ENABLED };
@@ -125,7 +126,7 @@ export function siteShown(): boolean {
 
 export const siteGate: Handle = async ({ event, resolve }) => {
   if (event.route.id?.startsWith(SITE_ROUTES) && !siteShown()) {
-    throw error(NOT_FOUND);
+    throw redirect(SEE_OTHER, APP_HOME);
   }
   return resolve(event);
 };

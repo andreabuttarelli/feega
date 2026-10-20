@@ -11,12 +11,12 @@ program.hook('preAction', () => assertEnv());
 
 program
   .name('feega')
-  .description('CLI per gestire feega — social media AI autopilot')
+  .description('CLI per gestire feega — motion e tela infinita')
   .version('0.1.0')
   .addHelpText('after', `
 Esempi:
   $ feega brands                   Lista tutti i brand
-  $ feega dashboard my-brand       Dashboard completa
+  $ feega motion list              Lista i video
 
 Documentazione completa: cli/README.md
 `);
@@ -42,34 +42,18 @@ program
 
 program
   .command('brands')
-  .description('Elenca tutti i brand con status e autopilot')
+  .description('Elenca tutti i brand')
   .action(async () => {
     const { cmdBrands } = await import('./commands/brands.ts');
     await cmdBrands();
   });
 
 program
-  .command('status <slug>')
-  .description('Status dettagliato di un brand (post pending, quota, ultimi run)')
-  .action(async (slug: string) => {
-    const { cmdStatus } = await import('./commands/status.ts');
-    await cmdStatus(slug);
-  });
-
-program
   .command('health')
-  .description('Verifica lo stato delle API (Supabase, Gemini, Zernio)')
+  .description('Verifica lo stato delle API')
   .action(async () => {
     const { cmdHealth } = await import('./commands/health.ts');
     await cmdHealth();
-  });
-
-program
-  .command('dashboard <slug>')
-  .description('Dashboard completa di un brand: stats, pipeline, stato autopilot')
-  .action(async (slug: string) => {
-    const { cmdDashboard } = await import('./commands/dashboard.ts');
-    await cmdDashboard(slug);
   });
 
 program
@@ -78,17 +62,6 @@ program
   .action(async (slug: string, action: string | undefined) => {
     const { cmdProducts } = await import('./commands/products.ts');
     await cmdProducts(slug, { action: action ?? 'list' });
-  });
-
-program
-  .command('ads <slug>')
-  .description('Meta ad campaigns of a brand: list, approve spend')
-  .option('--approve <id>', 'Approve and launch a proposed campaign (spends budget)')
-  .option('--pause <id>', 'Pause a running campaign')
-  .option('--resume <id>', 'Resume a paused campaign')
-  .action(async (slug: string, opts) => {
-    const { cmdAds } = await import('./commands/ads.ts');
-    await cmdAds(slug, opts);
   });
 
 program

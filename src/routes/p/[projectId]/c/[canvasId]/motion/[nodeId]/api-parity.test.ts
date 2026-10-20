@@ -431,6 +431,19 @@ describe('POST /api/v1/motion/[nodeId]/ops guards like the page', () => {
     expect(endpoint).toEqual({ status: 403, data: { error: 'api_key_read_only' } });
   });
 
+  it('describe lists the ops with the voice-over one among them', async () => {
+    const endpoint = await viaEndpoint('describe', {});
+
+    expect(endpoint.status).toBe(200);
+    expect(endpoint.data.ops).toContainEqual({ name: 'generate_sound', access: 'write', summary: expect.stringContaining('voice-over') });
+  });
+
+  it('describe with an op answers its strict input schema', async () => {
+    const endpoint = await viaEndpoint('describe', { op: 'generate_sound' });
+
+    expect(endpoint.data.input_schema.required).toEqual(expect.arrayContaining(['sound', 'text']));
+  });
+
   it('names the ops it has when asked for another', async () => {
     const endpoint = await viaEndpoint('nope', {});
 

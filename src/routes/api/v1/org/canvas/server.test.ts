@@ -115,6 +115,44 @@ describe('POST /api/v1/org/canvas — the chat canvas ops, for CLI and MCP', () 
     expect(body.ops).toContain('create_node');
   });
 
+  it('describe lists every op with its access and one line, in one call', async () => {
+    caller(fakeDb({ projects: [projectRow] }, { filter: true }).db);
+
+    const { res, body } = await call({ project_id: PROJECT, op: 'describe', input: {} });
+
+    expect(res.status).toBe(200);
+    expect(body.ops).toContainEqual({ name: 'draw_frame', access: 'write', summary: expect.stringContaining('frame') });
+    expect(body.ops).toContainEqual(expect.objectContaining({ name: 'export_selection', access: 'read' }));
+  });
+
+  it('describe with an op answers its strict input schema', async () => {
+    caller(fakeDb({ projects: [projectRow] }, { filter: true }).db);
+
+    const { body } = await call({ project_id: PROJECT, op: 'describe', input: { op: 'draw_frame' } });
+
+    expect(body.input_schema.required).toEqual(expect.arrayContaining(['canvasId', 'x', 'y', 'w']));
+    expect(body.input_schema.properties.format.enum).toContain('4:5');
+    expect(body.input_schema.properties.still.description).toContain('still graphic');
+    expect(body.input_schema.additionalProperties).toBe(false);
+  });
+
+  it('describe of an op that is not there names the fix', async () => {
+    caller(fakeDb({ projects: [projectRow] }, { filter: true }).db);
+
+    const { res, body } = await call({ project_id: PROJECT, op: 'describe', input: { op: 'nope' } });
+
+    expect(res.status).toBe(400);
+    expect(body).toMatchObject({ error: 'unknown_op', fix: expect.stringContaining('describe') });
+  });
+
+  it('an unknown op points to describe', async () => {
+    caller(fakeDb({ projects: [projectRow] }, { filter: true }).db);
+
+    const { body } = await call({ project_id: PROJECT, op: 'drop_table', input: {} });
+
+    expect(body.fix).toContain('describe');
+  });
+
   it('refuses input that does not match the op schema', async () => {
     caller(fakeDb({ projects: [projectRow] }, { filter: true }).db);
 

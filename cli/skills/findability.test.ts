@@ -26,8 +26,6 @@ const ASKED_FOR: ReadonlyArray<{ tool: string; question: string; words: readonly
   { tool: 'query', question: 'what does this brand sell', words: ['products', 'read'] },
   { tool: 'run_node_generation', question: 'generate an image in this node', words: ['generate', 'image', 'node'] },
   { tool: 'run_node_generation', question: 'animate this into a video', words: ['generate', 'video', 'node'] },
-  { tool: 'create_ad_campaign', question: 'draft an ad campaign for this brand', words: ['campaign', 'draft'] },
-  { tool: 'approve_ad_campaign', question: 'approve this ad campaign so it can spend', words: ['approve', 'campaign', 'spend'] },
   { tool: 'insert_row', question: 'add a row to a table', words: ['add', 'row', 'table'] },
   { tool: 'delete_row', question: 'delete rows from a table', words: ['remove', 'org'] },
   { tool: 'get_media', question: 'show me the image this node generated', words: ['view', 'image', 'node'] },

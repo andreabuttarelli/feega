@@ -48,28 +48,23 @@ OAuth only — session at ~/.config/feega/session.json. No static API tokens.
 
 Stdio: bun run /path/to/feega-cli/mcp/stdio.ts
 HTTP: https://mcp.feega.app/mcp (Bearer required remotely)
-Start with list_brands / whoami. Use specific tools; chat for open-ended work.
+Start with `query`. Use specific tools; chat for open-ended work.
 
 ## CLI quick reference
 
 ```bash
 feega login
 feega brands
-feega dashboard <slug>
-feega content <slug> --status pending_user
-feega approve <slug> --all
-feega post <slug> <id> edit --caption "..."
-feega plan <slug> propose
-feega weekly-plan <slug> plan --week 0
-feega weekly-plan <slug> produce --week 0
-feega studio <slug> add-note --text "..."
+feega motion list
+feega motion ask <nodeId> "..."
+feega motion render <nodeId>
 ```
 
 ## Tips
 
 - Prefer MCP tools over shell when the server is connected
 - Use --pipe for machine-readable AI output
-- Post IDs: short prefixes from list tables (never guess if ambiguous)
+- IDs: short prefixes from list tables (never guess if ambiguous)
 SKILL_EOF
   fi
 

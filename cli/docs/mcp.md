@@ -82,10 +82,7 @@ Auth: Bearer **or** the local session file.
 ## What to call first
 
 1. `query` on `brands` — confirm auth, see what you can see
-2. `list_ad_campaigns` for the brand-scoped named read
-
-Ad campaign ids accept **short unambiguous prefixes** from list results (same rule as
-the CLI).
+2. `list_motion_videos` to find a video's node id
 
 ## Tool areas
 
@@ -93,7 +90,6 @@ the CLI).
 |------|-------|
 | Database (org-scoped) | `query`, `insert_row`, `update_row`, `delete_row`, `describe_node_types` |
 | Canvas generation | `run_node_generation`, `get_media` |
-| Ads (Meta) | `list_ad_campaigns`, `create_ad_campaign`, `approve_ad_campaign`, `set_ad_campaign_status` |
 
 12 tools total. Full map: [`skills/feega/references/tools.md`](../skills/feega/references/tools.md).
 

@@ -14,6 +14,8 @@ import { assetUrls, motionAssets, motionTokens, type MotionAsset } from './edito
 import { OpsOutcome, commitDoc } from './frame-ops';
 import { templateLibrary } from './templates';
 import { exportStill } from './still-export';
+import { speakVoiceover } from './voiceover';
+import { withOrgContext } from '$lib/server/ai-log';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { frameMover } from './move-element';
 import { drawFrames, firstFrames } from './server-frames';
@@ -43,6 +45,7 @@ export type ToolRunTurn = { sessions: Map<string, MotionSession>; selection: str
 export type ToolRunResult = { outcome: ToolRun.Done; output: unknown; version: number; saved: boolean; frames: Frame[] } | { outcome: Exclude<ToolRun, ToolRun.Done | ToolRun.Refused>; detail?: string };
 
 export const TOOL_RUN_AGENT_KEY = 'mcp';
+export const SPENDING_TOOLS: ReadonlySet<string> = new Set(['generate_voiceover']);
 const ID_LENGTH = 8;
 const HEADLESS = 'needs a chat turn in the editor: ask the motion agent instead';
 
@@ -61,8 +64,8 @@ const freshSession = (doc: MotionSession['doc'], version: number): MotionSession
 
 const noFrames: MotionToolDeps['frames'] = async () => null;
 
-function toolsFor(deps: Omit<MotionToolDeps, 'voiceover' | 'frames' | 'check' | 'newId'>, frames = noFrames): Record<string, Tool> {
-  return createMotionTools({ ...deps, newId, voiceover: offTurn, frames, check: async () => null, fontAdvance: readFontAdvance });
+function toolsFor(deps: Omit<MotionToolDeps, 'voiceover' | 'frames' | 'check' | 'newId'> & { voiceover?: MotionToolDeps['voiceover'] }, frames = noFrames): Record<string, Tool> {
+  return createMotionTools({ ...deps, newId, voiceover: deps.voiceover ?? offTurn, frames, check: async () => null, fontAdvance: readFontAdvance });
 }
 
 function carried(turn: ToolRunTurn | undefined, nodeId: string, doc: MotionDoc, version: number): MotionSession {
@@ -134,6 +137,7 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
     exportStill: async (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens: await tokens(), assets }),
     moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId),
     fonts: () => orgFontFamilies(db, scope.orgId),
+    voiceover: (voice) => withOrgContext(scope.orgId, () => speakVoiceover(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId, userId: scope.userId, actor }, voice)),
     embed: async (action) => embedAction(db, { nodeId: scope.nodeId, doc: session.doc, tokens: await tokens(), assetUrls: assetUrls(assets), title: saved.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()), mode: saved.project.mode }, action)
   }, frames);
   return { saved, session, tools, actor, nodeScope };

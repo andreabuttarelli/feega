@@ -120,11 +120,20 @@ export function blankElement(box: CanvasBox): OpResult {
   return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
 }
 
-export function drawnFrame(box: CanvasBox, format: MotionFormat = MotionFormat.Custom): MotionDoc {
+function sizedFrame(box: CanvasBox, format: MotionFormat): MotionDoc {
   if (format !== MotionFormat.Custom) {
     return newMotionDoc(format);
   }
   return { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box) };
+}
+
+export function drawnFrame(box: CanvasBox, format: MotionFormat = MotionFormat.Custom, stillSeconds?: number): MotionDoc {
+  const doc = sizedFrame(box, format);
+  if (stillSeconds === undefined) {
+    return doc;
+  }
+  const pinned = setStill(doc, stillSeconds);
+  return pinned.ok ? pinned.doc : doc;
 }
 
 function canvasBoxOf(outline: Outline): CanvasBox {
