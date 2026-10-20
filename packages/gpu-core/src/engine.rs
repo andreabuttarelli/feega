@@ -5,7 +5,7 @@ use vello::{AaConfig, AaSupport, RenderParams, RendererOptions, Scene};
 
 use crate::display_list::{Cover, DisplayList, Item, Rgba};
 use crate::groups::Plan;
-use crate::filter_passes::{layer_texture, FilterPasses, WgpuRunner};
+use crate::filter_passes::{layer_texture, FilterPasses, Pooled, WgpuRunner};
 use crate::layers::{prepare, Blending, Surface};
 use crate::pictures::Pictures;
 use crate::scene::{build, Placed};
@@ -25,6 +25,7 @@ struct Gpu<'a> {
     width: u32,
     height: u32,
     drawn: Vec<ImageData>,
+    kept: Vec<Pooled>,
 }
 
 fn clips(items: &[Item]) -> Vec<&str> {
@@ -73,9 +74,9 @@ impl<'a> Surface for Gpu<'a> {
         Rect::new(0.0, 0.0, self.width as f64, self.height as f64)
     }
 
-    fn paint(&mut self, region: Rect, colour: Option<Rgba>, draw: &dyn Fn(&mut Scene)) -> Result<wgpu::Texture, EngineError> {
+    fn paint(&mut self, region: Rect, colour: Option<Rgba>, draw: &dyn Fn(&mut Scene)) -> Result<Pooled, EngineError> {
         let size = (region.width() as u32, region.height() as u32);
-        let texture = layer_texture(self.runner.device, size.0, size.1);
+        let texture = self.runner.passes.texture(self.runner.device, size.0, size.1);
         let mut scene = Scene::new();
         draw(&mut scene);
         let mut moved = Scene::new();
@@ -88,8 +89,10 @@ impl<'a> Surface for Gpu<'a> {
         &self.runner
     }
 
-    fn place(&mut self, texture: wgpu::Texture, region: Rect) -> Placed {
-        Placed { image: self.vello.register_texture(texture), origin: region.origin() }
+    fn place(&mut self, texture: Pooled, region: Rect) -> Placed {
+        let image = self.vello.register_texture((*texture).clone());
+        self.kept.push(texture);
+        Placed { image, origin: region.origin() }
     }
 }
 
@@ -100,7 +103,7 @@ impl Engine {
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
-        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, drawn: drawn(list, pictures) };
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, drawn: drawn(list, pictures), kept: Vec::new() };
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let (scene, skipped) = build(list, pictures, &layers);
         let drawn = gpu.render(&scene, base(list.background), target, (list.width, list.height));

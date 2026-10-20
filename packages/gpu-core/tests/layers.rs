@@ -195,3 +195,15 @@ fn a_wipe_cuts_the_item_at_its_scissor() {
     assert_eq!(grey(&pixels, 20, 32), 255);
     assert_eq!(grey(&pixels, 40, 32), 0);
 }
+
+#[cfg(feature = "gpu")]
+#[test]
+fn a_frame_after_a_blurred_one_matches_a_fresh_renderer() {
+    let blurred = square(r#", "blur": 6"#);
+    let plain = square(RECT_MASK);
+    let mut shared = gpu_core::render::Renderer::new().expect("a GPU adapter");
+    shared.render(&parse(&blurred).unwrap(), &Pictures::new()).unwrap();
+    let reused = shared.render(&parse(&plain).unwrap(), &Pictures::new()).unwrap().pixels;
+
+    assert_eq!(reused, render(&plain));
+}

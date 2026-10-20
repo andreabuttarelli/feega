@@ -3196,3 +3196,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## A worktree dev server keeps serving the old module
 
 **Signal:** edits to a `.svelte` or `.ts` file change nothing in a Playwright run against `vite dev` started in a worktree; `curl localhost:PORT/src/...` shows the old source; before/after A/B runs agree because both ran the same stale code. **Move:** restart the dev server for every variant (`scripts/bench/editor-scrub.ts` runs against a fresh one) and grep the served module for a marker before trusting a comparison.
+
+## A gpu-core layer-heavy frame is slow with idle CPU
+
+**Signal:** `?engine=gpu-core` drops frames (presents/s well under rAF fps) on docs with blur, masks or filters while the main thread is idle. **Move:** `cargo run --release --example frame_cost -- <display list json>` in `packages/gpu-core` (dump a list with `scripts/bench/dump-list.ts`) gives GPU time per frame without readback. Cost was per-pass texture allocation and initialisation, not texel math: pooling the textures cut a 16-filter frame from 54 to 42 ms, while tiling or downscaling the blur added passes and got slower.
