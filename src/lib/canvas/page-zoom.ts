@@ -113,3 +113,56 @@ export function lockPageZoom(win: Window, zoom: CanvasZoom | null): () => void {
     win.removeEventListener('touchmove', blockMultiTouch, CAPTURE);
   };
 }
+
+export function pinchFactors(): { start: () => void; next: (scale: number) => number } {
+  let previous = 1;
+  return {
+    start: () => {
+      previous = 1;
+    },
+    next: (scale) => {
+      const factor = scale / previous;
+      previous = scale;
+      return factor;
+    }
+  };
+}
+
+export function watchPinch(el: HTMLElement, onPinch: (factor: number, clientX: number, clientY: number) => void): () => void {
+  const factors = pinchFactors();
+  let sentWheels = false;
+
+  const onStart = (e: Event) => {
+    e.preventDefault();
+    factors.start();
+    sentWheels = false;
+  };
+
+  const onChange = (e: Event) => {
+    e.preventDefault();
+    const { scale, clientX, clientY } = e as GestureEvent & { clientX: number; clientY: number };
+    const factor = factors.next(scale);
+    if (sentWheels) {
+      return;
+    }
+    onPinch(factor, clientX, clientY);
+  };
+
+  const onWheel = (e: WheelEvent) => {
+    if (e.ctrlKey) {
+      sentWheels = true;
+    }
+  };
+
+  el.addEventListener('gesturestart', onStart, ACTIVE);
+  el.addEventListener('gesturechange', onChange, ACTIVE);
+  el.addEventListener('gestureend', onStart, ACTIVE);
+  el.addEventListener('wheel', onWheel, CAPTURE);
+
+  return () => {
+    el.removeEventListener('gesturestart', onStart);
+    el.removeEventListener('gesturechange', onChange);
+    el.removeEventListener('gestureend', onStart);
+    el.removeEventListener('wheel', onWheel, CAPTURE);
+  };
+}

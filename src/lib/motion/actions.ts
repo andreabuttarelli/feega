@@ -234,6 +234,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Intersect]: { name: 'Intersect', icon: SquaresIntersect, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Exclude]: { name: 'Exclude', icon: SquaresExclude, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.OutlineStroke]: { name: 'Outline stroke', icon: PenLine, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.TextToPath]: { name: 'Outline text', icon: TypeIcon, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Flatten]: { name: 'Flatten', icon: Combine, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignLeft]: { name: 'Align left', icon: AlignStartVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignCenter]: { name: 'Align horizontal centres', icon: AlignCenterVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },

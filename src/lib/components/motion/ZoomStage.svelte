@@ -6,6 +6,7 @@
   import { isTyping } from '$lib/motion/shortcuts';
   import { ACTUAL_SIZE, FIT, Step, panBy, scaleOf, zoomAt, zoomLabel, zoomStep, zoomToBox, type Point, type Size, type View } from '$lib/motion/preview-view';
   import type { Box } from '$lib/motion/layout';
+  import { watchPinch } from '$lib/canvas/page-zoom';
 
   let { frame, view = $bindable(FIT), onspace, children }: { frame: Size; view?: View; onspace?: () => void; children: Snippet } = $props();
 
@@ -73,7 +74,11 @@
       return;
     }
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    const stopPinch = watchPinch(el, (factor, x, y) => zoomTo(scale * factor, fromCentre(x, y)));
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      stopPinch();
+    };
   });
 
   const centre = () => {

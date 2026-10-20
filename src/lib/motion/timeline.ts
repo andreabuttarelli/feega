@@ -44,7 +44,7 @@ function fitted(doc: MotionDoc): OpResult {
   return { ok: true, doc: { ...doc, durationInFrames: Math.max(doc.durationInFrames, end) } };
 }
 
-function editClip(doc: MotionDoc, clipId: string, edit: (clip: MotionClip) => MotionClip | string): OpResult {
+export function editClip(doc: MotionDoc, clipId: string, edit: (clip: MotionClip) => MotionClip | string): OpResult {
   const found = findClip(doc, clipId);
   if (!found) {
     return fail(`no clip ${clipId}`);

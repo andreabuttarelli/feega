@@ -44,7 +44,7 @@
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
   import { FocusMode, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
-  import { ZoomStep, type CanvasZoom } from '$lib/canvas/page-zoom';
+  import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
@@ -1318,6 +1318,18 @@
     props.onMoveEnd?.(moves);
     settleOverrides();
   }
+
+  $effect(() => {
+    const el = surface;
+    if (!el) {
+      return;
+    }
+    return watchPinch(el, (factor, x, y) => {
+      glide = null;
+      markBusy();
+      view = zoomAt(view, local({ clientX: x, clientY: y }), factor);
+    });
+  });
 
   function onWheel(e: WheelEvent) {
     glide = null;

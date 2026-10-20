@@ -199,6 +199,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Exclude]: motion('combine_shapes'),
   [Command.OutlineStroke]: motion('combine_shapes'),
   [Command.Flatten]: motion('combine_shapes'),
+  [Command.TextToPath]: motion('text_to_path'),
   [Command.RemoveMask]: motion('release_mask'),
   [Command.AlignLeft]: motion('arrange_space'),
   [Command.AlignCenter]: motion('arrange_space'),
