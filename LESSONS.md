@@ -4,6 +4,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Trascinare un elemento in un frame appena aperto sposta il frame, non l'elemento
+Segnale: un e2e doppio-clicca un elemento, `selection-box` è già «visibile», si trascina — e si muove tutto il nodo (la `stage` dell'editor era a `opacity: 0; pointer-events: none` finché `editor-stage` non ha `data-shown="true"`, quindi la pressione è andata alla tela). Stesso sintomo per un clip `Text` (il doppio clic avvia la scrittura sul posto e l'overlay diventa `pointer-events: none` fino a Esc), e per un box piccolo preso dal centro (lì sta il maniglione `selection-anchor`, che sposta il perno, non il box). Mossa: aspettare `data-shown="true"` prima di premere, premere Esc dopo un doppio clic su un testo, afferrare fuori dal centro. Un «non si muove» in un e2e di questo tipo va letto con `document.elementsFromPoint` sul punto di presa, prima di accusare il codice.
+
 ### In Safari l'anteprima gira a 30 fps mentre la pagina è a 60
 Segnale: `editor-scrub-budget.spec.ts` in WebKit dà host 60 fps e iframe 30 (play e scrub, ogni
 via di seek). WebKit limita il rAF degli iframe cross-origin mai toccati dall'utente a 30 fps
