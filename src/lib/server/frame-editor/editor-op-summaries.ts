@@ -1,0 +1,35 @@
+import type { OpSummaries } from '$lib/server/ops-description';
+import type { EDITOR_OPS } from './editor-ops';
+
+export const EDITOR_OP_SUMMARIES: OpSummaries<typeof EDITOR_OPS> = {
+  editor_session: 'Everything the editor page loads: head, assets, tokens, templates, render state, gallery.',
+  read_head: 'Version, full doc and actorKind of the saved revision.',
+  save_doc: 'Save the whole doc; a stale version answers 409 with the head.',
+  apply_ops: 'Apply doc ops, rebased on newer edits.',
+  record_export: 'Turn an mp4 already in storage into the render asset.',
+  upload_font: 'Add a font file already in storage to the org library.',
+  list_fonts: 'Uploaded font families of the org.',
+  rename_font: 'Rename a font family.',
+  delete_font: 'Delete a font family.',
+  analyze_sounds: 'Tempo, beats and speech of audio assets.',
+  template_sounds: 'Lay the template clip sound effects into the doc.',
+  save_template: 'Save the doc as an org template.',
+  generate_sound: 'Make a voice-over (sound:"voice") or music (sound:"music") from text; answers assetId and url (spends credits).',
+  render_batch: 'One server render per row of template field values (spends credits).',
+  list_revisions: 'Saved revisions, newest first.',
+  name_revision: 'Give a revision a name.',
+  create_branch: 'Fork the doc into a branch.',
+  list_branches: 'Branches of the doc.',
+  review_branch: 'Diff a branch against the main doc.',
+  merge_branch: 'Merge a branch back.',
+  drop_branch: 'Delete a branch.',
+  restore_revision: 'Put an earlier revision back as a new revision.',
+  export_still: 'Render a still image of the doc.',
+  start_render: 'Start a server render of the video.',
+  cancel_render: 'Cancel a running render.',
+  delete_template: 'Delete an org template.',
+  publish_gallery: 'Publish the node to the gallery.',
+  withdraw_gallery: 'Take the node out of the gallery.',
+  render_status: 'Latest server render.',
+  batch_status: 'Latest batch render.'
+};

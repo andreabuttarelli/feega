@@ -1,12 +1,21 @@
 import { json } from '@sveltejs/kit';
+import { z } from 'zod';
 import type { RequestHandler } from './$types';
 import { resolveOrgCaller, type OrgCaller } from '$lib/server/org-data/auth';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { findProjectById } from '$lib/server/repos/projects';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { Access, CANVAS_OPS, canvasCtx, isCanvasOp } from '$lib/server/canvas/canvas-ops';
+import { CANVAS_OP_SUMMARIES } from '$lib/server/canvas/canvas-op-summaries';
+import { describeOps } from '$lib/server/ops-description';
 
 type Gate = (caller: OrgCaller) => Promise<Response | undefined>;
+
+const HTTP_OK = 200;
+const HTTP_BAD_REQUEST = 400;
+const DESCRIBE_OP = 'describe';
+
+const describeInput = z.object({ op: z.string().optional() }).strict();
 
 const READ_ONLY_KEY = () => json({ error: 'api_key_read_only' }, { status: 403 });
 
@@ -32,8 +41,16 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
   const body = (await request.json().catch(() => ({}))) as { project_id?: string; op?: string; input?: unknown };
   const name = body.op ?? '';
+  if (name === DESCRIBE_OP) {
+    const asked = describeInput.safeParse(body.input ?? {});
+    if (!asked.success) {
+      return json({ error: 'invalid_input', issues: asked.error.issues }, { status: HTTP_BAD_REQUEST });
+    }
+    const described = describeOps(CANVAS_OPS, CANVAS_OP_SUMMARIES, asked.data.op);
+    return json(described, { status: 'error' in described ? HTTP_BAD_REQUEST : HTTP_OK });
+  }
   if (!isCanvasOp(name)) {
-    return json({ error: 'unknown_op', ops: Object.keys(CANVAS_OPS) }, { status: 400 });
+    return json(describeOps(CANVAS_OPS, CANVAS_OP_SUMMARIES, name), { status: HTTP_BAD_REQUEST });
   }
   const op = CANVAS_OPS[name];
 

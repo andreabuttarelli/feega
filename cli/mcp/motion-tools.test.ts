@@ -318,6 +318,22 @@ describe('the editor tools over MCP, through one tool', () => {
     expect(result?.structuredContent).toMatchObject({ version: 4, saved: true });
   });
 
+  test('passes every showcase tool through unchanged, batch and voice-over included', async () => {
+    const asks = [
+      { tool: 'add_shape', input: { kind: 'rect', start: 0, duration: 15, props: { x: 10, y: 10, width: 5, height: 5 } } },
+      { tool: 'set_layout_item', input: { clip_id: 'c' } },
+      { tool: 'arrange_layers', input: {} },
+      { tool: 'generate_voiceover', input: { text: 'Hello' } },
+      { tool: 'batch', input: { ops: [{ tool: 'set_canvas', input: { still: 2 } }] } },
+    ];
+
+    for (const ask of asks) {
+      calls.length = 0;
+      await callTool('motion_tool', { node_id: NODE, ...ask });
+      expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/tools`, body: ask });
+    }
+  });
+
   test('new_motion_from_template starts a still poster', async () => {
     await callTool('new_motion_from_template', { template: 'builtin:prompt-input', format: 'A poster', still: 2 });
 

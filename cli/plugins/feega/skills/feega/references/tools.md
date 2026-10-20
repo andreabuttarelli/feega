@@ -182,7 +182,7 @@ and its session. Free.
 | `canvas_tool` `list_models` | `feega canvas models <projectId> [--medium image]` |
 
 `canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
-through the same code: `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`, `list_models` (models this project can run, with provider, credits, uncensored flag and `routes[]` — one row per provider that serves the model; pass its `provider` to `run_node`),
+through the same code (op `describe` `{}` lists them all, `{ op }` gives one input schema; `draw_frame` `{ canvasId, x, y, w, format?, still? }` makes a frame or still): `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`, `list_models` (models this project can run, with provider, credits, uncensored flag and `routes[]` — one row per provider that serves the model; pass its `provider` to `run_node`),
 `list_templates`, `create_node`, `update_node`, `move_node`, `resize_node`, `duplicate_nodes`,
 `write_nodes`, `paste_nodes`,
 `connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,
@@ -307,7 +307,7 @@ a minute per workspace (429 past that); bad times 400, empty video 409. API:
 `POST /api/v1/motion/{node_id}/frames` `{ times, width? }` → `{ revision, frames: [{ time, mime, data }], quality, blocking }`.
 
 `motion_tool({ org, tool?, node_id?, input?, version? })` reaches every tool of the motion editor
-agent with no AI. No `tool`: `GET /api/v1/motion/tools` → `{ tools: [{ name, summary }] }`. `tool`
+agent with no AI (`generate_voiceover` spends credits and is gated like a chat turn). No `tool`: `GET /api/v1/motion/tools` → `{ tools: [{ name, summary }] }`. `tool`
 alone: `GET /api/v1/motion/tools?name=` → `{ tool: { name, description, input_schema } }`. With
 `node_id`: `POST /api/v1/motion/{node_id}/tools` `{ tool, input, version? }` → `{ tool, version,
 saved, output }`, the input checked by the tool's own schema (400), screened like a chat prompt

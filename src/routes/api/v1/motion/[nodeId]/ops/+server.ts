@@ -5,11 +5,18 @@ import { agentActor } from '$lib/server/repos/actor';
 import { MCP_AGENT_KEY } from '$lib/server/motion/ask';
 import { callerMotionScope } from '$lib/server/motion/editor-scope';
 import { EDITOR_OPS, EditorAccess, isEditorOp, runEditorOp, type EditorAnswer } from '$lib/server/frame-editor/editor-ops';
+import { EDITOR_OP_SUMMARIES } from '$lib/server/frame-editor/editor-op-summaries';
+import { describeOps } from '$lib/server/ops-description';
+import { z } from 'zod';
 import type { RequestHandler } from './$types';
 
 export const config = { maxDuration: 60, memory: 2048 };
 
+const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
+const DESCRIBE_OP = 'describe';
+
+const describeInput = z.object({ op: z.string().optional() }).strict();
 const HTTP_FORBIDDEN = 403;
 const HTTP_NOT_FOUND = 404;
 
@@ -23,8 +30,16 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
 
   const body = (await request.json().catch(() => ({}))) as { op?: string; input?: unknown };
   const name = body.op ?? '';
+  if (name === DESCRIBE_OP) {
+    const asked = describeInput.safeParse(body.input ?? {});
+    if (!asked.success) {
+      return json({ error: 'invalid_input', issues: asked.error.issues }, { status: HTTP_BAD_REQUEST });
+    }
+    const described = describeOps(EDITOR_OPS, EDITOR_OP_SUMMARIES, asked.data.op);
+    return json(described, { status: 'error' in described ? HTTP_BAD_REQUEST : HTTP_OK });
+  }
   if (!isEditorOp(name)) {
-    return json({ error: 'unknown_op', ops: Object.keys(EDITOR_OPS) }, { status: HTTP_BAD_REQUEST });
+    return json(describeOps(EDITOR_OPS, EDITOR_OP_SUMMARIES, name), { status: HTTP_BAD_REQUEST });
   }
 
   const input = EDITOR_OPS[name].input.safeParse(body.input ?? {});

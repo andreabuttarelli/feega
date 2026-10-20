@@ -7,9 +7,13 @@ const ORG = 'org-1';
 const NODE = 'node-1';
 const BLOCKED_WORD = 'zqxforbidden';
 
-const state = vi.hoisted(() => ({ writeAllowed: true, db: null as unknown, screened: [] as string[][], rows: [] as Record<string, unknown>[], assetsAsked: () => {}, nodeAfter: Promise.resolve() as Promise<unknown>, projectAfter: Promise.resolve() as Promise<unknown> }));
+const state = vi.hoisted(() => ({ denied: null as Response | null, spoken: [] as unknown[], writeAllowed: true, db: null as unknown, screened: [] as string[][], rows: [] as Record<string, unknown>[], assetsAsked: () => {}, nodeAfter: Promise.resolve() as Promise<unknown>, projectAfter: Promise.resolve() as Promise<unknown> }));
 
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => ({ caller: { db: state.db, orgId: ORG, userId: 'u-1', writeAllowed: state.writeAllowed } }) }));
+vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiAction: async () => state.denied ?? undefined }));
+vi.mock('$lib/server/motion/voiceover', () => ({
+  speakVoiceover: async (_db: unknown, _scope: unknown, voice: unknown) => (state.spoken.push(voice), { ok: true, assetId: 'voice-1', seconds: 2, url: 'https://signed/voice.mp3' })
+}));
 vi.mock('$lib/server/repos/motion-templates', () => ({ listOrgTemplates: async () => [], insertOrgTemplate: vi.fn(), deleteOrgTemplate: vi.fn() }));
 vi.mock('$lib/server/repos/assets', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/assets')>()), listFontAssets: async () => [], listProjectAssets: async () => (state.assetsAsked(), []) }));
 vi.mock('$lib/server/canvas/sign-media', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/canvas/sign-media')>()), signAssetPaths: async () => new Map(), createAssetSigningDb: () => ({}) }));
@@ -42,6 +46,8 @@ beforeEach(async () => {
   state.db = fake.db;
   state.rows = fake.rows;
   state.writeAllowed = true;
+  state.denied = null;
+  state.spoken = [];
   state.screened = [];
   state.nodeAfter = Promise.resolve();
   state.projectAfter = Promise.resolve();
@@ -50,6 +56,32 @@ beforeEach(async () => {
 });
 
 describe('POST /api/v1/motion/:node/tools runs one motion tool of the chat agent', () => {
+  it('generate_voiceover speaks the script and lays it as an Audio clip', async () => {
+    const res = await post(NODE, { tool: 'generate_voiceover', input: { text: 'Hello there' } });
+
+    expect(res.status).toBe(200);
+    expect(state.spoken).toEqual([{ text: 'Hello there', voiceId: undefined }]);
+    expect(JSON.stringify((await head()).tracks)).toContain('voice-1');
+  });
+
+  it('generate_voiceover inside a batch is gated the same way', async () => {
+    state.denied = new Response(JSON.stringify({ error: 'insufficient_credits' }), { status: 402 });
+
+    const res = await post(NODE, { tool: 'batch', input: { ops: [{ tool: 'generate_voiceover', input: { text: 'Hi' } }] } });
+
+    expect(res.status).toBe(402);
+    expect(state.spoken).toEqual([]);
+  });
+
+  it('generate_voiceover without credits is refused before the provider is asked', async () => {
+    state.denied = new Response(JSON.stringify({ error: 'insufficient_credits' }), { status: 402 });
+
+    const res = await post(NODE, { tool: 'generate_voiceover', input: { text: 'Hi' } });
+
+    expect(res.status).toBe(402);
+    expect(state.spoken).toEqual([]);
+  });
+
   it('a doc edit is saved as a new revision by the agent', async () => {
     const res = await post(NODE, { tool: 'add_clip', input: { component: 'Title', start: 0, duration: 2, props: { text: 'From an outside agent' } } });
     const body = await res.json();
