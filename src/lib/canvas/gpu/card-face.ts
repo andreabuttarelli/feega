@@ -12,12 +12,16 @@ export enum Surface {
   Graphic = 'graphic',
   Text = 'text',
   Source = 'source',
+  List = 'list',
+  Doc = 'doc',
   Blank = 'blank'
 }
 
 export type FaceTile = { id: string; kind?: string; tag?: NameTag; displayName?: string | null; poster?: Poster };
 
 export type Media = { url: string; video: boolean };
+
+export type CardRow = { lead: string; text: string; thumb: string | null; status: string | null };
 
 export type CardFace = {
   surface: Surface;
@@ -33,6 +37,9 @@ export type CardFace = {
   subtitle: string;
   thumbs: string[];
   gen: GenTileView | null;
+  rows: CardRow[];
+  pills: string[];
+  count: string;
 };
 
 type Data = Record<string, unknown>;
@@ -63,6 +70,17 @@ const source =
   (title: (d: Data) => string, subtitle: (d: Data) => string = () => ''): Draw =>
   (d) => ({ surface: Surface.Source, title: title(d), subtitle: subtitle(d) });
 
+const listFace: Draw = (d, asset) => {
+  const items = Array.isArray(d.items) ? (d.items as Data[]) : [];
+  const images = d.itemKind !== 'text';
+  return {
+    surface: Surface.List,
+    pills: [images ? 'Images' : 'Text'],
+    count: String(items.length),
+    rows: items.map((item, i) => ({ lead: String(i + 1), text: str(item.text) || str(item.label) || String(i + 1), thumb: images ? str(item.url) || (str(item.asset_id) ? asset(str(item.asset_id)) : null) || null : null, status: str(item.status) || null }))
+  };
+};
+
 const motion: Draw = (d, asset, t) => {
   const kind = str(d.kind) || FrameKind.Frame;
   const live = str(d.lastRenderAssetId);
@@ -82,14 +100,14 @@ const FACES: Record<NodeType, Draw> = {
   audio: textGenerate,
   model3d: (d, asset, t) => ({ ...generate(false)(d, asset, t), media: str(d.posterRefId) ? { url: asset(str(d.posterRefId)), video: false } : null }),
   motion,
-  doc: (d) => ({ surface: Surface.Text, text: str(d.content) }),
+  doc: (d) => ({ surface: Surface.Doc, text: str(d.content), pills: ['Read', 'Write'], count: d.public === true ? 'Revoke' : 'Public link' }),
   iframe: source((d) => str(d.url) || 'HTML'),
   social_account_feed: source((d) => `@${str(d.handle)}`, (d) => str(d.platform)),
   social_post_mockup: (d) => ({ surface: Surface.Text, text: str((d.general as Data | undefined)?.caption) }),
   products: source((d) => str(d.url), (d) => str(d.type)),
   ads: source((d) => str(d.page_name) || str(d.search_terms), (d) => str(d.country)),
   influencer: source(() => ''),
-  list: source((d) => `${Array.isArray(d.items) ? d.items.length : 0} items`),
+  list: listFace,
   select: source((d) => `#${typeof d.index === 'number' ? d.index : 1}`),
   effects: (d, asset) => ({ surface: Surface.Source, media: ref(d) ? { url: asset(ref(d)!), video: false } : null }),
   composition: (d, asset) => ({ surface: Surface.Source, media: ref(d) ? { url: asset(ref(d)!), video: true } : null }),
@@ -110,7 +128,10 @@ const BLANK: CardFace = {
   title: '',
   subtitle: '',
   thumbs: [],
-  gen: null
+  gen: null,
+  rows: [],
+  pills: [],
+  count: ''
 };
 
 function labelOf(t: FaceTile, kind: NodeType): string | null {

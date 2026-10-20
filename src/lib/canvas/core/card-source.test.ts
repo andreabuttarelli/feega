@@ -12,7 +12,6 @@ const tile: CardTile = {
   id: 'n',
   box: { x: 100, y: 200, w: 240, h: 160 },
   face: faceOf({ id: 'n', kind: 'doc' }, { content: 'hi' }, (id) => id),
-  shot: null,
   inputs: [],
   outputs: [{ type: 'text', state: PortState.Quiet }],
   label: 'Document',
