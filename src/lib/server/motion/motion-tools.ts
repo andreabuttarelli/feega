@@ -1616,6 +1616,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    set_constraints: tool({
+      description: 'Pin clips to the frame for when it is resized (set_canvas, the frame on the canvas). horizontal: left, right, left_right (stretch), center or scale (default). vertical: top, bottom, top_bottom (stretch), center or scale. Only the axes given change; clip_ids may list several clips.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), horizontal: z.enum(HORIZONTALS).optional(), vertical: z.enum(VERTICALS).optional() }),
+      execute: async ({ clip_ids, ...patch }) => apply(setConstraints(session.doc, clip_ids, patch), `pinned ${clip_ids.length} clip(s) to the frame`)
+    }),
+
     set_part_fill: tool({
       description: 'Colour one text part of a poster (a data-part such as "title" or "lines:0", as the clip summary lists them in parts) without touching the other parts. fills is its fill stack (solid, linear, radial, image), bottom first. A plain solid on a part that has its own colour field writes that field; anything else, or a part whose colour is shared with other parts, is kept as an override on this part only. fills null drops the override and the part takes its shared colour again.',
       inputSchema: z.object({ clip_id: z.string(), part: z.string().min(1).max(80), fills: fillsSchema.nullable() }),
