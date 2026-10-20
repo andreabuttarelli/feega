@@ -149,7 +149,8 @@ Test app account: the project chat logs in to the user's own app with a TEST acc
 carries its fields in camelCase. List canvases, nodes and runs; create, update, move, connect and
 delete nodes; run a node; preview, queue or cancel a loop. Unlike `insert_row`/`update_row`, each
 write passes the checks the chat applies (node schema, model, uncensored targets, edge media).
-An unknown `op` answers the list of ops.
+Op `describe` with `{}` lists every op with one line; `{ op }` gives its strict JSON input schema.
+An unknown `op` answers the list of ops. `draw_frame` takes `format` and `still` (seconds): a poster or post is one call.
 
 ## Loop a node over many combinations
 

@@ -71,6 +71,32 @@ describe('canvas_tool: the chat canvas ops over MCP', () => {
     expect(result?.structuredContent).toMatchObject({ outcome: 'written' });
   });
 
+  test('passes the showcase surface through unchanged: create_node motion, resize_node, draw_frame with a still, describe', async () => {
+    const asks = [
+      { op: 'create_node', input: { canvasId: 'c-1', type: 'motion', x: 0, y: 0, data: { format: 'custom', kind: 'frame' } } },
+      { op: 'resize_node', input: { nodeId: 'n-1', width: 400, height: 300 } },
+      { op: 'draw_frame', input: { canvasId: 'c-1', x: 0, y: 0, w: 1080, format: 'A poster', still: 1 } },
+      { op: 'draw_element', input: { canvasId: 'c-1', drawn: { tool: 'rectangle', box: { left: 0, top: 0, width: 10, height: 10 } } } },
+      { op: 'export_selection', input: { frameIds: ['f-1'], rows: [{ format: 'png', by: 'scale', value: 1 }] } },
+      { op: 'describe', input: { op: 'draw_frame' } },
+    ];
+
+    for (const ask of asks) {
+      calls.length = 0;
+      await callTool('canvas_tool', { project_id: 'p-1', ...ask });
+      expect(calls[0]).toEqual({ method: 'POST', path: '/api/v1/org/canvas', body: { project_id: 'p-1', ...ask } });
+    }
+  });
+
+  test('teaches describe and the poster still in its description', async () => {
+    await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'canvas', version: '0.0.1' } });
+    const tools = (await rpc('tools/list', {})).result?.tools ?? [];
+    const description = tools.find((t) => t.name === 'canvas_tool')?.description ?? '';
+
+    expect(description).toContain('describe');
+    expect(description).toContain('still?');
+  });
+
   test('names every op it reaches in its description', async () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'canvas', version: '0.0.1' } });
     const tools = (await rpc('tools/list', {})).result?.tools ?? [];

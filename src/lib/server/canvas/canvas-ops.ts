@@ -185,7 +185,8 @@ const drawFrameInput = z
     y: z.number().finite(),
     w: z.number().positive(),
     h: z.number().positive().optional(),
-    format: z.enum(MOTION_FORMATS).optional()
+    format: z.enum(MOTION_FORMATS).optional(),
+    still: z.number().min(0).optional().describe('seconds into the frame to keep, making it a still graphic (post, poster) instead of a video')
   })
   .strict()
   .refine((a) => a.h !== undefined || (a.format && a.format !== MotionFormat.Custom), 'h or a preset');
@@ -658,7 +659,7 @@ export const CANVAS_OPS = {
   draw_frame: op({
     access: Access.Write,
     input: drawFrameInput,
-    run: async (ctx, input) => frameAnswer(await drawFrameAt(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, frameBox(input), input.format))
+    run: async (ctx, input) => frameAnswer(await drawFrameAt(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, frameBox(input), input.format, input.still))
   }),
 
   group_elements: op({

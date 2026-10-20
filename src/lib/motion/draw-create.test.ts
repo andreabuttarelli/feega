@@ -3,7 +3,7 @@ import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from
 import { setStill } from './still';
 import { COMPONENTS } from './components';
 import { DrawTool } from './draw-tool';
-import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, penClip } from './draw-create';
+import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, penClip } from './draw-create';
 import { parsePath, type Outline } from './shape/geometry';
 import type { OpResult } from './timeline';
 import { TextSizing } from './text-sizing';
@@ -177,5 +177,18 @@ describe('the resizing a drawn text starts with', () => {
   it('a free text drawn on the canvas keeps the resizing it was drawn with', () => {
     const made = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 300, height: 80 }, sizing: TextSizing.AutoWidth }, 'tx');
     expect(made.ok && made.doc.tracks.flatMap((t) => t.clips)[0].props.sizing).toBe('auto');
+  });
+});
+
+describe('drawing a frame in a chosen format', () => {
+  const box = { left: 0, top: 0, width: 1080, height: 1350 };
+
+  it('a preset format sizes the frame as a video', () => {
+    expect(drawnFrame(box, MotionFormat.Portrait)).toMatchObject({ width: 1080, height: 1350 });
+    expect(drawnFrame(box, MotionFormat.Portrait).still).toBeUndefined();
+  });
+
+  it('a still second makes it a still graphic holding that frame', () => {
+    expect(drawnFrame(box, MotionFormat.Square, 1).still).toEqual({ frame: 30 });
   });
 });
