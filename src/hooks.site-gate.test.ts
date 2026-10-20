@@ -16,15 +16,16 @@ const request = async (routeId: string) => {
     } as never);
     return res.status;
   } catch (e) {
-    return (e as { status?: number }).status;
+    const thrown = e as { status?: number; location?: string };
+    return thrown.location ? `${thrown.status} ${thrown.location}` : thrown.status;
   }
 };
 
 describe('the rebuilt marketing site stays hidden in production', () => {
-  it('production answers 404 for a site page', async () => {
+  it('production sends a site page to the app', async () => {
     Object.assign(privateEnv, { VERCEL_ENV: 'production' });
     Object.assign(publicEnv, { PUBLIC_SITE_ENABLED: undefined });
-    expect(await request('/(site)/[doc=legal]')).toBe(404);
+    expect(await request('/(site)/[doc=legal]')).toBe('303 /app');
   });
 
   it('production keeps serving the app', async () => {
