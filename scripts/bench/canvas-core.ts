@@ -91,33 +91,36 @@ async function covered(page: Page): Promise<{ placeholdersMs: number | null; cov
   return { placeholdersMs, coveredMs: null };
 }
 
-async function pan(page: Page): Promise<{ fps: number; worstMs: number }> {
-  await page.evaluate('window.__bench = []; (function tick(t) { if (t) window.__bench.push(t); requestAnimationFrame(tick); })()');
-  const box = page.viewportSize()!;
+type Wheel = (dir: number) => string;
+
+const P95 = 0.95;
+
+async function gesture(page: Page, ms: number, wheel: Wheel): Promise<{ fps: number; worstMs: number; p95Ms: number }> {
+  await page.evaluate('window.__bench = []; window.__benchOn = true; (function tick(t) { if (t) window.__bench.push(t); if (window.__benchOn) requestAnimationFrame(tick); })()');
   const start = Date.now();
-  let dir = 1;
-  while (Date.now() - start < PAN_MS) {
-    await page.evaluate(`document.elementFromPoint(${box.width / 2}, ${box.height / 2})?.dispatchEvent(new WheelEvent('wheel', { clientX: ${box.width / 2}, clientY: ${box.height / 2}, deltaX: ${PAN_STEP * dir}, deltaY: ${(PAN_STEP / 2) * dir}, bubbles: true, cancelable: true }))`);
-    dir = Date.now() - start > PAN_MS / 2 ? -1 : 1;
+  while (Date.now() - start < ms) {
+    await page.evaluate(wheel(Date.now() - start > ms / 2 ? -1 : 1));
     await page.waitForTimeout(16);
   }
-  const stamps = (await page.evaluate("window.__bench")) as number[];
-  const gaps = stamps.slice(1).map((t, i) => t - stamps[i]);
-  return { fps: Math.round((stamps.length / PAN_MS) * 1000), worstMs: Math.round(Math.max(...gaps)) };
+  const stamps = (await page.evaluate('window.__benchOn = false, window.__bench')) as number[];
+  const gaps = stamps
+    .slice(1)
+    .map((t, i) => t - stamps[i])
+    .sort((a, b) => a - b);
+  return { fps: Math.round((stamps.length / ms) * 1000), worstMs: Math.round(gaps.at(-1) ?? 0), p95Ms: Math.round(gaps[Math.floor(gaps.length * P95)] ?? 0) };
 }
 
-async function zoomMotion(page: Page): Promise<{ zoomFps: number; zoomWorstMs: number }> {
-  await page.evaluate('window.__bench = []');
-  const size = page.viewportSize()!;
-  const start = Date.now();
-  while (Date.now() - start < PAN_MS) {
-    const dir = Date.now() - start > PAN_MS / 2 ? 1 : -1;
-    await page.evaluate(`document.elementFromPoint(${size.width / 2}, ${size.height / 2})?.dispatchEvent(new WheelEvent('wheel', { clientX: ${size.width / 2}, clientY: ${size.height / 2}, deltaY: ${ZOOM_STEP * dir}, ctrlKey: true, bubbles: true, cancelable: true }))`);
-    await page.waitForTimeout(16);
-  }
-  const stamps = (await page.evaluate('window.__bench')) as number[];
-  const gaps = stamps.slice(1).map((t, i) => t - stamps[i]);
-  return { zoomFps: Math.round((stamps.length / PAN_MS) * 1000), zoomWorstMs: Math.round(Math.max(...gaps)) };
+function pan(page: Page) {
+  const box = page.viewportSize()!;
+  return gesture(page, PAN_MS, (dir) => `document.elementFromPoint(${box.width / 2}, ${box.height / 2})?.dispatchEvent(new WheelEvent('wheel', { clientX: ${box.width / 2}, clientY: ${box.height / 2}, deltaX: ${PAN_STEP * dir}, deltaY: ${(PAN_STEP / 2) * dir}, bubbles: true, cancelable: true }))`);
+}
+
+const ZOOM_GESTURE_MS = 3000;
+const ZOOM_GESTURE_STEP = 8;
+
+function zoomMotion(page: Page) {
+  const box = page.viewportSize()!;
+  return gesture(page, ZOOM_GESTURE_MS, (dir) => `document.elementFromPoint(${box.width / 2}, ${box.height / 2})?.dispatchEvent(new WheelEvent('wheel', { clientX: ${box.width / 2}, clientY: ${box.height / 2}, deltaY: ${ZOOM_GESTURE_STEP * dir}, ctrlKey: true, bubbles: true, cancelable: true }))`);
 }
 
 const zoomOf = async (page: Page) => Number(((await page.locator('[data-view]').first().getAttribute('data-view')) ?? '0,0,1').split(',')[2]);
@@ -171,15 +174,17 @@ async function run(target: Target, renderer: string) {
   const idleMb = rssMb(mine());
   const pixiTextureMb = Math.round(((await page.evaluate('window.__gpuCanvas?.textures?.().bytes ?? 0')) as number) / 1024 / 1024);
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer}-settled.png` });
-  const motion = { ...(await pan(page)), ...(await zoomMotion(page)) };
+  const motion = await pan(page);
   const panMb = rssMb(mine());
+  const zooming = await zoomMotion(page);
+  const painted = (await core.count()) ? await core.getAttribute('data-painted') : null;
   const coreFrames = (await core.count()) ? `${await core.getAttribute('data-frames')} whole, ${await core.getAttribute('data-partial')} partial` : null;
   const cacheKb = (await core.count()) ? Math.round(Number(await core.getAttribute('data-cache-bytes')) / BYTES_PER_KB) : null;
   const backend = await page.locator('[data-renderer]').first().getAttribute('data-renderer');
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer}.png` });
   const zooms = await zoomShots(page, target, renderer);
   await browser.close();
-  return { target, renderer, backend, coreFrames, firstMs, fullPaintMs, imageRequests: images, previewUploads: uploads, ...coverage, pixiTextureMb, cacheKb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion, zooms };
+  return { target, renderer, backend, coreFrames, firstMs, fullPaintMs, imageRequests: images, previewUploads: uploads, ...coverage, pixiTextureMb, cacheKb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion, zoomFps: zooming.fps, zoomWorstMs: zooming.worstMs, zoomP95Ms: zooming.p95Ms, painted, zooms };
 }
 
 const targets = (process.env.BENCH_TARGETS ?? `${Target.Chrome},${Target.IPhone}`).split(',') as Target[];

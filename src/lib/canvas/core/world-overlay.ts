@@ -1,6 +1,5 @@
-import { mul2d, type Affine } from '$lib/motion/affine';
+import { mul2d } from '$lib/motion/affine';
 import type { PathItem } from '$lib/motion/gpu-full/display-list';
-import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import { EdgeLook, edgeItems, ghostItems, guideItems, hoverItems, marqueeItems, runningItems, peerItems, rotateItems, type CorePeer, type CoreTheme } from './overlay';
@@ -43,9 +42,4 @@ export function overlayOf(o: WorldOverlay): PathItem[] {
     ...o.rotate.flatMap((r) => rotateItems(r.id, r.box, o.theme)),
     ...(o.ghost ? ghostItems(o.ghost.curve, o.ghost.ok, o.zoom, o.theme) : [])
   ];
-}
-
-export function throughCamera(items: readonly PathItem[], view: Viewport): PathItem[] {
-  const camera: Affine = [view.zoom, 0, 0, view.zoom, view.x, view.y];
-  return items.map((i) => ({ ...i, matrix: mul2d(camera, i.matrix) }));
 }

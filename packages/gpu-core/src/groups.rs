@@ -172,6 +172,8 @@ pub struct Plan {
     pub evicted: Vec<String>,
     pub pending: bool,
     pub skipped: Vec<Skipped>,
+    pub finished: Vec<String>,
+    pub waiting: Vec<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -274,6 +276,19 @@ pub struct Library {
     fonts: Fonts,
 }
 
+fn draws(item: &Item, picture: &str) -> bool {
+    let own = match item {
+        Item::Image(i) => i.clip == picture,
+        Item::Layer(l) => l.source == picture,
+        Item::Group(g) => g.items.iter().any(|i| draws(i, picture)),
+        _ => false,
+    };
+    let look = item.look();
+    let covered = look.and_then(|l| l.masks.as_ref()).into_iter().flatten().any(|m| matches!(&m.cover, crate::display_list::Cover::Picture { src, .. } if src == picture));
+    let matted = look.and_then(|l| l.matte.as_ref()).is_some_and(|m| m.items.iter().any(|i| draws(i, picture)));
+    own || covered || matted
+}
+
 fn named(keys: Vec<String>, what: &str) -> impl Iterator<Item = Skipped> + '_ {
     keys.into_iter().map(move |clip| Skipped { clip, what: what.into() })
 }
@@ -331,6 +346,14 @@ impl Library {
         }
     }
 
+    pub fn groups_drawing(&self, picture: &str) -> Vec<String> {
+        self.groups.lists.iter().filter(|(_, list)| list.items.iter().any(|i| draws(i, picture))).map(|(k, _)| k.clone()).collect()
+    }
+
+    pub fn size_of(&self, group: &str) -> Option<(f64, f64)> {
+        self.groups.get(group).map(|g| (g.width as f64, g.height as f64))
+    }
+
     pub fn cache_bytes(&self) -> u64 {
         self.held.values().map(|h| h.bytes).sum()
     }
@@ -340,6 +363,8 @@ impl Library {
         let mut rasters = Vec::new();
         let mut seen = HashSet::new();
         let mut pending = false;
+        let mut finished = Vec::new();
+        let mut waiting = Vec::new();
         let mut items = Vec::with_capacity(list.items.len());
         for item in &list.items {
             let Item::Use(u) = item else {
@@ -383,15 +408,18 @@ impl Library {
                         }
                         let (w, h) = texels(group, at.scale);
                         self.held.insert(u.group.clone(), Held { scale: at.scale, bytes: w as u64 * h as u64 * RGBA_BYTES });
+                        finished.push(u.group.clone());
                         Some(at.scale)
                     } else {
                         self.building.insert(u.group.clone(), Building { scale: at.scale, next });
                         pending = true;
+                        waiting.push(u.group.clone());
                         held.map(|h| h.scale)
                     }
                 }
                 _ => {
                     pending = true;
+                    waiting.push(u.group.clone());
                     held.map(|h| h.scale)
                 }
             };
@@ -414,7 +442,7 @@ impl Library {
         evicted.extend(abandoned.iter().map(|k| building_clip(k)));
         let rasters = rasters.into_iter().map(|r| Raster { list: self.drawable(&r.list).0, ..r }).collect();
         let (screen, unset) = self.drawable(&DisplayList { items, ..list.clone_empty() });
-        Plan { screen, rasters, evicted, pending, skipped: named(missing, "group").chain(unset).collect() }
+        Plan { screen, rasters, evicted, pending, skipped: named(missing, "group").chain(unset).collect(), finished, waiting }
     }
 }
 

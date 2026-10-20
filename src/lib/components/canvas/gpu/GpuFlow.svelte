@@ -289,6 +289,11 @@
   };
   const chromeOf = (t: Tile) => (chromeIds.has(t.id) ? null : idleChrome(t, labelOf(t), t.kind && isNodeType(t.kind) ? t.kind : null, (port) => CONNECTOR_STYLE[port].color));
   const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
+  function drawnByCore(ids: Set<string>) {
+    if (!sameSet(untrack(() => coreDrawn), ids)) {
+      coreDrawn = ids;
+    }
+  }
 
   const SNAPSHOT_SETTLE_MS = 120;
   const SNAPSHOT_TIMEOUT_MS = 4000;
@@ -1476,6 +1481,7 @@
   let snapGuides = $state<SnapGuide[]>([]);
   const corePeers = $derived(coreOn && coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
   const coreRotate = $derived(coreOn && props.onRotate ? selectedBoxes.filter((t) => t.rotatable && !t.rotation).map((t) => ({ id: t.id, box: { x: t.x, y: t.y, w: t.w, h: t.h } })) : []);
+  const viewZoom = $derived(view.zoom);
   const coreOverlay = $derived(
     coreOn && coreLook && coreType
       ? overlayOf({
@@ -1484,7 +1490,7 @@
           selectedEdge,
           marquee,
           guides: snapGuides,
-          zoom: view.zoom,
+          zoom: viewZoom,
           theme: { ...coreLook, panel: coreLook.paper },
           glyphs: coreType.glyphs,
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
@@ -1898,7 +1904,9 @@
     data-owns-pinch
   >
     {#if coreOn}
-      <CoreFrames frames={coreFrames} edited={resizing} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={coreOff} />
+      <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
+        <CoreFrames frames={coreFrames} edited={resizing} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+      </svelte:boundary>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
