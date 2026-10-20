@@ -14,7 +14,7 @@ const keep: Flow = { spaces: Spaces.Keep, wraps: true };
 
 const linesOf = (text: string, room = 10_000, align = 0) => {
   const paragraphs = text.split('\n');
-  return caretLines(layOut(paragraphs, type, keep, room, boxBook()), paragraphs, { room, align, top: 0 });
+  return caretLines(layOut(paragraphs, type, keep, room, boxBook()), paragraphs, { room, align, top: 0, space: SPACE_ADVANCE });
 };
 
 describe('caretRect', () => {
@@ -117,6 +117,19 @@ describe('moves', () => {
     expect(lineEdge(lines, 4, Step.Back)).toBe(3);
     expect(lineEdge(lines, 3, Step.Forward)).toBe(5);
     expect(lineRange(lines, 1)).toEqual([0, 2]);
+  });
+});
+
+describe('trailing spaces', () => {
+  it('advance the caret by a space each', () => {
+    const lines = linesOf('ab  ');
+    expect(caretRect(lines, 2).x).toBe(2 * ADVANCE);
+    expect(caretRect(lines, 4).x).toBe(2 * ADVANCE + 2 * SPACE_ADVANCE);
+  });
+
+  it('stay put at a wrap, where the layout hides them', () => {
+    const lines = linesOf('aa bb', 2 * ADVANCE + SPACE_ADVANCE);
+    expect(caretRect(lines, 2).x).toBe(2 * ADVANCE);
   });
 });
 

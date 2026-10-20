@@ -15,6 +15,13 @@ describe('a text box that follows its text', () => {
     expect(next).toEqual({ x: 0.5, y: 0.55, width: 0.2, height: 0.3 });
   });
 
+  it('never grows past the stage, so the doc stays valid', () => {
+    const next = fittedTextBox(TextSizing.AutoHeight, { x: 0.5, y: 0.5, width: 0.2, height: 0.2 }, { left: 400, top: 200, width: 200, height: 900 }, doc)!;
+    expect(next.height).toBeLessThanOrEqual(1);
+    expect(next.y).toBeLessThanOrEqual(1);
+    expect(next.y - next.height / 2).toBeGreaterThanOrEqual(0);
+  });
+
   it('a fixed box never moves on its own', () => {
     expect(fittedTextBox(TextSizing.Fixed, placed, { left: 0, top: 0, width: 10, height: 10 }, doc)).toBeNull();
   });

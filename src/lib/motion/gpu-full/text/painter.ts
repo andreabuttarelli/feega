@@ -588,10 +588,17 @@ export function paintText(env: TextEnv): Painted | TextGap {
   return typeof plan === 'string' ? plan : inksOf(plan, env.fonts, env.output);
 }
 
+const SPACE_EM = 0.25;
+
+function spaceOf(laid: Laid, paragraphs: string[], size: number): number {
+  const glyphs = laid.blocks.flatMap((b, p) => b.lines.flatMap((l) => l.glyphs.filter((g) => [...(paragraphs[p] ?? '')][g.char] === ' ')));
+  return glyphs[0]?.advance ?? size * SPACE_EM;
+}
+
 export type Caret = { lines: CaretLine[]; left: number; top: number; width: number; height: number };
 
 export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
-  const { laid, room } = place(plan, fonts);
+  const { laid, room, type } = place(plan, fonts);
   if (!laid.blocks.some((b) => b.lines.length) || laid.ascent + laid.descent === 0) {
     return TextGap.Font;
   }
@@ -600,7 +607,7 @@ export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
   }
   const top = plan.frame.top + (plan.frame.anchor === Anchor.Centre ? (plan.frame.height - laid.height) / 2 : 0);
   return {
-    lines: caretLines(laid, plan.paragraphs, { room, align: plan.align, top: 0 }),
+    lines: caretLines(laid, plan.paragraphs, { room, align: plan.align, top: 0, space: spaceOf(laid, plan.paragraphs, type.size) }),
     left: plan.frame.left,
     top,
     width: plan.frame.hugs ? laid.width : plan.frame.width,
