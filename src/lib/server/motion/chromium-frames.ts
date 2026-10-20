@@ -34,7 +34,7 @@ function localChromium(): string | null {
   if (process.env.CHROMIUM_PATH) {
     return process.env.CHROMIUM_PATH;
   }
-  if (process.env.VERCEL) {
+  if (process.env.VERCEL || process.env.NODE_ENV === 'test') {
     return null;
   }
   return LOCAL_CHROME_PATHS.find((path) => existsSync(path)) ?? null;
