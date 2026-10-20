@@ -23,6 +23,7 @@
   import GpuTileChrome from './GpuTileChrome.svelte';
   import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
+  import { liveDocs } from '$lib/canvas/core/live-docs.svelte';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
@@ -1901,7 +1902,7 @@
   >
     {#if coreOn}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
@@ -2093,9 +2094,19 @@
     background: transparent;
   }
 
-  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview']:not([data-text-editing]) > .host),
-  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview']:not([data-text-editing]) > .gpu-wrap) {
+  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview'] > .host),
+  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview'] > .gpu-wrap) {
     visibility: hidden;
+  }
+
+  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview'] > .host [contenteditable='true']),
+  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview'] > .host [contenteditable='true'] *) {
+    visibility: visible;
+    color: transparent !important;
+    -webkit-text-fill-color: transparent !important;
+    text-shadow: none !important;
+    background: transparent !important;
+    caret-color: #0a84ff;
   }
 
   .wrap:not([data-revealed='true']) .surface,
