@@ -29,7 +29,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), hidden = new Set(), cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; hidden?: ReadonlySet<string>; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), hidden = new Set(), order = [], cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; hidden?: ReadonlySet<string>; order?: readonly string[]; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
@@ -150,7 +150,9 @@
   const textureBytes = BUDGET[currentDevice()].textureBytes;
   const real = $derived(resident(whole, view, area, textureBytes));
 
-  const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...frames.map((f) => ({ id: f.id, box: f.box, stand: Stand.Frame })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))]);
+  const rank = $derived(new Map(order.map((id, i) => [id, i])));
+  const stacking = (id: string) => rank.get(id) ?? 0;
+  const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...frames.map((f) => ({ id: f.id, box: f.box, stand: Stand.Frame })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))].sort((a, b) => stacking(a.id) - stacking(b.id)));
   const placeholders = $derived(new Map(standIns.map((n) => [n.id, { ...n, ...placeholder(n.stand, { width: n.box.w, height: n.box.h }, look) }])));
   const BLOCKS = ':blocks';
   const blocksGroup = (key: string) => `${key}${BLOCKS}`;
