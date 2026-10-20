@@ -1,5 +1,5 @@
 import type { Item } from '$lib/motion/gpu-full/display-list';
-import { BORDER, CardPart, UI_TRACKING, at, measure, write, type Ctx } from './card-kit';
+import { BORDER, CardPart, UI_TRACKING, at, box, measure, write, type Ctx } from './card-kit';
 import { rect, solid } from './shapes';
 
 const PADDING = 16;
@@ -68,17 +68,47 @@ export function emptyItems(x: Ctx): Item[] {
   ];
 }
 
+const NO_BATCHES = 'No batches in this project yet.';
+const SELECT_LABEL = 'Show a Photo studio batch';
+const SELECT_HINT = 'Pick a batch…';
+const SELECT = { h: 30, size: 12, padX: 8, gap: 4 };
+
+function pickBody(x: Ctx): { height: number; items: (top: number) => Item[] } {
+  const { c, theme } = x;
+  const options = c.face.batch?.options ?? null;
+  if (options === true) {
+    const width = c.w - PADDING * 2;
+    const height = PICK.line + SELECT.gap + SELECT.h;
+    return {
+      height,
+      items: (top) => [
+        ...write(x, CardPart.Empty, SELECT_LABEL, PICK.size, theme.inkSoft, PADDING, top, null),
+        ...box(x, CardPart.Field, { x: PADDING, y: top + PICK.line + SELECT.gap, w: width, h: SELECT.h }, theme.paper, theme.line2),
+        ...write(x, CardPart.Field, SELECT_HINT, SELECT.size, theme.ink, PADDING + SELECT.padX, top + PICK.line + SELECT.gap + (SELECT.h - SELECT.size) / 2 - 1, null)
+      ]
+    };
+  }
+  if (options === false) {
+    return { height: PICK.line, items: (top) => centred(x, CardPart.Empty, NO_BATCHES, PICK.size, theme.inkSoft, top) };
+  }
+  return { height: 0, items: () => [] };
+}
+
 export function pickItems(x: Ctx): Item[] {
   const { c, theme, icons } = x;
   const f = c.face;
   const mark = f.kind ? icons?.badge.get(f.kind) : undefined;
-  const total = PICK.icon + PICK.gap + PICK.line;
+  const middle = pickBody(x);
+  const stack = [PICK.icon, middle.height, PICK.line].filter(Boolean);
+  const total = stack.reduce((a, b) => a + b, 0) + PICK.gap * (stack.length - 1);
   const top = (c.h - total) / 2;
+  const bodyTop = top + PICK.icon + PICK.gap;
+  const base = bodyTop + (middle.height ? middle.height + PICK.gap : 0);
   const left = (c.w - measure(x, f.title, PICK.size)) / 2;
-  const base = top + PICK.icon + PICK.gap;
   return [
     solid(x.clip(CardPart.Panel), at(c, [rect(0, 0, c.w, c.h)]), theme.paper),
     ...(mark ? [solid(x.clip(CardPart.Badge), at(c, moved(mark, (c.w - PICK.icon) / 2, top)), theme.inkSoft)] : []),
+    ...middle.items(bodyTop),
     ...centred(x, CardPart.Empty, f.title, PICK.size, theme.inkSoft, base),
     solid(x.clip(CardPart.Empty), at(c, [rect(left, base + PICK.line - 1, measure(x, f.title, PICK.size), PICK.underline)]), theme.inkSoft)
   ];

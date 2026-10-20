@@ -69,7 +69,8 @@
   import { Renderer, Switch, rendererOf } from '$lib/canvas/gpu/renderer-flag';
   import RendererBadge from '$lib/components/canvas/gpu/RendererBadge.svelte';
   import { dev } from '$app/environment';
-  import { feedView, personView, productsView, type SourceView } from '$lib/canvas/source-thumbs';
+  import { feedView, personView, productsView } from '$lib/canvas/source-thumbs';
+import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type NodeView } from '$lib/canvas/node-view';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
@@ -143,7 +144,7 @@
   import { upstreamCards as compositionCards, cardAssetIds } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
-  import { isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, sourceOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
+  import { fieldsFor, isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, sourceOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
   import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
   import { hasInspector, inspectorOf } from '$lib/canvas/node-inspector';
   import SourceSettingsFrame from '$lib/components/canvas/SourceSettingsFrame.svelte';
@@ -1161,15 +1162,73 @@
   /** `type`/`data` grezzi di ogni tile — la forma che `commonPropertiesOf` legge, per la barra
    *  della selezione: `tiles` porta già `node: CanvasNode`, un'astrazione diversa che non ha
    *  `model`/`params` come campi diretti. */
-  function sourceView(id: string): SourceView | null {
+  const STUDIO_REFRESH_MS = 10000;
+  let studioBatches = $state<Record<string, BatchView>>({});
+  const studioWatched = $derived(
+    nodes
+      .filter((n) => n.type === 'studio_batch')
+      .map((n) => `${n.id}:${studioBatchOf(n)?.batchId ?? ''}`)
+      .join('|')
+  );
+
+  async function studioJson<T>(url: string): Promise<T | null> {
+    const response = await fetch(url).catch(() => null);
+    return response?.ok ? ((await response.json()) as T) : null;
+  }
+
+  $effect(() => {
+    const stops = studioWatched
+      .split('|')
+      .filter(Boolean)
+      .map((entry) => {
+        const [nodeId, batchId] = entry.split(':');
+        const show = (view: BatchView) => (studioBatches = { ...studioBatches, [nodeId]: view });
+        if (!batchId) {
+          void studioJson<unknown[]>(`/app/studio/cards?project=${data.projectId}`).then((list) => show(pickBatch(list ? list.length > 0 : null)));
+          return () => {};
+        }
+        const refresh = () => void studioJson<Parameters<typeof batchOf>[0]>(`/app/studio/${batchId}/card`).then((card) => show(card ? batchOf(card) : unreachableBatch()));
+        refresh();
+        const timer = setInterval(refresh, STUDIO_REFRESH_MS);
+        return () => clearInterval(timer);
+      });
+    return () => stops.forEach((stop) => stop());
+  });
+
+  function mediaView(row: Tile): NodeView | null {
+    const effects = effectsOf(row);
+    if (!effects) {
+      return null;
+    }
+    const input = upstreamEffectsMediaOf(row.id);
+    return { media: { url: assetUrl(effects.refId) ?? assetUrl(input?.refId ?? effects.sourceRefId), kind: input?.kind ?? effects.mediaKind } };
+  }
+
+  function selectedView(row: Tile): NodeView | null {
+    const select = selectOf(row);
+    if (!select) {
+      return null;
+    }
+    const type = selectSourceOf(row.id)?.type ?? null;
+    return { select: selectView(select.index, upstreamListOf(row.id), selectOutputsOf(row), selectValuesOf(row) ?? {}, fieldsFor(type).length > 0) };
+  }
+
+  function sourceView(id: string): NodeView | null {
     if (shownPosts[id]) {
-      return feedView(shownPosts[id], socialPosts[id]?.length ?? 0);
+      return { source: feedView(shownPosts[id], socialPosts[id]?.length ?? 0) };
     }
     if (shownProducts[id]) {
-      return productsView(shownProducts[id], products[id]?.length ?? 0);
+      return { source: productsView(shownProducts[id], products[id]?.length ?? 0) };
     }
     const person = influencersByNode[id];
-    return person ? personView(person.name, person.views) : null;
+    if (person) {
+      return { source: personView(person.name, person.views) };
+    }
+    const row = nodes.find((n) => n.id === id);
+    if (!row) {
+      return null;
+    }
+    return mediaView(row) ?? selectedView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
   }
 
   let domReason = $state<string | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Dom ? (data.rendererSwitch === Switch.ForceDom ? 'kill switch' : '?renderer=dom') : null);

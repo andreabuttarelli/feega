@@ -5,7 +5,8 @@ import { faceOf } from '$lib/canvas/gpu/card-face';
 import { NODE_PORTS } from '$lib/canvas/node-ports';
 import { CardPart, cardItems, type CoreCard } from './cards';
 import type { CardIcons } from './card-kit';
-import { TileBadge, type SourceView } from '$lib/canvas/source-thumbs';
+import { TileBadge } from '$lib/canvas/source-thumbs';
+import { SelectBody, batchOf, type NodeView } from '$lib/canvas/node-view';
 import type { CoreTheme } from './overlay';
 import type { Glyphs } from './chrome';
 
@@ -18,8 +19,8 @@ const box = (contours: number[][]) => {
   return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)].map((v) => Math.round(v) + 0);
 };
 const asset = (id: string) => `https://cdn/${id}`;
-const view = (thumbs: string[], total = thumbs.length): SourceView => ({ tiles: thumbs.map((thumb) => ({ thumb, caption: null, badge: null, sale: null })), total, name: null });
-const icons: CardIcons = { references: [], credit: [], head: new Map(), badge: new Map(), layers: [[0, 0, 5, 0, 5, 5]], play: [[0, 0, 5, 0, 5, 5]], person: [] };
+const view = (thumbs: string[], total = thumbs.length): NodeView => ({ source: { tiles: thumbs.map((thumb) => ({ thumb, caption: null, badge: null, sale: null })), total, name: null } });
+const icons: CardIcons = { references: [], credit: [], head: new Map(), badge: new Map(), layers: [[0, 0, 5, 0, 5, 5]], play: [[0, 0, 5, 0, 5, 5]], person: [], ui: { open: [], left: [], right: [], help: [], plus: [], image: [], camera: [] } };
 const card = (kind: string, data: Record<string, unknown>, over: Partial<CoreCard> = {}): CoreCard => ({ id: 'n', x: 0, y: 0, w: 200, h: 100, face: faceOf({ id: 'n', kind }, data, asset), ...over });
 const part = (items: Item[], p: CardPart) => items.filter((i) => i.clip === `n:${p}` || i.clip.startsWith(`n:${p}:`));
 const paths = (items: Item[], p: CardPart) => part(items, p) as PathItem[];
@@ -89,7 +90,7 @@ describe('cardItems', () => {
 
   it('marks a tile with its badge, its sale and its caption only when the whole tile shows', () => {
     const tile = { thumb: 't', caption: '9.00 EUR', badge: TileBadge.Carousel, sale: '−20%' };
-    const draw = (h: number) => cardItems({ ...card('products', { url: 'x' }), face: faceOf({ id: 'n', kind: 'products' }, { url: 'x' }, asset, { tiles: [tile], total: 1, name: null }), w: 300, h }, theme, glyphs, glyphs, icons);
+    const draw = (h: number) => cardItems({ ...card('products', { url: 'x' }), face: faceOf({ id: 'n', kind: 'products' }, { url: 'x' }, asset, { source: { tiles: [tile], total: 1, name: null } }), w: 300, h }, theme, glyphs, glyphs, icons);
 
     expect(paths(draw(300), CardPart.Badge)).toHaveLength(2);
     expect(paths(draw(300), CardPart.Sale)).toHaveLength(2);
@@ -131,8 +132,53 @@ describe('cardItems', () => {
     expect(paths(items, CardPart.Empty)).toHaveLength(2);
   });
 
+  it('draws an embedded page as a mode switch and an address field over a blank page', () => {
+    const items = cardItems({ ...card('iframe', { url: 'https://x.co' }), w: 480, h: 360 }, theme, glyphs, glyphs, icons);
+
+    expect(paths(items, CardPart.Field)).toHaveLength(3);
+    expect(paths(items, CardPart.Head).length).toBeGreaterThan(3);
+    expect(paths(items, CardPart.Empty)).toHaveLength(0);
+    expect(paths(items, CardPart.Footer)).toHaveLength(2);
+  });
+
+  it('asks for an address when an embedded page has none, and shows its code box in code mode', () => {
+    expect(paths(cardItems({ ...card('iframe', {}), w: 480, h: 360 }, theme, glyphs), CardPart.Empty)).toHaveLength(1);
+    const code = cardItems({ ...card('iframe', { html: '<b>x</b>' }), w: 480, h: 360 }, theme, glyphs);
+
+    expect(paths(code, CardPart.Code)).toHaveLength(3);
+    expect(paths(code, CardPart.Button).length).toBeGreaterThan(1);
+  });
+
+  it('draws a select as navigation, its current photo and one row per output', () => {
+    const view: NodeView = { select: { index: 2, total: 5, body: SelectBody.Photo, text: '', url: 'p.jpg', canAdd: true, rows: [{ color: '#16a34a', label: 'Images', value: '1 file', thumb: 't.jpg', flagged: false }, { color: '#2563eb', label: 'Text', value: '—', thumb: null, flagged: false }] } };
+    const items = cardItems({ ...card('select', { index: 2 }), face: faceOf({ id: 'n', kind: 'select' }, { index: 2 }, asset, view), w: 320, h: 300 }, theme, glyphs, glyphs, icons);
+
+    expect((part(items, CardPart.Media) as ImageItem[])[0].fit).toBe('cover');
+    expect(part(items, CardPart.Row).length).toBeGreaterThanOrEqual(2);
+    expect((part(items, CardPart.Thumb) as ImageItem[])[0].src).toBe('t.jpg');
+    expect(paths(items, CardPart.Button).length).toBeGreaterThan(1);
+  });
+
+  it('draws effects as the picture, a Not applied tag and an Open editor button, or a prompt without input', () => {
+    const view: NodeView = { media: { url: 'e.jpg', kind: 'image' } };
+    const items = cardItems({ ...card('effects', {}), face: faceOf({ id: 'n', kind: 'effects' }, {}, asset, view), w: 300, h: 300 }, theme, glyphs);
+
+    expect((part(items, CardPart.Media) as ImageItem[])[0].fit).toBe('contain');
+    expect(paths(items, CardPart.Badge)).toHaveLength(2);
+    expect(paths(items, CardPart.Button).length).toBeGreaterThan(1);
+    expect(paths(cardItems({ ...card('effects', {}), w: 300, h: 300 }, theme, glyphs), CardPart.Empty)).toHaveLength(1);
+  });
+
+  it('draws a picked studio batch as a thumbnail grid over its counts', () => {
+    const view: NodeView = { batch: batchOf({ approved: 3, done: 5, total: 8, running: 1, failed: 0, thumbs: ['a', 'b', 'c', 'd'] }) };
+    const items = cardItems({ ...card('studio_batch', {}), face: faceOf({ id: 'n', kind: 'studio_batch' }, {}, asset, view), w: 300, h: 300 }, theme, glyphs);
+
+    expect((part(items, CardPart.Thumb) as ImageItem[]).filter((i) => i.kind === ItemKind.Image).map((i) => i.src)).toEqual(['a', 'b', 'c', 'd']);
+    expect(paths(items, CardPart.Footer).length).toBeGreaterThan(1);
+  });
+
   it('draws an influencer as a cover over a name and views band', () => {
-    const f = faceOf({ id: 'n', kind: 'influencer' }, {}, asset, { tiles: [{ thumb: 'face', caption: null, badge: null, sale: null }], total: 1, name: 'Giulia' });
+    const f = faceOf({ id: 'n', kind: 'influencer' }, {}, asset, { source: { tiles: [{ thumb: 'face', caption: null, badge: null, sale: null }], total: 1, name: 'Giulia' } });
     const items = cardItems({ ...card('influencer', {}), face: f, w: 200, h: 200 }, theme, glyphs);
     const [cover] = part(items, CardPart.Media) as ImageItem[];
     const [rule] = paths(items, CardPart.Info);
@@ -152,11 +198,11 @@ describe('cardItems', () => {
     expect(cardItems(card(kind, {}), theme, glyphs).length).toBeGreaterThan(0);
   });
 
-  it('sets a source title in the bold face', () => {
+  it('sets a title in the bold face', () => {
     const bold: Glyphs = () => ({ contours: [[0, 0, 1, 0, 1, 1]], width: 1, height: 1 });
-    const [title] = paths(cardItems(card('iframe', { url: 'x' }), theme, glyphs, bold), CardPart.Title);
+    const [title] = paths(cardItems(card('ads', {}), theme, glyphs, bold), CardPart.Title);
 
-    expect(box(title.contours)).toEqual([14, 14, 15, 15]);
+    expect(box(title.contours)[2] - box(title.contours)[0]).toBe(1);
   });
 
   it('gives each picture its own clip, since the engine keys textures by clip', () => {

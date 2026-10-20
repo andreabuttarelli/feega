@@ -95,7 +95,7 @@
   import { baseRatio, cellBox, cellBytes, cellCss, cellKey, detailRatio, neededCells, softPosters, type Cell } from '$lib/canvas/gpu/detail-plan';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
   import type { GenTileView } from '$lib/canvas/gen-tile-view';
-  import type { SourceView } from '$lib/canvas/source-thumbs';
+  import type { NodeView } from '$lib/canvas/node-view';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { revealIn as revealDelay } from '$lib/canvas/gpu/reveal-gate';
@@ -105,7 +105,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => SourceView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
 
   const DOM_CAP = 6;
   const CORE = 'core';

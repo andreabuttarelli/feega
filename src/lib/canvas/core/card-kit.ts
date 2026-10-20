@@ -26,7 +26,10 @@ export enum CardPart {
   Sale = 'sale',
   Caption = 'caption',
   Empty = 'empty',
-  Info = 'info'
+  Info = 'info',
+  Field = 'field',
+  Button = 'button',
+  Code = 'code'
 }
 
 export enum Fit {
@@ -62,7 +65,17 @@ export const RUNNING = 'Running…';
 export const AUTO_MODEL = 'Auto';
 export const CENTRE: [number, number] = [0.5, 0.5];
 
-export type SourceIcons = { head: ReadonlyMap<NodeType, number[][]>; badge: ReadonlyMap<NodeType, number[][]>; layers: number[][]; play: number[][]; person: number[][] };
+export enum UiGlyph {
+  Open = 'open',
+  Left = 'left',
+  Right = 'right',
+  Help = 'help',
+  Plus = 'plus',
+  Image = 'image',
+  Camera = 'camera'
+}
+
+export type SourceIcons = { head: ReadonlyMap<NodeType, number[][]>; badge: ReadonlyMap<NodeType, number[][]>; layers: number[][]; play: number[][]; person: number[][]; ui: Readonly<Record<UiGlyph, number[][]>> };
 
 export type CardIcons = GenIcons & SourceIcons;
 
@@ -106,3 +119,17 @@ export const measure = (x: Ctx, s: string, size: number, weight: 'regular' | 'bo
 export const body = (x: Ctx, s: string, top: number, bottom = PAD) => text(x, CardPart.Body, s, BODY_SIZE, x.theme.ink, PAD, top, x.c.w - PAD * 2, x.c.h - top - bottom);
 
 export const whole = (c: CoreCard): Box => ({ x: 0, y: 0, w: c.w, h: c.h });
+
+export function box(x: Ctx, part: CardPart, b: Box, fill: string, stroke: string | null): Item[] {
+  const outer = stroke ? [solid(x.clip(part), at(x.c, [rect(b.x, b.y, b.w, b.h)]), stroke)] : [];
+  const inset = stroke ? BORDER : 0;
+  return [...outer, solid(x.clip(part), at(x.c, [rect(b.x + inset, b.y + inset, b.w - 2 * inset, b.h - 2 * inset)]), fill)];
+}
+
+export const moved = (contours: number[][], dx: number, dy: number): number[][] => contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)));
+
+export function glyph(x: Ctx, part: CardPart, contours: number[][], left: number, top: number, colour: string, opacity = 1): Item[] {
+  return [solid(x.clip(part), at(x.c, moved(contours, left, top)), colour, opacity)];
+}
+
+export const LEADING = 1.5;
