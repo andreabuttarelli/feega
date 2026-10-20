@@ -62,7 +62,7 @@
   import { SPRINGS } from '$lib/motion/spring';
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
-  import { addAutoLayout } from '$lib/motion/layout/ops';
+  import { addAutoLayout, removeAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
   import { releaseMasks, useAsMask } from '$lib/motion/mask-group';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
@@ -1263,8 +1263,30 @@
     selection = result.ok ? [...topClipIds(result.doc)].filter((id) => !before.has(id)) : selection;
   }
 
+  function frameSelection() {
+    if (!selection.length) {
+      return;
+    }
+    const container = newId();
+    const result = wrapInFrame(doc, selection, container, newId());
+    if (!result.ok) {
+      notice = result.error;
+      return;
+    }
+    edit(result.doc, 'Framed the selection');
+    selection = [container];
+  }
+
   function autoLayoutSelection() {
     if (!selection.length) {
+      return;
+    }
+    const lone = selection.length === 1 ? findClip(doc, selection[0])?.clip : null;
+    if (lone?.autoLayout) {
+      const removed = removeAutoLayout(doc, lone.id);
+      if (removed.ok) {
+        edit(removed.doc, 'Removed auto layout');
+      }
       return;
     }
     const { result, containerId } = addAutoLayout(doc, selection, newId);
@@ -1832,6 +1854,7 @@
     [Command.Precompose]: precomposeSelection,
     [Command.Group]: groupSelection,
     [Command.Ungroup]: ungroupSelection,
+    [Command.FrameSelection]: frameSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
     [Command.EditAsVector]: () => selected && apply(toVector(doc, selected.id), 'Made a vector'),

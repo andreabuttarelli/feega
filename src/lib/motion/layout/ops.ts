@@ -12,7 +12,6 @@ import { isText } from './text-extent';
 const fail = (error: string): OpResult => ({ ok: false, error });
 
 const HUG: Partial<LayoutItem> = { width: Sizing.Hug, height: Sizing.Hug };
-const CONTAINER_TRACK = 'Auto layout';
 const PX = 100;
 const roundPx = (n: number) => Math.round(n * PX) / PX;
 
@@ -115,7 +114,35 @@ function ownTracks(doc: MotionDoc, clipIds: readonly string[], trackId: string):
   }, doc);
 }
 
-export function wrapInAutoLayout(source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult {
+enum Container {
+  Frame = 'frame',
+  AutoLayout = 'auto-layout'
+}
+
+const CONTAINER_TRACK: Record<Container, string> = { [Container.Frame]: 'Frame', [Container.AutoLayout]: 'Auto layout' };
+
+export const wrapInAutoLayout = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.AutoLayout);
+
+export const wrapInFrame = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Frame);
+
+export function removeAutoLayout(doc: MotionDoc, containerId: string): OpResult {
+  const container = findClip(doc, containerId)?.clip;
+  if (!container?.autoLayout) {
+    return fail(`${containerId} is not an auto layout`);
+  }
+  const laid = withAutoLayout(doc);
+  const children = doc.tracks.flatMap((t) => t.clips).filter((c) => c.parent === containerId);
+  const baked = children.reduce(
+    (next, child) => {
+      const props = findClip(laid, child.id)!.clip.props;
+      return withClip(next, child.id, ({ layoutItem: _item, ...c }) => ({ ...c, props: { ...c.props, x: props.x, y: props.y, width: props.width, height: props.height } }));
+    },
+    doc
+  );
+  return setAutoLayout(baked, containerId, null);
+}
+
+function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trackId: string, container: Container): OpResult {
   const doc = ownTracks(source, clipIds, trackId);
   const size = { width: doc.width, height: doc.height };
   const placed: Placed[] = clipIds
@@ -133,24 +160,24 @@ export function wrapInAutoLayout(source: MotionDoc, clipIds: readonly string[], 
   const from = Math.min(...placed.map((p) => p.clip.from));
   const end = Math.max(...placed.map((p) => p.clip.from + p.clip.durationInFrames));
   const lane = Math.max(...placed.map((p) => p.trackIndex)) + 1;
-  const tracks = [...doc.tracks.slice(0, lane), { id: trackId, kind: TrackKind.Visual, name: CONTAINER_TRACK, clips: [] }, ...doc.tracks.slice(lane)];
+  const tracks = [...doc.tracks.slice(0, lane), { id: trackId, kind: TrackKind.Visual, name: CONTAINER_TRACK[container], clips: [] }, ...doc.tracks.slice(lane)];
 
   const props = { shape: 'rect', fill: 'transparent', x: (left + right) / 2 / size.width, y: (top + bottom) / 2 / size.height, width: (right - left) / size.width, height: (bottom - top) / size.height };
   let result = addClip({ ...doc, tracks }, { component: 'Shape', from, durationInFrames: end - from, trackId, props }, id);
   if (!result.ok) {
     return result;
   }
-  result = setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start });
+  result = container === Container.AutoLayout ? setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start }) : result;
   for (const p of placed) {
     if (!result.ok) {
       return result;
     }
     result = setParent(result.doc, p.clip.id, id, { at: p.clip.from });
-    if (result.ok && isText(p.clip.component) && !p.clip.layoutItem) {
+    if (result.ok && container === Container.AutoLayout && isText(p.clip.component) && !p.clip.layoutItem) {
       result = setLayoutItem(result.doc, p.clip.id, HUG);
     }
   }
-  return result.ok ? setLayoutItem(result.doc, id, HUG) : result;
+  return result.ok && container === Container.AutoLayout ? setLayoutItem(result.doc, id, HUG) : result;
 }
 
 export function addAutoLayout(doc: MotionDoc, clipIds: readonly string[], newId: () => string): { result: OpResult; containerId: string } {

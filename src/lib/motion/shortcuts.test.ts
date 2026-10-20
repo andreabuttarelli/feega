@@ -139,6 +139,10 @@ describe('typing', () => {
     expect(press('g', { mod: true })).toBe(Command.Group);
     expect(press('g', { mod: true, shift: true })).toBe(Command.Ungroup);
   });
+
+  it('alt+cmd+g frames the selection, even where alt types another character', () => {
+    expect(press('©', { mod: true, alt: true, code: 'KeyG' })).toBe(Command.FrameSelection);
+  });
 });
 
 describe('preview zoom keys', () => {

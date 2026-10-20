@@ -252,3 +252,19 @@ describe('copy and paste whole elements', () => {
     expect(findClip(pasted.doc, pasted.ids[0])!.clip.props).toMatchObject({ x: 0.25, y: 0.5 });
   });
 });
+
+describe('copy and paste of a multi-selection', () => {
+  const two = () => {
+    let doc = newMotionDoc(MotionFormat.Landscape);
+    doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', x: 0.2, y: 0.5, width: 0.1, height: 0.1 } }, 'a'));
+    return must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', x: 0.7, y: 0.5, width: 0.1, height: 0.1 } }, 'b'));
+  };
+
+  it('pastes every copied clip at its own position, selecting all the copies', () => {
+    const doc = two();
+    const pasted = pasteElements(doc, copyElements(doc, ['a', 'b']), ids());
+
+    expect(pasted.ok && pasted.ids).toHaveLength(2);
+    expect(pasted.ok && pasted.ids.map((id) => findClip(pasted.doc, id)!.clip.props.x)).toEqual([0.2, 0.7]);
+  });
+});
