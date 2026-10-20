@@ -13,6 +13,16 @@ describe('sent overlay', () => {
     expect(sent.changed([{ ...ring, clip: 's' }])).toBe(true);
   });
 
+  it('knows an array it has not sent yet, without reading it', () => {
+    const sent = new SentOverlay();
+    const items = [{ kind: 'path', clip: 'r', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem];
+
+    expect(sent.waiting(items)).toBe(true);
+    sent.changed(items);
+    expect(sent.waiting(items)).toBe(false);
+    expect(sent.waiting([...items])).toBe(true);
+  });
+
   it('does not read the items again when the same array comes back', () => {
     const sent = new SentOverlay();
     const items = [{ kind: 'path', clip: 'r', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem];

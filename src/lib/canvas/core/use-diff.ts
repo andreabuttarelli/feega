@@ -7,6 +7,10 @@ export class SentOverlay {
   #sent: string | null = null;
   #items: readonly PathItem[] | null = null;
 
+  waiting(items: readonly PathItem[]): boolean {
+    return items !== this.#items;
+  }
+
   changed(items: readonly PathItem[]): boolean {
     if (items === this.#items) {
       return false;

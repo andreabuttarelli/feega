@@ -23,13 +23,13 @@
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
   import type { Pictures } from '$lib/motion/gpu-full/raster';
-  import { Stand, fillOrder, lastShown, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, fillOrder, firstDrawn, lastShown, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), hidden = new Set(), cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; hidden?: ReadonlySet<string>; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
@@ -158,15 +158,18 @@
 
   const rebuilding = $derived(new Set([...shownCards.filter((c) => !cardLists.has(c.key)).map((c) => c.frame.id), ...frames.filter((f) => !lists.has(keyOf(f))).map((f) => f.id)]));
   let shownBefore = new Map<string, HeldFrame>();
-  const held = $derived.by(() => {
+  const chains = $derived.by(() => {
     const ready = new Map(real.map((f) => [f.id, f]));
     shownBefore = lastShown(shownBefore, real, rebuilding);
-    return [...placeholders.values()].flatMap((p) => {
+    return [...placeholders.values()].map((p) => {
       const before = shownBefore.get(p.id);
-      const shown = standIn<HeldFrame>([ready.get(p.id), before && { ...before, box: p.box, ...(p.turn ? { turn: p.turn } : {}) }, blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...(p.turn ? { turn: p.turn } : {}) }]);
-      return shown ? [shown] : [];
+      const turned = p.turn ? { turn: p.turn } : {};
+      const layers = [ready.get(p.id), before && { ...before, box: p.box, ...turned }, blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned }];
+      return layers.filter((l): l is HeldFrame => l != null);
     });
   });
+  const held = $derived(chains.map((c) => c[0]));
+  const tails = $derived(chains.map((c) => c[c.length - 1]));
   const listOf = (group: string) => cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list ?? [...placeholders.values()].find((p) => p.group === group)!.list;
 
   const waiting = $derived.by(() => {
@@ -252,12 +255,17 @@
     if (!into) {
       return false;
     }
-    const keep = new Set([...whole, ...held].map((f) => f.group));
+    const keep = new Set([...whole, ...held, ...tails].map((f) => f.group));
     for (const group of [...put, ...putting.keys()].filter((g) => !keep.has(g))) {
       into.dropGroup(group);
       put.delete(group);
       putting.delete(group);
       pictured.delete(group);
+    }
+    for (const f of tails) {
+      while (!put.has(f.group)) {
+        putPart(into, f.group);
+      }
     }
     let room = gesture.active() ? 0 : ITEMS_PER_FRAME;
     for (const f of held) {
@@ -265,20 +273,24 @@
         room -= putPart(into, f.group);
       }
     }
-    for (const f of held.filter((f) => put.has(f.group) && !pictured.has(f.group)).slice(0, PICTURES_PER_FRAME)) {
+    for (const f of [...tails, ...held].filter((f) => put.has(f.group) && !pictured.has(f.group)).slice(0, PICTURES_PER_FRAME)) {
       if (into.upload(listOf(f.group), pictures, 1)) {
         pictured.add(f.group);
       }
     }
-    const shown = held.filter((f) => pictured.has(f.group));
+    const shown = chains.flatMap((c) => {
+      const layer = firstDrawn(c, pictured);
+      return layer ? [layer] : [];
+    });
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileEdited(cached(shown, wide.view, wide.area, textureBytes), edited)));
+    const patch = sent.patch(worldUses(heldWhileEdited(cached(shown.filter((f) => !hidden.has(f.id)), wide.view, wide.area, textureBytes), edited)));
     if (patch) {
       into.patchUses(patch);
     }
-    if (sentOverlay.changed(overlay)) {
+    const quiet = !gesture.active();
+    if (quiet && sentOverlay.changed(overlay)) {
       into.setOverlay(overlay);
     }
     into.setCamera(at.x, at.y, at.zoom);
@@ -286,7 +298,7 @@
     painted[outcome]++;
     paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
     cacheBytes = into.cacheBytes();
-    return pending || held.some((f) => !pictured.has(f.group));
+    return pending || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
   }
 
   let ahead = false;
@@ -327,7 +339,7 @@
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame));
 
   $effect(() => {
-    void [raster, held, edited, overlay, view.x, view.y, view.zoom, area.width, area.height];
+    void [raster, held, edited, hidden, overlay, view.x, view.y, view.zoom, area.width, area.height];
     pacer.invalidate();
   });
 
