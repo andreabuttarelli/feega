@@ -36,8 +36,13 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
     expect(faceOf({ id: 'd', kind: 'doc', tag: NameTag.Shown, displayName: 'Brief' }, { content: '# Hi\nthere' }, asset)).toMatchObject({ surface: Surface.Doc, label: 'Brief', text: '# Hi\nthere', pills: ['Read', 'Write'], count: 'Public link' });
   });
 
-  it('an iframe shows the address it loads', () => {
-    expect(faceOf({ id: 'w', kind: 'iframe', tag: NameTag.Shown }, { url: 'https://x.co' }, asset)).toMatchObject({ surface: Surface.Source, title: 'https://x.co' });
+  it('an iframe carries its mode, its address, and what to say when there is none or it is refused', () => {
+    const frame = (data: Record<string, unknown>) => faceOf({ id: 'w', kind: 'iframe', tag: NameTag.Shown }, data, asset).embed;
+
+    expect(frame({ url: 'https://x.co' })).toMatchObject({ mode: 'url', url: 'https://x.co', hint: null });
+    expect(frame({})).toMatchObject({ mode: 'url', hint: 'Paste an address' });
+    expect(frame({ url: 'ftp://x.co' })?.hint).toBe('Only http and https addresses can be embedded');
+    expect(frame({ html: '<b>x</b>' })).toMatchObject({ mode: 'html', code: '<b>x</b>', hint: null });
   });
 
   it('an unknown kind falls back to a plain card, never throws', () => {
@@ -46,7 +51,7 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
 
   it('a feed carries its tiles, its title and how many it shows of how many it has', () => {
     const tile = (thumb: string) => ({ thumb, caption: null, badge: null, sale: null });
-    const face = faceOf({ id: 'f', kind: 'social_account_feed', tag: NameTag.Shown }, { platform: 'tiktok', handle: 'nike' }, asset, { tiles: [tile('t1'), tile('t2')], total: 5, name: null });
+    const face = faceOf({ id: 'f', kind: 'social_account_feed', tag: NameTag.Shown }, { platform: 'tiktok', handle: 'nike' }, asset, { source: { tiles: [tile('t1'), tile('t2')], total: 5, name: null } });
 
     expect(face).toMatchObject({ surface: Surface.Preview, title: '@nike · tiktok', count: '2/5', error: null });
     expect(face.tiles.map((t) => t.thumb)).toEqual(['t1', 't2']);
@@ -54,7 +59,7 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
   });
 
   it('a source says what it waits for, syncs, or failed at', () => {
-    const feed = (data: Record<string, unknown>, total = 0) => faceOf({ id: 'f', kind: 'social_account_feed' }, data, asset, { tiles: [], total, name: null });
+    const feed = (data: Record<string, unknown>, total = 0) => faceOf({ id: 'f', kind: 'social_account_feed' }, data, asset, { source: { tiles: [], total, name: null } });
     const store = (data: Record<string, unknown>) => faceOf({ id: 'p', kind: 'products' }, data, asset);
 
     expect(feed({})).toMatchObject({ title: 'Feed social', empty: 'Select the node to choose the account.' });
@@ -74,7 +79,7 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
   });
 
   it('an influencer carries its name, its cover and its number of views', () => {
-    const face = faceOf({ id: 'i', kind: 'influencer' }, {}, asset, { tiles: [{ thumb: 'a', caption: null, badge: null, sale: null }, { thumb: 'b', caption: null, badge: null, sale: null }], total: 2, name: 'Giulia' });
+    const face = faceOf({ id: 'i', kind: 'influencer' }, {}, asset, { source: { tiles: [{ thumb: 'a', caption: null, badge: null, sale: null }, { thumb: 'b', caption: null, badge: null, sale: null }], total: 2, name: 'Giulia' } });
 
     expect(face).toMatchObject({ surface: Surface.Person, title: 'Giulia', count: '2' });
     expect(face.tiles.map((t) => t.thumb)).toEqual(['a']);
