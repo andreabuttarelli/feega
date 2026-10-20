@@ -70,7 +70,7 @@ const CLIP: Record<string, Access> = {
   parentOpacity: { write: ['set_parent'], read: 'parentOpacity' },
   autoLayout: { write: ['add_auto_layout', 'set_auto_layout', 'reorder_auto_layout'], read: 'autoLayout' },
   layoutItem: { write: ['add_auto_layout', 'set_layout_item'], read: 'layoutItem' },
-  constraints: { write: ['set_layout_item'], read: 'constraints' },
+  constraints: { write: ['set_layout_item', 'set_constraints'], read: 'constraints' },
   partStyles: { write: ['set_part_fill'], read: 'partStyles' },
   styleRef: { write: ['named_style'], read: 'styleRef' },
   expressions: { write: ['set_expression', 'pulse_with_music'], read: 'expressions' },
