@@ -23,6 +23,7 @@
   import GpuTileChrome from './GpuTileChrome.svelte';
   import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
+  import { liveCovers } from '$lib/canvas/core/live-visible';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
@@ -1473,7 +1474,11 @@
   let snapGuides = $state<SnapGuide[]>([]);
   const corePeers = $derived(coreOn && coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
   const coreRotate = $derived(coreOn && props.onRotate ? selectedBoxes.filter((t) => t.rotatable && !t.rotation).map((t) => ({ id: t.id, box: { x: t.x, y: t.y, w: t.w, h: t.h } })) : []);
-  const liveEdited = $derived(new Set(placed.filter((t) => t.kind === 'motion' && handedOver(t)).map((t) => t.id)));
+  const liveEdited = $derived(new Set(editing ? placed.filter((t) => t.kind === 'motion' && handedOver(t)).map((t) => t.id) : []));
+  function liveShown(id: string): boolean {
+    const node = wrap?.querySelector(`.gpu-dom-node[data-id="${id}"]:not(.unshown)`);
+    return !!node && !!wrap && liveCovers(node.getBoundingClientRect(), wrap.getBoundingClientRect());
+  }
   const stackOrder = $derived(placed.map((t) => t.id));
   const viewZoom = $derived(view.zoom);
   const coreOverlay = $derived(
@@ -1899,7 +1904,7 @@
   >
     {#if coreOn}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} hidden={liveEdited} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} hidden={liveEdited} {liveShown} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>

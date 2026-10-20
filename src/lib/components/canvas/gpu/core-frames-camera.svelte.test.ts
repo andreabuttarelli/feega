@@ -86,4 +86,13 @@ describe('CoreFrames camera', () => {
     const put = (calls.patches[0] as { put: { clip: string }[] }).put.map((u) => u.clip);
     expect(put).toEqual(['c2', 'c1']);
   });
+
+  it('keeps drawing a node the live editor has not actually put on screen', async () => {
+    const props = $state({ frames: [], cards: [card], hidden: new Set(['c1']), liveShown: () => false, view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    calls.patches.length = 0;
+    app = mount(CoreFrames, { target: document.body, props });
+    flushSync();
+
+    await vi.waitFor(() => expect(calls.patches.flatMap((p) => (p as { put: { clip: string }[] }).put.map((u) => u.clip))).toContain('c1'));
+  });
 });
