@@ -284,6 +284,12 @@ export function dropLayer(doc: MotionDoc, dragged: string, target: string, place
   return mask && mask !== dragged ? joinMask(moved.doc, dragged, mask) : leaveMask(moved.doc, dragged);
 }
 
+export function dropLayers(doc: MotionDoc, dragged: readonly string[], target: string, place: Place, topFirst: readonly string[], newId: NewId = newTrackId): OpResult {
+  const block = topFirst.filter((id) => dragged.includes(id) && id !== target);
+  const sequence = place === Place.Below ? [...block].reverse() : block;
+  return sequence.reduce<OpResult>((result, id) => (result.ok ? dropLayer(result.doc, id, target, place, newId) : result), { ok: true, doc });
+}
+
 const TRACK_EDIT: Record<LayerAction, (doc: MotionDoc, track: Track, index: number, name?: string) => OpResult> = {
   [LayerAction.Up]: (doc, track, index) => (index > 0 ? moveTrack(doc, track.id, index - 1) : fail('already the top track')),
   [LayerAction.Down]: (doc, track, index) => (index < doc.tracks.length - 1 ? moveTrack(doc, track.id, index + 1) : fail('already the bottom track')),
