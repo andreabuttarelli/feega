@@ -23,7 +23,7 @@
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
   import type { Pictures } from '$lib/motion/gpu-full/raster';
-  import { Stand, fillOrder, firstDrawn, lastShown, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
@@ -152,24 +152,49 @@
 
   const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...frames.map((f) => ({ id: f.id, box: f.box, stand: Stand.Frame })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))]);
   const placeholders = $derived(new Map(standIns.map((n) => [n.id, { ...n, ...placeholder(n.stand, { width: n.box.w, height: n.box.h }, look) }])));
-  const blocksGroup = (key: string) => `${key}:blocks`;
+  const BLOCKS = ':blocks';
+  const blocksGroup = (key: string) => `${key}${BLOCKS}`;
   const cardBlocks = $derived(new Map(shownCards.filter((c) => !cardLists.has(c.key)).map((c) => [blocksGroup(c.key), { card: c, list: withoutPictures(c.frame.list, look) }])));
   const blocksById = $derived(new Map([...cardBlocks.entries()].map(([group, { card }]) => [card.frame.id, { id: card.frame.id, group, box: card.frame.box, size: { width: card.frame.list.width, height: card.frame.list.height }, bytes: 0, ...(card.turn ? { turn: card.turn } : {}) }])));
 
   const rebuilding = $derived(new Set([...shownCards.filter((c) => !cardLists.has(c.key)).map((c) => c.frame.id), ...frames.filter((f) => !lists.has(keyOf(f))).map((f) => f.id)]));
-  let shownBefore = new Map<string, HeldFrame>();
+  const drawnLast = new Map<string, HeldFrame>();
+  const RETAIN_MS: Record<Device, number> = { [Device.Desktop]: 15_000, [Device.Phone]: 0 };
+  const lastSeen = new Map<string, number>();
+  const placeIndex = $derived(new SpatialIndex([...placeholders.values()].map((p) => ({ id: p.id, ...p.box }))));
+  const retained = (now: number) => {
+    for (const id of placeIndex.visible(view, area)) {
+      lastSeen.set(id, now);
+    }
+    const keep = new Set<string>();
+    for (const [id, at] of lastSeen) {
+      if (!placeholders.has(id)) {
+        lastSeen.delete(id);
+      } else if (now - at < RETAIN_MS[currentDevice()]) {
+        keep.add(id);
+      }
+    }
+    return keep;
+  };
   const chains = $derived.by(() => {
     const ready = new Map(real.map((f) => [f.id, f]));
-    shownBefore = lastShown(shownBefore, real, rebuilding);
+    const holding = new Set([...rebuilding, ...retained(Date.now())]);
+    for (const id of [...drawnLast.keys()].filter((id) => !holding.has(id))) {
+      drawnLast.delete(id);
+    }
     return [...placeholders.values()].map((p) => {
-      const before = shownBefore.get(p.id);
+      const before = holding.has(p.id) ? drawnLast.get(p.id) : undefined;
       const turned = p.turn ? { turn: p.turn } : {};
-      const layers = [ready.get(p.id), before && { ...before, box: p.box, ...turned }, blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned }];
+      const layers = [ready.get(p.id), before && before.group !== ready.get(p.id)?.group && { ...before, box: p.box, ...turned }, blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned }];
       return layers.filter((l): l is HeldFrame => l != null);
     });
   });
   const held = $derived(chains.map((c) => c[0]));
-  const tails = $derived(chains.map((c) => c[c.length - 1]));
+  const standIndex = $derived(new SpatialIndex(chains.map((c) => ({ id: c[0].id, ...c[0].box }))));
+  const nearTails = () => {
+    const near = standIndex.visible(view, area);
+    return chains.filter((c) => near.has(c[0].id)).map((c) => c[c.length - 1]);
+  };
   const listOf = (group: string) => cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list ?? [...placeholders.values()].find((p) => p.group === group)!.list;
 
   const waiting = $derived.by(() => {
@@ -178,7 +203,7 @@
   });
 
   $effect(() => {
-    onready(new Set(real.map((f) => f.id)));
+    onready(new Set(chains.filter((c) => !c[0].group.endsWith(BLOCKS) && c[0].group !== c[c.length - 1].group).map((c) => c[0].id)));
   });
 
   $effect(() => {
@@ -255,7 +280,8 @@
     if (!into) {
       return false;
     }
-    const keep = new Set([...whole, ...held, ...tails].map((f) => f.group));
+    const tails = nearTails();
+    const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group));
     for (const group of [...put, ...putting.keys()].filter((g) => !keep.has(g))) {
       into.dropGroup(group);
       put.delete(group);
@@ -282,6 +308,11 @@
       const layer = firstDrawn(c, pictured);
       return layer ? [layer] : [];
     });
+    for (const layer of shown) {
+      if (!layer.group.startsWith('placeholder') && !layer.group.endsWith(BLOCKS)) {
+        drawnLast.set(layer.id, layer);
+      }
+    }
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
