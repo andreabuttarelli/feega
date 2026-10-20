@@ -1498,6 +1498,23 @@
     z-index: 3;
   }
 
+  .grip::after {
+    content: '';
+    position: absolute;
+    top: 25%;
+    bottom: 25%;
+    left: 50%;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--ui-accent);
+    opacity: 0.35;
+  }
+
+  .grip:hover::after,
+  .grip.selected::after {
+    opacity: 1;
+  }
+
   .flags :global(.ib.whip) {
     cursor: crosshair;
   }
