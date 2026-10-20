@@ -44,4 +44,14 @@ describe('the preview tells the editor when its drawing moves', () => {
 
     expect(told).toEqual([]);
   });
+
+  it('a measurement says which stage it was taken on, so a stale one is told from a current one', async () => {
+    const replies: { stage?: unknown }[] = [];
+    const root = document.getElementById('root')!;
+    Object.defineProperty(root, 'offsetWidth', { configurable: true, value: 764 });
+    Object.defineProperty(root, 'offsetHeight', { configurable: true, value: 162 });
+    window.dispatchEvent(new MessageEvent('message', { data: { type: MEASURE_REQUEST, id: 's' }, source: { postMessage: (m: { stage?: unknown }) => void replies.push(m) } as unknown as Window }));
+
+    expect(replies[0].stage).toEqual({ width: 764, height: 162 });
+  });
 });
