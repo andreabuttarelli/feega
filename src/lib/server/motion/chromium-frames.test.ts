@@ -62,6 +62,7 @@ describe('chromium launch', () => {
 
   it('the downloaded serverless browser keeps its flags', async () => {
     vi.stubEnv('CHROMIUM_PATH', '');
+    vi.stubEnv('VERCEL', '1');
     const { chromiumPage } = await import('./chromium-frames');
 
     await chromiumPage();
