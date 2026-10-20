@@ -4,6 +4,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Un e2e che trascina un elemento in un frame non si muove: il punto di presa era sul bordo
+Segnale: il clic seleziona l'elemento (`selection-box` visibile) ma il trascinamento non cambia il documento salvato. Causa: la presa calcolata come quota dello stage meno un offset in pixel cadeva sul bordo del box, dove stanno le maniglie. Mossa: prendere il punto dal `boundingBox()` di `selection-box` (un quarto della larghezza, a metà altezza), mai da una quota dello stage. Con un worktree nuovo, `node_modules` del checkout principale può essere rotto (`intl-messageformat/lib/src/core` mancante): `npm ci` nel worktree, non un symlink.
+
 ### In Safari l'anteprima gira a 30 fps mentre la pagina è a 60
 Segnale: `editor-scrub-budget.spec.ts` in WebKit dà host 60 fps e iframe 30 (play e scrub, ogni
 via di seek). WebKit limita il rAF degli iframe cross-origin mai toccati dall'utente a 30 fps

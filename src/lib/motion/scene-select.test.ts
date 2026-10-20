@@ -277,6 +277,22 @@ describe('smart guides while resizing', () => {
   });
 });
 
+describe('snapping a dragged child to its parent frame', () => {
+  const dragBackBy = (dx: number) => dragPatch({ doc: base, clipId: 'back', frame: 0, box: boxes.back, grip: Grip.Move, handle: 0, from: [960, 540], to: [960 + dx, 540], shift: false, snapTargets: [], snapPx: 8 });
+
+  it('pulls the left edge onto the frame edge and draws the guide', () => {
+    const { guides } = dragBackBy(-764);
+
+    expect(guides).toContainEqual({ axis: 'x', at: 0 });
+  });
+
+  it('pulls the centre onto the frame centre', () => {
+    const { guides } = dragBackBy(4);
+
+    expect(guides).toContainEqual({ axis: 'x', at: W / 2 });
+  });
+});
+
 describe('distance labels', () => {
   const frame = { width: W, height: H };
 

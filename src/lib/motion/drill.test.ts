@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Depth, FramePress, Gesture, Press, depthOf, drill, pressOf, type Level, type Probe } from './drill';
+import { Depth, FramePress, Gesture, Press, Under, depthOf, drill, pressOf, type Level, type Probe } from './drill';
 
 const CANVAS: Level = { depth: Depth.Canvas, clip: null, part: null };
 const FRAME: Level = { depth: Depth.Frame, clip: null, part: null };
@@ -29,14 +29,24 @@ describe('depth of a selection', () => {
 });
 
 describe('a press on a frame selected on the canvas', () => {
-  it('moves the whole frame: inner elements wait for a double-click or Enter', () => {
-    expect(pressOf(Depth.Frame, FramePress.Move)).toBe(Press.MoveFrame);
+  it('picks the child under the pointer so it moves without entering the frame', () => {
+    expect(pressOf(Depth.Frame, FramePress.Move, Under.Child)).toBe(Press.Pick);
   });
 
-  it('picks the element under the pointer once inside, or where the frame does not move on press', () => {
-    expect(pressOf(Depth.Clip, FramePress.Move)).toBe(Press.Pick);
-    expect(pressOf(Depth.Part, FramePress.Move)).toBe(Press.Pick);
-    expect(pressOf(Depth.Frame, FramePress.Pick)).toBe(Press.Pick);
+  it('moves the whole frame when the pointer is on its bare background', () => {
+    expect(pressOf(Depth.Frame, FramePress.Move, Under.Bare)).toBe(Press.MoveFrame);
+    expect(pressOf(Depth.Clip, FramePress.Move, Under.Bare)).toBe(Press.MoveFrame);
+    expect(pressOf(Depth.Part, FramePress.Move, Under.Bare)).toBe(Press.MoveFrame);
+  });
+
+  it('picks a child once inside, whatever the depth', () => {
+    expect(pressOf(Depth.Clip, FramePress.Move, Under.Child)).toBe(Press.Pick);
+    expect(pressOf(Depth.Part, FramePress.Move, Under.Child)).toBe(Press.Pick);
+  });
+
+  it('never moves the host of a node that does not move on press', () => {
+    expect(pressOf(Depth.Frame, FramePress.Pick, Under.Bare)).toBe(Press.Pick);
+    expect(pressOf(Depth.Clip, FramePress.Pick, Under.Bare)).toBe(Press.Pick);
   });
 });
 
