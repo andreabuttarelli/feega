@@ -97,6 +97,9 @@ async function scrub(page: Page, cdp: CDPSession) {
     await cdp.send('Profiler.setSamplingInterval', { interval: 500 });
     await cdp.send('Profiler.start');
   }
+  if (flags.has('trace')) {
+    await browser.startTracing(page, { path: flags.get('trace')!, categories: ['devtools.timeline', 'toplevel', 'v8', 'blink', 'gpu', 'disabled-by-default-devtools.timeline'] });
+  }
   await page.mouse.move(left, y);
   await page.mouse.down();
   const start = Date.now();
@@ -107,6 +110,9 @@ async function scrub(page: Page, cdp: CDPSession) {
     await page.waitForTimeout(STEP_MS);
   }
   await page.mouse.up();
+  if (flags.has('trace')) {
+    await browser.stopTracing();
+  }
   const result = await page.evaluate(() => {
     const w = window as unknown as { __gaps: number[]; __long: number[]; __moves: number; __presents: number };
     return { gaps: w.__gaps, long: w.__long, moves: w.__moves, presents: w.__presents };
