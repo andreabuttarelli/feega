@@ -16,11 +16,10 @@ export async function cmdBrands() {
   console.log(c.bold(`\n${brands.length} brand\n`));
 
   table(
-    ['Brand', 'Slug', 'Pending'],
+    ['Brand', 'Slug'],
     brands.map((b) => [
       c.bold(b.name),
       c.dim(b.slug),
-      b.pendingCount > 0 ? c.yellow(String(b.pendingCount)) : c.dim('0'),
     ])
   );
 }

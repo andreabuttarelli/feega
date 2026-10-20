@@ -152,10 +152,6 @@ bun run mcp:http
       <td>{$_('docs.mcp.s80')}</td>
       <td><code>run_node_generation</code></td>
     </tr>
-    <tr>
-      <td>{$_('docs.mcp.s55')}</td>
-      <td><code>list_ad_campaigns</code>, <code>create_ad_campaign</code>, <code>approve_ad_campaign</code></td>
-    </tr>
   </tbody>
 </table>
 <p>{@html $_('docs.mcp.s81')}</p>

@@ -2,7 +2,7 @@
 name: feega
 description: >-
   Operate feega (motion videos on an infinite canvas) via MCP tools or the
-  feega CLI: motion videos, canvas nodes, generation, gallery, ad campaigns.
+  feega CLI: motion videos, canvas nodes, generation, gallery.
   Use when the user mentions feega, feega.app, a feega canvas or video, or
   managing brand content and ads from an agent.
 license: Apache-2.0
@@ -30,8 +30,8 @@ iframe, social feed, social post mockup, products, ads) — through **MCP tools*
 | feega MCP is connected | Call MCP tools (`query`, `ask_motion_agent`, `run_node_generation`, …) |
 | MCP not available | Shell: `feega …` after `feega login` |
 
-MCP reaches the whole org: any project, canvas, node or ad campaign the signed-in user can
-see. The CLI is narrower — it is the fallback for motion, gallery and ads without a connected
+MCP reaches the whole org: any project, canvas, node the signed-in user can
+see. The CLI is narrower — it is the fallback for motion and gallery without a connected
 agent. Never invent REST endpoints or API keys.
 
 ## Auth (always OAuth)
@@ -60,15 +60,12 @@ Setup details: [references/mcp.md](references/mcp.md).
 3. `run_node_generation` needs the node's current `version` (optimistic concurrency): read the
    node with `query` first, pass that number, and if the call comes back `conflict`, re-read and
    retry — never assume your write landed.
-4. An ad campaign always drafts unapproved. `approve_ad_campaign` only works from a signed-in
-   person's own session — an API key (an agent acting alone) is refused on purpose. If you are an
-   agent and this fails, tell the person to approve it themselves.
-5. Confirm before deleting unless the user clearly asked: `delete_row` does not come back.
+4. Confirm before deleting unless the user clearly asked: `delete_row` does not come back.
 
 ## Reading is one tool
 
 **`query` is the read.** Every table your org can see — projects, canvases, nodes, connections,
-assets, posts, ad campaigns, products, social accounts — the request runs with your own session,
+assets, products — the request runs with your own session,
 so Postgres RLS returns exactly the rows you would see in the app and nothing more. Read only, no
 credits, no model. Omit `table` to list what you can name; ask for a table with no `columns` and
 the keys of a row are the schema.
@@ -92,9 +89,7 @@ are cut at 2 000 chars and `limits` says in which columns.
 | a project's canvases | `query({table:"canvases", columns:["id","name","project_id"], where:[{column:"project_id",op:"eq",value:"…"}]})` |
 | the nodes on a canvas | `query({table:"nodes", columns:["id","type","data","version","canvas_id"], where:[{column:"canvas_id",op:"eq",value:"…"},{column:"deleted_at",op:"is",value:null}]})` |
 | a node's current version (before generating into it) | same read, `limit:1` on the node's `id`, read back `version` |
-| ad campaigns and their spend | `query({table:"ad_campaigns", columns:["id","name","status","budget_amount","budget_type"], where:[{column:"brand_id",op:"eq",value:"…"}]})` |
 | what a brand sells | `query({table:"products", columns:["id","title","pricing","url","featured"]})` |
-| connected social accounts | `query({table:"social_accounts", columns:["platform","username","status"]})` |
 
 **A row in a table nothing else writes** → `insert_row`, `update_row` and `delete_row`, `query`
 turned around. `insert_row({table, values})` adds one row; `org_id` is filled in for you, and a
@@ -287,15 +282,6 @@ as viewer), `disable_invite_link`, `set_role`, `remove_member`, `leave`, `transf
 Viewers see everything and change nothing; free organisations have limited editor seats (a
 `seat_limit` answer carries `upgrade_path`). CLI: `feega orgs`, `feega orgs use <orgId>`,
 `feega orgs create <name>`, `feega team [invite|resend|revoke|link|link-off|role|remove|leave|transfer]`.
-
-## Ad campaigns
-
-Meta only (Facebook + Instagram). `list_ad_campaigns` reads a brand's campaigns and their status.
-`create_ad_campaign` drafts one against a brand's Meta ad account — objective, budget, days,
-audience, placements, copy, and canvas image/video nodes (or an existing post to boost) — and it
-always lands `draft` with no `approved_by`: nothing here can make it spend. `approve_ad_campaign`
-is the only door that launches it, and it only opens for a signed-in person's own session.
-`set_ad_campaign_status` pauses or resumes a launched campaign.
 
 ## References (load on demand)
 

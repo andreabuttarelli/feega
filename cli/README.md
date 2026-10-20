@@ -1,10 +1,9 @@
 # feega CLI — infinite-canvas CLI, MCP Server & Agent Skill
 
 [feega](https://feega.app) is an infinite canvas of typed nodes (text, image, video, doc,
-iframe, social feed, social post mockup, products, ads) for producing and publishing social
-content. This repository is its command-line client, [MCP server](docs/mcp.md) (Model Context
-Protocol — `stdio` + HTTP) and agent skill: everything you need to read and write the canvas,
-approve posts and manage ad campaigns from a terminal or an AI agent.
+iframe, social feed, social post mockup, products) for producing motion videos and images. This repository is its command-line client, [MCP server](docs/mcp.md) (Model Context
+Protocol — `stdio` + HTTP) and agent skill: everything you need to read and write the canvas
+and drive motion videos from a terminal or an AI agent.
 
 This repository ships **three ways** to drive the same product (same OAuth, same API, **no static tokens**):
 
@@ -17,8 +16,8 @@ This repository ships **three ways** to drive the same product (same OAuth, same
 > **You need a feega account.** This is a client, not a standalone tool: every call talks to
 > the feega API over HTTPS. Without an account there is nothing to drive.
 
-With the feega CLI you can browse brands, approve pending posts, edit a post's caption or media,
-re-render a missing image, manage ad campaigns and re-sync a connected store's product catalog —
+With the feega CLI you can browse brands, ask the motion agent to edit a video, render it,
+and re-sync a connected store's product catalog —
 from the terminal **or** from an AI agent like Cursor or Claude talking to the MCP server.
 
 ```text
@@ -77,24 +76,19 @@ Update later with `feega update`, or `npm install -g feega-cli@latest` / `brew u
 
 ```bash
 feega brands
-feega dashboard my-brand
-feega content my-brand --status pending_user
-feega approve my-brand --all
-feega calendar my-brand
-feega ads my-brand
+feega motion list
+feega motion render <nodeId>
 ```
 
-Every command takes the brand slug as its first argument. `feega --help` lists them all;
+Brand commands take the brand slug as their first argument. `feega --help` lists them all;
 `feega <command> --help` details one. Short id prefixes from tables are accepted; ambiguous
 prefixes error instead of guessing.
 
 | Area | Commands |
 |------|----------|
-| Posts | `content`, `approve`, `post <id> [show\|edit\|render\|approve\|publish\|reschedule\|reject]` |
-| Planning | `calendar` |
+| Motion | `motion list`, `motion ask`, `motion render`, `motion embed`, `gallery`, `remix`, `publish` |
 | Brand | `products [sync]` |
-| Ads | `ads` — Meta campaigns of a brand; `--approve` launches one, `--pause`/`--resume` |
-| Insight | `dashboard`, `status`, `health` |
+| Insight | `health` |
 | Account | `upgrade`, `update`, `login`, `logout` |
 
 Full command dump: [`llms.txt`](llms.txt) · more docs: [`docs/`](docs/)

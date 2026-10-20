@@ -68,13 +68,10 @@ read why and change your call.
 | you want | how |
 |---|---|
 | your projects/brands | `query` on `brands` — `id`, `slug`, `name`, `plan`, `status`; CLI `feega brands` |
-| the brand at a glance | `feega dashboard <slug>` and `feega status <slug>` — no single table stands in for them |
 | a project's canvases | `query` on `canvases` — `id`, `name`, `project_id`, `viewport`, filtered `project_id` `eq` |
 | the nodes on a canvas | `query` on `nodes` — `id`, `type`, `data`, `version`, filtered `canvas_id` `eq` and `deleted_at` `is` null |
 | a node's connections | `query` on `nodes_connections` — `source_node_id`, `target_node_id`, `target_handle`, filtered on the canvas's node ids |
-| ad campaigns | `query` on `ad_campaigns` — `id`, `name`, `status`, `budget_amount`, `budget_type`, `approved_by`; CLI `feega ads <slug>` |
 | products | `query` on `products` — `id`, `title`, `pricing`, `url`, `featured`, `images`; CLI `feega products <slug>` |
-| connected accounts | `query` on `social_accounts` — `platform`, `username`, `status`, `connected_at` |
 | what `nodes.data` must look like | `describe_node_types` — not a `query`, since it reads a schema, not a table |
 
 ## Writing a row that has no tool of its own
@@ -375,32 +372,3 @@ permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publisha
 | `team_op` `invite_link` / `disable_invite_link` | `feega team link` / `link-off` |
 | `team_op` `set_role` / `remove_member` | `feega team role <userId> <role>` / `remove <userId>` |
 | `team_op` `leave` / `transfer_ownership` | `feega team leave` / `transfer <userId>` |
-
-## Ads
-
-| MCP | CLI |
-|-----|-----|
-| `list_ad_campaigns` | `feega ads <slug>` |
-| `create_ad_campaign` | Promote → Paid ad, in the app |
-| `approve_ad_campaign` | `feega ads <slug> --approve <id>` |
-| `set_ad_campaign_status` | `feega ads <slug> --pause <id>` / `--resume <id>` |
-
-Ads are Meta only (Facebook + Instagram). An ad campaign spends real money, so
-`create_ad_campaign` never produces something already running: it always drafts `draft`,
-`approved_by: null`. `approve_ad_campaign` is the only door that launches it, and it is refused
-over an API key on purpose — an agent cannot approve its own spend. This only works from a
-signed-in person's own session (the app, `feega login`, or the MCP host doing OAuth). If you are
-an agent and this fails, tell the person to approve it themselves.
-
-`list_ad_campaigns({ org, brand_id, status? })` reads a brand's campaigns with their status and
-whether a human has approved them yet. Free.
-
-`create_ad_campaign({ org, brand_id, ad_account_id, objective, budget_type, budget_amount, days,
-countries, placements, primary_text, headline, age_min?, age_max?, gender?, call_to_action?,
-link_url?, node_ids?, post_id? })` drafts a campaign and its creative. `objective` is `traffic`
-(needs `link_url`), `engagement` or `awareness`. `node_ids` are canvas image/video nodes;
-`post_id` boosts a published post instead. Free.
-
-`approve_ad_campaign({ org, id })` launches a drafted campaign on Meta and charges the fee.
-
-`set_ad_campaign_status({ org, id, next })` pauses (`paused`) or resumes (`active`) it.

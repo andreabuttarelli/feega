@@ -31,13 +31,7 @@
 
 <h2>{$_('docs.cli.s10')}</h2>
 <pre><code>feega brands                          # List brands
-feega dashboard &lt;slug&gt;                # Brand overview
-feega content &lt;slug&gt; --status pending_user  # Pending posts
-feega approve &lt;slug&gt; --all            # Approve all pending
-feega post &lt;slug&gt; &lt;id&gt; edit --caption "..." # Edit post
-feega calendar &lt;slug&gt;                 # Monthly scheduled posts
-feega products &lt;slug&gt; sync            # Re-import the store catalog
-feega ads &lt;slug&gt;                      # Ad campaigns</code></pre>
+feega products &lt;slug&gt; sync            # Re-import the store catalog</code></pre>
 
 <h2>{$_('docs.cli.s11')}</h2>
 <pre><code>feega update</code></pre>

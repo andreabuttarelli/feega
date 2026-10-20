@@ -155,22 +155,6 @@ Re-importa il catalogo dallo store collegato (Shopify/Woo).
 { "ok": true, "platform": "shopify", "synced": 24, "rejected": [] }
 ```
 
-## Ads
-
-### GET /api/v1/brands/:slug/ads
-
-Campagne, spesa, metriche e candidati boost.
-
-### POST /api/v1/brands/:slug/ads
-
-Azione sulle ads (`action` nel body: `sync`, `propose`, `approve`, `pause`, `resume`, `duplicate`,
-`delete`, `create`, …) — vedi [`cli/commands/ads.ts`](../commands/ads.ts) per il mapping completo
-dei flag CLI su questo endpoint.
-
-### POST /api/v1/brands/:slug/ads/remix
-
-Remix di ads competitor/trending in brief creativi in brand voice.
-
 ## Billing
 
 ### POST /api/v1/brands/:slug/billing/checkout

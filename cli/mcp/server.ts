@@ -4,7 +4,6 @@ import { asTool } from '../lib/api.ts';
 import { getRequestAuth } from './context.ts';
 import { mcpLog } from './observability.ts';
 import { registerOrgDataTools } from './tools/org-data.ts';
-import { registerAdsTools } from './tools/ads.ts';
 import { registerNodeTools } from './tools/nodes.ts';
 import { registerCanvasTools } from './tools/canvas.ts';
 import { registerPromptTools } from './tools/prompts.ts';
@@ -23,15 +22,11 @@ import { registerOrgTools } from './tools/orgs.ts';
  * chiamava per qualunque cosa e poi sceglieva un brand a caso, spendendo i crediti di
  * un'organizzazione vera e scrivendo nella libreria di un cliente vero.
  */
-const ADS_INSTRUCTION =
-  'An ad campaign (`list_ad_campaigns`/`create_ad_campaign`/`approve_ad_campaign`/`set_ad_campaign_status`) always drafts unapproved; only a signed-in person approves it.';
-
 const MCP_INSTRUCTION_LINES = [
   'feega is an infinite canvas of typed nodes that people, chat or MCP agents drive.',
   'Reads cost nothing; READING IS ONE TOOL: `query`. Every table, org-scoped. Name `columns`; `offset` is the next page; `count: "exact"` when the number IS the answer; `embed` brings a related table along.',
   'Generic writes on every table: `insert_row`, `update_row`, `delete_row`; `canvas_tool`: the chat\'s checked canvas ops. `describe_node_types` gives the JSON Schema `nodes.data` must match per `type` before you insert or update one.',
   '`run_node_generation` is the canvas Generate button: fills an existing node, never creates one; no `model` = default; `medium` must match the node\'s type; a video comes back `queued`. `apply_effects`/`make_effects_pair` render effects (`list_effects`; custom: `write_effect`, `patch_effect`), free. `enhance_prompt` improves a prompt. `run_node_loop` queues every combination of a node\'s inputs (`preview_node_loop` free, `cancel_node_loop` stops it); confirm >50, refused >1000.',
-  ADS_INSTRUCTION,
   'A project needs no brand; never guess one: attach one only to publish.',
   '`get_media`: show `preview_url`, give `full_url`.',
   '`list_motion_videos`/`list_shader_effects`; `ask_motion_agent`/`get_motion_run`/`get_motion_summary`/`motion_budget`; `render_video`/`get_render`; `publish_motion_embed`/`get_motion_embed`; `view_motion_frames`/`list_motion_revisions`/`restore_motion_revision`; `list_motion_templates`/`add_motion_template`/`new_motion_from_template`/`motion_tool`/`motion_editor_op`; `get_storyboard`/`write_storyboard`/`edit_storyboard_card`; `search_gallery`/`remix_gallery_item`/`publish_to_gallery`; `write_layout`/`patch_layout`/`list_layouts`; `get_app_account`/`forget_app_account`; `list_orgs`/`list_team`/`team_op`.',
@@ -142,7 +137,7 @@ export function createFeegaMcpServer(): McpServer {
       name: 'feega',
       version: '0.1.0',
       description:
-        'feega infinite canvas — query and write projects, canvases, nodes, motion videos and ad campaigns via OAuth.',
+        'feega infinite canvas — query and write projects, canvases, nodes, motion videos via OAuth.',
     },
     { instructions: MCP_INSTRUCTIONS },
   );
@@ -151,7 +146,6 @@ export function createFeegaMcpServer(): McpServer {
   recordToolCalls(server);
 
   registerOrgDataTools(server);
-  registerAdsTools(server);
   registerNodeTools(server);
   registerCanvasTools(server);
   registerPromptTools(server);
