@@ -88,6 +88,21 @@ describe('POST /api/v1/motion/[nodeId]/frames', () => {
     expect(body.revision).toBe(2);
   });
 
+  it('asks the remote renderer, with the caller bearer, when local Chromium is off', async () => {
+    store.open = false;
+    const asked: { url: string; auth: string | null }[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      asked.push({ url, auth: new Headers(init.headers).get('authorization') });
+      return Response.json({ frames: [] });
+    });
+    const res = await call({ times: [1] });
+    vi.unstubAllGlobals();
+
+    expect(res.status).toBe(200);
+    expect(asked).toEqual([{ url: `https://oh.feega.app/api/v1/motion/${NODE}/frames`, auth: 'Bearer k' }]);
+    expect(store.seeks).toEqual([]);
+  });
+
   it('works with a read-only key: looking spends nothing and changes nothing', async () => {
     expect((await call({ times: [1] })).status).toBe(200);
   });
@@ -122,7 +137,9 @@ describe('POST /api/v1/motion/[nodeId]/frames', () => {
 
   it('says so when this deployment cannot draw frames', async () => {
     store.open = false;
+    vi.stubEnv('REMOTE_RENDER_URL', 'off');
     expect((await call({ times: [1] })).status).toBe(503);
+    vi.unstubAllEnvs();
   });
 
   it('rate-limits each org', async () => {

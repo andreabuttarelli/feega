@@ -10,7 +10,7 @@ import { runningRuns } from '$lib/server/repos/node-runs';
 import { readHead } from '$lib/server/repos/motion-revisions';
 import { FramesFailure, motionFrames } from '$lib/server/motion/agent-frames';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
-import { FramesSource, fetchRemoteFrames, framesSource, remoteRenderUrl } from './frames-source';
+import { remoteFramesWhenClosed } from './frames-source';
 import type { MotionDoc } from '$lib/motion/doc';
 import { detailOf, elementsOf, summarizeCanvas } from './canvas-summary';
 import type { Answer } from './runners';
@@ -117,9 +117,9 @@ async function snapshot(caller: OrgCaller, input: z.infer<(typeof VIEW_OPS)[View
   if (input.element_id || input.region !== undefined || !input.node_id) {
     return refusal(HTTP_BAD_REQUEST, 'snapshot_unsupported', { fix: 'Snapshot a frame by `node_id`; an element or a region is seen inside its frame. canvas_summary gives the outline in words.' });
   }
-  const remoteUrl = remoteRenderUrl(process.env);
-  if (framesSource({ open: serverFramesOpen(), remoteUrl, ownOrigin: via.ownOrigin }) === FramesSource.Remote) {
-    return fetchRemoteFrames(remoteUrl!, { nodeId: input.node_id, times: [input.time ?? 0], width: input.width, bearer: via.bearer, org: via.org });
+  const remote = await remoteFramesWhenClosed({ nodeId: input.node_id, times: [input.time ?? 0], width: input.width }, { ...via, open: serverFramesOpen() });
+  if (remote) {
+    return remote;
   }
   const answer = await motionFrames(caller.db, { orgId: caller.orgId, nodeId: input.node_id }, { times: [input.time ?? 0], size: input.width });
   return answer.ok ? { status: HTTP_OK, body: answer.body } : refusal(FRAMES_STATUS[answer.failure], answer.failure, { detail: answer.detail, fix: answer.failure === FramesFailure.Closed ? 'Use canvas_summary for the structure, or open the frame editor.' : undefined });
