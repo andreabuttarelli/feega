@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { breakAtVertex, deleteVertex, handlesAt, mirrorHandle, removeVertex, splitSegmentAt, Tangent } from './edit';
+import { breakAtVertex, deleteVertex, handlesAt, mirrorHandle, removeVertex, splitSegmentAt, toggleSmoothVertex, Tangent } from './edit';
 import { Mirroring, Winding, type VectorNetwork } from './model';
 import { evalCubic, nearestOnNetwork, networkBounds, segmentCubic } from './curve-math';
 
@@ -66,5 +66,15 @@ describe('editing a vector network', () => {
   it('finds the nearest point on the network and its tight bounds', () => {
     expect(nearestOnNetwork({ x: 5, y: 1 }, square(), 2)).toMatchObject({ segmentIndex: 0, x: 5, y: 0 });
     expect(networkBounds(arc()).height).toBeCloseTo(3.75, 6);
+  });
+
+  it('alt-click smooths a corner vertex of a network, and back', () => {
+    const smooth = toggleSmoothVertex(square(), 1);
+    const into = smooth.segments[0].tangentEnd;
+    const out = smooth.segments[1].tangentStart;
+
+    expect(into.x * out.x + into.y * out.y).toBeLessThan(0);
+    expect(Math.abs(into.x * out.y - into.y * out.x)).toBeCloseTo(0, 6);
+    expect(toggleSmoothVertex(smooth, 1).segments[0].tangentEnd).toEqual(zero);
   });
 });

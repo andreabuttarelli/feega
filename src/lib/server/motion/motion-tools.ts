@@ -5,6 +5,8 @@ import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
 import { setNetwork, toVector } from '$lib/motion/vector/ops';
+import { PointOp, editPathPoints } from '$lib/motion/shape/point-ops';
+import { Handle } from '$lib/motion/shape/pen';
 import { networkSchema } from '$lib/motion/vector/model';
 import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
@@ -1741,6 +1743,15 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Replace a Shape clip network: vertices [{x,y}] in 0..1 of its box, segments [{start,end,tangentStart,tangentEnd}] (tangents relative to their vertex, zero = straight), regions [{winding, loops: [[segment indices]]}] that fill.',
       inputSchema: z.object({ clip_id: z.string(), network: networkSchema }),
       execute: async (input) => apply(setNetwork(session.doc, input.clip_id, input.network), `set the network of ${input.clip_id}`)
+    }),
+
+    edit_path_points: tool({
+      description: `Edit the points of a path, polygon, star or line Shape clip one by one, in order (indices refer to the path after the previous edits; a parametric shape becomes a free path). Coordinates are in the shape box, 0,0 top-left and 1,1 bottom-right. move: point contour.index goes to "to". delete: remove it. insert: add a point on the segment that starts at contour.index, at t 0..1 along it. smooth: give a corner point curved handles; corner: flatten its handles. handle: put the in or out handle of the point at "to". close: close or open the contour.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        edits: z.array(z.object({ op: z.enum(PointOp), contour: z.number().int().min(0), index: z.number().int().min(0), to: z.tuple([z.number(), z.number()]).optional(), t: z.number().min(0).max(1).optional(), handle: z.enum(Handle).optional() })).min(1).max(200)
+      }),
+      execute: async (input) => apply(editPathPoints(session.doc, input.clip_id, input.edits), `edited the points of ${input.clip_id}`)
     }),
 
     set_path: tool({
