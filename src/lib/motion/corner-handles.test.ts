@@ -41,3 +41,23 @@ describe('the corner handles follow the shape', () => {
     expect(local[1]).toBeCloseTo(unmoved[1]);
   });
 });
+
+describe('the corner handles follow a resize and a turn', () => {
+  it('a stretched shape moves its handle to the new corner', () => {
+    const stretched = must(setTransform(placed, clipId, { scaleX: 2 }));
+
+    const before = cornerHandleAt(placed, clipIn(placed), FRAME, 2, NO_RADIUS);
+    const after = cornerHandleAt(stretched, clipIn(stretched), FRAME, 2, NO_RADIUS);
+
+    expect(after[0]).toBeGreaterThan(before[0]);
+  });
+
+  it('a turned shape moves its handle off the straight corner', () => {
+    const turned = must(setTransform(placed, clipId, { rotateZ: 90 }));
+
+    const before = cornerHandleAt(placed, clipIn(placed), FRAME, 0, NO_RADIUS);
+    const after = cornerHandleAt(turned, clipIn(turned), FRAME, 0, NO_RADIUS);
+
+    expect(after[0]).not.toBeCloseTo(before[0]);
+  });
+});

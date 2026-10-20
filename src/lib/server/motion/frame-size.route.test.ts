@@ -59,14 +59,14 @@ const custom = (): MotionDoc => {
 };
 
 describe('frameSize action', () => {
-  it('a custom frame resized on the canvas saves a revision with the node aspect', async () => {
+  it('a custom frame resized on the canvas saves a revision with the exact node size', async () => {
     const input = event({ node_id: SOURCE, width: '600', height: '300' }, { motion_revisions: [revisionRow(SOURCE, 1, custom())] });
 
     const result = await actions.frameSize(input as never);
 
     expect(result).toMatchObject({ outcome: 'done', undo: [{ kind: 'doc.revision', nodeId: SOURCE, before: 1, after: 2 }] });
     const [saved] = written(input, SOURCE);
-    expect([saved.version, saved.doc.width, saved.doc.height, saved.doc.freeSize]).toEqual([2, 1920, 960, true]);
+    expect([saved.version, saved.doc.width, saved.doc.height, saved.doc.freeSize]).toEqual([2, 600, 300, true]);
   });
 
   it('elements keep their place', async () => {
@@ -77,11 +77,12 @@ describe('frameSize action', () => {
     expect(written(input, SOURCE)[0].doc.tracks.flatMap((t) => t.clips).map((c) => c.id)).toEqual(['txt']);
   });
 
-  it('a preset frame is not resized from the canvas', async () => {
+  it('a preset frame takes the exact size, any ratio', async () => {
     const input = event({ node_id: SOURCE, width: '600', height: '300' });
 
-    expect(await actions.frameSize(input as never)).toMatchObject({ status: 409 });
-    expect(written(input, SOURCE)).toEqual([]);
+    await actions.frameSize(input as never);
+
+    expect(written(input, SOURCE)[0].doc).toMatchObject({ width: 600, height: 300 });
   });
 
   it('a missing size is a 400', async () => {
