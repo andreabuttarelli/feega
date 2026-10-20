@@ -48,3 +48,20 @@ describe('iconContours', () => {
     expect(box(iconContours([['rect', { x: 2, y: 4, width: 20, height: 16, rx: 2 }]], 24, 2))).toEqual([1, 3, 23, 21]);
   });
 });
+
+describe('iconContours winding', () => {
+  it('turns every piece of a stroke the same way, so overlapping pieces union instead of cancelling', () => {
+    const turn = (c: number[]) => {
+      let twice = 0;
+      for (let i = 0; i < c.length; i += 2) {
+        const j = (i + 2) % c.length;
+        twice += c[i] * c[j + 1] - c[j] * c[i + 1];
+      }
+      return Math.sign(twice);
+    };
+    const path = iconContours([['path', { d: 'M3 11v3a1 1 0 0 0 1 1h2l3 3V7L6 10H4a1 1 0 0 0-1 1z' }]], 20, 1.6);
+
+    expect(path.length).toBeGreaterThan(1);
+    expect(new Set(path.map(turn).filter(Boolean))).toEqual(new Set([1]));
+  });
+});
