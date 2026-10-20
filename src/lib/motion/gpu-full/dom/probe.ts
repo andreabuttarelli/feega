@@ -11,9 +11,6 @@ type Seekable = { pause: () => void; seek: (t: number) => void };
 export function domProbe(cfg: ProbeConfig) {
   const UNRENDERED = new Set(['style', 'script', 'defs', 'clippath', 'pattern', 'lineargradient', 'radialgradient', 'filter', 'mask', 'symbol', 'marker', 'title', 'desc', 'metadata']);
   const UNTRANSFORMED = 'feega-dom-read-untransformed';
-  const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
-  const rootOf = (clip: string) => document.getElementById(cfg.prefix + clip) ?? document.querySelector<HTMLElement>(`[data-clip="${CSS.escape(clip)}"]`);
-  const drawsCanvas = (clips: string[]) => clips.some((clip) => rootOf(clip) instanceof HTMLCanvasElement || rootOf(clip)?.querySelector('canvas') != null);
   const boxed = (el: Element) => el instanceof HTMLElement || el.tagName.toLowerCase() === 'svg';
 
   const ownText = (el: Element) =>
@@ -194,12 +191,11 @@ export function domProbe(cfg: ProbeConfig) {
         tl?.seek(m.time);
       })
       .then(() => w.__hfWaitForSeekCompletion?.())
-      .then(() => (drawsCanvas(m.clips) ? frame() : undefined))
       .then(async () => {
         const pending: Promise<ImageBitmap>[] = [];
         const trees = Object.fromEntries(
           m.clips.flatMap((clip) => {
-            const root = rootOf(clip);
+            const root = document.getElementById(cfg.prefix + clip) ?? document.querySelector<HTMLElement>(`[data-clip="${CSS.escape(clip)}"]`);
             return root ? [[clip, read(root, pending)]] : [];
           })
         );

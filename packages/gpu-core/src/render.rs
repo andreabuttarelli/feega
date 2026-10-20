@@ -82,6 +82,18 @@ impl Renderer {
         Ok(Rendered { pixels: self.read(&target, size)?, skipped: [skipped, missing].concat() })
     }
 
+    pub fn draw_and_wait(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<(), RenderError> {
+        let plan = self.library.plan(list, self.limits);
+        let (list, _) = self.engine.hold(&mut self.cached, plan, pictures, &self.device, &self.queue).map_err(failed)?;
+        let pictures = &pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), v.clone())).collect();
+        let size = wgpu::Extent3d { width: list.width, height: list.height, depth_or_array_layers: 1 };
+        let target = self.device.create_texture(&wgpu::TextureDescriptor { label: None, size, mip_level_count: 1, sample_count: 1, dimension: wgpu::TextureDimension::D2, format: wgpu::TextureFormat::Rgba8Unorm, usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC, view_formats: &[] });
+        let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+        self.engine.draw(&self.device, &self.queue, &list, pictures, &view).map_err(failed)?;
+        self.device.poll(wgpu::PollType::Wait { submission_index: None, timeout: None }).map_err(failed)?;
+        Ok(())
+    }
+
     fn read(&self, target: &wgpu::Texture, size: wgpu::Extent3d) -> Result<Vec<u8>, RenderError> {
         let row = size.width * BYTES;
         let padded = row.div_ceil(ROW_ALIGN) * ROW_ALIGN;

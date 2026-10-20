@@ -3192,3 +3192,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## A gpu-core scrub below 60 fps with a cheap draw
 
 **Signal:** `?engine=gpu-core` scrub stutters while `raster` is a few ms and the HTML engine is smooth. **Move:** `npm run bench:gpu-parity -- --doc=<doc> --mode=scrub` prints per-phase p50 (`read` / `build` / `ready` / `raster`). A `read` near 20 ms with the in-iframe seek and read under 1.5 ms is the hidden DOM page waiting a vsync (`dom/probe.ts`), not work. The first engine run in a page also pays a one-off ~1 s iframe stall: compare runs in the same order.
+
+## A worktree dev server keeps serving the old module
+
+**Signal:** edits to a `.svelte` or `.ts` file change nothing in a Playwright run against `vite dev` started in a worktree; `curl localhost:PORT/src/...` shows the old source; before/after A/B runs agree because both ran the same stale code. **Move:** restart the dev server for every variant (`scripts/bench/editor-scrub.ts` runs against a fresh one) and grep the served module for a marker before trusting a comparison.

@@ -8,8 +8,8 @@ const CONFIG = { request: DOM_READ_REQUEST, reply: DOM_READ_REPLY, timeline: 'ma
 
 type Reply = { type: string; id: string; trees: Record<string, unknown>; error?: string };
 
-function asked(body: string, beside = ''): Promise<{ reply: Reply; frames: number }> {
-  document.body.innerHTML = `<div id="${CUSTOM_ROOT_PREFIX}${CLIP}">${body}</div>${beside}`;
+function asked(body: string): Promise<{ reply: Reply; frames: number }> {
+  document.body.innerHTML = `<div id="${CUSTOM_ROOT_PREFIX}${CLIP}">${body}</div>`;
   let frames = 0;
   vi.stubGlobal('requestAnimationFrame', (run: () => void) => {
     frames += 1;
@@ -36,16 +36,10 @@ describe('domProbe', () => {
     expect(frames).toBe(0);
   });
 
-  it('does not wait for a canvas the read clips do not contain', async () => {
-    const { frames } = await asked('<div></div>', '<canvas></canvas>');
-
-    expect(frames).toBe(0);
-  });
-
-  it('gives a clip with a canvas one animation frame to paint it', async () => {
+  it('does not wait for an animation frame to read a clip with a canvas', async () => {
     const { reply, frames } = await asked('<canvas></canvas>');
 
     expect(reply.error).toBeUndefined();
-    expect(frames).toBe(1);
+    expect(frames).toBe(0);
   });
 });
