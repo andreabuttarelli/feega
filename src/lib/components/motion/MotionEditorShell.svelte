@@ -1983,7 +1983,7 @@
   let caughtAt = $state<[number, number] | null>(null);
   let overlay = $state<ReturnType<typeof SelectionOverlay> | null>(null);
 
-  const inFrame = (asked: DrillAsk) => ({ at: asked.at ? ([asked.at.x * doc.width, asked.at.y * doc.height] as [number, number]) : null, gesture: asked.gesture, from: asked.from });
+  const inFrame = (asked: DrillAsk) => ({ at: asked.at ? ([asked.at.x * doc.width, asked.at.y * doc.height] as [number, number]) : null, gesture: asked.gesture, from: asked.from, drag: asked.drag })
 
   $effect(() => frameDrill.listen(data.node.id, (asked) => overlay?.drillAsked(inFrame(asked))));
 

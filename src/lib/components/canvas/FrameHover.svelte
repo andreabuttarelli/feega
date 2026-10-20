@@ -7,7 +7,7 @@
 <script lang="ts">
   import PartsProbe from './PartsProbe.svelte';
   import { Pose } from '$lib/motion/hyperframes/measure';
-  import { Gesture } from '$lib/motion/drill';
+  import { Depth, Gesture } from '$lib/motion/drill';
   import { closedHover, containFit } from '$lib/canvas/frame-hover';
   import { frameDrill, type FramePoint } from '$lib/canvas/frame-drill';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -73,9 +73,31 @@
   const DOUBLE_MS = 600;
   const DRAG_PX = 4;
 
+  function upgradeOnDouble() {
+    const upgrade = () => frameDrill.upgrade(nodeId, Gesture.Double);
+    addEventListener('dblclick', upgrade, { capture: true, once: true });
+    setTimeout(() => removeEventListener('dblclick', upgrade, { capture: true }), DOUBLE_MS);
+  }
+
   function press(e: PointerEvent) {
     const p = pointOf(e);
     if (!p) {
+      return;
+    }
+    const pressed = boxes && !(e.metaKey || e.ctrlKey) && e.pointerType === 'mouse' ? closedHover(boxes, p) : null;
+    if (pressed) {
+      e.stopPropagation();
+      e.preventDefault();
+      frameDrill.request(nodeId, p, Gesture.Click, Depth.Canvas, { pointer: e.pointerId, client: { x: e.clientX, y: e.clientY } });
+      layersSource.canvas?.open(nodeId);
+      const held = { x: e.clientX, y: e.clientY };
+      const lift = (up: PointerEvent) => {
+        frameDrill.release(nodeId);
+        if (Math.hypot(up.clientX - held.x, up.clientY - held.y) <= DRAG_PX) {
+          upgradeOnDouble();
+        }
+      };
+      addEventListener('pointerup', lift, { capture: true, once: true });
       return;
     }
     if (!(e.metaKey || e.ctrlKey)) {
@@ -85,9 +107,7 @@
           return;
         }
         frameDrill.request(nodeId, p, Gesture.Click);
-        const upgrade = () => frameDrill.upgrade(nodeId, Gesture.Double);
-        addEventListener('dblclick', upgrade, { capture: true, once: true });
-        setTimeout(() => removeEventListener('dblclick', upgrade, { capture: true }), DOUBLE_MS);
+        upgradeOnDouble();
       };
       addEventListener('pointerup', release, { capture: true, once: true });
       return;

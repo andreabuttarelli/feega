@@ -1,7 +1,8 @@
 import { Depth, type Gesture } from '$lib/motion/drill';
 
 export type FramePoint = { x: number; y: number };
-export type DrillAsk = { at: FramePoint | null; gesture: Gesture; from: Depth };
+export type HeldPointer = { pointer: number; client: { x: number; y: number } };
+export type DrillAsk = { at: FramePoint | null; gesture: Gesture; from: Depth; drag?: HeldPointer };
 
 const FRESH_MS = 3000;
 
@@ -10,9 +11,15 @@ export function drillRequests(now: () => number) {
   let taken: (DrillAsk & { nodeId: string; when: number; late: (ask: DrillAsk) => void }) | null = null;
   const open = new Map<string, (ask: DrillAsk) => void>();
   return {
-    request(nodeId: string, at: FramePoint | null, gesture: Gesture, from: Depth = Depth.Canvas) {
-      pending = { nodeId, at, gesture, from, when: now() };
-      open.get(nodeId)?.({ at, gesture, from });
+    request(nodeId: string, at: FramePoint | null, gesture: Gesture, from: Depth = Depth.Canvas, drag?: HeldPointer) {
+      pending = { nodeId, at, gesture, from, when: now(), ...(drag ? { drag } : {}) };
+      open.get(nodeId)?.({ at, gesture, from, ...(drag ? { drag } : {}) });
+    },
+    release(nodeId: string) {
+      if (pending?.nodeId === nodeId) {
+        const { drag: _held, ...rest } = pending;
+        pending = rest;
+      }
     },
     listen(nodeId: string, listener: (ask: DrillAsk) => void): () => void {
       open.set(nodeId, listener);
@@ -43,7 +50,7 @@ export function drillRequests(now: () => number) {
         return null;
       }
       taken = { ...ask, late };
-      return { at: ask.at, gesture: ask.gesture, from: ask.from };
+      return { at: ask.at, gesture: ask.gesture, from: ask.from, ...(ask.drag ? { drag: ask.drag } : {}) };
     }
   };
 }
