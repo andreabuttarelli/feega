@@ -4,8 +4,9 @@ import { Surface, type CardFace } from '$lib/canvas/gpu/card-face';
 import type { Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
 import { circle, rect, solid } from './shapes';
-import { genBody, genItems, genMark, type GenIcons } from './gen-card';
-import { BODY_SIZE, BORDER, CardPart, DONE, ERROR, FOOTER_LINES, Fit, HEAD_H, HEAD_SIZE, PAD, ROW_GAP, ROW_H, ROW_THUMB, DOT_RADIUS, PILL_H, PILL_PAD, PROMPT_HINT, RUNNING, AUTO_MODEL, STAGE, STATUS_RADIUS, STATUS_TEXT_GAP, THUMB_COLUMNS, THUMB_GAP, at, body, image, panel, text, whole, type CoreCard, type Ctx } from './card-kit';
+import { personItems, previewItems } from './source-card';
+import { genBody, genItems, genMark } from './gen-card';
+import { BODY_SIZE, BORDER, CardPart, DONE, ERROR, FOOTER_LINES, Fit, HEAD_H, HEAD_SIZE, PAD, ROW_GAP, ROW_H, ROW_THUMB, DOT_RADIUS, PILL_H, PILL_PAD, PROMPT_HINT, RUNNING, AUTO_MODEL, STAGE, STATUS_RADIUS, STATUS_TEXT_GAP, THUMB_GAP, at, body, image, panel, text, whole, type CardIcons, type CoreCard, type Ctx } from './card-kit';
 
 export { CardPart, type CoreCard };
 
@@ -37,16 +38,6 @@ function generate(x: Ctx): Item[] {
   ];
 }
 
-function thumbs(x: Ctx, top: number): Item[] {
-  const { c, theme } = x;
-  const cell = (c.w - PAD * 2 - THUMB_GAP * (THUMB_COLUMNS - 1)) / THUMB_COLUMNS;
-  const rows = Math.max(0, Math.floor((c.h - top - PAD + THUMB_GAP) / (cell + THUMB_GAP)));
-  return c.face.thumbs.slice(0, rows * THUMB_COLUMNS).flatMap((url, i) => {
-    const b = { x: PAD + (i % THUMB_COLUMNS) * (cell + THUMB_GAP), y: top + Math.floor(i / THUMB_COLUMNS) * (cell + THUMB_GAP), w: cell, h: cell };
-    return [solid(x.clip(CardPart.Thumb), at(c, [rect(b.x, b.y, b.w, b.h)]), theme.line), image(x, CardPart.Thumb, { url, video: false }, b, Fit.Cover, i)];
-  });
-}
-
 function source(x: Ctx): Item[] {
   const { c, theme } = x;
   const f = c.face;
@@ -55,7 +46,7 @@ function source(x: Ctx): Item[] {
   }
   const below = PAD + BODY_SIZE * 2;
   const title = text(x, CardPart.Title, f.title || f.label || '', BODY_SIZE, theme.ink, PAD, PAD, c.w - PAD * 2);
-  const rest = f.thumbs.length ? thumbs(x, below) : text(x, CardPart.Subtitle, f.subtitle, BODY_SIZE - 1, theme.inkSoft, PAD, below, c.w - PAD * 2);
+  const rest = text(x, CardPart.Subtitle, f.subtitle, BODY_SIZE - 1, theme.inkSoft, PAD, below, c.w - PAD * 2);
   return [...panel(x), ...title, ...rest];
 }
 
@@ -118,12 +109,14 @@ const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
   [Surface.Generate]: generate,
   [Surface.Text]: (x) => [...panel(x), ...body(x, x.c.face.text, PAD)],
   [Surface.Source]: source,
+  [Surface.Preview]: previewItems,
+  [Surface.Person]: personItems,
   [Surface.List]: list,
   [Surface.Doc]: doc,
   [Surface.Blank]: (x) => panel(x)
 };
 
-export function cardItems(c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: GenIcons | null = null): Item[] {
+export function cardItems(c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null): Item[] {
   const x: Ctx = { c, theme, glyphs, bold, icons, clip: (p) => `${c.id}:${p}` };
   const drawn = live(x);
   if (drawn) {

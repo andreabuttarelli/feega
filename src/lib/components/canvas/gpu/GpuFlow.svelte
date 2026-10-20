@@ -95,6 +95,7 @@
   import { baseRatio, cellBox, cellBytes, cellCss, cellKey, detailRatio, neededCells, softPosters, type Cell } from '$lib/canvas/gpu/detail-plan';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
   import type { GenTileView } from '$lib/canvas/gen-tile-view';
+  import type { SourceView } from '$lib/canvas/source-thumbs';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { revealIn as revealDelay } from '$lib/canvas/gpu/reveal-gate';
@@ -104,7 +105,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => SourceView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
 
   const DOM_CAP = 6;
   const CORE = 'core';
@@ -229,7 +230,7 @@
       const card: CardTile = {
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
-        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.thumbsOf?.(t.id) ?? [], props.genViewFor?.(t.id) ?? null),
+        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.viewOf?.(t.id) ?? null, props.genViewFor?.(t.id) ?? null),
         ...portMarks(t),
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null
@@ -354,7 +355,7 @@
   const snapshotKind = (t: Tile) => !!t.kind && t.kind !== 'motion' && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
   const shotKeyOf = (id: string) => {
     const t = byId.get(id);
-    return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.thumbsOf?.(id) ?? []) : '';
+    return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.viewOf?.(id) ?? null) : '';
   };
   let shown = $state(new Map<string, string>());
   const shotOf = (id: string) => shown.get(id) ?? null;
@@ -780,7 +781,7 @@
   );
 
   function faceFor(t: Tile) {
-    const face = faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []);
+    const face = faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.viewOf?.(t.id) ?? null);
     return coreDrawn.has(t.id) ? handedToCore(face) : face;
   }
 

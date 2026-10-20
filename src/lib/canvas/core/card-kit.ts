@@ -6,6 +6,7 @@ import type { Box } from '$lib/canvas/gpu/geometry';
 import type { Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
 import { line, rect, solid } from './shapes';
+import type { NodeType } from '$lib/canvas/node-data';
 import type { GenIcons } from './gen-card';
 
 export enum CardPart {
@@ -20,7 +21,12 @@ export enum CardPart {
   Model = 'model',
   Thumb = 'thumb',
   Head = 'head',
-  Row = 'row'
+  Row = 'row',
+  Badge = 'badge',
+  Sale = 'sale',
+  Caption = 'caption',
+  Empty = 'empty',
+  Info = 'info'
 }
 
 export enum Fit {
@@ -56,7 +62,13 @@ export const RUNNING = 'Running…';
 export const AUTO_MODEL = 'Auto';
 export const CENTRE: [number, number] = [0.5, 0.5];
 
-export type Ctx = { c: CoreCard; theme: CoreTheme; glyphs: Glyphs; bold: Glyphs; icons: GenIcons | null; clip: (p: CardPart) => string };
+export type SourceIcons = { head: ReadonlyMap<NodeType, number[][]>; layers: number[][]; play: number[][]; person: number[][] };
+
+export type CardIcons = GenIcons & SourceIcons;
+
+const BOLD_PARTS: ReadonlySet<CardPart> = new Set([CardPart.Title, CardPart.Sale]);
+
+export type Ctx = { c: CoreCard; theme: CoreTheme; glyphs: Glyphs; bold: Glyphs; icons: CardIcons | null; clip: (p: CardPart) => string };
 
 export const at = (c: CoreCard, contours: number[][]) => contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + c.x : v + c.y)));
 
@@ -81,7 +93,7 @@ export function text(x: Ctx, part: CardPart, s: string, size: number, colour: st
     return [];
   }
   const set = width === null ? undefined : { width, height };
-  const contours = at(x.c, (part === CardPart.Title ? x.bold : x.glyphs)(s, size, set).contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + left : v + top))));
+  const contours = at(x.c, (BOLD_PARTS.has(part) ? x.bold : x.glyphs)(s, size, set).contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + left : v + top))));
   return [{ ...solid(x.clip(part), contours, colour), scissor: [x.c.x, x.c.y, x.c.x + x.c.w, x.c.y + x.c.h] }];
 }
 

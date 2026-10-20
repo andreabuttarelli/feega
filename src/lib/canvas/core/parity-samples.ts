@@ -1,6 +1,7 @@
 import type { NodeType } from '$lib/canvas/node-data';
+import type { SourceView } from '$lib/canvas/source-thumbs';
 
-export type ParitySample = { name: string; kind: NodeType; data: Record<string, unknown>; thumbs?: string[] };
+export type ParitySample = { name: string; kind: NodeType; data: Record<string, unknown>; view?: SourceView };
 
 const PHOTO = '/login-visual.webp';
 const WIDE = '/og.png';
@@ -31,7 +32,7 @@ const MEDIA: ParitySample[] = [
   { name: 'image upload', kind: 'image', data: { assetId: PHOTO } },
   { name: 'image generated', kind: 'image', data: { output_asset_id: WIDE, model: 'Image model' } },
   { name: 'effects output', kind: 'effects', data: { refId: PHOTO } },
-  { name: 'feed thumbs', kind: 'social_account_feed', data: { handle: 'studio', platform: 'instagram' }, thumbs: [PHOTO, WIDE, PHOTO] }
+  { name: 'feed thumbs', kind: 'social_account_feed', data: { handle: 'studio', platform: 'instagram' }, view: { tiles: [PHOTO, WIDE, PHOTO].map((thumb) => ({ thumb, caption: null, badge: null, sale: null })), total: 3, name: null } }
 ];
 
 export const PARITY_SAMPLES: ParitySample[] = [...(Object.entries(BY_KIND) as [NodeType, Record<string, unknown>][]).map(([kind, data]) => ({ name: kind, kind, data })), ...MEDIA];

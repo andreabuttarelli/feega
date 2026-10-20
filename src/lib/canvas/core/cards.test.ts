@@ -4,6 +4,8 @@ import { rgbaOf } from '$lib/motion/gpu-full/rgba';
 import { faceOf } from '$lib/canvas/gpu/card-face';
 import { NODE_PORTS } from '$lib/canvas/node-ports';
 import { CardPart, cardItems, type CoreCard } from './cards';
+import type { CardIcons } from './card-kit';
+import { TileBadge, type SourceView } from '$lib/canvas/source-thumbs';
 import type { CoreTheme } from './overlay';
 import type { Glyphs } from './chrome';
 
@@ -16,6 +18,8 @@ const box = (contours: number[][]) => {
   return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)].map((v) => Math.round(v) + 0);
 };
 const asset = (id: string) => `https://cdn/${id}`;
+const view = (thumbs: string[], total = thumbs.length): SourceView => ({ tiles: thumbs.map((thumb) => ({ thumb, caption: null, badge: null, sale: null })), total, name: null });
+const icons: CardIcons = { references: [], credit: [], head: new Map(), layers: [[0, 0, 5, 0, 5, 5]], play: [[0, 0, 5, 0, 5, 5]], person: [] };
 const card = (kind: string, data: Record<string, unknown>, over: Partial<CoreCard> = {}): CoreCard => ({ id: 'n', x: 0, y: 0, w: 200, h: 100, face: faceOf({ id: 'n', kind }, data, asset), ...over });
 const part = (items: Item[], p: CardPart) => items.filter((i) => i.clip === `n:${p}` || i.clip.startsWith(`n:${p}:`));
 const paths = (items: Item[], p: CardPart) => part(items, p) as PathItem[];
@@ -63,14 +67,54 @@ describe('cardItems', () => {
     expect(stage.paint).toEqual({ kind: 'solid', color: rgbaOf('#000000') });
   });
 
-  it('lays thumbnails of a source in three square columns', () => {
-    const c = { ...card('social_account_feed', { handle: 'x' }), face: { ...faceOf({ id: 'n', kind: 'social_account_feed' }, { handle: 'x' }, asset, ['t1', 't2']) }, w: 300, h: 300 };
+  it('lays thumbnails of a source in three square columns under the header', () => {
+    const c = { ...card('social_account_feed', { handle: 'x' }), face: faceOf({ id: 'n', kind: 'social_account_feed' }, { handle: 'x' }, asset, view(['t1', 't2'])), w: 300, h: 300 };
     const thumbs = part(cardItems(c, theme, glyphs), CardPart.Thumb).filter((i): i is ImageItem => i.kind === ItemKind.Image);
 
     expect(thumbs.map((t) => t.src)).toEqual(['t1', 't2']);
-    expect(thumbs[0].size.width).toBeCloseTo((300 - 28 - 8) / 3);
+    expect(thumbs.map((t) => t.matrix[4])).toEqual([6, 6 + (300 - 20) / 3 + 4]);
+    expect(thumbs.map((t) => t.matrix[5])).toEqual([37, 37]);
+    expect(thumbs[0].size.width).toBeCloseTo((300 - 20) / 3);
+    expect(thumbs[0].size.height).toBeCloseTo(thumbs[0].size.width);
   });
 
+  it('puts a rule under the header and the count at its right edge', () => {
+    const c = { ...card('products', { url: 'shop.io' }), face: faceOf({ id: 'n', kind: 'products' }, { url: 'shop.io' }, asset, view(['t1'], 9)), w: 300, h: 300 };
+    const [rule] = paths(cardItems(c, theme, glyphs), CardPart.Head).slice(-1);
+    const [count] = paths(cardItems(c, theme, glyphs), CardPart.Head).filter((p) => p !== rule);
+
+    expect(box(rule.contours)).toEqual([0, 30, 300, 31]);
+    expect(box(count.contours)[2]).toBe(291);
+  });
+
+  it('marks a tile with its badge, its sale and its caption only when the whole tile shows', () => {
+    const tile = { thumb: 't', caption: '9.00 EUR', badge: TileBadge.Carousel, sale: '−20%' };
+    const draw = (h: number) => cardItems({ ...card('products', { url: 'x' }), face: faceOf({ id: 'n', kind: 'products' }, { url: 'x' }, asset, { tiles: [tile], total: 1, name: null }), w: 300, h }, theme, glyphs, glyphs, icons);
+
+    expect(paths(draw(300), CardPart.Badge)).toHaveLength(2);
+    expect(paths(draw(300), CardPart.Sale)).toHaveLength(2);
+    expect(paths(draw(300), CardPart.Caption)).toHaveLength(2);
+    expect(paths(draw(80), CardPart.Caption)).toHaveLength(0);
+  });
+
+  it('shows the failure instead of the grid when the sync failed', () => {
+    const f = faceOf({ id: 'n', kind: 'products' }, { url: 'x', sync_status: 'failed', sync_error: 'boom' }, asset, view(['t1']));
+    const items = cardItems({ ...card('products', {}), face: f, w: 300, h: 300 }, theme, glyphs);
+
+    expect(part(items, CardPart.Thumb)).toHaveLength(0);
+    expect(part(items, CardPart.Empty)).toHaveLength(1);
+  });
+
+  it('draws an influencer as a cover over a name and views band', () => {
+    const f = faceOf({ id: 'n', kind: 'influencer' }, {}, asset, { tiles: [{ thumb: 'face', caption: null, badge: null, sale: null }], total: 1, name: 'Giulia' });
+    const items = cardItems({ ...card('influencer', {}), face: f, w: 200, h: 200 }, theme, glyphs);
+    const [cover] = part(items, CardPart.Media) as ImageItem[];
+    const [rule] = paths(items, CardPart.Info);
+
+    expect(cover.fit).toBe('cover');
+    expect(box(rule.contours)[1]).toBe(148);
+    expect(paths(items, CardPart.Subtitle)).toHaveLength(1);
+  });
 
   it('moves every item by the card position', () => {
     const [, paper] = paths(cardItems(card('doc', {}, { x: 50, y: 70 }), theme, glyphs), CardPart.Panel);
@@ -90,7 +134,7 @@ describe('cardItems', () => {
   });
 
   it('gives each picture its own clip, since the engine keys textures by clip', () => {
-    const c = { ...card('social_account_feed', {}), face: faceOf({ id: 'n', kind: 'social_account_feed' }, {}, asset, ['t1', 't2', 't3']), w: 300, h: 300 };
+    const c = { ...card('social_account_feed', {}), face: faceOf({ id: 'n', kind: 'social_account_feed' }, {}, asset, view(['t1', 't2', 't3'])), w: 300, h: 300 };
     const clips = cardItems(c, theme, glyphs).filter((i) => i.kind === ItemKind.Image).map((i) => i.clip);
 
     expect(new Set(clips).size).toBe(3);

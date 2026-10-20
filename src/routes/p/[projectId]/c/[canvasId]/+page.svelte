@@ -69,7 +69,7 @@
   import { Renderer, Switch, rendererOf } from '$lib/canvas/gpu/renderer-flag';
   import RendererBadge from '$lib/components/canvas/gpu/RendererBadge.svelte';
   import { dev } from '$app/environment';
-  import { postThumb, productThumb } from '$lib/canvas/source-thumbs';
+  import { feedView, personView, productsView, type SourceView } from '$lib/canvas/source-thumbs';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
@@ -1161,9 +1161,15 @@
   /** `type`/`data` grezzi di ogni tile — la forma che `commonPropertiesOf` legge, per la barra
    *  della selezione: `tiles` porta già `node: CanvasNode`, un'astrazione diversa che non ha
    *  `model`/`params` come campi diretti. */
-  function sourceThumbs(id: string): string[] {
-    const items = [...(shownPosts[id] ?? []).map(postThumb), ...(shownProducts[id] ?? []).map(productThumb), ...(influencersByNode[id]?.views ?? []).map((v) => v.url)];
-    return items.filter((url): url is string => !!url);
+  function sourceView(id: string): SourceView | null {
+    if (shownPosts[id]) {
+      return feedView(shownPosts[id], socialPosts[id]?.length ?? 0);
+    }
+    if (shownProducts[id]) {
+      return productsView(shownProducts[id], products[id]?.length ?? 0);
+    }
+    const person = influencersByNode[id];
+    return person ? personView(person.name, person.views) : null;
   }
 
   let domReason = $state<string | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Dom ? (data.rendererSwitch === Switch.ForceDom ? 'kill switch' : '?renderer=dom') : null);
@@ -3501,7 +3507,7 @@
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
-    thumbsOf={sourceThumbs}
+    viewOf={sourceView}
     cardPreviews={data.cardPreviews}
     previewsAt={`/p/${data.projectId}/c/${data.canvas.id}/card-previews`}
     onfail={(why) => {

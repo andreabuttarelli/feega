@@ -687,8 +687,9 @@ export class GpuScene {
         title.position.set(PAD, PAD);
         root.addChild(title);
         b.texts.push(title);
-        if (f.thumbs.length) {
-          this.thumbGrid(root, b, f.thumbs, c, PAD + BODY_SIZE * 2);
+        const thumbs = f.tiles.flatMap((t) => t.thumb ?? []);
+        if (thumbs.length) {
+          this.thumbGrid(root, b, thumbs, c, PAD + BODY_SIZE * 2);
           return;
         }
         this.skeleton(root, b, c, PAD + BODY_SIZE * 2);
