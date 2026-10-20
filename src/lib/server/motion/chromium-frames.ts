@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import type { Browser, Page } from 'puppeteer-core';
 import shaderRuntime from 'virtual:motion-shader-fx';
 import type { ExportPage, ExportPort, PageBox, StillPage, StillPort, Viewport } from './server-frames';
@@ -19,11 +20,31 @@ type Stage = Window & {
   __hfWaitForSeekCompletion?: () => Promise<unknown>;
 };
 
+const LOCAL_CHROME_PATHS = [
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Chromium.app/Contents/MacOS/Chromium',
+  '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser'
+];
+
+function localChromium(): string | null {
+  if (process.env.CHROMIUM_PATH) {
+    return process.env.CHROMIUM_PATH;
+  }
+  if (process.env.VERCEL) {
+    return null;
+  }
+  return LOCAL_CHROME_PATHS.find((path) => existsSync(path)) ?? null;
+}
+
 let shared: Promise<Browser> | null = null;
 
 async function launch(): Promise<Browser> {
   const [{ default: chromium }, { default: puppeteer }] = await Promise.all([import('@sparticuz/chromium-min'), import('puppeteer-core')]);
-  const local = process.env.CHROMIUM_PATH;
+  const local = localChromium();
   if (local) {
     return puppeteer.launch({ executablePath: local, headless: 'shell' });
   }
@@ -115,7 +136,7 @@ async function print(html: string): Promise<Buffer> {
 
 export const chromiumExport: ExportPort = { open: exportPageOf, print };
 
-export const serverFramesOpen = () => Boolean(process.env.VERCEL || process.env.CHROMIUM_PATH);
+export const serverFramesOpen = () => Boolean(process.env.VERCEL || localChromium());
 
 export const chromiumFrames: StillPort = { open: pageOf };
 
