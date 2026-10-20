@@ -5,7 +5,7 @@ import { DrawTool, type DrawBox } from './draw-tool';
 import { mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
 import { ShapeKind } from './shape/schema';
 import { DocMode, docMode, setStill, settledStill } from './still';
-import { TOP_LEFT_ANCHOR, addClip, type OpResult } from './timeline';
+import { TOP_LEFT_START, addClip, type OpResult } from './timeline';
 
 type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse;
 
@@ -31,7 +31,7 @@ const SPAN: Record<DocMode, (doc: MotionDoc, frame: number, component: Component
 const fail = (error: string): OpResult => ({ ok: false, error });
 
 function place(doc: MotionDoc, component: ComponentId, props: Record<string, unknown>, frame: number, id: string): OpResult {
-  return addClip(doc, { component, props, transform: TOP_LEFT_ANCHOR, ...SPAN[docMode(doc)](doc, frame, component) }, id);
+  return addClip(doc, { component, props, ...TOP_LEFT_START, ...SPAN[docMode(doc)](doc, frame, component) }, id);
 }
 
 const TEXT_TYPE = COMPONENTS.Text.schema.parse({});
