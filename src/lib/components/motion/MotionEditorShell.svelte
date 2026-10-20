@@ -424,10 +424,13 @@
     if (brief) {
       void sendBrief(url, brief);
     }
-    return watchMotionNode(supabase, data.node.id, (row) => {
-      if (headMoved(row, version)) {
-        void pullExternalEdit();
-      }
+    return watchMotionNode(supabase, data.node.id, {
+      onChange: (row) => {
+        if (headMoved(row, version)) {
+          void pullExternalEdit();
+        }
+      },
+      onResync: () => void pullExternalEdit()
     });
   });
   let body = $state<HTMLDivElement | null>(null);
