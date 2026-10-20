@@ -196,7 +196,10 @@ import { liftElement, type Element } from '$lib/motion/move-element';
 import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
 import type { BreakdownAnswer } from '$lib/server/video-reference';
-import { guessedAdvance, measureText, type Advance, type TextLook } from '$lib/motion/text-measure';
+import { guessedAdvance, measureText, type Advance } from '$lib/motion/text-measure';
+import { textLook } from '$lib/motion/text-look';
+import { loadOutliner } from '$lib/motion/fonts/outliner';
+import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
 import { isText } from '$lib/motion/layout/text-extent';
 import { outlineUrl } from '$lib/motion/fonts/outline';
 import { pivotBox } from '$lib/motion/parent';
@@ -229,6 +232,7 @@ export type MotionToolDeps = {
   sfx?: (sfx: Sfx) => Promise<SfxAsset>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   fontAdvance?: (fontUrl: string) => Promise<Advance | null>;
+  fontOutliner?: OutlinerLoader;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
   seam?: () => Promise<number | null>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
@@ -477,21 +481,6 @@ const PLACED = { track_id: z.string().optional() };
 const PLACED_PICTURE = { ...PLACED, effects: z.array(effectSpec).max(MAX_EFFECTS).optional() };
 
 const REGULAR_WEIGHT = 400;
-
-const WRAPS: Partial<Record<ComponentId, (p: Record<string, unknown>) => boolean>> = { Text: (p) => p.sizing !== 'auto' };
-const CAPITALS: Partial<Record<ComponentId, true>> = { Kicker: true };
-
-function textLook(component: ComponentId, p: Record<string, unknown>): TextLook {
-  return {
-    text: String(p.text ?? ''),
-    size: Number(p.size ?? 0),
-    tracking: Number(p.tracking ?? 0),
-    leading: Number(p.leading ?? 1),
-    align: (p.align as TextLook['align']) ?? 'left',
-    wraps: WRAPS[component]?.(p) ?? true,
-    capitals: Boolean(CAPITALS[component]) || p.textCase === 'upper'
-  };
-}
 
 const PLACEMENT_HELP = 'track_id puts it on that track (else the first that fits); effects is its effect stack, same kinds and params as add_effect.';
 
@@ -1735,6 +1724,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Turn a Shape clip into an editable vector network (same drawing): vertices that any number of segments can join, filled regions.',
       inputSchema: z.object({ clip_id: z.string() }),
       execute: async (input) => apply(toVector(session.doc, input.clip_id), `made ${input.clip_id} a vector`)
+    }),
+
+    text_to_path: tool({
+      description: 'Turn Title, Text or Kicker clips into free path shapes that look the same: glyph outlines from the font with its size, tracking, leading, alignment and wrapping as rendered. Fill, stroke, opacity, transform and constraints stay; keyframes on font props and text animators are dropped. The text is no longer editable afterwards.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
+      execute: async (input) => apply(await outlineTexts(session.doc, input.clip_ids, deps.fontOutliner ?? loadOutliner), `outlined ${input.clip_ids.join(', ')}`)
     }),
 
     set_vector_network: tool({
