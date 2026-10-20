@@ -10,7 +10,7 @@
   import { ItemKind } from '$lib/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
-  import { cached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
+  import { cached, uncached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentOverlay, SentUses } from '$lib/canvas/core/use-diff';
@@ -301,7 +301,7 @@
     const moving = gesture.active();
     const overscan = Math.min(Math.floor((Math.min(area.width, area.height) * resolution) / OVERSCAN_SHARE), OVERSCAN_MAX);
     const refine = `${Math.round(area.width * resolution) + 2 * overscan}x${Math.round(area.height * resolution) + 2 * overscan}`;
-    const header = `zoom=${view.zoom.toFixed(3)} view=${Math.round(view.x)},${Math.round(view.y)} area=${Math.round(area.width)}x${Math.round(area.height)} retained=${refine} outcome=${outcome} cacheBytes=${cacheBytes} held=${held.length} pictured=${pictured.size} put=${put.size}`;
+    const header = `zoom=${view.zoom.toFixed(3)} view=${Math.round(view.x)},${Math.round(view.y)} area=${Math.round(area.width)}x${Math.round(area.height)} retained=${refine} outcome=${outcome} caching=${zooming.active()} cacheBytes=${cacheBytes} held=${held.length} pictured=${pictured.size} put=${put.size}`;
     const signature = signatureOf(debugFacts);
     if (debugMoving && !moving) {
       console.info(`[core] gesture end ${header}`);
@@ -384,7 +384,7 @@
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileEdited(cached(shown, wide.view, wide.area, textureBytes), edited)));
+    const patch = sent.patch(worldUses(heldWhileEdited(zooming.active() ? cached(shown, wide.view, wide.area, textureBytes) : uncached(shown), edited)));
     if (patch) {
       into.patchUses(patch);
     }
@@ -400,19 +400,25 @@
     if (DEBUG) {
       debugFrame(outcome, skipped, shown);
     }
-    return pending || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
+    return pending || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
   }
 
   let ahead = false;
   const gesture = gestureWatch();
   let lastView = '';
+  let lastZoom = 0;
+  const zooming = gestureWatch();
 
   $effect(() => {
     const now = `${view.x},${view.y},${view.zoom}`;
     if (lastView && now !== lastView) {
       gesture.moved();
     }
+    if (lastZoom && view.zoom !== lastZoom) {
+      zooming.moved();
+    }
     lastView = now;
+    lastZoom = view.zoom;
   });
 
   const idle = (run: () => void) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : setTimeout(run, IDLE_MS));
