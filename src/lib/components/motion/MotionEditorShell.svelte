@@ -2296,7 +2296,7 @@
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector gesture={live} {doc} onchange={edit} />{/if}
       {:else if view === PropertiesView.Multiple}
-        <MultiInspector {doc} ids={selection} {frame} mode={editMode} onchange={edit} />
+        <MultiInspector {doc} ids={selection} {frame} mode={editMode} boxes={spaceBoxes()} onchange={edit} />
       {:else}
         <header class="frame-head" data-testid="selection-head"><FamilyIcon /><span>Frame</span></header>
         <DocFields gesture={live} {doc} {assets} upload={uploadMedia} onchange={edit} />
