@@ -90,7 +90,6 @@
   import type { Boxes } from '$lib/motion/scene-select';
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
-  import ConstraintsSection from '$lib/components/motion/ConstraintsSection.svelte';
   import { ScaleMode, flipScale } from '$lib/motion/scale-tool';
   import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
   import { GridToggle, flipGrid } from '$lib/motion/pixel-grid';
@@ -147,7 +146,7 @@
   import {
     ClipEdge,
     Direction,
-    TOP_LEFT_ANCHOR,
+    TOP_LEFT_START,
     addClip,
     addTrack,
     adjacentKeyframe,
@@ -1183,7 +1182,7 @@
   function add(component: ComponentId) {
     adding = false;
     const id = newId();
-    apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame, transform: TOP_LEFT_ANCHOR }, id), `Added ${COMPONENTS[component].label}`);
+    apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame, ...TOP_LEFT_START }, id), `Added ${COMPONENTS[component].label}`);
     selection = [id];
   }
 
@@ -2246,7 +2245,7 @@
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       {#if panelsDue}
-      {#if selection.length}<AlignBar count={selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
+      {#if selection.length > 1}<AlignBar count={selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector gesture={live} {doc} onchange={edit} />
@@ -2256,8 +2255,7 @@
         {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel gesture={live} {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
         {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack gesture={live} fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector gesture={live} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} fonts={fontLibrary} onopen={enterComp} />
-        {#if typeof selected.props.x === 'number' && !selected.parent}<ConstraintsSection {doc} clip={selected} onchange={apply} />{/if}
+        <MotionInspector gesture={live} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onalign={alignTo} onchange={edit} fonts={fontLibrary} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}

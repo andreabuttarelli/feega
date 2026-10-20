@@ -31,7 +31,7 @@ describe('the Layer section', () => {
   });
 
   it('flips a layer horizontally and vertically', () => {
-    const html = layer(inspect('Shape', { shape: 'rect' }));
+    const html = inspect('Shape', { shape: 'rect' });
     expect(html).toContain('data-testid="flip-horizontal"');
     expect(html).toContain('data-testid="flip-vertical"');
   });

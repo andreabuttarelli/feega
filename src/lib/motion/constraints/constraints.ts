@@ -9,7 +9,7 @@ type Rule = (span: Span, from: number, to: number) => Span;
 
 const pinStart: Rule = (s) => s;
 const pinEnd: Rule = (s, from, to) => ({ start: to - (from - s.start), length: s.length });
-const stretch: Rule = (s, from, to) => ({ start: s.start, length: to - s.start - (from - s.start - s.length) });
+const stretch: Rule = (s, from, to) => ({ start: s.start, length: Math.max(0, s.length + to - from) });
 const centre: Rule = (s, from, to) => ({ start: s.start + (to - from) / 2, length: s.length });
 const scale: Rule = (s, from, to) => ({ start: (s.start / from) * to, length: (s.length / from) * to });
 
@@ -33,17 +33,32 @@ type Placed = { x: number; y: number; width: number; height: number };
 
 const placed = (props: Record<string, unknown>): props is Record<string, unknown> & Placed => ['x', 'y', 'width', 'height'].every((k) => typeof props[k] === 'number');
 
+type Axis = 'x' | 'y';
+
+const keepsPixels = (rule: Rule): boolean => rule !== scale;
+
+function offsetKept(clip: MotionClip, axis: Axis, ratio: number): MotionClip {
+  const own = clip.transform[axis];
+  const track = clip.keyframes[axis];
+  return {
+    ...clip,
+    transform: own === undefined ? clip.transform : { ...clip.transform, [axis]: own * ratio },
+    keyframes: track ? { ...clip.keyframes, [axis]: track.map((k) => ({ ...k, value: Number(k.value) * ratio })) } : clip.keyframes
+  };
+}
+
 function constrained(clip: MotionClip, from: CanvasSize, to: CanvasSize): MotionClip {
   if (!clip.constraints || clip.parent || !placed(clip.props)) {
     return clip;
   }
   const p = clip.props;
-  const across = HORIZONTAL[clip.constraints.horizontal]({ start: (p.x - p.width / 2) * from.width, length: p.width * from.width }, from.width, to.width);
-  const down = VERTICAL[clip.constraints.vertical]({ start: (p.y - p.height / 2) * from.height, length: p.height * from.height }, from.height, to.height);
-  return {
-    ...clip,
-    props: { ...p, x: (across.start + across.length / 2) / to.width, y: (down.start + down.length / 2) / to.height, width: across.length / to.width, height: down.length / to.height }
-  };
+  const across = HORIZONTAL[clip.constraints.horizontal];
+  const down = VERTICAL[clip.constraints.vertical];
+  const wide = across({ start: (p.x - p.width / 2) * from.width, length: p.width * from.width }, from.width, to.width);
+  const high = down({ start: (p.y - p.height / 2) * from.height, length: p.height * from.height }, from.height, to.height);
+  const moved = { ...clip, props: { ...p, x: (wide.start + wide.length / 2) / to.width, y: (high.start + high.length / 2) / to.height, width: wide.length / to.width, height: high.length / to.height } };
+  const horizontally = keepsPixels(across) ? offsetKept(moved, 'x', from.width / to.width) : moved;
+  return keepsPixels(down) ? offsetKept(horizontally, 'y', from.height / to.height) : horizontally;
 }
 
 export function withConstraints(before: MotionDoc, sized: OpResult): OpResult {
