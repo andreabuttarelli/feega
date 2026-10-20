@@ -92,7 +92,7 @@
   const ROTATE_REACH_PX = 44;
   const ROTATE_STEP_DEG = 15;
   const SIDE_UNIT = 0.5;
-  const CORE_TEXT_ATTRIBUTE = 'data-core-text';
+  const CORE_DRAWN_ATTRIBUTE = 'data-core-drawn';
   const CORE_SURFACE = '[data-canvas-surface][data-renderer="core"]';
 
   const SUMMARY: Record<Grip, string> = {
@@ -288,11 +288,11 @@
 
   $effect(() => {
     const stage = host?.parentElement;
-    if (!core || !stage) {
+    if (!stage || inPlace || !host?.ownerDocument.querySelector(CORE_SURFACE)) {
       return;
     }
-    stage.setAttribute(CORE_TEXT_ATTRIBUTE, '');
-    return () => stage.removeAttribute(CORE_TEXT_ATTRIBUTE);
+    stage.setAttribute(CORE_DRAWN_ATTRIBUTE, '');
+    return () => stage.removeAttribute(CORE_DRAWN_ATTRIBUTE);
   });
 
   function writeCore(at: CoreEdit, typed: string) {
@@ -906,7 +906,7 @@
 </div>
 
 <style>
-  :global([data-core-text] > .host) {
+  :global([data-core-drawn] > .host) {
     visibility: hidden;
   }
 

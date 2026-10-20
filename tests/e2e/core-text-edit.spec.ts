@@ -49,6 +49,7 @@ test.describe('text edit in the core is drawn by the core @real', () => {
     await page.mouse.move(FROM.x + DRAG.width, FROM.y + DRAG.height);
     await page.mouse.up();
     await page.waitForTimeout(1500);
+    await expect(page.locator('[data-testid="motion-preview"] > .host').first()).toHaveCSS('visibility', 'hidden');
     await shot(page, '01-created');
 
     const frame = (await page.getByTestId('selection-box').boundingBox())!;
@@ -63,7 +64,13 @@ test.describe('text edit in the core is drawn by the core @real', () => {
     await page.keyboard.press('Meta+A');
     await page.keyboard.type('Hi');
     await page.keyboard.press('Shift+Enter');
-    await page.keyboard.type('yo');
+    await page.keyboard.type('yo ');
+    await expect(page.locator(CARET)).toHaveCount(1, { timeout: FIRST_EDIT_MS });
+    await page.waitForTimeout(SETTLE_MS);
+    const spaced = await caretAt(page);
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(SETTLE_MS);
+    expect(spaced.x).toBeGreaterThan((await caretAt(page)).x);
     await expect(page.locator(CARET)).toHaveCount(1, { timeout: FIRST_EDIT_MS });
     await page.waitForTimeout(SETTLE_MS);
     expect(await textOf(page)).toBe('Hi\nyo');

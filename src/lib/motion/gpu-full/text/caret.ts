@@ -13,7 +13,7 @@ export enum Step {
   Forward = 1
 }
 
-export type Shape = { room: number; align: number; top: number };
+export type Shape = { room: number; align: number; top: number; space: number };
 
 export function caretLines(laid: Laid, paragraphs: string[], shape: Shape): CaretLine[] {
   let first = 0;
@@ -39,8 +39,12 @@ export function caretLines(laid: Laid, paragraphs: string[], shape: Shape): Care
       const right = last ? origin + last.pen + last.advance : origin;
       const reached = stops.at(-1)?.offset ?? base + start - 1;
       const shown = Math.max(reached + 1, base + start);
-      for (let o = Math.max(reached + 1, base + start); o <= base + end; o++) {
-        stops.push({ offset: o, x: o === base + start && !last ? origin : right });
+      const chars = [...(paragraphs[p] ?? '')];
+      const closing = j === block.lines.length - 1;
+      let x = right;
+      for (let o = shown; o <= base + end; o++) {
+        stops.push({ offset: o, x });
+        x += closing && chars[o - base] === ' ' ? shape.space : 0;
       }
       const top = shape.top + block.top + j * laid.lineHeight;
       return { start: base + start, end: base + end, shown, top, height: laid.lineHeight, ink: shape.top + block.top + line.baseline - laid.ascent, inkHeight: laid.ascent + laid.descent, stops };
