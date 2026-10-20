@@ -3188,3 +3188,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 
 ## A canvas op that fails still answers 200
 **Signal:** a batch over `POST /api/v1/edit` reported `applied: 3` although a `move_node` on a missing node came back `{ error: 'node_not_found' }`. **Move:** canvas ops signal refusal in the body (`error`, or `outcome` invalid/conflict/not_found), not in the HTTP status; anything that sequences ops reads both (`run-edit.ts`). A dev server also keeps serving the old module after an edit under `$lib/server`: restart it before believing a live run.
+
+## A gpu-core scrub below 60 fps with a cheap draw
+
+**Signal:** `?engine=gpu-core` scrub stutters while `raster` is a few ms and the HTML engine is smooth. **Move:** `npm run bench:gpu-parity -- --doc=<doc> --mode=scrub` prints per-phase p50 (`read` / `build` / `ready` / `raster`). A `read` near 20 ms with the in-iframe seek and read under 1.5 ms is the hidden DOM page waiting a vsync (`dom/probe.ts`), not work. The first engine run in a page also pays a one-off ~1 s iframe stall: compare runs in the same order.
