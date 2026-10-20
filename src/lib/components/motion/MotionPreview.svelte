@@ -455,7 +455,7 @@
 
 <svelte:window onmessage={redrawn} />
 
-<div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview" data-engine={engine} data-export-engine={exportedOn}>
+<div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview" data-text-editing={textEditing ? '' : undefined} data-engine={engine} data-export-engine={exportedOn}>
   <div class="host" bind:this={host}></div>
   {#if engine === RenderEngine.Gpu && gpuCompose}
     <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>

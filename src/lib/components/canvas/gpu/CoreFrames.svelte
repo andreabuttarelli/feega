@@ -30,7 +30,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), hidden = new Set(), order = [], cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; hidden?: ReadonlySet<string>; order?: readonly string[]; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
@@ -296,7 +296,7 @@
     debugFacts = chains.map((c) => {
       const id = c[0].id;
       const box = placeholders.get(id)!.box;
-      return factsOf(id, { onScreen: onScreen(box), hidden: hidden.has(id), drawn: drawn.get(id) ?? null, ready: readyIds.has(id), candidates: { ready: readyIds.get(id) ?? null, previous: drawnLast.get(id) ?? null, blocks: blocksById.get(id) ?? null, placeholder: c[c.length - 1] } });
+      return factsOf(id, { onScreen: onScreen(box), drawn: drawn.get(id) ?? null, ready: readyIds.has(id), candidates: { ready: readyIds.get(id) ?? null, previous: drawnLast.get(id) ?? null, blocks: blocksById.get(id) ?? null, placeholder: c[c.length - 1] } });
     });
     const moving = gesture.active();
     const overscan = Math.min(Math.floor((Math.min(area.width, area.height) * resolution) / OVERSCAN_SHARE), OVERSCAN_MAX);
@@ -384,7 +384,7 @@
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileEdited(cached(shown.filter((f) => !hidden.has(f.id)), wide.view, wide.area, textureBytes), edited)));
+    const patch = sent.patch(worldUses(heldWhileEdited(cached(shown, wide.view, wide.area, textureBytes), edited)));
     if (patch) {
       into.patchUses(patch);
     }
@@ -441,7 +441,7 @@
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame));
 
   $effect(() => {
-    void [raster, held, edited, hidden, overlay, view.x, view.y, view.zoom, area.width, area.height];
+    void [raster, held, edited, overlay, view.x, view.y, view.zoom, area.width, area.height];
     pacer.invalidate();
   });
 
