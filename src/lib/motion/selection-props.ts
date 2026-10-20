@@ -1,6 +1,7 @@
 import { findClip, type MotionClip, type MotionDoc } from './doc';
 import type { EditMode } from './edit-mode';
 import { scaleAround } from './group-transform';
+import { Horizontal, Vertical } from './constraints/model';
 import { MIXED, shared, type Shared } from './mixed';
 import type { Bounds } from './scene-select';
 import { moveBy } from './space';
@@ -18,8 +19,13 @@ export const STYLE_PROPS = [
   { key: 'strokeWidth', label: 'Stroke width', kind: PropKind.Number },
   { key: 'font', label: 'Font', kind: PropKind.Text },
   { key: 'size', label: 'Font size', kind: PropKind.Number },
-  { key: 'weight', label: 'Weight', kind: PropKind.Number }
+  { key: 'weight', label: 'Weight', kind: PropKind.Number },
+  { key: 'roundness', label: 'Roundness', kind: PropKind.Number }
 ] as const;
+
+const CONSTRAINT_DEFAULT = { horizontal: Horizontal.Scale, vertical: Vertical.Scale } as const;
+
+export const sharedConstraint = (clips: readonly MotionClip[], axis: keyof typeof CONSTRAINT_DEFAULT) => shared(clips.map((c) => c.constraints?.[axis] ?? CONSTRAINT_DEFAULT[axis]));
 
 export type BoxPatch = Partial<{ x: number; y: number; width: number; height: number }>;
 
