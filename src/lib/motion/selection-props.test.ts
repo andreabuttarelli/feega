@@ -6,7 +6,9 @@ import { aabb, quadOf } from './scene-select';
 import { propBoxes } from './space';
 import { addClip, type OpResult } from './timeline';
 import { unionBounds } from './multi-select';
-import { placeBox, setPropAcross, sharedProp } from './selection-props';
+import { setConstraints } from './constraints/constraints';
+import { Horizontal, Vertical } from './constraints/model';
+import { placeBox, setPropAcross, sharedConstraint, sharedProp } from './selection-props';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -42,6 +44,20 @@ describe('a prop across a selection', () => {
 
   it('refuses a prop no clip has', () => {
     expect(setPropAcross(base, ['a', 'b'], 'nothing', 1).ok).toBe(false);
+  });
+});
+
+describe('constraints across a selection', () => {
+  it('read as the default when never set', () => {
+    expect(sharedConstraint(clips, 'horizontal')).toBe(Horizontal.Scale);
+  });
+
+  it('are Mixed when the clips differ', () => {
+    const pinned = must(setConstraints(base, ['a'], { horizontal: Horizontal.Left }));
+    const both = ['a', 'b'].map((id) => findClip(pinned, id)!.clip);
+
+    expect(sharedConstraint(both, 'horizontal')).toBe(MIXED);
+    expect(sharedConstraint(both, 'vertical')).toBe(Vertical.Scale);
   });
 });
 

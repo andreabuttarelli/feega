@@ -15,7 +15,9 @@
   import type { OpResult } from '$lib/motion/timeline';
   import { aabb, quadOf, type Boxes } from '$lib/motion/scene-select';
   import { unionBounds } from '$lib/motion/multi-select';
-  import { PropKind, STYLE_PROPS, placeBox, setPropAcross, sharedProp, type BoxPatch } from '$lib/motion/selection-props';
+  import { HORIZONTALS, VERTICALS } from '$lib/motion/constraints/model';
+  import { setConstraints } from '$lib/motion/constraints/constraints';
+  import { PropKind, STYLE_PROPS, placeBox, setPropAcross, sharedConstraint, sharedProp, type BoxPatch } from '$lib/motion/selection-props';
   import NumberField from './NumberField.svelte';
 
   let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; onchange: (doc: MotionDoc, summary: string) => void } = $props();
@@ -31,7 +33,7 @@
   const HEX = /^#[0-9a-f]{6}$/i;
   const FALLBACK_COLOUR = '#000000';
 
-  const SHARED_KEYS = ['x', 'y', 'rotateZ', 'scale', 'opacity'] as const;
+  const SHARED_KEYS = ['x', 'y', 'rotateZ', 'scale', 'opacity', 'anchorX', 'anchorY'] as const;
   type SharedKey = (typeof SHARED_KEYS)[number];
   const MIXED_OPTION = '';
 
@@ -88,6 +90,15 @@
   const textProp = (key: string) => {
     const raw = sharedProp(clips, key);
     return raw === MIXED ? '' : String(raw);
+  };
+
+  const horizontal = $derived(sharedConstraint(clips, 'horizontal'));
+  const vertical = $derived(sharedConstraint(clips, 'vertical'));
+  const setPin = (axis: 'horizontal' | 'vertical', value: string) => {
+    const result = value === MIXED_OPTION ? null : setConstraints(doc, [...ids], { [axis]: value });
+    if (result?.ok) {
+      onchange(result.doc, `Pinned ${ids.length} layers`);
+    }
   };
 
   const setBlend = (value: string) => value !== MIXED_OPTION && across((d, clip) => setBlendMode(d, clip.id, value as BlendMode), `Changed the blend mode on ${ids.length} clips`);
@@ -147,6 +158,18 @@
         {/each}
       </section>
     {/if}
+    <section class="section" data-section="constraints">
+      <h3>Constraints</h3>
+      {#each [{ axis: 'horizontal', label: 'Horizontal', value: horizontal, options: HORIZONTALS }, { axis: 'vertical', label: 'Vertical', value: vertical, options: VERTICALS }] as c (c.axis)}
+        <label class="line">
+          <span>{c.label}</span>
+          <select aria-label={`${c.label} constraint`} data-testid={`multi-${c.axis}`} value={c.value === MIXED ? MIXED_OPTION : c.value} onchange={(e) => setPin(c.axis as 'horizontal' | 'vertical', e.currentTarget.value)}>
+            {#if c.value === MIXED}<option value={MIXED_OPTION}>Mixed</option>{/if}
+            {#each c.options as o (o)}<option value={o}>{o}</option>{/each}
+          </select>
+        </label>
+      {/each}
+    </section>
     <section class="section" data-section="layer">
       <h3>Layer</h3>
       <label class="line">
