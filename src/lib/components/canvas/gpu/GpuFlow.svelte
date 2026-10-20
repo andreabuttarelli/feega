@@ -1259,7 +1259,9 @@
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
-        overrides = new Map([[a.id, resized(a.box, a.corner, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min)]]);
+        const box = resized(a.box, a.corner, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min);
+        overrides = new Map([[a.id, box]]);
+        props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
       },
       [GestureKind.Marquee]: (a) => {
         if (a.kind !== GestureKind.Marquee || (!far && !a.moved)) {
@@ -1332,6 +1334,7 @@
         if (a.kind !== GestureKind.Resize) {
           return;
         }
+        props.onLive?.([]);
         const box = overrides.get(a.id);
         if (box && (box.x !== a.box.x || box.y !== a.box.y)) {
           props.onMove?.(a.id, box.x, box.y);

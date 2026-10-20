@@ -185,8 +185,8 @@ describe('a custom frame takes the size the hand gives it', () => {
     expect(heightFollowsDoc(element)).toBe(false);
   });
 
-  it('a preset keeps its aspect and asks for no picture change', () => {
-    expect(frameResize(preset, { w: 420, h: 900 }, FORMATS[MotionFormat.Landscape])).toEqual({ w: 420, h: 236 + MOTION_NODE_BAR_H, picture: null });
+  it('a preset frame takes any ratio the hand gives it', () => {
+    expect(frameResize(preset, { w: 420, h: 900 }, FORMATS[MotionFormat.Landscape])).toEqual({ w: 420, h: 900, picture: { width: 420, height: 900 - MOTION_NODE_BAR_H } });
   });
 
   it('a free element takes the box it is given, width and height apart, like a shape or a text box', () => {

@@ -6,18 +6,19 @@ import { setCanvas } from './timeline';
 const ratio = (s: { width: number; height: number }) => s.width / s.height;
 
 describe('customSize', () => {
-  it('keeps the node aspect', () => {
-    const size = customSize({ width: 500, height: 300 });
-
-    expect(Math.abs(ratio(size) - 500 / 300)).toBeLessThan(0.01);
+  it('keeps the node pixels when a video fits', () => {
+    expect(customSize({ width: 500, height: 300 })).toEqual({ width: 500, height: 300 });
   });
 
-  it('fills the long side up to the max side', () => {
-    expect(customSize({ width: 600, height: 200 }).width).toBe(MAX_SIDE);
+  it('keeps the aspect when a video side is over the limit', () => {
+    const size = customSize({ width: 4000, height: 1000 });
+
+    expect(size.width).toBe(MAX_SIDE);
+    expect(Math.abs(ratio(size) - 4)).toBeLessThan(0.01);
   });
 
   it('caps the short side at 1080p', () => {
-    expect(customSize({ width: 400, height: 400 })).toEqual({ width: MAX_SHORT_SIDE, height: MAX_SHORT_SIDE });
+    expect(customSize({ width: 3000, height: 3000 })).toEqual({ width: MAX_SHORT_SIDE, height: MAX_SHORT_SIDE });
   });
 
   it('gives even sides the doc accepts', () => {
@@ -29,6 +30,10 @@ describe('customSize', () => {
 
   it('never goes under the doc minimum on a sliver', () => {
     expect(customSize({ width: 2000, height: 4 }).height).toBeGreaterThanOrEqual(16);
+  });
+
+  it('gives a still the exact pixels, any ratio', () => {
+    expect(customSize({ width: 333, height: 2111 }, { still: { frame: 0 } })).toEqual({ width: 333, height: 2111 });
   });
 });
 

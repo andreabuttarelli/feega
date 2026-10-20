@@ -2415,10 +2415,44 @@
     const plan = framePlan(id, width, height);
     const before = nodes.find((n) => n.id === id);
     const was = before && motionOf(before)?.kind === FrameKind.Element ? { width: before.w, height: before.h } : null;
+    liveResized([]);
+    livePreview(id, null);
+    const sized = plan?.picture ? sizeFrameDoc(id, plan.picture, was) : null;
     await storeSize(id, plan?.w ?? width, plan?.h ?? height);
-    if (plan?.picture) {
-      await sizeFrameDoc(id, plan.picture, was);
+    await sized;
+  }
+
+  let liveAsk: { id: string; w: number; h: number } | null = null;
+  let liveFrame = 0;
+
+  function livePreview(id: string, size: { w: number; h: number } | null) {
+    const open = layersSource.video;
+    if (open?.nodeId !== id) {
+      return;
     }
+    const plan = size ? framePlan(id, size.w, size.h) : null;
+    const fitted = plan?.picture ? fitToNode(open.doc, plan.picture) : null;
+    open.preview(fitted?.ok ? fitted.doc : null);
+  }
+
+  function liveResized(boxes: { id: string; w?: number; h?: number }[]) {
+    const box = boxes.find((b) => b.w !== undefined && b.h !== undefined);
+    if (!box) {
+      cancelAnimationFrame(liveFrame);
+      liveFrame = 0;
+      liveAsk = null;
+      return;
+    }
+    liveAsk = { id: box.id, w: box.w!, h: box.h! };
+    if (liveFrame) {
+      return;
+    }
+    liveFrame = requestAnimationFrame(() => {
+      liveFrame = 0;
+      if (liveAsk) {
+        livePreview(liveAsk.id, liveAsk);
+      }
+    });
   }
 
   async function storeSize(id: string, w: number, h: number) {
@@ -3477,7 +3511,10 @@
     }}
     peers={drawnPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
-    onLive={(live) => cursors.port.update({ live })}
+    onLive={(live) => {
+      cursors.port.update({ live });
+      liveResized(live);
+    }}
     onView={(view) => cursors.port.update({ view })}
     onUserPan={() => (following = null)}
     follow={followView}

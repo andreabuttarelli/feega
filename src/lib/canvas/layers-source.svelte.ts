@@ -22,6 +22,7 @@ export type VideoSide = {
   select(ids: string[]): void;
   selectPart(clipId: string, part: string): void;
   edit(result: OpResult, summary: string): void;
+  preview(doc: MotionDoc | null): void;
 };
 
 let canvas = $state.raw<CanvasSide | null>(null);

@@ -115,11 +115,11 @@ enum Sizing {
   Free = 'free'
 }
 
-const FREE_KIND: ReadonlySet<FrameKind> = new Set([FrameKind.Element]);
+const FREE_KIND: ReadonlySet<FrameKind> = new Set([FrameKind.Frame, FrameKind.Element]);
 
-const sizingOf = (node: Pick<MotionNode, 'kind' | 'format'>): Sizing => ((node.kind === FrameKind.Frame && node.format === MotionFormat.Custom) || FREE_KIND.has(node.kind) ? Sizing.Free : Sizing.Fixed);
+const sizingOf = (node: Pick<MotionNode, 'kind'>): Sizing => (FREE_KIND.has(node.kind) ? Sizing.Free : Sizing.Fixed);
 
-export const heightFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>): boolean => sizingOf(node) === Sizing.Fixed;
+export const heightFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>): boolean => node.kind === FrameKind.Frame && node.format !== MotionFormat.Custom;
 
 export type FrameResize = { w: number; h: number; picture: Picture | null };
 
