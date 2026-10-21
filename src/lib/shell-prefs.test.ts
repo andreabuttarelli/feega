@@ -27,6 +27,11 @@ describe('quale scheda del pannello chat era aperta (Chat o Guide)', () => {
     expect(readChatTab()).toBe('guide');
   });
 
+  it('scrivere properties e rileggere torna properties', () => {
+    writeChatTab('properties');
+    expect(readChatTab()).toBe('properties');
+  });
+
   it('un valore fuori vocabolario ripiega su chat', () => {
     testLocalStorage.setItem('feega.chatTab', 'qualcosa-altro');
     expect(readChatTab()).toBe('chat');

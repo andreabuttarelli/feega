@@ -45,7 +45,7 @@ export class RightBarHost {
   }
 
   get tabs(): BarTab[] {
-    return this.active?.binding.properties ? [...SHARED_TABS, BarTab.Properties] : [...SHARED_TABS];
+    return this.active?.binding.properties ? [BarTab.Properties, ...SHARED_TABS] : [...SHARED_TABS];
   }
 
   get tab(): BarTab {

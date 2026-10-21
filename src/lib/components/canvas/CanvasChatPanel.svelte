@@ -11,12 +11,39 @@
   import { replaceState } from '$app/navigation';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import { handoffOf, withoutHandoff, type ChatHandoff } from '$lib/canvas/chat-handoff';
+  import { untrack } from 'svelte';
   import BarSlot from '$lib/components/brand-agent/BarSlot.svelte';
-  import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
+  import { BarTab, portalInto, rightBar, type BarProperties } from '$lib/components/brand-agent/right-bar-host.svelte';
+  import { readChatTab, writeChatTab } from '$lib/shell-prefs';
+  import FrameInspectorPanel from './FrameInspectorPanel.svelte';
+  import { frameProperties, typingInBar } from './frame-properties.svelte';
 
   let { open }: { open: boolean } = $props();
 
   let prefill = $state<ChatPrefill | null>(null);
+  let propertiesShown = $state(readChatTab() === BarTab.Properties);
+
+  const properties: BarProperties = {
+    get shown() {
+      return propertiesShown;
+    },
+    onshow(shown) {
+      propertiesShown = shown;
+    }
+  };
+
+  $effect(() => {
+    const picked = frameProperties.session?.selection.join(',');
+    if (!picked) {
+      return;
+    }
+    untrack(() => {
+      if (!typingInBar(document.activeElement)) {
+        rightBar.select(BarTab.Properties);
+        writeChatTab(BarTab.Properties);
+      }
+    });
+  });
 
   $effect(() => {
     const handoff = $page.data.handoff as ChatHandoff | null | undefined;
@@ -64,12 +91,23 @@
       onpointerdown={onResizeStart}
     ></div>
     <div class="chat-column">
-      <BarSlot {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
+      <BarSlot {prefill} {properties} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
     </div>
   </div>
+  {#if rightBar.propertiesPane}
+    <div class="properties" use:portalInto={rightBar.propertiesPane}>
+      <FrameInspectorPanel session={frameProperties.session} tokens={frameProperties.tokens} assets={frameProperties.extras?.assets ?? []} fonts={frameProperties.extras} upload={frameProperties.extras?.uploadMedia ?? null} analyses={frameProperties.extras?.analyses} />
+    </div>
+  {/if}
 {/if}
 
 <style>
+  .properties {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
   .chat-pane {
     position: relative;
     flex: 0 0 auto;

@@ -59,9 +59,7 @@
 
   function pick(next: BarTab) {
     rightBar.select(next);
-    if (next !== BarTab.Properties) {
-      writeChatTab(next);
-    }
+    writeChatTab(next);
   }
 
   $effect(() => {

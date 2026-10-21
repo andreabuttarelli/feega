@@ -16,7 +16,7 @@
   import { findClip, type MotionClip } from '$lib/motion/doc';
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import { commitText, editsText, hideText, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
-  import FrameInspectorPanel from '../FrameInspectorPanel.svelte';
+  import { frameProperties } from '../frame-properties.svelte';
   import FrameDialogs from '../FrameDialogs.svelte';
   import { FrameExtras } from '$lib/canvas/frame-extras.svelte';
   import { FRAME_DIALOG_ACTIONS, FrameDialog, isFrameDialogAction } from '$lib/canvas/frame-dialogs';
@@ -1310,6 +1310,14 @@
     panelSession?.select(picks);
   });
 
+  $effect(() => {
+    if (!panelSession || !panelTokens) {
+      return;
+    }
+    frameProperties.publish(panelSession, panelTokens, panelExtras);
+    return () => frameProperties.clear();
+  });
+
   const Step = { Back: 'back', Forward: 'forward' } as const;
   type Step = (typeof Step)[keyof typeof Step];
 
@@ -2390,11 +2398,6 @@
           {/if}
         {/snippet}
       </FrameOverlays>
-    {/if}
-    {#if panelSession && panelTokens}
-      <div class="frame-inspector-dock" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
-        <FrameInspectorPanel session={panelSession} tokens={panelTokens} assets={panelExtras?.assets ?? []} fonts={panelExtras} upload={panelExtras?.uploadMedia ?? null} analyses={panelExtras?.analyses} />
-      </div>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
