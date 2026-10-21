@@ -1,7 +1,8 @@
 <script lang="ts">
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
-  import { Gesture } from '$lib/motion/drill';
+  import { Depth, Gesture } from '$lib/motion/drill';
+  import { framePicker, unifiedFrames, type WorldRect } from '$lib/canvas/frame-pick';
   import { onMount, untrack, type ComponentProps } from 'svelte';
   import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
@@ -23,7 +24,7 @@
   import GpuTileChrome from './GpuTileChrome.svelte';
   import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
-  import { liveDocs } from '$lib/canvas/core/live-docs.svelte';
+  import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
@@ -154,6 +155,7 @@
   let selected = $state<string[]>([]);
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
+  let pickHover = $state<{ nodeId: string; clip: string; rect: WorldRect } | null>(null);
   let overrides = $state<Map<string, Box>>(new Map());
   let copies = $state<Map<string, Box>>(new Map());
   let marquee = $state<Box | null>(null);
@@ -1089,6 +1091,69 @@
     glider.invalidate();
   }
 
+  const pickers = new Map<string, { live: object; picker: ReturnType<typeof framePicker> }>();
+  let fetched = $state.raw(new Map<string, { revision: number; live: LiveDoc }>());
+  const asked = new Set<string>();
+
+  async function fetchPickDoc(id: string, revision: number) {
+    const res = await fetch(`${coreSource(id)}?revision=${revision}`).catch(() => null);
+    const body = res?.ok ? ((await res.json().catch(() => null)) as { doc: LiveDoc['doc']; tokens: LiveDoc['tokens']; assets: LiveDoc['assets'] } | null) : null;
+    if (body?.doc) {
+      fetched = new Map(fetched).set(id, { revision, live: { doc: body.doc, tokens: body.tokens, assets: body.assets ?? {} } });
+    }
+  }
+
+  $effect(() => {
+    if (!unified) {
+      return;
+    }
+    const due = coreFrames.filter((f) => !asked.has(`${f.id}:${f.revision}`));
+    if (!due.length) {
+      return;
+    }
+    due.forEach((f) => asked.add(`${f.id}:${f.revision}`));
+    void (async () => {
+      for (const f of due) {
+        await quiet();
+        await fetchPickDoc(f.id, f.revision);
+      }
+    })();
+  });
+
+  const unified = typeof location !== 'undefined' && unifiedFrames(new URL(location.href));
+
+  function framePickAt(w: Point) {
+    const id = topNodeAt(w);
+    const frame = unified && id && !domIds.has(id) ? coreFrames.find((f) => f.id === id) : null;
+    const live = frame ? (liveDocs.map.get(frame.id) ?? fetched.get(frame.id)?.live) : null;
+    if (!frame || !live) {
+      return null;
+    }
+    const held = pickers.get(frame.id);
+    const picker = held?.live === live ? held.picker : framePicker(live);
+    pickers.set(frame.id, { live, picker });
+    const space = picker.spaceOf(frame.box, byId.get(frame.id)?.rotation ?? 0);
+    const clip = picker.pick(w, space);
+    return { nodeId: frame.id, clip, space, picker, frame };
+  }
+
+  function hoverElement(w: Point) {
+    const hit = framePickAt(w);
+    const rect = hit?.clip ? hit.picker.outline(hit.clip, hit.space) : null;
+    pickHover = hit?.clip && rect ? { nodeId: hit.nodeId, clip: hit.clip, rect } : null;
+    layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
+  }
+
+  function pickElement(e: PointerEvent, w: Point): boolean {
+    const hit = e.button === 0 && !e.shiftKey && !e.metaKey && !e.ctrlKey && e.pointerType === 'mouse' ? framePickAt(w) : null;
+    if (!hit?.clip) {
+      return false;
+    }
+    frameDrill.request(hit.nodeId, hit.picker.unitAt(w, hit.space), Gesture.Click, Depth.Canvas, { pointer: e.pointerId, client: { x: e.clientX, y: e.clientY } });
+    layersSource.canvas?.open(hit.nodeId);
+    return true;
+  }
+
   function onDown(e: PointerEvent) {
     glide = null;
     markBusy();
@@ -1105,6 +1170,10 @@
     const w = toWorld(view, p);
     const target = e.target as HTMLElement;
     const hit = boxHit(hitAt(w), target);
+    if (hit.kind === HitKind.Node && pickElement(e, w)) {
+      e.preventDefault();
+      return;
+    }
     const inDom = target.closest('.gpu-dom-node');
     if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && target.closest(INTERACTIVE)) {
       return;
@@ -1203,6 +1272,9 @@
     if (!active) {
       hovered = e.pointerType === 'mouse' ? topNodeAt(w) : null;
       hoverChrome = e.pointerType === 'mouse' ? (hovered ?? portAt(ports, w, view.zoom)?.nodeId ?? null) : null;
+      if (e.pointerType === 'mouse') {
+        hoverElement(w);
+      }
       return;
     }
     const far = Math.hypot(p.x - downAt.x, p.y - downAt.y) > MOVE_SLOP_PX;
@@ -1898,7 +1970,10 @@
     onclick={onClickInside}
     ondblclick={onDouble}
     oncontextmenu={onContextMenu}
-    onpointerleave={() => props.onPointer?.(null)}
+    onpointerleave={() => {
+      props.onPointer?.(null);
+      pickHover = null;
+    }}
     class:panning={space}
     data-owns-pinch
   >
@@ -1962,6 +2037,14 @@
           {/if}
         </div>
       {/each}
+      {#if pickHover}
+        {@const t = byId.get(pickHover.nodeId)}
+        {#if t}
+          <div class="pick-tile" style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}>
+            <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={`left:${pickHover.rect.x - t.x}px;top:${pickHover.rect.y - t.y}px;width:${pickHover.rect.w}px;height:${pickHover.rect.h}px;border-width:${1 / view.zoom}px`}></div>
+          </div>
+        {/if}
+      {/if}
       <PeerLayer peers={corePeers.length ? (props.peers ?? []).filter((p) => p.chat) : (props.peers ?? [])} outlined={!corePeers.length} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
       {#if measured.length || snapGuides.length || snapSpacing.length}
         <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={coreOn ? [] : snapGuides} zoom={view.zoom} />
@@ -2147,6 +2230,19 @@
     z-index: 1;
     left: 0;
     top: 0;
+  }
+
+  .pick-tile {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+  }
+
+  .pick-outline {
+    position: absolute;
+    border: 0 solid var(--ui-hover-outline, var(--ui-accent));
+    pointer-events: none;
   }
 
   .gpu-node {
