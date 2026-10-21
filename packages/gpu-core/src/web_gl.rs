@@ -7,7 +7,7 @@ use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap
 
 use crate::canvas::{brush, Canvas};
 use crate::compositor::{Compositor, Painter};
-use crate::display_list::{parse, DisplayList, Paint, Rgba, Size};
+use crate::display_list::{parse, parse_splice, DisplayList, Paint, Rgba, Size};
 use crate::groups::{report, Library, Limits, Plan};
 use crate::gl_passes::{texture, GlRunner, Tex};
 use crate::gl_reproject::{held, smooth, GlReprojector, Held, Target};
@@ -269,6 +269,13 @@ impl WebGlCore {
         self.library.append_group(key, &parse(list_json).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
+    }
+
+    pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &str) -> Result<bool, JsValue> {
+        self.compositor.touch(to, &self.library);
+        let patched = self.library.patch_group(from, to, &parse_splice(splice_json).map_err(failed)?);
+        self.compositor.touch(to, &self.library);
+        Ok(patched)
     }
 
     pub fn drop_group(&mut self, key: &str) {

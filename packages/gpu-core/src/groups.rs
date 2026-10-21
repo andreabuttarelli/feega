@@ -4,13 +4,13 @@ use std::sync::Arc;
 use vello::kurbo::{Affine as Matrix, Point, Rect};
 use vello::Scene;
 
-use crate::display_list::{Affine, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Lens, LensItem, Look, Paint, PathItem, Size, UseItem};
+use crate::display_list::{Affine, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Lens, LensItem, Look, Paint, PathItem, Size, Splice, UseItem};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::glyphs::{outline, Fonts};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::text::typeset;
 use crate::pictures::Pictures;
-use crate::fragments::{Encoded, Fragments};
+use crate::fragments::{Encoded, Fragments, Kept};
 use crate::lod::{blur_px, detail, Detail, BLUR_REACH};
 use crate::scene::{bounds, build_items, needs_layer, Layers};
 use crate::Skipped;
@@ -31,6 +31,18 @@ impl Groups {
 
     pub fn remove(&mut self, key: &str) {
         self.lists.remove(key);
+    }
+
+    pub fn splice(&mut self, from: &str, to: &str, head: usize, tail: usize, middle: Vec<Item>) {
+        let Some(base) = self.lists.get(from) else {
+            return;
+        };
+        let mut next = base.clone_empty();
+        next.items.reserve(head + middle.len() + tail);
+        next.items.extend(base.items[..head].iter().cloned());
+        next.items.extend(middle);
+        next.items.extend(base.items[base.items.len() - tail..].iter().cloned());
+        self.lists.insert(to.into(), next);
     }
 
     pub fn append(&mut self, key: &str, items: Vec<Item>) {
@@ -298,7 +310,12 @@ fn softened(item: Item) -> Item {
     }
 }
 
-fn encode(group: &DisplayList) -> Option<Arc<Encoded>> {
+struct Seed {
+    before: Arc<Encoded>,
+    stable: usize,
+}
+
+fn encode(group: &DisplayList, seed: Option<Seed>) -> Option<Arc<Encoded>> {
     if !group.items.iter().all(vector_only) {
         return None;
     }
@@ -309,13 +326,15 @@ fn encode(group: &DisplayList) -> Option<Arc<Encoded>> {
         build_items(&mut scene, items, frame, &Pictures::new(), &Layers::new());
         scene
     };
-    Some(Arc::new(Encoded::of(&used(&local, group, 0), frame, |i| bounds::<Scene>(i, &Pictures::new()), paint)))
+    let kept = seed.as_ref().map(|s| Kept { before: &s.before, stable: s.stable });
+    Some(Arc::new(Encoded::reusing(kept, &used(&local, group, 0), frame, |i| bounds::<Scene>(i, &Pictures::new()), paint)))
 }
 
 #[derive(Default)]
 pub struct Library {
     groups: Groups,
     encodings: HashMap<String, Option<Arc<Encoded>>>,
+    seeds: HashMap<String, Seed>,
     composes: bool,
     held: HashMap<String, Held>,
     building: HashMap<String, Building>,
@@ -386,6 +405,28 @@ impl Library {
         self.forget(key);
     }
 
+    pub fn patch_group(&mut self, from: &str, to: &str, splice: &Splice) -> bool {
+        let Some(base) = self.groups.get(from) else {
+            return false;
+        };
+        if splice.head + splice.tail > base.items.len() {
+            return false;
+        }
+        let (drawn, _) = self.drawable(&DisplayList { items: splice.items.clone(), ..base.clone_empty() });
+        let before = self.encodings.get(from).cloned().flatten();
+        let stable = splice.head + usize::from(base.background.is_some());
+        self.groups.splice(from, to, splice.head, splice.tail, drawn.items);
+        self.forget(to);
+        if let Some(before) = before {
+            self.seeds.insert(to.to_string(), Seed { before, stable });
+        }
+        true
+    }
+
+    pub fn items_in(&self, group: &str) -> Option<usize> {
+        self.groups.get(group).map(|g| g.items.len())
+    }
+
     pub fn compose_encodings(&mut self) {
         self.composes = true;
     }
@@ -395,7 +436,8 @@ impl Library {
             return None;
         }
         let list = self.groups.get(group)?;
-        self.encodings.entry(group.to_string()).or_insert_with(|| encode(list)).clone()
+        let seed = self.seeds.remove(group);
+        self.encodings.entry(group.to_string()).or_insert_with(|| encode(list, seed)).clone()
     }
 
     fn cheapened(&self, items: Vec<Item>, view: Rect) -> Vec<Item> {
@@ -407,6 +449,7 @@ impl Library {
 
     fn forget(&mut self, key: &str) {
         self.encodings.remove(key);
+        self.seeds.remove(key);
         if self.held.remove(key).is_some() {
             self.stale.push(cache_clip(key));
         }
