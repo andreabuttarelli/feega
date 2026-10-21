@@ -10,8 +10,9 @@ use crate::glyphs::{outline, Fonts};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::text::typeset;
 use crate::pictures::Pictures;
-use crate::fragments::Fragments;
-use crate::scene::{build_items, needs_layer, Layers};
+use crate::fragments::{Encoded, Fragments};
+use crate::lod::{blur_px, detail, Detail, BLUR_REACH};
+use crate::scene::{bounds, build_items, needs_layer, Layers};
 use crate::Skipped;
 
 #[derive(Default)]
@@ -272,21 +273,49 @@ fn vector_only(item: &Item) -> bool {
     }
 }
 
-fn encode(group: &DisplayList) -> Option<Arc<Scene>> {
+fn standalone(item: &Item) -> bool {
+    let Some(look) = item.look() else { return false };
+    let drawn_alone = matches!(item, Item::Path(_) | Item::Group(_));
+    drawn_alone && look.filters.is_none() && look.backdrop.is_none() && look.matte.is_none() && look.masks.is_none()
+}
+
+fn visible(item: &Item, view: Rect) -> bool {
+    if !standalone(item) {
+        return true;
+    }
+    let Some(own) = bounds::<Scene>(item, &Pictures::new()) else { return true };
+    let blur = item.look().map_or(0.0, |l| l.blur);
+    let reach = own.inflate(blur * BLUR_REACH, blur * BLUR_REACH);
+    reach.overlaps(view) && detail(reach.width().max(reach.height()), false) != Detail::Skip
+}
+
+fn softened(item: Item) -> Item {
+    let soften = |look: &Look| Look { blur: blur_px(look.blur), ..look.clone() };
+    match item {
+        Item::Path(p) => Item::Path(PathItem { look: soften(&p.look), ..p }),
+        Item::Group(g) => Item::Group(Box::new(GroupItem { look: soften(&g.look), ..*g })),
+        other => other,
+    }
+}
+
+fn encode(group: &DisplayList) -> Option<Arc<Encoded>> {
     if !group.items.iter().all(vector_only) {
         return None;
     }
     let local = UseItem { clip: String::new(), group: String::new(), matrix: IDENTITY, cache: false, hold: false };
     let frame = Rect::new(0.0, 0.0, group.width as f64, group.height as f64);
-    let mut scene = Scene::new();
-    build_items(&mut scene, &used(&local, group, 0), frame, &Pictures::new(), &Layers::new());
-    Some(Arc::new(scene))
+    let paint = |items: &[Item]| {
+        let mut scene = Scene::new();
+        build_items(&mut scene, items, frame, &Pictures::new(), &Layers::new());
+        scene
+    };
+    Some(Arc::new(Encoded::of(&used(&local, group, 0), frame, |i| bounds::<Scene>(i, &Pictures::new()), paint)))
 }
 
 #[derive(Default)]
 pub struct Library {
     groups: Groups,
-    encodings: HashMap<String, Option<Arc<Scene>>>,
+    encodings: HashMap<String, Option<Arc<Encoded>>>,
     composes: bool,
     held: HashMap<String, Held>,
     building: HashMap<String, Building>,
@@ -361,12 +390,19 @@ impl Library {
         self.composes = true;
     }
 
-    fn encoding(&mut self, group: &str) -> Option<Arc<Scene>> {
+    fn encoding(&mut self, group: &str) -> Option<Arc<Encoded>> {
         if !self.composes {
             return None;
         }
         let list = self.groups.get(group)?;
         self.encodings.entry(group.to_string()).or_insert_with(|| encode(list)).clone()
+    }
+
+    fn cheapened(&self, items: Vec<Item>, view: Rect) -> Vec<Item> {
+        if !self.composes || items.iter().any(|i| matches!(i, Item::Lens(_))) {
+            return items;
+        }
+        items.into_iter().filter(|i| visible(i, view)).map(softened).collect()
     }
 
     fn forget(&mut self, key: &str) {
@@ -399,7 +435,8 @@ impl Library {
         let mut finished = Vec::new();
         let mut waiting = Vec::new();
         let mut items = Vec::with_capacity(list.items.len());
-        let mut encoded: HashMap<String, Arc<Scene>> = HashMap::new();
+        let mut encoded: HashMap<String, Arc<Encoded>> = HashMap::new();
+        let view = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
         for item in &list.items {
             let Item::Use(u) = item else {
                 items.push(item.clone());
@@ -430,7 +467,7 @@ impl Library {
             if !u.cache || want <= 0.0 || w.max(h) > limits.side {
                 if on_screen {
                     let start = items.len();
-                    items.extend(used(u, group, start));
+                    items.extend(self.cheapened(used(u, group, start), view));
                 }
                 continue;
             }

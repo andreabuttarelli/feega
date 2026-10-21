@@ -17,6 +17,7 @@ pub mod fragments;
 pub mod groups;
 pub mod kernel;
 pub mod layers;
+pub mod lod;
 pub mod pictures;
 pub mod reproject;
 pub mod retained;

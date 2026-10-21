@@ -5,7 +5,7 @@ use vello::peniko::{Fill, ImageData};
 use vello::Scene;
 
 use crate::canvas::{mix, Canvas};
-use crate::fragments::Fragments;
+use crate::fragments::{compose, Fragments};
 use crate::display_list::{Cover, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Look, Paint, PathItem, Ramp, Rgba, Size, Stop};
 use crate::pictures::{image_rect, Pictures};
 use crate::Skipped;
@@ -278,7 +278,7 @@ pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictur
     let mut skipped = Vec::new();
     for (i, item) in items.iter().enumerate() {
         if let Item::Use(u) = item {
-            let composed = layers.fragments.get(&u.group).is_some_and(|encoded| scene.fragment(encoded, Affine::new(u.matrix)));
+            let composed = layers.fragments.get(&u.group).is_some_and(|encoded| compose(scene, encoded, Affine::new(u.matrix), frame));
             if !composed {
                 skip(&mut skipped, item.clip(), item.kind());
             }
