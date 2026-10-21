@@ -13,7 +13,8 @@
   import FrameOverlays from '../FrameOverlays.svelte';
   import FrameSelection from '../FrameSelection.svelte';
   import { frameLevel, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
-  import { frameSaver } from '$lib/canvas/frame-save';
+  import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
+  import type { OpResult } from '$lib/motion/timeline';
   import { dragClip } from '$lib/canvas/frame-transform';
   import { postPageAction } from '$lib/api/page-action';
   import { Grip, type Pt } from '$lib/motion/scene-select';
@@ -1163,7 +1164,7 @@
   }
 
   let inside = $state<Inside | null>(null);
-  const savers = new Map<string, ReturnType<typeof frameSaver>>();
+  const savers = new Map<string, FrameEditSession>();
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
 
@@ -1200,21 +1201,34 @@
       return held ?? null;
     }
     const url = `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${nodeId}`;
-    const saver = frameSaver(
-      { version: frame.revision, doc: live.doc },
-      async ({ ops, version, summary }) => {
-        const form = new FormData();
-        form.set('ops', JSON.stringify(ops));
-        form.set('version', String(version));
-        form.set('summary', summary);
-        const result = await postPageAction(url, 'ops', form);
-        return result.type === 'success' ? { version: Number(result.data?.version), doc: result.data?.doc as LiveDoc['doc'] } : null;
-      },
-      undefined,
-      (doc) => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc })
+    const session: FrameEditSession = new FrameEditSession(
+      { head: { version: frame.revision, doc: live.doc }, selection: [] },
+      {
+        viewPath: () => [],
+        show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
+        recorded: () => {},
+        saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: session.history.present }),
+        pull: async () => {},
+        send: async (ops, version, summary) => {
+          const form = new FormData();
+          form.set('ops', JSON.stringify(ops));
+          form.set('version', String(version));
+          form.set('summary', summary);
+          const result = await postPageAction(url, 'ops', form);
+          return result.type === 'success' ? { ok: true, version: Number(result.data?.version), doc: result.data?.doc as LiveDoc['doc'] } : { ok: false, error: 'Save failed' };
+        }
+      }
     );
-    savers.set(nodeId, saver);
-    return saver;
+    savers.set(nodeId, session);
+    return session;
+  }
+
+  function commit(nodeId: string, result: OpResult, summary: string) {
+    const session = saverOf(nodeId);
+    session?.apply(result, summary);
+    if (session && result.ok) {
+      liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
+    }
   }
 
   function pickerOf(nodeId: string) {
@@ -1245,7 +1259,7 @@
     }
     e.preventDefault();
     e.stopPropagation();
-    const start = saver.doc;
+    const start = saver.history.present;
     const frame = stillFrame(start);
     const box = guessedBoxes(withAutoLayout(start))[clip] ?? rect;
     const framePt = (ev: PointerEvent): Pt => at.picker.framePoint(toWorld(view, local(ev)), at.space);
@@ -1262,7 +1276,7 @@
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       if (result?.ok) {
-        saver.apply(result.doc, grip === Grip.Move ? 'Moved an element' : 'Resized an element');
+        commit(nodeId, result, grip === Grip.Move ? 'Moved an element' : 'Resized an element');
       }
     };
     window.addEventListener('pointermove', move);
@@ -1280,7 +1294,7 @@
         doc: () => liveOf(nodeId)!.doc,
         selection: () => (inside?.nodeId === nodeId && inside.level.clip ? [inside.level.clip] : []),
         select: (ids) => goInside(nodeId, Gesture.Click, ids[0] ?? null),
-        edit: (result, summary) => result.ok && saverOf(nodeId)?.apply(result.doc, summary)
+        edit: (result, summary) => commit(nodeId, result, summary)
       })
     );
   });
