@@ -40,10 +40,12 @@ export enum NodeIcon {
   Element = 'shape'
 }
 
-export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean; element?: boolean };
+export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean; element?: boolean; glyph?: string };
 export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]>; mode?: EditMode };
 
 const FRAME_TYPE = 'motion';
+
+export const elementGlyph = (clip: { component: string; props: Record<string, unknown> } | undefined): string | undefined => (clip?.component === 'Shape' ? String(clip.props.shape) : clip?.component);
 
 export const nodeIcon = (node: { type: string; still?: boolean }): string => (node.type === FRAME_TYPE ? (node.still ? NodeIcon.Still : NodeIcon.Video) : node.type);
 type Parts = Record<string, readonly string[]>;
@@ -179,7 +181,7 @@ function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlin
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
-    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.element ? NodeIcon.Element : nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
+    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.element ? (node.glyph ?? NodeIcon.Element) : nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
     return folded.has(node.id) || node.element ? [row] : [row, ...childRows(node.id, open, outlines, folded)];
   });
 }

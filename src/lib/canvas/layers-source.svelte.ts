@@ -28,6 +28,7 @@ export type VideoSide = {
 let canvas = $state.raw<CanvasSide | null>(null);
 let video = $state.raw<VideoSide | null>(null);
 let hovered = $state.raw<LayerHover>(null);
+let glyphs = $state.raw<ReadonlyMap<string, string | undefined>>(new Map());
 
 function publisher<T>(set: (side: T | null) => void, current: () => T | null) {
   return (side: T) => {
@@ -49,6 +50,14 @@ export const layersSource = {
   },
   get hovered() {
     return hovered;
+  },
+  get glyphs() {
+    return glyphs;
+  },
+  setGlyphs(next: ReadonlyMap<string, string | undefined>) {
+    if (next.size !== glyphs.size || [...next].some(([id, glyph]) => glyphs.get(id) !== glyph)) {
+      glyphs = next;
+    }
   },
   hover(target: LayerHover) {
     if (target?.nodeId !== hovered?.nodeId || target?.id !== hovered?.id) {

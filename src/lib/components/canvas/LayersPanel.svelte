@@ -9,6 +9,11 @@
   import ImageIcon from '@lucide/svelte/icons/image';
   import TypeIcon from '@lucide/svelte/icons/type';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import Circle from '@lucide/svelte/icons/circle';
+  import Minus from '@lucide/svelte/icons/minus';
+  import PenTool from '@lucide/svelte/icons/pen-tool';
+  import Hexagon from '@lucide/svelte/icons/hexagon';
+  import Star from '@lucide/svelte/icons/star';
   import Shapes from '@lucide/svelte/icons/shapes';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -158,7 +163,7 @@
     landing = { key: row.key, place: dropPlace(row.kind, (e.clientY - box.top) / box.height) };
   }
 
-  const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, shape: Shapes, Audio: Music };
+  const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, shape: Shapes, Audio: Music, rect: Square, circle: Circle, ellipse: Circle, line: Minus, polygon: Hexagon, star: Star, path: PenTool, vector: PenTool, Text: TypeIcon, Title: TypeIcon, Kicker: TypeIcon, Caption: TypeIcon, Image: ImageIcon, Video: Clapperboard };
   const KIND_ICON: Partial<Record<LayerKind, typeof Square>> = { [LayerKind.Group]: Component, [LayerKind.Track]: Rows3, [LayerKind.Mask]: Contrast };
   const EYE_LABEL: Record<'mask' | 'layer', [string, string]> = { mask: ['Turn mask off', 'Turn mask on'], layer: ['Hide', 'Show'] };
   const eyeLabel = (row: LayerRow) => EYE_LABEL[row.kind === LayerKind.Mask ? 'mask' : 'layer'][row.hidden ? 1 : 0];

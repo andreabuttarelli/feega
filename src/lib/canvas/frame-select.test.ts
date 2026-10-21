@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Depth, Gesture } from '$lib/motion/drill';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { frameLevel, stepInside, videoSide } from './frame-select';
+import { frameLevel, ownClipToPick, stepInside, videoSide } from './frame-select';
 
 const FRAME = frameLevel();
 const clipLevel = (clip: string) => ({ depth: Depth.Clip, clip, part: null });
@@ -36,5 +36,19 @@ describe('videoSide', () => {
     expect(side.nodeId).toBe('n1');
     expect(side.doc).toBe(doc);
     expect(side.selection).toEqual(['card']);
+  });
+});
+
+describe('ownClipToPick', () => {
+  it('picks the own clip of a free element whose doc arrived after the selection', () => {
+    expect(ownClipToPick(null, 'e1', 'shape')).toBe('shape');
+  });
+
+  it('leaves a clip the user deselected alone', () => {
+    expect(ownClipToPick('e1', 'e1', 'shape')).toBeNull();
+  });
+
+  it('picks nothing while the doc has not arrived', () => {
+    expect(ownClipToPick(null, 'e1', undefined)).toBeNull();
   });
 });

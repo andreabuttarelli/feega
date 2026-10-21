@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
@@ -57,6 +57,19 @@ describe('layer rows', () => {
     const [row] = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], null);
 
     expect(row.type).toBe('shape');
+  });
+
+  it('draws a free element with the icon of what it is', () => {
+    const glyphs = ['ellipse', 'Text', 'Image'];
+    const rows = layerRows(glyphs.map((glyph, i) => ({ id: `e${i}`, type: 'motion', name: null, element: true, glyph })), null);
+
+    expect(rows.map((r) => r.type)).toEqual(glyphs);
+  });
+
+  it('names an element glyph from its clip: the shape for a shape, the component otherwise', () => {
+    expect(elementGlyph({ component: 'Shape', props: { shape: 'ellipse' } })).toBe('ellipse');
+    expect(elementGlyph({ component: 'Text', props: {} })).toBe('Text');
+    expect(elementGlyph(undefined)).toBeUndefined();
   });
 
   it('picks the one element row while its shape is selected inside it', () => {
