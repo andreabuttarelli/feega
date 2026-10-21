@@ -1446,7 +1446,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const row = selectedIds.length === 1 ? nodes.find((n) => n.id === selectedIds[0]) : null;
     return row ? openingFor(row, opening) : opening;
   });
-  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, openingHere, requestedMotion, unifiedFrames(page.url) && rendererOf(page.url, data.rendererSwitch) === Renderer.Core));
+  const unifiedCore = $derived(unifiedFrames(page.url) && rendererOf(page.url, data.rendererSwitch) === Renderer.Core);
+  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, openingHere, requestedMotion, unifiedCore));
   const editingMotion = $derived(editorOn(inlineMotion, inlineStage.leaving));
   let lastOpen: string | null = null;
 
@@ -3591,7 +3592,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {@const overMotion = over ? motionOf(over) : null}
       {@const hoverNode = nodes.find((n) => n.id === id)}
       {@const hoverMotion = hoverNode ? motionOf(hoverNode) : null}
-      {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && tileMode(id, inlineMotion, inlineStage.leaving) === NodeMode.Preview}
+      {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && !unifiedCore && tileMode(id, inlineMotion, inlineStage.leaving) === NodeMode.Preview}
         <FrameHover nodeId={id} revision={hoverMotion.docHeadRevision} previewUrl={motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} width={FORMATS[hoverMotion.format].width} height={FORMATS[hoverMotion.format].height} />
       {/if}
       {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive && tileMode(id, inlineMotion, inlineStage.leaving) === NodeMode.Preview} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
