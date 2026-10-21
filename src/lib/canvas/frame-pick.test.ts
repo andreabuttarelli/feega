@@ -70,6 +70,16 @@ describe('framePicker under pan and zoom', () => {
   });
 });
 
+describe('framePicker in frame pixels', () => {
+  it('gives the clip rect in the pixels of the doc', () => {
+    expect(picker.frameRect('card')).toEqual({ left: 768, top: 432, width: 384, height: 216 });
+  });
+
+  it('gives a world point in the pixels of the doc', () => {
+    expect(picker.framePoint({ x: BOX.x + BOX.w / 2, y: BOX.y + BOX.h / 2 }, space)).toEqual([960, 540]);
+  });
+});
+
 describe('unifiedFrames', () => {
   it('is on unless switched off in the address', () => {
     expect(unifiedFrames(new URL('https://app.test/p'))).toBe(true);
