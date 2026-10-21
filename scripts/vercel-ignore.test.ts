@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 const SCRIPT = resolve('scripts/vercel-ignore.sh');
 const BUILD = 1;
 const SKIP = 0;
+const APP_EXCLUDED = [':!cli', ':!changelog', ':!docs', ':!apps', ':!imgs', ':!supabase'].map((p) => `'${p}'`).join(' ');
 
 function repoTouching(path: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'vercel-ignore-'));
@@ -49,10 +50,20 @@ describe('vercel ignoreCommand: exit 0 skips the build, exit 1 runs it', () => {
     expect(exitOf({ VERCEL_ENV: 'production' }, ['cli'], repo)).toBe(BUILD);
   });
 
+  it('skips production when only excluded paths changed', () => {
+    const repo = repoTouching('cli/tool.ts');
+    expect(exitOf({ VERCEL_ENV: 'production' }, ['.', ':!cli'], repo)).toBe(SKIP);
+  });
+
+  it('builds production when a path outside the exclusions changed', () => {
+    const repo = repoTouching('src/app.ts');
+    expect(exitOf({ VERCEL_ENV: 'production' }, ['.', ':!cli'], repo)).toBe(BUILD);
+  });
+
   it('is the ignoreCommand of both Vercel projects', () => {
     const app = JSON.parse(readFileSync('vercel.json', 'utf8'));
     const mcp = JSON.parse(readFileSync('cli/mcp/vercel.json', 'utf8'));
-    expect(app.ignoreCommand).toBe('bash scripts/vercel-ignore.sh');
+    expect(app.ignoreCommand).toBe(`bash scripts/vercel-ignore.sh . ${APP_EXCLUDED}`);
     expect(mcp.ignoreCommand).toBe('bash ../../scripts/vercel-ignore.sh ..');
   });
 });
