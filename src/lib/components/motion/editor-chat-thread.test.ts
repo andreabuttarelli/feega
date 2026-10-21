@@ -16,7 +16,7 @@ describe('one chat: the editor Chat tab is the canvas thread', () => {
 
   it('it sends the open frame as context, so the canvas chat knows what "this" is', () => {
     expect(editorChat).toContain('context={openFrame}');
-    expect(shell).toMatch(/const openFrame = \(\) => \(\{ canvasId: data\.canvas\.id, frame: \{ nodeId: data\.node\.id, selection, playhead/);
+    expect(shell).toMatch(/const openFrame = \(\) => \(\{ canvasId: data\.canvas\.id, frame: \{ nodeId: data\.node\.id, selection: session\.selection, playhead/);
   });
 
   it('the sidebar and the editor share one live session, so a turn shows in both', () => {
