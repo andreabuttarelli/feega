@@ -40,13 +40,10 @@ async function drawAt(page: Page, tool: string, share: { x: number; y: number })
 }
 
 async function leaveEditor(page: Page) {
-  await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 20_000 });
-  await expect(async () => {
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('add-bar')).toHaveAttribute('data-context', 'canvas', { timeout: 1500 });
-  }).toPass({ timeout: 25_000 });
+  await page.keyboard.press('Escape');
   const pane = (await page.locator('.svelte-flow').boundingBox())!;
   await page.mouse.click(pane.x + 20, pane.y + pane.height - 120);
+  await expect(page.getByTestId('add-bar')).toHaveAttribute('data-context', 'canvas');
 }
 
 async function shoot(page: Page, name: string) {
@@ -60,13 +57,14 @@ test.describe('free insertion from the bottom bar @real', () => {
 
   test('box, text and circle on the bare canvas are free elements and stay free after a reload', async ({ page, session, admin }) => {
     test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
     const url = `/p/${session.projectId}/c/${session.canvasId}`;
     await gotoHydrated(page, url);
 
     const tools = [
-      { tool: 'rectangle', at: { x: 0.15, y: 0.2 } },
-      { tool: 'ellipse', at: { x: 0.45, y: 0.2 } },
-      { tool: 'text', at: { x: 0.15, y: 0.55 } }
+      { tool: 'rectangle', at: { x: 0.15, y: 0.15 } },
+      { tool: 'ellipse', at: { x: 0.45, y: 0.15 } },
+      { tool: 'text', at: { x: 0.7, y: 0.15 } }
     ];
     for (const [i, { tool, at }] of tools.entries()) {
       await drawAt(page, tool, at);
@@ -142,12 +140,24 @@ test.describe('free insertion from the bottom bar @real', () => {
     for (const element of elements) {
       await page.locator(`[data-motion-node="${element.id}"]`).click({ force: true });
       await expect(page.getByTestId('frame-timeline')).toHaveCount(0);
+      await expect(page.getByTestId('side-tab-properties')).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 });
+      await expect(page.getByText('Layout', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
       await shoot(page, `element-${element.id.slice(0, 4)}-selected`);
     }
+
+    await page.locator(`[data-motion-node="${elements[0].id}"]`).click({ force: true });
+    const alpha = page.getByTestId('fill-opacity').first();
+    await expect(alpha).toBeVisible({ timeout: 15_000 });
+    await alpha.fill('40');
+    await alpha.blur();
+    await expect(alpha).toHaveValue('40');
+    await shoot(page, 'element-fill-edited');
 
     await page.getByRole('button', { name: 'Layers' }).click();
     await page.waitForTimeout(800);
     await shoot(page, 'element-layers-tree');
+    const icons = await page.locator('[data-layer] .icon svg').evaluateAll((svgs) => svgs.map((svg) => svg.getAttribute('class') ?? ''));
+    expect(new Set(icons).size).toBeGreaterThan(2);
 
     await page.locator(`[data-motion-node="${frame.id}"] [data-frame-stage]`).click({ force: true });
     await expect(page.getByTestId('frame-timeline')).toBeVisible({ timeout: 15_000 });

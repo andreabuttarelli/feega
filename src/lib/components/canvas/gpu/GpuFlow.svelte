@@ -22,7 +22,7 @@
   import { FRAME_DIALOG_ACTIONS, FrameDialog, isFrameDialogAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { frameLevel, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
   import { dragClip } from '$lib/canvas/frame-transform';
@@ -54,6 +54,7 @@
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
   import { editableIds } from '$lib/canvas/frame-live';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { elementGlyph } from '$lib/canvas/layers';
   import { frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
@@ -1129,11 +1130,19 @@
   let fetched = $state.raw(new Map<string, { revision: number; live: LiveDoc }>());
   const asked = new Set<string>();
 
-  async function fetchPickDoc(id: string, revision: number) {
+  const PICK_DOC_RETRIES = 4;
+  const PICK_DOC_RETRY_MS = 1000;
+
+  async function fetchPickDoc(id: string, revision: number, attempt = 0) {
     const res = await fetch(`${coreSource(id)}?revision=${revision}`).catch(() => null);
     const body = res?.ok ? ((await res.json().catch(() => null)) as { doc: LiveDoc['doc']; tokens: LiveDoc['tokens']; assets: LiveDoc['assets'] } | null) : null;
     if (body?.doc) {
       fetched = new Map(fetched).set(id, { revision, live: { doc: body.doc, tokens: body.tokens, assets: body.assets ?? {} } });
+      return;
+    }
+    if (attempt < PICK_DOC_RETRIES) {
+      await new Promise((resolve) => setTimeout(resolve, PICK_DOC_RETRY_MS));
+      await fetchPickDoc(id, revision, attempt + 1);
     }
   }
 
@@ -1235,19 +1244,23 @@
     return true;
   }
 
+  let ownPicked: string | null = null;
+
   $effect(() => {
     const only = selected.length === 1 ? selected[0] : null;
     if (unified && only && coreFrames.some((f) => f.id === only)) {
       if (inside?.nodeId !== only) {
         inside = { nodeId: only, level: frameLevel() };
         picks = [];
-        const own = frameChrome(kindOfNode(only)).selectsOwnClip ? liveOf(only)?.doc.tracks[0]?.clips[0]?.id : null;
-        if (own) {
-          goInside(only, Gesture.Click, own);
-        }
+      }
+      const own = ownClipToPick(ownPicked, only, frameChrome(kindOfNode(only)).selectsOwnClip ? liveOf(only)?.doc.tracks[0]?.clips[0]?.id : null);
+      if (own) {
+        ownPicked = only;
+        untrack(() => goInside(only, Gesture.Click, own));
       }
       return;
     }
+    ownPicked = null;
     inside = null;
     picks = [];
   });
@@ -1308,6 +1321,10 @@
 
   $effect(() => {
     void panelExtras?.load();
+  });
+
+  $effect(() => {
+    layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks[0]?.clips[0])] as const] : []))));
   });
 
   $effect(() => {

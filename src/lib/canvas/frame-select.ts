@@ -38,3 +38,5 @@ export function videoSide(hooks: Hooks): VideoSide {
     preview: () => {}
   };
 }
+
+export const ownClipToPick = (alreadyPicked: string | null, node: string, own: string | null | undefined): string | null => (own && alreadyPicked !== node ? own : null);
