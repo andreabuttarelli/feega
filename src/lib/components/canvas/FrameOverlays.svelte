@@ -25,6 +25,7 @@
     inset: 0;
     pointer-events: none;
     overflow: hidden;
+    z-index: 2;
   }
 
   .frame {

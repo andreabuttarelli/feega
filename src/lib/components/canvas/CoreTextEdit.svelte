@@ -12,15 +12,18 @@
   let ended = false;
 
   const style = $derived(
-    `left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;min-height:${rect.height}px;font:${look.italic ? 'italic ' : ''}${look.weight} ${look.fontPx}px/${look.leading} ${look.family};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};${look.upper ? 'text-transform:uppercase' : ''}`
+    `left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;font:${look.italic ? 'italic ' : ''}${look.weight} ${look.fontPx}px/${look.leading} ${look.family};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};${look.upper ? 'text-transform:uppercase' : ''}`
   );
 
   function fit() {
     if (!field) {
       return;
     }
-    field.style.height = 'auto';
-    field.style.height = `${Math.max(rect.height, field.scrollHeight)}px`;
+    field.style.paddingTop = '0';
+    field.style.height = '0';
+    const content = field.scrollHeight;
+    field.style.paddingTop = `${Math.max(0, (rect.height - content) / 2)}px`;
+    field.style.height = `${Math.max(rect.height, content)}px`;
   }
 
   function end() {

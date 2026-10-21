@@ -43,5 +43,14 @@ describe('text editing inside a core frame', () => {
 
     expect(style.fontPx).toBeCloseTo(0.1 * 1080 * 0.5);
     expect(style.family).toContain('DM Sans');
+    expect(style.align).toBe('center');
+  });
+
+  it('fills the defaults a seeded clip leaves out', () => {
+    const doc = withText();
+    const bare = { ...findClip(doc, 'title')!.clip, props: { text: 'Hi', size: 0.1 } } as never;
+    const style = textEditStyle({ clip: bare, doc, tokens: FEEGA_TOKENS, frame: { width: 1920, height: 1080 }, scale: 1 });
+
+    expect(Number.isFinite(style.weight) && Number.isFinite(style.leading) && Number.isFinite(style.trackingEm)).toBe(true);
   });
 });

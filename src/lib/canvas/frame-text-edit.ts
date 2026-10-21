@@ -1,6 +1,7 @@
 import type { BrandTokens } from '$lib/motion/brand';
 import { resolveColor } from '$lib/motion/brand';
-import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+import { Strictness } from '$lib/motion/custom/component';
+import { clipProps, findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
 import { fontStack } from '$lib/motion/fonts/model';
 import { CLIP_TEXT, editablePart, PartEdit } from '$lib/motion/poster-parts';
 import { setProps, type OpResult } from '$lib/motion/timeline';
@@ -16,6 +17,7 @@ export type TextEditStyle = {
   leading: number;
   color: string;
   upper: boolean;
+  align: string;
 };
 
 export function editsText(doc: MotionDoc, clipId: string): boolean {
@@ -31,7 +33,8 @@ export const hideText = (doc: MotionDoc, clipId: string): MotionDoc => {
 export const commitText = (doc: MotionDoc, clipId: string, text: string): OpResult => setProps(doc, clipId, { text });
 
 export function textEditStyle(input: { clip: MotionClip; doc: MotionDoc; tokens: BrandTokens; frame: Size; scale: number }): TextEditStyle {
-  const p = input.clip.props as Record<string, unknown>;
+  const verdict = clipProps(input.doc.components, input.clip.component, input.clip.props, Strictness.Lenient);
+  const p = (verdict.ok ? verdict.props : input.clip.props) as Record<string, unknown>;
   const unit = Math.min(input.frame.width, input.frame.height);
   return {
     fontPx: Number(p.size) * unit * input.scale,
@@ -41,6 +44,7 @@ export function textEditStyle(input: { clip: MotionClip; doc: MotionDoc; tokens:
     trackingEm: Number(p.tracking),
     leading: Number(p.leading),
     color: resolveColor(p.color, input.tokens),
-    upper: p.textCase === 'upper'
+    upper: p.textCase === 'upper',
+    align: String(p.align)
   };
 }
