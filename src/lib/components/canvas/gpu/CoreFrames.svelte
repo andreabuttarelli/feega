@@ -333,6 +333,29 @@
 
   const onScreen = (b: { x: number; y: number; w: number; h: number }) => b.x * view.zoom + view.x < area.width && (b.x + b.w) * view.zoom + view.x > 0 && b.y * view.zoom + view.y < area.height && (b.y + b.h) * view.zoom + view.y > 0;
 
+  const GRID = 3;
+  const SAMPLE_PX = 24;
+  const ALPHA_VISIBLE = 8;
+  let sampler: CanvasRenderingContext2D | null = null;
+
+  function coverage(target: HTMLCanvasElement | null): string {
+    sampler ??= Object.assign(document.createElement('canvas'), { width: GRID * SAMPLE_PX, height: GRID * SAMPLE_PX }).getContext('2d', { willReadFrequently: true });
+    if (!target || !sampler) {
+      return 'n/a';
+    }
+    sampler.clearRect(0, 0, GRID * SAMPLE_PX, GRID * SAMPLE_PX);
+    sampler.drawImage(target, 0, 0, GRID * SAMPLE_PX, GRID * SAMPLE_PX);
+    const px = sampler.getImageData(0, 0, GRID * SAMPLE_PX, GRID * SAMPLE_PX).data;
+    const cells = Array.from({ length: GRID * GRID }, () => 0);
+    for (let y = 0; y < GRID * SAMPLE_PX; y++) {
+      for (let x = 0; x < GRID * SAMPLE_PX; x++) {
+        const cell = Math.floor(y / SAMPLE_PX) * GRID + Math.floor(x / SAMPLE_PX);
+        cells[cell] += px[(y * GRID * SAMPLE_PX + x) * 4 + 3] > ALPHA_VISIBLE ? 1 : 0;
+      }
+    }
+    return cells.map((n) => (n / (SAMPLE_PX * SAMPLE_PX)).toFixed(2)).join(',');
+  }
+
   function debugFrame(outcome: string, skipped: string[], shown: HeldFrame[]) {
     const drawn = new Map(shown.map((f) => [f.id, f]));
     const readyIds = new Map(real.map((f) => [f.id, f]));
@@ -347,12 +370,12 @@
     const header = `zoom=${view.zoom.toFixed(3)} view=${Math.round(view.x)},${Math.round(view.y)} area=${Math.round(area.width)}x${Math.round(area.height)} retained=${refine} outcome=${outcome} caching=${zooming.active()} cacheBytes=${cacheBytes} held=${held.length} pictured=${pictured.size} put=${put.size}`;
     const signature = signatureOf(debugFacts);
     if (debugMoving && !moving) {
-      console.info(`[core] gesture end ${header}`);
+      console.info(`[core] gesture end ${header} coverage3x3=${coverage(canvas)} camera=${at0()}`);
       undrawn(debugFacts).slice(0, MAX_LISTED).forEach((f) => console.warn(`[core]   ${describe(f)}`));
     }
     if (signature !== debugSignature) {
       debugSignature = signature;
-      console.warn(`[core] ${signature ? 'undrawn on screen' : 'all drawn again'} ${header}`);
+      console.warn(`[core] ${signature ? 'undrawn on screen' : 'all drawn again'} ${header} coverage3x3=${coverage(canvas)}`);
       undrawn(debugFacts).slice(0, MAX_LISTED).forEach((f) => console.warn(`[core]   ${describe(f)}`));
     }
     if (skipped.length) {
@@ -361,6 +384,8 @@
     debugMoving = moving;
     hud = hudText(header);
   }
+
+  const at0 = () => `${Math.round(view.x * resolution)},${Math.round(view.y * resolution)},${(view.zoom * resolution).toFixed(3)}`;
 
   function hudText(header: string): string {
     const world = { x: (pointer.x - view.x) / view.zoom, y: (pointer.y - view.y) / view.zoom };
