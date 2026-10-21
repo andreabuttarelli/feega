@@ -75,6 +75,10 @@ describe('framePicker in frame pixels', () => {
     expect(picker.frameRect('card')).toEqual({ left: 768, top: 432, width: 384, height: 216 });
   });
 
+  it('gives the size of the frame it draws', () => {
+    expect(picker.frameSize()).toEqual({ width: 1920, height: 1080 });
+  });
+
   it('gives a world point in the pixels of the doc', () => {
     expect(picker.framePoint({ x: BOX.x + BOX.w / 2, y: BOX.y + BOX.h / 2 }, space)).toEqual([960, 540]);
   });

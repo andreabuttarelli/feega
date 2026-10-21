@@ -12,6 +12,9 @@
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
   import FrameSelection from '../FrameSelection.svelte';
+  import { findClip, type MotionClip } from '$lib/motion/doc';
+  import CoreTextEdit from '../CoreTextEdit.svelte';
+  import { commitText, editsText, hideText, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import FrameInspectorPanel from '../FrameInspectorPanel.svelte';
   import { frameLevel, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
@@ -1075,6 +1078,7 @@
     if (id && deeper?.clip) {
       select([id]);
       goInside(id, Gesture.Double, deeper.clip);
+      startTyping(id, deeper.clip);
       return;
     }
     if (id) {
@@ -1256,6 +1260,52 @@
     const at = clip && !byId.get(nodeId)?.rotation ? pickerOf(nodeId) : null;
     const rect = clip && at ? at.picker.outline(clip, at.space) : null;
     return clip && at && rect ? { clip, rect: { left: (rect.x - at.frame.box.x) * view.zoom, top: (rect.y - at.frame.box.y) * view.zoom, width: rect.w * view.zoom, height: rect.h * view.zoom } } : null;
+  }
+
+  type Typing = { nodeId: string; clip: string; text: string; world: { x: number; y: number; w: number; h: number }; look: TextEditStyle };
+  let typing = $state<Typing | null>(null);
+
+  function startTyping(nodeId: string, clip: string) {
+    const saver = saverOf(nodeId);
+    const at = pickerOf(nodeId);
+    const found = saver ? findClip(saver.history.present, clip)?.clip : null;
+    const world = at?.picker.outline(clip, at.space);
+    const frameRect = at?.picker.frameRect(clip);
+    const size = at?.picker.frameSize();
+    if (!saver || !at || !found || !world || !frameRect || !size || frameRect.width <= 0 || !editsText(saver.history.present, clip)) {
+      return;
+    }
+    const look = textEditStyle({ clip: found as MotionClip, doc: saver.history.present, tokens: at.live.tokens, frame: size, scale: world.w / frameRect.width });
+    typing = { nodeId, clip, world, look, text: String((found.props as { text?: unknown }).text ?? '') };
+    liveDocs.set(nodeId, { ...at.live, doc: hideText(saver.history.present, clip) });
+  }
+
+  function stopTyping(text: string) {
+    const open = typing;
+    const saver = open ? saverOf(open.nodeId) : null;
+    typing = null;
+    if (!open || !saver) {
+      return;
+    }
+    const result = commitText(saver.history.present, open.clip, text);
+    liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
+    if (result.ok && text !== open.text) {
+      commit(open.nodeId, result, 'Edited text');
+    }
+  }
+
+  function typingMark(nodeId: string) {
+    const open = typing?.nodeId === nodeId ? typing : null;
+    const box = open ? coreFrames.find((f) => f.id === nodeId)?.box : null;
+    if (!open || !box) {
+      return null;
+    }
+    const z = view.zoom;
+    return {
+      text: open.text,
+      rect: { left: (open.world.x - box.x) * z, top: (open.world.y - box.y) * z, width: open.world.w * z, height: open.world.h * z },
+      look: { ...open.look, fontPx: open.look.fontPx * z }
+    };
   }
 
   function grab(nodeId: string, clip: string, grip: Grip, handle: number, e: PointerEvent) {
@@ -1902,6 +1952,12 @@
       connectPickerAt = null;
       targeting = null;
     }
+    const entered = e.key === 'Enter' && !typing && inside?.level.clip && !(e.target as HTMLElement).closest?.(INTERACTIVE);
+    if (entered) {
+      e.preventDefault();
+      startTyping(inside!.nodeId, inside!.level.clip!);
+      return;
+    }
     if (!spec.chrome || keyRegion.current !== Region.Canvas) {
       return;
     }
@@ -2145,7 +2201,11 @@
     {#if unified}
       <FrameOverlays {view} frames={overlayFrames}>
         {#snippet children(frame)}
-          {@const mark = selectionMark(frame.id)}
+          {@const mark = typing?.nodeId === frame.id ? null : selectionMark(frame.id)}
+          {@const edit = typingMark(frame.id)}
+          {#if edit}
+            <CoreTextEdit rect={edit.rect} look={edit.look} text={edit.text} oncommit={stopTyping} />
+          {/if}
           {#if mark}
             <FrameSelection clip={mark.clip} rect={mark.rect} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
           {/if}
