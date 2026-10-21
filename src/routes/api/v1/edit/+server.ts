@@ -7,8 +7,6 @@ import { editPorts } from '$lib/server/edit/edit-ports';
 import { runEdit } from '$lib/server/edit/run-edit';
 import { RESERVED_OPS } from '$lib/server/edit/edit-catalogue';
 
-export const config = { maxDuration: 60, memory: 2048 };
-
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
 const DESCRIBE_OP = 'describe';

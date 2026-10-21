@@ -1,6 +1,6 @@
 {
   "installCommand": "npm ci",
-  "ignoreCommand": "bash scripts/vercel-ignore.sh",
+  "ignoreCommand": "bash scripts/vercel-ignore.sh . ':!cli' ':!changelog' ':!docs' ':!apps' ':!imgs' ':!supabase'",
   "headers": [
     {
       "source": "/motion-libs/(.*)",

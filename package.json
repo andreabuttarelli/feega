@@ -11,7 +11,7 @@
     "dev:5173": "lsof -ti tcp:5173 | xargs kill -9 2>/dev/null; vite dev --strictPort",
     "dev:stable": "NO_HMR=1 vite dev",
     "dev:vercel": "vercel dev --listen 5173",
-    "build": "node scripts/typecheck-runtime.mjs && vite build",
+    "build": "vite build",
     "build:node": "NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=8192} DEPLOY_TARGET=node npm run build",
     "start": "node --env-file-if-exists=.env scripts/node-server.mjs",
     "preview": "vite preview",

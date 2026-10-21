@@ -73,6 +73,7 @@ export default defineConfig({
     // traces there were already minified. Want symbolication back? Set SENTRY_AUTH_TOKEN
     // first, then flip this to 'hidden'.
     sourcemap: false,
+    reportCompressedSize: false,
     rollupOptions: {
       // c2pa-node signs Content Credentials and is DELIBERATELY NOT INSTALLED: its 38 MB native
       // binary took the Vercel function past the 250 MB uncompressed limit, to carry a feature
