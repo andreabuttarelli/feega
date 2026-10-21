@@ -253,14 +253,14 @@
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video);
-      const hovered = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
+      const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
       const layers = t.kind === 'motion' ? ChromeLayers.Whole : ChromeLayers.State;
-      if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !hovered) {
+      if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
       }
       const marks = portMarks(t);
       const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null } : { label: null, icon: null };
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered, ringColor: ringColour(marks, look), names: on, turn: turnOf(t), layers }];
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, turn: turnOf(t), layers }];
     });
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
