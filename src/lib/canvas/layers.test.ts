@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
@@ -531,5 +531,16 @@ describe('dragging several layers at once', () => {
     const doc = stacked();
 
     expect(order(ok(dropLayers(doc, ['b', 'c'], 'c', Place.Above, order(doc))))).toEqual(order(ok(dropLayer(doc, 'b', 'c', Place.Above))));
+  });
+});
+
+describe('the frame ring while the pointer is on one of its elements', () => {
+  it('yields to the element the pointer is on', () => {
+    expect(frameRinged({ nodeId: 'm1', id: 't1' }, 'm1', null, 'm1')).toBe(false);
+  });
+
+  it('still rings for a layer row hovered elsewhere, or for the frame itself', () => {
+    expect(frameRinged({ nodeId: 'm1', id: 't1' }, 'm1', null, null)).toBe(true);
+    expect(frameRinged({ nodeId: 'm1', id: 'm1' }, 'm1', null, 'm1')).toBe(true);
   });
 });
