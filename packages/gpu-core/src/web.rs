@@ -82,8 +82,7 @@ impl Painter for GpuPainter<'_> {
     }
 
     fn tile(&self) -> (u32, u32) {
-        let side = self.device.limits().max_texture_dimension_2d;
-        (side, side)
+        crate::compositor::render_tile(self.device.limits().max_texture_dimension_2d)
     }
 
     fn shift(&mut self, (dx, dy): (i32, i32)) -> Result<(), JsValue> {
