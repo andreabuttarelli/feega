@@ -15,11 +15,11 @@
   import { isTyping } from '$lib/motion/shortcuts';
   import type { OpResult } from '$lib/motion/timeline';
   import { containFit } from '$lib/canvas/frame-hover';
-  import { activeAt, shownOverlays, FrameOverlay } from '$lib/canvas/frame-tools';
+  import { activeAt, shownOverlays, AlignSide, FrameOverlay } from '$lib/canvas/frame-tools';
 
   type Size = { width: number; height: number };
 
-  let { doc, frame, size, picks, tool, apply, ondrawn }: { doc: MotionDoc; frame: number; size: Size; picks: string[]; tool: DrawTool; apply: (result: OpResult, summary: string) => void; ondrawn: (id: string) => void } = $props();
+  let { doc, frame, size, picks, tool, side, apply, ondrawn }: { doc: MotionDoc; frame: number; size: Size; picks: string[]; tool: DrawTool; side: AlignSide; apply: (result: OpResult, summary: string) => void; ondrawn: (id: string) => void } = $props();
 
   let pointEdit = $state<string | null>(null);
 
@@ -77,7 +77,7 @@
 </div>
 
 {#if shown.has(FrameOverlay.Align)}
-  <div class="align" data-testid="frame-align" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
+  <div class="align" data-side={side} data-testid="frame-align" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
     <AlignBar count={picks.length} onalign={alignTo} ondistribute={distribute} />
   </div>
 {/if}
@@ -101,5 +101,19 @@
     margin-top: 8px;
     pointer-events: auto;
     background: var(--ui-bg);
+  }
+
+  .align[data-side='right'] {
+    left: 100%;
+    top: 0;
+    margin-top: 0;
+    margin-left: 8px;
+  }
+
+  .align[data-side='above'] {
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    margin-bottom: 8px;
   }
 </style>

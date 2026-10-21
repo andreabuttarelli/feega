@@ -274,9 +274,36 @@ fn missing_picture<P>(item: &Item, pictures: &Shelf<P>) -> bool {
     }
 }
 
+struct SharedScissor {
+    open: Option<[f64; 4]>,
+}
+
+impl SharedScissor {
+    fn enter<C: Canvas>(&mut self, scene: &mut C, scissor: Option<[f64; 4]>) {
+        if self.open == scissor {
+            return;
+        }
+        self.close(scene);
+        if let Some([x0, y0, x1, y1]) = scissor {
+            scene.push_clip(Fill::NonZero, Affine::IDENTITY, &Rect::new(x0, y0, x1, y1).to_path(0.1));
+        }
+        self.open = scissor;
+    }
+
+    fn close<C: Canvas>(&mut self, scene: &mut C) {
+        if self.open.take().is_some() {
+            scene.pop();
+        }
+    }
+}
+
 pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>) -> Vec<Skipped> {
     let mut skipped = Vec::new();
+    let mut shared = SharedScissor { open: None };
     for (i, item) in items.iter().enumerate() {
+        if !matches!(item, Item::Path(_) | Item::Image(_) | Item::Layer(_)) || item.look().is_some_and(|l| needs_layer(l) || l.backdrop.is_some()) || layers.blended.contains_key(&i) {
+            shared.close(scene);
+        }
         if let Item::Use(u) = item {
             let composed = layers.fragments.get(&u.group).is_some_and(|encoded| compose(scene, encoded, Affine::new(u.matrix), frame));
             if !composed {
@@ -322,7 +349,9 @@ pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictur
             skip(&mut skipped, item.clip(), item.kind());
             continue;
         }
-        scissored(scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| content(s, item, pictures, frame)));
+        shared.enter(scene, look.scissor);
+        layered(scene, &look.blend, look.opacity, frame, |s| content(s, item, pictures, frame));
     }
+    shared.close(scene);
     skipped
 }

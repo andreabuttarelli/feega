@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MotionClip, MotionDoc } from '$lib/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { FrameOverlay, activeAt, shownOverlays } from './frame-tools';
+import { AlignSide, FrameOverlay, activeAt, alignSide, shownOverlays } from './frame-tools';
 
 const clip = (patch: Partial<MotionClip> & { props?: Record<string, unknown> }): MotionClip => ({ id: 'c', from: 10, durationInFrames: 20, component: 'Shape', props: { shape: 'rect' }, ...patch }) as MotionClip;
 const doc = { layoutGuides: [{ id: 'g' }] } as unknown as MotionDoc;
@@ -57,5 +57,21 @@ describe('activeAt', () => {
     expect(activeAt(clip({}), 10)).toBe(true);
     expect(activeAt(clip({}), 29)).toBe(true);
     expect(activeAt(clip({}), 30)).toBe(false);
+  });
+});
+
+describe('alignSide', () => {
+  const clear = { width: 1100, bottom: 567 };
+
+  it('puts the align bar under a frame with room below it', () => {
+    expect(alignSide({ left: 100, top: 100, width: 400, height: 200 }, clear)).toBe(AlignSide.Below);
+  });
+
+  it('moves the align bar beside a frame whose bottom sits on the canvas bar', () => {
+    expect(alignSide({ left: 345, top: 307, width: 420, height: 238 }, clear)).toBe(AlignSide.Right);
+  });
+
+  it('puts the align bar over a frame with no room below or beside it', () => {
+    expect(alignSide({ left: 0, top: 307, width: 1000, height: 238 }, clear)).toBe(AlignSide.Above);
   });
 });

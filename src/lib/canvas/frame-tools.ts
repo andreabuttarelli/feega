@@ -16,6 +16,26 @@ export enum FrameOverlay {
 type Context = { doc: MotionDoc; clip: MotionClip | null; picks: number; tool: DrawTool; pointEdit: string | null; active: boolean };
 
 const MIN_ALIGNED = 2;
+const ALIGN_BAR_PX = { width: 280, height: 42 };
+
+export enum AlignSide {
+  Below = 'below',
+  Right = 'right',
+  Above = 'above'
+}
+
+type Screen = { left: number; top: number; width: number; height: number };
+type Clear = { width: number; bottom: number };
+
+export function alignSide(frame: Screen, clear: Clear): AlignSide {
+  if (frame.top + frame.height + ALIGN_BAR_PX.height <= clear.bottom) {
+    return AlignSide.Below;
+  }
+  if (frame.left + frame.width + ALIGN_BAR_PX.width <= clear.width) {
+    return AlignSide.Right;
+  }
+  return AlignSide.Above;
+}
 
 const POINT_OVERLAY: Record<string, FrameOverlay> = { path: FrameOverlay.Pen, vector: FrameOverlay.Vector };
 

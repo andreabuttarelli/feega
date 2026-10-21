@@ -11,6 +11,11 @@
   import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
+  import { alignSide } from '$lib/canvas/frame-tools';
+  import { barAction } from '$lib/canvas/frame-inspector';
+  import { Action } from '$lib/motion/actions';
+  import { followDocks } from '$lib/canvas/dock-lift';
+  import { frameScreenRect } from '$lib/canvas/frame-screen';
   import FrameSelection from '../FrameSelection.svelte';
   import FrameTools from '../FrameTools.svelte';
   import { findClip, type MotionClip } from '$lib/motion/doc';
@@ -177,6 +182,14 @@
     }
   });
   let area = $state({ width: 0, height: 0 });
+  let docked = $state(0);
+  $effect(() => {
+    void picks;
+    if (!surface) {
+      return;
+    }
+    return followDocks(surface, () => [...document.querySelectorAll<HTMLElement>('[data-dock="timeline"]')], (px) => (docked = px));
+  });
   let selected = $state<string[]>([]);
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
@@ -1187,6 +1200,19 @@
 
   let inside = $state<Inside | null>(null);
   const savers = new Map<string, FrameEditSession>();
+
+  $effect(() => {
+    const warnUnsaved = (event: BeforeUnloadEvent) => {
+      const open = [...savers.values()].filter((s) => s.unsaved());
+      if (!open.length) {
+        return;
+      }
+      open.forEach((s) => void s.flushPending());
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warnUnsaved);
+    return () => window.removeEventListener('beforeunload', warnUnsaved);
+  });
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
 
@@ -1421,6 +1447,18 @@
   function toolsOf(nodeId: string) {
     const live = inside?.nodeId === nodeId ? liveOf(nodeId) : null;
     return live ? { doc: live.doc, frame: frameOfLive(live) } : null;
+  }
+
+  function deletePicks(): boolean {
+    const nodeId = inside?.nodeId;
+    const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
+    const done = tools ? barAction(Action.Delete, { doc: tools.doc, selection: picks, frame: tools.frame, newId: () => crypto.randomUUID().slice(0, 8) }) : null;
+    if (!nodeId || !done) {
+      return false;
+    }
+    commit(nodeId, { ok: true, doc: done.doc }, done.summary);
+    picks = [];
+    return true;
   }
 
   function drawnInside(id: string) {
@@ -2095,7 +2133,7 @@
         frameBar.tool = c.tool;
       }
     },
-    delete: () => (selected.length || selectedEdge) && dropSelection(selected, selectedEdge ? [selectedEdge] : []),
+    delete: () => deletePicks() || ((selected.length || selectedEdge) && dropSelection(selected, selectedEdge ? [selectedEdge] : [])),
     deselect: () => clearSelection(),
     'select-all': () => select(placed.map((t) => t.id)),
     fit: () => fitTo(placed),
@@ -2414,7 +2452,7 @@
           {/if}
           {@const tools = toolsOf(frame.id)}
           {#if tools}
-            <FrameTools doc={tools.doc} frame={tools.frame} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
+            <FrameTools doc={tools.doc} frame={tools.frame} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
           {/if}
           {@const band = marqueeRect(frame.id)}
           {#if band}
