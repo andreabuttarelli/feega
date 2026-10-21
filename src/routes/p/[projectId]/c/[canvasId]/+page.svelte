@@ -112,10 +112,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { FEEGA_TOKENS } from '$lib/motion/brand';
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
+  import FrameHover from '$lib/components/canvas/FrameHover.svelte';
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, frameResize, heightFollowsDoc, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, heightFollowsDoc, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
@@ -3584,9 +3585,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onUserPan={() => (following = null)}
     follow={followView}
   >
-    {#snippet tileOver({ id })}
+    {#snippet tileOver({ id, body })}
       {@const over = liveHost === LiveHost.Canvas ? nodes.find((n) => n.id === id) : null}
       {@const overMotion = over ? motionOf(over) : null}
+      {@const hoverNode = nodes.find((n) => n.id === id)}
+      {@const hoverMotion = hoverNode ? motionOf(hoverNode) : null}
+      {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && tileMode(id, inlineMotion, inlineStage.leaving) === NodeMode.Preview}
+        <FrameHover nodeId={id} revision={hoverMotion.docHeadRevision} previewUrl={motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} width={FORMATS[hoverMotion.format].width} height={FORMATS[hoverMotion.format].height} />
+      {/if}
       {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive && tileMode(id, inlineMotion, inlineStage.leaving) === NodeMode.Preview} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
     {/snippet}
     {#snippet tile({ id, selected })}

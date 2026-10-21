@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -193,5 +193,15 @@ describe('a custom frame takes the size the hand gives it', () => {
     const element = { ...preset, kind: FrameKind.Element };
 
     expect(frameResize(element, { w: 200, h: 999 }, { width: 100, height: 50 })).toEqual({ w: 200, h: 999, picture: { width: 200, height: 999 } });
+  });
+});
+
+describe('who hears a pointer over a frame\'s children', () => {
+  it('a tile with no DOM node gets the overlay, so its children are hit without selecting the frame first', () => {
+    expect(hoverHostOf(TileBody.Standin)).toBe(HoverHost.Overlay);
+  });
+
+  it('a tile with a DOM node keeps its own hover', () => {
+    expect(hoverHostOf(TileBody.Dom)).toBe(HoverHost.Node);
   });
 });
