@@ -64,7 +64,7 @@
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { MOTION_NODE_BAR_H, TileBody } from '$lib/canvas/motion-node';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, frameChrome } from '$lib/canvas/motion-node';
   import { BarContext } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -1241,6 +1241,10 @@
       if (inside?.nodeId !== only) {
         inside = { nodeId: only, level: frameLevel() };
         picks = [];
+        const own = frameChrome(kindOfNode(only)).selectsOwnClip ? liveOf(only)?.doc.tracks[0]?.clips[0]?.id : null;
+        if (own) {
+          goInside(only, Gesture.Click, own);
+        }
       }
       return;
     }
@@ -1377,10 +1381,13 @@
     }
   });
 
+  const kindOfNode = (id: string) => (summaries.get(id)?.data.kind as FrameKind | undefined) ?? FrameKind.Frame;
+
   const timeline = $derived.by(() => {
     const nodeId = unified ? inside?.nodeId : null;
     const live = nodeId ? liveOf(nodeId) : null;
-    return nodeId && live ? { nodeId, doc: live.doc, frame: frameOfLive(live) } : null;
+    const shown = nodeId ? frameChrome(kindOfNode(nodeId)).timeline : false;
+    return nodeId && live && shown ? { nodeId, doc: live.doc, frame: frameOfLive(live) } : null;
   });
 
   function selectionMarks(nodeId: string) {

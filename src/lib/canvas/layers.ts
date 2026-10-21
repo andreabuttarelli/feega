@@ -36,7 +36,8 @@ export enum Pick {
 
 export enum NodeIcon {
   Still = 'still',
-  Video = 'video'
+  Video = 'video',
+  Element = 'shape'
 }
 
 export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean; element?: boolean };
@@ -178,7 +179,7 @@ function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlin
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
-    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
+    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.element ? NodeIcon.Element : nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
     return folded.has(node.id) || node.element ? [row] : [row, ...childRows(node.id, open, outlines, folded)];
   });
 }

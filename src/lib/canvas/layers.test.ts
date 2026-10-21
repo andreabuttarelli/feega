@@ -53,6 +53,12 @@ describe('layer rows', () => {
     expect(rows.map((r) => [r.id, r.kind, r.label, r.nodeId])).toEqual([['e1', LayerKind.Node, 'Rectangle', 'e1']]);
   });
 
+  it('draws a free element with a shape icon, not the frame clapperboard', () => {
+    const [row] = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], null);
+
+    expect(row.type).toBe('shape');
+  });
+
   it('picks the one element row while its shape is selected inside it', () => {
     const doc = video();
     const [row] = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], { nodeId: 'e1', doc });

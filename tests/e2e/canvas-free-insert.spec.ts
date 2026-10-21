@@ -120,4 +120,37 @@ test.describe('free insertion from the bottom bar @real', () => {
     expect(await clipCount()).toBe(2);
     expect((await nodesOf(admin, session)).map((n) => n.kind)).toEqual(['frame']);
   });
+
+  test('a free element is selected as an element: no timeline, shape icon in the tree, and a real frame keeps its timeline', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const frame = await seedNode({ type: 'motion', x: 80, y: 480, data: LANDSCAPE });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frame.id, version: 1, doc: FRAME_DOC, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+
+    for (const [i, { tool, at }] of [{ tool: 'rectangle', at: { x: 0.15, y: 0.15 } }, { tool: 'ellipse', at: { x: 0.45, y: 0.15 } }, { tool: 'text', at: { x: 0.7, y: 0.15 } }].entries()) {
+      await drawAt(page, tool, at);
+      await expect.poll(async () => (await nodesOf(admin, session)).filter((n) => n.kind === 'element').length, { timeout: 15_000 }).toBe(i + 1);
+      await page.keyboard.press('Escape');
+      const pane = (await page.locator('.svelte-flow').boundingBox())!;
+      await page.mouse.click(pane.x + 20, pane.y + pane.height - 120);
+      await expect(page.getByTestId('add-bar')).toHaveAttribute('data-context', 'canvas');
+    }
+
+    const elements = (await nodesOf(admin, session)).filter((n) => n.kind === 'element');
+    for (const element of elements) {
+      await page.locator(`[data-motion-node="${element.id}"]`).click({ force: true });
+      await expect(page.getByTestId('frame-timeline')).toHaveCount(0);
+      await shoot(page, `element-${element.id.slice(0, 4)}-selected`);
+    }
+
+    await page.getByRole('button', { name: 'Layers' }).click();
+    await page.waitForTimeout(800);
+    await shoot(page, 'element-layers-tree');
+
+    await page.locator(`[data-motion-node="${frame.id}"] [data-frame-stage]`).click({ force: true });
+    await expect(page.getByTestId('frame-timeline')).toBeVisible({ timeout: 15_000 });
+    await shoot(page, 'frame-selected-timeline');
+  });
 });
