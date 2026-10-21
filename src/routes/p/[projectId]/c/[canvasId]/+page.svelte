@@ -104,6 +104,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
+  import { frameHolding, type FrameHold } from '$lib/canvas/frame-holding';
   import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
@@ -555,7 +556,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
     nodes = settle(nodes, id, toTile(node));
+    const hold = 'box' in drawn ? frameHolding(nodes, drawn.box) : null;
+    if (hold) {
+      intoFrame(id, hold);
+      return;
+    }
     focusOn([id], undefined, FocusMode.Select);
+  }
+
+  async function intoFrame(id: string, hold: FrameHold) {
+    const res = await post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at }) });
+    if (!landed(res)) {
+      focusOn([id], undefined, FocusMode.Select);
+      return;
+    }
+    nodes = nodes.filter((n) => n.id !== id);
   }
 
   $effect(() => {
