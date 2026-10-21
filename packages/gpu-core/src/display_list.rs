@@ -488,3 +488,14 @@ impl DisplayList {
 pub fn parse(json: &str) -> Result<DisplayList, serde_json::Error> {
     serde_json::from_str(json)
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Splice {
+    pub head: usize,
+    pub tail: usize,
+    pub items: Vec<Item>,
+}
+
+pub fn parse_splice(json: &str) -> Result<Splice, serde_json::Error> {
+    serde_json::from_str(json)
+}

@@ -10,6 +10,7 @@
   import { ItemKind } from '$lib/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
+  import { spliceOf } from '$lib/canvas/core/group-diff';
   import { cached, uncached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
@@ -303,7 +304,26 @@
   const painted: Record<Outcome, number> = { [Outcome.Idle]: 0, [Outcome.Reused]: 0, [Outcome.Partial]: 0, [Outcome.Full]: 0 };
   let paintedLabel = $state('');
 
+  const listIfKnown = (group: string) => cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list;
+
+  function patchedFromSent(into: CoreRaster, group: string): number {
+    const layers = chains.flat();
+    const target = layers.find((f) => f.group === group);
+    const base = target && layers.find((f) => f.id === target.id && f.group !== group && put.has(f.group));
+    const [before, after] = [base && listIfKnown(base.group), listIfKnown(group)];
+    const splice = before && after && spliceOf(before, after);
+    if (!base || !splice || splice.items.length > PART_ITEMS || !into.patchGroup(base.group, group, splice, pictures)) {
+      return 0;
+    }
+    put.add(group);
+    return splice.items.length + 1;
+  }
+
   function putPart(into: CoreRaster, group: string): number {
+    const patched = putting.has(group) ? 0 : patchedFromSent(into, group);
+    if (patched) {
+      return patched;
+    }
     const job = putting.get(group) ?? { parts: parts(listOf(group), PART_ITEMS), next: 0 };
     const part = job.parts[job.next];
     if (job.next === 0) {

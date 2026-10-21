@@ -7,7 +7,7 @@ use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap
 use vello::kurbo::Rect;
 
 use crate::compositor::{Compositor, Painter};
-use crate::display_list::parse;
+use crate::display_list::{parse, parse_splice};
 use crate::engine::Engine;
 use crate::filter_passes::layer_texture;
 use crate::groups::{report, Library, Limits, Plan};
@@ -237,6 +237,13 @@ impl WebCore {
         self.library.append_group(key, &parse(list_json).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
+    }
+
+    pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &str) -> Result<bool, JsValue> {
+        self.compositor.touch(to, &self.library);
+        let patched = self.library.patch_group(from, to, &parse_splice(splice_json).map_err(failed)?);
+        self.compositor.touch(to, &self.library);
+        Ok(patched)
     }
 
     pub fn drop_group(&mut self, key: &str) {

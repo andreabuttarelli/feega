@@ -15,6 +15,7 @@ pub struct Ink {
 }
 
 pub struct Run {
+    pub end: usize,
     pub bounds: Rect,
     pub extent: f64,
     pub ink: Option<Ink>,
@@ -22,7 +23,7 @@ pub struct Run {
 }
 
 pub struct Encoded {
-    pub runs: Vec<Run>,
+    pub runs: Vec<Arc<Run>>,
 }
 
 #[derive(Clone, Default)]
@@ -73,21 +74,32 @@ fn ink_of(items: &[Item], bounds: &[Rect], whole: Rect) -> Option<Ink> {
     (uniform && coverage >= BAR_MIN_COVERAGE).then_some(Ink { color, coverage: coverage.min(1.0) })
 }
 
+pub struct Kept<'a> {
+    pub before: &'a Encoded,
+    pub stable: usize,
+}
+
 impl Encoded {
     pub fn of(items: &[Item], frame: Rect, bounds: impl Fn(&Item) -> Option<Rect>, paint: impl Fn(&[Item]) -> Scene) -> Encoded {
-        let measured: Vec<Rect> = items.iter().map(|i| bounds(i).unwrap_or(frame)).collect();
+        Encoded::reusing(None, items, frame, bounds, paint)
+    }
+
+    pub fn reusing(kept: Option<Kept>, items: &[Item], frame: Rect, bounds: impl Fn(&Item) -> Option<Rect>, paint: impl Fn(&[Item]) -> Scene) -> Encoded {
+        let mut runs: Vec<Arc<Run>> = kept.map(|k| k.before.runs.iter().take_while(|r| r.end < k.stable.min(items.len())).cloned().collect()).unwrap_or_default();
+        let first = runs.last().map_or(0, |r| r.end);
+        let measured: Vec<Rect> = items[first..].iter().map(|i| bounds(i).unwrap_or(frame)).collect();
         let tiers: Vec<i32> = measured.iter().map(|b| tier(extent_of(*b))).collect();
-        let mut runs = Vec::new();
         let mut start = 0;
-        while start < items.len() {
+        while start < measured.len() {
             let mut end = start + 1;
-            while end < items.len() && end - start < RUN_ITEMS && tiers[end] == tiers[start] {
+            while end < measured.len() && end - start < RUN_ITEMS && tiers[end] == tiers[start] {
                 end += 1;
             }
             let members = &measured[start..end];
             let whole = members.iter().skip(1).fold(members[0], |acc, r| acc.union(*r));
             let extent = members.iter().map(|r| extent_of(*r)).fold(0.0, f64::max);
-            runs.push(Run { bounds: whole, extent, ink: ink_of(&items[start..end], members, whole), scene: paint(&items[start..end]) });
+            let run = &items[first + start..first + end];
+            runs.push(Arc::new(Run { end: first + end, bounds: whole, extent, ink: ink_of(run, members, whole), scene: paint(run) }));
             start = end;
         }
         Encoded { runs }
