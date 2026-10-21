@@ -22,19 +22,22 @@
     upload = null,
     analyses = {}
   }: {
-    session: FrameEditSession;
-    tokens: BrandTokens;
+    session: FrameEditSession | null;
+    tokens: BrandTokens | null;
     assets?: ComponentProps<typeof MotionInspector>['assets'];
     fonts?: ComponentProps<typeof MotionInspector>['fonts'];
     upload?: ComponentProps<typeof MotionInspector>['upload'];
     analyses?: ComponentProps<typeof MotionInspector>['analyses'];
   } = $props();
 
-  const doc = $derived(session.history.present);
-  const shown = $derived(inspectorOf(doc, session.selection));
-  const edit = (next: typeof doc, summary: string) => session.edit(next, summary);
+  const doc = $derived(session?.history.present ?? null);
+  const shown = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
+  const edit = (next: NonNullable<typeof doc>, summary: string) => session?.edit(next, summary);
 
   function runBar(id: ActionId) {
+    if (!session || !doc) {
+      return;
+    }
     const done = barAction(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8) });
     if (!done) {
       return;
@@ -44,7 +47,7 @@
   }
 </script>
 
-{#if shown}
+{#if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
     <ClipBar {doc} selection={session.selection} pick={PickMode.One} onrun={runBar} ondone={() => {}} />
     {#if shown.view === PropertiesView.Multiple}
@@ -54,21 +57,22 @@
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}
     {/if}
   </aside>
+{:else}
+  <p class="empty" data-testid="properties-empty">Select an element in a frame to edit its properties.</p>
 {/if}
 
 <style>
   .frame-inspector {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 280px;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     overscroll-behavior: contain;
-    background: var(--ui-surface, var(--background));
-    border-left: 1px solid var(--ui-border, var(--border));
-    z-index: 20;
+  }
+
+  .empty {
+    margin: 0;
+    padding: var(--ui-space-4);
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-type-caption);
   }
 </style>
