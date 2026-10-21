@@ -10,7 +10,8 @@ use crate::glyphs::{outline, Fonts};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::text::typeset;
 use crate::pictures::Pictures;
-use crate::scene::{build_items, needs_layer, Fragments, Layers};
+use crate::fragments::Fragments;
+use crate::scene::{build_items, needs_layer, Layers};
 use crate::Skipped;
 
 #[derive(Default)]
