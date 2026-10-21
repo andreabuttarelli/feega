@@ -23,11 +23,11 @@ type Row = { id: string; type: string };
 
 export const dismissedAfterClick = (dismissed: string | null, clicked: string): string | null => (dismissed === clicked ? null : dismissed);
 
-export function inlineMotionTarget(selected: readonly string[], rows: readonly Row[], dismissed: string | null, opening: Opening, requested: string | null = null): string | null {
+export function inlineMotionTarget(selected: readonly string[], rows: readonly Row[], dismissed: string | null, opening: Opening, requested: string | null = null, unified = false): string | null {
   if (selected.length !== 1 || selected[0] === dismissed) {
     return null;
   }
-  if (opening === Opening.OnRequest && selected[0] !== requested) {
+  if ((unified || opening === Opening.OnRequest) && selected[0] !== requested) {
     return null;
   }
   return rows.find((r) => r.id === selected[0])?.type === 'motion' ? selected[0] : null;

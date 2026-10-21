@@ -11,6 +11,16 @@
   import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
+  import FrameSelection from '../FrameSelection.svelte';
+  import { frameLevel, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
+  import type { OpResult } from '$lib/motion/timeline';
+  import { dragClip } from '$lib/canvas/frame-transform';
+  import { postPageAction } from '$lib/api/page-action';
+  import { Grip, type Pt } from '$lib/motion/scene-select';
+  import { guessedBoxes } from '$lib/motion/move-element';
+  import { withAutoLayout } from '$lib/motion/layout/resolve';
+  import { stillFrame } from '$lib/canvas/core/frame-source';
   import type CanvasFlow from '../CanvasFlow.svelte';
   import type { Tile } from '../CanvasFlow.svelte';
   import CanvasAddBar from '../CanvasAddBar.svelte';
@@ -214,7 +224,6 @@
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
-  const overlaysOn = $derived(unifiedFrames(page.url));
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   let coreType = $state<CoreText | null>(null);
@@ -1057,8 +1066,15 @@
     if (target.closest('.gpu-dom-node [data-motion-node]')) {
       return;
     }
-    const hit = hitAt(toWorld(view, local(e as PointerEvent)));
+    const world = toWorld(view, local(e as PointerEvent));
+    const hit = hitAt(world);
     const id = hit.kind === HitKind.Node ? hit.nodeId : null;
+    const deeper = id && unified ? framePickAt(world) : null;
+    if (id && deeper?.clip) {
+      select([id]);
+      goInside(id, Gesture.Double, deeper.clip);
+      return;
+    }
     if (id) {
       props.onNodeDoubled?.(id);
     }
@@ -1123,7 +1139,7 @@
     })();
   });
 
-  const unified = typeof location !== 'undefined' && unifiedFrames(new URL(location.href));
+  const unified = $derived(unifiedFrames(page.url));
 
   function framePickAt(w: Point) {
     const id = topNodeAt(w);
@@ -1147,15 +1163,141 @@
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
+  let inside = $state<Inside | null>(null);
+  const savers = new Map<string, FrameEditSession>();
+  const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
+  const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
+
+  function goInside(nodeId: string, gesture: Gesture, clip: string | null) {
+    inside = { nodeId, level: stepInside(insideLevel(nodeId), gesture, clip) };
+  }
+
   function pickElement(e: PointerEvent, w: Point): boolean {
     const hit = e.button === 0 && !e.shiftKey && !e.metaKey && !e.ctrlKey && e.pointerType === 'mouse' ? framePickAt(w) : null;
     if (!hit?.clip) {
       return false;
     }
-    frameDrill.request(hit.nodeId, hit.picker.unitAt(w, hit.space), Gesture.Click, Depth.Canvas, { pointer: e.pointerId, client: { x: e.clientX, y: e.clientY } });
-    layersSource.canvas?.open(hit.nodeId);
+    select([hit.nodeId]);
+    goInside(hit.nodeId, Gesture.Click, hit.clip);
     return true;
   }
+
+  $effect(() => {
+    const only = selected.length === 1 ? selected[0] : null;
+    if (unified && only && coreFrames.some((f) => f.id === only)) {
+      if (inside?.nodeId !== only) {
+        inside = { nodeId: only, level: frameLevel() };
+      }
+      return;
+    }
+    inside = null;
+  });
+
+  function saverOf(nodeId: string) {
+    const held = savers.get(nodeId);
+    const live = liveOf(nodeId);
+    const frame = coreFrames.find((f) => f.id === nodeId);
+    if (held || !live || !frame) {
+      return held ?? null;
+    }
+    const url = `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${nodeId}`;
+    const session: FrameEditSession = new FrameEditSession(
+      { head: { version: frame.revision, doc: live.doc }, selection: [] },
+      {
+        viewPath: () => [],
+        show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
+        recorded: () => {},
+        saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: session.history.present }),
+        pull: async () => {},
+        send: async (ops, version, summary) => {
+          const form = new FormData();
+          form.set('ops', JSON.stringify(ops));
+          form.set('version', String(version));
+          form.set('summary', summary);
+          const result = await postPageAction(url, 'ops', form);
+          return result.type === 'success' ? { ok: true, version: Number(result.data?.version), doc: result.data?.doc as LiveDoc['doc'] } : { ok: false, error: 'Save failed' };
+        }
+      }
+    );
+    savers.set(nodeId, session);
+    return session;
+  }
+
+  function commit(nodeId: string, result: OpResult, summary: string) {
+    const session = saverOf(nodeId);
+    session?.apply(result, summary);
+    if (session && result.ok) {
+      liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
+    }
+  }
+
+  function pickerOf(nodeId: string) {
+    const frame = coreFrames.find((f) => f.id === nodeId);
+    const live = liveOf(nodeId);
+    if (!frame || !live) {
+      return null;
+    }
+    const held = pickers.get(nodeId);
+    const picker = held?.live === live ? held.picker : framePicker(live);
+    pickers.set(nodeId, { live, picker });
+    return { picker, space: picker.spaceOf(frame.box, byId.get(nodeId)?.rotation ?? 0), frame, live };
+  }
+
+  function selectionMark(nodeId: string) {
+    const clip = inside?.nodeId === nodeId ? inside.level.clip : null;
+    const at = clip && !byId.get(nodeId)?.rotation ? pickerOf(nodeId) : null;
+    const rect = clip && at ? at.picker.outline(clip, at.space) : null;
+    return clip && at && rect ? { clip, rect: { left: (rect.x - at.frame.box.x) * view.zoom, top: (rect.y - at.frame.box.y) * view.zoom, width: rect.w * view.zoom, height: rect.h * view.zoom } } : null;
+  }
+
+  function grab(nodeId: string, clip: string, grip: Grip, handle: number, e: PointerEvent) {
+    const at = pickerOf(nodeId);
+    const saver = saverOf(nodeId);
+    const rect = at?.picker.frameRect(clip);
+    if (!at || !saver || !rect || e.button !== 0) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const start = saver.history.present;
+    const frame = stillFrame(start);
+    const box = guessedBoxes(withAutoLayout(start))[clip] ?? rect;
+    const framePt = (ev: PointerEvent): Pt => at.picker.framePoint(toWorld(view, local(ev)), at.space);
+    const from = framePt(e);
+    let result: ReturnType<typeof dragClip> | null = null;
+
+    const move = (ev: PointerEvent) => {
+      result = dragClip({ doc: start, clipId: clip, frame, box, grip, handle, from, to: framePt(ev) });
+      if (result.ok) {
+        liveDocs.set(nodeId, { ...at.live, doc: result.doc });
+      }
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      if (result?.ok) {
+        commit(nodeId, result, grip === Grip.Move ? 'Moved an element' : 'Resized an element');
+      }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  $effect(() => {
+    const nodeId = inside?.nodeId;
+    if (!unified || !nodeId || !liveOf(nodeId)) {
+      return;
+    }
+    return layersSource.publishVideo(
+      videoSide({
+        nodeId,
+        doc: () => liveOf(nodeId)!.doc,
+        selection: () => (inside?.nodeId === nodeId && inside.level.clip ? [inside.level.clip] : []),
+        select: (ids) => goInside(nodeId, Gesture.Click, ids[0] ?? null),
+        edit: (result, summary) => commit(nodeId, result, summary)
+      })
+    );
+  });
 
   function onDown(e: PointerEvent) {
     glide = null;
@@ -1176,6 +1318,9 @@
     if (hit.kind === HitKind.Node && pickElement(e, w)) {
       e.preventDefault();
       return;
+    }
+    if (unified && hit.kind === HitKind.Node && inside?.nodeId === hit.nodeId) {
+      goInside(hit.nodeId, Gesture.Click, null);
     }
     const inDom = target.closest('.gpu-dom-node');
     if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && target.closest(INTERACTIVE)) {
@@ -1739,6 +1884,10 @@
     if (e.key === ' ' && !(e.target as HTMLElement).closest?.(INTERACTIVE)) {
       space = true;
     }
+    if (e.key === 'Escape' && inside?.level.clip) {
+      goInside(inside.nodeId, Gesture.Leave, null);
+      return;
+    }
     if (e.key === 'Escape') {
       picked = null;
       refusal = null;
@@ -1985,8 +2134,15 @@
         <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
-    {#if overlaysOn}
-      <FrameOverlays {view} frames={overlayFrames}>{#snippet children()}{/snippet}</FrameOverlays>
+    {#if unified}
+      <FrameOverlays {view} frames={overlayFrames}>
+        {#snippet children(frame)}
+          {@const mark = selectionMark(frame.id)}
+          {#if mark}
+            <FrameSelection clip={mark.clip} rect={mark.rect} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          {/if}
+        {/snippet}
+      </FrameOverlays>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">

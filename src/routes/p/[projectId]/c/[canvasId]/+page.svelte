@@ -124,6 +124,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { barContextOf } from '$lib/canvas/bottom-bar';
   import { CanvasState, NodeMode, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { unifiedFrames } from '$lib/canvas/frame-pick';
   import { decoded, painted } from '$lib/canvas/paint-wait';
   import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
@@ -1445,7 +1446,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const row = selectedIds.length === 1 ? nodes.find((n) => n.id === selectedIds[0]) : null;
     return row ? openingFor(row, opening) : opening;
   });
-  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, openingHere, requestedMotion));
+  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, openingHere, requestedMotion, unifiedFrames(page.url) && rendererOf(page.url, data.rendererSwitch) === Renderer.Core));
   const editingMotion = $derived(editorOn(inlineMotion, inlineStage.leaving));
   let lastOpen: string | null = null;
 

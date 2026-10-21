@@ -103,3 +103,13 @@ describe('a frame being closed', () => {
     expect(nodeLayers(NodeMode.Leaving, Paint.Pending)).toEqual({ own: true, editor: true });
   });
 });
+
+describe('inline motion target on the unified canvas', () => {
+  it('selecting a frame does not open the editor', () => {
+    expect(inlineMotionTarget(['m1'], rows, null, Opening.OnSelect, null, true)).toBeNull();
+  });
+
+  it('asking for the editor still opens it', () => {
+    expect(inlineMotionTarget(['m1'], rows, null, Opening.OnSelect, 'm1', true)).toBe('m1');
+  });
+});
