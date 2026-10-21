@@ -13,12 +13,12 @@ export enum FrameKind {
   Group = 'group'
 }
 
-type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress };
+type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress; timeline: boolean; selectsOwnClip: boolean };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move },
-  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick },
-  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick }
+  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move, timeline: true, selectsOwnClip: false },
+  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick, timeline: false, selectsOwnClip: true },
+  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick, timeline: true, selectsOwnClip: false }
 };
 
 export enum TileBody {
