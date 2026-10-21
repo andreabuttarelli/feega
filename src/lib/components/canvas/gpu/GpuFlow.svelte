@@ -193,7 +193,6 @@
   const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
-  const editIds = $derived(editableIds(selected, DOM_CAP));
   let drawn = $state(new Set<string>());
   let sticky = $state(new Map<string, number>());
   let wasEditing = new Set<string>();
@@ -224,7 +223,9 @@
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
+  const unified = $derived(unifiedFrames(page.url));
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
+  const editIds = $derived(editableIds(selected, DOM_CAP, unified ? new Set(coreFrames.map((f) => f.id)) : new Set()));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
@@ -1138,8 +1139,6 @@
       }
     })();
   });
-
-  const unified = $derived(unifiedFrames(page.url));
 
   function framePickAt(w: Point) {
     const id = topNodeAt(w);
