@@ -29,7 +29,6 @@
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { tileHovered } from '$lib/canvas/layers';
-  import { TileBody } from '$lib/canvas/motion-node';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
