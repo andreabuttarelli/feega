@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { landingDoc } from './fixtures/landing-frame-doc';
 
 const SHOTS_DIR = `${process.env.HOME}/Documents/feega-videos/e2e`;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
@@ -192,5 +193,97 @@ test.describe('a core-drawn frame stays itself through hover, select and deselec
     const idle = await frameRect();
     expectSameBox(idle, start, '4. frame box after deselect');
     expect(await filledRatio(page, idle), '4. drawn after deselect').toBeGreaterThan(MIN_FILLED_RATIO);
+  });
+});
+
+const LANDING_SIZE = { width: 1440, height: 4734 };
+const LANDING_DATA = { format: 'custom', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
+const PAGE_DARK = 60;
+const DARK_RATIO_DRIFT = 0.05;
+const LANDING_SPOTS: Record<string, Point> = { nav: { x: 300, y: 36 }, card: { x: 900, y: 600 } };
+
+const LANDING_ZOOM = 0.55;
+const ABOVE_PANELS: Rect = { x: 48, y: 52, width: 1100, height: 540 };
+
+const onScreen = (r: Rect): Rect => {
+  const x = Math.max(ABOVE_PANELS.x, r.x);
+  const y = Math.max(ABOVE_PANELS.y, r.y);
+  return { x, y, width: Math.min(r.x + r.width, ABOVE_PANELS.x + ABOVE_PANELS.width) - x, height: Math.min(r.y + r.height, ABOVE_PANELS.y + ABOVE_PANELS.height) - y };
+};
+
+async function zoomInto(page: Page, at: Point, target: number) {
+  await page.mouse.move(at.x, at.y);
+  await page.keyboard.down('Control');
+  for (let i = 0; i < ZOOM_STEPS && (await zoomOf(page)) < target; i++) {
+    await page.mouse.wheel(0, -4);
+  }
+  await page.keyboard.up('Control');
+  await page.waitForTimeout(SETTLE_MS);
+}
+
+async function darkArea(page: Page, area: Rect): Promise<{ ratio: number; bounds: Rect | null }> {
+  const view = onScreen(area);
+  const { at } = await grab(page, view);
+  let dark = 0;
+  let total = 0;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (let y = 0; y < view.height - 1; y += 2) {
+    for (let x = 0; x < view.width - 1; x += 2) {
+      total += 1;
+      if (Math.max(...at(x, y)) >= PAGE_DARK) {
+        continue;
+      }
+      dark += 1;
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    }
+  }
+  return { ratio: dark / total, bounds: x1 < 0 ? null : { x: view.x + x0, y: view.y + y0, width: x1 - x0 + 2, height: y1 - y0 + 2 } };
+}
+
+test.describe('a landing-page frame stays drawn when an element inside it is selected @real', () => {
+  test.skip(!REAL_STACK, 'E2E_REAL_STACK=1');
+  test.setTimeout(180_000);
+
+  test('clicking the nav or a card keeps the whole page drawn, same box, same pixels', async ({ page, session, admin, seedNode }) => {
+    await page.setViewportSize(VIEWPORT);
+    const node = await seedNode({ type: 'motion', x: FRAME_AT.x, y: FRAME_AT.y, data: LANDING_DATA });
+    await admin.from('nodes').update(LANDING_SIZE).eq('id', node.id);
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: landingDoc, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}?unifiedFrames=1`);
+    await expect(page.locator('[data-canvas-surface]')).toHaveAttribute('data-renderer', 'core', { timeout: 30_000 });
+    const tile = page.locator(`[data-testid="gpu-node"][data-id="${node.id}"]`);
+    await expect(tile).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(SETTLE_MS);
+    const fitted = (await tile.boundingBox())!;
+    await zoomInto(page, { x: fitted.x + fitted.width / 2, y: fitted.y }, LANDING_ZOOM);
+
+    const start = (await tile.boundingBox())!;
+    const loaded = await darkArea(page, start);
+    await snap(page, 'landing-1-loaded');
+    expect(loaded.ratio, 'landing drawn after load').toBeGreaterThan(MIN_FILLED_RATIO);
+    expectAligned(loaded.bounds!, onScreen(start), 'landing drawn over its whole tile');
+
+    const scale = start.width / LANDING_SIZE.width;
+    for (const [name, spot] of Object.entries(LANDING_SPOTS)) {
+      await page.mouse.click(start.x + spot.x * scale, start.y + spot.y * scale);
+      await page.waitForTimeout(SETTLE_MS);
+      await page.mouse.move(EMPTY_SPOT.x, EMPTY_SPOT.y);
+      await snap(page, `landing-2-${name}`);
+      await expect(page.getByTestId('frame-selection'), `${name} selected`).toHaveCount(1);
+      const after = (await tile.boundingBox())!;
+      expectSameBox(after, start, `${name}: tile box`);
+      const drawn = await darkArea(page, after);
+      expect(drawn.bounds, `${name}: landing still drawn`).not.toBeNull();
+      expectSameBox(drawn.bounds!, loaded.bounds!, `${name}: drawn landing box`);
+      expect(Math.abs(drawn.ratio - loaded.ratio), `${name}: landing pixels unchanged`).toBeLessThanOrEqual(DARK_RATIO_DRIFT);
+    }
   });
 });
