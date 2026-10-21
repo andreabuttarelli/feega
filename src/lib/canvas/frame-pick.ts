@@ -61,6 +61,10 @@ export function framePicker(live: LiveDoc) {
       const [x, y] = space.toFrame(world);
       return { x: x / s.width, y: y / s.height };
     },
+    frameSize(): Size {
+      const s = scene();
+      return { width: s.width, height: s.height };
+    },
     frameRect(clip: string) {
       return rectOf(scene(), clip, time());
     },
