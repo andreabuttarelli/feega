@@ -3,11 +3,12 @@ import type { Viewport } from '../dot-grid';
 import { MOTION_NODE_BAR_H } from '../motion-node';
 import { AssetSize, sized } from '../asset-url';
 import { Surface, type CardFace, type Media } from './card-face';
-import type { Box, Curve } from './geometry';
+import { containedIn, type Box, type Curve } from './geometry';
 import { createTextureCache, fitBitmap, type TextureCache } from './texture-cache';
 import { createUploadQueue, type UploadQueue } from './upload-queue';
 import { textureDecoder } from './texture-decoder';
 import { Counter, count, exposeTextures } from './frame-stats';
+import { cellBox, cellBytes, cellKey, type Cell } from './detail-plan';
 import { BUDGET, currentDevice, rendererResolution } from './memory-budget';
 import { textureReport, type SourceSize } from './texture-bytes';
 import { createPins } from './texture-pins';
@@ -109,6 +110,10 @@ function cover(tex: Texture, w: number, h: number): Texture {
   return new Texture({ source: tex.source, frame: new Rectangle((tw - fw) / 2, (th - fh) / 2, fw, fh) });
 }
 
+type DetailLayer = { key: string; ratio: number; size: number; box: Container; cells: Map<string, { tex: Texture; bytes: number }> };
+
+export type DetailInfo = { key: string; ratio: number; size: number; cells: ReadonlySet<string> };
+
 export class GpuScene {
   readonly backend: Backend;
   private app: Application;
@@ -137,6 +142,7 @@ export class GpuScene {
   private retiring = new Map<string, Built>();
   private snapshots = new Map<string, { key: string; tex: Texture }>();
   private staleSnapshots = new Map<string, Texture[]>();
+  private details = new Map<string, DetailLayer[]>();
   private renderFailed = false;
   private pins = createPins<Built>();
   private uploaded = new WeakSet<object>();
@@ -302,6 +308,89 @@ export class GpuScene {
     }
   }
 
+  async addDetailCell(id: string, key: string, ratio: number, size: number, cell: Cell, bitmap: ImageBitmap) {
+    const b = this.built.get(id);
+    const snap = this.snapshots.get(id);
+    if (!b || !snap || snap.key !== key) {
+      bitmap.close();
+      return;
+    }
+    const layers = this.layersOf(id);
+    let layer = layers.find((l) => l.ratio === ratio && l.key === key);
+    if (!layer) {
+      layer = { key, ratio, size, box: new Container(), cells: new Map() };
+      b.skin.addChild(layer.box);
+      layers.push(layer);
+      this.details.set(id, layers);
+    }
+    const card = this.cards.find((c) => c.id === id)!;
+    const at = cellBox({ x: 0, y: 0, w: card.w, h: card.h }, size, cell);
+    const tex = Texture.from(bitmap);
+    const sprite = new Sprite(tex);
+    sprite.position.set(at.x, at.y);
+    sprite.width = at.w;
+    sprite.height = at.h;
+    layer.box.addChild(sprite);
+    layer.cells.get(cellKey(cell))?.tex.destroy(true);
+    layer.cells.set(cellKey(cell), { tex, bytes: cellBytes(at, ratio) });
+    this.invalidate();
+  }
+
+  detailOf(id: string): DetailInfo | null {
+    const layer = this.layersOf(id).at(-1);
+    return layer ? { key: layer.key, ratio: layer.ratio, size: layer.size, cells: new Set(layer.cells.keys()) } : null;
+  }
+
+  detailBytes(id?: string): number {
+    const mine = id === undefined ? [...this.details.values()].flat() : this.layersOf(id);
+    return mine.reduce((sum, l) => sum + [...l.cells.values()].reduce((s, c) => s + c.bytes, 0), 0);
+  }
+
+  detailIds(): string[] {
+    return [...this.details.keys()].filter((id) => this.layersOf(id).length);
+  }
+
+  trimDetail(id: string) {
+    const layers = this.layersOf(id);
+    if (layers.length < 2) {
+      return;
+    }
+    for (const layer of layers.splice(0, layers.length - 1)) {
+      this.destroyLayer(layer);
+    }
+    this.invalidate();
+  }
+
+  dropDetail(id: string) {
+    for (const layer of this.layersOf(id)) {
+      this.destroyLayer(layer);
+    }
+    this.details.delete(id);
+    this.invalidate();
+  }
+
+  private layersOf(id: string): DetailLayer[] {
+    const skin = this.built.get(id)?.skin;
+    const all = this.details.get(id) ?? [];
+    const alive = all.filter((l) => !l.box.destroyed && l.box.parent === skin);
+    for (const dead of all.filter((l) => !alive.includes(l))) {
+      for (const cell of dead.cells.values()) {
+        cell.tex.destroy(true);
+      }
+    }
+    if (alive.length !== all.length) {
+      this.details.set(id, alive);
+    }
+    return alive;
+  }
+
+  private destroyLayer(layer: DetailLayer) {
+    layer.box.destroy({ children: true });
+    for (const cell of layer.cells.values()) {
+      cell.tex.destroy(true);
+    }
+  }
+
   setDim(dim: { body: number; edges: number } | null) {
     this.dim = dim;
     this.setCards(this.cards);
@@ -439,6 +528,7 @@ export class GpuScene {
     if (this.ready.delete(id)) {
       this.report();
     }
+    this.dropDetail(id);
     this.destroyBuilt(this.built.get(id));
     this.built.delete(id);
   }
@@ -597,8 +687,9 @@ export class GpuScene {
         title.position.set(PAD, PAD);
         root.addChild(title);
         b.texts.push(title);
-        if (f.thumbs.length) {
-          this.thumbGrid(root, b, f.thumbs, c, PAD + BODY_SIZE * 2);
+        const thumbs = f.tiles.flatMap((t) => t.thumb ?? []);
+        if (thumbs.length) {
+          this.thumbGrid(root, b, thumbs, c, PAD + BODY_SIZE * 2);
           return;
         }
         this.skeleton(root, b, c, PAD + BODY_SIZE * 2);
@@ -612,8 +703,10 @@ export class GpuScene {
     const snap = c.snapshot ? this.snapshots.get(c.id) : undefined;
     if (snap && snap.key === c.snapshot) {
       const sprite = new Sprite(snap.tex);
-      sprite.width = c.w;
-      sprite.height = c.h;
+      const fitted = containedIn({ w: snap.tex.width, h: snap.tex.height }, { x: 0, y: 0, w: c.w, h: c.h });
+      sprite.position.set(fitted.x, fitted.y);
+      sprite.width = fitted.w;
+      sprite.height = fitted.h;
       root.addChild(sprite);
       b.body = sprite;
       b.media = { url: snap.key, video: false };

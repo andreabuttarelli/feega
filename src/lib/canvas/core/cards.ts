@@ -1,84 +1,31 @@
-import { ItemKind, type ImageItem, type Item } from '$lib/motion/gpu-full/display-list';
-import { BlendMode } from '$lib/motion/blend';
-import { IDENTITY, type Affine } from '$lib/motion/parent';
+import type { Item } from '$lib/motion/gpu-full/display-list';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { Surface, type CardFace, type Media } from '$lib/canvas/gpu/card-face';
-import type { Box } from '$lib/canvas/gpu/geometry';
+import { Surface, type CardFace } from '$lib/canvas/gpu/card-face';
 import type { Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
-import { circle, line, rect, solid } from './shapes';
+import { circle, rect, solid } from './shapes';
+import { emptyItems } from './empty-card';
+import { embedItems } from './embed-card';
+import { batchItems, effectsItems } from './media-card';
+import { selectItems } from './select-card';
+import { personItems, previewItems } from './source-card';
+import { genBody, genItems, genMark } from './gen-card';
+import { BODY_SIZE, BORDER, CardPart, DONE, ERROR, FOOTER_LINES, Fit, HEAD_H, HEAD_SIZE, PAD, ROW_GAP, ROW_H, ROW_THUMB, DOT_RADIUS, PILL_H, PILL_PAD, PROMPT_HINT, RUNNING, AUTO_MODEL, STAGE, STATUS_RADIUS, STATUS_TEXT_GAP, THUMB_GAP, at, body, image, panel, text, whole, type CardIcons, type CoreCard, type Ctx } from './card-kit';
 
-export enum CardPart {
-  Panel = 'panel',
-  Media = 'media',
-  Stage = 'stage',
-  Body = 'body',
-  Title = 'title',
-  Subtitle = 'subtitle',
-  Footer = 'footer',
-  Status = 'status',
-  Model = 'model',
-  Thumb = 'thumb',
-  Shot = 'shot'
-}
-
-enum Fit {
-  Cover = 'cover',
-  Contain = 'contain'
-}
-
-export type CoreCard = Box & { id: string; face: CardFace; shot?: string | null };
-
-const PAD = 14;
-const BODY_SIZE = 13;
-const SHADOW_DROP = 2;
-const SHADOW_OPACITY = 0.06;
-const BORDER = 1;
-const FOOTER_LINES = 2.4;
-const STATUS_RADIUS = 4;
-const STATUS_TEXT_GAP = 12;
-const THUMB_COLUMNS = 3;
-const THUMB_GAP = 4;
-const STAGE = '#000000';
-const ERROR = '#c0392b';
-const DONE = '#16a34a';
-const PROMPT_HINT = 'Describe what to generate…';
-const RUNNING = 'Running…';
-const AUTO_MODEL = 'Auto';
-const CENTRE: [number, number] = [0.5, 0.5];
-
-type Ctx = { c: CoreCard; theme: CoreTheme; glyphs: Glyphs; bold: Glyphs; clip: (p: CardPart) => string };
-
-const at = (c: CoreCard, contours: number[][]) => contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + c.x : v + c.y)));
-
-const translate = (x: number, y: number): Affine => [IDENTITY[0], IDENTITY[1], IDENTITY[2], IDENTITY[3], x, y];
-
-function image(x: Ctx, part: CardPart, media: Media, b: Box, fit: Fit, nth = 0): ImageItem {
-  return { kind: ItemKind.Image, clip: `${x.clip(part)}:${nth}`, src: media.url, video: media.video, mediaTime: 0, size: { width: b.w, height: b.h }, fit, focus: CENTRE, zoom: 1, clipped: true, inner: IDENTITY, opacity: 1, matrix: translate(x.c.x + b.x, x.c.y + b.y), blur: 0, blend: BlendMode.Normal };
-}
-
-function panel(x: Ctx, raised = true): Item[] {
-  const { c, theme } = x;
-  const shadow = raised ? [solid(x.clip(CardPart.Panel), at(c, [rect(0, SHADOW_DROP, c.w, c.h)]), STAGE, SHADOW_OPACITY)] : [];
-  return [
-    ...shadow,
-    solid(x.clip(CardPart.Panel), at(c, [rect(0, 0, c.w, c.h)]), theme.paper),
-    solid(x.clip(CardPart.Panel), at(c, line(rect(BORDER / 2, BORDER / 2, c.w - BORDER, c.h - BORDER), BORDER, true)), theme.line)
-  ];
-}
-
-function text(x: Ctx, part: CardPart, s: string, size: number, colour: string, left: number, top: number, width: number | null, height = size): Item[] {
-  if (!s) {
-    return [];
-  }
-  const set = width === null ? undefined : { width, height };
-  const contours = at(x.c, (part === CardPart.Title ? x.bold : x.glyphs)(s, size, set).contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + left : v + top))));
-  return [{ ...solid(x.clip(part), contours, colour), scissor: [x.c.x, x.c.y, x.c.x + x.c.w, x.c.y + x.c.h] }];
-}
-
-const body = (x: Ctx, s: string, top: number, bottom = PAD) => text(x, CardPart.Body, s, BODY_SIZE, x.theme.ink, PAD, top, x.c.w - PAD * 2, x.c.h - top - bottom);
+export { CardPart, type CoreCard };
 
 const statusColour = (f: CardFace, theme: CoreTheme) => (f.error ? ERROR : f.running ? theme.accent : f.media ? DONE : theme.line);
+
+function live(x: Ctx): Item[] | null {
+  const { c, icons } = x;
+  const gen = c.face.gen;
+  if (!gen || !icons) {
+    return null;
+  }
+  const media = c.face.media && gen.state === 'done' ? [image(x, CardPart.Media, c.face.media, genBody(c, gen), Fit.Contain)] : [];
+  const kit = { theme: x.theme, glyphs: x.glyphs, bold: x.bold, icons };
+  return [...genItems(c, gen, kit), ...media, ...genMark(c, gen, kit)];
+}
 
 function generate(x: Ctx): Item[] {
   const { c, theme } = x;
@@ -95,16 +42,6 @@ function generate(x: Ctx): Item[] {
   ];
 }
 
-function thumbs(x: Ctx, top: number): Item[] {
-  const { c, theme } = x;
-  const cell = (c.w - PAD * 2 - THUMB_GAP * (THUMB_COLUMNS - 1)) / THUMB_COLUMNS;
-  const rows = Math.max(0, Math.floor((c.h - top - PAD + THUMB_GAP) / (cell + THUMB_GAP)));
-  return c.face.thumbs.slice(0, rows * THUMB_COLUMNS).flatMap((url, i) => {
-    const b = { x: PAD + (i % THUMB_COLUMNS) * (cell + THUMB_GAP), y: top + Math.floor(i / THUMB_COLUMNS) * (cell + THUMB_GAP), w: cell, h: cell };
-    return [solid(x.clip(CardPart.Thumb), at(c, [rect(b.x, b.y, b.w, b.h)]), theme.line), image(x, CardPart.Thumb, { url, video: false }, b, Fit.Cover, i)];
-  });
-}
-
 function source(x: Ctx): Item[] {
   const { c, theme } = x;
   const f = c.face;
@@ -113,7 +50,7 @@ function source(x: Ctx): Item[] {
   }
   const below = PAD + BODY_SIZE * 2;
   const title = text(x, CardPart.Title, f.title || f.label || '', BODY_SIZE, theme.ink, PAD, PAD, c.w - PAD * 2);
-  const rest = f.thumbs.length ? thumbs(x, below) : text(x, CardPart.Subtitle, f.subtitle, BODY_SIZE - 1, theme.inkSoft, PAD, below, c.w - PAD * 2);
+  const rest = text(x, CardPart.Subtitle, f.subtitle, BODY_SIZE - 1, theme.inkSoft, PAD, below, c.w - PAD * 2);
   return [...panel(x), ...title, ...rest];
 }
 
@@ -124,7 +61,50 @@ function frame(x: Ctx): Item[] {
   return [...panel(x, false), solid(x.clip(CardPart.Stage), at(c, [rect(stage.x, stage.y, stage.w, stage.h)]), STAGE), ...(media ? [image(x, CardPart.Media, media, stage, Fit.Contain)] : [])];
 }
 
-const whole = (c: CoreCard): Box => ({ x: 0, y: 0, w: c.w, h: c.h });
+const markdownText = (md: string) => md.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/^#{1,6}\s+/gm, '').replace(/^\s*[-*]\s+/gm, '• ').replace(/[*_`>]/g, '');
+
+const ROW_STATUS: Record<string, (t: CoreTheme) => string> = {
+  done: () => DONE,
+  failed: () => ERROR,
+  running: (t) => t.accent,
+  queued: (t) => t.line
+};
+
+function pills(x: Ctx, labels: readonly string[], active: number): Item[] {
+  const { c, theme } = x;
+  let left = PAD;
+  return labels.flatMap((label, i) => {
+    const w = x.glyphs(label, HEAD_SIZE).width + PILL_PAD * 2;
+    const at0 = left;
+    left += w + THUMB_GAP;
+    const on = i === active;
+    return [solid(x.clip(CardPart.Head), at(c, [rect(at0, (HEAD_H - PILL_H) / 2, w, PILL_H)]), on ? theme.chip : theme.paper), ...text(x, CardPart.Head, label, HEAD_SIZE, on ? theme.chipInk : theme.inkSoft, at0 + PILL_PAD, (HEAD_H - HEAD_SIZE) / 2 - 1, null)];
+  });
+}
+
+function head(x: Ctx, labels: readonly string[], active: number): Item[] {
+  const { c, theme } = x;
+  const right = c.face.count;
+  const width = right ? x.glyphs(right, HEAD_SIZE).width : 0;
+  return [...pills(x, labels, active), ...text(x, CardPart.Head, right, HEAD_SIZE, theme.inkSoft, c.w - PAD - width, (HEAD_H - HEAD_SIZE) / 2 - 1, null), solid(x.clip(CardPart.Head), at(c, [rect(0, HEAD_H, c.w, BORDER)]), theme.line)];
+}
+
+function rows(x: Ctx): Item[] {
+  const { c, theme } = x;
+  const fits = Math.max(0, Math.floor((c.h - HEAD_H - ROW_GAP) / ROW_H));
+  return c.face.rows.slice(0, fits).flatMap((row, i) => {
+    const top = HEAD_H + ROW_GAP + i * ROW_H;
+    const mid = top + ROW_H / 2;
+    const textLeft = PAD + ROW_THUMB + ROW_GAP + (row.thumb ? ROW_THUMB + ROW_GAP : 0);
+    const thumb = row.thumb ? [solid(x.clip(CardPart.Thumb), at(c, [rect(PAD + ROW_THUMB + ROW_GAP, mid - ROW_THUMB / 2, ROW_THUMB, ROW_THUMB)]), theme.line), image(x, CardPart.Thumb, { url: row.thumb, video: false }, { x: PAD + ROW_THUMB + ROW_GAP, y: mid - ROW_THUMB / 2, w: ROW_THUMB, h: ROW_THUMB }, Fit.Cover, i)] : [];
+    const dot = row.status && ROW_STATUS[row.status] ? [solid(x.clip(CardPart.Status), at(c, circle(c.w - PAD - DOT_RADIUS, mid, DOT_RADIUS)), ROW_STATUS[row.status](theme))] : [];
+    return [...text(x, CardPart.Row, row.lead, HEAD_SIZE, theme.inkSoft, PAD, mid - HEAD_SIZE * 0.6, null), ...thumb, ...text(x, CardPart.Row, row.text, HEAD_SIZE, theme.ink, textLeft, mid - HEAD_SIZE * 0.6, c.w - textLeft - PAD - DOT_RADIUS * 2 - ROW_GAP, HEAD_SIZE * 1.3), ...dot];
+  });
+}
+
+const list = (x: Ctx): Item[] => [...panel(x), ...head(x, x.c.face.pills, 0), ...rows(x)];
+
+const doc = (x: Ctx): Item[] => [...panel(x), ...head(x, x.c.face.pills, 0), ...text(x, CardPart.Body, markdownText(x.c.face.text), BODY_SIZE, x.theme.ink, PAD, HEAD_H + ROW_GAP + PAD / 2, x.c.w - PAD * 2, x.c.h - HEAD_H - ROW_GAP - PAD * 1.5)];
 
 const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
   [Surface.Media]: (x) => [...panel(x), ...(x.c.face.media ? [image(x, CardPart.Media, x.c.face.media, whole(x.c), Fit.Contain)] : [])],
@@ -133,12 +113,23 @@ const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
   [Surface.Generate]: generate,
   [Surface.Text]: (x) => [...panel(x), ...body(x, x.c.face.text, PAD)],
   [Surface.Source]: source,
+  [Surface.Preview]: previewItems,
+  [Surface.Person]: personItems,
+  [Surface.Empty]: emptyItems,
+  [Surface.Pick]: batchItems,
+  [Surface.Embed]: embedItems,
+  [Surface.Select]: selectItems,
+  [Surface.Effects]: effectsItems,
+  [Surface.List]: list,
+  [Surface.Doc]: doc,
   [Surface.Blank]: (x) => panel(x)
 };
 
-const pictured = (x: Ctx, shot: string): Item[] => [...panel(x), { ...image(x, CardPart.Shot, { url: shot, video: false }, whole(x.c), Fit.Cover), clip: `${x.clip(CardPart.Shot)}:${shot}` }];
-
-export function cardItems(c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): Item[] {
-  const x: Ctx = { c, theme, glyphs, bold, clip: (p) => `${c.id}:${p}` };
-  return c.shot ? pictured(x, c.shot) : SURFACES[c.face.surface](x);
+export function cardItems(c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null): Item[] {
+  const x: Ctx = { c, theme, glyphs, bold, icons, clip: (p) => `${c.id}:${p}` };
+  const drawn = live(x);
+  if (drawn) {
+    return drawn;
+  }
+  return SURFACES[c.face.surface](x);
 }

@@ -69,7 +69,7 @@ test.describe('layer section @real', () => {
     await layer.locator('[data-segmented="Clip content"]').getByRole('radio', { name: 'Yes' }).click();
     await expect.poll(async () => clipOf(await head(admin, node.id), 'card')?.clipContent, { timeout: 10_000 }).toBe(true);
 
-    await layer.getByTestId('flip-horizontal').click();
+    await page.getByTestId('motion-inspector').getByTestId('flip-horizontal').click();
     await expect.poll(async () => clipOf(await head(admin, node.id), 'card')?.transform?.scaleX, { timeout: 10_000 }).toBe(-1);
 
     const smoothing = layer.locator('[data-prop="smoothing"] input');

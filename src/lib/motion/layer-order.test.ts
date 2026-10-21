@@ -63,3 +63,37 @@ describe('arranging layers inside a frame', () => {
     expect(arrangeLayers(twoTracks(), ['gone'], Arrange.Front, newId).ok).toBe(false);
   });
 });
+
+describe('arranging several layers together', () => {
+  const four = () => ['a', 'b', 'c', 'd'].reduce((d, id) => ok(addClip(d, shape, id)), newMotionDoc(MotionFormat.Landscape));
+  const arranged = (ids: string[], to: Arrange) => layerOrder(ok(arrangeLayers(four(), ids, to, newId)));
+
+  it('starts with the last added on top', () => {
+    expect(layerOrder(four())).toEqual(['d', 'c', 'b', 'a']);
+  });
+
+  it('brings a block to the front keeping its inner order, whatever the click order', () => {
+    expect(arranged(['a', 'c'], Arrange.Front)).toEqual(['c', 'a', 'd', 'b']);
+    expect(arranged(['c', 'a'], Arrange.Front)).toEqual(['c', 'a', 'd', 'b']);
+  });
+
+  it('sends a block to the back keeping its inner order', () => {
+    expect(arranged(['d', 'b'], Arrange.Back)).toEqual(['c', 'a', 'd', 'b']);
+    expect(arranged(['b', 'd'], Arrange.Back)).toEqual(['c', 'a', 'd', 'b']);
+  });
+
+  it('moves a block forward one step as a whole', () => {
+    expect(arranged(['a', 'b'], Arrange.Forward)).toEqual(['d', 'b', 'a', 'c']);
+    expect(arranged(['b', 'a'], Arrange.Forward)).toEqual(['d', 'b', 'a', 'c']);
+  });
+
+  it('moves a block backward one step as a whole', () => {
+    expect(arranged(['d', 'c'], Arrange.Backward)).toEqual(['b', 'd', 'c', 'a']);
+    expect(arranged(['c', 'd'], Arrange.Backward)).toEqual(['b', 'd', 'c', 'a']);
+  });
+
+  it('leaves a block already at the edge where it is', () => {
+    expect(arranged(['d', 'c'], Arrange.Forward)).toEqual(['d', 'c', 'b', 'a']);
+    expect(arranged(['b', 'a'], Arrange.Backward)).toEqual(['d', 'c', 'b', 'a']);
+  });
+});

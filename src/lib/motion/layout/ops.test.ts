@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, type OpResult } from '../timeline';
 import { Align, Direction, Sizing } from './auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from './model';
-import { addAutoLayout, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout } from './ops';
+import { addAutoLayout, leaveAutoLayout, reorderChild, removeAutoLayout, setAutoLayout, setLayoutItem, wrapInAutoLayout, wrapInFrame } from './ops';
 import { withAutoLayout } from './resolve';
 import { layerOrder } from '../siblings';
 
@@ -142,5 +142,39 @@ describe('addAutoLayout (⇧A)', () => {
     const { result, containerId } = addAutoLayout(plain, ['box'], newId);
     expect(containerId).toBe('box');
     expect(clip(must(result), 'box').autoLayout).toBeTruthy();
+  });
+});
+
+describe('wrapInFrame', () => {
+  const framed = must(wrapInFrame(row, ['a', 'b'], 'box', 'lane'));
+
+  it('parents the clips to a plain container that covers them', () => {
+    expect(['a', 'b'].map((id) => clip(framed, id).parent)).toEqual(['box', 'box']);
+    expect(clip(framed, 'box').autoLayout).toBeFalsy();
+  });
+
+  it('leaves the children where they were', () => {
+    expect(clip(framed, 'a').props.x).toBe(0.2);
+    expect(clip(framed, 'b').layoutItem).toBeFalsy();
+  });
+});
+
+describe('removeAutoLayout', () => {
+  const laid = must(wrapInAutoLayout(row, ['a', 'b'], 'box', 'lane'));
+  const removed = must(removeAutoLayout(laid, 'box'));
+
+  it('turns the container into a plain frame', () => {
+    expect(clip(removed, 'box').autoLayout).toBeFalsy();
+  });
+
+  it('keeps the children in place, with the boxes the layout gave them', () => {
+    const was = clip(withAutoLayout(laid), 'b').props;
+
+    expect(clip(removed, 'b').parent).toBe('box');
+    expect(clip(removed, 'b').props).toMatchObject({ x: was.x, y: was.y, width: was.width, height: was.height });
+  });
+
+  it('refuses a clip that is not an auto layout', () => {
+    expect(removeAutoLayout(row, 'a').ok).toBe(false);
   });
 });

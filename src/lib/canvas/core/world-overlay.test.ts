@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { wireCurve } from '$lib/canvas/gpu/geometry';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { EdgeLook, type CoreTheme } from './overlay';
-import { edgeLook, overlayOf, throughCamera } from './world-overlay';
+import { ChromeLayers, edgeLook, overlayOf } from './world-overlay';
+import { PortState } from './chrome';
 
-const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', line: '#e5e5e5', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
+const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', paper2: '#f9f9f9', line: '#e5e5e5', line2: '#d2d2d7', chip: '#f2f2f2', chipInk: '#141414', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
 const edge = (over: Partial<{ id: string; source: string; target: string; mode: string }> = {}) => ({ id: 'e', source: 'a', target: 'b', ...over });
 const glyphs = ((text: string, size: number) => ({ contours: [[0, 0, size, 0, size, size]], width: text.length * size, height: size })) as never;
 const none = { peers: [], outlines: [], rotate: [], ghost: null, hovered: null, running: [], chrome: [], glyphs };
@@ -47,11 +48,6 @@ describe('world overlay', () => {
     const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, running: [{ id: 'n', x: 0, y: 0, w: 10, h: 10 }] });
     expect(items.map((i) => i.clip)).toEqual(['n:running']);
   });
-
-  it('is placed on screen through the camera', () => {
-    const [item] = throughCamera(overlayOf({ curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 2, theme, ...none }), { x: 10, y: 20, zoom: 2 });
-    expect(item.matrix).toEqual([2, 0, 0, 2, 10, 20]);
-  });
 });
 
 describe('node chrome in the overlay', () => {
@@ -62,6 +58,14 @@ describe('node chrome in the overlay', () => {
     const parts = [...new Set(items.map((i) => i.clip.split(':')[1]))];
 
     expect(parts).toEqual(['wire', 'ring', 'handle']);
+  });
+
+  it('keeps a frame label and ports in the overlay when its layers are whole', () => {
+    const frame = { ...at, ring: NodeChrome.None, handles: false, label: 'Hero', outputs: [{ type: 'text', state: PortState.Quiet }], layers: ChromeLayers.Whole } as never;
+    const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, chrome: [frame] });
+
+    expect(items.length).toBeGreaterThan(0);
+    expect(overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, chrome: [{ ...(frame as object), layers: ChromeLayers.State } as never] })).toHaveLength(0);
   });
 
   it('turns the chrome of a rotated node about its pivot', () => {

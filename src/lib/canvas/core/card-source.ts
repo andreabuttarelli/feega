@@ -3,6 +3,7 @@ import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 import type { PortTile } from '$lib/canvas/gpu/geometry';
 import type { Box, FrameOnCanvas } from './canvas-scene';
 import { cardItems } from './cards';
+import type { CardIcons } from './card-kit';
 import { PortState, tileChrome, type Glyphs, type PortMark } from './chrome';
 import type { CoreTheme } from './overlay';
 
@@ -10,7 +11,6 @@ export type CardTile = {
   id: string;
   box: Box;
   face: CardFace;
-  shot: string | null;
   inputs: readonly PortMark[];
   outputs: readonly PortMark[];
   label: string | null;
@@ -21,12 +21,17 @@ export const CHROME_REACH = { top: 24, side: 96, bottom: 4 };
 
 export const ringColour = (t: Pick<CardTile, 'outputs'>, theme: Pick<CoreTheme, 'accent'>): string => (t.outputs.length ? CONNECTOR_STYLE[t.outputs[0].type].color : theme.accent);
 
-export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): FrameOnCanvas {
+export enum CardLayer {
+  Whole = 'whole',
+  Face = 'face'
+}
+
+export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null, layer = CardLayer.Whole): FrameOnCanvas {
   const [x, y] = [CHROME_REACH.side, CHROME_REACH.top];
   const w = t.box.w + 2 * CHROME_REACH.side;
   const h = t.box.h + CHROME_REACH.top + CHROME_REACH.bottom;
-  const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face, shot: t.shot }, theme, glyphs, bold);
-  const chrome = tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon }, glyphs);
+  const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face }, theme, glyphs, bold, icons);
+  const chrome = layer === CardLayer.Face ? [] : tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon }, glyphs);
   return {
     id: t.id,
     box: { x: t.box.x - x, y: t.box.y - y, w, h },
@@ -34,12 +39,12 @@ export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold
   };
 }
 
-export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): (t: CardTile) => FrameOnCanvas {
+export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null): (t: CardTile, layer?: CardLayer) => FrameOnCanvas {
   const drawn = new Map<string, { key: string; frame: FrameOnCanvas }>();
-  return (t) => {
-    const key = cardKey(t);
+  return (t, layer = CardLayer.Whole) => {
+    const key = `${layer}:${cardKey(t)}`;
     const hit = drawn.get(t.id);
-    const frame = hit?.key === key ? hit.frame : cardOnCanvas(t, theme, glyphs, bold);
+    const frame = hit?.key === key ? hit.frame : cardOnCanvas(t, theme, glyphs, bold, icons, layer);
     drawn.set(t.id, { key, frame });
     return { ...frame, box: { ...frame.box, x: t.box.x - CHROME_REACH.side, y: t.box.y - CHROME_REACH.top } };
   };
@@ -58,5 +63,5 @@ export function portMarks(t: PortTile): { inputs: PortMark[]; outputs: PortMark[
 }
 
 export function cardKey(t: CardTile): string {
-  return `${t.id}:${JSON.stringify([t.box.w, t.box.h, t.face, t.shot, t.inputs, t.outputs, t.label])}`;
+  return `${t.id}:${JSON.stringify([t.box.w, t.box.h, t.face, t.inputs, t.outputs, t.label])}`;
 }

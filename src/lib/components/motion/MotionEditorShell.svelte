@@ -2,6 +2,7 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { fitTexts, freeTextFit, resizedFreeText, type HostShare } from '$lib/motion/text-fit';
   import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
+  import { canEditPoints, enterPointEdit } from '$lib/motion/shape/vector-edit';
   import { toVector } from '$lib/motion/vector/ops';
   import { localStore } from '$lib/browser-storage';
   import { painted } from '$lib/canvas/paint-wait';
@@ -61,7 +62,7 @@
   import { SPRINGS } from '$lib/motion/spring';
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
-  import { addAutoLayout } from '$lib/motion/layout/ops';
+  import { addAutoLayout, removeAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
   import { releaseMasks, useAsMask } from '$lib/motion/mask-group';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
@@ -90,7 +91,6 @@
   import type { Boxes } from '$lib/motion/scene-select';
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
-  import ConstraintsSection from '$lib/components/motion/ConstraintsSection.svelte';
   import { ScaleMode, flipScale } from '$lib/motion/scale-tool';
   import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
   import { GridToggle, flipGrid } from '$lib/motion/pixel-grid';
@@ -103,6 +103,8 @@
   import { matchingLayers } from '$lib/motion/select-matching';
   import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
   import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
+  import { outlineTexts } from '$lib/motion/text-outline-run';
+  import { loadOutliner } from '$lib/motion/fonts/outliner';
   import { Copied, elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
@@ -147,7 +149,7 @@
   import {
     ClipEdge,
     Direction,
-    TOP_LEFT_ANCHOR,
+    TOP_LEFT_START,
     addClip,
     addTrack,
     adjacentKeyframe,
@@ -189,6 +191,8 @@
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { liveDocs } from '$lib/canvas/core/live-docs.svelte';
+  import { caretSource } from '$lib/canvas/core/text-caret';
   import { claimsWidth } from '$lib/canvas/claim-width';
   import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -368,7 +372,8 @@
             selection = ids;
             selectedPart = null;
           },
-          edit: (result, summary) => apply(result, summary)
+          edit: (result, summary) => apply(result, summary),
+          preview: (next) => (previewDoc = next)
         })
       : undefined
   );
@@ -422,10 +427,13 @@
     if (brief) {
       void sendBrief(url, brief);
     }
-    return watchMotionNode(supabase, data.node.id, (row) => {
-      if (headMoved(row, version)) {
-        void pullExternalEdit();
-      }
+    return watchMotionNode(supabase, data.node.id, {
+      onChange: (row) => {
+        if (headMoved(row, version)) {
+          void pullExternalEdit();
+        }
+      },
+      onResync: () => void pullExternalEdit()
     });
   });
   let body = $state<HTMLDivElement | null>(null);
@@ -532,6 +540,14 @@
   });
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
+  let vectorEdit = $state<string | null>(null);
+  const editingPoints = $derived(selected !== null && selected.id === vectorEdit && canEditPoints(selected));
+
+  $effect(() => {
+    if (vectorEdit !== null && selected?.id !== vectorEdit) {
+      vectorEdit = null;
+    }
+  });
   const view = $derived(propertiesFor({ count: selection.length, clip: selected?.id ?? null, part: selectedPart }));
   const agent = $derived(agentBusy || draft ? Agent.Working : Agent.Idle);
 
@@ -676,7 +692,22 @@
     live.edit(next, summary);
   }
 
+  const textCaret = caretSource(() => data.tokens, () => assetUrls);
+
+  let userEdited = $state(false);
+  let typingInCore = $state(false);
+
+  $effect(() => {
+    if (!userEdited || rules.stage !== Stage.Node) {
+      return;
+    }
+    liveDocs.set(data.node.id, { doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls });
+  });
+
+  $effect(() => () => liveDocs.clear(data.node.id));
+
   function recordEdit(next: MotionDoc, summary: string) {
+    userEdited = true;
     const now = Date.now();
     const root = mergeView(history.present, compPath, next);
     history = summary === lastEdit.summary && now - lastEdit.at < COALESCE_MS ? amend(history, root) : record(history, root);
@@ -685,6 +716,7 @@
   }
 
   const TEXT_FIT_SUMMARY = 'Fitted a text box to its words';
+  const HOST_FIT_QUIET_MS = 300;
 
   const hostDragged: HostDrag = (move, to, phase) => {
     onhostdrag?.(move, to, phase);
@@ -696,15 +728,18 @@
 
   $effect(() => {
     const boxes = stageBoxes;
-    if (playing || draft || untrack(() => preview?.isTextEditing())) {
+    if (!userEdited || playing || draft || typingInCore || untrack(() => preview?.isTextEditing())) {
       return;
     }
     if (onhostfit && (data.node.kind ?? FrameKind.Frame) === FrameKind.Element) {
-      const share = untrack(() => freeTextFit(doc, boxes));
-      if (share) {
-        setTimeout(() => onhostfit?.(share), 0);
-      }
-      return;
+      const measuredOn = untrack(() => ({ width: doc.width, height: doc.height }));
+      const timer = setTimeout(() => {
+        const share = untrack(() => (doc.width === measuredOn.width && doc.height === measuredOn.height ? freeTextFit(doc, boxes) : null));
+        if (share) {
+          onhostfit?.(share);
+        }
+      }, HOST_FIT_QUIET_MS);
+      return () => clearTimeout(timer);
     }
     const next = untrack(() => fitTexts(doc, boxes));
     if (next) {
@@ -722,6 +757,25 @@
     }
     notice = '';
     edit(result.doc, summary);
+  }
+
+  function enterVectorEdit() {
+    if (!selected || !canEditPoints(selected) || playing) {
+      return;
+    }
+    const entered = enterPointEdit(doc, selected);
+    if (!entered.ok) {
+      notice = entered.error;
+      return;
+    }
+    if (entered.doc !== doc) {
+      edit(entered.doc, 'Edited the shape as a path');
+    }
+    vectorEdit = selected.id;
+  }
+
+  async function outlineSelectedText() {
+    apply(await outlineTexts(doc, selection, loadOutliner, assetUrls), 'Outlined text');
   }
 
   function scheduleSave(summary: string) {
@@ -1169,6 +1223,7 @@
 
   async function drawn(id: string) {
     selection = [id];
+    vectorEdit = findClip(history.present, id)?.clip.props.shape === 'path' ? id : null;
     typeInto = findClip(history.present, id)?.clip.component === DRAWN_TEXT ? id : null;
     await painted(DRAWN_SETTLE_FRAMES);
     frameBar.tool = DrawTool.Select;
@@ -1183,7 +1238,7 @@
   function add(component: ComponentId) {
     adding = false;
     const id = newId();
-    apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame, transform: TOP_LEFT_ANCHOR }, id), `Added ${COMPONENTS[component].label}`);
+    apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame, ...TOP_LEFT_START }, id), `Added ${COMPONENTS[component].label}`);
     selection = [id];
   }
 
@@ -1230,8 +1285,30 @@
     selection = result.ok ? [...topClipIds(result.doc)].filter((id) => !before.has(id)) : selection;
   }
 
+  function frameSelection() {
+    if (!selection.length) {
+      return;
+    }
+    const container = newId();
+    const result = wrapInFrame(doc, selection, container, newId());
+    if (!result.ok) {
+      notice = result.error;
+      return;
+    }
+    edit(result.doc, 'Framed the selection');
+    selection = [container];
+  }
+
   function autoLayoutSelection() {
     if (!selection.length) {
+      return;
+    }
+    const lone = selection.length === 1 ? findClip(doc, selection[0])?.clip : null;
+    if (lone?.autoLayout) {
+      const removed = removeAutoLayout(doc, lone.id);
+      if (removed.ok) {
+        edit(removed.doc, 'Removed auto layout');
+      }
       return;
     }
     const { result, containerId } = addAutoLayout(doc, selection, newId);
@@ -1799,6 +1876,7 @@
     [Command.Precompose]: precomposeSelection,
     [Command.Group]: groupSelection,
     [Command.Ungroup]: ungroupSelection,
+    [Command.FrameSelection]: frameSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
     [Command.EditAsVector]: () => selected && apply(toVector(doc, selected.id), 'Made a vector'),
@@ -1812,6 +1890,7 @@
     [Command.Exclude]: () => combine(BooleanOp.Exclude),
     [Command.OutlineStroke]: () => apply(outlineStrokes(doc, selection, frame, newId), 'Outlined the stroke'),
     [Command.Flatten]: () => reshape(flattenShapes(doc, selection, frame), 'Flattened shapes'),
+    [Command.TextToPath]: () => void outlineSelectedText(),
     [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
     [Command.AlignLeft]: () => selection.length && alignTo(Edge.Left),
     [Command.AlignCenter]: () => selection.length && alignTo(Edge.Center),
@@ -1833,7 +1912,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.EditAsVector, Action.Union, Action.SelectMatching, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.Subtract, Action.Intersect, Action.Exclude, Action.OutlineStroke, Action.Flatten, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.EditAsVector, Action.Union, Action.SelectMatching, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.Subtract, Action.Intersect, Action.Exclude, Action.OutlineStroke, Action.Flatten, Action.TextToPath, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
@@ -1922,7 +2001,7 @@
   let caughtAt = $state<[number, number] | null>(null);
   let overlay = $state<ReturnType<typeof SelectionOverlay> | null>(null);
 
-  const inFrame = (asked: DrillAsk) => ({ at: asked.at ? ([asked.at.x * doc.width, asked.at.y * doc.height] as [number, number]) : null, gesture: asked.gesture, from: asked.from });
+  const inFrame = (asked: DrillAsk) => ({ at: asked.at ? ([asked.at.x * doc.width, asked.at.y * doc.height] as [number, number]) : null, gesture: asked.gesture, from: asked.from, drag: asked.drag })
 
   $effect(() => frameDrill.listen(data.node.id, (asked) => overlay?.drillAsked(inFrame(asked))));
 
@@ -2208,19 +2287,19 @@
   {/if}
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${rightBar.width}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && (!sideOpen || barSeat === BarSeat.InPlace)} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
-    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
+    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost} ondblclick={enterVectorEdit}>
       {#snippet player()}
-      <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} fullDoc={{ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls }} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
+      <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} fullDoc={{ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls }} background={doc.background} width={(previewDoc ?? doc).width} height={(previewDoc ?? doc).height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if outlineView === OutlineView.On}<OutlineOverlay doc={previewDoc ?? doc} {frame} boxes={spaceBoxes()} />{/if}
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
         {#if !playing}<PixelGridOverlay width={doc.width} height={doc.height} toggle={pixelGrid} />{/if}
         {#if guidesShown && doc.layoutGuides?.length && !playing}<LayoutGuidesOverlay {doc} />{/if}
-        {#if !playing}<SelectionOverlay bind:this={overlay} {scaleMode} layoutBounds={guidesShown ? guideSnapBounds(doc) : []} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost && onhostdrag ? hostDragged : null} onframemove={frameChrome(data.node.kind ?? FrameKind.Frame).press === FramePress.Move ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} {scaleMode} mode={editMode} layoutBounds={guidesShown ? guideSnapBounds(doc) : []} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} caret={textCaret} ontyping={(on) => (typingInCore = on)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost && onhostdrag ? hostDragged : null} onframemove={frameChrome(data.node.kind ?? FrameKind.Frame).press === FramePress.Move ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
         {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
-        {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
-        {#if selected?.component === 'Shape' && selected.props.shape === 'vector' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<VectorOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
+        {#if editingPoints && selected?.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} onexit={() => (vectorEdit = null)} />{/if}
+        {#if editingPoints && selected?.props.shape === 'vector' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<VectorOverlay {doc} clip={selected} {frame} onchange={edit} onexit={() => (vectorEdit = null)} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay doc={previewDoc ?? doc} {frame} clip={findClip(withAutoLayout(previewDoc ?? doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
         {#if selected?.autoLayout && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -2246,7 +2325,7 @@
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       {#if panelsDue}
-      {#if selection.length}<AlignBar count={selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
+      {#if selection.length > 1}<AlignBar count={selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector gesture={live} {doc} onchange={edit} />
@@ -2256,14 +2335,13 @@
         {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel gesture={live} {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
         {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack gesture={live} fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector gesture={live} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} fonts={fontLibrary} onopen={enterComp} />
-        {#if typeof selected.props.x === 'number' && !selected.parent}<ConstraintsSection {doc} clip={selected} onchange={apply} />{/if}
+        <MotionInspector gesture={live} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onalign={alignTo} onchange={edit} fonts={fontLibrary} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector gesture={live} {doc} onchange={edit} />{/if}
       {:else if view === PropertiesView.Multiple}
-        <MultiInspector {doc} ids={selection} {frame} mode={editMode} onchange={edit} />
+        <MultiInspector {doc} ids={selection} {frame} mode={editMode} boxes={spaceBoxes()} onchange={edit} />
       {:else}
         <header class="frame-head" data-testid="selection-head"><FamilyIcon /><span>Frame</span></header>
         <DocFields gesture={live} {doc} {assets} upload={uploadMedia} onchange={edit} />

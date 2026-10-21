@@ -88,7 +88,7 @@
 
   onMount(async () => {
     const theme = themeOf(reference);
-    const cards = PARITY_SAMPLES.map((s, i) => ({ id: `${i}`, name: s.name, kind: s.kind, ...placed(i), face: faceOf({ id: `${i}`, kind: s.kind }, s.data, (id) => id, s.thumbs ?? []) }));
+    const cards = PARITY_SAMPLES.map((s, i) => ({ id: `${i}`, name: s.name, kind: s.kind, ...placed(i), face: faceOf({ id: `${i}`, kind: s.kind }, s.data, (id) => id, s.view ?? null) }));
     const scene = await GpuScene.create(reference, Backend.WebGL, theme);
     const kinds = [...new Set(cards.map((c) => c.kind))];
     const icons = new Map(await Promise.all(kinds.map(async (k) => [k, iconContours(await iconNodes(NODE_KIND_ICON[k]), ICON_PX, ICON_STROKE)] as const)));

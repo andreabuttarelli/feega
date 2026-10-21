@@ -36,14 +36,16 @@ function lastVisualIndex(doc: MotionDoc): number {
   return doc.tracks.filter((t) => t.kind === TrackKind.Visual).length - 1;
 }
 
-type Step = (own: Isolated, newId: () => string) => OpResult | string;
+type Held = ReadonlySet<string>;
+
+type Step = (own: Isolated, newId: () => string, held: Held) => OpResult | string;
 
 function stepPast(offset: number, landing: number): Step {
-  return (own, newId) => {
+  return (own, newId, held) => {
     const order = layerOrder({ ...own.doc, tracks: own.doc.tracks.filter((t) => t.kind === TrackKind.Visual) });
     const clipId = own.doc.tracks.find((t) => t.id === own.trackId)!.clips[0].id;
     const neighbour = order[order.indexOf(clipId) + offset];
-    if (!neighbour) {
+    if (!neighbour || held.has(neighbour)) {
       return { ok: true, doc: own.doc };
     }
     const next = isolate(own.doc, neighbour, newId);
@@ -62,18 +64,31 @@ const STEPS: Record<Arrange, Step> = {
   [Arrange.Back]: (own) => moveTrack(own.doc, own.trackId, lastVisualIndex(own.doc))
 };
 
-const LAST_FIRST: ReadonlySet<Arrange> = new Set([Arrange.Front, Arrange.Forward]);
+enum Start {
+  Top = 'top',
+  Bottom = 'bottom'
+}
+
+const STARTS_AT: Record<Arrange, Start> = { [Arrange.Front]: Start.Bottom, [Arrange.Forward]: Start.Top, [Arrange.Backward]: Start.Bottom, [Arrange.Back]: Start.Top };
+
+function inMoveOrder(doc: MotionDoc, ids: readonly string[], to: Arrange): string[] {
+  const topFirst = layerOrder(doc);
+  const known = topFirst.filter((id) => ids.includes(id));
+  const unknown = ids.filter((id) => !topFirst.includes(id));
+  return STARTS_AT[to] === Start.Top ? [...known, ...unknown] : [...known].reverse().concat(unknown);
+}
 
 export function arrangeLayers(doc: MotionDoc, ids: readonly string[], to: Arrange, newId: () => string): OpResult {
   let next = doc;
-  const order = LAST_FIRST.has(to) ? [...ids].reverse() : ids;
+  const order = inMoveOrder(doc, ids, to);
+  const held = new Set(ids);
 
   for (const id of order) {
     const own = isolate(next, id, newId);
     if (typeof own === 'string') {
       return { ok: false, error: own };
     }
-    const moved = STEPS[to](own, newId);
+    const moved = STEPS[to](own, newId, held);
     if (typeof moved === 'string') {
       return { ok: false, error: moved };
     }

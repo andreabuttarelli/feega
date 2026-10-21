@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind, type DisplayList, type Item } from '$lib/motion/gpu-full/display-list';
 import { BlendMode } from '$lib/motion/blend';
-import { Stand, fillOrder, placeholder, standIn, withoutPictures, type Look } from './placeholders';
+import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from './placeholders';
 
 const LOOK: Look = { paper: '#ffffff', line: '#e5e5e5' };
 const box = (x: number) => ({ x, y: 0, w: 200, h: 100 });
@@ -51,5 +51,20 @@ describe('pictures not there', () => {
 
   it('keeps the pictures that loaded and blocks only the ones that failed', () => {
     expect(withoutPictures(listOf([picture('ok'), picture('gone')]), LOOK, (i) => i.clip === 'gone').items.map((i) => i.kind)).toEqual([ItemKind.Image, ItemKind.Path]);
+  });
+});
+
+describe('what is drawn while a better layer is not in the raster yet', () => {
+  const layer = (group: string) => ({ group });
+
+  it('draws the first layer already in the raster, so a node never vanishes while its real picture waits', () => {
+    const chain = [layer('real'), layer('blocks'), layer('placeholder')];
+    expect(firstDrawn(chain, new Set(['placeholder']))?.group).toBe('placeholder');
+    expect(firstDrawn(chain, new Set(['blocks', 'placeholder']))?.group).toBe('blocks');
+    expect(firstDrawn(chain, new Set(['real', 'blocks']))?.group).toBe('real');
+  });
+
+  it('draws nothing only when no layer is in the raster', () => {
+    expect(firstDrawn([layer('real')], new Set())).toBeNull();
   });
 });

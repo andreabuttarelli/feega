@@ -14,6 +14,7 @@
    */
   import { runStateOf, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
   import { shownIndex } from '$lib/canvas/gen-history';
+  import { PROMPT_PLACEHOLDER, RUN_LABEL, hasGenBody } from '$lib/canvas/gen-tile-view';
   import { loopCreditsOf, runQuoteOf } from '$lib/canvas/run-quote';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
@@ -158,23 +159,8 @@
   }
 
   const shownExample = $derived(node.refId ? null : example);
-  const hasBody = $derived(node.medium !== 'text' || state === 'running' || state === 'failed' || !!node.refId || !!shownExample);
+  const hasBody = $derived(hasGenBody(node.medium, state, node.refId, !!shownExample));
 
-  const PROMPT_PLACEHOLDER: Record<GenNode['medium'], string> = {
-    text: 'What should it be about…',
-    image: 'Describe what you want to see…',
-    video: 'Describe what you want to see…',
-    audio: 'Text to speak, or the music or sound to make…',
-    model3d: 'Connect an image, or describe the object…'
-  };
-
-  const LABEL: Record<string, string> = {
-    empty: 'Write what you want',
-    ready: 'Ready',
-    running: 'Sta lavorando…',
-    done: 'Done',
-    failed: 'Failed'
-  };
 
   /**
    * QUANTO È ALTO IL CONTENUTO VERO, per il nodo testo — `scrollHeight`, non i caratteri del
@@ -233,12 +219,12 @@
     <div class="gen-body">
       {#if state === 'running'}
         <div class="gen-busy">
-          <span class="gen-dots" aria-label={LABEL.running}><i></i><i></i><i></i></span>
+          <span class="gen-dots" aria-label={RUN_LABEL.running}><i></i><i></i><i></i></span>
           <button type="button" class="gen-unlock" onclick={() => onunlock?.()}>Sblocca</button>
         </div>
       {:else if state === 'failed'}
         <div class="gen-fail" role="alert">
-          <p class="gen-fail-title">{LABEL.failed}</p>
+          <p class="gen-fail-title">{RUN_LABEL.failed}</p>
           {#if node.error}
             <p class="gen-fail-why">{node.error}</p>
           {/if}
@@ -259,7 +245,7 @@
           {/if}
         </div>
       {:else}
-        <p class="gen-hint">{LABEL[state]}</p>
+        <p class="gen-hint">{RUN_LABEL[state]}</p>
       {/if}
     </div>
   {/if}

@@ -1,7 +1,7 @@
 import { ImageSource, Texture } from 'pixi8';
 import { createLru } from './lru';
 import { Counter, count, reportPending } from './frame-stats';
-import { BUDGET, decodeSize, type Device } from './memory-budget';
+import { BUDGET, snapshotSize, type Device } from './memory-budget';
 import type { UploadQueue } from './upload-queue';
 import { bytesOf } from './texture-bytes';
 
@@ -14,7 +14,7 @@ export type TextureCache = {
 type Hooks = { changed: () => void; device: Device; pinned: (url: string) => boolean; evicted: (url: string) => void; decode: (url: string, edge: number) => Promise<ImageBitmap>; queue: UploadQueue; upload: (tex: Texture) => void };
 
 export async function fitBitmap(full: ImageBitmap, device: Device): Promise<ImageBitmap> {
-  const size = decodeSize(full.width, full.height, device);
+  const size = snapshotSize(full.width, full.height, device);
   if (size.width === full.width && size.height === full.height) {
     return full;
   }

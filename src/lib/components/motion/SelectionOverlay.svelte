@@ -3,6 +3,10 @@
   import { textTarget } from '$lib/motion/hyperframes/text-edit';
   import { clipChrome } from '$lib/canvas/selection-chrome';
   import { onMount, untrack } from 'svelte';
+  import CoreTextEdit from '$lib/components/motion/CoreTextEdit.svelte';
+  import type { CaretSource } from '$lib/canvas/core/text-caret';
+  import type { TextCaret } from '$lib/motion/gpu-full/display-list';
+  import { laidAsTyped } from '$lib/motion/gpu-full/text/caret';
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import { DragPhase, isOutside, type ElementOut, type HostDrag, type HostMove, hostShift, hostTurn } from '$lib/canvas/canvas-drop';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
@@ -16,8 +20,15 @@
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
+  import type { HeldPointer } from '$lib/canvas/frame-drill';
   import { Depth, FramePress, Gesture, Press, Under, drill, levelOf, pressOf, type Level, type Probe } from '$lib/motion/drill';
+  import type { OpResult } from '$lib/motion/timeline';
+  import { EditMode } from '$lib/motion/edit-mode';
+  import { resizeFactors, rotateAround, scaleAroundXY, snappedHandle, turnedBy } from '$lib/motion/group-transform';
+  import { groupMove, rectOf, swept, toggled, unionBounds } from '$lib/motion/multi-select';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Bounds, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
+
+  type Asked = { at: Pt | null; gesture: Gesture; from: Depth; drag?: HeldPointer };
 
   let {
     doc,
@@ -39,8 +50,11 @@
     onframemove = null,
     onmenu = null,
     edittext = null,
+    caret = null,
+    ontyping = () => {},
     layoutBounds = [],
-    scaleMode = ScaleMode.Resize
+    scaleMode = ScaleMode.Resize,
+    mode = EditMode.Motion
   }: {
     doc: MotionDoc;
     frame: number;
@@ -50,7 +64,7 @@
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
     pickAt?: Pt | null;
-    ask?: () => { at: Pt | null; gesture: Gesture; from: Depth } | null;
+    ask?: () => Asked | null;
     part?: string | null;
     onparts?: (parts: Record<string, string[]>) => void;
     onboxes?: (boxes: Boxes) => void;
@@ -61,7 +75,10 @@
     onframemove?: HostDrag | null;
     onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
     edittext?: ((selector: string, at: { x: number; y: number } | null, oninput: (text: string) => void) => Promise<string | null>) | null;
+    caret?: CaretSource | null;
+    ontyping?: (typing: boolean) => void;
     scaleMode?: ScaleMode;
+    mode?: EditMode;
     layoutBounds?: Bounds[];
   } = $props();
 
@@ -73,6 +90,10 @@
   const SETTLE_MS = 300;
   const EMPTY_RETRIES = 20;
   const ROTATE_REACH_PX = 44;
+  const ROTATE_STEP_DEG = 15;
+  const SIDE_UNIT = 0.5;
+  const CORE_DRAWN_ATTRIBUTE = 'data-core-drawn';
+  const CORE_SURFACE = '[data-canvas-surface][data-renderer="core"]';
 
   const SUMMARY: Record<Grip, string> = {
     [Grip.Move]: 'Moved in the preview',
@@ -82,7 +103,8 @@
   };
 
   const chrome = $derived(clipChrome(part));
-  type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; start: ClientPt; pointer: number; whole: boolean; travelled: boolean };
+  type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; start: ClientPt; pointer: number; whole: boolean; travelled: boolean; group?: string[] };
+  type Sweep = { from: Pt; to: Pt; base: string[]; start: ClientPt; moved: boolean };
   const FRAME_SLOP_PX = 4;
   const framePress = $derived(onframemove ? FramePress.Move : FramePress.Pick);
   type ClientPt = { x: number; y: number };
@@ -91,6 +113,7 @@
   let boxes = $state<Boxes>(untrack(() => guessedBoxes(withAutoLayout(doc))));
   let hover = $state<string | null>(null);
   let grab = $state<Grab | null>(null);
+  let sweep = $state<Sweep | null>(null);
   let live = $state<{ doc: MotionDoc; patch: Transform; guides: Guide[]; gaps: Gap[] } | null>(null);
 
   const laid = $derived(withAutoLayout(doc));
@@ -99,6 +122,10 @@
   const clip = $derived<MotionClip | null>(selected ? (findClip(shown, selected)?.clip ?? null) : null);
   const onFrame = (c: MotionClip) => frame >= c.from && frame < c.from + c.durationInFrames;
   const quad = $derived(clip && boxes[clip.id] && onFrame(clip) ? quadOf(shown, clip.id, frame, boxes[clip.id]) : null);
+  const members = $derived(selection.length > 1 ? selection.filter((id) => boxes[id] && findClip(shown, id) && onFrame(findClip(shown, id)!.clip)) : []);
+  const memberQuads = $derived(members.map((id) => quadOf(shown, id, frame, boxes[id])));
+  const groupBounds = $derived(memberQuads.length > 1 ? unionBounds(memberQuads.map(aabb)) : null);
+  const sweepBounds = $derived(sweep?.moved ? rectOf(sweep.from, sweep.to) : null);
   const hoverQuad = $derived(hover && hover !== selected && !hover.includes(PART_SEP) && boxes[hover] ? quadOf(shown, hover, frame, boxes[hover]) : null);
   const hoverPart = $derived(hover && hover.includes(PART_SEP) && hover !== `${selected}${PART_SEP}${part}` ? (boxes[hover] ?? null) : null);
   const anchor = $derived(quad && clip ? anchorOf(shown, clip.id, frame) : null);
@@ -211,6 +238,9 @@
   });
 
   function double(e: MouseEvent) {
+    if (core) {
+      return;
+    }
     const [x, y] = local(e as PointerEvent);
     editAt = { x: x / doc.width, y: y / doc.height };
     step(Gesture.Double, local(e as PointerEvent), froms[0] ?? level());
@@ -230,6 +260,64 @@
       return;
     }
     const clipId = clip.id;
+    if (caret && host?.ownerDocument.querySelector(CORE_SURFACE) && target === CLIP_TEXT) {
+      void openCore(clipId, target, text, point).then((opened) => {
+        if (!opened) {
+          domEdit(clipId, target, text, point);
+        }
+      });
+      return;
+    }
+    domEdit(clipId, target, text, point);
+  }
+
+  type CoreEdit = { clipId: string; part: string; text: string; first: TextCaret; at: Pt | null };
+
+  let core = $state<CoreEdit | null>(null);
+  let coreEditor = $state<ReturnType<typeof CoreTextEdit> | null>(null);
+
+  async function openCore(clipId: string, part: string, text: string, point: { x: number; y: number } | null): Promise<boolean> {
+    const first = await caret!(doc, clipId);
+    if (!first || !laidAsTyped(text, first.text, first.paragraphs, first.flow)) {
+      return false;
+    }
+    core = { clipId, part, text, first, at: point ? [point.x * doc.width, point.y * doc.height] : null };
+    ontyping(true);
+    return true;
+  }
+
+  $effect(() => {
+    const stage = host?.parentElement;
+    if (!stage || inPlace || !host?.ownerDocument.querySelector(CORE_SURFACE)) {
+      return;
+    }
+    stage.setAttribute(CORE_DRAWN_ATTRIBUTE, '');
+    return () => stage.removeAttribute(CORE_DRAWN_ATTRIBUTE);
+  });
+
+  function writeCore(at: CoreEdit, typed: string) {
+    const result = writePartText(doc, at.clipId, at.part, typed);
+    if (result.ok) {
+      onchange(result.doc, 'Edited text on the canvas');
+    }
+  }
+
+  function typeCore(typed: string) {
+    if (core) {
+      writeCore(core, typed);
+    }
+  }
+
+  function endCore(typed: string | null) {
+    const was = core;
+    core = null;
+    ontyping(false);
+    if (was && typed !== null) {
+      writeCore(was, typed);
+    }
+  }
+
+  function domEdit(clipId: string, target: string, text: string, point: { x: number; y: number } | null) {
     const turn = ++editTurn;
     inPlace = true;
     const typedInto = (typed: string) => {
@@ -242,7 +330,10 @@
       }
     };
     typing = null;
-    void edittext(textTarget(clipId, target), point, (typed) => (typing = () => typedInto(typed))).then((typed) => {
+    void edittext!(textTarget(clipId, target), point, (typed) => {
+      typing = () => typedInto(typed);
+      void remeasure();
+    }).then((typed) => {
       typing = null;
       if (turn === editTurn) {
         inPlace = false;
@@ -261,7 +352,11 @@
     pending?.();
   }
 
-  onMount(() => flushTyping);
+  onMount(() => {
+    return () => {
+        flushTyping();
+    };
+  });
 
   function commitPart(text: string) {
     const was = editing;
@@ -345,9 +440,20 @@
     editPart({ depth: Depth.Clip, clip: clipId, part: null });
   }
 
-  export function drillAsked(asked: { at: Pt | null; gesture: Gesture; from: Depth }) {
+  function carryHeldPress(held: HeldPointer, landed: Level) {
+    if (landed.depth !== Depth.Clip || !landed.clip) {
+      return;
+    }
+    host!.setPointerCapture(held.pointer);
+    grab = { grip: Grip.Move, handle: 0, clipId: landed.clip, from: localAt(held.client), start: held.client, pointer: held.pointer, whole: false, travelled: false };
+  }
+
+  export function drillAsked(asked: Asked) {
     editAt = asked.at ? { x: asked.at[0] / doc.width, y: asked.at[1] / doc.height } : null;
-    step(asked.gesture, asked.at, { depth: asked.from, clip: null, part: null });
+    const landed = step(asked.gesture, asked.at, { depth: asked.from, clip: null, part: null });
+    if (asked.drag) {
+      carryHeldPress(asked.drag, landed);
+    }
   }
 
   function pickPending() {
@@ -381,10 +487,12 @@
 
   const client = (e: PointerEvent): ClientPt => ({ x: e.clientX, y: e.clientY });
 
-  function local(e: PointerEvent): Pt {
+  function localAt(at: ClientPt): Pt {
     const rect = host!.getBoundingClientRect();
-    return [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
+    return [((at.x - rect.left) / rect.width) * doc.width, ((at.y - rect.top) / rect.height) * doc.height];
   }
+
+  const local = (e: PointerEvent): Pt => localAt(client(e));
 
   function snapReach(): number {
     const rect = host!.getBoundingClientRect();
@@ -401,15 +509,42 @@
     grab = { grip, handle, clipId, from: local(e), start: client(e), pointer: e.pointerId, whole: false, travelled: false };
   }
 
+  function beginGroup(e: PointerEvent, grip: Grip, handle: number) {
+    e.stopPropagation();
+    host!.setPointerCapture(e.pointerId);
+    grab = { grip, handle, clipId: '', from: local(e), start: client(e), pointer: e.pointerId, whole: false, travelled: false, group: [...members] };
+  }
+
   let lastPress: Pt | null = null;
 
   function press(e: PointerEvent) {
     menu = null;
+    if (coreEditor?.down(e, local(e))) {
+      host!.setPointerCapture(e.pointerId);
+      return;
+    }
     const p = local(e);
     const from = level();
     froms = [froms.at(-1) ?? from, from];
-    const under = liveStack(p).length ? Under.Child : Under.Bare;
-    if (pressOf(from.depth, framePress, under) === Press.MoveFrame) {
+    const stack = liveStack(p);
+    if (e.shiftKey && stack[0]) {
+      part = null;
+      onselect(toggled(selection, stack[0]));
+      return;
+    }
+    if (members.length > 1 && members.includes(stack[0])) {
+      host!.setPointerCapture(e.pointerId);
+      grab = { grip: Grip.Move, handle: 0, clipId: stack[0], from: p, start: client(e), pointer: e.pointerId, whole: false, travelled: false, group: [...members] };
+      return;
+    }
+    const under = stack.length ? Under.Child : liveStack(null).length ? Under.Bare : Under.Empty;
+    const response = pressOf(from.depth, framePress, under);
+    if (response === Press.Marquee) {
+      host!.setPointerCapture(e.pointerId);
+      sweep = { from: p, to: p, base: e.shiftKey ? [...selection] : [], start: client(e), moved: false };
+      return;
+    }
+    if (response === Press.MoveFrame) {
       host!.setPointerCapture(e.pointerId);
       grab = { grip: Grip.Move, handle: 0, clipId: '', from: p, start: client(e), pointer: e.pointerId, whole: true, travelled: false };
       return;
@@ -431,9 +566,11 @@
     return target.part ? `${target.clip}${PART_SEP}${target.part}` : target.clip;
   }
 
-  function others(clipId: string) {
+  const others = (clipId: string) => othersThan([clipId]);
+
+  function othersThan(ids: readonly string[]) {
     return Object.keys(boxes)
-      .filter((id) => id !== clipId && findClip(doc, id) && onFrame(findClip(doc, id)!.clip))
+      .filter((id) => !ids.includes(id) && findClip(doc, id) && onFrame(findClip(doc, id)!.clip))
       .map((id) => aabb(quadOf(laid, id, frame, boxes[id])));
   }
 
@@ -462,9 +599,80 @@
     }
   }
 
+  function sweepTo(e: PointerEvent) {
+    if (!sweep) {
+      return;
+    }
+    const to = client(e);
+    sweep.moved ||= Math.hypot(to.x - sweep.start.x, to.y - sweep.start.y) >= FRAME_SLOP_PX;
+    sweep.to = local(e);
+    if (!sweep.moved) {
+      return;
+    }
+    const hits = swept(Object.fromEntries(Object.keys(boxes).filter((id) => findClip(laid, id) && onFrame(findClip(laid, id)!.clip)).map((id) => [id, aabb(quadOf(laid, id, frame, boxes[id]))])), rectOf(sweep.from, sweep.to), sweep.base);
+    if (hits.join() !== selection.join()) {
+      part = null;
+      onselect(hits);
+    }
+  }
+
+  const centreOf = (b: Bounds): Pt => [(b.left + b.right) / 2, (b.top + b.bottom) / 2];
+
+  function groupTransform(g: Grab & { group: string[] }, box: Bounds, e: PointerEvent): { result: OpResult; guides: Guide[] } {
+    const corners = handlesOf(boundsQuad(box));
+    const at = local(e);
+    if (g.grip === Grip.Rotate) {
+      const turn = turnedBy(centreOf(box), g.from, at);
+      return { result: rotateAround(laid, g.group, frame, centreOf(box), e.shiftKey ? Math.round(turn / ROTATE_STEP_DEG) * ROTATE_STEP_DEG : turn, mode), guides: [] };
+    }
+    const { unit, at: handleAt } = corners[g.handle];
+    const dragged: Pt = [handleAt[0] + at[0] - g.from[0], handleAt[1] + at[1] - g.from[1]];
+    const snapped = snappedHandle(dragged, [unit[0] !== SIDE_UNIT, unit[1] !== SIDE_UNIT], [...othersThan(g.group), ...layoutBounds], { width: doc.width, height: doc.height }, snapReach());
+    const { anchor, fx, fy } = resizeFactors(box, unit, snapped.point, e.shiftKey, e.altKey);
+    return { result: scaleAroundXY(laid, g.group, frame, anchor, fx, fy, mode), guides: snapped.guides };
+  }
+
+  const axisLocked = ([dx, dy]: Pt): Pt => (Math.abs(dx) >= Math.abs(dy) ? [dx, 0] : [0, dy]);
+
+  function moveGroup(g: Grab & { group: string[] }, e: PointerEvent) {
+    const to = client(e);
+    g.travelled ||= Math.hypot(to.x - g.start.x, to.y - g.start.y) >= FRAME_SLOP_PX;
+    if (!g.travelled) {
+      return;
+    }
+    const at = local(e);
+    const box = unionBounds(g.group.map((id) => aabb(quadOf(laid, id, frame, boxes[id]))));
+    if (g.grip !== Grip.Move) {
+      const turned = groupTransform(g, box, e);
+      if (turned.result.ok) {
+        live = { doc: turned.result.doc, patch: {}, guides: turned.guides, gaps: [] };
+        onpreview(turned.result.doc);
+      }
+      return;
+    }
+    const { result, guides } = groupMove({ doc: laid, ids: g.group, frame, mode, offset: e.shiftKey ? axisLocked([at[0] - g.from[0], at[1] - g.from[1]]) : [at[0] - g.from[0], at[1] - g.from[1]], box, others: [...othersThan(g.group), ...layoutBounds], size: { width: doc.width, height: doc.height }, reach: snapReach() });
+    if (!result.ok) {
+      return;
+    }
+    live = { doc: result.doc, patch: {}, guides, gaps: [] };
+    onpreview(result.doc);
+  }
+
   function move(e: PointerEvent) {
+    if (coreEditor?.active()) {
+      coreEditor.drag(local(e));
+      return;
+    }
+    if (sweep) {
+      sweepTo(e);
+      return;
+    }
     if (!grab) {
       hoverFrom(e);
+      return;
+    }
+    if (grab.group) {
+      moveGroup({ ...grab, group: grab.group }, e);
       return;
     }
     const hosted = hostGesture(grab, e);
@@ -521,11 +729,27 @@
 
   const baking = (grip: Grip) => grip === Grip.Scale && scaleMode === ScaleMode.Scale;
 
+  function endSweep() {
+    const done = sweep;
+    sweep = null;
+    if (done && !done.moved && !done.base.length) {
+      land(levelOf({ open: true, clip: null, part: null }));
+    }
+  }
+
   function end(e: PointerEvent | null) {
+    if (coreEditor?.release()) {
+      return;
+    }
+    if (sweep) {
+      endSweep();
+      return;
+    }
     const done = live;
     const grip = grab?.grip;
     const clipId = grab?.clipId;
     const hosting = hostGesture(grab, e);
+    const groupGrab = grab?.group ? grab : null;
     const stillOnBare = !!grab?.whole && !grab.travelled;
     const reordered = done && grip === Grip.Move && grab && e ? reorderAt(doc, grab.clipId, local(e)) : null;
     const outside = grab && e ? leaving(e) : null;
@@ -533,6 +757,14 @@
     grab = null;
     live = null;
     onpreview(null);
+    if (groupGrab) {
+      if (!groupGrab.travelled && groupGrab.grip === Grip.Move) {
+        onselect([groupGrab.clipId]);
+      } else if (done) {
+        onchange(done.doc, `${SUMMARY[groupGrab.grip]} (${groupGrab.group!.length} layers)`);
+      }
+      return;
+    }
     if (stillOnBare) {
       land(levelOf({ open: true, clip: null, part: null }));
       return;
@@ -562,6 +794,12 @@
   }
 
   const pct = ([x, y]: Pt) => `left: ${(x / doc.width) * 100}%; top: ${(y / doc.height) * 100}%;`;
+  const boundsQuad = (b: Bounds): Quad => [
+    [b.left, b.top],
+    [b.right, b.top],
+    [b.right, b.bottom],
+    [b.left, b.bottom]
+  ];
   const points = (q: Quad) => q.map((p) => p.join(',')).join(' ');
 
   function outward(q: Quad, corner: Pt): string {
@@ -578,6 +816,9 @@
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} data-testid="hover-box" />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
+    {#each memberQuads as q, i (members[i])}<polygon class="box member" points={points(q)} data-testid="member-box" />{/each}
+    {#if groupBounds}<polygon class="box group" points={points(boundsQuad(groupBounds))} data-testid="group-box" />{/if}
+    {#if sweepBounds}<polygon class="sweep" points={points(boundsQuad(sweepBounds))} data-testid="marquee" />{/if}
     {#if quad}<polygon class="box" class:passive={!chrome.handles} points={points(quad)} data-testid="selection-box" data-ring={chrome.ring} />{/if}
     {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
       {#if g.axis === 'x'}<line class="gap" x1={g.from} y1={g.at} x2={g.to} y2={g.at} />{:else}<line class="gap" x1={g.at} y1={g.from} x2={g.at} y2={g.to} />{/if}
@@ -600,6 +841,17 @@
   {/if}
   {#if outlinedPart}
     <div class="outlined-part" data-testid="layer-hover-part" style={boxStyle(outlinedPart)}></div>
+  {/if}
+  {#if groupBounds}
+    {@const groupQuad = boundsQuad(groupBounds)}
+    {@const all = handlesOf(groupQuad)}
+    {@const corners = all.slice(0, 4)}
+    {#each corners as h, i (i)}
+      <button type="button" class="target rotate" aria-label="Rotate selection" style={outward(groupQuad, h.at)} onpointerdown={(e) => beginGroup(e, Grip.Rotate, i)}></button>
+    {/each}
+    {#each all as h, i (i)}
+      <button type="button" class="target scale" aria-label="Scale selection" data-handle={i} style={pct(h.at)} onpointerdown={(e) => beginGroup(e, Grip.Scale, i)}><span></span></button>
+    {/each}
   {/if}
   {#if quad && clip}
     {@const handles = chrome.handles ? handlesOf(quad) : []}
@@ -648,9 +900,16 @@
     {/if}
     {#if live}<output class="readout">{readout(clip.component as ComponentId, live.patch, doc)}</output>{/if}
   {/if}
+  {#if core && caret}
+    <CoreTextEdit bind:this={coreEditor} {doc} clipId={core.clipId} text={core.text} first={core.first} {caret} at={core.at} ontype={typeCore} onend={endCore} />
+  {/if}
 </div>
 
 <style>
+  :global([data-core-drawn] > .host) {
+    visibility: hidden;
+  }
+
   .overlay.typing {
     pointer-events: none;
   }
@@ -681,6 +940,18 @@
   .box {
     stroke: var(--ui-accent);
     stroke-width: 1.5px;
+  }
+
+  .box.member {
+    stroke-width: 1px;
+    opacity: 0.7;
+  }
+
+  .sweep {
+    fill: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+    stroke: var(--ui-accent);
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
   }
 
   .box.passive {

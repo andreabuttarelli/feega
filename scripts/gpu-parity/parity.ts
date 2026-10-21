@@ -20,7 +20,8 @@ import type { ExportInput, ExportResult, PreviewInput, PreviewResult, ShotsInput
 enum Mode {
   Parity = 'parity',
   Export = 'export',
-  Preview = 'preview'
+  Preview = 'preview',
+  Scrub = 'scrub'
 }
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -215,6 +216,19 @@ if (mode === Mode.Preview) {
   const table = `| doc | engine | frames | rAF p50 ms | rAF p95 ms | dropped (>18.7ms) | work p50 ms | work p95 ms |\n|---|---|---|---|---|---|---|---|\n${row('html', today)}\n${row('gpu', gpu)}\n`;
   writeFileSync(join(dir, 'preview.md'), table);
   console.log(table);
+}
+
+if (mode === Mode.Scrub) {
+  page.on('console', (m) => (m.text().startsWith('phases') ? console.log(m.text()) : undefined));
+  const throttle = Number(flags.get('throttle') ?? 1);
+  if (throttle > 1) {
+    await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
+  }
+  const input: PreviewInput = { html, spec, seconds, warmMs: 2000, preference };
+  const today = await call<PreviewInput, PreviewResult>('htmlScrub', input);
+  const core = await call<PreviewInput, PreviewResult>('coreScrub', input);
+  const row = (label: string, r: PreviewResult) => `| ${name} | ${label} | ${r.frames} | ${r.p50.toFixed(1)} | ${r.p95.toFixed(1)} | ${r.dropped} (worst ${r.worst.toFixed(0)} ms) | ${r.workP50.toFixed(1)} | ${r.workP95.toFixed(1)} |`;
+  console.log(`| doc | engine | rAF frames | rAF p50 ms | rAF p95 ms | dropped (>18.7ms) | work p50 ms | work p95 ms |\n|---|---|---|---|---|---|---|---|\n${row('html', today)}\n${row('gpu-core', core)}\n`);
 }
 
 await browser.close();

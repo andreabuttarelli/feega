@@ -5,6 +5,8 @@ import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
 import { setNetwork, toVector } from '$lib/motion/vector/ops';
+import { PointOp, editPathPoints } from '$lib/motion/shape/point-ops';
+import { Handle } from '$lib/motion/shape/pen';
 import { networkSchema } from '$lib/motion/vector/model';
 import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
@@ -39,16 +41,19 @@ import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
-import { ClipEdge, Side, TOP_LEFT_ANCHOR, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, TOP_LEFT_START, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
+import { aabb, quadOf } from '$lib/motion/scene-select';
+import { rotateAround, scaleAroundXY } from '$lib/motion/group-transform';
+import { unionBounds } from '$lib/motion/multi-select';
 import { AXES, EDGES, alignSpace, distributeSpace, moveBy, tidySpace, propBoxes, type Axis, type Edge } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import type { Pt } from '$lib/motion/scene-select';
 import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '$lib/motion/organize';
 
-const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) => `distribute_${a}` as const), 'tidy', 'move', 'scale'] as const;
+const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) => `distribute_${a}` as const), 'tidy', 'move', 'scale', 'scale_group', 'rotate_group'] as const;
 
 const OUTLINE_STROKE = 'outline_stroke';
 const FLATTEN = 'flatten';
@@ -56,7 +61,7 @@ const SHAPE_OPS = [BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, Boo
 
 type ShapeOp = (doc: MotionDoc, ids: string[], frame: number) => OpResult;
 
-type SpaceInput = { doc: MotionDoc; ids: string[]; frame: number; by: Pt; mode: EditMode; factor: number | undefined };
+type SpaceInput = { doc: MotionDoc; ids: string[]; frame: number; by: Pt; mode: EditMode; factor: number | undefined; factorY: number | undefined; degrees: number | undefined };
 
 function scaledFromCorner(i: SpaceInput): OpResult {
   if (i.factor === undefined) {
@@ -71,12 +76,32 @@ function scaledFromCorner(i: SpaceInput): OpResult {
   return scaleClips(i.doc, i.ids, i.factor, corner);
 }
 
+function jointCentre(i: SpaceInput): Pt | string {
+  const boxes = propBoxes(i.doc);
+  const missing = i.ids.find((id) => !boxes[id] || !findClip(i.doc, id));
+  if (missing) {
+    return `no clip ${missing}`;
+  }
+  const around = unionBounds(i.ids.map((id) => aabb(quadOf(i.doc, id, i.frame, boxes[id]))));
+  return [(around.left + around.right) / 2, (around.top + around.bottom) / 2];
+}
+
+function aroundJoint(i: SpaceInput, missing: string | undefined, run: (centre: Pt) => OpResult): OpResult {
+  if (missing) {
+    return { ok: false, error: missing };
+  }
+  const centre = jointCentre(i);
+  return typeof centre === 'string' ? { ok: false, error: centre } : run(centre);
+}
+
 const SPACE: Record<(typeof SPACE_OPS)[number], (i: SpaceInput) => OpResult> = {
   ...(Object.fromEntries(EDGES.map((edge) => [`align_${edge}`, (i: SpaceInput) => alignSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), edge, i.mode)])) as Record<`align_${Edge}`, (i: SpaceInput) => OpResult>),
   ...(Object.fromEntries(AXES.map((axis) => [`distribute_${axis}`, (i: SpaceInput) => distributeSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), axis, i.mode)])) as Record<`distribute_${Axis}`, (i: SpaceInput) => OpResult>),
   tidy: (i) => tidySpace(i.doc, i.ids, i.frame, propBoxes(i.doc), i.mode),
   move: (i) => moveBy(i.doc, i.ids, i.frame, i.by, i.mode),
-  scale: scaledFromCorner
+  scale: scaledFromCorner,
+  scale_group: (i) => aroundJoint(i, i.factor === undefined ? 'scale_group needs a factor' : undefined, (centre) => scaleAroundXY(i.doc, i.ids, i.frame, centre, i.factor!, i.factorY ?? i.factor!, i.mode)),
+  rotate_group: (i) => aroundJoint(i, i.degrees === undefined ? 'rotate_group needs degrees' : undefined, (centre) => rotateAround(i.doc, i.ids, i.frame, centre, i.degrees!, i.mode))
 };
 
 const ARRANGE_OPS = ['nudge', 'sequence', 'stagger', 'align_start', 'align_end', 'distribute'] as const;
@@ -130,7 +155,7 @@ import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCamer
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
-import { leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout } from '$lib/motion/layout/ops';
+import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '$lib/motion/layout/model';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
@@ -196,7 +221,10 @@ import { liftElement, type Element } from '$lib/motion/move-element';
 import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
 import type { BreakdownAnswer } from '$lib/server/video-reference';
-import { guessedAdvance, measureText, type Advance, type TextLook } from '$lib/motion/text-measure';
+import { guessedAdvance, measureText, type Advance } from '$lib/motion/text-measure';
+import { textLook } from '$lib/motion/text-look';
+import { loadOutliner } from '$lib/motion/fonts/outliner';
+import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
 import { isText } from '$lib/motion/layout/text-extent';
 import { outlineUrl } from '$lib/motion/fonts/outline';
 import { pivotBox } from '$lib/motion/parent';
@@ -229,6 +257,7 @@ export type MotionToolDeps = {
   sfx?: (sfx: Sfx) => Promise<SfxAsset>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   fontAdvance?: (fontUrl: string) => Promise<Advance | null>;
+  fontOutliner?: OutlinerLoader;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
   seam?: () => Promise<number | null>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
@@ -477,21 +506,6 @@ const PLACED = { track_id: z.string().optional() };
 const PLACED_PICTURE = { ...PLACED, effects: z.array(effectSpec).max(MAX_EFFECTS).optional() };
 
 const REGULAR_WEIGHT = 400;
-
-const WRAPS: Partial<Record<ComponentId, (p: Record<string, unknown>) => boolean>> = { Text: (p) => p.sizing !== 'auto' };
-const CAPITALS: Partial<Record<ComponentId, true>> = { Kicker: true };
-
-function textLook(component: ComponentId, p: Record<string, unknown>): TextLook {
-  return {
-    text: String(p.text ?? ''),
-    size: Number(p.size ?? 0),
-    tracking: Number(p.tracking ?? 0),
-    leading: Number(p.leading ?? 1),
-    align: (p.align as TextLook['align']) ?? 'left',
-    wraps: WRAPS[component]?.(p) ?? true,
-    capitals: Boolean(CAPITALS[component]) || p.textCase === 'upper'
-  };
-}
 
 const PLACEMENT_HELP = 'track_id puts it on that track (else the first that fits); effects is its effect stack, same kinds and params as add_effect.';
 
@@ -914,7 +928,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const result = addClip(
           session.doc,
-          { component: input.component, from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props: propsIn(input.component, input.props), transform: TOP_LEFT_ANCHOR },
+          { component: input.component, from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props: propsIn(input.component, input.props), ...TOP_LEFT_START },
           id
         );
         return created(apply(withEffects(registered(result, input.props?.assetId), [id], input.effects), `added ${input.component}`), id);
@@ -1014,10 +1028,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     arrange_space: tool({
-      description: `Arrange clips in the frame, like a design tool: align_left/center/right/top/middle/bottom lines up several clips on the edge of their joint box (one clip aligns to the frame); distribute_x/distribute_y spreads 3+ clips so the gaps between them are equal; tidy lays a row or column out with its most common gap, or a grid from its top-left corner (Tidy up); move shifts them by dx/dy px; scale (Scale tool) multiplies size, text size and stroke weight by factor from the top-left of their joint box. at (seconds, default 0) is the moment measured. mode design (default) moves animated positions whole, every keyframe; motion keys the change at that moment. Locked clips are refused.`,
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(SPACE_OPS), dx: z.number().optional(), dy: z.number().optional(), factor: z.number().positive().optional(), at: z.number().min(0).optional(), mode: z.enum(EditMode).optional() }),
+      description: `Arrange clips in the frame, like a design tool: align_left/center/right/top/middle/bottom lines up several clips on the edge of their joint box (one clip aligns to the frame); distribute_x/distribute_y spreads 3+ clips so the gaps between them are equal; tidy lays a row or column out with its most common gap, or a grid from its top-left corner (Tidy up); move shifts them by dx/dy px; scale (Scale tool) multiplies size, text size and stroke weight by factor from the top-left of their joint box; scale_group (factor, optional factor_y for a different vertical factor) and rotate_group (degrees) transform the clips together around the centre of their joint box, like dragging the selection handles. at (seconds, default 0) is the moment measured. mode design (default) moves animated positions whole, every keyframe; motion keys the change at that moment. Locked clips are refused.`,
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(SPACE_OPS), dx: z.number().optional(), dy: z.number().optional(), factor: z.number().positive().optional(), degrees: z.number().optional(), factor_y: z.number().positive().optional(), at: z.number().min(0).optional(), mode: z.enum(EditMode).optional() }),
       execute: async (input) =>
-        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [input.dx ?? 0, input.dy ?? 0], mode: input.mode ?? EditMode.Design, factor: input.factor }), `${input.op} ${input.clip_ids.length} clip(s)`)
+        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [input.dx ?? 0, input.dy ?? 0], mode: input.mode ?? EditMode.Design, factor: input.factor, factorY: input.factor_y, degrees: input.degrees }), `${input.op} ${input.clip_ids.length} clip(s)`)
     }),
 
     remove_clip: tool({
@@ -1049,7 +1063,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_transform: tool({
-      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot inside the clip box (0..1; clips added with add_clip and add_shape start at 0,0 top-left, older ones at 0.5,0.5 centre), blur in px. A negative scaleX or scaleY flips the clip on that axis (-100 = mirrored).`,
+      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot (origin of rotation and scale, not the frame constraint) inside the clip box (0..1; clips added with add_clip and add_shape start at 0,0 top-left, older ones at 0.5,0.5 centre), blur in px. A negative scaleX or scaleY flips the clip on that axis (-100 = mirrored).`,
       inputSchema: z.object({ clip_id: z.string(), transform: transformInput }),
       execute: async (input) => {
         const shrunk = uiShrink(session.doc, input.clip_id, input.transform.scale as number | undefined);
@@ -1600,14 +1614,24 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    frame_clips: tool({
+      description: 'Frame the selection, like the editor Frame selection: wraps those visual clips in a transparent rectangle Shape drawn directly under them and parents them to it, without auto layout; children stay where they are. Returns container_id.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
+      execute: async ({ clip_ids }) => {
+        const id = deps.newId();
+        const out = apply(wrapInFrame(session.doc, clip_ids, id, deps.newId()), `framed ${clip_ids.length} clip(s)`);
+        return out.ok ? { ...out, container_id: id } : out;
+      }
+    }),
+
     set_auto_layout: tool({
-      description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, padding {top,right,bottom,left} px, justify start|center|end|space-between on the main axis, align start|center|end on the cross axis, order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent).',
+      description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, padding {top,right,bottom,left} px, justify start|center|end|space-between on the main axis, align start|center|end on the cross axis, order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent and the boxes the layout gave them).',
       inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
-      execute: async ({ clip_id, off, ...patch }) => apply(setAutoLayout(session.doc, clip_id, off ? null : patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
+      execute: async ({ clip_id, off, ...patch }) => apply(off ? removeAutoLayout(session.doc, clip_id) : setAutoLayout(session.doc, clip_id, patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
     }),
 
     set_layout_item: tool({
-      description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; on a clip not yet in a container it applies once it is parented). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this. constraints pins a clip to the frame for when the frame is resized (set_canvas, the frame on the canvas): horizontal left, right, left_right (stretch), center or scale (default); vertical top, bottom, top_bottom, center or scale.',
+      description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; on a clip not yet in a container it applies once it is parented). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this. constraints pins a clip to the frame for when the frame is resized (set_canvas, the frame on the canvas): horizontal left, right, left_right (stretch), center or scale (default for older clips; clips added since are left/top); vertical top, bottom, top_bottom, center or scale. Not the pivot (anchorX/anchorY), which is the rotation origin.',
       inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string(), constraints: z.object({ horizontal: z.enum(HORIZONTALS).optional(), vertical: z.enum(VERTICALS).optional() }).optional() }),
       execute: async ({ clip_id, constraints, ...patch }) => {
         const pinned = constraints ? setConstraints(session.doc, [clip_id], constraints) : ({ ok: true, doc: session.doc } as OpResult);
@@ -1710,7 +1734,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const outlined = input.props?.stroke !== undefined && input.props?.strokeKind === undefined ? { strokeKind: StrokeKind.Solid } : {};
         const props = { ...propsIn('Shape', { ...outlined, ...input.props }), shape: input.kind, ...(input.path ? { path: input.path } : {}), ...(input.fills ? { fills: input.fills } : {}), ...(input.strokes ? { strokes: input.strokes } : {}) };
-        const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props, transform: TOP_LEFT_ANCHOR }, id);
+        const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props, ...TOP_LEFT_START }, id);
         return created(apply(withEffects(shape, [id], input.effects), `added ${input.kind} shape`), id);
       }
     }),
@@ -1737,10 +1761,25 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => apply(toVector(session.doc, input.clip_id), `made ${input.clip_id} a vector`)
     }),
 
+    text_to_path: tool({
+      description: 'Turn Title, Text or Kicker clips into free path shapes that look the same: glyph outlines from the font with its size, tracking, leading, alignment and wrapping as rendered. Fill, stroke, opacity, transform and constraints stay; keyframes on font props and text animators are dropped. The text is no longer editable afterwards.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
+      execute: async (input) => apply(await outlineTexts(session.doc, input.clip_ids, deps.fontOutliner ?? loadOutliner), `outlined ${input.clip_ids.join(', ')}`)
+    }),
+
     set_vector_network: tool({
       description: 'Replace a Shape clip network: vertices [{x,y}] in 0..1 of its box, segments [{start,end,tangentStart,tangentEnd}] (tangents relative to their vertex, zero = straight), regions [{winding, loops: [[segment indices]]}] that fill.',
       inputSchema: z.object({ clip_id: z.string(), network: networkSchema }),
       execute: async (input) => apply(setNetwork(session.doc, input.clip_id, input.network), `set the network of ${input.clip_id}`)
+    }),
+
+    edit_path_points: tool({
+      description: `Edit the points of a path, polygon, star or line Shape clip one by one, in order (indices refer to the path after the previous edits; a parametric shape becomes a free path). Coordinates are in the shape box, 0,0 top-left and 1,1 bottom-right. move: point contour.index goes to "to". delete: remove it. insert: add a point on the segment that starts at contour.index, at t 0..1 along it. smooth: give a corner point curved handles; corner: flatten its handles. handle: put the in or out handle of the point at "to". close: close or open the contour.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        edits: z.array(z.object({ op: z.enum(PointOp), contour: z.number().int().min(0), index: z.number().int().min(0), to: z.tuple([z.number(), z.number()]).optional(), t: z.number().min(0).max(1).optional(), handle: z.enum(Handle).optional() })).min(1).max(200)
+      }),
+      execute: async (input) => apply(editPathPoints(session.doc, input.clip_id, input.edits), `edited the points of ${input.clip_id}`)
     }),
 
     set_path: tool({

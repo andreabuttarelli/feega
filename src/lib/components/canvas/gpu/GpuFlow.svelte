@@ -23,13 +23,14 @@
   import GpuTileChrome from './GpuTileChrome.svelte';
   import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
-  import { cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
+  import { liveDocs } from '$lib/canvas/core/live-docs.svelte';
+  import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { tileHovered } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
-  import { overlayOf } from '$lib/canvas/core/world-overlay';
+  import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
   import { dev } from '$app/environment';
@@ -44,7 +45,7 @@
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
   import { FocusMode, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
-  import { ZoomStep, type CanvasZoom } from '$lib/canvas/page-zoom';
+  import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
@@ -89,8 +90,12 @@
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { Counter, count, exposeLoss, exposeReveal, exposeSettled, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
+  import { POSTER_WIDTH } from '$lib/motion/poster-capture';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
+  import { baseRatio, cellBox, cellBytes, cellCss, cellKey, detailRatio, neededCells, softPosters, type Cell } from '$lib/canvas/gpu/detail-plan';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
+  import type { GenTileView } from '$lib/canvas/gen-tile-view';
+  import type { NodeView } from '$lib/canvas/node-view';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { revealIn as revealDelay } from '$lib/canvas/gpu/reveal-gate';
@@ -100,7 +105,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
 
   const DOM_CAP = 6;
   const CORE = 'core';
@@ -193,9 +198,13 @@
       sticky = keep;
     }
   });
+  const LIVE_POSTER_CAP = 3;
+  let settledView = $state<Viewport | null>(null);
   const domIds = $derived.by(() => {
-    const liveFrames = domPainted(placed.filter((t) => t.kind === 'motion' && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
-    const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
+    const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => t.kind === 'motion' && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
+    const posters = placed.filter((t) => t.kind === 'motion' && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
+    const sharp = !coreOn && BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
+    const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
@@ -210,7 +219,7 @@
   });
   const coreLook = $derived(wrap ? themeOf(wrap) : null);
   const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
-  const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold) : null);
+  const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
   const coreCards = $derived.by(() => {
     const text = coreType;
     const draw = drawCard;
@@ -221,19 +230,20 @@
       const card: CardTile = {
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
-        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.thumbsOf?.(t.id) ?? []),
-        shot: coreShots.get(t.id) ?? null,
+        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.viewOf?.(t.id) ?? null, props.genViewFor?.(t.id) ?? null),
         ...portMarks(t),
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null
       };
-      return [{ key: cardKey(card), frame: draw(card), turn: turnOf(t), poster: t.kind === 'motion' }];
+      const poster = t.kind === 'motion';
+      return [{ key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
     });
   });
   const turnOf = (t: Tile) => (t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined);
   const coreChrome = $derived.by(() => {
     const look = coreLook;
-    if (!coreOn || !look) {
+    const text = coreType;
+    if (!coreOn || !look || !text) {
       return [];
     }
     return placed.flatMap((t) => {
@@ -243,11 +253,13 @@
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video);
       const hovered = !on && tileHovered(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null);
-      if (chrome.ring === NodeChrome.None && !hovered) {
+      const layers = t.kind === 'motion' ? ChromeLayers.Whole : ChromeLayers.State;
+      if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !hovered) {
         return [];
       }
       const marks = portMarks(t);
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, label: null, icon: null, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered, ringColor: ringColour(marks, look), names: on, turn: turnOf(t) }];
+      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null } : { label: null, icon: null };
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered, ringColor: ringColour(marks, look), names: on, turn: turnOf(t), layers }];
     });
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
@@ -283,6 +295,11 @@
   };
   const chromeOf = (t: Tile) => (chromeIds.has(t.id) ? null : idleChrome(t, labelOf(t), t.kind && isNodeType(t.kind) ? t.kind : null, (port) => CONNECTOR_STYLE[port].color));
   const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
+  function drawnByCore(ids: Set<string>) {
+    if (!sameSet(untrack(() => coreDrawn), ids)) {
+      coreDrawn = ids;
+    }
+  }
 
   const SNAPSHOT_SETTLE_MS = 120;
   const SNAPSHOT_TIMEOUT_MS = 4000;
@@ -338,25 +355,13 @@
   const snapshotKind = (t: Tile) => !!t.kind && t.kind !== 'motion' && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
   const shotKeyOf = (id: string) => {
     const t = byId.get(id);
-    return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.thumbsOf?.(id) ?? []) : '';
+    return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.viewOf?.(id) ?? null) : '';
   };
   let shown = $state(new Map<string, string>());
   const shotOf = (id: string) => shown.get(id) ?? null;
-  let coreShots = $state(new Map<string, string>());
-  const shootsTiles = () => !!scene || coreOn;
+  const shootsTiles = () => !!scene;
   const showSnapshot = (id: string, key: string, bitmap: ImageBitmap) => {
-    if (scene) {
-      void scene.setSnapshot(id, key, bitmap).then(() => (shown = new Map(shown).set(id, key)));
-      return;
-    }
-    void blobOf(bitmap).then((blob) => {
-      const before = coreShots.get(id);
-      coreShots = new Map(coreShots).set(id, URL.createObjectURL(blob));
-      shown = new Map(shown).set(id, key);
-      if (before) {
-        URL.revokeObjectURL(before);
-      }
-    });
+    void scene?.setSnapshot(id, key, bitmap).then(() => (shown = new Map(shown).set(id, key)));
   };
   const preloaded = new Set<string>();
   let looking = $state(new Set<string>());
@@ -502,7 +507,7 @@
       clearTimeout(hoverTimer);
       hoverTimer = null;
     }
-    if (!id || !byId.get(id) || !snapshotKind(byId.get(id)!)) {
+    if (coreOn || !id || !byId.get(id) || !snapshotKind(byId.get(id)!)) {
       untrack(() => {
         if (hoverLive && !wrap?.querySelector(`.gpu-dom-node[data-id="${hoverLive}"]:hover, .gpu-dom-node[data-id="${hoverLive}"]:focus-within`)) {
           hoverLive = null;
@@ -517,10 +522,34 @@
     focusLive = (e.target as HTMLElement | null)?.closest<HTMLElement>('.gpu-dom-node')?.dataset.id ?? null;
   }
 
+  const shelfReady = async (host: HTMLElement) => {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await quiet();
+    for (const img of host.querySelectorAll('img')) {
+      img.loading = 'eager';
+    }
+    await withTimeout(Promise.all([...host.querySelectorAll('img')].map((img) => img.decode().catch(() => undefined))), SNAPSHOT_TIMEOUT_MS).catch(() => undefined);
+    await new Promise((r) => setTimeout(r, SNAPSHOT_SETTLE_MS));
+  };
+
+  const capture = async (el: HTMLElement, extra: Record<string, unknown>) => {
+    const { getFontEmbedCSS, toCanvas } = await import('html-to-image');
+    fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
+    const options = { ...extra, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL };
+    const foreign = [...el.querySelectorAll('img')].some((img) => crossOrigin(img.currentSrc || img.src));
+    const keep = (n: Node) => !(n instanceof HTMLImageElement && crossOrigin(n.currentSrc || n.src));
+    await quiet();
+    const canvas = await withTimeout(toCanvas(el, foreign ? { ...options, filter: keep } : options), SNAPSHOT_TIMEOUT_MS);
+    if (foreign && tainted(canvas)) {
+      throw new Error('tainted snapshot');
+    }
+    return canvas;
+  };
+
   let schedulerTick = $state(0);
   $effect(() => {
     void schedulerTick;
-    if (shotJob || !shootsTiles() || !BUDGET[currentDevice()].shootsSnapshots) {
+    if (shotJob || detailJob || !shootsTiles() || !BUDGET[currentDevice()].shootsSnapshots) {
       return;
     }
     if (performance.now() < busyUntil) {
@@ -537,6 +566,109 @@
   });
 
   let shotMount = $state<string | null>(null);
+
+  type DetailJob = { id: string; key: string; ratio: number; size: number; cell: Cell };
+  const DETAIL_SETTLE_MS = 200;
+  let detailJob = $state<DetailJob | null>(null);
+  const tried = new Set<string>();
+  const triedKey = (id: string, ratio: number, c: Cell) => `${id}|${ratio}|${cellKey(c)}`;
+  $effect(() => {
+    const v = view;
+    const t = setTimeout(() => {
+      tried.clear();
+      settledView = v;
+    }, DETAIL_SETTLE_MS);
+    return () => clearTimeout(t);
+  });
+
+  const nextDetail = (s: GpuScene, v: Viewport): DetailJob | null => {
+    const screen = screenSize();
+    const dpr = window.devicePixelRatio || 1;
+    const worldView = { x: -v.x / v.zoom, y: -v.y / v.zoom, w: screen.width / v.zoom, h: screen.height / v.zoom };
+    const seen = visibleIds(placed.filter(snapshotKind), v, area);
+    let spent = s.detailBytes();
+    for (const id of s.detailIds()) {
+      if (!seen.has(id) || domIds.has(id)) {
+        s.dropDetail(id);
+      }
+    }
+    spent = s.detailBytes();
+    const budget = BUDGET[currentDevice()].detailBytes;
+    const centre = { x: worldView.x + worldView.w / 2, y: worldView.y + worldView.h / 2 };
+    const candidates = placed.filter((t) => seen.has(t.id) && !domIds.has(t.id) && pictured.get(t.id) === shotKeyOf(t.id)).sort((a, b) => Math.hypot(a.x + a.w / 2 - centre.x, a.y + a.h / 2 - centre.y) - Math.hypot(b.x + b.w / 2 - centre.x, b.y + b.h / 2 - centre.y));
+    for (const t of candidates) {
+      const ratio = detailRatio(v.zoom, dpr, baseRatio(t, SNAPSHOT_PIXEL_RATIO, BUDGET[currentDevice()].snapshotEdge));
+      if (!ratio) {
+        s.dropDetail(t.id);
+        continue;
+      }
+      const key = shotKeyOf(t.id);
+      const have = s.detailOf(t.id);
+      const size = cellCss(ratio);
+      const same = have && have.ratio === ratio && have.key === key ? have : null;
+      const missing = neededCells(t, worldView, size).filter((c) => !same?.cells.has(cellKey(c)) && !tried.has(triedKey(t.id, ratio, c)));
+      if (!missing.length) {
+        s.trimDetail(t.id);
+        continue;
+      }
+      const cell = missing[0];
+      if (spent + cellBytes(cellBox({ x: 0, y: 0, w: t.w, h: t.h }, size, cell), ratio) > budget) {
+        continue;
+      }
+      return { id: t.id, key, ratio, size, cell };
+    }
+    return null;
+  };
+
+  $effect(() => {
+    const v = settledView;
+    void schedulerTick;
+    void detailJob;
+    void shotJob;
+    void pictured;
+    if (!v || !scene || detailJob || shotJob || !BUDGET[currentDevice()].shootsSnapshots) {
+      return;
+    }
+    if (performance.now() < busyUntil) {
+      const t = setTimeout(() => schedulerTick++, BUSY_MS);
+      return () => clearTimeout(t);
+    }
+    detailJob = untrack(() => nextDetail(scene!, v));
+  });
+
+  $effect(() => {
+    const job = detailJob;
+    const host = shelfHost;
+    if (!job || !host) {
+      return;
+    }
+    let cancelled = false;
+    tried.add(triedKey(job.id, job.ratio, job.cell));
+    void (async () => {
+      try {
+        await shelfReady(host);
+        const el = host.querySelector<HTMLElement>('.snapshot-node');
+        const box = cellBox({ x: 0, y: 0, w: byId.get(job.id)?.w ?? 0, h: byId.get(job.id)?.h ?? 0 }, job.size, job.cell);
+        if (cancelled || !el || !scene || shotKeyOf(job.id) !== job.key) {
+          return;
+        }
+        const style = { transform: `translate(${-box.x}px, ${-box.y}px)`, transformOrigin: 'top left' };
+        const canvas = await capture(el, { pixelRatio: job.ratio, width: box.w, height: box.h, style });
+        if (!cancelled && scene && shotKeyOf(job.id) === job.key) {
+          await scene.addDetailCell(job.id, job.key, job.ratio, job.size, job.cell, await createImageBitmap(canvas));
+          count(Counter.Snapshot);
+        }
+      } catch (err) {
+        console.warn(`[canvas] detail ${job.id}`, err);
+      }
+      if (!cancelled) {
+        detailJob = null;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  });
 
   $effect(() => {
     const id = shotJob;
@@ -578,29 +710,14 @@
     const key = untrack(() => shotKeyOf(id));
     let cancelled = false;
     void (async () => {
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await quiet();
-      for (const img of host.querySelectorAll('img')) {
-        img.loading = 'eager';
-      }
-      await withTimeout(Promise.all([...host.querySelectorAll('img')].map((img) => img.decode().catch(() => undefined))), SNAPSHOT_TIMEOUT_MS).catch(() => undefined);
-      await new Promise((r) => setTimeout(r, SNAPSHOT_SETTLE_MS));
+      await shelfReady(host);
       if (cancelled) {
         return;
       }
       const el = host.querySelector<HTMLElement>('.snapshot-node');
       try {
         if (el && shootsTiles()) {
-          const { getFontEmbedCSS, toCanvas } = await import('html-to-image');
-          fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
-          const options = { pixelRatio: SNAPSHOT_PIXEL_RATIO, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL };
-          const foreign = [...el.querySelectorAll('img')].some((img) => crossOrigin(img.currentSrc || img.src));
-          const keep = (n: Node) => !(n instanceof HTMLImageElement && crossOrigin(n.currentSrc || n.src));
-          await quiet();
-          const canvas = await withTimeout(toCanvas(el, foreign ? { ...options, filter: keep } : options), SNAPSHOT_TIMEOUT_MS);
-          if (foreign && tainted(canvas)) {
-            throw new Error('tainted snapshot');
-          }
+          const canvas = await capture(el, { pixelRatio: SNAPSHOT_PIXEL_RATIO });
           showSnapshot(id, key, await createImageBitmap(canvas));
           void storeSnapshot(id, key, canvas).then((blob) => publish(id, key, blob));
           count(Counter.Snapshot);
@@ -664,7 +781,7 @@
   );
 
   function faceFor(t: Tile) {
-    const face = faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []);
+    const face = faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.viewOf?.(t.id) ?? null);
     return coreDrawn.has(t.id) ? handedToCore(face) : face;
   }
 
@@ -1144,7 +1261,9 @@
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
-        overrides = new Map([[a.id, resized(a.box, a.corner, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min)]]);
+        const box = resized(a.box, a.corner, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min);
+        overrides = new Map([[a.id, box]]);
+        props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
       },
       [GestureKind.Marquee]: (a) => {
         if (a.kind !== GestureKind.Marquee || (!far && !a.moved)) {
@@ -1217,6 +1336,7 @@
         if (a.kind !== GestureKind.Resize) {
           return;
         }
+        props.onLive?.([]);
         const box = overrides.get(a.id);
         if (box && (box.x !== a.box.x || box.y !== a.box.y)) {
           props.onMove?.(a.id, box.x, box.y);
@@ -1319,6 +1439,18 @@
     settleOverrides();
   }
 
+  $effect(() => {
+    const el = surface;
+    if (!el) {
+      return;
+    }
+    return watchPinch(el, (factor, x, y) => {
+      glide = null;
+      markBusy();
+      view = zoomAt(view, local({ clientX: x, clientY: y }), factor);
+    });
+  });
+
   function onWheel(e: WheelEvent) {
     glide = null;
     markBusy();
@@ -1346,6 +1478,8 @@
   let snapGuides = $state<SnapGuide[]>([]);
   const corePeers = $derived(coreOn && coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
   const coreRotate = $derived(coreOn && props.onRotate ? selectedBoxes.filter((t) => t.rotatable && !t.rotation).map((t) => ({ id: t.id, box: { x: t.x, y: t.y, w: t.w, h: t.h } })) : []);
+  const stackOrder = $derived(placed.map((t) => t.id));
+  const viewZoom = $derived(view.zoom);
   const coreOverlay = $derived(
     coreOn && coreLook && coreType
       ? overlayOf({
@@ -1354,7 +1488,7 @@
           selectedEdge,
           marquee,
           guides: snapGuides,
-          zoom: view.zoom,
+          zoom: viewZoom,
           theme: { ...coreLook, panel: coreLook.paper },
           glyphs: coreType.glyphs,
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
@@ -1768,7 +1902,9 @@
     data-owns-pinch
   >
     {#if coreOn}
-      <CoreFrames frames={coreFrames} edited={resizing} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={coreOff} />
+      <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
+        <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+      </svelte:boundary>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
@@ -1834,9 +1970,9 @@
 
 
   <div class="snapshot-shelf" aria-hidden="true" bind:this={shelfHost}>
-    {#if shotMount && byId.get(shotMount)}
-      {@const t = byId.get(shotMount)!}
-      {#key shotMount}
+    {#if (shotMount ?? detailJob?.id) && byId.get((shotMount ?? detailJob?.id)!)}
+      {@const t = byId.get((shotMount ?? detailJob?.id)!)!}
+      {#key t.id}
         <div class="snapshot-node" data-snapshot={t.id} style={`width:${t.w}px;height:${t.h}px`}>
           <NodeBoundary>
             {@render props.tile({ id: t.id, selected: false })}
@@ -1953,6 +2089,25 @@
   :global(html.canvas-gesture *) {
     user-select: none !important;
     -webkit-user-select: none !important;
+  }
+
+  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview']) {
+    background: transparent;
+  }
+
+  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview'] > .host),
+  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview'] > .gpu-wrap) {
+    visibility: hidden;
+  }
+
+  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview'] > .host [contenteditable='true']),
+  .wrap[data-renderer='core'] :global(.gpu-dom-node [data-testid='motion-preview'] > .host [contenteditable='true'] *) {
+    visibility: visible;
+    color: transparent !important;
+    -webkit-text-fill-color: transparent !important;
+    text-shadow: none !important;
+    background: transparent !important;
+    caret-color: #0a84ff;
   }
 
   .wrap:not([data-revealed='true']) .surface,

@@ -1,20 +1,70 @@
-use vello::kurbo::{Affine, Rect};
+use std::collections::HashMap;
+
+use vello::kurbo::{Affine, Point, Rect};
 use vello::peniko::{color::AlphaColor, Color, ImageData};
 use vello::wgpu;
 use vello::{AaConfig, AaSupport, RenderParams, RendererOptions, Scene};
 
 use crate::display_list::{Cover, DisplayList, Item, Rgba};
 use crate::groups::Plan;
-use crate::filter_passes::{layer_texture, FilterPasses, WgpuRunner};
+use crate::filter_passes::{layer_texture, FilterPasses, Pooled, WgpuRunner};
 use crate::layers::{prepare, Blending, Surface};
 use crate::pictures::Pictures;
 use crate::scene::{build, Placed};
 use crate::Skipped;
 
+const KEPT_LAYERS: usize = 32;
+const KEPT_FRAMES: u64 = 240;
+
+struct Cached {
+    image: ImageData,
+    origin: Point,
+    _texture: Pooled,
+    used: u64,
+}
+
+#[derive(Default)]
+struct LayerCache {
+    entries: HashMap<String, Cached>,
+    tick: u64,
+}
+
+impl LayerCache {
+    fn holds(&self, image: &ImageData) -> bool {
+        self.entries.values().any(|c| c.image.data.id() == image.data.id())
+    }
+
+    fn sweep(&mut self, vello: &mut vello::Renderer) {
+        self.tick += 1;
+        let tick = self.tick;
+        let mut stale: Vec<String> = self.entries.iter().filter(|(_, c)| c.used + KEPT_FRAMES < tick).map(|(k, _)| k.clone()).collect();
+        if self.entries.len() - stale.len() > KEPT_LAYERS {
+            let mut rest: Vec<(&String, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k, c.used)).collect();
+            rest.sort_by_key(|(_, used)| *used);
+            let excess = rest.len() - KEPT_LAYERS;
+            stale.extend(rest.into_iter().take(excess).map(|(k, _)| k.clone()));
+        }
+        for key in stale {
+            if let Some(gone) = self.entries.remove(&key) {
+                vello.unregister_texture(gone.image);
+            }
+        }
+    }
+}
+
+fn plain_content(item: &Item) -> bool {
+    match item {
+        Item::Path(_) => clips(std::slice::from_ref(item)).is_empty(),
+        Item::Group(group) => clips(std::slice::from_ref(item)).is_empty() && group.items.iter().all(plain_content),
+        _ => false,
+    }
+}
+
 pub struct Engine {
     pub vello: vello::Renderer,
     pub blending: Blending,
     filters: FilterPasses,
+    cache: LayerCache,
 }
 
 pub type EngineError = vello::Error;
@@ -25,6 +75,9 @@ struct Gpu<'a> {
     width: u32,
     height: u32,
     drawn: Vec<ImageData>,
+    kept: Vec<Pooled>,
+    last: Option<Pooled>,
+    cache: &'a mut LayerCache,
 }
 
 fn clips(items: &[Item]) -> Vec<&str> {
@@ -73,9 +126,9 @@ impl<'a> Surface for Gpu<'a> {
         Rect::new(0.0, 0.0, self.width as f64, self.height as f64)
     }
 
-    fn paint(&mut self, region: Rect, colour: Option<Rgba>, draw: &dyn Fn(&mut Scene)) -> Result<wgpu::Texture, EngineError> {
+    fn paint(&mut self, region: Rect, colour: Option<Rgba>, draw: &dyn Fn(&mut Scene)) -> Result<Pooled, EngineError> {
         let size = (region.width() as u32, region.height() as u32);
-        let texture = layer_texture(self.runner.device, size.0, size.1);
+        let texture = self.runner.passes.texture(self.runner.device, size.0, size.1);
         let mut scene = Scene::new();
         draw(&mut scene);
         let mut moved = Scene::new();
@@ -88,25 +141,58 @@ impl<'a> Surface for Gpu<'a> {
         &self.runner
     }
 
-    fn place(&mut self, texture: wgpu::Texture, region: Rect) -> Placed {
-        Placed { image: self.vello.register_texture(texture), origin: region.origin() }
+    fn recall(&mut self, item: &Item) -> Option<Placed> {
+        if !plain_content(item) || item.look().is_some_and(|l| l.backdrop.is_some()) {
+            return None;
+        }
+        let tick = self.cache.tick;
+        let cached = self.cache.entries.get_mut(&self.key(item))?;
+        cached.used = tick;
+        Some(Placed { image: cached.image.clone(), origin: cached.origin })
+    }
+
+    fn remember(&mut self, item: &Item, placed: &Placed) {
+        if !plain_content(item) || item.look().is_some_and(|l| l.backdrop.is_some()) {
+            return;
+        }
+        if let Some(texture) = self.last.take() {
+            let used = self.cache.tick;
+            let key = self.key(item);
+            self.cache.entries.insert(key, Cached { image: placed.image.clone(), origin: placed.origin, _texture: texture, used });
+        }
+    }
+
+    fn place(&mut self, texture: Pooled, region: Rect) -> Placed {
+        let image = self.vello.register_texture((*texture).clone());
+        self.last = Some(texture.clone());
+        self.kept.push(texture);
+        Placed { image, origin: region.origin() }
+    }
+}
+
+impl Gpu<'_> {
+    fn key(&self, item: &Item) -> String {
+        format!("{}x{} {:?}", self.width, self.height, item)
     }
 }
 
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device) })
+        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default() })
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
-        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, drawn: drawn(list, pictures) };
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, drawn: drawn(list, pictures), kept: Vec::new(), last: None, cache: &mut self.cache };
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let (scene, skipped) = build(list, pictures, &layers);
         let drawn = gpu.render(&scene, base(list.background), target, (list.width, list.height));
         for image in layers.into_images() {
-            gpu.vello.unregister_texture(image);
+            if !gpu.cache.holds(&image) {
+                gpu.vello.unregister_texture(image);
+            }
         }
+        gpu.cache.sweep(gpu.vello);
         drawn.map(|_| skipped)
     }
 

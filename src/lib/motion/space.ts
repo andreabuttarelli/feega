@@ -66,6 +66,14 @@ function moveOne(doc: MotionDoc, clipId: string, frame: number, by: Pt, mode: Ed
   return WRITE[mode](doc, clipId, frame, patch);
 }
 
+export function patchEach(doc: MotionDoc, patches: [string, Transform][], frame: number, mode: EditMode): OpResult {
+  const locked = patches.find(([id]) => isLocked(doc, id));
+  if (locked) {
+    return fail(`${locked[0]} is locked`);
+  }
+  return patches.reduce<OpResult>((r, [id, patch]) => (r.ok ? WRITE[mode](r.doc, id, frame, patch) : r), { ok: true, doc });
+}
+
 function moveEach(doc: MotionDoc, moves: [string, Pt][], frame: number, mode: EditMode): OpResult {
   const locked = moves.find(([id]) => isLocked(doc, id));
   if (locked) {

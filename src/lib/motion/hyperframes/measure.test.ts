@@ -114,7 +114,8 @@ describe('measuring the clips in the preview', () => {
       {
         type: MEASURE_REPLY,
         id: 'q',
-        boxes: { a: { left: 0.1, top: 0.1, width: 0.35, height: 0.2 }, 'a#lines:1': { left: 0.1, top: 0.2, width: 0.1, height: 0.1 } }
+        boxes: { a: { left: 0.1, top: 0.1, width: 0.35, height: 0.2 }, 'a#lines:1': { left: 0.1, top: 0.2, width: 0.1, height: 0.1 } },
+        stage: { width: 0, height: 0 }
       }
     ]);
   });

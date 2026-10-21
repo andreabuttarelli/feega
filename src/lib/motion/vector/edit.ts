@@ -182,3 +182,44 @@ export function handlesAt(network: VectorNetwork, vertex: number): Handle[] {
 export function oppositeHandle(network: VectorNetwork, vertex: number, segmentIndex: number): Handle | null {
   return handlesAt(network, vertex).find((h) => h.segmentIndex !== segmentIndex) ?? null;
 }
+
+const SMOOTH_REACH = 1 / 3;
+
+const length = (v: Vector) => Math.hypot(v.x, v.y);
+
+const isFlat = (network: VectorNetwork, vertex: number) => handlesAt(network, vertex).every((h) => length(network.segments[h.segmentIndex][h.tangent]) < NEAR_ZERO);
+
+function neighbourDirection(network: VectorNetwork, handles: Handle[], vertex: number): Vector | null {
+  const at = network.vertices[vertex];
+  const others = handles.map((h) => network.vertices[h.neighbor]);
+  if (others.length >= PASS_THROUGH) {
+    return relative(others[1], others[0]);
+  }
+  return others.length ? relative(others[0], at) : null;
+}
+
+export function toggleSmoothVertex(network: VectorNetwork, vertex: number): VectorNetwork {
+  const handles = handlesAt(network, vertex);
+  const flat = isFlat(network, vertex);
+  const direction = flat ? neighbourDirection(network, handles, vertex) : null;
+  if (flat && (!direction || length(direction) < NEAR_ZERO)) {
+    return network;
+  }
+
+  const at = network.vertices[vertex];
+  const reached = (h: Handle): Vector => {
+    if (!direction) {
+      return { x: 0, y: 0 };
+    }
+    const toward = relative(network.vertices[h.neighbor], at);
+    const sign = toward.x * direction.x + toward.y * direction.y >= 0 ? 1 : -1;
+    const k = (sign * length(toward) * SMOOTH_REACH) / length(direction);
+    return { x: direction.x * k, y: direction.y * k };
+  };
+
+  const segments = network.segments.map((s, i) => {
+    const mine = handles.filter((h) => h.segmentIndex === i);
+    return mine.reduce((out, h) => ({ ...out, [h.tangent]: reached(h) }), s);
+  });
+  return { ...network, segments };
+}

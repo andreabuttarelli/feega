@@ -6,11 +6,13 @@
   import { EMPTY_NETWORK, networkSchema, type Vector, type VectorNetwork } from '$lib/motion/vector/model';
   import { networkStroke } from '$lib/motion/vector/outline';
   import { nearestOnNetwork } from '$lib/motion/vector/curve-math';
-  import { Tangent, breakAtVertex, deleteVertex, handlesAt, removeVertex, splitSegmentAt, type Handle } from '$lib/motion/vector/edit';
+  import { Tangent, breakAtVertex, deleteVertex, handlesAt, removeVertex, splitSegmentAt, toggleSmoothVertex, type Handle } from '$lib/motion/vector/edit';
   import { addVertex, connect, fillClosed, moveVertex, setTangent } from '$lib/motion/vector/draw';
   import { setNetwork } from '$lib/motion/vector/ops';
+  import type { Guide } from '$lib/motion/scene-select';
+  import { pointBounds, snapPoint, snapReach, snapTargets } from '$lib/motion/shape/vector-edit';
 
-  let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, clip, frame, onchange, onexit }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void; onexit: () => void } = $props();
 
   type Grab = { kind: 'vertex'; vertex: number; from: Vector; base: VectorNetwork } | { kind: 'handle'; handle: Handle; base: VectorNetwork };
 
@@ -22,6 +24,7 @@
   let selected = $state<number | null>(null);
   let grab = $state<Grab | null>(null);
   let live = $state.raw<VectorNetwork | null>(null);
+  let guides = $state<Guide[]>([]);
 
   const space = $derived(pathSpace(doc, clip.id, frame));
   const saved = $derived.by(() => {
@@ -66,8 +69,12 @@
       selected = vertex;
       return;
     }
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
     selected = vertex;
+    if (e.altKey) {
+      commit(toggleSmoothVertex(network, vertex), 'Toggled a point between corner and smooth');
+      return;
+    }
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
     grab = { kind: 'vertex', vertex, from: local(e), base: network };
   }
 
@@ -89,6 +96,28 @@
     commit(split.network, 'Added a point');
   }
 
+  function pressOutside(e: PointerEvent) {
+    const target = e.target as Element | null;
+    if (pen || !target || target.closest('[data-vector-edit]') || !host?.parentElement?.contains(target)) {
+      return;
+    }
+    onexit();
+  }
+
+  const targets = $derived(snapTargets(doc, clip.id, frame));
+
+  function snapped(raw: Vector, held: number, e: PointerEvent): Vector {
+    if (e.metaKey || e.ctrlKey) {
+      guides = [];
+      return raw;
+    }
+    const own = saved.vertices.flatMap((v, i) => (i === held ? [] : [pointBounds(space.toFrame([v.x, v.y]))]));
+    const result = snapPoint(space.toFrame([raw.x, raw.y]), [...targets, ...own], { width: doc.width, height: doc.height }, snapReach(doc.width, host!.getBoundingClientRect().width));
+    guides = result.guides;
+    const [x, y] = space.toLocal(result.point);
+    return { x, y };
+  }
+
   function place(e: PointerEvent) {
     if (!pen) {
       return;
@@ -104,7 +133,9 @@
     }
     const at = local(e);
     if (grab.kind === 'vertex') {
-      live = moveVertex(grab.base, grab.vertex, { x: at.x - grab.from.x, y: at.y - grab.from.y });
+      const origin = grab.base.vertices[grab.vertex];
+      const to = snapped({ x: origin.x + at.x - grab.from.x, y: origin.y + at.y - grab.from.y }, grab.vertex, e);
+      live = moveVertex(grab.base, grab.vertex, { x: to.x - origin.x, y: to.y - origin.y });
       return;
     }
     const s = grab.base.segments[grab.handle.segmentIndex];
@@ -117,20 +148,27 @@
     const kind = grab?.kind;
     grab = null;
     live = null;
+    guides = [];
     if (done && kind) {
       commit(done, kind === 'vertex' ? 'Moved a point' : 'Bent a curve');
     }
   }
 
   function key(e: KeyboardEvent) {
-    if (selected === null || isTyping(e.target as HTMLElement | null)) {
+    if (isTyping(e.target as HTMLElement | null)) {
       return;
     }
-    if (e.key === 'Escape' && pen) {
-      pen = false;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (pen) {
+        pen = false;
+        return;
+      }
+      onexit();
       return;
     }
-    if (e.key !== 'Backspace' && e.key !== 'Delete') {
+    if (selected === null || (e.key !== 'Backspace' && e.key !== 'Delete')) {
       return;
     }
     e.preventDefault();
@@ -140,12 +178,15 @@
   }
 </script>
 
-<svelte:window onkeydowncapture={key} />
+<svelte:window onkeydowncapture={key} onpointerdowncapture={pressOutside} />
 
-<div class="overlay" class:pen bind:this={host} data-testid="vector-overlay" role="presentation" onpointerdown={place} onpointermove={move} onpointerup={end} onpointercancel={end}>
+<div class="overlay" class:pen bind:this={host} data-vector-edit data-testid="vector-overlay" role="presentation" onpointerdown={place} onpointermove={move} onpointerup={end} onpointercancel={end}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     <polygon class="frame" points={UNIT_BOX.map((p) => space.toFrame(p).join(',')).join(' ')} />
     <path class="outline" d={framedStroke} />
+    {#each guides as g (g.axis + g.at)}
+      {#if g.axis === 'x'}<line class="guide" x1={g.at} y1="0" x2={g.at} y2={doc.height} />{:else}<line class="guide" x1="0" y1={g.at} x2={doc.width} y2={g.at} />{/if}
+    {/each}
     <path class="hit" role="presentation" data-testid="vector-segments" d={framedStroke} onpointerdown={pressSegment} />
     {#if selected !== null}
       {#each shownHandles as h (`${h.segmentIndex}-${h.tangent}`)}
@@ -196,6 +237,12 @@
     width: 100%;
     height: 100%;
     overflow: visible;
+  }
+
+  .guide {
+    stroke: #ff3d7f;
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
   }
 
   .frame,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
@@ -500,5 +500,36 @@ describe('a mask in Layers', () => {
     const doc = ok(layerEdit(masked(), 'disc', LayerAction.Hide));
 
     expect(frameRows(doc, 'm1').find((r) => r.id === 'disc')).toMatchObject({ kind: LayerKind.Mask, hidden: true });
+  });
+});
+
+describe('dragging several layers at once', () => {
+  function stacked(): MotionDoc {
+    let doc = ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, props: { shape: 'rect' } }, 'a'));
+    for (const id of ['b', 'c', 'd']) {
+      doc = ok(addClip(ok(addTrack(doc, TrackKind.Visual, `t-${id}`)), { component: 'Shape', from: 0, trackId: `t-${id}`, props: { shape: 'rect' } }, id));
+    }
+    return doc;
+  }
+  const order = (doc: MotionDoc) => frameRows(doc, 'm1').map((r) => r.id);
+
+  it('lands the block above the target keeping its inner order', () => {
+    const doc = stacked();
+    const moved = ok(dropLayers(doc, ['a', 'c'], 'd', Place.Above, order(doc)));
+
+    expect(order(moved).filter((id) => ['a', 'c', 'd'].includes(id))).toEqual(['c', 'a', 'd']);
+  });
+
+  it('lands the block below the target keeping its inner order', () => {
+    const doc = stacked();
+    const moved = ok(dropLayers(doc, ['c', 'a'], 'b', Place.Below, order(doc)));
+
+    expect(order(moved).filter((id) => ['a', 'b', 'c'].includes(id))).toEqual(['b', 'c', 'a']);
+  });
+
+  it('ignores the target when it is part of the block', () => {
+    const doc = stacked();
+
+    expect(order(ok(dropLayers(doc, ['b', 'c'], 'c', Place.Above, order(doc))))).toEqual(order(ok(dropLayer(doc, 'b', 'c', Place.Above))));
   });
 });

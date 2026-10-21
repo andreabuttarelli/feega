@@ -5,9 +5,9 @@ const LIVE_FIELDS = new Set(['running', 'status', 'run_id', 'started_at', 'finis
 
 export const isRunning = (data: Record<string, unknown>) => data.running === true || data.status === 'running';
 
-export function snapshotKey<T extends Tile>(t: T, data: Record<string, unknown>, thumbs: readonly string[]): string {
+export function snapshotKey<T extends Tile>(t: T, data: Record<string, unknown>, view: unknown): string {
   const still = Object.fromEntries(Object.entries(data).filter(([k]) => !LIVE_FIELDS.has(k)));
-  return JSON.stringify([Math.round(t.w), Math.round(t.h), still, thumbs]);
+  return JSON.stringify([Math.round(t.w), Math.round(t.h), still, view]);
 }
 
 const distance = (t: Tile, p: Point) => Math.hypot((t.x ?? 0) + t.w / 2 - p.x, (t.y ?? 0) + t.h / 2 - p.y);

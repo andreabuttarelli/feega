@@ -146,3 +146,10 @@ export function edgeAt(edges: { id: string; curve: Curve }[], p: Point, zoom: nu
   }
   return null;
 }
+
+export function containedIn(picture: { w: number; h: number }, box: Box): Box {
+  const scale = Math.min(box.w / (picture.w || 1), box.h / (picture.h || 1));
+  const w = picture.w * scale;
+  const h = picture.h * scale;
+  return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h };
+}

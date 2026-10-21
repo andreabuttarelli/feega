@@ -58,4 +58,13 @@ describe('constraints', () => {
 
     expect(parsed.ok && findClip(parsed.doc, 'card')!.clip.constraints).toEqual({ horizontal: Horizontal.Right, vertical: Vertical.Bottom });
   });
+
+  it('a pinned layer keeps its offset in pixels, keyframes included', () => {
+    const doc = framed(Horizontal.Left, Vertical.Top);
+    const offset = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, transform: { x: 0.1 }, keyframes: { x: [{ frame: 0, value: 0.1, ease: 'standard' as never }] } })) })) };
+    const clip = findClip(ok(resizeFrame(offset, { width: 1250, height: 1000 })), 'card')!.clip;
+
+    expect(clip.transform.x).toBeCloseTo(0.08);
+    expect(Number(clip.keyframes.x[0].value)).toBeCloseTo(0.08);
+  });
 });

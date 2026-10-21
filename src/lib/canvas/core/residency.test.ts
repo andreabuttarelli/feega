@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CACHE_SHARE, cached, resident, heldWhileEdited } from './residency';
+import { CACHE_SHARE, cached, resident, heldWhileEdited, uncached } from './residency';
 
 const view = { x: 0, y: 0, zoom: 1 };
 const screen = { width: 1000, height: 1000 };
@@ -30,6 +30,15 @@ describe('frame residency', () => {
 
     expect(cached(frames, { x: 0, y: 0, zoom: 2 }, screen, texture / CACHE_SHARE).map((f) => f.cache)).toEqual([true, false, false]);
     expect(cached(frames, { x: 0, y: 0, zoom: 2 }, screen, (3 * texture) / CACHE_SHARE).every((f) => f.cache)).toBe(true);
+  });
+});
+
+describe('a view at rest', () => {
+  it('draws every frame from its vectors, never from a cache texture, so it is crisp at the current zoom', () => {
+    const shown = cached([frame('a', 0, 0), frame('b', 200, 0)], view, screen, 1e9);
+
+    expect(shown.every((f) => f.cache)).toBe(true);
+    expect(uncached(shown).every((f) => !f.cache)).toBe(true);
   });
 });
 

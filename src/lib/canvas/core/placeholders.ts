@@ -28,6 +28,8 @@ export function placeholder(stand: Stand, size: Size, look: Look): { group: stri
 
 export const standIn = <T>(layers: readonly (T | null | undefined)[]): T | null => layers.find((l) => l != null) ?? null;
 
+export const firstDrawn = <T extends { group: string }>(chain: readonly T[], drawn: ReadonlySet<string>): T | null => chain.find((l) => drawn.has(l.group)) ?? null;
+
 export function fillOrder<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {
   const centre = { x: (screen.width / 2 - view.x) / view.zoom, y: (screen.height / 2 - view.y) / view.zoom };
   const half = { w: screen.width / 2 / view.zoom, h: screen.height / 2 / view.zoom };

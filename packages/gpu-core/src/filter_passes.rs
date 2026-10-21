@@ -1,3 +1,8 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::ops::Deref;
+use std::rc::Rc;
+
 use vello::wgpu;
 use vello::wgpu::util::DeviceExt;
 
@@ -461,9 +466,45 @@ const SOURCES: [(Op, &str); 14] = [
     (Op::Lens, LENS),
 ];
 
+const POOL_PER_SIZE: usize = 6;
+const POOL_SIZES: usize = 48;
+
+type Shelves = HashMap<(u32, u32), Vec<wgpu::Texture>>;
+
+struct Slot {
+    texture: wgpu::Texture,
+    shelves: Rc<RefCell<Shelves>>,
+}
+
+impl Drop for Slot {
+    fn drop(&mut self) {
+        let mut shelves = self.shelves.borrow_mut();
+        let size = (self.texture.width(), self.texture.height());
+        if shelves.len() >= POOL_SIZES && !shelves.contains_key(&size) {
+            return;
+        }
+        let shelf = shelves.entry(size).or_default();
+        if shelf.len() < POOL_PER_SIZE {
+            shelf.push(self.texture.clone());
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Pooled(Rc<Slot>);
+
+impl Deref for Pooled {
+    type Target = wgpu::Texture;
+
+    fn deref(&self) -> &wgpu::Texture {
+        &self.0.texture
+    }
+}
+
 pub struct FilterPasses {
     layout: wgpu::BindGroupLayout,
     pipelines: Vec<(Op, wgpu::ComputePipeline)>,
+    shelves: Rc<RefCell<Shelves>>,
 }
 
 pub fn layer_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
@@ -486,13 +527,13 @@ pub struct WgpuRunner<'a> {
 }
 
 impl Runner for WgpuRunner<'_> {
-    type Tex = wgpu::Texture;
+    type Tex = Pooled;
 
-    fn run(&self, op: Op, inputs: [&wgpu::Texture; 2], params: &[f32]) -> wgpu::Texture {
+    fn run(&self, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {
         self.passes.run(self.device, self.queue, op, inputs, params)
     }
 
-    fn size(tex: &wgpu::Texture) -> (u32, u32) {
+    fn size(tex: &Pooled) -> (u32, u32) {
         (tex.width(), tex.height())
     }
 }
@@ -524,13 +565,19 @@ impl FilterPasses {
                 (*op, device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor { label: None, layout: Some(&shared), module: &module, entry_point: Some("main"), compilation_options: Default::default(), cache: None }))
             })
             .collect();
-        Self { layout, pipelines }
+        Self { layout, pipelines, shelves: Rc::new(RefCell::new(HashMap::new())) }
     }
 
-    pub fn run(&self, device: &wgpu::Device, queue: &wgpu::Queue, op: Op, inputs: [&wgpu::Texture; 2], params: &[f32]) -> wgpu::Texture {
+    pub fn texture(&self, device: &wgpu::Device, width: u32, height: u32) -> Pooled {
+        let reused = self.shelves.borrow_mut().get_mut(&(width, height)).and_then(Vec::pop);
+        let texture = reused.unwrap_or_else(|| layer_texture(device, width, height));
+        Pooled(Rc::new(Slot { texture, shelves: self.shelves.clone() }))
+    }
+
+    pub fn run(&self, device: &wgpu::Device, queue: &wgpu::Queue, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {
         let pipeline = &self.pipelines.iter().find(|(o, _)| *o == op).expect("every op has a pipeline").1;
         let [a, b] = inputs;
-        let out = layer_texture(device, a.width(), a.height());
+        let out = self.texture(device, a.width(), a.height());
         let padded: Vec<u8> = params.iter().chain(std::iter::once(&0.0)).flat_map(|v| v.to_le_bytes()).collect();
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: None, contents: &padded, usage: wgpu::BufferUsages::STORAGE });
         let view = |t: &wgpu::Texture| t.create_view(&wgpu::TextureViewDescriptor::default());

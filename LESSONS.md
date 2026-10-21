@@ -4,6 +4,10 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### An effect that publishes into a `$state` map loops once it runs per edit
+
+**Signal:** `effect_update_depth_exceeded` in the console, the UI stops updating after the first keystroke, the stack points at an `$effect` calling `liveDocs.set`. **Move:** the setter read `this.map` to copy it, so the effect depended on what it wrote; read it with `untrack` inside the setter. Vitest runs the server build of Svelte, where effects do not run: only a real browser shows it.
+
 ### Un e2e che trascina un elemento in un frame non si muove: il punto di presa era sul bordo
 Segnale: il clic seleziona l'elemento (`selection-box` visibile) ma il trascinamento non cambia il documento salvato. Causa: la presa calcolata come quota dello stage meno un offset in pixel cadeva sul bordo del box, dove stanno le maniglie. Mossa: prendere il punto dal `boundingBox()` di `selection-box` (un quarto della larghezza, a metà altezza), mai da una quota dello stage. Con un worktree nuovo, `node_modules` del checkout principale può essere rotto (`intl-messageformat/lib/src/core` mancante): `npm ci` nel worktree, non un symlink.
 
@@ -3188,3 +3192,19 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 
 ## A canvas op that fails still answers 200
 **Signal:** a batch over `POST /api/v1/edit` reported `applied: 3` although a `move_node` on a missing node came back `{ error: 'node_not_found' }`. **Move:** canvas ops signal refusal in the body (`error`, or `outcome` invalid/conflict/not_found), not in the HTTP status; anything that sequences ops reads both (`run-edit.ts`). A dev server also keeps serving the old module after an edit under `$lib/server`: restart it before believing a live run.
+
+## A gpu-core scrub below 60 fps with a cheap draw
+
+**Signal:** `?engine=gpu-core` scrub stutters while `raster` is a few ms and the HTML engine is smooth. **Move:** `npm run bench:gpu-parity -- --doc=<doc> --mode=scrub` prints per-phase p50 (`read` / `build` / `ready` / `raster`). A `read` near 20 ms with the in-iframe seek and read under 1.5 ms is the hidden DOM page waiting a vsync (`dom/probe.ts`), not work. The first engine run in a page also pays a one-off ~1 s iframe stall: compare runs in the same order.
+
+## A worktree dev server keeps serving the old module
+
+**Signal:** edits to a `.svelte` or `.ts` file change nothing in a Playwright run against `vite dev` started in a worktree; `curl localhost:PORT/src/...` shows the old source; before/after A/B runs agree because both ran the same stale code. **Move:** restart the dev server for every variant (`scripts/bench/editor-scrub.ts` runs against a fresh one) and grep the served module for a marker before trusting a comparison.
+
+## A gpu-core layer-heavy frame is slow with idle CPU
+
+**Signal:** `?engine=gpu-core` drops frames (presents/s well under rAF fps) on docs with blur, masks or filters while the main thread is idle. **Move:** `cargo run --release --example frame_cost -- <display list json>` in `packages/gpu-core` (dump a list with `scripts/bench/dump-list.ts`) gives GPU time per frame without readback. Cost was per-pass texture allocation and initialisation, not texel math: pooling the textures cut a 16-filter frame from 54 to 42 ms, while tiling or downscaling the blur added passes and got slower.
+
+## A static layer is repainted every frame
+
+**Signal:** a doc with a few moving paths and several blurred or masked layers that do not move still costs 10-50 ms per core frame. **Move:** `scripts/bench/dump-list.ts <doc> <out.json> <frames...>` and compare layered items between frames (identical JSON means a cache hit is possible); the engine keeps finished layer textures for path-only items (`LayerCache` in `engine.rs`). Pictures, text and backdrop layers must stay uncached: their inputs change without the item changing.

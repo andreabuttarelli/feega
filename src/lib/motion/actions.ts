@@ -93,6 +93,7 @@ import ArrowRight from '@lucide/svelte/icons/arrow-right';
 import CircleDashed from '@lucide/svelte/icons/circle-dashed';
 import Group from '@lucide/svelte/icons/group';
 import Ungroup from '@lucide/svelte/icons/ungroup';
+import Frame from '@lucide/svelte/icons/frame';
 import Columns2 from '@lucide/svelte/icons/columns-2';
 import FolderOpen from '@lucide/svelte/icons/folder-open';
 import CopyCheck from '@lucide/svelte/icons/copy-check';
@@ -221,6 +222,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Precompose]: { name: 'Precompose', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Group]: { name: 'Group', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Ungroup]: { name: 'Ungroup', icon: Ungroup, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.FrameSelection]: { name: 'Frame selection', icon: Frame, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
@@ -234,6 +236,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Intersect]: { name: 'Intersect', icon: SquaresIntersect, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Exclude]: { name: 'Exclude', icon: SquaresExclude, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.OutlineStroke]: { name: 'Outline stroke', icon: PenLine, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.TextToPath]: { name: 'Outline text', icon: TypeIcon, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Flatten]: { name: 'Flatten', icon: Combine, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignLeft]: { name: 'Align left', icon: AlignStartVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignCenter]: { name: 'Align horizontal centres', icon: AlignCenterVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },

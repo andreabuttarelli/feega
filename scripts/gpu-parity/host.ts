@@ -140,7 +140,7 @@ function percentile(values: number[], p: number): number {
 
 function summary(deltas: number[], work: number[]): PreviewResult {
   const BUDGET_MS = 1000 / 60 + 2;
-  return { frames: deltas.length, p50: percentile(deltas, 0.5), p95: percentile(deltas, 0.95), dropped: deltas.filter((d) => d > BUDGET_MS).length, workP50: percentile(work, 0.5), workP95: percentile(work, 0.95) };
+  return { frames: deltas.length, p50: percentile(deltas, 0.5), p95: percentile(deltas, 0.95), dropped: deltas.filter((d) => d > BUDGET_MS).length, worst: Math.max(...deltas), workP50: percentile(work, 0.5), workP95: percentile(work, 0.95) };
 }
 
 async function htmlPreview(input: PreviewInput): Promise<PreviewResult> {
@@ -199,6 +199,100 @@ async function gpuPreview(input: PreviewInput): Promise<PreviewResult> {
   return summary(deltas.slice(1), work);
 }
 
+const SCRUB_PERIOD_S = 2;
+
+const sweepFrame = (now: number, start: number, frames: number) => {
+  const phase = (((now - start) / 1000 / SCRUB_PERIOD_S) % 1) * 2;
+  return Math.round((phase < 1 ? phase : 2 - phase) * (frames - 1));
+};
+
+async function htmlScrub(input: PreviewInput): Promise<PreviewResult> {
+  await import('@hyperframes/player');
+  const doc = input.spec.doc as MotionDoc;
+  const el = document.createElement('hyperframes-player') as HTMLElement & { seek: (t: number) => void };
+  el.setAttribute('sandbox-origin', 'opaque');
+  el.setAttribute('disable-click-to-play', '');
+  el.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+  const ready = new Promise((r) => el.addEventListener('ready', r, { once: true }));
+  host().appendChild(el);
+  el.setAttribute('srcdoc', input.html);
+  await ready;
+  await new Promise((r) => setTimeout(r, input.warmMs));
+  const deltas: number[] = [];
+  const work: number[] = [];
+  const start = performance.now();
+  let last = start;
+  while (performance.now() - start < input.seconds * 1000) {
+    await new Promise((r) => requestAnimationFrame(r));
+    const now = performance.now();
+    deltas.push(now - last);
+    last = now;
+    const w0 = performance.now();
+    el.seek(sweepFrame(now, start, doc.durationInFrames) / doc.fps);
+    work.push(performance.now() - w0);
+  }
+  el.remove();
+  return summary(deltas.slice(1), work);
+}
+
+async function coreScrub(input: PreviewInput): Promise<PreviewResult> {
+  const doc = input.spec.doc as MotionDoc;
+  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets, { fonts: await loadFontsWith(faceEngineOf(input.spec.faces))(doc, input.spec.assets, FEEGA_TOKENS), smoothing: smoothingOf(navigator.userAgent) });
+  const media = createMedia();
+  const custom = await mountCustomReads(host(), composer(input.spec), prepared);
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+  host().appendChild(canvas);
+  const raster = await BACKENDS[FullBackend.Core](canvas, doc.width, doc.height);
+  const phases: Record<string, number[]> = { read: [], build: [], ready: [], raster: [] };
+  const lap = (name: string, since: number) => {
+    phases[name].push(performance.now() - since);
+    return performance.now();
+  };
+  const draw = async (frame: number) => {
+    let t = performance.now();
+    const read = await custom.readAt(frame);
+    t = lap('read', t);
+    const list = drawFrame(prepared, frame, read.reads);
+    t = lap('build', t);
+    await media.ready(list);
+    t = lap('ready', t);
+    raster.draw(list, (item) => read.picture(item) ?? media.pictures(item));
+    lap('raster', t);
+  };
+  await draw(0);
+  await new Promise((r) => setTimeout(r, input.warmMs));
+  const deltas: number[] = [];
+  const work: number[] = [];
+  const start = performance.now();
+  let last = start;
+  let drawn = -1;
+  let busy = false;
+  while (performance.now() - start < input.seconds * 1000) {
+    await new Promise((r) => requestAnimationFrame(r));
+    const now = performance.now();
+    deltas.push(now - last);
+    last = now;
+    const frame = sweepFrame(now, start, doc.durationInFrames);
+    if (busy || frame === drawn) {
+      continue;
+    }
+    drawn = frame;
+    busy = true;
+    const w0 = performance.now();
+    void draw(frame).finally(() => {
+      work.push(performance.now() - w0);
+      busy = false;
+    });
+  }
+  await new Promise((r) => setTimeout(r, 200));
+  raster.dispose();
+  media.dispose();
+  custom.dispose();
+  console.log('phases p50/p95/max', JSON.stringify(Object.fromEntries(Object.entries(phases).map(([k, v]) => [k, [percentile(v, 0.5), percentile(v, 0.95), percentile(v, 1)].map((n) => +n.toFixed(2))]))));
+  return summary(deltas.slice(1), work);
+}
+
 let live: (HTMLElement & { seek: (t: number) => void; pause: () => void }) | null = null;
 
 async function liveMount(input: { html: string; width: number; height: number }) {
@@ -219,4 +313,4 @@ async function liveSeek(t: number) {
   await new Promise((r) => setTimeout(r, 400));
 }
 
-Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, gpuCoreShots, gpuCoreGlShots, coreExportShots: (i: ShotsInput) => coreExportShots(i, FullBackend.Core), coreExportGlShots: (i: ShotsInput) => coreExportShots(i, FullBackend.CoreGl), htmlExport, gpuExport, htmlPreview, gpuPreview });
+Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, gpuCoreShots, gpuCoreGlShots, coreExportShots: (i: ShotsInput) => coreExportShots(i, FullBackend.Core), coreExportGlShots: (i: ShotsInput) => coreExportShots(i, FullBackend.CoreGl), htmlExport, gpuExport, htmlPreview, gpuPreview, htmlScrub, coreScrub });

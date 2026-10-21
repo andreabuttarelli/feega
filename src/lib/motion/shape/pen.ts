@@ -50,6 +50,37 @@ export function deletePoint(outline: Outline, ref: PointRef): Outline {
     .filter((c) => c.vertices.length > 0);
 }
 
+const SMOOTH_REACH = 1 / 3;
+
+export const isCorner = (v: Vertex) => sameAt(v.in, v.p) && sameAt(v.out, v.p);
+
+export function toggleSmooth(outline: Outline, ref: PointRef): Outline {
+  const contour = outline[ref.contour];
+  const v = contour?.vertices[ref.index];
+  if (!v) {
+    return outline;
+  }
+  if (!isCorner(v)) {
+    return editVertex(outline, ref, (own) => corner(own.p));
+  }
+
+  const count = contour.vertices.length;
+  const prev = ref.index > 0 || contour.closed ? contour.vertices[(ref.index - 1 + count) % count] : null;
+  const next = ref.index < count - 1 || contour.closed ? contour.vertices[(ref.index + 1) % count] : null;
+  const from = prev && prev !== v ? prev.p : null;
+  const to = next && next !== v ? next.p : null;
+  const along = from && to ? ([to[0] - from[0], to[1] - from[1]] as Pt) : to ? ([to[0] - v.p[0], to[1] - v.p[1]] as Pt) : from ? ([v.p[0] - from[0], v.p[1] - from[1]] as Pt) : null;
+  const length = along ? Math.hypot(along[0], along[1]) : 0;
+  if (!along || length === 0) {
+    return outline;
+  }
+
+  const unit: Pt = [along[0] / length, along[1] / length];
+  const reachOut = (to ? distance(v.p, to) : from ? distance(v.p, from) : 0) * SMOOTH_REACH;
+  const reachIn = (from ? distance(v.p, from) : reachOut / SMOOTH_REACH) * SMOOTH_REACH;
+  return editVertex(outline, ref, (own) => ({ p: own.p, in: pt(own.p[0] - unit[0] * reachIn, own.p[1] - unit[1] * reachIn), out: pt(own.p[0] + unit[0] * reachOut, own.p[1] + unit[1] * reachOut) }));
+}
+
 export function toggleClosed(outline: Outline, contour: number): Outline {
   return outline.map((c, ci) => (ci === contour ? { ...c, closed: !c.closed } : c));
 }

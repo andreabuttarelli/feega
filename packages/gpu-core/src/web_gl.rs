@@ -6,9 +6,13 @@ use wasm_bindgen::prelude::*;
 use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap, WebGl2RenderingContext as Gl};
 
 use crate::canvas::{brush, Canvas};
+use crate::compositor::{Compositor, Painter};
 use crate::display_list::{parse, DisplayList, Paint, Rgba, Size};
 use crate::groups::{report, Library, Limits, Plan};
 use crate::gl_passes::{texture, GlRunner, Tex};
+use crate::gl_reproject::{held, smooth, GlReprojector, Held, Target};
+use crate::retained::{Camera, Lookup, Quality};
+use crate::world::{parse_overlay, parse_patch};
 use crate::layers::{prepare, Blending, Surface};
 use crate::scene::{build_into, Placed, Shelf};
 use crate::Skipped;
@@ -137,6 +141,78 @@ pub struct WebGlCore {
     library: Library,
     cached: Shelf<GlPicture>,
     pending: bool,
+    compositor: Compositor,
+    camera: Camera,
+    retained: Held,
+    spare: Held,
+    reprojector: GlReprojector,
+}
+
+impl Painter for WebGlCore {
+    type Error = JsValue;
+
+    fn limits(&self) -> Limits {
+        WebGlCore::limits(self)
+    }
+
+    fn tile(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+
+    fn shift(&mut self, (dx, dy): (i32, i32)) -> Result<(), JsValue> {
+        let gl = self.renderer.gl_context().clone();
+        let (w, h) = (self.retained.tex.width as f64, self.retained.tex.height as f64);
+        let whole = Rect::new(0.0, 0.0, w, h);
+        let from = whole.intersect(whole - vello::kurbo::Vec2::new(dx as f64, dy as f64));
+        if from.area() > 0.0 {
+            let (x0, x1) = (from.x0 as i32, from.x1 as i32);
+            let (y0, y1) = ((h - from.y1) as i32, (h - from.y0) as i32);
+            gl.disable(Gl::SCISSOR_TEST);
+            gl.bind_framebuffer(Gl::READ_FRAMEBUFFER, Some(&self.retained.fbo));
+            gl.bind_framebuffer(Gl::DRAW_FRAMEBUFFER, Some(&self.spare.fbo));
+            gl.blit_framebuffer(x0, y0, x1, y1, x0 + dx, y0 - dy, x1 + dx, y1 - dy, Gl::COLOR_BUFFER_BIT, Gl::NEAREST);
+            gl.bind_framebuffer(Gl::READ_FRAMEBUFFER, None);
+            gl.bind_framebuffer(Gl::DRAW_FRAMEBUFFER, None);
+        }
+        std::mem::swap(&mut self.retained, &mut self.spare);
+        Ok(())
+    }
+
+    fn paint(&mut self, plan: Plan, into: Rect, quality: Quality) -> Result<Vec<Skipped>, JsValue> {
+        let (list, missing) = self.hold(plan)?;
+        let pictures: Shelf<GlPicture> = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), *v)).collect();
+        let mut surface = GlSurface { renderer: &mut self.renderer, resources: &mut self.resources, canvas: &mut self.canvas, runner: &self.runner, width: self.width, height: self.height, placed: Vec::new() };
+        let layers = prepare(&mut surface, &list, &pictures, Blending::Composited)?;
+        let skipped = std::cell::RefCell::new(Vec::new());
+        surface.render(list.background, Affine::IDENTITY, &|c| skipped.borrow_mut().extend(build_into(c, &list, &pictures, &layers)))?;
+        for id in surface.placed {
+            surface.renderer.destroy_image(surface.resources, id);
+        }
+        let gl = self.renderer.gl_context().clone();
+        let (w, h) = (list.width as i32, list.height as i32);
+        let below = self.height as i32 - h;
+        gl.bind_framebuffer(Gl::FRAMEBUFFER, None);
+        match quality {
+            Quality::Sharp => {
+                gl.bind_texture(Gl::TEXTURE_2D, Some(&self.retained.tex.texture));
+                gl.copy_tex_sub_image_2d(Gl::TEXTURE_2D, 0, into.x0 as i32, self.retained.tex.height as i32 - into.y0 as i32 - h, 0, below, w, h);
+            }
+            Quality::Rough => {
+                let scratch = texture(&gl, w as u32, h as u32);
+                smooth(&gl, &scratch.texture);
+                gl.copy_tex_sub_image_2d(Gl::TEXTURE_2D, 0, 0, 0, 0, below, w, h);
+                let scale = w as f64 / into.width();
+                let look = Lookup { scale, x: -into.x0 * scale, y: -into.y0 * scale };
+                self.reprojector.draw(&scratch, look, Target { fbo: Some(&self.retained.fbo), width: self.retained.tex.width, height: self.retained.tex.height, within: Some(into) });
+            }
+        }
+        Ok([skipped.into_inner(), missing].concat())
+    }
+
+    fn present(&mut self, look: Lookup) -> Result<(), JsValue> {
+        self.reprojector.draw(&self.retained.tex, look, Target { fbo: None, width: self.width, height: self.height, within: None });
+        Ok(())
+    }
 }
 
 #[wasm_bindgen]
@@ -146,7 +222,12 @@ impl WebGlCore {
         canvas.set_height(height);
         let (renderer, resources) = WebGlRenderer::new(&canvas);
         let runner = GlRunner::new(renderer.gl_context());
-        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, pictures: Shelf::new(), library: Library::new(), cached: Shelf::new(), pending: false }
+        let compositor = Compositor::new(width, height);
+        let retained = held(renderer.gl_context(), compositor.size());
+        let spare = held(renderer.gl_context(), compositor.size());
+        let reprojector = GlReprojector::new(renderer.gl_context());
+        let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, pictures: Shelf::new(), library: Library::new(), cached: Shelf::new(), pending: false, compositor, camera, retained, spare, reprojector }
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -173,21 +254,52 @@ impl WebGlCore {
         let id = self.renderer.upload_image(&mut self.resources, &WebGlTextureWithDimensions { texture: texture.clone(), width, height });
         gl.delete_texture(Some(&texture));
         self.pictures.insert(clip.into(), GlPicture { id, size: Size { width: width as f64, height: height as f64 } });
+        self.compositor.touch_picture(clip, &self.library);
         Ok(())
     }
 
     pub fn put_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
+        self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse(list_json).map_err(failed)?);
+        self.compositor.touch(key, &self.library);
         Ok(())
     }
 
     pub fn append_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
         self.library.append_group(key, &parse(list_json).map_err(failed)?);
+        self.compositor.touch(key, &self.library);
         Ok(())
     }
 
     pub fn drop_group(&mut self, key: &str) {
+        self.compositor.touch(key, &self.library);
         self.library.drop_group(key);
+    }
+
+    pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) {
+        self.camera = Camera { x, y, zoom };
+    }
+
+    pub fn patch_uses(&mut self, patch_json: &str) -> Result<(), JsValue> {
+        self.compositor.patch(parse_patch(patch_json).map_err(failed)?, &self.library);
+        Ok(())
+    }
+
+    pub fn set_overlay(&mut self, items_json: &str) -> Result<(), JsValue> {
+        self.compositor.set_overlay(parse_overlay(items_json).map_err(failed)?);
+        Ok(())
+    }
+
+    pub fn frame(&mut self, now_ms: f64) -> Result<String, JsValue> {
+        let mut library = std::mem::take(&mut self.library);
+        let mut compositor = std::mem::replace(&mut self.compositor, Compositor::new(0, 0));
+        let camera = self.camera;
+        let frame = compositor.frame(self, &mut library, camera, now_ms, &mut js_sys::Date::now);
+        self.library = library;
+        self.compositor = compositor;
+        let frame = frame?;
+        self.pending = frame.pending;
+        Ok(frame.report())
     }
 
     pub fn cache_pending(&self) -> bool {
