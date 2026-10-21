@@ -12,13 +12,10 @@
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
   import FrameSelection from '../FrameSelection.svelte';
-<<<<<<< HEAD
   import { findClip, type MotionClip } from '$lib/motion/doc';
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import { commitText, editsText, hideText, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
-=======
   import FrameInspectorPanel from '../FrameInspectorPanel.svelte';
->>>>>>> origin/dev
   import { frameLevel, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
