@@ -21,7 +21,9 @@
   import { Grip, type Pt } from '$lib/motion/scene-select';
   import { guessedBoxes } from '$lib/motion/move-element';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
-  import { stillFrame } from '$lib/canvas/core/frame-source';
+  import { frameOfLive } from '$lib/canvas/core/frame-source';
+  import { withPlayhead } from '$lib/canvas/frame-playhead';
+  import FrameTimeline from '../FrameTimeline.svelte';
   import type CanvasFlow from '../CanvasFlow.svelte';
   import type { Tile } from '../CanvasFlow.svelte';
   import CanvasAddBar from '../CanvasAddBar.svelte';
@@ -1149,8 +1151,8 @@
       return null;
     }
     const held = pickers.get(frame.id);
-    const picker = held?.live === live ? held.picker : framePicker(live);
-    pickers.set(frame.id, { live, picker });
+    const picker = held?.live === live.doc ? held.picker : framePicker(live, () => liveOf(frame.id)?.playhead);
+    pickers.set(frame.id, { live: live.doc, picker });
     const space = picker.spaceOf(frame.box, byId.get(frame.id)?.rotation ?? 0);
     const clip = picker.pick(w, space);
     return { nodeId: frame.id, clip, space, picker, frame };
@@ -1246,10 +1248,35 @@
       return null;
     }
     const held = pickers.get(nodeId);
-    const picker = held?.live === live ? held.picker : framePicker(live);
-    pickers.set(nodeId, { live, picker });
+    const picker = held?.live === live.doc ? held.picker : framePicker(live, () => liveOf(nodeId)?.playhead);
+    pickers.set(nodeId, { live: live.doc, picker });
     return { picker, space: picker.spaceOf(frame.box, byId.get(nodeId)?.rotation ?? 0), frame, live };
   }
+
+  let timed: string | null = null;
+
+  function scrubTo(nodeId: string, frame: number) {
+    const live = liveOf(nodeId);
+    if (live) {
+      timed = nodeId;
+      liveDocs.set(nodeId, withPlayhead(live, frame));
+    }
+  }
+
+  $effect(() => {
+    const leaving = timed;
+    const live = leaving && inside?.nodeId !== leaving ? liveOf(leaving) : null;
+    if (leaving && live) {
+      timed = null;
+      liveDocs.set(leaving, withPlayhead(live, null));
+    }
+  });
+
+  const timeline = $derived.by(() => {
+    const nodeId = unified ? inside?.nodeId : null;
+    const live = nodeId ? liveOf(nodeId) : null;
+    return nodeId && live ? { nodeId, doc: live.doc, frame: frameOfLive(live) } : null;
+  });
 
   function selectionMark(nodeId: string) {
     const clip = inside?.nodeId === nodeId ? inside.level.clip : null;
@@ -1268,7 +1295,7 @@
     e.preventDefault();
     e.stopPropagation();
     const start = saver.history.present;
-    const frame = stillFrame(start);
+    const frame = frameOfLive({ doc: start, playhead: at.live.playhead });
     const box = guessedBoxes(withAutoLayout(start))[clip] ?? rect;
     const framePt = (ev: PointerEvent): Pt => at.picker.framePoint(toWorld(view, local(ev)), at.space);
     const from = framePt(e);
@@ -2118,6 +2145,19 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="wrap svelte-flow" onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? (coreOn ? CORE : 'pending')} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
+  {#if timeline}
+    {@const nodeId = timeline.nodeId}
+    <div style="display: contents" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
+      <FrameTimeline
+        doc={timeline.doc}
+        frame={timeline.frame}
+        selection={inside?.level.clip ? [inside.level.clip] : []}
+        onframe={(f) => scrubTo(nodeId, f)}
+        onselect={(ids) => goInside(nodeId, Gesture.Click, ids[0] ?? null)}
+        onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
+      />
+    </div>
+  {/if}
   <div
     class="surface svelte-flow__pane"
     bind:this={surface}

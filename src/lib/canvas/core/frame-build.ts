@@ -4,9 +4,9 @@ import { drawFrame, prepare, type DisplayList } from '$lib/motion/gpu-full/displ
 import { readClips } from '$lib/motion/gpu-full/dom/custom';
 import type { FaceBook } from '$lib/motion/gpu-full/text/face';
 import type { Smoothing } from '$lib/motion/gpu-full/text/painter';
-import { stillFrame } from './frame-source';
+import { frameOfLive } from './frame-source';
 
-export type FrameDoc = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens };
+export type FrameDoc = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens; playhead?: number };
 
 export type Fonts = (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook>;
 
@@ -22,7 +22,7 @@ export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: 
   }
   const faces = await fonts(source.doc, source.assets, source.tokens);
   const prepared = prepare(source.doc, source.tokens, source.assets, { fonts: faces, smoothing });
-  return drawFrame(prepared, stillFrame(source.doc));
+  return drawFrame(prepared, frameOfLive(source));
 }
 
 export function frameBuilder(spawn: () => BuildWorker | null): (url: string, smoothing: Smoothing) => Promise<DisplayList | null> {

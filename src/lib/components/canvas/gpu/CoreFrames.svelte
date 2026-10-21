@@ -16,7 +16,7 @@
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentOverlay, SentUses } from '$lib/canvas/core/use-diff';
   import type { PathItem } from '$lib/motion/gpu-full/display-list';
-  import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsWhole, frameOfLive, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
@@ -87,7 +87,7 @@
   async function buildSource(f: FrameAt, source: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
-    const still = stillFrame(source.doc);
+    const still = frameOfLive(source);
     const custom = await readDom(f, source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
     return { list: drawFrame(prepared, still, custom?.reads), custom };
   }

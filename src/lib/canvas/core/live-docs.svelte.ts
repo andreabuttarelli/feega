@@ -2,7 +2,7 @@ import { untrack } from 'svelte';
 import type { MotionDoc } from '$lib/motion/doc';
 import type { BrandTokens } from '$lib/motion/brand';
 
-export type LiveDoc = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> };
+export type LiveDoc = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; playhead?: number };
 
 class LiveDocs {
   map = $state(new Map<string, LiveDoc>());
