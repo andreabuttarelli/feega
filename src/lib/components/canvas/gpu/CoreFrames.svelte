@@ -171,7 +171,7 @@
   const framePuts = $derived(
     frames.flatMap((f): HeldFrame[] => {
       const list = lists.get(groupOf(f));
-      return list && drawsWhole(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items) }] : [];
+      return list && drawsWhole(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
     })
   );
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));
@@ -197,7 +197,7 @@
 
   const rank = $derived(new Map(order.map((id, i) => [id, i])));
   const stacking = (id: string) => rank.get(id) ?? 0;
-  const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...frames.map((f) => ({ id: f.id, box: f.box, stand: Stand.Frame })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))].sort((a, b) => stacking(a.id) - stacking(b.id)));
+  const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...frames.map((f) => ({ id: f.id, box: f.box, stand: Stand.Frame, turn: f.turn })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))].sort((a, b) => stacking(a.id) - stacking(b.id)));
   const placeholders = $derived(new Map(standIns.map((n) => [n.id, { ...n, ...placeholder(n.stand, { width: n.box.w, height: n.box.h }, look) }])));
   const BLOCKS = ':blocks';
   const blocksGroup = (key: string) => `${key}${BLOCKS}`;

@@ -11,6 +11,11 @@ describe('frames on canvas', () => {
     expect(f).toEqual({ id: 'a', kind: FrameKind.Frame, revision: 4, box: { x: 10, y: 20, w: 300, h: 200 - MOTION_NODE_BAR_H } });
   });
 
+  it('a rotated tile turns its frame about the tile centre', () => {
+    const [f] = framesOnCanvas([{ ...tile('a'), rotation: 20 }], () => ({ kind: FrameKind.Element, docHeadRevision: 1 }));
+    expect(f.turn).toEqual({ degrees: 20, about: { x: 160, y: 120 } });
+  });
+
   it('elements and groups have no bar', () => {
     const [f] = framesOnCanvas([tile('a')], () => ({ kind: FrameKind.Element, docHeadRevision: 1 }));
     expect(f.box.h).toBe(200);
