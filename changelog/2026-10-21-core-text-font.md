@@ -6,3 +6,12 @@ deselected (core). `core-font.ts` now declares the core faces (400, 600); a test
 checks them against the `--sans` family and `@font-face` rules in `app.css`.
 
 Not found: the cause of the blurry bitmap on click-to-edit; needs a browser.
+
+## Frame selection mounts its DOM tile again
+
+#1069 left selected frames out of the DOM set under the core. The inline editor
+stages on the `MotionNode` host (`inlineStage.offer`), so with no tile the player
+mounted at 0x0 and the frame was re-fitted, rescaling its content. `editableIds`
+is back to the plain capped selection. Cost: the select/deselect swap flash #1069
+tried to remove returns; it needs a fix that keeps the host mounted while the core
+keeps drawing. `frameBar.host` is `$state.raw` (proxy broke the teardown identity check).

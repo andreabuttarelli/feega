@@ -27,7 +27,7 @@
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
-  import { CoreMode, editableIds } from '$lib/canvas/frame-live';
+  import { editableIds } from '$lib/canvas/frame-live';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
@@ -180,7 +180,7 @@
   const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
-  const editIds = $derived(editableIds(selected, placed, coreOn ? CoreMode.On : CoreMode.Off, DOM_CAP));
+  const editIds = $derived(editableIds(selected, DOM_CAP));
   let drawn = $state(new Set<string>());
   let sticky = $state(new Map<string, number>());
   let wasEditing = new Set<string>();
