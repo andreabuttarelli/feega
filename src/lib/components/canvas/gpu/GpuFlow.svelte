@@ -19,7 +19,6 @@
   import { frameLevel, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
-  import { findClip } from '$lib/motion/doc';
   import { dragClip } from '$lib/canvas/frame-transform';
   import { marqueeIds, primaryOf, redoRoute, spanOf, toggleId, undoRoute, UndoRoute } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
