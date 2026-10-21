@@ -19,7 +19,9 @@
   import { frameLevel, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
+  import { findClip } from '$lib/motion/doc';
   import { dragClip } from '$lib/canvas/frame-transform';
+  import { marqueeIds, primaryOf, redoRoute, spanOf, toggleId, undoRoute, UndoRoute } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
   import { Grip, type Pt } from '$lib/motion/scene-select';
   import { guessedBoxes } from '$lib/motion/move-element';
@@ -232,7 +234,7 @@
   const unified = $derived(unifiedFrames(page.url));
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
   const editIds = $derived(editableIds(selected, DOM_CAP, unified ? new Set(coreFrames.map((f) => f.id)) : new Set()));
-  const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
+  const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
     if (coreOn && !coreType) {
@@ -1174,8 +1176,48 @@
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
 
+  let picks = $state<string[]>([]);
+  let bandDrag = $state<{ nodeId: string; from: Point; to: Point } | null>(null);
+
   function goInside(nodeId: string, gesture: Gesture, clip: string | null) {
     inside = { nodeId, level: stepInside(insideLevel(nodeId), gesture, clip) };
+    picks = inside.level.clip ? [inside.level.clip] : [];
+  }
+
+  function pickMany(nodeId: string, ids: string[]) {
+    inside = { nodeId, level: stepInside(frameLevel(), Gesture.Click, primaryOf(ids)) };
+    picks = ids;
+  }
+
+  function extendPick(e: PointerEvent, w: Point): boolean {
+    const hit = e.shiftKey && e.button === 0 && e.pointerType === 'mouse' ? framePickAt(w) : null;
+    if (!hit || inside?.nodeId !== hit.nodeId) {
+      return false;
+    }
+    if (hit.clip) {
+      pickMany(hit.nodeId, toggleId(picks, hit.clip));
+      return true;
+    }
+    const clips = liveOf(hit.nodeId)?.doc.tracks.flatMap((t) => t.clips.map((c) => c.id)) ?? [];
+    const from = w;
+    const move = (ev: PointerEvent) => {
+      bandDrag = { nodeId: hit.nodeId, from, to: toWorld(view, local(ev)) };
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      bandDrag = null;
+      const a = hit.picker.framePoint(from, hit.space);
+      const b = hit.picker.framePoint(toWorld(view, local(ev)), hit.space);
+      const rects = Object.fromEntries(clips.flatMap((id) => {
+        const r = hit.picker.frameRect(id);
+        return r ? [[id, r]] : [];
+      }));
+      pickMany(hit.nodeId, marqueeIds(rects, spanOf(a, b)));
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    return true;
   }
 
   function pickElement(e: PointerEvent, w: Point): boolean {
@@ -1193,10 +1235,12 @@
     if (unified && only && coreFrames.some((f) => f.id === only)) {
       if (inside?.nodeId !== only) {
         inside = { nodeId: only, level: frameLevel() };
+        picks = [];
       }
       return;
     }
     inside = null;
+    picks = [];
   });
 
   function saverOf(nodeId: string) {
@@ -1229,13 +1273,33 @@
     return session;
   }
 
-  const panelNodeId = $derived(unified && inside?.level.clip ? inside.nodeId : null);
+  const panelNodeId = $derived(unified && picks.length && inside ? inside.nodeId : null);
   const panelSession = $derived(panelNodeId ? saverOf(panelNodeId) : null);
   const panelTokens = $derived(panelNodeId ? (liveOf(panelNodeId)?.tokens ?? null) : null);
 
   $effect(() => {
-    panelSession?.select(inside?.level.clip ? [inside.level.clip] : []);
+    panelSession?.select(picks);
   });
+
+  const Step = { Back: 'back', Forward: 'forward' } as const;
+  type Step = (typeof Step)[keyof typeof Step];
+
+  const frameHistory = (route: typeof undoRoute) => (panelSession ? route(panelSession.history) : UndoRoute.Canvas);
+
+  function stepFrame(step: Step) {
+    const session = panelSession;
+    const nodeId = panelNodeId;
+    if (!session || !nodeId) {
+      return;
+    }
+    if (step === Step.Back) {
+      session.undo();
+    } else {
+      session.redo();
+    }
+    liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
+    picks = picks.filter((id) => findClip(session.history.present, id));
+  }
 
   function commit(nodeId: string, result: OpResult, summary: string) {
     const session = saverOf(nodeId);
@@ -1282,11 +1346,25 @@
     return nodeId && live ? { nodeId, doc: live.doc, frame: frameOfLive(live) } : null;
   });
 
-  function selectionMark(nodeId: string) {
-    const clip = inside?.nodeId === nodeId ? inside.level.clip : null;
-    const at = clip && !byId.get(nodeId)?.rotation ? pickerOf(nodeId) : null;
-    const rect = clip && at ? at.picker.outline(clip, at.space) : null;
-    return clip && at && rect ? { clip, rect: { left: (rect.x - at.frame.box.x) * view.zoom, top: (rect.y - at.frame.box.y) * view.zoom, width: rect.w * view.zoom, height: rect.h * view.zoom } } : null;
+  function selectionMarks(nodeId: string) {
+    const at = inside?.nodeId === nodeId ? pickerOf(nodeId) : null;
+    if (!at) {
+      return [];
+    }
+    return picks.flatMap((clip) => {
+      const rect = at.picker.outline(clip, at.space);
+      return rect ? [{ clip, rect: { left: (rect.x - at.frame.box.x) * view.zoom, top: (rect.y - at.frame.box.y) * view.zoom, width: rect.w * view.zoom, height: rect.h * view.zoom } }] : [];
+    });
+  }
+
+  function marqueeRect(nodeId: string) {
+    const m = bandDrag?.nodeId === nodeId ? bandDrag : null;
+    const frame = coreFrames.find((f) => f.id === nodeId);
+    if (!m || !frame) {
+      return null;
+    }
+    const r = spanOf([m.from.x, m.from.y], [m.to.x, m.to.y]);
+    return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
   }
 
   type Typing = { nodeId: string; clip: string; text: string; world: { x: number; y: number; w: number; h: number }; look: TextEditStyle };
@@ -1346,13 +1424,18 @@
     e.stopPropagation();
     const start = saver.history.present;
     const frame = frameOfLive({ doc: start, playhead: at.live.playhead });
-    const box = guessedBoxes(withAutoLayout(start))[clip] ?? rect;
+    const ids = picks.includes(clip) ? picks : [clip];
+    const boxes = guessedBoxes(withAutoLayout(start));
     const framePt = (ev: PointerEvent): Pt => at.picker.framePoint(toWorld(view, local(ev)), at.space);
     const from = framePt(e);
     let result: ReturnType<typeof dragClip> | null = null;
 
     const move = (ev: PointerEvent) => {
-      result = dragClip({ doc: start, clipId: clip, frame, box, grip, handle, from, to: framePt(ev) });
+      const to = framePt(ev);
+      result = ids.reduce<ReturnType<typeof dragClip>>((acc, id) => {
+        const doc = acc.ok ? acc.doc : start;
+        return dragClip({ doc, clipId: id, frame, box: boxes[id] ?? at.picker.frameRect(id) ?? rect, grip, handle, from, to });
+      }, { ok: true, doc: start });
       if (result.ok) {
         liveDocs.set(nodeId, { ...at.live, doc: result.doc });
       }
@@ -1377,8 +1460,8 @@
       videoSide({
         nodeId,
         doc: () => liveOf(nodeId)!.doc,
-        selection: () => (inside?.nodeId === nodeId && inside.level.clip ? [inside.level.clip] : []),
-        select: (ids) => goInside(nodeId, Gesture.Click, ids[0] ?? null),
+        selection: () => (inside?.nodeId === nodeId ? picks : []),
+        select: (ids) => pickMany(nodeId, ids),
         edit: (result, summary) => commit(nodeId, result, summary)
       })
     );
@@ -1400,7 +1483,7 @@
     const w = toWorld(view, p);
     const target = e.target as HTMLElement;
     const hit = boxHit(hitAt(w), target);
-    if (hit.kind === HitKind.Node && pickElement(e, w)) {
+    if (hit.kind === HitKind.Node && (extendPick(e, w) || pickElement(e, w))) {
       e.preventDefault();
       return;
     }
@@ -1955,8 +2038,8 @@
     duplicate: () => selected.length && props.onDuplicate?.(selected),
     copy: () => selected.length && props.onCopy?.(selected),
     paste: () => props.onPaste?.(viewCentre()),
-    undo: () => props.onUndo?.(),
-    redo: () => props.onRedo?.(),
+    undo: () => (frameHistory(undoRoute) === UndoRoute.Frame ? stepFrame(Step.Back) : props.onUndo?.()),
+    redo: () => (frameHistory(redoRoute) === UndoRoute.Frame ? stepFrame(Step.Forward) : props.onRedo?.()),
     group: () => props.onGroup?.(selected),
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),
@@ -2241,13 +2324,16 @@
     {#if unified}
       <FrameOverlays {view} frames={overlayFrames}>
         {#snippet children(frame)}
-          {@const mark = typing?.nodeId === frame.id ? null : selectionMark(frame.id)}
           {@const edit = typingMark(frame.id)}
           {#if edit}
             <CoreTextEdit rect={edit.rect} look={edit.look} text={edit.text} oncommit={stopTyping} />
           {/if}
-          {#if mark}
+          {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
             <FrameSelection clip={mark.clip} rect={mark.rect} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          {/each}
+          {@const band = marqueeRect(frame.id)}
+          {#if band}
+            <div class="frame-marquee" data-testid="frame-marquee" style={`left:${band.left}px;top:${band.top}px;width:${band.width}px;height:${band.height}px`}></div>
           {/if}
         {/snippet}
       </FrameOverlays>
@@ -2444,6 +2530,12 @@
 </div>
 
 <style>
+  .frame-marquee {
+    position: absolute;
+    border: 1px solid var(--ui-accent, #3b82f6);
+    background: color-mix(in srgb, var(--ui-accent, #3b82f6) 12%, transparent);
+  }
+
   :global(html.canvas-gesture),
   :global(html.canvas-gesture *) {
     user-select: none !important;
