@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::scene::Fragments;
+use crate::fragments::Fragments;
 
 pub type Rgba = [f32; 4];
 pub type Affine = [f64; 6];

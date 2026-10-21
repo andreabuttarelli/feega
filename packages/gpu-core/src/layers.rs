@@ -2,8 +2,9 @@ use vello::kurbo::Rect;
 
 use crate::canvas::Canvas;
 use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
+use crate::fragments::Fragments;
 use crate::filters::{reach as filter_reach, Fold, Fx, Reach, Runner};
-use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, unblended, Fragments, Layers, Placed, Shelf};
+use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
 
 const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
 const REACH: f64 = 3.0;

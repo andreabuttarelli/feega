@@ -1,43 +1,16 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use vello::kurbo::{Affine, BezPath, Point, Rect, Shape};
 use vello::peniko::{Fill, ImageData};
 use vello::Scene;
 
 use crate::canvas::{mix, Canvas};
+use crate::fragments::{compose, Fragments};
 use crate::display_list::{Cover, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Look, Paint, PathItem, Ramp, Rgba, Size, Stop};
 use crate::pictures::{image_rect, Pictures};
 use crate::Skipped;
 
 pub type Shelf<P> = HashMap<String, P>;
-
-#[derive(Clone, Default)]
-pub struct Fragments(Arc<HashMap<String, Arc<Scene>>>);
-
-impl Fragments {
-    pub fn new(encoded: HashMap<String, Arc<Scene>>) -> Self {
-        Fragments(Arc::new(encoded))
-    }
-
-    pub fn get(&self, group: &str) -> Option<&Scene> {
-        self.0.get(group).map(|s| s.as_ref())
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
-impl std::fmt::Debug for Fragments {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Fragments({})", self.0.len())
-    }
-}
 
 fn polygon(points: &[f64]) -> BezPath {
     let mut path = BezPath::new();
@@ -305,7 +278,7 @@ pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictur
     let mut skipped = Vec::new();
     for (i, item) in items.iter().enumerate() {
         if let Item::Use(u) = item {
-            let composed = layers.fragments.get(&u.group).is_some_and(|encoded| scene.fragment(encoded, Affine::new(u.matrix)));
+            let composed = layers.fragments.get(&u.group).is_some_and(|encoded| compose(scene, encoded, Affine::new(u.matrix), frame));
             if !composed {
                 skip(&mut skipped, item.clip(), item.kind());
             }
