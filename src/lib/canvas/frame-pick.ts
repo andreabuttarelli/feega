@@ -1,7 +1,7 @@
 import { composeHtml } from '$lib/motion/hyperframes/compose';
 import { pickAt, rectOf } from '$lib/motion/gpu/pick';
 import { compileScene, type Scene } from '$lib/motion/gpu/scene';
-import { stillFrame } from '$lib/canvas/core/frame-source';
+import { frameOfLive } from '$lib/canvas/core/frame-source';
 import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
 import { containFit } from './frame-hover';
 import type { Box } from './core/canvas-scene';
@@ -39,10 +39,10 @@ export function frameSpace(box: Box, frame: Size, rotation: number): FrameSpace 
   };
 }
 
-export function framePicker(live: LiveDoc) {
+export function framePicker(live: LiveDoc, playhead: () => number | undefined = () => live.playhead) {
   let compiled: Scene | null = null;
   const scene = () => (compiled ??= compileScene(composeHtml({ doc: live.doc, tokens: live.tokens, assets: live.assets, origin: ORIGIN })));
-  const time = () => stillFrame(live.doc) / live.doc.fps;
+  const time = () => frameOfLive({ doc: live.doc, playhead: playhead() }) / live.doc.fps;
   return {
     spaceOf(box: Box, rotation: number): FrameSpace {
       const s = scene();

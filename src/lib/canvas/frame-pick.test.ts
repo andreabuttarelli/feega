@@ -84,6 +84,26 @@ describe('framePicker in frame pixels', () => {
   });
 });
 
+describe('framePicker at the playhead', () => {
+  const brief = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 } }, 'blink');
+  if (!brief.ok) {
+    throw new Error(brief.error);
+  }
+  const centre = { x: BOX.x + BOX.w / 2, y: BOX.y + BOX.h / 2 };
+  let head = 10;
+  const blink = framePicker({ doc: brief.doc, tokens: FEEGA_TOKENS, assets: {} }, () => head);
+
+  it('picks what is on screen at the playhead time', () => {
+    expect(blink.pick(centre, space)).toBe('blink');
+  });
+
+  it('picks nothing once the playhead is past the clip', () => {
+    head = 200;
+
+    expect(blink.pick(centre, space)).toBeNull();
+  });
+});
+
 describe('unifiedFrames', () => {
   it('is on unless switched off in the address', () => {
     expect(unifiedFrames(new URL('https://app.test/p'))).toBe(true);

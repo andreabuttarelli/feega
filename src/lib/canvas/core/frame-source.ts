@@ -31,6 +31,8 @@ export function framesOnCanvas(tiles: readonly FrameTile[], dataOf: (id: string)
 
 export const stillFrame = (doc: { fps: number; durationInFrames: number; still?: { frame: number } }): number => docStill(doc) ?? Math.round(posterSecond(doc) * doc.fps);
 
+export const frameOfLive = (live: { doc: Parameters<typeof stillFrame>[0]; playhead?: number }): number => live.playhead ?? stillFrame(live.doc);
+
 export const drawsWhole = (list: DisplayList): boolean => list.unsupported.length === 0 && list.items.length > 0;
 
 const STAGE: Record<FrameKind, Rgba | null> = {
