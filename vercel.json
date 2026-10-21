@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm ci --prefer-offline --no-audit --no-fund",
+  "installCommand": "npm ci",
   "ignoreCommand": "bash scripts/vercel-ignore.sh . ':!cli' ':!changelog' ':!docs' ':!apps' ':!imgs' ':!supabase'",
   "headers": [
     {
