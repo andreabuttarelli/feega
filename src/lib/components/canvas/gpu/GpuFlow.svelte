@@ -214,7 +214,7 @@
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
-  const unifiedFrames = $derived(page.url.searchParams.get('unifiedFrames') === '1');
+  const overlaysOn = $derived(unifiedFrames(page.url));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
   let coreType = $state<CoreText | null>(null);
@@ -1985,7 +1985,7 @@
         <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
-    {#if unifiedFrames}
+    {#if overlaysOn}
       <FrameOverlays {view} frames={overlayFrames}>{#snippet children()}{/snippet}</FrameOverlays>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
