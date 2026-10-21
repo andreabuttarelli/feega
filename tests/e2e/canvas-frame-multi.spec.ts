@@ -41,7 +41,13 @@ test.describe('multi-select, undo and rotated chrome inside a core frame @real',
 
       const at = async (x: number) => {
         const r = (await frame.boundingBox())!;
-        return { x: r.x + r.width * x, y: r.y + r.height * 0.5 };
+        const rad = (rotation * Math.PI) / 180;
+        const [c, n] = [Math.cos(rad), Math.sin(rad)];
+        const det = c * c - n * n;
+        const w = (r.width * c - r.height * n) / det;
+        const h = (r.height * c - r.width * n) / det;
+        const dx = (x - 0.5) * w;
+        return { x: r.x + r.width / 2 + dx * c, y: r.y + r.height / 2 + dx * n };
       };
       const first = await at(0.25);
       await page.mouse.click(first.x, first.y);
@@ -70,8 +76,8 @@ test.describe('multi-select, undo and rotated chrome inside a core frame @real',
       await page.mouse.up();
       await page.waitForTimeout(SETTLE_MS);
       const moved = (await body.boundingBox())!;
-      expect(Math.abs(moved.x - b.x)).toBeGreaterThan(SIZE_TOLERANCE_PX);
       await shot(page, `${rotation}-moved`);
+      expect(Math.abs(moved.x - b.x)).toBeGreaterThan(SIZE_TOLERANCE_PX);
 
       await page.keyboard.press('Control+z');
       await page.waitForTimeout(SETTLE_MS);
