@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { mapOutline, parsePath, pathData, type Outline, type Pt } from '$lib/motion/shape/geometry';
   import { Handle, Mirror, addPoint, deletePoint, dragHandle, insertPoint, movePoint, segmentHit, toggleClosed, toggleSmooth, type PointRef } from '$lib/motion/shape/pen';
@@ -40,9 +41,9 @@
   };
 
   function local(e: PointerEvent): Pt {
-    const rect = host!.getBoundingClientRect();
-    const fx = ((e.clientX - rect.left) / rect.width) * doc.width;
-    const fy = ((e.clientY - rect.top) / rect.height) * doc.height;
+    const at = hostFraction(e, host!);
+    const fx = at.x * doc.width;
+    const fy = at.y * doc.height;
     return space.toLocal([fx, fy]);
   }
 
@@ -71,9 +72,9 @@
   }
 
   function insertOnPath(e: PointerEvent) {
-    const rect = host!.getBoundingClientRect();
-    const at: Pt = [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
-    const hit = segmentHit(framed, at, (HIT_SCREEN_PX * doc.width) / Math.max(rect.width, 1));
+    const fraction = hostFraction(e, host!);
+    const at: Pt = [fraction.x * doc.width, fraction.y * doc.height];
+    const hit = segmentHit(framed, at, (HIT_SCREEN_PX * doc.width) / Math.max(hostWidth(host!), 1));
     if (!hit) {
       return;
     }
@@ -122,7 +123,7 @@
       return raw;
     }
     const own = saved.flatMap((c, ci) => c.vertices.flatMap((v, vi) => (ci === held.contour && vi === held.index ? [] : [pointBounds(space.toFrame(v.p))])));
-    const result = snapPoint(space.toFrame(raw), [...targets, ...own], { width: doc.width, height: doc.height }, snapReach(doc.width, host!.getBoundingClientRect().width));
+    const result = snapPoint(space.toFrame(raw), [...targets, ...own], { width: doc.width, height: doc.height }, snapReach(doc.width, hostWidth(host!)));
     guides = result.guides;
     return space.toLocal(result.point);
   }

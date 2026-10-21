@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
   import { TextSizing } from '$lib/motion/text-sizing';
   import type { MotionDoc } from '$lib/motion/doc';
   import { DrawTool, clickBox, closesOnFirst, dragRect, type DragPoint, type DrawBox } from '$lib/motion/draw-tool';
@@ -43,11 +44,11 @@
   const newId = () => crypto.randomUUID().slice(0, 8);
 
   function local(e: PointerEvent): DragPoint {
-    const rect = host!.getBoundingClientRect();
-    return { x: ((e.clientX - rect.left) / rect.width) * doc.width, y: ((e.clientY - rect.top) / rect.height) * doc.height };
+    const at = hostFraction(e, host!);
+    return { x: at.x * doc.width, y: at.y * doc.height };
   }
 
-  const reach = () => (host ? (CLOSE_REACH_PX * doc.width) / host.getBoundingClientRect().width : CLOSE_REACH_PX);
+  const reach = () => (host ? (CLOSE_REACH_PX * doc.width) / hostWidth(host) : CLOSE_REACH_PX);
   const unit = (box: DrawBox): DrawBox => ({ x: box.x / doc.width, y: box.y / doc.height, width: box.width / doc.width, height: box.height / doc.height });
 
   function create(result: OpResult, id: string) {

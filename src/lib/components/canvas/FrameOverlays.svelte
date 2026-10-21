@@ -13,7 +13,7 @@
 <div class="overlays" data-testid="frame-overlays">
   {#each frames as frame (frame.id)}
     {@const r = frameScreenRect(view, frame)}
-    <div class="frame" data-frame={frame.id} style={`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px${frame.rotation ? `;rotate:${frame.rotation}deg;transform-origin:50% 50%` : ''}`}>
+    <div class="frame" data-frame={frame.id} data-turn={frame.rotation || undefined} style={`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px${frame.rotation ? `;rotate:${frame.rotation}deg;transform-origin:50% 50%` : ''}`}>
       {@render children(frame)}
     </div>
   {/each}
