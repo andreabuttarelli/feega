@@ -15,3 +15,7 @@ mounted at 0x0 and the frame was re-fitted, rescaling its content. `editableIds`
 is back to the plain capped selection. Cost: the select/deselect swap flash #1069
 tried to remove returns; it needs a fix that keeps the host mounted while the core
 keeps drawing. `frameBar.host` is `$state.raw` (proxy broke the teardown identity check).
+
+## Frame hover overlay stops above the bar
+
+FrameHover filled the whole tile, bar included, while its contain-fit assumes the stage only. Highlights sat offset from the core drawing. The tile now carries `--bar-h` and the overlay insets by it.
