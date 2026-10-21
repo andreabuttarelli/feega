@@ -12,6 +12,7 @@
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
   import FrameSelection from '../FrameSelection.svelte';
+  import FrameInspectorPanel from '../FrameInspectorPanel.svelte';
   import { frameLevel, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
@@ -1223,6 +1224,14 @@
     return session;
   }
 
+  const panelNodeId = $derived(unified && inside?.level.clip ? inside.nodeId : null);
+  const panelSession = $derived(panelNodeId ? saverOf(panelNodeId) : null);
+  const panelTokens = $derived(panelNodeId ? (liveOf(panelNodeId)?.tokens ?? null) : null);
+
+  $effect(() => {
+    panelSession?.select(inside?.level.clip ? [inside.level.clip] : []);
+  });
+
   function commit(nodeId: string, result: OpResult, summary: string) {
     const session = saverOf(nodeId);
     session?.apply(result, summary);
@@ -2143,6 +2152,11 @@
           {/if}
         {/snippet}
       </FrameOverlays>
+    {/if}
+    {#if panelSession && panelTokens}
+      <div class="frame-inspector-dock" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
+        <FrameInspectorPanel session={panelSession} tokens={panelTokens} />
+      </div>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
