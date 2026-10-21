@@ -12,7 +12,6 @@
     "dev:stable": "NO_HMR=1 vite dev",
     "dev:vercel": "vercel dev --listen 5173",
     "build": "vite build",
-    "typecheck:runtime": "node scripts/typecheck-runtime.mjs",
     "build:node": "NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=8192} DEPLOY_TARGET=node npm run build",
     "start": "node --env-file-if-exists=.env scripts/node-server.mjs",
     "preview": "vite preview",
