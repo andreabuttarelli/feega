@@ -150,6 +150,12 @@ worktree agente non vede nessun file salvato dopo l'avvio. Segnale: l'e2e fallis
 un comportamento appena scritto, o un doc nuovo non si apre (parse fallito, editor in `video`).
 Mossa: riavvia il dev server dopo ogni modifica, prima di ogni giro Playwright.
 
+### Il canvas core diventa vuoto o nero dopo un clic, senza errori
+Segnale: nessun `pageerror`, nessun `liveDocs.set`, `data-painted` aumenta di un `full` e poi il
+canvas è vuoto; succede solo su frame grandi. Causa vista: l'overlay passato a `setOverlay` con
+migliaia di item (un item per trattino dell'anello). Mossa: logga `overlay.length` in `paint()`
+di `CoreFrames.svelte`; un elemento di chrome è un solo item, i pezzi sono contorni.
+
 ### `backdrop-filter` che non sfoca niente
 Un antenato con `will-change: opacity` (o `filter`, `opacity < 1`, `mask`, `clip-path`,
 `mix-blend-mode`) è una Backdrop Root: il blur vede solo ciò che sta dentro di lui, cioè niente.

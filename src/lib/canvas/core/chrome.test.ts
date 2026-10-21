@@ -51,10 +51,18 @@ describe('tileChrome', () => {
   });
 
   it('draws the editing ring dashed at half opacity', () => {
-    const rings = ofPart(tile({ ring: NodeChrome.Editing }), ChromePart.Ring);
+    const [ring, ...rest] = ofPart(tile({ ring: NodeChrome.Editing }), ChromePart.Ring);
 
-    expect(rings.length).toBeGreaterThan(1);
-    expect(rings.every((r) => r.opacity === 0.5)).toBe(true);
+    expect(rest).toEqual([]);
+    expect(ring.contours.length).toBeGreaterThan(1);
+    expect(ring.opacity).toBe(0.5);
+  });
+
+  it('keeps the editing ring of a landing-page frame one overlay item, or the core stops drawing the canvas', () => {
+    const rings = ofPart(tile({ ring: NodeChrome.Editing, width: 1440, height: 4734 }), ChromePart.Ring);
+
+    expect(rings).toHaveLength(1);
+    expect(box(rings[0].contours)).toEqual([98, 198, 1542, 4936]);
   });
 
   it('outlines a hovered tile only while it is not selected', () => {
