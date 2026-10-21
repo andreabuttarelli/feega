@@ -215,8 +215,8 @@
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
   const overlaysOn = $derived(unifiedFrames(page.url));
-  const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
+  const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
     if (coreOn && !coreType) {
