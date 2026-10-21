@@ -10,6 +10,7 @@
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
   import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
+  import FrameOverlays from '../FrameOverlays.svelte';
   import type CanvasFlow from '../CanvasFlow.svelte';
   import type { Tile } from '../CanvasFlow.svelte';
   import CanvasAddBar from '../CanvasAddBar.svelte';
@@ -213,6 +214,8 @@
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
+  const unifiedFrames = $derived(page.url.searchParams.get('unifiedFrames') === '1');
+  const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
@@ -1981,6 +1984,9 @@
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
         <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
+    {/if}
+    {#if unifiedFrames}
+      <FrameOverlays {view} frames={overlayFrames}>{#snippet children()}{/snippet}</FrameOverlays>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
