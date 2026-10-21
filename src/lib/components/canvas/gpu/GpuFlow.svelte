@@ -12,9 +12,13 @@
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
   import FrameSelection from '../FrameSelection.svelte';
+<<<<<<< HEAD
   import { findClip, type MotionClip } from '$lib/motion/doc';
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import { commitText, editsText, hideText, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+=======
+  import FrameInspectorPanel from '../FrameInspectorPanel.svelte';
+>>>>>>> origin/dev
   import { frameLevel, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
@@ -196,7 +200,6 @@
   const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
-  const editIds = $derived(editableIds(selected, DOM_CAP));
   let drawn = $state(new Set<string>());
   let sticky = $state(new Map<string, number>());
   let wasEditing = new Set<string>();
@@ -227,7 +230,9 @@
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
+  const unified = $derived(unifiedFrames(page.url));
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
+  const editIds = $derived(editableIds(selected, DOM_CAP, unified ? new Set(coreFrames.map((f) => f.id)) : new Set()));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
@@ -1143,8 +1148,6 @@
     })();
   });
 
-  const unified = $derived(unifiedFrames(page.url));
-
   function framePickAt(w: Point) {
     const id = topNodeAt(w);
     const frame = unified && id && !domIds.has(id) ? coreFrames.find((f) => f.id === id) : null;
@@ -1226,6 +1229,14 @@
     savers.set(nodeId, session);
     return session;
   }
+
+  const panelNodeId = $derived(unified && inside?.level.clip ? inside.nodeId : null);
+  const panelSession = $derived(panelNodeId ? saverOf(panelNodeId) : null);
+  const panelTokens = $derived(panelNodeId ? (liveOf(panelNodeId)?.tokens ?? null) : null);
+
+  $effect(() => {
+    panelSession?.select(inside?.level.clip ? [inside.level.clip] : []);
+  });
 
   function commit(nodeId: string, result: OpResult, summary: string) {
     const session = saverOf(nodeId);
@@ -2203,6 +2214,11 @@
           {/if}
         {/snippet}
       </FrameOverlays>
+    {/if}
+    {#if panelSession && panelTokens}
+      <div class="frame-inspector-dock" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
+        <FrameInspectorPanel session={panelSession} tokens={panelTokens} />
+      </div>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
