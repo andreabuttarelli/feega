@@ -1,12 +1,16 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use vello::kurbo::{Affine as Matrix, Point, Rect};
+use vello::Scene;
 
 use crate::display_list::{Affine, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Lens, LensItem, Look, Paint, PathItem, Size, UseItem};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::glyphs::{outline, Fonts};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::text::typeset;
+use crate::pictures::Pictures;
+use crate::scene::{build_items, needs_layer, Fragments, Layers};
 use crate::Skipped;
 
 #[derive(Default)]
@@ -253,14 +257,36 @@ fn chunk_of(u: &UseItem, group: &DisplayList, at: Building, items: usize) -> Chu
     let end = if whole { all.len() } else { (at.next + items).min(all.len()) };
     let done = end == all.len();
     let base = (at.next > 0).then(|| partial(&u.group, size));
-    let list = DisplayList { width: size.0, height: size.1, background: None, items: base.into_iter().chain(all[at.next..end].iter().cloned()).collect(), faces: group.faces.clone() };
+    let list = DisplayList { width: size.0, height: size.1, background: None, items: base.into_iter().chain(all[at.next..end].iter().cloned()).collect(), faces: group.faces.clone(), fragments: Default::default() };
     let clip = if done { cache_clip(&u.group) } else { building_clip(&u.group) };
     Chunk { raster: Raster { clip, list }, done }
+}
+
+fn vector_only(item: &Item) -> bool {
+    let plain = |look: &Look| !needs_layer(look) && look.backdrop.is_none();
+    match item {
+        Item::Path(p) => plain(&p.look),
+        Item::Group(g) => plain(&g.look) && g.items.iter().all(vector_only),
+        _ => false,
+    }
+}
+
+fn encode(group: &DisplayList) -> Option<Arc<Scene>> {
+    if !group.items.iter().all(vector_only) {
+        return None;
+    }
+    let local = UseItem { clip: String::new(), group: String::new(), matrix: IDENTITY, cache: false, hold: false };
+    let frame = Rect::new(0.0, 0.0, group.width as f64, group.height as f64);
+    let mut scene = Scene::new();
+    build_items(&mut scene, &used(&local, group, 0), frame, &Pictures::new(), &Layers::new());
+    Some(Arc::new(scene))
 }
 
 #[derive(Default)]
 pub struct Library {
     groups: Groups,
+    encodings: HashMap<String, Option<Arc<Scene>>>,
+    composes: bool,
     held: HashMap<String, Held>,
     building: HashMap<String, Building>,
     stale: Vec<String>,
@@ -330,7 +356,20 @@ impl Library {
         self.forget(key);
     }
 
+    pub fn compose_encodings(&mut self) {
+        self.composes = true;
+    }
+
+    fn encoding(&mut self, group: &str) -> Option<Arc<Scene>> {
+        if !self.composes {
+            return None;
+        }
+        let list = self.groups.get(group)?;
+        self.encodings.entry(group.to_string()).or_insert_with(|| encode(list)).clone()
+    }
+
     fn forget(&mut self, key: &str) {
+        self.encodings.remove(key);
         if self.held.remove(key).is_some() {
             self.stale.push(cache_clip(key));
         }
@@ -359,6 +398,7 @@ impl Library {
         let mut finished = Vec::new();
         let mut waiting = Vec::new();
         let mut items = Vec::with_capacity(list.items.len());
+        let mut encoded: HashMap<String, Arc<Scene>> = HashMap::new();
         for item in &list.items {
             let Item::Use(u) = item else {
                 items.push(item.clone());
@@ -369,6 +409,14 @@ impl Library {
                 continue;
             };
             let on_screen = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64)).overlaps(Rect::new(0.0, 0.0, list.width as f64, list.height as f64));
+            if let Some(scene) = self.encoding(&u.group) {
+                if on_screen {
+                    encoded.insert(u.group.clone(), scene);
+                    items.push(item.clone());
+                }
+                continue;
+            }
+            let Some(group) = self.groups.get(&u.group) else { continue };
             let want = held_within(u, group, scale_of(u.matrix), limits.side);
             let (w, h) = texels(group, want);
             if let (true, Some(kept)) = (u.cache && u.hold, self.held.get(&u.group).copied()) {
@@ -437,7 +485,8 @@ impl Library {
         evicted.extend(gone.iter().map(|k| cache_clip(k)));
         evicted.extend(abandoned.iter().map(|k| building_clip(k)));
         let rasters = rasters.into_iter().map(|r| Raster { list: self.drawable(&r.list).0, ..r }).collect();
-        let (screen, unset) = self.drawable(&DisplayList { items, ..list.clone_empty() });
+        let (mut screen, unset) = self.drawable(&DisplayList { items, ..list.clone_empty() });
+        screen.fragments = Fragments::new(encoded);
         Plan { screen, rasters, evicted, pending, skipped: named(missing, "group").chain(unset).collect(), finished, waiting }
     }
 }

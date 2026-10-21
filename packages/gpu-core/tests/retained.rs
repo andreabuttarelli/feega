@@ -116,9 +116,10 @@ fn damage_over_sixty_percent_of_the_view_is_a_full_render() {
 }
 
 #[test]
-fn during_a_zoom_gesture_the_texture_is_only_reprojected() {
+fn during_a_zoom_gesture_a_slow_scene_is_only_reprojected() {
     let mut r = Retained::new(W, H);
     rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    r.took(20.0);
 
     assert!(matches!(rendered(&mut r, at(-40.0, -30.0, 1.1), 16.0), Step::Present));
     assert!(r.pending());
@@ -130,6 +131,7 @@ fn during_a_zoom_gesture_the_texture_is_only_reprojected() {
 fn after_the_zoom_settles_a_sharp_render_refines_it() {
     let mut r = Retained::new(W, H);
     rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    r.took(11.0);
     rendered(&mut r, at(0.0, 0.0, 1.1), 16.0);
 
     assert!(!matches!(rendered(&mut r, at(0.0, 0.0, 1.1), 60.0), Step::Raster(_)));
@@ -223,10 +225,36 @@ fn a_region_larger_than_the_scratch_target_is_split_into_tiles() {
 fn a_zoom_out_that_uncovers_the_view_rasters_rough_while_the_gesture_runs() {
     let mut r = Retained::new(W, H);
     rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    r.took(20.0);
 
     let Step::Raster(mid) = rendered(&mut r, at(200.0, 150.0, 0.5), 16.0) else { panic!("a raster") };
     assert_eq!(mid.quality, Quality::Rough);
 
     let Step::Raster(settled) = rendered(&mut r, at(200.0, 150.0, 0.5), 300.0) else { panic!("a raster") };
     assert_eq!(settled.quality, Quality::Sharp);
+}
+
+#[test]
+fn during_a_zoom_gesture_a_cheap_scene_is_redrawn_sharp_every_frame() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    r.took(4.0);
+
+    for (i, zoom) in [1.05, 1.1, 1.15].into_iter().enumerate() {
+        let Step::Raster(live) = rendered(&mut r, at(0.0, 0.0, zoom), 16.0 * (i + 1) as f64) else { panic!("a raster") };
+        assert_eq!((live.outcome, live.quality), (Outcome::Full, Quality::Sharp));
+        assert_eq!(live.camera.zoom, zoom);
+    }
+}
+
+#[test]
+fn a_scene_that_misses_the_live_budget_falls_back_to_the_reprojected_texture() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    r.took(4.0);
+    rendered(&mut r, at(0.0, 0.0, 1.05), 16.0);
+
+    r.took(14.0);
+
+    assert!(matches!(rendered(&mut r, at(0.0, 0.0, 1.1), 32.0), Step::Present));
 }
