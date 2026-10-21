@@ -3530,6 +3530,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}
     onExport={(ids) => (exportFor = ids)}
+    onExportRows={exportFrames}
     onEdgeDelete={disconnect}
     onEdgeModeChange={setEdgeMode}
     onCreate={create}

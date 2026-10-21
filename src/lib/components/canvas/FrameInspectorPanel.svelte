@@ -14,7 +14,21 @@
 
   const FIRST_FRAME = 0;
 
-  let { session, tokens, assets = [] }: { session: FrameEditSession; tokens: BrandTokens; assets?: ComponentProps<typeof MotionInspector>['assets'] } = $props();
+  let {
+    session,
+    tokens,
+    assets = [],
+    fonts = null,
+    upload = null,
+    analyses = {}
+  }: {
+    session: FrameEditSession;
+    tokens: BrandTokens;
+    assets?: ComponentProps<typeof MotionInspector>['assets'];
+    fonts?: ComponentProps<typeof MotionInspector>['fonts'];
+    upload?: ComponentProps<typeof MotionInspector>['upload'];
+    analyses?: ComponentProps<typeof MotionInspector>['analyses'];
+  } = $props();
 
   const doc = $derived(session.history.present);
   const shown = $derived(inspectorOf(doc, session.selection));
@@ -36,7 +50,7 @@
     {#if shown.view === PropertiesView.Multiple}
       <MultiInspector {doc} ids={session.selection} frame={FIRST_FRAME} onchange={edit} />
     {:else}
-      <MotionInspector gesture={session.live} {doc} clip={shown.clip} {tokens} {assets} frame={FIRST_FRAME} onchange={edit} />
+      <MotionInspector gesture={session.live} {doc} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={FIRST_FRAME} onchange={edit} />
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}
     {/if}
   </aside>

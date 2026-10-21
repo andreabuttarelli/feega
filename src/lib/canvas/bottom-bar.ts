@@ -58,8 +58,6 @@ const STATE_CONTEXT: Record<CanvasState, BarContext> = {
 
 export const barContextOf = (state: CanvasState): BarContext => STATE_CONTEXT[state];
 
-export const barLift = (context: BarContext, timelinePx: number): number => (CONTEXT[context].followsTimeline ? timelinePx : 0);
-
 const HALF = 2;
 
 export const barShift = (context: BarContext, sidePx: number): number => (CONTEXT[context].followsTimeline ? sidePx / HALF : 0);

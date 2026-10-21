@@ -16,6 +16,11 @@
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import { commitText, editsText, hideText, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import FrameInspectorPanel from '../FrameInspectorPanel.svelte';
+  import FrameDialogs from '../FrameDialogs.svelte';
+  import { FrameExtras } from '$lib/canvas/frame-extras.svelte';
+  import { FRAME_DIALOG_ACTIONS, FrameDialog, isFrameDialogAction } from '$lib/canvas/frame-dialogs';
+  import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import type { ExportRow } from '$lib/motion/export-rows';
   import { frameLevel, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
@@ -125,7 +130,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]> } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]> } = $props();
 
   const DOM_CAP = 6;
   const CORE = 'core';
@@ -1272,9 +1277,33 @@
     return session;
   }
 
+  const extras = new Map<string, FrameExtras>();
+
+  function extrasOf(nodeId: string) {
+    const held = extras.get(nodeId);
+    const session = saverOf(nodeId);
+    if (held || !session) {
+      return held ?? null;
+    }
+    const made = new FrameExtras({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId }, createSupabaseBrowserClient(), () => session.history.present);
+    extras.set(nodeId, made);
+    return made;
+  }
+
+  let frameDialog = $state<{ nodeId: string; dialog: FrameDialog } | null>(null);
+
+  const dialogSession = $derived(frameDialog ? saverOf(frameDialog.nodeId) : null);
+  const dialogExtras = $derived(frameDialog ? extrasOf(frameDialog.nodeId) : null);
+  const dialogTokens = $derived(frameDialog ? (liveOf(frameDialog.nodeId)?.tokens ?? null) : null);
+
   const panelNodeId = $derived(unified && picks.length && inside ? inside.nodeId : null);
   const panelSession = $derived(panelNodeId ? saverOf(panelNodeId) : null);
   const panelTokens = $derived(panelNodeId ? (liveOf(panelNodeId)?.tokens ?? null) : null);
+  const panelExtras = $derived(panelNodeId ? extrasOf(panelNodeId) : null);
+
+  $effect(() => {
+    void panelExtras?.load();
+  });
 
   $effect(() => {
     panelSession?.select(picks);
@@ -2046,6 +2075,9 @@
   };
 
   function onKeydown(e: KeyboardEvent) {
+    if (frameDialog) {
+      return;
+    }
     markBusy();
     altHeld = e.altKey;
     if (e.key === ' ' && !(e.target as HTMLElement).closest?.(INTERACTIVE)) {
@@ -2104,11 +2136,15 @@
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
-    export: (ids) => props.onExport?.(ids),
+    export: (ids) => (unified && coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
     delete: (ids) => props.onDelete?.(ids)
   };
 
   function runSelectionAction(id: SelectionActionId) {
+    if (selected.length === 1 && isFrameDialogAction(id)) {
+      frameDialog = { nodeId: selected[0], dialog: FRAME_DIALOG_ACTIONS[id] };
+      return;
+    }
     if (selected.length && isCanvasAction(id)) {
       SELECTION_RUN[id](selected);
     }
@@ -2339,7 +2375,7 @@
     {/if}
     {#if panelSession && panelTokens}
       <div class="frame-inspector-dock" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
-        <FrameInspectorPanel session={panelSession} tokens={panelTokens} />
+        <FrameInspectorPanel session={panelSession} tokens={panelTokens} assets={panelExtras?.assets ?? []} fonts={panelExtras} upload={panelExtras?.uploadMedia ?? null} analyses={panelExtras?.analyses} />
       </div>
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
@@ -2491,6 +2527,7 @@
       choicesFor={props.modelChoicesFor}
       catalogueSynced={selectionMedium && props.catalogueSyncedFor ? props.catalogueSyncedFor(selectionMedium) : true}
       runQuote={props.runQuoteFor?.(selected) ?? null}
+      frameTools={unified}
       onrun={() => props.onRunNode?.(selected[0])}
       onaction={runSelectionAction}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
@@ -2498,6 +2535,25 @@
     {#if props.postAction}
       <NextStepChips postAction={props.postAction} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
     {/if}
+  {/if}
+
+  {#if frameDialog && dialogSession && dialogExtras && dialogTokens}
+    {@const nodeId = frameDialog.nodeId}
+    <FrameDialogs
+      dialog={frameDialog.dialog}
+      {nodeId}
+      projectId={page.params.projectId ?? ''}
+      canvasId={page.params.canvasId ?? ''}
+      session={dialogSession}
+      extras={dialogExtras}
+      tokens={dialogTokens}
+      frame={frameOfLive(liveOf(nodeId)!)}
+      onedit={(result, summary) => commit(nodeId, result, summary)}
+      onswitch={(next) => (frameDialog = { nodeId, dialog: next })}
+      onfocus={(id) => select([id])}
+      onimages={(rows) => props.onExportRows?.([nodeId], rows) ?? Promise.resolve('Export failed')}
+      onclose={() => (frameDialog = null)}
+    />
   {/if}
 
   {#if menuAt && spec.chrome}

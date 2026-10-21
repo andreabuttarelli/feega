@@ -6,6 +6,7 @@
   import { advance } from '$lib/canvas/frame-playhead';
   import { Action } from '$lib/motion/actions';
   import { findClip, type MotionDoc } from '$lib/motion/doc';
+  import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { Snap } from '$lib/motion/timeline-view';
   import type { KeyRef } from '$lib/motion/timeline';
 
@@ -23,6 +24,7 @@
   let camera = $state(false);
   let zoom = $state(1);
   let keySelection = $state<KeyRef[]>([]);
+  let section = $state<HTMLElement | null>(null);
   let raf = 0;
   let last = 0;
   let head = 0;
@@ -30,6 +32,16 @@
   const remapped = $derived.by(() => {
     const found = selection.length === 1 ? findClip(doc, selection[0]) : null;
     return found?.clip.component === 'Video' ? found.clip : null;
+  });
+
+  $effect(() => {
+    const mine = section;
+    frameBar.timeline = mine;
+    return () => {
+      if (frameBar.timeline === mine) {
+        frameBar.timeline = null;
+      }
+    };
   });
 
   function tick(now: number) {
@@ -59,7 +71,7 @@
   $effect(() => () => cancelAnimationFrame(raf));
 </script>
 
-<section class="timeline" data-testid="frame-timeline">
+<section bind:this={section} class="timeline" data-testid="frame-timeline" data-dock="timeline">
   <div class="bar">
     <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" data-testid="frame-timeline-play" onclick={toggle} />
     <span class="time" data-testid="frame-timeline-time">{(frame / doc.fps).toFixed(2)}s</span>

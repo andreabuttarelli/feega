@@ -1,6 +1,7 @@
 <script lang="ts">
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import Sparkles from '@lucide/svelte/icons/sparkles';
+  import { isFrameDialogAction } from '$lib/canvas/frame-dialogs';
   import { actionsIn, enabledFor, shownFor, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
@@ -32,6 +33,7 @@
     choicesFor,
     catalogueSynced = true,
     runQuote = null,
+    frameTools = false,
     onrun,
     onaction,
     onpropertychange
@@ -45,6 +47,7 @@
     choicesFor?: (type: GenPropertyType) => ModelChoice[];
     catalogueSynced?: boolean;
     runQuote?: RunQuote | null;
+    frameTools?: boolean;
     onrun?: () => void;
     onaction?: (id: SelectionActionId) => void;
     onpropertychange?: (patch: SelectionPatch & { model?: string | null }) => void;
@@ -79,7 +82,7 @@
 
   const primary = $derived(actionsIn('primary', count));
   const secondary = $derived(actionsIn('secondary', count).filter((a) => shownFor(a.id, nodeSummaries)));
-  const overflow = $derived(actionsIn('overflow', count));
+  const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameDialogAction(a.id))));
   const danger = $derived(actionsIn('danger', count));
 
   function gateOf(action: SelectionAction) {

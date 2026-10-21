@@ -3208,3 +3208,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## A static layer is repainted every frame
 
 **Signal:** a doc with a few moving paths and several blurred or masked layers that do not move still costs 10-50 ms per core frame. **Move:** `scripts/bench/dump-list.ts <doc> <out.json> <frames...>` and compare layered items between frames (identical JSON means a cache hit is possible); the engine keeps finished layer textures for path-only items (`LayerCache` in `engine.rs`). Pictures, text and backdrop layers must stay uncached: their inputs change without the item changing.
+
+## A capture iframe parked off screen never loads its images
+
+**Signal:** a browser export of a frame with a picture reports `the frame at 3.37s did not draw within 60s` right where the picture first appears; frames without pictures drew fine; the picture request shows `ERR_ABORTED`. **Move:** keep the hidden `MotionPreview` inside the viewport (`left: 0; top: 0; opacity: 0; z-index: -1`), never at `left: -10000px`: lazy images outside the viewport are never fetched.

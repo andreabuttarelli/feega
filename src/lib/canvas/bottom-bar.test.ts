@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EditMode } from '$lib/motion/edit-mode';
-import { BarContext, BarMode, barShown, BarSlot, barSlots, readBarMode, barContextOf, barHidden, barKeys, barLift, barShift } from './bottom-bar';
+import { BarContext, BarMode, barShown, BarSlot, barSlots, readBarMode, barContextOf, barHidden, barKeys, barShift } from './bottom-bar';
 import { CanvasState } from './inline-motion';
 import { Region } from './key-region.svelte';
 
@@ -30,12 +30,6 @@ describe('one bottom bar, its tools by context', () => {
     expect(readBarMode('generate')).toBe(BarMode.Generate);
     expect(readBarMode(null)).toBe(BarMode.Generate);
     expect(readBarMode('nope')).toBe(BarMode.Generate);
-  });
-
-  it('sits flush to the edge, above the timeline only while a frame shows one', () => {
-    expect(barLift(BarContext.Canvas, 200)).toBe(0);
-    expect(barLift(BarContext.Frame, 200)).toBe(200);
-    expect(barLift(BarContext.Frame, 0)).toBe(0);
   });
 
   it('centres on the stage left visible: a frame panel docked on the right moves it left by half its width', () => {

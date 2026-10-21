@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FRAME_DIALOG_ACTIONS } from './frame-dialogs';
 import { CANVAS_MENU, actionsIn, enabledFor, menuFor, shownFor } from './selection-actions';
 
 describe('group and ungroup', () => {
@@ -59,7 +60,7 @@ describe('group and ungroup', () => {
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
     expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup']);
-    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['copy-id', 'report']);
+    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['export', ...Object.keys(FRAME_DIALOG_ACTIONS), 'copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });
 

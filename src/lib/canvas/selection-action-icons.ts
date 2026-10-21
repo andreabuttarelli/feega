@@ -7,7 +7,6 @@ import Copy from '@lucide/svelte/icons/copy';
 import Download from '@lucide/svelte/icons/download';
 import Workflow from '@lucide/svelte/icons/workflow';
 import Link2 from '@lucide/svelte/icons/link-2';
-import Megaphone from '@lucide/svelte/icons/megaphone';
 import Play from '@lucide/svelte/icons/play';
 import ListEnd from '@lucide/svelte/icons/list-end';
 import RefreshCw from '@lucide/svelte/icons/refresh-cw';
@@ -31,6 +30,14 @@ import FlipHorizontal2 from '@lucide/svelte/icons/flip-horizontal-2';
 import FlipVertical2 from '@lucide/svelte/icons/flip-vertical-2';
 import SquareDashed from '@lucide/svelte/icons/square-dashed';
 import Square from '@lucide/svelte/icons/square';
+import Mic from '@lucide/svelte/icons/mic';
+import Music from '@lucide/svelte/icons/music';
+import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+import Blocks from '@lucide/svelte/icons/blocks';
+import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+import GitBranch from '@lucide/svelte/icons/git-branch';
+import History from '@lucide/svelte/icons/history';
+import MessageSquareText from '@lucide/svelte/icons/message-square-text';
 import Proportions from '@lucide/svelte/icons/proportions';
 import type { Component } from 'svelte';
 import type { SelectionActionId } from './selection-actions';
@@ -39,7 +46,6 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   duplicate: Copy,
   'connect-new': Workflow,
   'connect-existing': Link2,
-  promote: Megaphone,
   'run-workflow': Play,
   'run-downstream': ListEnd,
   'run-stale': RefreshCw,
@@ -64,5 +70,13 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'release-mask': Square,
   'create-formats': Proportions,
   export: Download,
+  'frame-voice': Mic,
+  'frame-music': Music,
+  'frame-interactive': SlidersHorizontal,
+  'frame-components': Blocks,
+  'frame-templates': LayoutTemplate,
+  'frame-branches': GitBranch,
+  'frame-history': History,
+  'frame-chat': MessageSquareText,
   delete: Trash2
 };
