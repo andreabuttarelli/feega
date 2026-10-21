@@ -177,3 +177,21 @@ describe('remote heads', () => {
     expect(port.pull).toHaveBeenCalled();
   });
 });
+
+describe('unsaved', () => {
+  it('is true from the edit until the save lands', async () => {
+    const { send, release } = held();
+    const { session } = open(send);
+    expect(session.unsaved()).toBe(false);
+
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    expect(session.unsaved()).toBe(true);
+
+    await vi.runAllTimersAsync();
+    expect(session.unsaved()).toBe(true);
+
+    release({ ok: true, version: 2, doc: longer(60) });
+    await vi.runAllTimersAsync();
+    expect(session.unsaved()).toBe(false);
+  });
+});

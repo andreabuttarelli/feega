@@ -112,6 +112,10 @@ export class FrameEditSession {
     this.saveTimer = setTimeout(() => void this.save(), SAVE_DEBOUNCE_MS);
   }
 
+  unsaved(): boolean {
+    return this.saveState === SaveState.Pending || this.saveState === SaveState.Saving;
+  }
+
   async flushPending() {
     if (this.saveState !== SaveState.Pending) {
       return;

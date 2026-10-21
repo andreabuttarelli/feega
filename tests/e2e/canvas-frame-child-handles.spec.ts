@@ -47,7 +47,7 @@ async function shot(page: Page, name: string) {
 test.describe('selection handles follow a frame child @real', () => {
   test.skip(!REAL_STACK, 'richiede E2E_REAL_STACK=1');
 
-  test('after a drag the corner dots sit on the moved shape', async ({ page, session, admin, seedNode }) => {
+  test('after a drag the handles sit on the moved shape', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(150_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     const node = await seedNode({ type: 'motion', x: 80, y: 80, data: LANDSCAPE });
@@ -55,29 +55,28 @@ test.describe('selection handles follow a frame child @real', () => {
     expect(error).toBeNull();
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    const stage = page.locator(`[data-motion-node="${node.id}"] [data-frame-stage]`);
+    const stage = page.locator(`[data-testid="frame-overlays"] [data-frame="${node.id}"]`);
     await expect(stage).toBeVisible({ timeout: 20_000 });
     const stageBox = (await stage.boundingBox())!;
     const grab = { x: stageBox.x + stageBox.width * (BOX_AT.x - BOX_SIZE / 4), y: stageBox.y + stageBox.height * BOX_AT.y };
     await expect(async () => {
       await page.mouse.click(grab.x, grab.y);
-      await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 1500 });
+      await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 1500 });
     }).toPass({ timeout: 25_000 });
-    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
 
-    const selected = (await page.getByTestId('selection-box').boundingBox())!;
+    const selected = (await page.getByTestId('frame-selection').boundingBox())!;
     await shot(page, '0-selected');
     await drag(page, { x: selected.x + selected.width * GRAB_SHARE, y: selected.y + selected.height / 2 });
     await page.waitForTimeout(SETTLE_MS);
     await shot(page, '1-moved');
 
-    const moved = (await page.getByTestId('selection-box').boundingBox())!;
+    const moved = (await page.getByTestId('frame-selection').boundingBox())!;
     expect(moved.x, 'the selection box moved').toBeGreaterThan(selected.x + EDGE_TOLERANCE_PX);
 
-    const dots = await centres(page.getByTestId('corner-overlay').locator('[data-corner]'));
-    expect(dots).toHaveLength(CORNER_COUNT);
+    const dots = await centres(page.getByTestId('frame-selection-handle'));
+    expect(dots.length).toBeGreaterThanOrEqual(CORNER_COUNT);
     for (const d of dots) {
-      expect(d.x, `corner dot at ${d.x},${d.y} sits inside the moved shape`).toBeGreaterThan(moved.x - EDGE_TOLERANCE_PX);
+      expect(d.x, `handle at ${d.x},${d.y} sits on the moved shape`).toBeGreaterThan(moved.x - EDGE_TOLERANCE_PX);
       expect(d.x).toBeLessThan(moved.x + moved.width + EDGE_TOLERANCE_PX);
       expect(d.y).toBeGreaterThan(moved.y - EDGE_TOLERANCE_PX);
       expect(d.y).toBeLessThan(moved.y + moved.height + EDGE_TOLERANCE_PX);
