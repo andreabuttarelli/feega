@@ -21,6 +21,23 @@ const CHROME: Record<FrameKind, Chrome> = {
   [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick }
 };
 
+export enum TileBody {
+  Dom = 'dom',
+  Standin = 'standin'
+}
+
+export enum HoverHost {
+  Node = 'node',
+  Overlay = 'overlay'
+}
+
+const HOVER_HOST: Record<TileBody, HoverHost> = {
+  [TileBody.Dom]: HoverHost.Node,
+  [TileBody.Standin]: HoverHost.Overlay
+};
+
+export const hoverHostOf = (body: TileBody): HoverHost => HOVER_HOST[body];
+
 export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];
 
 export type MotionNode = {
