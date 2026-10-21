@@ -12,6 +12,7 @@
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
   import FrameSelection from '../FrameSelection.svelte';
+  import FrameTools from '../FrameTools.svelte';
   import { findClip, type MotionClip } from '$lib/motion/doc';
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import { commitText, editsText, hideText, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
@@ -1356,6 +1357,16 @@
     });
   }
 
+  function toolsOf(nodeId: string) {
+    const live = inside?.nodeId === nodeId ? liveOf(nodeId) : null;
+    return live ? { doc: live.doc, frame: frameOfLive(live) } : null;
+  }
+
+  function drawnInside(id: string) {
+    picks = [id];
+    frameBar.tool = DrawTool.Select;
+  }
+
   function marqueeRect(nodeId: string) {
     const m = bandDrag?.nodeId === nodeId ? bandDrag : null;
     const frame = coreFrames.find((f) => f.id === nodeId);
@@ -2330,6 +2341,13 @@
           {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
             <FrameSelection clip={mark.clip} rect={mark.rect} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
           {/each}
+          {#if pickHover?.nodeId === frame.id}
+            <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={`left:${(pickHover.rect.x - frame.x) * view.zoom}px;top:${(pickHover.rect.y - frame.y) * view.zoom}px;width:${pickHover.rect.w * view.zoom}px;height:${pickHover.rect.h * view.zoom}px`}></div>
+          {/if}
+          {@const tools = toolsOf(frame.id)}
+          {#if tools}
+            <FrameTools doc={tools.doc} frame={tools.frame} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
+          {/if}
           {@const band = marqueeRect(frame.id)}
           {#if band}
             <div class="frame-marquee" data-testid="frame-marquee" style={`left:${band.left}px;top:${band.top}px;width:${band.width}px;height:${band.height}px`}></div>
@@ -2397,14 +2415,6 @@
           {/if}
         </div>
       {/each}
-      {#if pickHover}
-        {@const t = byId.get(pickHover.nodeId)}
-        {#if t}
-          <div class="pick-tile" style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}>
-            <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={`left:${pickHover.rect.x - t.x}px;top:${pickHover.rect.y - t.y}px;width:${pickHover.rect.w}px;height:${pickHover.rect.h}px;border-width:${1 / view.zoom}px`}></div>
-          </div>
-        {/if}
-      {/if}
       <PeerLayer peers={corePeers.length ? (props.peers ?? []).filter((p) => p.chat) : (props.peers ?? [])} outlined={!corePeers.length} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
       {#if measured.length || snapGuides.length || snapSpacing.length}
         <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={coreOn ? [] : snapGuides} zoom={view.zoom} />
@@ -2454,7 +2464,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && (scene || coreOn) && props.barContext === BarContext.Canvas && frameBar.tool !== DrawTool.Select}
+  {#if props.onDraw && (scene || coreOn) && props.barContext === BarContext.Canvas && frameBar.tool !== DrawTool.Select && (frameBar.tool === DrawTool.Frame || !inside)}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
@@ -2598,16 +2608,10 @@
     top: 0;
   }
 
-  .pick-tile {
-    position: absolute;
-    left: 0;
-    top: 0;
-    pointer-events: none;
-  }
-
   .pick-outline {
     position: absolute;
-    border: 0 solid var(--ui-hover-outline, var(--ui-accent));
+    box-sizing: border-box;
+    border: 1px solid var(--ui-hover-outline, var(--ui-accent));
     pointer-events: none;
   }
 

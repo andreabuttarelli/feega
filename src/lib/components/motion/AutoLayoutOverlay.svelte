@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { Box } from '$lib/motion/layout';
   import { StripKind, dragStrip, layoutStrips, type Pt, type Strip } from '$lib/motion/layout/guides';
@@ -30,8 +31,8 @@
   const nameOf = (strip: Strip) => (strip.kind === StripKind.Gap ? 'gap' : `${strip.side} padding`);
 
   function local(e: PointerEvent): Pt {
-    const rect = host!.getBoundingClientRect();
-    return [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
+    const at = hostFraction(e, host!);
+    return [at.x * doc.width, at.y * doc.height];
   }
 
   function begin(e: PointerEvent, strip: Strip) {

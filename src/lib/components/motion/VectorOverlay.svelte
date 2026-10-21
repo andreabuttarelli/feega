@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { pathData, type Pt } from '$lib/motion/shape/geometry';
   import { pathSpace } from '$lib/motion/shape/space';
@@ -50,8 +51,8 @@
   const shownHandles = $derived(selected === null ? [] : handlesAt(network, selected));
 
   function local(e: PointerEvent): Vector {
-    const rect = host!.getBoundingClientRect();
-    const [x, y] = space.toLocal([((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height]);
+    const at = hostFraction(e, host!);
+    const [x, y] = space.toLocal([at.x * doc.width, at.y * doc.height]);
     return { x, y };
   }
 
@@ -85,8 +86,7 @@
   }
 
   function pressSegment(e: PointerEvent) {
-    const rect = host!.getBoundingClientRect();
-    const hit = nearestOnNetwork(local(e), network, HIT_SCREEN_PX / Math.max(rect.width, 1));
+    const hit = nearestOnNetwork(local(e), network, HIT_SCREEN_PX / Math.max(hostWidth(host!), 1));
     if (!hit) {
       return;
     }
@@ -112,7 +112,7 @@
       return raw;
     }
     const own = saved.vertices.flatMap((v, i) => (i === held ? [] : [pointBounds(space.toFrame([v.x, v.y]))]));
-    const result = snapPoint(space.toFrame([raw.x, raw.y]), [...targets, ...own], { width: doc.width, height: doc.height }, snapReach(doc.width, host!.getBoundingClientRect().width));
+    const result = snapPoint(space.toFrame([raw.x, raw.y]), [...targets, ...own], { width: doc.width, height: doc.height }, snapReach(doc.width, hostWidth(host!)));
     guides = result.guides;
     const [x, y] = space.toLocal(result.point);
     return { x, y };

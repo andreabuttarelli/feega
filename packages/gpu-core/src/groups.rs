@@ -135,8 +135,15 @@ fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
     }
 }
 
-fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect) -> Item {
-    let contour = vec![frame.x0, frame.y0, frame.x1, frame.y0, frame.x1, frame.y1, frame.x0, frame.y1];
+fn turned_corners(m: Affine, local: Rect) -> Vec<f64> {
+    let t = Matrix::new(m);
+    [(local.x0, local.y0), (local.x1, local.y0), (local.x1, local.y1), (local.x0, local.y1)].into_iter().flat_map(|(x, y)| {
+        let p = t * Point::new(x, y);
+        [p.x, p.y]
+    }).collect()
+}
+
+fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect, contour: Vec<f64>) -> Item {
     Item::Path(PathItem {
         clip: format!("frame:{clip}"),
         contours: vec![contour],
@@ -150,7 +157,7 @@ fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect) -> Ite
 fn used(u: &UseItem, group: &DisplayList, start: usize) -> Vec<Item> {
     let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
     let scale = scale_of(u.matrix);
-    let back = group.background.map(|c| background(&u.clip, c, frame));
+    let back = group.background.map(|c| background(&u.clip, c, frame, turned_corners(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64))));
     let first = start + back.iter().count();
     let items = group.items.iter().map(|i| match placed(i, u.matrix, frame, scale) {
         Item::Lens(mut l) => {
