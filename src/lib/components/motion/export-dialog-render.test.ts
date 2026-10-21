@@ -14,7 +14,7 @@ import { ComponentMode } from '$lib/motion/custom/component';
 
 const doc = newMotionDoc(MotionFormat.Landscape);
 
-function dialog(start: ExportMode | null = null, shown = doc) {
+function dialog(start: ExportMode | null = null, shown = doc, images: { count: number; onexport: () => Promise<string> } | null = null) {
   return render(ExportDialog, {
     props: {
       doc: shown,
@@ -26,6 +26,7 @@ function dialog(start: ExportMode | null = null, shown = doc) {
       server: { configured: true, version: 1, saved: true, latest: null, queue: RenderQueue.Ticking, assetHref: (id: string) => `/a/${id}` },
       tokens: FEEGA_TOKENS,
       opening: start,
+      images,
       onclose: () => {}
     }
   }).body;
@@ -72,6 +73,19 @@ describe('the export dialog asks what you want first', () => {
     expect(body).toContain('data-testid="export-fps"');
     expect(body).toContain('data-testid="export-background"');
     expect(body).toContain('data-testid="export-quote"');
+  });
+
+  it('offers image files only when the host can draw them', () => {
+    expect(dialog()).not.toContain('data-testid="export-mode-images"');
+    expect(dialog(null, doc, { count: 1, onexport: async () => 'no' })).toContain('data-testid="export-mode-images"');
+  });
+
+  it('the image path lists the size rows of the canvas export', () => {
+    const body = dialog(ExportMode.Images, doc, { count: 1, onexport: async () => 'no' });
+
+    expect(body).toContain('data-testid="export-row"');
+    expect(body).toContain('data-testid="export-go"');
+    expect(body).not.toContain('data-testid="export-format"');
   });
 
   it('the embed path mounts the interactive export', () => {

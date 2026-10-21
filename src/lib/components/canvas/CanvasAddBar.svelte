@@ -8,7 +8,7 @@
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
   import Hash from '@lucide/svelte/icons/hash';
-  import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barHidden, barKeys, barLift, barShift, barShown, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
+  import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barHidden, barKeys, barShift, barShown, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
   import PenTool from '@lucide/svelte/icons/pen-tool';
   import Sparkles from '@lucide/svelte/icons/sparkles';
   import { KEY_REGION_ATTR } from '$lib/canvas/key-region.svelte';
@@ -44,7 +44,7 @@
   $effect(() => {
     const timeline = frameBar.timeline;
     const host = barEl?.parentElement;
-    if (!frameBar.host || !host) {
+    if (!host) {
       timelinePx = 0;
       return;
     }
@@ -324,7 +324,7 @@
   </span>
 {/snippet}
 
-<div bind:this={barEl} class="add-bar" class:phone class:covered={barHidden(context, frameBar.covered)} class:stowed={!barShown(context, frameBar.editMode)} aria-hidden={!barShown(context, frameBar.editMode)} inert={!barShown(context, frameBar.editMode)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
+<div bind:this={barEl} class="add-bar" class:phone class:covered={barHidden(context, frameBar.covered)} class:stowed={!barShown(context, frameBar.editMode)} aria-hidden={!barShown(context, frameBar.editMode)} inert={!barShown(context, frameBar.editMode)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${timelinePx}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
   {#key `${context}:${mode}`}
     <div class="group" data-testid={`bar-${context}`}>
       {#each barSlots(context, mode) as s (s)}{@render SLOT[s]()}{/each}

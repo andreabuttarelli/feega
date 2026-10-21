@@ -25,9 +25,12 @@
   import type { BrandTokens } from '$lib/motion/brand';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
   import InteractiveExport from './InteractiveExport.svelte';
+  import ExportRows from './ExportRows.svelte';
+  import type { ExportRow } from '$lib/motion/export-rows';
   import { ExportMode } from './export-mode';
   import Film from '@lucide/svelte/icons/film';
   import Code from '@lucide/svelte/icons/code';
+  import ImageIcon from '@lucide/svelte/icons/image';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
 
   type Renderer = (times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal) => Promise<void>;
@@ -46,7 +49,7 @@
   };
   const RESOLUTION_LABEL: Record<Resolution, string> = { [Resolution.P720]: '720p', [Resolution.P1080]: '1080p', [Resolution.P1440]: '1440p', [Resolution.P2160]: '4K' };
   const QUALITY_LABEL: Record<Quality, string> = { [Quality.Standard]: 'Standard', [Quality.High]: 'High', [Quality.Max]: 'Max' };
-  const MODE_TITLE: Record<ExportMode, string> = { [ExportMode.Video]: 'Video file', [ExportMode.Interactive]: 'Embed on a website' };
+  const MODE_TITLE: Record<ExportMode, string> = { [ExportMode.Video]: 'Video file', [ExportMode.Interactive]: 'Embed on a website', [ExportMode.Images]: 'Image files' };
 
   const STAGE_LABEL: Record<RenderStage, string> = {
     [RenderStage.Starting]: 'Starting render machines…',
@@ -92,6 +95,7 @@
     tokens,
     analyses = {},
     opening = null,
+    images = null,
     onpresets,
     onclose
   }: {
@@ -106,6 +110,7 @@
     tokens: BrandTokens;
     analyses?: Record<string, AudioAnalysis>;
     opening?: ExportMode | null;
+    images?: { count: number; onexport: (rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string> } | null;
     onpresets?: () => void;
     onclose: () => void;
   } = $props();
@@ -312,7 +317,16 @@
         <b>Embed on a website</b>
         <span class="hint">A live player you paste into your site. It can react to the cursor and scroll.</span>
       </button>
+      {#if images}
+        <button type="button" class="choice" onclick={() => (mode = ExportMode.Images)} data-testid="export-mode-images">
+          <span class="icon"><ImageIcon size={20} /></span>
+          <b>Image files</b>
+          <span class="hint">PNG, JPG, WebP, PDF or SVG, at the sizes you list.</span>
+        </button>
+      {/if}
     </div>
+  {:else if mode === ExportMode.Images && images}
+    <ExportRows count={images.count} onexport={images.onexport} />
   {:else if mode === ExportMode.Interactive}
     <InteractiveExport {doc} {tokens} {assetUrls} {analyses} {fileName} {editorUrl} {onpresets} />
   {:else}

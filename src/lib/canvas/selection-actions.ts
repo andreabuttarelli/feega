@@ -17,6 +17,7 @@
 import type { PostCompositionNode } from './post-composition';
 import { FrameKind } from './motion-node';
 import { Edge } from '$lib/motion/space';
+import { FRAME_DIALOG_ACTIONS, isFrameDialogAction, type FrameDialogActionId } from './frame-dialogs';
 import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-plan';
 
 export type SelectionActionId =
@@ -47,7 +48,8 @@ export type SelectionActionId =
   | 'release-mask'
   | 'create-formats'
   | 'export'
-  | 'delete';
+  | 'delete'
+  | FrameDialogActionId;
 
 export type SelectionActionGroup = 'primary' | 'secondary' | 'overflow' | 'menu' | 'danger';
 
@@ -84,7 +86,15 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'use-as-mask', label: 'Use as mask', group: 'menu', minNodes: 1, shortcut: 'Mod+Ctrl+M' },
   { id: 'release-mask', label: 'Remove mask', group: 'menu', minNodes: 1 },
   { id: 'create-formats', label: 'Create formats…', group: 'menu', minNodes: 1 },
-  { id: 'export', label: 'Export…', group: 'menu', minNodes: 1 },
+  { id: 'export', label: 'Export…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-voice', label: 'Add voice-over…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-music', label: 'Add music…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-interactive', label: 'Interactive…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-components', label: 'Components…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-templates', label: 'Templates…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-branches', label: 'Branches…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-history', label: 'Version history…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-chat', label: 'Chat history…', group: 'overflow', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
   { id: 'report', label: 'Report content', group: 'overflow', minNodes: 1 },
   { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, shortcut: 'Backspace' }
@@ -115,7 +125,12 @@ const isDrawn = (n: Summary) => typeof n.data.format === 'string' && n.data.kind
 
 const isFrame = (n: Summary) => typeof n.data.format === 'string' && (n.data.kind ?? FrameKind.Frame) === FrameKind.Frame;
 
+const isOneFrame = (summaries: readonly Summary[]) => summaries.length === 1 && isFrame(summaries[0]);
+
+const FRAME_DIALOG_SHOWN = Object.fromEntries((Object.keys(FRAME_DIALOG_ACTIONS) as FrameDialogActionId[]).map((id) => [id, isOneFrame]));
+
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
+  ...FRAME_DIALOG_SHOWN,
   ungroup: (summaries) => summaries.some(isGroup),
   'create-formats': (summaries) => summaries.length === 1 && isFrame(summaries[0]),
   export: (summaries) => summaries.length > 0 && summaries.every(isDrawn)
@@ -127,11 +142,11 @@ export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): 
 
 export type FrameOnlyActionId = 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask';
 
-export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId>;
+export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId | FrameDialogActionId>;
 
 const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask']);
 
-export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id);
+export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id) && !isFrameDialogAction(id);
 
 const MIN_ALIGNED_TILES = 2;
 

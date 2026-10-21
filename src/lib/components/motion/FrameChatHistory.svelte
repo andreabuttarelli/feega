@@ -2,7 +2,7 @@
   import ChatMessage from '$lib/components/brand-agent/ChatMessage.svelte';
   import type { Turn } from '$lib/server/repos/chat';
 
-  let { historyUrl, projectId }: { historyUrl: string; projectId: string } = $props();
+  let { historyUrl, projectId, open = false }: { historyUrl: string; projectId: string; open?: boolean } = $props();
 
   let turns = $state<Turn[]>([]);
 
@@ -23,12 +23,14 @@
 </script>
 
 {#if turns.length}
-  <details class="frame-history" data-testid="frame-chat-history">
+  <details class="frame-history" data-testid="frame-chat-history" {open}>
     <summary>Earlier chat about this frame ({turns.length})</summary>
     {#each turns as turn, i (i)}
       <ChatMessage role={turn.role} content={turn.content} {projectId} tools={turn.tools as never} attachments={turn.attachments} />
     {/each}
   </details>
+{:else if open}
+  <p class="frame-history" data-testid="frame-chat-empty">No earlier chat about this frame.</p>
 {/if}
 
 <style>

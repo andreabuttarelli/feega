@@ -294,6 +294,14 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'release-mask': motion('release_mask'),
   'create-formats': canvas('create_formats'),
   export: canvas('export_selection'),
+  'frame-voice': editor('generate_sound'),
+  'frame-music': editor('generate_sound'),
+  'frame-interactive': motion('declare_var'),
+  'frame-components': motion('add_template'),
+  'frame-templates': motion('add_template'),
+  'frame-branches': editor('list_branches'),
+  'frame-history': tool('list_motion_revisions'),
+  'frame-chat': tool('ask_motion_agent'),
   delete: canvas('delete_node')
 };
 
