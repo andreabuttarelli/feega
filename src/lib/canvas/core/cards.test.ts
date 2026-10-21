@@ -20,7 +20,7 @@ const box = (contours: number[][]) => {
 };
 const asset = (id: string) => `https://cdn/${id}`;
 const view = (thumbs: string[], total = thumbs.length): NodeView => ({ source: { tiles: thumbs.map((thumb) => ({ thumb, caption: null, badge: null, sale: null })), total, name: null } });
-const icons: CardIcons = { references: [], credit: [], head: new Map(), badge: new Map(), layers: [[0, 0, 5, 0, 5, 5]], play: [[0, 0, 5, 0, 5, 5]], person: [], ui: { open: [], left: [], right: [], help: [], plus: [], image: [], camera: [] } };
+const icons: CardIcons = { references: [], credit: [], chevron: [], voicePlay: [], head: new Map(), badge: new Map(), layers: [[0, 0, 5, 0, 5, 5]], play: [[0, 0, 5, 0, 5, 5]], person: [], ui: { open: [], left: [], right: [], help: [], plus: [], image: [], camera: [] } };
 const card = (kind: string, data: Record<string, unknown>, over: Partial<CoreCard> = {}): CoreCard => ({ id: 'n', x: 0, y: 0, w: 200, h: 100, face: faceOf({ id: 'n', kind }, data, asset), ...over });
 const part = (items: Item[], p: CardPart) => items.filter((i) => i.clip === `n:${p}` || i.clip.startsWith(`n:${p}:`));
 const paths = (items: Item[], p: CardPart) => part(items, p) as PathItem[];

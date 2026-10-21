@@ -5,7 +5,8 @@ import type { Box } from '$lib/canvas/gpu/geometry';
 import type { Glyphs, TextSet } from './chrome';
 import type { CoreTheme } from './overlay';
 import { mix } from '$lib/canvas/gpu/theme';
-import { line, rect, roundRect, solid } from './shapes';
+import { AudioFieldKind } from '$lib/canvas/audio-form';
+import { circle, line, rect, roundRect, solid } from './shapes';
 
 export enum GenPart {
   Panel = 'gen-panel',
@@ -25,10 +26,11 @@ export enum GenPart {
   PromptText = 'gen-prompt-text',
   Warn = 'gen-warn',
   Loop = 'gen-loop',
-  Run = 'gen-run'
+  Run = 'gen-run',
+  Form = 'gen-form'
 }
 
-export type GenIcons = { references: number[][]; credit: number[][] };
+export type GenIcons = { references: number[][]; credit: number[][]; chevron: number[][]; voicePlay: number[][] };
 
 export type GenKit = { theme: CoreTheme; glyphs: Glyphs; bold: Glyphs; icons: GenIcons };
 
@@ -58,6 +60,8 @@ const PAST = { band: 30.75, padX: 9, padY: 5, size: 10.5, leading: 1.5, padCell:
 const TOGGLE = { height: 24.8, size: 10.5, leading: 1.5 };
 const OUTPUT = { pad: 12, size: 12, leading: 1.5 };
 const MARK = { inset: 7, below: 5, height: 16, padX: 6, size: 10, radius: 4, fill: '#000000', fillAlpha: 0.6, ink: '#ffffff' };
+const FORM = { padX: 9, padY: 7, gapX: 8, gapY: 6, size: 11, leading: 1.5, label: 2, select: { padX: 4, padY: 3 }, play: 24, playGap: 4, track: 4, thumb: 16, slider: 16, disabled: 0.35, trackRest: 0.85, chevron: 12 };
+const MORE_VOICES_FALLBACK = 'More voices';
 const PLACEHOLDER_ALPHA = 0.55;
 const MARK_TEXT = 'AI-generated';
 const ADD_REFERENCES = 'Add references';
@@ -210,6 +214,61 @@ function past(x: Ctx, v: GenTileView, top: number): PathItem[] {
   return items;
 }
 
+function selectBox(x: Ctx, part: GenPart, b: Box, label: string, nth: number, withArrow = true): PathItem[] {
+  const { theme } = x;
+  const arrow = withArrow ? [{ ...solid(x.clip(part, nth + 3), at(x, x.icons.chevron.map((k) => k.map((v, i) => (i % 2 === 0 ? v + b.x + b.w - FORM.select.padX - FORM.chevron : v + b.y + (b.h - FORM.chevron) / 2)))), theme.ink), rule: FillRule.Union }] : [];
+  return [
+    solid(x.clip(part, nth), box(x, b), theme.paper2),
+    solid(x.clip(part, nth + 1), frame(x, b), theme.line2),
+    ...write(x, part, label, FORM.size, theme.ink, b.x + BORDER + FORM.select.padX, b.y + BORDER + FORM.select.padY, { leading: FORM.leading, width: b.w - 2 * (BORDER + FORM.select.padX) - (withArrow ? FORM.chevron : 0), height: FORM_LINE }).map((i) => ({ ...i, clip: x.clip(part, nth + 2) })),
+    ...arrow
+  ];
+}
+
+function slider(x: Ctx, b: Box, ratio: number, nth: number): PathItem[] {
+  const { theme } = x;
+  const mid = b.y + b.h / 2;
+  const track = { x: b.x, y: mid - FORM.track / 2, w: b.w, h: FORM.track };
+  const knob = b.x + FORM.thumb / 2 + (b.w - FORM.thumb) * Math.min(1, Math.max(0, ratio));
+  return [
+    solid(x.clip(GenPart.Form, nth), at(x, roundRect(track.x, track.y, track.w, track.h, FORM.track / 2)), theme.ink, FORM.trackRest),
+    solid(x.clip(GenPart.Form, nth + 1), at(x, roundRect(track.x, track.y, knob - track.x, track.h, FORM.track / 2)), theme.accent),
+    solid(x.clip(GenPart.Form, nth + 2), at(x, circle(knob, mid, FORM.thumb / 2)), theme.accent)
+  ];
+}
+
+function form(x: Ctx, v: GenTileView, top: number): PathItem[] {
+  const { c, theme } = x;
+  const colW = (c.w - 2 * BORDER - 2 * FORM.padX - FORM.gapX) / 2;
+  const items: PathItem[] = [solid(x.clip(GenPart.Form), box(x, { x: BORDER, y: top, w: c.w - 2 * BORDER, h: BORDER }), theme.line)];
+  let y = top + BORDER + FORM.padY;
+  formRows(v).forEach((row, r) => {
+    const h = Math.max(...row.map(formCellHeight));
+    row.forEach((f, i) => {
+      const left = BORDER + FORM.padX + i * (colW + FORM.gapX);
+      const nth = 10 * (2 * r + i + 1);
+      const labelled = f.kind !== AudioFieldKind.More;
+      const body = labelled ? y + FORM_LINE + FORM.label : y + h - FORM_SELECT_H;
+      if (labelled) {
+        items.push(...write(x, GenPart.Form, f.label, FORM.size, theme.inkSoft, left, y, { leading: FORM.leading }).map((it) => ({ ...it, clip: x.clip(GenPart.Form, nth) })));
+      }
+      if (f.kind === AudioFieldKind.Slider) {
+        items.push(...slider(x, { x: left, y: body, w: colW, h: FORM.slider }, f.ratio, nth + 1));
+      } else if (f.kind === AudioFieldKind.More) {
+        items.push(solid(x.clip(GenPart.Form, nth + 1), box(x, { x: left, y: body, w: colW, h: FORM_SELECT_H }), theme.paper), solid(x.clip(GenPart.Form, nth + 2), frame(x, { x: left, y: body, w: colW, h: FORM_SELECT_H }), theme.line2), ...write(x, GenPart.Form, f.value || MORE_VOICES_FALLBACK, FORM.size, theme.ink, left + (colW - words(x, f.value || MORE_VOICES_FALLBACK, FORM.size, { leading: FORM.leading }).width) / 2, body + BORDER + FORM.select.padY, { leading: FORM.leading }).map((it) => ({ ...it, clip: x.clip(GenPart.Form, nth + 3) })));
+      } else if (f.kind === AudioFieldKind.Voice) {
+        const select = { x: left, y: body, w: colW - FORM.play - FORM.playGap, h: FORM_SELECT_H };
+        const play = { x: left + colW - FORM.play, y: body, w: FORM.play, h: FORM_SELECT_H };
+        items.push(...selectBox(x, GenPart.Form, select, f.value, nth + 1), solid(x.clip(GenPart.Form, nth + 6), box(x, play), theme.paper), solid(x.clip(GenPart.Form, nth + 7), frame(x, play), theme.line2), { ...solid(x.clip(GenPart.Form, nth + 8), at(x, x.icons.voicePlay.map((k) => k.map((p, j) => (j % 2 === 0 ? p + play.x + (FORM.play - 12) / 2 : p + play.y + (FORM_SELECT_H - 12) / 2)))), theme.ink, FORM.disabled), rule: FillRule.Union });
+      } else {
+        items.push(...selectBox(x, GenPart.Form, { x: left, y: body, w: colW, h: FORM_SELECT_H }, f.value, nth + 1, f.kind === AudioFieldKind.Select));
+      }
+    });
+    y += h + FORM.gapY;
+  });
+  return items;
+}
+
 function references(x: Ctx, top: number): PathItem[] {
   const { theme } = x;
   const label = words(x, ADD_REFERENCES, REFS.size, { leading: REFS.leading }, x.bold);
@@ -260,8 +319,27 @@ function panel(x: Ctx, running: boolean): PathItem[] {
   return [solid(x.clip(GenPart.Panel), box(x, { x: 0, y: SHADOW_DROP, w: c.w, h: c.h }), SHADOW, SHADOW_OPACITY), solid(x.clip(GenPart.Panel, 1), box(x, { x: 0, y: 0, w: c.w, h: c.h }), theme.paper), ...border];
 }
 
+const FORM_LINE = FORM.size * FORM.leading;
+const FORM_SELECT_H = FORM.select.padY * 2 + FORM_LINE + 2 * BORDER;
+
+function formCellHeight(f: GenTileView['form'][number]): number {
+  if (f.kind === AudioFieldKind.More) {
+    return FORM_SELECT_H;
+  }
+  const control = f.kind === AudioFieldKind.Slider ? FORM.slider : FORM_SELECT_H;
+  return FORM_LINE + FORM.label + control;
+}
+
+function formRows(v: GenTileView): GenTileView['form'][] {
+  const rows: GenTileView['form'][] = [];
+  v.form.forEach((f, i) => (i % 2 ? rows[rows.length - 1].push(f) : rows.push([f])));
+  return rows;
+}
+
+const formHeight = (v: GenTileView) => (v.form.length ? BORDER + FORM.padY * 2 + formRows(v).reduce((a, r, i) => a + Math.max(...r.map(formCellHeight)) + (i ? FORM.gapY : 0), 0) : 0);
+
 function bands(c: Box, v: GenTileView) {
-  const refs = v.hasBody && v.medium !== 'text' ? REFS.band : 0;
+  const refs = v.hasBody && v.medium !== 'text' ? (v.form.length ? formHeight(v) : REFS.band) : 0;
   const strip = v.runs > 1 ? PAST.band : 0;
   const foot = c.h - BORDER - footHeight(v);
   return { refs, strip, foot, body: { x: BORDER, y: BORDER, w: c.w - 2 * BORDER, h: foot - strip - refs - BORDER } };
@@ -282,6 +360,6 @@ export function genItems(c: At, v: GenTileView, kit: GenKit): PathItem[] {
   const { refs, strip, foot, body: bodyBox } = bands(c, v);
   const body = v.hasBody ? [solid(x.clip(GenPart.Body), box(x, bodyBox), kit.theme.paper2), ...BODIES[v.state](x, v, bodyBox)] : [];
   const history = strip ? past(x, v, foot - strip - refs) : [];
-  const refsBand = refs ? references(x, foot - refs) : [];
+  const refsBand = refs ? (v.form.length ? form(x, v, foot - refs) : references(x, foot - refs)) : [];
   return [...panel(x, v.state === 'running'), ...body, ...history, ...refsBand, ...footer(x, v, v.hasBody ? foot : BORDER)];
 }

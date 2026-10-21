@@ -9,7 +9,7 @@ import { GenPart, genItems, genMark, type GenIcons } from './gen-card';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', paper2: '#f9f9f9', line: '#ededef', line2: '#d2d2d7', ink: '#1d1d1f', inkSoft: '#6e6e73', chip: '#f2f2f2', chipInk: '#141414', accent: '#0099ff', wire: '#b3b3b6', iterate: '#d97706' };
 const glyphs: Glyphs = (text, size) => ({ contours: text ? [[0, 0, text.length * size * 0.5, 0, text.length * size * 0.5, size, 0, size]] : [], width: text.length * size * 0.5, height: size });
-const icons: GenIcons = { references: [[0, 0, 14, 0, 14, 14, 0, 14]], credit: [[0, 0, 12, 0, 12, 12, 0, 12]] };
+const icons: GenIcons = { references: [[0, 0, 14, 0, 14, 14, 0, 14]], credit: [[0, 0, 12, 0, 12, 12, 0, 12]], chevron: [[0, 0, 12, 0, 12, 12, 0, 12]], voicePlay: [[0, 0, 12, 0, 12, 12, 0, 12]] };
 
 const view = (over: Partial<GenTileView> = {}): GenTileView => ({
   medium: 'image',
@@ -25,6 +25,7 @@ const view = (over: Partial<GenTileView> = {}): GenTileView => ({
   loop: null,
   runs: 0,
   shown: -1,
+  form: [],
   ...over
 });
 
@@ -91,5 +92,16 @@ describe('genItems', () => {
 
   it('draws the markdown toggle over a finished text output', () => {
     expect(parts(draw(view({ medium: 'text', state: 'done', output: 'hi' }), { ...card, h: 220 }), GenPart.Toggle).length).toBeGreaterThan(0);
+  });
+
+  it('replaces the references band of an audio tile with its controls', () => {
+    const form = [
+      { kind: 'select' as const, label: 'Operation', value: 'Text to speech', ratio: 0 },
+      { kind: 'slider' as const, label: 'Stability', value: '', ratio: 0.5 }
+    ];
+    const items = draw(view({ medium: 'audio', form }), { id: 'n', x: 0, y: 0, w: 320, h: 400 });
+
+    expect(items.some((i) => i.clip.startsWith(`n:${GenPart.Form}`))).toBe(true);
+    expect(items.some((i) => i.clip.startsWith(`n:${GenPart.References}`))).toBe(false);
   });
 });
