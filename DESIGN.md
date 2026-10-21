@@ -95,7 +95,7 @@ These rules apply to every panel, including the Properties inspector:
 | Role | Style |
 |---|---|
 | **Page and section titles** | **mega type, lowercase.** Very large display size (`clamp(40px, 4.5vw, 72px)` on desktop pages, `clamp(36px, 10vw, 64px)` on mobile), tight tracking (-0.04em), weight 600, line-height 0.95. Always lowercase, including the first letter: `gallery`, `your videos`, `create a video`. |
-| UI text | DM Sans, scale 11/12/13/15/20 (`--ui-text-xs…xl`). |
+| UI text | BDO Grotesk, scale 11/12/13/15/20 (`--ui-text-xs…xl`). |
 | Labels, timecodes, ids | Fragment Mono (`--ui-mono`). |
 
 Mega type is for the one title that names a view. Sign in is the exception: its title is small (20px), it is not a page the user cares about. Everything under it stays small; the contrast
