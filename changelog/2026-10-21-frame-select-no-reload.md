@@ -9,3 +9,7 @@ overlay from the previous change already covers stand-in tiles, so nothing is lo
 The frame stand-in is positioned after the hover overlay in the tile, so it covered `FrameHover` and the
 pointer never reached it on unselected frames. `tileOver` now renders after the stand-in. While the pointer is on
 one of a frame's elements the frame's own hover ring yields to it (`frameRinged`).
+
+The frame stand-in is positioned after the hover overlay in the tile, so it covered `FrameHover` and the
+pointer never reached it on unselected frames. `tileOver` now renders after the stand-in. While the pointer is on
+one of a frame's elements the frame's own hover ring yields to it (`frameRinged`).
