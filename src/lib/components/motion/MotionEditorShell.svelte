@@ -7,7 +7,8 @@
   import { localStore } from '$lib/browser-storage';
   import { painted } from '$lib/canvas/paint-wait';
   import { frameDocs } from '$lib/canvas/frame-docs.svelte';
-  import { liveEdits } from '$lib/motion/live-edit';
+  import { FrameEditSession, type SendResult } from '$lib/motion/frame-edit-session.svelte';
+  import type { DocOp } from '$lib/motion/doc-ops';
   import { FrameKind, frameChrome, freshText, openingSelection } from '$lib/canvas/motion-node';
   import { DRAWN_TEXT } from '$lib/motion/draw-create';
   import { groupClips, ungroupClip } from '$lib/motion/group';
@@ -163,8 +164,7 @@
   } from '$lib/motion/timeline';
   import { DragPhase, UndoRoute, type CanvasUndo, type ElementOut, type HostDrag, type MoveOut } from '$lib/canvas/canvas-drop';
   import { copyElements, liftElement, pasteElements } from '$lib/motion/move-element';
-  import { adoptHead, amend, canRedo, canUndo, followHead, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
-  import { landed, outgoing, remote, type Synced } from '$lib/motion/frame-sync';
+  import { canRedo, canUndo, previousSource } from '$lib/motion/history';
   import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
   import { InspectorTab } from '$lib/motion/inspector';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
@@ -212,10 +212,8 @@
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 
-  const SAVE_DEBOUNCE_MS = 250;
   const CHECK_WIDTH = 480;
   const CHECK_DEBOUNCE_MS = 900;
-  const COALESCE_MS = 800;
   const CURSOR_SEND_MS = 60;
   const PRESENCE_BEAT_MS = 3000;
   const HEAD_POLL_TRIES = 6;
@@ -231,23 +229,30 @@
   let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onsheet = () => {}, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onsheet?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: HostShare) => void) | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
   const rules = $derived(MOUNT[mount]);
 
-  let history = $state<History>(startHistory(data.head.doc as MotionDoc));
-  let version = $state(data.head.version);
-  let baseDoc = data.head.doc as MotionDoc;
-  let saving = false;
-  let resave = false;
-  let selection = $state<string[]>(openingSelection(data.node.kind ?? FrameKind.Frame, (data.head.doc as MotionDoc).tracks.flatMap((t) => t.clips.map((c) => c.id))));
+  const session = new FrameEditSession(
+    { head: { version: data.head.version, doc: data.head.doc as MotionDoc }, selection: openingSelection(data.node.kind ?? FrameKind.Frame, (data.head.doc as MotionDoc).tracks.flatMap((t) => t.clips.map((c) => c.id))) },
+    {
+      viewPath: () => compPath,
+      show: (next) => {
+        previewDoc = next;
+        liveRoot = next ? mergeView(session.history.present, compPath, next) : null;
+      },
+      recorded: () => (userEdited = true),
+      saved: (head) => frameDocs.saved(data.node.id, head),
+      pull: () => pullExternalEdit(),
+      send: sendOps
+    }
+  );
   let typeInto = $state<string | null>(freshText(data.node.kind ?? FrameKind.Frame, data.head.version, (data.head.doc as MotionDoc).tracks.flatMap((t) => t.clips)));
   let path = $state<{ comp: string; frame: number }[]>([]);
   let cameraOpen = $state(false);
   let keySelection = $state<KeyRef[]>([]);
   let keyBoard: KeyBoard = [];
-  let frame = $state(untrack(() => openingFrame(MOUNT[mount], history.present)));
+  let frame = $state(untrack(() => openingFrame(MOUNT[mount], session.history.present)));
   let playing = $state(false);
   let zoom = $state(1.5);
   let snap = $state(Snap.On);
   let graphOpen = $state(false);
-  let saveState = $state<SaveState>(SaveState.Saved);
   const presence = framePresence();
   let marks = $state(new Map<string, FrameMark>());
   let clock = $state(Date.now());
@@ -255,7 +260,6 @@
   let cursorSentAt = 0;
   let cursorTimer: ReturnType<typeof setTimeout> | null = null;
   const peers = $derived(presence ? peersIn(marks, data.node.id, presence.self.userId, clock) : []);
-  let notice = $state('');
   const supabase = createSupabaseBrowserClient();
   const uploadToProject = canvasMediaUploader(supabase, { orgId: data.orgId, projectId: data.projectId, canvasId: data.canvas.id });
   const uploadMedia: MediaUploader = async (file, progress) => {
@@ -323,7 +327,7 @@
   let pressAt: { x: number; y: number } | null = null;
   let pressedMenu: unknown = null;
 
-  let editMode = $state(startMode(history.present, localStore()?.getItem(EDIT_MODE_KEY) ?? null));
+  let editMode = $state(startMode(session.history.present, localStore()?.getItem(EDIT_MODE_KEY) ?? null));
 
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
@@ -353,7 +357,7 @@
             return doc;
           },
           get selection() {
-            return selection;
+            return session.selection;
           },
           get parts() {
             return partsByClip;
@@ -362,14 +366,14 @@
             return editMode;
           },
           get part() {
-            return selection.length === 1 && selectedPart ? `${selection[0]}${PART_SEP}${selectedPart}` : null;
+            return session.selection.length === 1 && selectedPart ? `${session.selection[0]}${PART_SEP}${selectedPart}` : null;
           },
           selectPart: (clipId, part) => {
-            selection = [clipId];
+            session.selection = [clipId];
             queueMicrotask(() => (selectedPart = part));
           },
           select: (ids) => {
-            selection = ids;
+            session.selection = ids;
             selectedPart = null;
           },
           edit: (result, summary) => apply(result, summary),
@@ -413,7 +417,7 @@
       seekTo(at);
     }
     layout = readLayout(localStore(), firstLayout());
-    if (selection.length) {
+    if (session.selection.length) {
       relayout({ side: Side.Properties, inspector: Panel.Open });
     }
     if (opensOn === OpensOn.Properties && viewport === Viewport.Phone) {
@@ -429,7 +433,7 @@
     }
     return watchMotionNode(supabase, data.node.id, {
       onChange: (row) => {
-        if (headMoved(row, version)) {
+        if (headMoved(row, session.version)) {
           void pullExternalEdit();
         }
       },
@@ -463,7 +467,7 @@
 
   function sendMark() {
     cursorSentAt = Date.now();
-    presence?.send({ nodeId: data.node.id, cursor, selection: [...selection] });
+    presence?.send({ nodeId: data.node.id, cursor, selection: [...session.selection] });
   }
 
   function pointAt(next: FrameCursor | null) {
@@ -496,29 +500,22 @@
   });
 
   $effect(() => {
-    void selection.join();
+    void session.selection.join();
     untrack(sendMark);
   });
 
-  let lastEdit = { summary: '', at: 0 };
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  let unsavedSummary = '';
-
   onMount(() => () => {
     overlay?.flushTyping();
-    if (saveTimer && saveState === SaveState.Pending) {
-      clearTimeout(saveTimer);
-      void save();
-    }
+    void session.flushPending();
   });
 
   const compPath = $derived(path.map((p) => p.comp));
-  const doc = $derived(viewOf(draft?.doc ?? history.present, compPath));
+  const doc = $derived(viewOf(draft?.doc ?? session.history.present, compPath));
   const unanimated = $derived(editMode === EditMode.Motion && doc.tracks.every((t) => t.clips.every((c) => !Object.keys(c.keyframes).length)));
-  const mode = $derived(docMode(history.present));
+  const mode = $derived(docMode(session.history.present));
 
   $effect(() => {
-    const pinned = stillFrame(history.present);
+    const pinned = stillFrame(session.history.present);
     if (pinned !== null) {
       frame = pinned;
       playing = false;
@@ -535,11 +532,11 @@
   const composeFrame = lastComposed(composeHtml);
   const html = $derived(composeFrame({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   $effect(() => {
-    const root = liveRoot ?? history.present;
-    frameDocs.put(data.node.id, { version, html: composeFrame({ doc: root, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen }), width: root.width, height: root.height, fps: root.fps, durationInFrames: root.durationInFrames, clean: !liveRoot && !history.past.length && !history.future.length });
+    const root = liveRoot ?? session.history.present;
+    frameDocs.put(data.node.id, { version: session.version, html: composeFrame({ doc: root, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen }), width: root.width, height: root.height, fps: root.fps, durationInFrames: root.durationInFrames, clean: !liveRoot && !session.history.past.length && !session.history.future.length });
   });
   const liveScene = $derived(liveComponents(doc));
-  const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
+  const selected = $derived(session.selection.length === 1 ? (findClip(doc, session.selection[0])?.clip ?? null) : null);
   let vectorEdit = $state<string | null>(null);
   const editingPoints = $derived(selected !== null && selected.id === vectorEdit && canEditPoints(selected));
 
@@ -548,7 +545,7 @@
       vectorEdit = null;
     }
   });
-  const view = $derived(propertiesFor({ count: selection.length, clip: selected?.id ?? null, part: selectedPart }));
+  const view = $derived(propertiesFor({ count: session.selection.length, clip: selected?.id ?? null, part: selectedPart }));
   const agent = $derived(agentBusy || draft ? Agent.Working : Agent.Idle);
 
   const OPEN_CHAT: Record<ChatPlace, () => void> = {
@@ -578,33 +575,33 @@
 
   provideSelection({
     get ids() {
-      return selection;
+      return session.selection;
     },
     get clip() {
       return selected;
     },
     select: (ids) => {
-      selection = ids;
+      session.select(ids);
       cameraOpen = false;
     }
   });
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
 
   const poster = posterJob(
-    () => preview?.still(posterSecond(history.present), POSTER_WIDTH, posterFormat(history.present.background)) ?? Promise.resolve(''),
-    (jpeg, shotAt) => sendPoster(editorUrl, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)), revision: String(shotAt) }),
-    () => version
+    () => preview?.still(posterSecond(session.history.present), POSTER_WIDTH, posterFormat(session.history.present.background)) ?? Promise.resolve(''),
+    (jpeg, shotAt) => sendPoster(editorUrl, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * session.history.present.height) / session.history.present.width)), revision: String(shotAt) }),
+    () => session.version
   );
   let posterVersion = data.node.posterAssetId ? data.head.version : -1;
   $effect(() => {
-    if (version > 0 && version !== posterVersion) {
-      posterVersion = version;
+    if (session.version > 0 && session.version !== posterVersion) {
+      posterVersion = session.version;
       untrack(() => poster.schedule());
     }
   });
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
 
-  const openFrame = () => ({ canvasId: data.canvas.id, frame: { nodeId: data.node.id, selection, playhead: frame / history.present.fps, mode } });
+  const openFrame = () => ({ canvasId: data.canvas.id, frame: { nodeId: data.node.id, selection: session.selection, playhead: frame / session.history.present.fps, mode } });
 
   const soundAssets = $derived(findSoundAssets(doc));
 
@@ -632,9 +629,9 @@
   }
 
   function cutSelectionToBeat() {
-    const result = cutToBeat(doc, selection, beats);
+    const result = cutToBeat(doc, session.selection, beats);
     if (!result.ok) {
-      notice = result.error;
+      session.notice = result.error;
       return;
     }
     edit(result.doc, 'Cut to the beat');
@@ -680,16 +677,10 @@
   }
 
   let liveRoot = $state.raw<MotionDoc | null>(null);
-  const live = liveEdits<MotionDoc>({
-    show: (next) => {
-      previewDoc = next;
-      liveRoot = next ? mergeView(history.present, compPath, next) : null;
-    },
-    record: (next, summary) => recordEdit(next, summary)
-  });
+  const live = session.live;
 
   function edit(next: MotionDoc, summary: string) {
-    live.edit(next, summary);
+    session.edit(next, summary);
   }
 
   const textCaret = caretSource(() => data.tokens, () => assetUrls);
@@ -705,15 +696,6 @@
   });
 
   $effect(() => () => liveDocs.clear(data.node.id));
-
-  function recordEdit(next: MotionDoc, summary: string) {
-    userEdited = true;
-    const now = Date.now();
-    const root = mergeView(history.present, compPath, next);
-    history = summary === lastEdit.summary && now - lastEdit.at < COALESCE_MS ? amend(history, root) : record(history, root);
-    lastEdit = { summary, at: now };
-    scheduleSave(summary);
-  }
 
   const TEXT_FIT_SUMMARY = 'Fitted a text box to its words';
   const HOST_FIT_QUIET_MS = 300;
@@ -744,19 +726,13 @@
     const next = untrack(() => fitTexts(doc, boxes));
     if (next) {
       untrack(() => {
-        history = amend(history, mergeView(history.present, compPath, next));
-        scheduleSave(TEXT_FIT_SUMMARY);
+        session.amendRoot(mergeView(session.history.present, compPath, next), TEXT_FIT_SUMMARY);
       });
     }
   });
 
   function apply(result: OpResult, summary: string) {
-    if (!result.ok) {
-      notice = result.error;
-      return;
-    }
-    notice = '';
-    edit(result.doc, summary);
+    session.apply(result, summary);
   }
 
   function enterVectorEdit() {
@@ -765,7 +741,7 @@
     }
     const entered = enterPointEdit(doc, selected);
     if (!entered.ok) {
-      notice = entered.error;
+      session.notice = entered.error;
       return;
     }
     if (entered.doc !== doc) {
@@ -775,71 +751,24 @@
   }
 
   async function outlineSelectedText() {
-    apply(await outlineTexts(doc, selection, loadOutliner, assetUrls), 'Outlined text');
+    apply(await outlineTexts(doc, session.selection, loadOutliner, assetUrls), 'Outlined text');
   }
 
-  function scheduleSave(summary: string) {
-    unsavedSummary = summary;
-    saveState = SaveState.Pending;
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-    }
-    saveTimer = setTimeout(() => void save(), SAVE_DEBOUNCE_MS);
-  }
-
-  function follow(next: Synced) {
-    baseDoc = next.base.doc;
-    version = next.base.version;
-    frameDocs.saved(data.node.id, next.base);
-    if (next.present === history.present) {
-      return;
-    }
-    history = followHead(history, next.present);
-    selection = selection.filter((id) => findClip(next.present, id));
-  }
-
-  function adopt(head: { version: number; doc: MotionDoc }) {
-    history = adoptHead(history, head.doc, version);
-    baseDoc = head.doc;
-    version = head.version;
-    frameDocs.saved(data.node.id, head);
-  }
-
-  async function save() {
-    if (saving) {
-      resave = true;
-      return;
-    }
-    saving = true;
-    saveState = SaveState.Saving;
-    const sent = history.present;
+  async function sendOps(ops: DocOp[], version: number, summary: string): Promise<SendResult> {
     const form = new FormData();
-    form.set('ops', JSON.stringify(outgoing({ version, doc: baseDoc }, sent)));
+    form.set('ops', JSON.stringify(ops));
     form.set('version', String(version));
-    form.set('summary', unsavedSummary);
+    form.set('summary', summary);
     frameDocs.sending(data.node.id);
     const result = await postPageAction(editorUrl, 'ops', form);
-    saving = false;
-
     if (result.type === 'success') {
-      frameDocs.landed(data.node.id, version, Number(result.data?.version));
-      presence?.landed({ nodeId: data.node.id, version: Number(result.data?.version), doc: result.data?.doc });
-      follow(landed({ version, doc: baseDoc }, sent, history.present, { version: Number(result.data?.version), doc: result.data?.doc as MotionDoc }));
-      saveState = SaveState.Saved;
-    } else {
-      frameDocs.landed(data.node.id, version, version);
-      saveState = SaveState.Failed;
-      notice = result.type === 'failure' ? String(result.data?.error ?? '') : '';
+      const landedVersion = Number(result.data?.version);
+      frameDocs.landed(data.node.id, version, landedVersion);
+      presence?.landed({ nodeId: data.node.id, version: landedVersion, doc: result.data?.doc });
+      return { ok: true, version: landedVersion, doc: result.data?.doc as MotionDoc };
     }
-    if (resave) {
-      resave = false;
-      await save();
-      return;
-    }
-    if (missedRemote) {
-      missedRemote = false;
-      await pullExternalEdit();
-    }
+    frameDocs.landed(data.node.id, version, version);
+    return { ok: false, error: result.type === 'failure' ? String(result.data?.error ?? '') : '' };
   }
 
   let fontFamiliesHere = $state<FontFamily[]>(data.fonts);
@@ -878,17 +807,17 @@
   async function dropFont(file: File) {
     const stored = await storeFont(file);
     if (!stored.ok) {
-      notice = stored.error;
+      session.notice = stored.error;
       return;
     }
     const registered = registerUpload(doc, stored.family);
     if (!registered.ok) {
-      notice = `${stored.font.family} is in the uploaded fonts; ${registered.error}`;
+      session.notice = `${stored.font.family} is in the uploaded fonts; ${registered.error}`;
       return;
     }
     const target = selected && 'font' in selected.props ? setFont(registered.doc, selected.id, { family: stored.font.family }, []) : registered;
     edit(target.ok ? target.doc : registered.doc, `Uploaded the font ${stored.font.family}`);
-    notice = `${stored.font.family} is in the uploaded fonts.`;
+    session.notice = `${stored.font.family} is in the uploaded fonts.`;
   }
 
   async function renameFont(family: string, to: string): Promise<string | null> {
@@ -943,20 +872,17 @@
 
   async function moveOut(out: ElementOut, phase: DragPhase) {
     if (!onmoveout || phase !== DragPhase.Drop) {
-      void onmoveout?.(out, phase, version);
+      void onmoveout?.(out, phase, session.version);
       return;
     }
-    if (saveState === SaveState.Pending) {
-      clearTimeout(saveTimer ?? undefined);
-      await save();
-    }
-    const landed = await onmoveout(out, phase, version);
-    const lifted = landed === null ? null : liftElement(history.present, out.clipId);
+    await session.flushPending();
+    const landed = await onmoveout(out, phase, session.version);
+    const lifted = landed === null ? null : liftElement(session.history.present, out.clipId);
     if (!lifted?.ok || landed === null) {
       return;
     }
-    adopt({ version: landed, doc: lifted.doc });
-    selection = selection.filter((id) => id !== out.clipId);
+    session.adopt({ version: landed, doc: lifted.doc });
+    session.selection = session.selection.filter((id) => id !== out.clipId);
   }
 
   type SavedHead = { version: number; doc: MotionDoc; actorKind?: string };
@@ -966,8 +892,6 @@
     return result.type === 'success' ? (result.data as SavedHead) : null;
   }
 
-  let missedRemote = false;
-
   $effect(() => presence?.onHead((head) => {
     if (head.nodeId === data.node.id) {
       takeRemote({ version: head.version, doc: head.doc as MotionDoc });
@@ -975,15 +899,7 @@
   }));
 
   function takeRemote(head: SavedHead | null): boolean {
-    if (saving) {
-      missedRemote = true;
-      return false;
-    }
-    const next = head ? remote({ version, doc: baseDoc }, history.present, head) : null;
-    if (next) {
-      follow(next);
-    }
-    return next !== null;
+    return session.takeRemote(head);
   }
 
   async function pullExternalEdit() {
@@ -1066,9 +982,8 @@
   const LAND: Record<Landing, (shown: AgentDraft) => void> = {
     [Landing.Head]: () => (draft = null),
     [Landing.KeepDraft]: (shown) => {
-      history = record(history, shown!.doc);
+      session.recordRoot(shown!.doc, 'Kept the agent edits');
       draft = null;
-      scheduleSave('Kept the agent edits');
     },
     [Landing.Nothing]: () => {}
   };
@@ -1105,25 +1020,24 @@
   let checkTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function checkPending() {
-    const next = unverified(history.present).find((u) => u.state === CheckState.Unchecked);
+    const next = unverified(session.history.present).find((u) => u.state === CheckState.Unchecked);
     if (checking || !next || !preview) {
       return;
     }
     checking = true;
     try {
-      const run = await runCheck(history.present, next.name, checkPorts);
-      const current = history.present.components[next.name];
+      const run = await runCheck(session.history.present, next.name, checkPorts);
+      const current = session.history.present.components[next.name];
       if (!current || sourceHash(current) !== run.check.hash) {
         return;
       }
-      const recorded = recordCheck(history.present, next.name, run.check);
+      const recorded = recordCheck(session.history.present, next.name, run.check);
       if (recorded.ok) {
-        history = amend(history, recorded.doc);
-        scheduleSave(`Checked ${next.name}`);
+        session.amendRoot(recorded.doc, `Checked ${next.name}`);
       }
     } finally {
       checking = false;
-      if (unverified(history.present).some((u) => u.state === CheckState.Unchecked)) {
+      if (unverified(session.history.present).some((u) => u.state === CheckState.Unchecked)) {
         checkTimer = setTimeout(() => void checkPending(), CHECK_DEBOUNCE_MS);
       }
     }
@@ -1222,9 +1136,9 @@
   });
 
   async function drawn(id: string) {
-    selection = [id];
-    vectorEdit = findClip(history.present, id)?.clip.props.shape === 'path' ? id : null;
-    typeInto = findClip(history.present, id)?.clip.component === DRAWN_TEXT ? id : null;
+    session.selection = [id];
+    vectorEdit = findClip(session.history.present, id)?.clip.props.shape === 'path' ? id : null;
+    typeInto = findClip(session.history.present, id)?.clip.component === DRAWN_TEXT ? id : null;
     await painted(DRAWN_SETTLE_FRAMES);
     frameBar.tool = DrawTool.Select;
   }
@@ -1239,7 +1153,7 @@
     adding = false;
     const id = newId();
     apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame, ...TOP_LEFT_START }, id), `Added ${COMPONENTS[component].label}`);
-    selection = [id];
+    session.selection = [id];
   }
 
   const ICON_SIZE = 0.12;
@@ -1249,61 +1163,61 @@
     adding = false;
     const id = newId();
     apply(addIcon(doc, { name, x: 0.5, y: 0.5, size: ICON_SIZE, color: ICON_COLOR, from: frame }, id), `Added the ${name} icon`);
-    selection = [id];
+    session.selection = [id];
   }
 
   function precomposeSelection() {
-    if (!selection.length) {
+    if (!session.selection.length) {
       return;
     }
     const id = newId();
-    const count = Object.keys(history.present.comps).length + 1;
-    apply(precompose(doc, selection, { comp: newId(), clip: id }, `Comp ${count}`), 'Precomposed');
-    selection = [id];
+    const count = Object.keys(session.history.present.comps).length + 1;
+    apply(precompose(doc, session.selection, { comp: newId(), clip: id }, `Comp ${count}`), 'Precomposed');
+    session.selection = [id];
   }
 
   const topClipIds = (of: MotionDoc) => new Set(of.tracks.flatMap((t) => t.clips.map((c) => c.id)));
 
   function groupSelection() {
-    if (selection.length < 2) {
+    if (session.selection.length < 2) {
       return;
     }
     const before = topClipIds(doc);
-    const grouped = groupClips(doc, selection, newId);
+    const grouped = groupClips(doc, session.selection, newId);
     apply(grouped, 'Grouped');
-    selection = grouped.ok ? [...topClipIds(grouped.doc)].filter((id) => !before.has(id)) : selection;
+    session.selection = grouped.ok ? [...topClipIds(grouped.doc)].filter((id) => !before.has(id)) : session.selection;
   }
 
   function ungroupSelection() {
-    const group = selection[0];
-    if (selection.length !== 1 || !group) {
+    const group = session.selection[0];
+    if (session.selection.length !== 1 || !group) {
       return;
     }
     const before = topClipIds(doc);
     const result = ungroupClip(doc, group, newId);
     apply(result, 'Ungrouped');
-    selection = result.ok ? [...topClipIds(result.doc)].filter((id) => !before.has(id)) : selection;
+    session.selection = result.ok ? [...topClipIds(result.doc)].filter((id) => !before.has(id)) : session.selection;
   }
 
   function frameSelection() {
-    if (!selection.length) {
+    if (!session.selection.length) {
       return;
     }
     const container = newId();
-    const result = wrapInFrame(doc, selection, container, newId());
+    const result = wrapInFrame(doc, session.selection, container, newId());
     if (!result.ok) {
-      notice = result.error;
+      session.notice = result.error;
       return;
     }
-    edit(result.doc, 'Framed the selection');
-    selection = [container];
+    edit(result.doc, 'Framed the session.selection');
+    session.selection = [container];
   }
 
   function autoLayoutSelection() {
-    if (!selection.length) {
+    if (!session.selection.length) {
       return;
     }
-    const lone = selection.length === 1 ? findClip(doc, selection[0])?.clip : null;
+    const lone = session.selection.length === 1 ? findClip(doc, session.selection[0])?.clip : null;
     if (lone?.autoLayout) {
       const removed = removeAutoLayout(doc, lone.id);
       if (removed.ok) {
@@ -1311,13 +1225,13 @@
       }
       return;
     }
-    const { result, containerId } = addAutoLayout(doc, selection, newId);
+    const { result, containerId } = addAutoLayout(doc, session.selection, newId);
     if (!result.ok) {
-      notice = result.error;
+      session.notice = result.error;
       return;
     }
     edit(result.doc, 'Added auto layout');
-    selection = [containerId];
+    session.selection = [containerId];
   }
 
   function componentDraft(id: string, format: MotionFormat): Instance | null {
@@ -1352,10 +1266,10 @@
     if (!placed.ok) {
       return;
     }
-    selection = [placed.clipId];
+    session.selection = [placed.clipId];
     showProperties();
     if (sounds) {
-      await addTemplateSounds(placed.doc, placed.clipId, history.present);
+      await addTemplateSounds(placed.doc, placed.clipId, session.history.present);
     }
   }
 
@@ -1365,11 +1279,11 @@
     form.set('clipId', clipId);
     const result = await postPageAction(editorUrl, 'templateSounds', form);
     if (result.type !== 'success') {
-      notice = 'The template is in; its sounds could not be added.';
+      session.notice = 'The template is in; its sounds could not be added.';
       return;
     }
-    if (history.present !== at) {
-      notice = 'The video changed while its sounds were made: insert the template again to add them.';
+    if (session.history.present !== at) {
+      session.notice = 'The video changed while its sounds were made: insert the template again to add them.';
       return;
     }
     apply({ ok: true, doc: (result.data as { doc: MotionDoc }).doc }, 'Added template sounds');
@@ -1377,11 +1291,11 @@
 
   function enterComp(comp: string) {
     if (isLockedComp(doc, comp)) {
-      notice = 'This is a template: change its fields in Properties, or Detach it to edit its structure.';
+      session.notice = 'This is a template: change its fields in Properties, or Detach it to edit its structure.';
       return;
     }
     path = [...path, { comp, frame }];
-    selection = [];
+    session.selection = [];
     keySelection = [];
     playing = false;
     frame = 0;
@@ -1393,7 +1307,7 @@
       return;
     }
     path = path.slice(0, depth);
-    selection = [];
+    session.selection = [];
     keySelection = [];
     playing = false;
     frame = back.frame;
@@ -1404,15 +1318,15 @@
   function startTrailer() {
     adding = false;
     edit(feegaTrailer({ modelId: firstOf(AssetKind.Model3d), imageId: firstOf(AssetKind.Image) }), 'Started from the feega trailer');
-    notice = 'Template applied. ⌘Z to undo.';
+    session.notice = 'Template applied. ⌘Z to undo.';
   }
 
   function startTemplate(id: AdTemplate) {
     adding = false;
     edit(AD_TEMPLATES[id].build(templateAssets(assets)), `Started from ${AD_TEMPLATES[id].label}`);
-    selection = [];
+    session.selection = [];
     frame = 0;
-    notice = 'Template applied. Swap pictures, text and colours in Properties. ⌘Z to undo.';
+    session.notice = 'Template applied. Swap pictures, text and colours in Properties. ⌘Z to undo.';
   }
 
   const SOUND_LABEL: Record<SoundKind, string> = { voice: 'Voice-over', music: 'Music' };
@@ -1423,7 +1337,7 @@
     const id = newId();
     const durationInFrames = Math.max(doc.fps, Math.ceil(made.seconds * doc.fps));
     apply(addClip(doc, { component: 'Audio', from: frame, durationInFrames, props: { assetId: made.assetId } }, id), `Added ${SOUND_LABEL[kind].toLowerCase()}`);
-    selection = [id];
+    session.selection = [id];
   }
 
   function newTrack(kind: TrackKind) {
@@ -1431,25 +1345,25 @@
   }
 
   function clipOp(op: ClipOp, parent: string | null = null) {
-    const result = runClipOp(op, { doc, selection, frame, parent, newId });
+    const result = runClipOp(op, { doc, selection: session.selection, frame, parent, newId });
     if (!result.ok) {
       return;
     }
     edit(result.doc, result.summary);
-    selection = result.selection;
+    session.selection = result.selection;
   }
 
   const split = () => clipOp(ClipOp.Split);
 
   function groupUnderNull() {
     const id = newId();
-    const result = nullFromSelection(doc, selection, frame, id);
+    const result = nullFromSelection(doc, session.selection, frame, id);
     if (!result.ok) {
-      notice = result.error;
+      session.notice = result.error;
       return;
     }
     edit(result.doc, 'Created a null');
-    selection = [id];
+    session.selection = [id];
   }
 
   const duplicate = () => clipOp(ClipOp.Duplicate);
@@ -1466,7 +1380,7 @@
       selectedPart = null;
       return;
     }
-    if (!selection.length) {
+    if (!session.selection.length) {
       return;
     }
     clipOp(ClipOp.Delete);
@@ -1498,7 +1412,7 @@
   }
 
   async function createBranch(name: string) {
-    await save();
+    await session.save();
     const form = new FormData();
     form.set('name', name);
     const result = await editorAction('createBranch', form);
@@ -1508,7 +1422,7 @@
   }
 
   async function reviewBranch() {
-    await save();
+    await session.save();
     const result = await editorAction('reviewBranch');
     conflicts = result.type === 'success' ? (result.data as { conflicts: Conflict[] }).conflicts : [];
   }
@@ -1521,7 +1435,7 @@
       location.assign(editorPathOf(fork.frameId));
       return;
     }
-    notice = 'The branch could not be merged.';
+    session.notice = 'The branch could not be merged.';
   }
 
   async function dropCurrentBranch() {
@@ -1546,39 +1460,34 @@
 
   async function nameCurrent(name: string) {
     const form = new FormData();
-    form.set('version', String(version));
+    form.set('version', String(session.version));
     form.set('name', name);
     const result = await editorAction('nameVersion', form);
-    notice = result.type === 'success' ? '' : 'The version could not be named: reload and try again.';
+    session.notice = result.type === 'success' ? '' : 'The version could not be named: reload and try again.';
     await loadRevisions();
   }
 
   async function restoreTo(target: number) {
     revisionsOpen = false;
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-      await save();
-    }
+    await session.flushScheduled();
     const form = new FormData();
     form.set('version', String(target));
     const result = await editorAction('restore', form);
     if (result.type !== 'success') {
-      notice = `Version ${target} could not be restored: reload and try again.`;
+      session.notice = `Version ${target} could not be restored: reload and try again.`;
       return;
     }
     const head = result.data?.head as { version: number; doc: MotionDoc };
-    adopt(head);
-    selection = selection.filter((id) => findClip(head.doc, id));
-    notice = `Restored version ${target}. ⌘Z to undo.`;
+    session.adopt(head);
+    session.selection = session.selection.filter((id) => findClip(head.doc, id));
+    session.notice = `Restored version ${target}. ⌘Z to undo.`;
   }
 
   function undoHere() {
-    if (!canUndo(history, agent)) {
+    if (!canUndo(session.history, agent)) {
       return;
     }
-    history = undo(history);
-    scheduleSave('Undo');
+    session.undo();
   }
 
   async function undoOnCanvas() {
@@ -1588,8 +1497,7 @@
     if (!body?.head) {
       return;
     }
-    history = startHistory(body.head.doc);
-    version = body.head.version;
+    session.restart(body.head);
   }
 
   const UNDO: Record<UndoRoute, () => void> = {
@@ -1597,14 +1505,13 @@
     [UndoRoute.Canvas]: () => void undoOnCanvas()
   };
 
-  const undoEdit = () => UNDO[saveState === SaveState.Saved && canvasundo?.owns(data.node.id, version) ? UndoRoute.Canvas : UndoRoute.Here]();
+  const undoEdit = () => UNDO[session.saveState === SaveState.Saved && canvasundo?.owns(data.node.id, session.version) ? UndoRoute.Canvas : UndoRoute.Here]();
 
   function redoEdit() {
-    if (!canRedo(history, agent)) {
+    if (!canRedo(session.history, agent)) {
       return;
     }
-    history = redo(history);
-    scheduleSave('Redo');
+    session.redo();
   }
 
   function step(frames: number) {
@@ -1613,7 +1520,7 @@
   }
 
   function jumpKey(direction: Direction) {
-    const ids = selection.length ? selection : doc.tracks.flatMap((t) => t.clips.map((c) => c.id));
+    const ids = session.selection.length ? session.selection : doc.tracks.flatMap((t) => t.clips.map((c) => c.id));
     const next = adjacentKeyframe(keyframeFrames(doc, ids), frame, direction);
     if (next !== null) {
       playing = false;
@@ -1627,8 +1534,8 @@
       elementClipboard.copyKeyframes();
       return;
     }
-    if (selection.length) {
-      elementClipboard.copyElements(data.node.id, [...selection], copyElements(doc, selection));
+    if (session.selection.length) {
+      elementClipboard.copyElements(data.node.id, [...session.selection], copyElements(doc, session.selection));
     }
   }
 
@@ -1637,7 +1544,7 @@
     if (elementClipboard.kind === Copied.Elements && copied) {
       const pasted = pasteElements(doc, copied.elements, newId);
       apply(pasted, 'Pasted elements');
-      selection = pasted.ok ? pasted.ids : selection;
+      session.selection = pasted.ok ? pasted.ids : session.selection;
       return;
     }
     const target = selected;
@@ -1669,14 +1576,14 @@
   const NUDGE_MORE = 10;
 
   function toPlayhead(edge: ClipEdge) {
-    if (selection.length) {
-      apply(clipsTo(doc, selection, edge, edge === ClipEdge.End ? frame + 1 : frame), 'Moved to the playhead');
+    if (session.selection.length) {
+      apply(clipsTo(doc, session.selection, edge, edge === ClipEdge.End ? frame + 1 : frame), 'Moved to the playhead');
     }
   }
 
   function trimHere(edge: ClipEdge) {
-    if (selection.length) {
-      apply(trimClipsAt(doc, selection, edge, edge === ClipEdge.End ? frame + 1 : frame), 'Trimmed');
+    if (session.selection.length) {
+      apply(trimClipsAt(doc, session.selection, edge, edge === ClipEdge.End ? frame + 1 : frame), 'Trimmed');
     }
   }
 
@@ -1687,8 +1594,8 @@
   const STAGGER_FRAMES = 3;
 
   function nudge(frames: number) {
-    if (selection.length) {
-      apply(nudgeClips(doc, selection, frames), 'Nudged');
+    if (session.selection.length) {
+      apply(nudgeClips(doc, session.selection, frames), 'Nudged');
     }
   }
 
@@ -1707,11 +1614,11 @@
   }
 
   const ARRANGE: Record<string, { label: string; run: () => OpResult }> = {
-    sequence: { label: 'Sequence layers', run: () => sequenceClips(doc, selection, 0) },
-    stagger: { label: 'Stagger by 3 frames', run: () => staggerClips(doc, selection, STAGGER_FRAMES) },
-    alignStart: { label: 'Align starts', run: () => alignClips(doc, selection, Align.Start) },
-    alignEnd: { label: 'Align ends', run: () => alignClips(doc, selection, Align.End) },
-    distribute: { label: 'Distribute in time', run: () => distributeClips(doc, selection) }
+    sequence: { label: 'Sequence layers', run: () => sequenceClips(doc, session.selection, 0) },
+    stagger: { label: 'Stagger by 3 frames', run: () => staggerClips(doc, session.selection, STAGGER_FRAMES) },
+    alignStart: { label: 'Align starts', run: () => alignClips(doc, session.selection, Align.Start) },
+    alignEnd: { label: 'Align ends', run: () => alignClips(doc, session.selection, Align.End) },
+    distribute: { label: 'Distribute in time', run: () => distributeClips(doc, session.selection) }
   };
 
   const NUDGE_PX = 1;
@@ -1738,28 +1645,28 @@
 
   function zoomToSelection() {
     const boxes = spaceBoxes();
-    const around = boxAround(selection.flatMap((id) => (boxes[id] ? [boxes[id]] : [])));
+    const around = boxAround(session.selection.flatMap((id) => (boxes[id] ? [boxes[id]] : [])));
     if (around) {
       zoomStage?.toBox(around);
     }
   }
-  const nudgeBy = (dx: number, dy: number) => selection.length && apply(moveBy(doc, selection, frame, [dx, dy], editMode), 'Moved with the arrows');
-  const arrangeTo = (to: Arrange) => apply(arrangeLayers(doc, selection, to, newId), `Arranged ${to}`);
-  const combine = (op: BooleanOp) => reshape(combineShapes(doc, selection, op, frame), `Combined shapes: ${op}`);
+  const nudgeBy = (dx: number, dy: number) => session.selection.length && apply(moveBy(doc, session.selection, frame, [dx, dy], editMode), 'Moved with the arrows');
+  const arrangeTo = (to: Arrange) => apply(arrangeLayers(doc, session.selection, to, newId), `Arranged ${to}`);
+  const combine = (op: BooleanOp) => reshape(combineShapes(doc, session.selection, op, frame), `Combined shapes: ${op}`);
 
   function reshape(result: OpResult, summary: string) {
     apply(result, summary);
     if (result.ok) {
-      selection = selection.filter((id) => findClip(result.doc, id));
+      session.selection = session.selection.filter((id) => findClip(result.doc, id));
     }
   }
 
-  const alignTo = (edge: Edge) => apply(alignSpace(doc, selection, frame, spaceBoxes(), edge, editMode), `Aligned ${edge}`);
-  const distribute = (axis: Axis) => apply(distributeSpace(doc, selection, frame, spaceBoxes(), axis, editMode), `Distributed along ${axis}`);
+  const alignTo = (edge: Edge) => apply(alignSpace(doc, session.selection, frame, spaceBoxes(), edge, editMode), `Aligned ${edge}`);
+  const distribute = (axis: Axis) => apply(distributeSpace(doc, session.selection, frame, spaceBoxes(), axis, editMode), `Distributed along ${axis}`);
 
   function arrange(id: string) {
     const op = ARRANGE[id];
-    if (op && selection.length > 1) {
+    if (op && session.selection.length > 1) {
       apply(op.run(), op.label);
     }
   }
@@ -1832,8 +1739,8 @@
     [Command.PreviewFit]: () => zoomStage?.fit(),
     [Command.PreviewActual]: () => zoomStage?.actual(),
     [Command.PreviewSelection]: () => zoomToSelection(),
-    [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
-    [Command.SelectMatching]: () => (selection = matchingLayers(doc, selection)),
+    [Command.SelectAll]: () => (session.selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
+    [Command.SelectMatching]: () => (session.selection = matchingLayers(doc, session.selection)),
     [Command.SelectChild]: () => overlay?.key(Gesture.Enter),
     [Command.SelectParent]: selectParent,
     [Command.SelectNext]: () => selectSibling(SiblingDirection.Next),
@@ -1843,7 +1750,7 @@
         return;
       }
       helpOpen = false;
-      selection = [];
+      session.selection = [];
       keySelection = [];
     },
     [Command.PrevKeyframe]: () => jumpKey(Direction.Back),
@@ -1878,7 +1785,7 @@
     [Command.Ungroup]: ungroupSelection,
     [Command.FrameSelection]: frameSelection,
     [Command.AutoLayout]: autoLayoutSelection,
-    [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
+    [Command.UseAsMask]: () => apply(useAsMask(doc, session.selection), 'Used as mask'),
     [Command.EditAsVector]: () => selected && apply(toVector(doc, selected.id), 'Made a vector'),
     [Command.BringForward]: () => arrangeTo(Arrange.Forward),
     [Command.SendBackward]: () => arrangeTo(Arrange.Backward),
@@ -1888,19 +1795,19 @@
     [Command.Subtract]: () => combine(BooleanOp.Subtract),
     [Command.Intersect]: () => combine(BooleanOp.Intersect),
     [Command.Exclude]: () => combine(BooleanOp.Exclude),
-    [Command.OutlineStroke]: () => apply(outlineStrokes(doc, selection, frame, newId), 'Outlined the stroke'),
-    [Command.Flatten]: () => reshape(flattenShapes(doc, selection, frame), 'Flattened shapes'),
+    [Command.OutlineStroke]: () => apply(outlineStrokes(doc, session.selection, frame, newId), 'Outlined the stroke'),
+    [Command.Flatten]: () => reshape(flattenShapes(doc, session.selection, frame), 'Flattened shapes'),
     [Command.TextToPath]: () => void outlineSelectedText(),
-    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
-    [Command.AlignLeft]: () => selection.length && alignTo(Edge.Left),
-    [Command.AlignCenter]: () => selection.length && alignTo(Edge.Center),
-    [Command.AlignRight]: () => selection.length && alignTo(Edge.Right),
-    [Command.AlignTop]: () => selection.length && alignTo(Edge.Top),
-    [Command.AlignMiddle]: () => selection.length && alignTo(Edge.Middle),
-    [Command.AlignBottom]: () => selection.length && alignTo(Edge.Bottom),
-    [Command.TidyUp]: () => selection.length > 1 && apply(tidySpace(doc, selection, frame, spaceBoxes(), editMode), 'Tidied up'),
-    [Command.FlipHorizontal]: () => selection.length && apply(flipClips(doc, selection, Flip.Horizontal), 'Flipped horizontally'),
-    [Command.FlipVertical]: () => selection.length && apply(flipClips(doc, selection, Flip.Vertical), 'Flipped vertically')
+    [Command.RemoveMask]: () => apply(releaseMasks(doc, session.selection), 'Removed a mask'),
+    [Command.AlignLeft]: () => session.selection.length && alignTo(Edge.Left),
+    [Command.AlignCenter]: () => session.selection.length && alignTo(Edge.Center),
+    [Command.AlignRight]: () => session.selection.length && alignTo(Edge.Right),
+    [Command.AlignTop]: () => session.selection.length && alignTo(Edge.Top),
+    [Command.AlignMiddle]: () => session.selection.length && alignTo(Edge.Middle),
+    [Command.AlignBottom]: () => session.selection.length && alignTo(Edge.Bottom),
+    [Command.TidyUp]: () => session.selection.length > 1 && apply(tidySpace(doc, session.selection, frame, spaceBoxes(), editMode), 'Tidied up'),
+    [Command.FlipHorizontal]: () => session.selection.length && apply(flipClips(doc, session.selection, Flip.Horizontal), 'Flipped horizontally'),
+    [Command.FlipVertical]: () => session.selection.length && apply(flipClips(doc, session.selection, Flip.Vertical), 'Flipped vertically')
   };
 
   const TOOL_RUN: Partial<Record<ActionId, () => void>> = {
@@ -1916,8 +1823,8 @@
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
-    ...(selection.length > 1 ? [{ section: 'Arrange', items: Object.entries(ARRANGE).map(([id, op]) => ({ label: op.label, run: () => arrange(id) })) }] : []),
-    ...(selection.length ? [{ section: 'Align', items: [...Object.values(Edge).map((edge) => ({ label: `Align ${edge}`, run: () => alignTo(edge) })), ...(selection.length > 2 ? Object.values(Axis).map((axis) => ({ label: `Distribute along ${axis}`, run: () => distribute(axis) })) : [])] }] : []),
+    ...(session.selection.length > 1 ? [{ section: 'Arrange', items: Object.entries(ARRANGE).map(([id, op]) => ({ label: op.label, run: () => arrange(id) })) }] : []),
+    ...(session.selection.length ? [{ section: 'Align', items: [...Object.values(Edge).map((edge) => ({ label: `Align ${edge}`, run: () => alignTo(edge) })), ...(session.selection.length > 2 ? Object.values(Axis).map((axis) => ({ label: `Distribute along ${axis}`, run: () => distribute(axis) })) : [])] }] : []),
     ...menuSections().map(({ section, ids }) => ({
       section,
       items: ids
@@ -1925,7 +1832,7 @@
         .map((id) => ({
           id,
           run: TOOL_RUN[id] ?? (() => {}),
-          disabled: (NEEDS_SELECTION.has(id) && !selection.length) || (id === Action.ClearWorkArea && !doc.workArea),
+          disabled: (NEEDS_SELECTION.has(id) && !session.selection.length) || (id === Action.ClearWorkArea && !doc.workArea),
           pressed: id === Action.GraphMode ? graphOpen : undefined
         }))
     }))
@@ -1941,12 +1848,12 @@
   let lastPick = '';
 
   $effect(() => {
-    const pick = [...selection, selectedPart ?? ''].join();
+    const pick = [...session.selection, selectedPart ?? ''].join();
     if (pick === lastPick) {
       return;
     }
     lastPick = pick;
-    if (selection.length && viewport === Viewport.Phone) {
+    if (session.selection.length && viewport === Viewport.Phone) {
       untrack(peekProperties);
     }
   });
@@ -1984,16 +1891,16 @@
     clipMenu = { at, parents: false };
   }
 
-  const clipBarShown = $derived(selection.length > 0 && (viewport !== Viewport.Desktop || pickMode === PickMode.Many));
+  const clipBarShown = $derived(session.selection.length > 0 && (viewport !== Viewport.Desktop || pickMode === PickMode.Many));
 
   const clipSections = $derived<MenuBlock[]>(
     clipMenu?.parents
-      ? [{ section: 'Parent to', items: parentChoices(doc, selection).map((choice) => ({ label: choice.name, run: () => clipOp(ClipOp.Parent, choice.id) })) }]
-      : [{ section: 'Clip', items: clipActions(doc, selection).map((id) => ({ id, run: () => CLIP_RUN[id]?.() })) }]
+      ? [{ section: 'Parent to', items: parentChoices(doc, session.selection).map((choice) => ({ label: choice.name, run: () => clipOp(ClipOp.Parent, choice.id) })) }]
+      : [{ section: 'Clip', items: clipActions(doc, session.selection).map((id) => ({ id, run: () => CLIP_RUN[id]?.() })) }]
   );
 
   $effect(() => {
-    if (!selection.length) {
+    if (!session.selection.length) {
       pickMode = PickMode.One;
     }
   });
@@ -2011,9 +1918,9 @@
   }
 
   function selectSibling(direction: SiblingDirection) {
-    const next = siblingOf(layerOrder(doc), selection, direction);
+    const next = siblingOf(layerOrder(doc), session.selection, direction);
     if (next) {
-      selection = [next];
+      session.selection = [next];
     }
   }
 
@@ -2096,8 +2003,8 @@
   <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost} use:claimsWidth={barHost}>
     <div class="group lead" {...dockOf(Part.Bar)}>
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
-      <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
-      <span class="save-dot" data-tone={SAVE_TONE[saveState]} role="status" aria-label={`${saveState} · v${version}`}></span>
+      <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(session.history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
+      <span class="save-dot" data-tone={SAVE_TONE[session.saveState]} role="status" aria-label={`${session.saveState} · v${session.version}`}></span>
       {#if controlShown(doc, VideoControl.EditMode)}
       <div class="mode-switch" role="radiogroup" aria-label="Edit mode" data-testid="edit-mode" title="Design edits the base, Motion keys at the playhead (E)">
         {#each [EditMode.Design, EditMode.Motion] as m (m)}
@@ -2131,8 +2038,8 @@
     {/if}
 
     <div class="group trail" {...dockOf(Part.Bar)} data-testid="bar-trail">
-      <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
-      <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
+      <IconButton action={Action.Undo} disabled={!canUndo(session.history, agent)} onclick={undoEdit} />
+      <IconButton action={Action.Redo} disabled={!canRedo(session.history, agent)} onclick={redoEdit} />
       <div class="popover-anchor" data-phone={ON_PHONE[BarItem.History]}>
         <button type="button" class="clock" aria-haspopup="menu" aria-expanded={branchesOpen} aria-label="Branches" title="Branches" disabled={agent === Agent.Working} data-testid="branches-open" onclick={() => void toggleBranches()}><BranchIcon size={16} /></button>
         {#if branchesOpen}
@@ -2143,7 +2050,7 @@
           <div class="menu more" role="menu" data-testid="revisions">
             <input class="version-name" aria-label="Name the current version" placeholder="Name the current version" data-testid="version-name" onkeydown={(e) => e.key === 'Enter' && void nameCurrent(e.currentTarget.value)} />
             {#each revisions as r (r.version)}
-              <button type="button" role="menuitem" disabled={r.version === version} onclick={() => void restoreTo(r.version)}><span>{r.name ? `${r.name} · v${r.version}` : `v${r.version}`} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span><kbd>{r.version === version ? 'Current' : 'Restore'}</kbd></button>
+              <button type="button" role="menuitem" disabled={r.version === session.version} onclick={() => void restoreTo(r.version)}><span>{r.name ? `${r.name} · v${r.version}` : `v${r.version}`} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span><kbd>{r.version === session.version ? 'Current' : 'Restore'}</kbd></button>
             {:else}
               <span class="empty">No saved versions yet</span>
             {/each}
@@ -2196,7 +2103,7 @@
       tokens={data.tokens}
       name={data.node.name ?? ''}
       {listed}
-      saved={saveState === SaveState.Saved}
+      saved={session.saveState === SaveState.Saved}
       onlisted={(item) => (listed = item)}
       onclose={() => (publishing = false)}
     />
@@ -2206,7 +2113,7 @@
     <SoundDialog kind={sounding} {editorUrl} seconds={doc.durationInFrames / doc.fps} onclose={() => (sounding = null)} onmade={(made) => placeSound(sounding ?? 'voice', made)} />
   {/if}
 
-  {#if clipMenu && selection.length}
+  {#if clipMenu && session.selection.length}
     <OverflowMenu sections={clipSections} at={clipMenu.at} label={clipMenu.parents ? 'Parent to' : 'Clip'} onclose={() => (clipMenu = null)} />
   {/if}
 
@@ -2214,11 +2121,11 @@
     <MenuDrawer
       canvasHref={`/p/${data.projectId}/c/${data.canvas.id}`}
       canvasName={data.canvas.name}
-      crumbs={[data.node.name ?? 'Frame', ...pathNames(history.present, compPath)].map((name, i, all) => ({ name, go: i === all.length - 1 ? null : () => leaveTo(i) }))}
+      crumbs={[data.node.name ?? 'Frame', ...pathNames(session.history.present, compPath)].map((name, i, all) => ({ name, go: i === all.length - 1 ? null : () => leaveTo(i) }))}
       {doc}
       onchange={apply}
-      {saveState}
-      {version}
+      saveState={session.saveState}
+      version={session.version}
       ontemplate={() => (leaveTo(0), (templating = true))}
       onhelp={COMMANDS[Command.Help]}
       onclose={() => (menuOpen = false)}
@@ -2230,7 +2137,7 @@
   {/if}
 
   {#if exporting && mode === DocMode.Still}
-    <StillExport {doc} {editorUrl} fileName={data.node.name ?? 'still'} saved={saveState === SaveState.Saved} onclose={() => (exporting = false)} />
+    <StillExport {doc} {editorUrl} fileName={data.node.name ?? 'still'} saved={session.saveState === SaveState.Saved} onclose={() => (exporting = false)} />
   {:else if exporting}
     <ExportDialog
       {doc}
@@ -2242,7 +2149,7 @@
       fallbackRender={htmlExportFrames}
       tokens={data.tokens}
       {analyses}
-      server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => canvasAssetUrl(data.projectId, data.canvas.id, id, AssetSize.Full) }}
+      server={{ ...data.serverRender, version: session.version, saved: session.saveState === SaveState.Saved, assetHref: (id: string) => canvasAssetUrl(data.projectId, data.canvas.id, id, AssetSize.Full) }}
       onpresets={() => ((exporting = false), (interactive = true))}
       onclose={() => (exporting = false)}
     />
@@ -2258,7 +2165,7 @@
       compose={(d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses })}
       initial={browseFirst}
       oninsert={insertEntry}
-      onsaved={(entry) => ((templates = [...templates, entry]), (notice = `Saved ${entry.template.name} to the templates.`))}
+      onsaved={(entry) => ((templates = [...templates, entry]), (session.notice = `Saved ${entry.template.name} to the templates.`))}
       onremoved={(id) => (templates = templates.filter((t) => t.id !== id))}
       onclose={() => (browsing = false)}
     />
@@ -2273,8 +2180,8 @@
       {doc}
       clip={selected}
       {editorUrl}
-      {version}
-      saved={saveState === SaveState.Saved}
+      version={session.version}
+      saved={session.saveState === SaveState.Saved}
       batch={data.batch}
       assetHref={(id: string) => canvasAssetUrl(data.projectId, data.canvas.id, id, AssetSize.Full)}
       {assetUrls}
@@ -2296,12 +2203,12 @@
         {#if !playing}<PixelGridOverlay width={doc.width} height={doc.height} toggle={pixelGrid} />{/if}
         {#if guidesShown && doc.layoutGuides?.length && !playing}<LayoutGuidesOverlay {doc} />{/if}
         {#if !playing}<SelectionOverlay bind:this={overlay} {scaleMode} mode={editMode} layoutBounds={guidesShown ? guideSnapBounds(doc) : []} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} caret={textCaret} ontyping={(on) => (typingInCore = on)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost && onhostdrag ? hostDragged : null} onframemove={frameChrome(data.node.kind ?? FrameKind.Frame).press === FramePress.Move ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
-        {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
+        {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, session.selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (session.selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if editingPoints && selected?.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} onexit={() => (vectorEdit = null)} />{/if}
         {#if editingPoints && selected?.props.shape === 'vector' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<VectorOverlay {doc} clip={selected} {frame} onchange={edit} onexit={() => (vectorEdit = null)} />{/if}
-        {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay doc={previewDoc ?? doc} {frame} clip={findClip(withAutoLayout(previewDoc ?? doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
-        {#if selected?.autoLayout && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
+        {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && session.selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay doc={previewDoc ?? doc} {frame} clip={findClip(withAutoLayout(previewDoc ?? doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
+        {#if selected?.autoLayout && session.selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
         {#if frameBar.tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} tool={frameBar.tool} onchange={apply} oncreated={drawn} />{/if}
@@ -2325,8 +2232,8 @@
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       {#if panelsDue}
-      {#if selection.length > 1}<AlignBar count={selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
-      {#if cameraOpen && !selection.length}
+      {#if session.selection.length > 1}<AlignBar count={session.selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
+      {#if cameraOpen && !session.selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector gesture={live} {doc} onchange={edit} />
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
@@ -2335,15 +2242,15 @@
         {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel gesture={live} {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
         {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack gesture={live} fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector gesture={live} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onalign={alignTo} onchange={edit} fonts={fontLibrary} onopen={enterComp} />
+        <MotionInspector gesture={live} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(session.history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onalign={alignTo} onchange={edit} fonts={fontLibrary} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector gesture={live} {doc} onchange={edit} />{/if}
       {:else if view === PropertiesView.Multiple}
-        <MultiInspector {doc} ids={selection} {frame} mode={editMode} boxes={spaceBoxes()} onchange={edit} />
+        <MultiInspector {doc} ids={session.selection} {frame} mode={editMode} boxes={spaceBoxes()} onchange={edit} />
       {:else}
-        <header class="frame-head" data-testid="selection-head"><FamilyIcon /><span>Frame</span></header>
+        <header class="frame-head" data-testid="session.selection-head"><FamilyIcon /><span>Frame</span></header>
         <DocFields gesture={live} {doc} {assets} upload={uploadMedia} onchange={edit} />
         <div class="composition" data-testid="composition-inspector">
           <header class="composition-head"><span>Frame</span></header>
@@ -2374,7 +2281,7 @@
       {#if unanimated}<p class="animate-hint" data-testid="animate-hint">Animate this frame — add keyframes at the playhead</p>{/if}
 
       {#if clipBarShown}
-        <ClipBar {doc} {selection} pick={pickMode} onrun={runFromBar} ondone={() => (pickMode = PickMode.One)} />
+        <ClipBar {doc} selection={session.selection} pick={pickMode} onrun={runFromBar} ondone={() => (pickMode = PickMode.One)} />
       {/if}
 
       <div class="toolbar">
@@ -2410,12 +2317,12 @@
           {/if}
         </div>
         {#if !clipBarShown || keySelection.length}
-          <IconButton action={Action.Split} size={14} disabled={!selection.length} onclick={split} />
-          <IconButton action={Action.Duplicate} size={14} disabled={!selection.length} onclick={duplicate} />
-          <IconButton action={Action.Delete} size={14} disabled={!selection.length && !keySelection.length} onclick={remove} />
+          <IconButton action={Action.Split} size={14} disabled={!session.selection.length} onclick={split} />
+          <IconButton action={Action.Duplicate} size={14} disabled={!session.selection.length} onclick={duplicate} />
+          <IconButton action={Action.Delete} size={14} disabled={!session.selection.length && !keySelection.length} onclick={remove} />
         {/if}
         <IconButton action={Action.Snap} size={14} caption={Caption.Wide} pressed={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)} />
-        {#if notice}<span class="notice" role="status">{notice}</span>{/if}
+        {#if session.notice}<span class="notice" role="status">{session.notice}</span>{/if}
         {#if missingFonts.length}<span class="notice" role="status" data-testid="fonts-missing">Missing font{missingFonts.length > 1 ? 's' : ''}: {missingFonts.join(', ')}. A fallback is showing.</span>{/if}
         <span class="spacer"></span>
         <div class="popover-anchor">
@@ -2426,9 +2333,9 @@
 
       <div class="tl">
         {#if graphOpen}
-          <GraphEditor {doc} {frame} {selection} bind:keySelection camera={cameraOpen} onchange={edit} />
+          <GraphEditor {doc} {frame} selection={session.selection} bind:keySelection camera={cameraOpen} onchange={edit} />
         {:else}
-          <MotionTimeline pick={pickMode} onmenu={(_, at) => openClipMenu(at)} {doc} bind:frame bind:selection bind:keySelection bind:camera={cameraOpen} bind:zoom {snap} {waveforms} {beats} {assetUrls} {reveal} onchange={edit} onopen={enterComp} />
+          <MotionTimeline pick={pickMode} onmenu={(_, at) => openClipMenu(at)} {doc} bind:frame bind:selection={session.selection} bind:keySelection bind:camera={cameraOpen} bind:zoom {snap} {waveforms} {beats} {assetUrls} {reveal} onchange={edit} onopen={enterComp} />
         {/if}
       </div>
     </section>
