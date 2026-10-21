@@ -239,13 +239,6 @@ fn texture_image(u: &UseItem, group: &DisplayList, scale: f64, clip: String) -> 
     Item::Image(ImageItem { clip: clip.clone(), src: clip, video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, clipped: true, inner: IDENTITY, look })
 }
 
-fn stand_in(u: &UseItem, group: &DisplayList, building: Option<Building>) -> Option<Item> {
-    match building {
-        Some(b) => Some(texture_image(u, group, b.scale, building_clip(&u.group))),
-        None => group.background.map(|c| background(&u.clip, c, screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64)))),
-    }
-}
-
 fn partial(group: &str, (w, h): (u32, u32)) -> Item {
     let look = Look { opacity: 1.0, matrix: IDENTITY, blur: 0.0, blend: "normal".into(), scissor: None, masks: None, matte: None, filters: None, space: None, backdrop: None };
     let size = Size { width: w as f64, height: h as f64 };
@@ -426,7 +419,10 @@ impl Library {
             match (on_screen, shown) {
                 (false, _) => {}
                 (true, Some(scale)) => items.push(cached_image(u, group, scale)),
-                (true, None) => items.extend(stand_in(u, group, self.building.get(&u.group).copied())),
+                (true, None) => {
+                    let start = items.len();
+                    items.extend(used(u, group, start));
+                }
             }
         }
         let gone: Vec<String> = self.held.keys().filter(|k| !seen.contains(*k)).cloned().collect();
