@@ -12,7 +12,7 @@ class FrameBar {
   tool = $state(DrawTool.Select);
   timeline = $state.raw<HTMLElement | null>(null);
   sidePx = $state(0);
-  host = $state<Host | null>(null);
+  host = $state.raw<Host | null>(null);
   covered = $state(false);
   editMode = $state(EditMode.Design);
 

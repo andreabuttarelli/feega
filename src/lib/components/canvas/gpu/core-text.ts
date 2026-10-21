@@ -1,5 +1,6 @@
 import { faceBook, faceRules } from '$lib/motion/gpu-full/text/fonts';
 import { fontkitSource } from '$lib/motion/gpu-full/text/fontkit-face';
+import { CORE_FACES, CORE_FAMILY } from './core-font';
 import { glyphsOf } from '$lib/canvas/core/glyphs';
 import { iconContours } from '$lib/canvas/core/icon-outline';
 import type { Glyphs } from '$lib/canvas/core/chrome';
@@ -21,8 +22,6 @@ import ImageIcon from '@lucide/svelte/icons/image';
 import ChevronDown from '@lucide/svelte/icons/chevron-down';
 import Camera from '@lucide/svelte/icons/camera';
 
-const APP_FONT = '/fonts/dm-sans-latin.woff2';
-const FAMILY = 'DM Sans';
 const REGULAR = 400;
 const BOLD = 600;
 const ICON_PX = 12;
@@ -52,14 +51,14 @@ const UI_GLYPHS = [
 export type CoreText = { glyphs: Glyphs; bold: Glyphs; icons: Map<NodeType, number[][]>; gen: CardIcons };
 
 export async function coreText(kinds: readonly NodeType[]): Promise<CoreText> {
-  const url = new URL(APP_FONT, location.origin).href;
-  const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
-  const css = `@font-face { font-family: '${FAMILY}'; font-weight: 100 1000; src: url('${url}'); }`;
-  const book = faceBook(faceRules(css), new Map([[url, fontkitSource(bytes)]]), []);
+  const faces = CORE_FACES.map((f) => ({ ...f, href: new URL(f.url, location.origin).href }));
+  const sources = new Map(await Promise.all(faces.map(async (f) => [f.href, fontkitSource(new Uint8Array(await (await fetch(f.href)).arrayBuffer()))] as const)));
+  const css = faces.map((f) => `@font-face { font-family: '${CORE_FAMILY}'; font-weight: ${f.weight}; src: url('${f.href}'); }`).join('\n');
+  const book = faceBook(faceRules(css), sources, []);
   const icons = new Map(await Promise.all(kinds.map(async (k) => [k, iconContours(await iconNodes(NODE_KIND_ICON[k]), ICON_PX, ICON_STROKE)] as const)));
   const head = new Map(await Promise.all(kinds.map(async (k) => [k, iconContours(await iconNodes(NODE_KIND_ICON[k]), HEAD_PX, HEAD_STROKE)] as const)));
   const badge = new Map(await Promise.all(kinds.map(async (k) => [k, iconContours(await iconNodes(NODE_KIND_ICON[k]), BADGE_ICON_PX, BADGE_ICON_STROKE)] as const)));
   const ui = Object.fromEntries(await Promise.all(UI_GLYPHS.map(async ([name, icon, px, stroke]) => [name, iconContours(await iconNodes(icon), px, stroke)] as const))) as Record<UiGlyph, number[][]>;
   const gen = { chevron: iconContours(await iconNodes(ChevronDown), 12, 2), voicePlay: iconContours(await iconNodes(Play), 12, 2), head, badge, ui, layers: iconContours(await iconNodes(Layers), BADGE_PX, BADGE_STROKE), play: iconContours(await iconNodes(Play), BADGE_PX, BADGE_STROKE), person: iconContours(await iconNodes(UserRound), PERSON_PX, PERSON_STROKE), references: iconContours(await iconNodes(ImagePlus), REFERENCES_PX, REFERENCES_STROKE), credit: iconContours(await iconNodes(CircleDollarSign), CREDIT_PX, CREDIT_STROKE) };
-  return { glyphs: glyphsOf(book, FAMILY, REGULAR), bold: glyphsOf(book, FAMILY, BOLD), icons, gen };
+  return { glyphs: glyphsOf(book, CORE_FAMILY, REGULAR), bold: glyphsOf(book, CORE_FAMILY, BOLD), icons, gen };
 }

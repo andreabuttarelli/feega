@@ -27,7 +27,7 @@
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
-  import { CoreMode, editableIds } from '$lib/canvas/frame-live';
+  import { editableIds } from '$lib/canvas/frame-live';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
@@ -180,7 +180,7 @@
   const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
-  const editIds = $derived(editableIds(selected, placed, coreOn ? CoreMode.On : CoreMode.Off, DOM_CAP));
+  const editIds = $derived(editableIds(selected, DOM_CAP));
   let drawn = $state(new Set<string>());
   let sticky = $state(new Map<string, number>());
   let wasEditing = new Set<string>();
@@ -1939,7 +1939,7 @@
           data-kind={t.kind}
           data-core={coreDrawn.has(t.id) || undefined}
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
-          style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
+          style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px;--bar-h:${t.kind === 'motion' && String(summaries.get(t.id)?.data.kind ?? 'frame') === 'frame' ? MOTION_NODE_BAR_H : 0}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
           <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} knobDrawn={coreRotate.some((r) => r.id === t.id)} />
           {#if !domIds.has(t.id) && t.kind === 'motion'}

@@ -142,7 +142,7 @@
 <style>
   .frame-hover {
     position: absolute;
-    inset: 0;
+    inset: 0 0 var(--bar-h, 0px) 0;
   }
 
   .outline {
