@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::scene::Fragments;
+
 pub type Rgba = [f32; 4];
 pub type Affine = [f64; 6];
 
@@ -473,11 +475,13 @@ pub struct DisplayList {
     pub items: Vec<Item>,
     #[serde(default)]
     pub faces: Vec<FaceSpec>,
+    #[serde(skip)]
+    pub fragments: Fragments,
 }
 
 impl DisplayList {
     pub fn clone_empty(&self) -> Self {
-        Self { width: self.width, height: self.height, background: self.background, items: Vec::new(), faces: self.faces.clone() }
+        Self { width: self.width, height: self.height, background: self.background, items: Vec::new(), faces: self.faces.clone(), fragments: Fragments::default() }
     }
 }
 

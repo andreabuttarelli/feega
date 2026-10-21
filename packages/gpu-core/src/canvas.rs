@@ -13,6 +13,10 @@ pub trait Canvas {
     fn push_layer(&mut self, blend: Mix, opacity: f32, frame: Rect);
     fn push_clip(&mut self, rule: Fill, transform: Affine, shape: &BezPath);
     fn pop(&mut self);
+
+    fn fragment(&mut self, _encoded: &Scene, _transform: Affine) -> bool {
+        false
+    }
 }
 
 pub fn colour(c: &Rgba) -> Color {
@@ -78,5 +82,10 @@ impl Canvas for Scene {
 
     fn pop(&mut self) {
         self.pop_layer();
+    }
+
+    fn fragment(&mut self, encoded: &Scene, transform: Affine) -> bool {
+        self.append(encoded, Some(transform));
+        true
     }
 }

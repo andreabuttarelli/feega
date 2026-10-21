@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use vello::kurbo::{Affine, BezPath, Point, Rect, Shape};
 use vello::peniko::{Fill, ImageData};
@@ -10,6 +11,33 @@ use crate::pictures::{image_rect, Pictures};
 use crate::Skipped;
 
 pub type Shelf<P> = HashMap<String, P>;
+
+#[derive(Clone, Default)]
+pub struct Fragments(Arc<HashMap<String, Arc<Scene>>>);
+
+impl Fragments {
+    pub fn new(encoded: HashMap<String, Arc<Scene>>) -> Self {
+        Fragments(Arc::new(encoded))
+    }
+
+    pub fn get(&self, group: &str) -> Option<&Scene> {
+        self.0.get(group).map(|s| s.as_ref())
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl std::fmt::Debug for Fragments {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Fragments({})", self.0.len())
+    }
+}
 
 fn polygon(points: &[f64]) -> BezPath {
     let mut path = BezPath::new();
@@ -194,11 +222,12 @@ pub struct Layers<P = ImageData> {
     pub behind: HashMap<usize, Placed<P>>,
     pub groups: HashMap<usize, Layers<P>>,
     pub blended: HashMap<usize, Placed<P>>,
+    pub fragments: Fragments,
 }
 
 impl<P> Default for Layers<P> {
     fn default() -> Self {
-        Self { bodies: HashMap::new(), behind: HashMap::new(), groups: HashMap::new(), blended: HashMap::new() }
+        Self { bodies: HashMap::new(), behind: HashMap::new(), groups: HashMap::new(), blended: HashMap::new(), fragments: Fragments::default() }
     }
 }
 
@@ -275,6 +304,13 @@ fn missing_picture<P>(item: &Item, pictures: &Shelf<P>) -> bool {
 pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>) -> Vec<Skipped> {
     let mut skipped = Vec::new();
     for (i, item) in items.iter().enumerate() {
+        if let Item::Use(u) = item {
+            let composed = layers.fragments.get(&u.group).is_some_and(|encoded| scene.fragment(encoded, Affine::new(u.matrix)));
+            if !composed {
+                skip(&mut skipped, item.clip(), item.kind());
+            }
+            continue;
+        }
         if let Item::Lens(_) = item {
             match layers.behind.get(&i) {
                 Some(layer) => placed(scene, layer),

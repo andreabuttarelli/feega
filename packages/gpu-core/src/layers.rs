@@ -3,7 +3,7 @@ use vello::kurbo::Rect;
 use crate::canvas::Canvas;
 use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
 use crate::filters::{reach as filter_reach, Fold, Fx, Reach, Runner};
-use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
+use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, unblended, Fragments, Layers, Placed, Shelf};
 
 const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
 const REACH: f64 = 3.0;
@@ -50,15 +50,16 @@ pub enum Blending {
 }
 
 pub fn prepare<S: Surface>(surface: &mut S, list: &DisplayList, pictures: &Shelf<Pic<S>>, blending: Blending) -> Result<Layers<Pic<S>>, S::Error> {
-    prepare_items(surface, &list.items, list.background, pictures, blending)
+    prepare_items(surface, &list.items, list.background, pictures, blending, &list.fragments)
 }
 
 fn composited_blend(item: &Item, blending: Blending) -> bool {
     blending == Blending::Composited && item.look().is_some_and(|l| l.blend != "normal")
 }
 
-fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option<Rgba>, pictures: &Shelf<Pic<S>>, blending: Blending) -> Result<Layers<Pic<S>>, S::Error> {
+fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option<Rgba>, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Layers<Pic<S>>, S::Error> {
     let mut layers = Layers::new();
+    layers.fragments = fragments.clone();
     for (i, item) in items.iter().enumerate() {
         if let Item::Lens(lens) = item {
             let layer = refracted(surface, &items[lens.under.min(i)..i], &layers, pictures, &lens.lens)?;
@@ -71,7 +72,7 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
         }
         let recalled = if layer_worthy(item) { surface.recall(item) } else { None };
         if let (Item::Group(group), None) = (item, &recalled) {
-            let inner = prepare_items(surface, &group.items, None, pictures, blending)?;
+            let inner = prepare_items(surface, &group.items, None, pictures, blending, &Fragments::default())?;
             layers.groups.insert(i, inner);
         }
         if layer_worthy(item) {

@@ -49,6 +49,10 @@ impl Renderer {
         self
     }
 
+    pub fn compose_encodings(&mut self) {
+        self.library.compose_encodings();
+    }
+
     pub fn put_group(&mut self, key: &str, list: DisplayList) {
         self.library.put_group(key, &list);
     }

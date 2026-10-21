@@ -6,6 +6,7 @@ const OVERSCAN_SHARE: u32 = 8;
 const OVERSCAN_MAX: u32 = 128;
 const ZOOM_IDLE_MS: f64 = 100.0;
 const SLOW_FULL_MS: f64 = 12.0;
+const LIVE_FULL_MS: f64 = 10.0;
 const FULL_SHARE: f64 = 0.6;
 const MAX_RECTS: usize = 8;
 const TOO_MANY_RECTS: usize = 32;
@@ -284,6 +285,9 @@ impl Retained {
             return self.full(c, Quality::Sharp);
         };
         if held.camera.zoom != c.zoom {
+            if gesture && self.full_ms <= LIVE_FULL_MS {
+                return self.full(c, Quality::Sharp);
+            }
             if gesture && self.covers(c) {
                 return self.present(c);
             }
@@ -291,7 +295,7 @@ impl Retained {
             return self.full(c, quality);
         }
         if held.quality == Quality::Rough {
-            if gesture {
+            if gesture && self.full_ms > LIVE_FULL_MS {
                 return self.present(c);
             }
             return self.full(c, Quality::Sharp);
