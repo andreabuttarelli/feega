@@ -3251,6 +3251,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onAccepted(inverseMoveGesture(gesture));
   }
 
+  let historyTurn: Promise<void> = Promise.resolve();
+  const inTurn = (step: () => Promise<void>) => (historyTurn = historyTurn.then(step, step));
+
   async function undo() {
     const entry = undoStack.popUndo();
     if (!entry) { return; }
@@ -3453,9 +3456,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onTemplate={insertTemplate}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     barContext={barContextOf(CanvasState.Browsing)}
-    onUndo={undo}
+    onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
-    onRedo={redo}
+    onRedo={() => inTurn(redo)}
     onConnectNew={connectNew}
     {focus}
     onConnectExisting={connectExisting}
