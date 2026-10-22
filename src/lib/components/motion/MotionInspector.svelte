@@ -56,6 +56,7 @@
   import { componentLabel } from '$lib/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
+  import TextCounterSection from './TextCounterSection.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
@@ -771,6 +772,7 @@
         {#each TEXT_PRESETS as preset (preset)}<option value={preset}>{preset}</option>{/each}
       </select>
     </div>
+    <TextCounterSection {doc} {clip} {commit} />
     <TextPathSection {doc} {clip} params={animated.params} row={animField} {commit} />
   {/if}
   {#if pulseShown}

@@ -36,7 +36,7 @@ import { addAdjustment, createComp, mergeView, precompose, viewOf } from '$lib/m
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, defaultProps, type ComponentId } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
-import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
+import { EASE_IDS, Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
@@ -115,6 +115,8 @@ const ARRANGE: Record<(typeof ARRANGE_OPS)[number], (doc: MotionDoc, ids: string
   distribute: (doc, ids) => distributeClips(doc, ids)
 };
 import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
+import { COUNTER_FORMATS } from '$lib/motion/text-counter';
+import { setTextCounter } from '$lib/motion/text-counter-ops';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
@@ -2144,6 +2146,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const out = apply(applyTextPreset(session.doc, input.clip_id, input.preset, { start: frames(input.start), duration: frames(input.duration) }, id), `${input.preset} on ${input.clip_id}`);
         return out.ok ? { ...out, animator_id: id } : out;
+      }
+    }),
+
+    set_text_counter: tool({
+      description: `Make a Text clip count from one number to another, like a stat reveal: the text shows the number frame by frame. from/to, format ${COUNTER_FORMATS.join('|')} (grouped 1,234; currency $1,234; percent 12%; compact 1.2K), decimals 0..6, start and duration in seconds from the clip start (default 0 and 2), ease ${EASE_IDS.join('|')} (default enter). counter null removes it and the text goes back to what it was typed as. Replaces the text while it counts, so it cannot go with styled ranges.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        counter: z
+          .object({ from: z.number(), to: z.number(), format: z.enum(COUNTER_FORMATS).optional(), decimals: z.number().int().min(0).max(6).optional(), start: z.number().min(0).optional(), duration: z.number().positive().optional(), ease: z.enum(EASE_IDS).optional() })
+          .nullable()
+      }),
+      execute: async (input) => {
+        const { counter } = input;
+        const patch = counter && { ...counter, start: counter.start === undefined ? undefined : frames(counter.start), duration: counter.duration === undefined ? undefined : frames(counter.duration) };
+        return apply(setTextCounter(session.doc, input.clip_id, patch), counter ? `counter on ${input.clip_id}` : `removed the counter from ${input.clip_id}`);
       }
     }),
 
