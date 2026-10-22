@@ -72,7 +72,7 @@ describe('a gallery item page', () => {
 
   it('remixing copies the doc into the project and opens the editor on it', async () => {
     const { value } = event(true, { project: 'p-2' });
-    await expect(actions.remix(value as never)).rejects.toMatchObject({ status: 303, location: expect.stringMatching(/^\/p\/p-2\/c\/c-9\/motion\//) });
+    await expect(actions.remix(value as never)).rejects.toMatchObject({ status: 303, location: expect.stringMatching(/^\/p\/p-2\/c\/c-9\?frame=/) });
 
     const calls = state.world!.calls;
     const revision = calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')?.payload as { doc: { assets: { id: string }[]; fields: { key: string }[] } };

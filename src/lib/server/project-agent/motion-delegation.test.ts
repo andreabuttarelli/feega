@@ -190,12 +190,12 @@ describe('the canvas agent delegates motion videos', () => {
 
   it('lists the motion videos of this project', async () => {
     const out = await call(tools().list_motion_videos, {});
-    expect(out.videos).toEqual([expect.objectContaining({ node_id: NODE, editor_url: `/p/${PROJECT}/c/${CANVAS}/motion/${NODE}` })]);
+    expect(out.videos).toEqual([expect.objectContaining({ node_id: NODE, editor_url: `/p/${PROJECT}/c/${CANVAS}?frame=${NODE}` })]);
   });
 
   it('asks the motion agent and reads its summary back once the run is done', async () => {
     const asked = await call(tools().ask_motion_agent, { nodeId: NODE, request: 'make a 6 s title saying hello' });
-    expect(asked).toMatchObject({ status: 'running', editor_url: `/p/${PROJECT}/c/${CANVAS}/motion/${NODE}` });
+    expect(asked).toMatchObject({ status: 'running', editor_url: `/p/${PROJECT}/c/${CANVAS}?frame=${NODE}` });
 
     const run = await call(tools().get_motion_run, { runId: asked.run_id, waitSeconds: 5 });
 

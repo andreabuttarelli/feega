@@ -131,7 +131,7 @@ describe('remixing a gallery item', () => {
 
     const remixed = await remixGalleryItem(db, { download }, remixInput);
 
-    expect(remixed).toMatchObject({ ok: true, title: 'Liquid glass', editorPath: expect.stringMatching(/^\/p\/p-2\/c\/c-9\/motion\//) });
+    expect(remixed).toMatchObject({ ok: true, title: 'Liquid glass', editorPath: expect.stringMatching(/^\/p\/p-2\/c\/c-9\?frame=/) });
     const stored = of(calls, 'storage:canvas-assets', 'upload').map((c) => String(c.filters[0][1]));
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatch(/^org-2\/p-2\/remix\/.+\.svg$/);
