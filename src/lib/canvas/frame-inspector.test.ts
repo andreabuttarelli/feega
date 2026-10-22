@@ -46,6 +46,15 @@ describe('inspectorOf', () => {
     expect(shown?.clip?.id).toBe('a');
   });
 
+  it('shows the clip inspector for a member picked inside a group', () => {
+    const grouped = must(precompose(fixture(), ['a', 'b'], { comp: 'g', clip: 'gc' }, 'Group 1'));
+    const shown = inspectorOf(grouped, ['gc__0__a']);
+
+    expect(shown?.view).toBe(PropertiesView.Clip);
+    expect(shown?.clip?.id).toBe('a');
+    expect(shown?.path).toEqual(['g']);
+  });
+
   it('shows the multi inspector for several', () => {
     expect(inspectorOf(fixture(), ['a', 'b'])?.view).toBe(PropertiesView.Multiple);
   });

@@ -21,6 +21,7 @@
   import { loadOutliner } from '$lib/motion/fonts/outliner';
   import type { ActionId } from '$lib/motion/actions';
   import type { OpResult } from '$lib/motion/timeline';
+  import { mergeView, viewOf } from '$lib/motion/precomp';
 
   const FIRST_FRAME = 0;
 
@@ -47,6 +48,8 @@
   const doc = $derived(session?.history.present ?? null);
   const shown = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
   const edit = (next: NonNullable<typeof doc>, summary: string) => session?.edit(next, summary);
+  const shownDoc = $derived(doc && shown ? viewOf(doc, shown.path) : doc);
+  const editShown = (next: NonNullable<typeof doc>, summary: string) => doc && shown && edit(mergeView(doc, shown.path, next), summary);
   const editGuides = (result: OpResult, summary: string) => result.ok && edit(result.doc, summary);
 
   async function runBar(id: ActionId) {
@@ -62,7 +65,7 @@
   }
 </script>
 
-{#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} {doc} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={edit} />{/if}{/snippet}
+{#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}
 
 {#if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
@@ -79,9 +82,9 @@
       <TemplateInspector gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
     {:else}
       {@const Presets = CLIP_PRESETS[shown.clip.component]}
-      <InstanceInspector {doc} clipId={shown.clip.id} onchange={edit} onrun={(id) => void runBar(id)} />
-      <MotionInspector gesture={session.live} lead={partLead} {doc} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={FIRST_FRAME} onchange={edit} />
-      {#if Presets}<Presets {doc} clip={shown.clip} onchange={edit} />{/if}
+      <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
+      <MotionInspector gesture={session.live} lead={partLead} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={FIRST_FRAME} onchange={editShown} />
+      {#if Presets}<Presets doc={shownDoc!} clip={shown.clip} onchange={editShown} />{/if}
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}
     {/if}
   </aside>

@@ -77,6 +77,8 @@ test.describe('group, boolean ops and deep select inside a core frame @real', ()
     await page.mouse.click(left.x, left.y);
     await page.keyboard.up('ControlOrMeta');
     await expect(selections).toHaveAttribute('data-clip', `${group}__0__a`);
+    await expect(page.getByTestId('frame-inspector')).toBeVisible();
+    await page.screenshot({ path: `${process.env.HOME}/Documents/feega-videos/e2e/stab-group-member-props.png` });
     await shot(page, 'deep');
 
     await page.keyboard.press('Escape');
