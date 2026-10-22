@@ -27,6 +27,21 @@ export enum Sizing {
   Fill = 'fill'
 }
 
+export enum TrackType {
+  Fixed = 'fixed',
+  Flex = 'flex',
+  Hug = 'hug'
+}
+
+export enum AutoFlow {
+  Row = 'row',
+  Column = 'column'
+}
+
+export type TrackSize = { type: TrackType; value: number };
+
+export type Cell = { column?: number; row?: number; columnSpan?: number; rowSpan?: number; x?: Align; y?: Align };
+
 export type Size = { width: number; height: number };
 export type Padding = { top: number; right: number; bottom: number; left: number };
 
@@ -39,6 +54,9 @@ export type Flow = {
   justify: Justify;
   align: Align;
   columns?: number;
+  columnTracks?: TrackSize[];
+  rowTracks?: TrackSize[];
+  autoFlow?: AutoFlow;
 };
 
 export const DEFAULT_COLUMNS = 2;
@@ -51,6 +69,7 @@ export type Item = {
   min?: Partial<Size>;
   max?: Partial<Size>;
   absolute?: boolean;
+  cell?: Cell;
   flow?: Flow;
   children?: Item[];
 };
@@ -142,48 +161,160 @@ function hugMain(item: Item, flow: Flow): number {
 
 const columnsOf = (flow: Flow) => Math.max(1, Math.round(flow.columns ?? DEFAULT_COLUMNS));
 
-function gridRows(kids: Item[], flow: Flow): Item[][] {
-  const columns = columnsOf(flow);
-  return Array.from({ length: Math.ceil(kids.length / columns) }, (_, r) => kids.slice(r * columns, (r + 1) * columns));
+const IMPLIED_COLUMN: TrackSize = { type: TrackType.Flex, value: 1 };
+const IMPLIED_ROW: TrackSize = { type: TrackType.Hug, value: 0 };
+
+const columnTracksOf = (flow: Flow): TrackSize[] => (flow.columnTracks?.length ? flow.columnTracks : Array.from({ length: columnsOf(flow) }, () => IMPLIED_COLUMN));
+
+const rowTracksOf = (flow: Flow, rows: number): TrackSize[] => Array.from({ length: rows }, (_, r) => flow.rowTracks?.[r] ?? IMPLIED_ROW);
+
+type Placed = { item: Item; column: number; row: number; columnSpan: number; rowSpan: number };
+
+const spanOf = (value: number | undefined, max: number) => Math.max(1, Math.min(max, Math.round(value ?? 1)));
+
+function arrange(kids: Item[], flow: Flow): { cells: Placed[]; rows: number } {
+  const columns = columnTracksOf(flow).length;
+  const taken = new Set<string>();
+  const cells: Placed[] = [];
+  const fits = (row: number, column: number, rowSpan: number, columnSpan: number) => {
+    if (row < 0 || column < 0 || column + columnSpan > columns) {
+      return false;
+    }
+    for (let r = row; r < row + rowSpan; r++) {
+      for (let c = column; c < column + columnSpan; c++) {
+        if (taken.has(`${r}:${c}`)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+  const take = (item: Item, row: number, column: number, rowSpan: number, columnSpan: number) => {
+    for (let r = row; r < row + rowSpan; r++) {
+      for (let c = column; c < column + columnSpan; c++) {
+        taken.add(`${r}:${c}`);
+      }
+    }
+    cells.push({ item, row, column, rowSpan, columnSpan });
+  };
+  const spans = (item: Item) => ({ columnSpan: spanOf(item.cell?.columnSpan, columns), rowSpan: spanOf(item.cell?.rowSpan, Infinity) });
+
+  const loose: Item[] = [];
+  for (const item of kids) {
+    const { column, row } = item.cell ?? {};
+    const { columnSpan, rowSpan } = spans(item);
+    if (column === undefined || row === undefined || !fits(row, column, rowSpan, columnSpan)) {
+      loose.push(item);
+      continue;
+    }
+    take(item, row, column, rowSpan, columnSpan);
+  }
+
+  const height = Math.max(flow.rowTracks?.length ?? 0, Math.ceil(kids.length / columns));
+  for (const item of loose) {
+    const { columnSpan, rowSpan } = spans(item);
+    const spot = flow.autoFlow === AutoFlow.Column ? downColumns(fits, columns, height, rowSpan, columnSpan) : null;
+    const [row, column] = spot ?? acrossRows(fits, columns, rowSpan, columnSpan);
+    take(item, row, column, rowSpan, columnSpan);
+  }
+  return { cells, rows: Math.max(flow.rowTracks?.length ?? 0, ...cells.map((c) => c.row + c.rowSpan)) };
 }
 
-const rowHeights = (rows: Item[][], height: (k: Item) => number) => rows.map((row) => Math.max(...row.map(height)));
+type Fits = (row: number, column: number, rowSpan: number, columnSpan: number) => boolean;
+
+function downColumns(fits: Fits, columns: number, height: number, rowSpan: number, columnSpan: number): [number, number] | null {
+  for (let column = 0; column < columns; column++) {
+    for (let row = 0; row + rowSpan <= height; row++) {
+      if (fits(row, column, rowSpan, columnSpan)) {
+        return [row, column];
+      }
+    }
+  }
+  return null;
+}
+
+function acrossRows(fits: Fits, columns: number, rowSpan: number, columnSpan: number): [number, number] {
+  for (let row = 0; ; row++) {
+    for (let column = 0; column < columns; column++) {
+      if (fits(row, column, rowSpan, columnSpan)) {
+        return [row, column];
+      }
+    }
+  }
+}
+
+const TRACK_BASE: Record<TrackType, (track: TrackSize, content: number) => number> = {
+  [TrackType.Fixed]: (track) => track.value,
+  [TrackType.Hug]: (_track, content) => content,
+  [TrackType.Flex]: () => 0
+};
+
+function sizeTracks(tracks: TrackSize[], content: number[], room: number | undefined, gap: number): number[] {
+  const base = tracks.map((t, i) => TRACK_BASE[t.type](t, content[i]));
+  const flexes = tracks.filter((t) => t.type === TrackType.Flex);
+  const fr = sum(flexes.map((t) => t.value));
+  if (!fr) {
+    return base;
+  }
+  const unit = room === undefined ? Math.max(0, ...tracks.map((t, i) => (t.type === TrackType.Flex && t.value > 0 ? content[i] / t.value : 0))) : Math.max(0, room - sum(base) - gaps(tracks.length, gap)) / fr;
+  return tracks.map((t, i) => (t.type === TrackType.Flex ? unit * t.value : base[i]));
+}
+
+function contentOf(cells: Placed[], count: number, axis: 'column' | 'row', size: (cell: Placed) => number): number[] {
+  const out = Array.from({ length: count }, () => 0);
+  const spanKey = axis === 'column' ? 'columnSpan' : 'rowSpan';
+  for (const cell of cells) {
+    if (cell[spanKey] === 1) {
+      out[cell[axis]] = Math.max(out[cell[axis]], size(cell));
+    }
+  }
+  return out;
+}
+
+const startsOf = (sizes: number[], gap: number) => sizes.map((_, i) => sum(sizes.slice(0, i)) + i * gap);
+const spanned = (sizes: number[], from: number, span: number, gap: number) => sum(sizes.slice(from, from + span)) + gaps(span, gap);
+
+type GridSizes = { cells: Placed[]; columns: number[]; rows: number[] };
+
+function sizeGrid(item: Item, flow: Flow, room: Partial<Size>): GridSizes {
+  const { cells, rows } = arrange(flowing(item), flow);
+  const columnTracks = columnTracksOf(flow);
+  const columns = sizeTracks(columnTracks, contentOf(cells, columnTracks.length, 'column', (c) => measure(c.item).width), room.width, flow.gap);
+  const heightOf = (c: Placed) => (c.item.sizing.height === Sizing.Fill ? 0 : measure(c.item, c.item.sizing.width === Sizing.Fill ? { width: spanned(columns, c.column, c.columnSpan, flow.gap) } : {}).height);
+  const rowTracks = rowTracksOf(flow, rows);
+  return { cells, columns, rows: sizeTracks(rowTracks, contentOf(cells, rows, 'row', heightOf), room.height, flow.crossGap) };
+}
 
 function hugGrid(item: Item, flow: Flow): Size {
-  const kids = flowing(item);
-  const columns = columnsOf(flow);
-  const widest = kids.length ? Math.max(...kids.map((k) => measure(k).width)) : 0;
-  const used = Math.min(columns, kids.length);
-  const heights = rowHeights(gridRows(kids, flow), (k) => measure(k).height);
+  const { columns, rows } = sizeGrid(item, flow, {});
   return {
-    width: used * widest + gaps(used, flow.gap) + PAD.width(flow.padding),
-    height: sum(heights) + gaps(heights.length, flow.crossGap) + PAD.height(flow.padding)
+    width: sum(columns) + gaps(columns.length, flow.gap) + PAD.width(flow.padding),
+    height: sum(rows) + gaps(rows.length, flow.crossGap) + PAD.height(flow.padding)
   };
 }
 
 function measureGrid(item: Item, flow: Flow, given: Partial<Size>): Size {
-  const hugged = hugGrid(item, flow);
-  const side = (dim: Dim) => clamp(item, dim, given[dim] ?? (item.sizing[dim] === Sizing.Hug ? hugged[dim] : item[dim]));
+  const hugs = (dim: Dim) => given[dim] === undefined && item.sizing[dim] === Sizing.Hug;
+  const hugged = hugs('width') || hugs('height') ? hugGrid(item, flow) : null;
+  const side = (dim: Dim) => clamp(item, dim, given[dim] ?? (hugged && hugs(dim) ? hugged[dim] : item[dim]));
   return { width: side('width'), height: side('height') };
 }
 
 function placeGrid(item: Item, flow: Flow, inner: Box, out: Map<string, Box>): void {
-  const columns = columnsOf(flow);
-  const cell = (inner.width - gaps(columns, flow.gap)) / columns;
-  const rows = gridRows(flowing(item), flow);
-  const sizeIn = (k: Item) => measure(k, k.sizing.width === Sizing.Fill ? { width: cell } : {});
-  const heights = rowHeights(rows, (k) => (k.sizing.height === Sizing.Fill ? 0 : sizeIn(k).height));
-  let top = inner.top;
+  const { cells, columns, rows } = sizeGrid(item, flow, { width: inner.width, height: inner.height });
+  const lefts = startsOf(columns, flow.gap);
+  const tops = startsOf(rows, flow.crossGap);
 
-  rows.forEach((row, r) => {
-    row.forEach((k, col) => {
-      const own = sizeIn(k);
-      const height = k.sizing.height === Sizing.Fill ? clamp(k, 'height', heights[r]) : own.height;
-      const left = inner.left + col * (cell + flow.gap) + JUSTIFIED_IN_CELL[flow.justify](cell - own.width);
-      place(k, { left, top: top + ALIGNED[flow.align](heights[r] - height), width: own.width, height }, out);
-    });
-    top += heights[r] + flow.crossGap;
-  });
+  for (const { item: k, column, row, columnSpan, rowSpan } of cells) {
+    const width = spanned(columns, column, columnSpan, flow.gap);
+    const height = spanned(rows, row, rowSpan, flow.crossGap);
+    const own = measure(k, k.sizing.width === Sizing.Fill ? { width } : {});
+    const w = k.sizing.width === Sizing.Fill ? clamp(k, 'width', width) : own.width;
+    const h = k.sizing.height === Sizing.Fill ? clamp(k, 'height', height) : own.height;
+    const dx = k.cell?.x ? ALIGNED[k.cell.x](width - w) : JUSTIFIED_IN_CELL[flow.justify](width - w);
+    const dy = ALIGNED[k.cell?.y ?? flow.align](height - h);
+    place(k, { left: inner.left + lefts[column] + dx, top: inner.top + tops[row] + dy, width: w, height: h }, out);
+  }
 }
 
 export function measure(item: Item, given: Partial<Size> = {}): Size {

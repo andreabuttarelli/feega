@@ -5,7 +5,7 @@ import { setParent } from '../parent-ops';
 import { layerOrder } from '../siblings';
 import { addClip, moveClip, type OpResult } from '../timeline';
 import { Align, Direction, Sizing } from './auto-layout';
-import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, autoLayoutSchema, layoutItemSchema, type AutoLayout, type LayoutItem } from './model';
+import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from './model';
 import { childrenInOrder, withAutoLayout } from './resolve';
 import { isText } from './text-extent';
 
@@ -41,6 +41,10 @@ export function setAutoLayout(doc: MotionDoc, clipId: string, patch: Partial<Aut
   if (!parsed.success) {
     return fail(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
   }
+  const invalid = flexOnHug(parsed.data, found.clip.layoutItem);
+  if (invalid) {
+    return fail(invalid);
+  }
   return { ok: true, doc: withClip(doc, clipId, (c) => ({ ...c, autoLayout: parsed.data })) };
 }
 
@@ -52,6 +56,10 @@ export function setLayoutItem(doc: MotionDoc, clipId: string, patch: Partial<Lay
   const parsed = layoutItemSchema.safeParse({ ...(found.clip.layoutItem ?? DEFAULT_LAYOUT_ITEM), ...patch });
   if (!parsed.success) {
     return fail(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
+  }
+  const invalid = flexOnHug(found.clip.autoLayout, parsed.data);
+  if (invalid) {
+    return fail(invalid);
   }
   return { ok: true, doc: withClip(doc, clipId, (c) => ({ ...c, layoutItem: parsed.data })) };
 }

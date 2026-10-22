@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { addClip, type OpResult } from '../timeline';
-import { Align, Direction, Sizing } from './auto-layout';
+import { Align, Direction, Sizing, TrackType } from './auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from './model';
 import { addAutoLayout, leaveAutoLayout, reorderChild, removeAutoLayout, setAutoLayout, setLayoutItem, wrapInAutoLayout, wrapInFrame } from './ops';
 import { withAutoLayout } from './resolve';
@@ -117,6 +117,34 @@ describe('editing a container', () => {
     expect(clip(doc, 'b').parent).toBeNull();
     expect(clip(doc, 'b').props).toMatchObject({ x: laid.x, y: laid.y, width: laid.width, height: laid.height });
     expect(clip(doc, 'box').autoLayout!.order).toEqual(['a']);
+  });
+});
+
+describe('grid tracks', () => {
+  const grid = must(setAutoLayout(must(setLayoutItem(must(wrapInAutoLayout(row, ['a', 'b'], 'box', 'lane')), 'box', { width: Sizing.Fixed, height: Sizing.Fixed })), 'box', { direction: Direction.Grid }));
+  const flex = { type: TrackType.Flex, value: 1 };
+
+  it('stores column and row tracks, auto flow and a child cell', () => {
+    const doc = must(setAutoLayout(grid, 'box', { columnTracks: [flex, { type: TrackType.Fixed, value: 40 }], rowTracks: [{ type: TrackType.Hug, value: 0 }] }));
+    expect(clip(doc, 'box').autoLayout!.columnTracks).toHaveLength(2);
+    expect(clip(must(setLayoutItem(doc, 'a', { columnSpan: 2, cellX: Align.End })), 'a').layoutItem).toMatchObject({ columnSpan: 2, cellX: Align.End });
+  });
+
+  it('refuses a flex track on an axis where the grid hugs its content', () => {
+    const hugging = must(setLayoutItem(grid, 'box', { width: Sizing.Hug }));
+    expect(setAutoLayout(hugging, 'box', { columnTracks: [flex] }).ok).toBe(false);
+    expect(setAutoLayout(hugging, 'box', { rowTracks: [flex] }).ok).toBe(true);
+  });
+
+  it('refuses hugging an axis that has a flex track', () => {
+    const tracked = must(setAutoLayout(grid, 'box', { rowTracks: [flex] }));
+    expect(setLayoutItem(tracked, 'box', { height: Sizing.Hug }).ok).toBe(false);
+  });
+
+  it('lays a spanning child across the cells', () => {
+    const doc = must(setLayoutItem(must(setAutoLayout(grid, 'box', { columnTracks: [flex, flex], gap: 0 })), 'a', { width: Sizing.Fill, columnSpan: 2 }));
+    const box = clip(withAutoLayout(doc), 'box').props;
+    expect(clip(withAutoLayout(doc), 'a').props.width).toBeCloseTo(box.width as number, 5);
   });
 });
 

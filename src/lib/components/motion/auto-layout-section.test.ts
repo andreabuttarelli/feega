@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { Justify } from '$lib/motion/layout/auto-layout';
+import { Direction, Justify, TrackType } from '$lib/motion/layout/auto-layout';
 import { setAutoLayout, wrapInAutoLayout } from '$lib/motion/layout/ops';
 import { addClip, type OpResult } from '$lib/motion/timeline';
 import AutoLayoutSection from './AutoLayoutSection.svelte';
@@ -81,3 +81,24 @@ describe('the auto layout section', () => {
     expect(body).not.toContain('Width sizing');
   });
 });
+
+describe('grid fields', () => {
+  const grid = must(setAutoLayout(row, 'box', { direction: Direction.Grid, columnTracks: [{ type: TrackType.Fixed, value: 120 }, { type: TrackType.Hug, value: 0 }] }));
+
+  it('a grid shows its tracks and auto flow', () => {
+    const body = html(grid, 'box');
+    expect(body).toMatch(/data-testid="auto-layout-column-tracks"[^>]*value="120 hug"|value="120 hug"[^>]*data-testid="auto-layout-column-tracks"/);
+    for (const id of ['auto-layout-row-tracks', 'auto-layout-auto-flow']) {
+      expect(body).toContain(`data-testid="${id}"`);
+    }
+  });
+
+  it('a grid child shows spans and cell alignment', () => {
+    const body = html(grid, 'a');
+    for (const id of ['auto-layout-column-span', 'auto-layout-row-span', 'auto-layout-cell-x', 'auto-layout-cell-y']) {
+      expect(body).toContain(`data-testid="${id}"`);
+    }
+    expect(html(row, 'a')).not.toContain('auto-layout-column-span');
+  });
+});
+

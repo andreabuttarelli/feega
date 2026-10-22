@@ -38,7 +38,8 @@ function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size): Ite
     sizing: { width: own.width, height: own.height },
     min: { width: own.minWidth, height: own.minHeight },
     max: { width: own.maxWidth, height: own.maxHeight },
-    absolute: own.absolute
+    absolute: own.absolute,
+    cell: { column: own.column, row: own.row, columnSpan: own.columnSpan, rowSpan: own.rowSpan, x: own.cellX, y: own.cellY }
   };
   if (!isContainer(clip)) {
     return base;
