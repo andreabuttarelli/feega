@@ -4,6 +4,7 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import { setAutoLayout } from '../layout/ops';
 import { setParent } from '../parent-ops';
 import { addClip, type OpResult } from '../timeline';
+import { Justify } from '../layout/auto-layout';
 import { composeHtml } from './compose';
 
 function must(r: OpResult): MotionDoc {
@@ -31,5 +32,16 @@ describe('auto layout in the composition', () => {
     expect(styleOf(html, 'k1')).toContain('left:0px');
     expect(styleOf(html, 'k2')).toContain('left:108px');
     expect(styleOf(html, 'k2')).toContain('top:513px');
+  });
+
+  it('exports space-evenly slots', () => {
+    const html = composeHtml({ doc: must(setAutoLayout(row, 'box', { justify: Justify.SpaceEvenly })), tokens: FEEGA_TOKENS, assets: {} });
+    expect(styleOf(html, 'k1')).toContain('left:288px');
+    expect(styleOf(html, 'k2')).toContain('left:684px');
+  });
+
+  it('exports a negative gap as overlap', () => {
+    const html = composeHtml({ doc: must(setAutoLayout(row, 'box', { gap: -20 })), tokens: FEEGA_TOKENS, assets: {} });
+    expect(styleOf(html, 'k2')).toContain('left:88px');
   });
 });
