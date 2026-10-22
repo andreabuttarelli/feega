@@ -3,13 +3,15 @@
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
-  import { StyleKind, applyStyle, detachStyle, saveAsStyle, stylesFor } from '$lib/motion/styles';
+  import { StyleKind, applyStyle, detachStyle, saveAsStyle } from '$lib/motion/styles';
+  import { adoptStyle, offeredStyles } from '$lib/motion/style-library';
+  import { styleLibrary } from '$lib/canvas/style-library.svelte';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
 
   const NONE = '';
 
-  const offered = $derived(stylesFor(doc, clip.component));
+  const offered = $derived(offeredStyles(doc, clip.component, styleLibrary.styles));
   let name = $state('');
 
   function pick(value: string) {
@@ -17,7 +19,8 @@
       commit(detachStyle(doc, [clip.id]), 'Detached the style');
       return;
     }
-    commit(applyStyle(doc, [clip.id], value), `Applied the ${value} style`);
+    const shared = offered.find((s) => s.name === value && s.shared);
+    commit(shared ? adoptStyle(doc, [clip.id], value, shared.style) : applyStyle(doc, [clip.id], value), `Applied the ${value} style`);
   }
 
   function save(kind: StyleKind) {
@@ -25,7 +28,12 @@
     if (!trimmed) {
       return;
     }
-    commit(saveAsStyle(doc, clip.id, trimmed, kind), `Saved the ${trimmed} style`);
+    const saved = saveAsStyle(doc, clip.id, trimmed, kind);
+    commit(saved, `Saved the ${trimmed} style`);
+    const style = saved.ok ? saved.doc.styles?.[trimmed] : undefined;
+    if (style) {
+      styleLibrary.push(trimmed, style);
+    }
     name = '';
   }
 </script>
@@ -34,7 +42,7 @@
   <Field label="Style" id="clip-style">
     <select id="clip-style" class={cn(FIELD_INPUT, 'w-full')} data-testid="clip-style" value={clip.styleRef ?? NONE} onchange={(e) => pick(e.currentTarget.value)}>
       <option value={NONE}>None</option>
-      {#each offered as s (s.name)}<option value={s.name}>{s.name}</option>{/each}
+      {#each offered as s (s.name)}<option value={s.name}>{s.name}{s.shared ? ' · canvas' : ''}</option>{/each}
     </select>
   </Field>
   <Field label="New style" id="clip-style-name">

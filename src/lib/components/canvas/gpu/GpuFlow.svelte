@@ -27,6 +27,9 @@
   import { findClip, type MotionClip } from '$lib/motion/doc';
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import GradientHandles from '../GradientHandles.svelte';
+  import { styleLibrary } from '$lib/canvas/style-library.svelte';
+  import { libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import type { Style } from '$lib/motion/styles-model';
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
   import type { Fill } from '$lib/motion/fill/model';
   import { baseStyle, commitText, editLayout, editsText, hideText, runsOfClip, styledKind, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
@@ -1489,6 +1492,26 @@
   const onCanvas = $derived(new Set((props.peers ?? []).filter((p) => p.cursor).map((p) => p.userId)));
 
   onMount(() => peering?.start());
+
+  $effect(() => {
+    styleLibrary.styles = libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
+  });
+
+  function syncStyle(name: string, style: Style) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
+      const saver = saverOf(frame.id);
+      const present = saver?.history.present;
+      const synced = present && JSON.stringify(present.styles?.[name]) !== JSON.stringify(style) ? syncedDoc(present, name, style) : null;
+      if (synced) {
+        commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} style`);
+      }
+    }
+  }
+
+  onMount(() => {
+    styleLibrary.connect(syncStyle);
+    return () => styleLibrary.connect(null);
+  });
 
   $effect(() => {
     peering?.select(pointedFrame, picks);

@@ -968,7 +968,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
-    style_text_range: tool({
+    text_style: tool({
       description: 'Rich text: style characters start..end (end exclusive) of a Text clip only. style takes color (#rrggbb, brand.*), weight, italic, font (register_font first), size (share of the frame like props.size), tracking (em), leading, underline, strike, textCase, opacity; null drops that field for the range. clear: true drops every range.',
       inputSchema: z.object({ clip_id: z.string(), start: z.number().int().min(0).optional(), end: z.number().int().min(1).optional(), style: runEditSchema.optional(), clear: z.boolean().optional() }),
       execute: async (input) => {

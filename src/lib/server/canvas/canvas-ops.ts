@@ -24,6 +24,7 @@ import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPU
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
+import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles';
 import { drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
@@ -125,7 +126,8 @@ export enum Access {
 
 export enum Audience {
   Everyone = 'everyone',
-  BytesSenders = 'bytes_senders'
+  BytesSenders = 'bytes_senders',
+  Mcp = 'mcp'
 }
 
 type Op<S extends z.ZodType> = {
@@ -635,6 +637,23 @@ export const CANVAS_OPS = {
       const targets = [...input.frameIds.map((nodeId) => ({ nodeId })), ...input.elements.map((e) => ({ nodeId: e.frameId, elementId: e.elementId }))];
       const out = await exportSelection(selectionPorts({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.projectId, brandId: ctx.brandId ?? null, actor: ctx.actor }), { targets, rows: input.rows, name: input.name ?? 'Export' });
       return out.outcome === ExportOutcome.Done ? out : { error: out.outcome, nodeId: out.nodeId, elementId: out.elementId };
+    }
+  }),
+
+  styles: op({
+    access: Access.Write,
+    audience: Audience.Mcp,
+    input: canvasStyleInput,
+    run: async (ctx, input) => {
+      const frames = framesOf(ctx);
+      return canvasStyle(
+        {
+          ids: async () => (await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })).filter((n) => n.type === MOTION_TYPE).map((n) => n.id),
+          read: frames.read,
+          write: frames.write
+        },
+        input
+      );
     }
   }),
 
