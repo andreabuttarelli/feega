@@ -71,7 +71,7 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/lib/server/influencer-create.ts': SCREENED,
   'src/routes/api/v1/prompts/enhance/+server.ts': SCREENED,
   'src/routes/api/v1/brands/[slug]/prompts/enhance/+server.ts': SCREENED,
-  'src/routes/api/v1/projects/[projectId]/agent/+server.ts': SCREENED,
+  'src/lib/server/project-agent/turn.ts': 'the project chat model call: its route screens the user text before starting it',
   'src/lib/server/motion/turn.ts': SCREENED,
   'src/lib/server/motion/voiceover.ts': SCREENED,
   'src/lib/server/agents/spawn-agent.ts': 'runs a sub-agent on a prompt its parent agent wrote inside a turn that screened the user text',
