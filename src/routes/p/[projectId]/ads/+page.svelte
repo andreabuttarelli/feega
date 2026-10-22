@@ -65,7 +65,7 @@
         {view.adAccounts.length} ad account{view.adAccounts.length === 1 ? '' : 's'} ·
         {view.adAccounts.map((a) => a.name ?? a.id).join(', ')}
       </p>
-      <button class="btn primary" type="button" onclick={() => openSheet(projectId, promotePath([], 'paid'), 'replace')}>
+      <button class="btn primary" type="button" onclick={() => openSheet(projectId, promotePath([]), 'replace')}>
         New ad
       </button>
     </section>

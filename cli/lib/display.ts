@@ -27,18 +27,3 @@ export function formatDate(iso: string | null | undefined): string {
   return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) +
     ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 }
-
-export function statusBadge(status: string): string {
-  const map: Record<string, string> = {
-    active: chalk.green('active'),
-    trial: chalk.yellow('trial'),
-    paused: chalk.dim('paused'),
-    canceled: chalk.red('canceled'),
-    pending_user: chalk.yellow('pending'),
-    approved: chalk.cyan('approved'),
-    scheduled: chalk.blue('scheduled'),
-    published: chalk.green('published'),
-    failed: chalk.red('failed'),
-  };
-  return map[status] ?? chalk.dim(status);
-}

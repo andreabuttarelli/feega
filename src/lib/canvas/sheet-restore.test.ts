@@ -18,14 +18,14 @@ describe('restoreSheet: un link diretto diventa tela + foglio', () => {
   it('sostituisce la voce con la tela, poi spinge il foglio con i dati già caricati', async () => {
     await restoreSheet({
       canvasHref: '/p/x/c/k',
-      sheetHref: '/p/x/calendar?month=2026-10',
-      path: '/calendar',
+      sheetHref: '/p/x/ads?month=2026-10',
+      path: '/ads',
       data: { posts: [] }
     });
 
     expect(calls).toEqual([
       'goto /p/x/c/k {"replaceState":true}',
-      'push /p/x/calendar?month=2026-10 {"sheet":{"path":"/calendar","data":{"posts":[]}}}'
+      'push /p/x/ads?month=2026-10 {"sheet":{"path":"/ads","data":{"posts":[]}}}'
     ]);
   });
 });

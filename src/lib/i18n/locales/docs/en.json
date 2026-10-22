@@ -19,7 +19,6 @@
     "s30": "Overview",
     "s31": "Endpoints",
     "s32": "Brands",
-    "s33": "Posts",
     "s37": "Analytics",
     "s38": "Products",
     "s40": "Close menu",
@@ -178,9 +177,7 @@
     "s1": "Analytics",
     "s2": "Engagement analytics and content calendar.",
     "s3": "Engagement analytics for published posts.",
-    "s4": "Analytics",
-    "s5": "Monthly content calendar.",
-    "s6": "Calendar"
+    "s4": "Analytics"
   },
   "api_brands": {
     "s0": "Brands — feega API",
@@ -192,27 +189,6 @@
     "s6": "Full brand detail with stats, plan, kit, and recent runs.",
     "s7": "Brand detail",
     "s8": "Brand not found"
-  },
-  "api_posts": {
-    "s0": "Posts — feega API",
-    "s1": "Posts",
-    "s2": "Create, approve, schedule, publish, and manage posts.",
-    "s3": "List posts, optionally filtered by status.",
-    "s4": "Array of posts",
-    "s5": "Invalid token",
-    "s6": "Update a post.",
-    "s7": "Updated",
-    "s8": "Not found",
-    "s9": "Approve and publish a single post.",
-    "s10": "Approved",
-    "s11": "Approve all pending posts.",
-    "s12": "Bulk result",
-    "s13": "Publish immediately.",
-    "s14": "Published",
-    "s15": "Reschedule a post.",
-    "s16": "Rescheduled",
-    "s17": "Delete a post (pending_user only).",
-    "s18": "Deleted"
   },
   "api_products": {
     "s0": "Products — feega API",

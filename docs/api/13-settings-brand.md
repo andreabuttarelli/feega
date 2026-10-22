@@ -91,8 +91,7 @@ chiamare.
 
 **Il fuso non sposta i post che hanno già un orario.** `posts.scheduled_for` è un `timestamptz`,
 cioè un istante assoluto: la conversione da orario locale a UTC avviene **una volta**, quando la
-riga viene creata o rischedulata (`wallClockToUtc` / `nextOccurrence` in
-`src/lib/server/schedule.ts`). Nessuno la ricalcola dopo. Cambiare il fuso quindi non muove niente
+riga viene creata o rischedulata. Nessuno la ricalcola dopo. Cambiare il fuso quindi non muove niente
 in assoluto — muove l'**ora locale** con cui quell'istante si legge: un post fissato per le 18:00 a
 Roma (16:00 UTC) diventa le 12:00 a New York. Solo le programmazioni successive usano il fuso
 nuovo.

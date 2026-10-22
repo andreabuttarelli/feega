@@ -82,10 +82,6 @@
               {/await}
             </div>
           </div>
-        {:else if entry.id === 'calendar'}
-          {#await SHEET_PAGE_LOADERS.calendar() then { default: CalendarPage }}
-            <CalendarPage data={sheet.data as never} form={null} />
-          {/await}
         {:else if entry.id === 'ads'}
           {#await SHEET_PAGE_LOADERS.ads() then { default: AdsSocialPage }}
             <AdsSocialPage data={sheet.data as never} form={null} />

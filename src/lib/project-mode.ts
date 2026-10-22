@@ -8,7 +8,6 @@ export enum ProjectMode {
 export enum Capability {
   Share = 'share',
   Publish = 'publish',
-  Schedule = 'schedule',
   Promote = 'promote',
   CatalogueWrite = 'catalogue_write',
   WiroModels = 'wiro_models',
@@ -25,7 +24,6 @@ export const MODE_ALLOWS: Readonly<Record<ProjectMode, ReadonlySet<Capability>>>
 export const MODE_REFUSAL: Readonly<Record<Capability, string>> = {
   [Capability.Share]: 'uncensored_not_shareable',
   [Capability.Publish]: 'uncensored_not_publishable',
-  [Capability.Schedule]: 'uncensored_not_publishable',
   [Capability.Promote]: 'uncensored_not_publishable',
   [Capability.CatalogueWrite]: 'uncensored_not_in_catalogue',
   [Capability.WiroModels]: 'wiro_requires_uncensored_project',
@@ -35,7 +33,6 @@ export const MODE_REFUSAL: Readonly<Record<Capability, string>> = {
 const WIRO_PREFIX = 'wiro/';
 
 export const SECTION_CAPABILITY: Readonly<Record<string, Capability>> = {
-  calendar: Capability.Schedule,
   promote: Capability.Promote,
   ads: Capability.Promote,
   influencers: Capability.CatalogueWrite

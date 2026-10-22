@@ -5,7 +5,6 @@ import { INSERT_ROW, UPDATE_ROW, DELETE_ROW } from './write';
 import { IMPORT_MEDIA_URL } from './posts';
 import { SET_BRAND_SETTINGS } from './brand-settings';
 import { GET_MEDIA_MODELS, SET_MEDIA_MODEL } from './media-models';
-import { SOCIAL_CONNECT_LINK } from './social';
 import { ENHANCE_PROMPT } from './prompts';
 import { UPDATE_PRODUCT } from './studio';
 
@@ -79,7 +78,6 @@ export const BRAND_ENDPOINTS: readonly BrandEndpoint[] = [
   QUERY_DATABASE,
   SET_BRAND_SETTINGS,
   SET_MEDIA_MODEL,
-  SOCIAL_CONNECT_LINK,
   UPDATE_ROW,
 ];
 
@@ -121,7 +119,6 @@ export {
  * nessuno di essi e' un endpoint del registry, quindi nessuno diventa un tool.
  */
 export { LIST_MEDIA_READ } from './posts';
-export { LIST_SOCIAL_ACCOUNTS_READ } from './social';
 
 export { QUERY_DATABASE, QUERY_OPS, QUERY_TABLE_NAMES, QUERY_DEFAULT_ROWS, QUERY_MAX_ROWS } from './query';
 export { QUERY_TABLES } from './query-tables';
@@ -145,7 +142,6 @@ export {
   AUTOMATION_STATES
 } from './automations';
 export type { AutomationJob } from './automations';
-export { SOCIAL_CONNECT_LINK } from './social';
 export { BILLING_PORTAL_LINK, CHECKOUT_LINK, ONE_TIME_CHECKOUT_LINK };
 export type {
   BillingPortalLinkResult,

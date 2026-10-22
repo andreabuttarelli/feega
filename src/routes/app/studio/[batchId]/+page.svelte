@@ -3,9 +3,8 @@
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { apiEnhance } from '$lib/dashboard/api-enhance';
   import { postPageAction } from '$lib/api/page-action';
-  import { publishes } from '$lib/social-publishing';
   import { invalidate } from '$app/navigation';
-  import { ArrowLeft, Check, Columns2, Download, CalendarPlus, RotateCcw, X, ChevronLeft, ChevronRight } from '@lucide/svelte';
+  import { ArrowLeft, Check, Columns2, Download, RotateCcw, X, ChevronLeft, ChevronRight } from '@lucide/svelte';
   import PageHead from '$lib/components/PageHead.svelte';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
@@ -17,7 +16,6 @@
   const POLL_MS = 5000;
   const PENDING: readonly string[] = [ItemStatus.Queued, ItemStatus.Running];
   const UNMADE: readonly string[] = [ItemStatus.Failed, ItemStatus.Blocked, ItemStatus.Cancelled];
-  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
 
   const dependency = $derived(`studio:batch:${data.batch.id}`);
   const total = $derived(data.items.length);
@@ -29,11 +27,9 @@
   const picked = $derived(ready.filter((i) => i.approval === Approval.Approved));
   const previewOnly = $derived(data.items.length > 0 && data.items.every((i) => i.preview));
   const failure = $derived(form && 'error' in form ? String(form.error) : null);
-  const posted = $derived(form && 'post' in form ? (form.post as { href: string }) : null);
   const unmadeText = $derived(unmade[0]?.error ? failureText(unmade[0].error) : null);
 
   let comparing = $state<number | null>(null);
-  let calendarOpen = $state(false);
   let more = $state(1);
   let draining = false;
 
@@ -179,26 +175,7 @@
       {/each}
       <a class="button" class:disabled={!picked.length} aria-disabled={!picked.length} href={picked.length ? grantedPath(`/app/studio/${data.batch.id}/zip`) : undefined} download>Original</a>
     </div>
-    {#if publishes(data.socialPublishing)}
-      <button type="button" class="primary" disabled={!picked.length} onclick={() => (calendarOpen = !calendarOpen)}><CalendarPlus size={16} /> Add to calendar</button>
-    {/if}
   </footer>
-
-  {#if calendarOpen && publishes(data.socialPublishing)}
-    <section class="calendar" data-testid="studio-calendar">
-      {#if posted}
-        <p>Added as a draft post. <a href={posted.href}>Open the calendar</a></p>
-      {:else if data.brands.length}
-        <form method="POST" action="?/calendar" use:apiEnhance>
-          <label>Brand <select name="brand_id">{#each data.brands as b (b.id)}<option value={b.id}>{b.name}</option>{/each}</select></label>
-          <label>Day <input type="date" name="date" value={tomorrow} min={new Date().toISOString().slice(0, 10)} /></label>
-          <button type="submit" class="primary">Add {picked.length} photo{picked.length === 1 ? '' : 's'}</button>
-        </form>
-      {:else}
-        <p>The calendar publishes for a brand. <a href={`/p/${data.projectId}/brands/new`}>Create your brand</a> first, then come back.</p>
-      {/if}
-    </section>
-  {/if}
 </div>
 
 {#if compared}
@@ -255,8 +232,7 @@
   }
   .progress,
   .notice,
-  .unmade,
-  .calendar {
+  .unmade {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -474,19 +450,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--ui-space-1);
-    color: var(--ui-text-secondary);
-  }
-  .calendar form {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: var(--ui-space-3);
-  }
-  .calendar label {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-1);
-    font-size: var(--ui-type-label);
     color: var(--ui-text-secondary);
   }
   .error {

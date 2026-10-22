@@ -174,11 +174,11 @@ async function refuseUncensoredSection(event: RequestEvent): Promise<void> {
 
 async function refuseSocialPublishing(event: RequestEvent): Promise<void> {
   const { routeRefused, SocialPublishing } = await import('$lib/social-publishing');
-  if (!routeRefused(SocialPublishing.Off, event.route.id, event.url.search)) {
+  if (!routeRefused(SocialPublishing.Off, event.route.id)) {
     return;
   }
   const { socialPublishing } = await import('$lib/server/social-publishing');
-  if (routeRefused(await socialPublishing(), event.route.id, event.url.search)) {
+  if (routeRefused(await socialPublishing(), event.route.id)) {
     throw error(404, 'not_available');
   }
 }

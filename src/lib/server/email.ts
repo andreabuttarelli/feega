@@ -3,7 +3,6 @@ import { tEmail } from './email-i18n';
 import { senderEmailDomain } from './support-config';
 import type { Locale } from '$lib/i18n/locale';
 import { siteUrl } from '$lib/seo';
-import { joinAppPath } from '$lib/server/tenancy/brand-slug';
 import { formatCredits } from '$lib/components/credit-amount-format';
 
 // Sender address. The domain must be verified in Resend, otherwise Resend rejects delivery to
@@ -178,37 +177,6 @@ export function brandInviteEmailText(locale: Locale, brandName: string, inviter:
     `${tEmail(locale, 'invite.cta')} ${acceptUrl}`,
     '',
     tEmail(locale, 'invite.footer', { email: toEmail })
-  ].join('\n');
-}
-
-// ── Calendar conflict email ─────────────────────────────────────────────────
-// Sent when the brand's calendar has 2+ posts double-booked on the same minute. Nudges the user to
-// let the AI rebalance the schedule. CTA lands on the calendar, whose banner opens the AI chat.
-
-export function calendarConflictEmailSubject(locale: Locale, brandName: string, count: number): string {
-  return tEmail(locale, 'conflict.subject', { brand: brandName, count });
-}
-
-export function calendarConflictEmailHtml(locale: Locale, brandName: string, count: number, calendarUrl: string, origin?: string): string {
-  return shell(
-    origin,
-    `
-    <h2 style="font-size:22px;letter-spacing:-0.02em;margin:14px 0 6px;">${tEmail(locale, 'conflict.heading', { brand: brandName, count })}</h2>
-    <p style="color:#6e6e73;line-height:1.5;margin:0 0 16px;">${tEmail(locale, 'conflict.intro', { count })}</p>
-    ${cta(calendarUrl, tEmail(locale, 'conflict.cta'))}
-    <p style="color:#86868b;font-size:12px;margin-top:22px;">${tEmail(locale, 'conflict.footer')}</p>`
-  );
-}
-
-export function calendarConflictEmailText(locale: Locale, brandName: string, count: number, calendarUrl: string): string {
-  return [
-    tEmail(locale, 'conflict.heading', { brand: brandName, count }),
-    '',
-    tEmail(locale, 'conflict.intro', { count }),
-    '',
-    `${tEmail(locale, 'conflict.cta')} ${calendarUrl}`,
-    '',
-    tEmail(locale, 'conflict.footer')
   ].join('\n');
 }
 
@@ -514,139 +482,6 @@ export function weeklyRecapEmailText(locale: Locale, data: RecapData): string {
 
   lines.push(`${tEmail(locale, 'recap_weekly.cta')} ${data.dashboardUrl}`, '', tEmail(locale, 'recap_weekly.footer'));
   return lines.join('\n');
-}
-
-// ── Daily digest email ────────────────────────────────────────────────────────
-// Sent every morning (08:00 UTC cron) with what went live the previous UTC day: one row per
-// published post — platform, truncated caption, thumbnail, link to the post itself (or the
-// brand calendar when no per-post URL exists). Never sent when nothing was published, so a
-// quiet day produces zero noise.
-
-export type DigestPost = {
-  id?: string;
-  platform: string | null;
-  caption: string | null;
-  media_url?: string | null;
-  published_url?: string | null;
-  slot?: string | null;
-};
-
-export function digestEmailSubject(locale: Locale, brandName: string, count: number): string {
-  return tEmail(locale, 'digest.subject', { brand: brandName, count });
-}
-
-// One digest post: thumbnail (when present) beside the platform + caption, the whole row linking
-// to the live post or, as a fallback, the brand calendar.
-function digestPostRow(p: DigestPost, fallbackUrl: string): string {
-  const platform = esc((p.platform ?? '').toUpperCase());
-  const caption = esc((p.caption ?? '').slice(0, 160)) || platform;
-  const href = esc(p.published_url || fallbackUrl);
-  const thumb = p.media_url
-    ? `<td width="68" valign="top" style="padding:0 12px 0 0;"><a href="${href}"><img src="${esc(p.media_url)}" width="56" height="56" alt="" style="display:block;width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid #e3e3e6;" /></a></td>`
-    : '';
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0 0 14px;"><tr>${thumb}<td valign="top" style="font-size:14px;line-height:1.45;color:#1d1d1f;"><div style="color:#86868b;font-size:11px;font-weight:600;letter-spacing:0.04em;margin-bottom:3px;">${platform}</div><a href="${href}" style="color:#1d1d1f;text-decoration:none;">${caption}</a></td></tr></table>`;
-}
-
-export function digestEmailHtml(
-  locale: Locale,
-  brand: { name: string; slug: string },
-  posts: DigestPost[],
-  appBasePath: string,
-  origin?: string
-): string {
-  const calendarUrl = `${siteUrl(origin)}${joinAppPath(appBasePath, '/calendar')}`;
-  const items = posts.map((p) => digestPostRow(p, calendarUrl)).join('');
-  return shell(
-    origin,
-    `
-    <h2 style="font-size:22px;letter-spacing:-0.02em;margin:14px 0 6px;">${tEmail(locale, 'digest.heading', { brand: esc(brand.name), count: posts.length })}</h2>
-    <p style="color:#6e6e73;line-height:1.5;margin:0 0 18px;">${tEmail(locale, 'digest.intro', { brand: esc(brand.name) })}</p>
-    ${items}
-    <p style="color:#86868b;font-size:12px;margin-top:22px;">${tEmail(locale, 'digest.footer')}</p>`
-  );
-}
-
-export function digestEmailText(
-  locale: Locale,
-  brand: { name: string; slug: string },
-  posts: DigestPost[],
-  appBasePath: string
-): string {
-  const calendarUrl = `${siteUrl()}${joinAppPath(appBasePath, '/calendar')}`;
-  const lines = posts.map((p) => {
-    const url = p.published_url || calendarUrl;
-    return `- ${(p.platform ?? '').toUpperCase()}: ${(p.caption ?? '').slice(0, 160)} (${url})`;
-  });
-  return [
-    tEmail(locale, 'digest.heading', { brand: brand.name, count: posts.length }),
-    '',
-    tEmail(locale, 'digest.intro', { brand: brand.name }),
-    '',
-    lines.join('\n'),
-    '',
-    tEmail(locale, 'digest.footer')
-  ].join('\n');
-}
-
-// ── Pre-publish hold (last-mile gate pulled a scheduled post back) ─────────────
-
-export type PrepublishHeldPost = {
-  platform: string | null;
-  caption: string | null;
-  media_url?: string | null;
-  reason: string;
-};
-
-export function prepublishHeldEmailSubject(locale: Locale, brandName: string, count: number): string {
-  return tEmail(locale, 'prepublish.subject', { brand: brandName, count });
-}
-
-export function prepublishHeldEmailHtml(
-  locale: Locale,
-  brand: { name: string; slug: string },
-  posts: PrepublishHeldPost[],
-  contentUrl: string,
-  origin?: string
-): string {
-  const items = posts
-    .map((p) => {
-      const row = postRow(p);
-      const reason = `<div style="color:#86868b;font-size:12px;margin:-8px 0 14px;">${esc(tEmail(locale, 'prepublish.reason', { reason: p.reason }))}</div>`;
-      return row + reason;
-    })
-    .join('');
-  return shell(
-    origin,
-    `
-    <h2 style="font-size:22px;letter-spacing:-0.02em;margin:14px 0 6px;">${tEmail(locale, 'prepublish.heading', { brand: esc(brand.name), count: posts.length })}</h2>
-    <p style="color:#6e6e73;line-height:1.5;margin:0 0 18px;">${tEmail(locale, 'prepublish.intro')}</p>
-    ${items}
-    ${cta(contentUrl, tEmail(locale, 'prepublish.cta'))}
-    <p style="color:#86868b;font-size:12px;margin-top:22px;">${tEmail(locale, 'prepublish.footer')}</p>`
-  );
-}
-
-export function prepublishHeldEmailText(
-  locale: Locale,
-  brand: { name: string; slug: string },
-  posts: Array<{ platform: string | null; caption: string | null; reason: string }>,
-  contentUrl: string
-): string {
-  const lines = posts.map(
-    (p) =>
-      `- ${(p.platform ?? '').toUpperCase()}: ${(p.caption ?? '').slice(0, 160)}\n  ${tEmail(locale, 'prepublish.reason', { reason: p.reason })}`
-  );
-  return [
-    tEmail(locale, 'prepublish.heading', { brand: brand.name, count: posts.length }),
-    '',
-    tEmail(locale, 'prepublish.intro'),
-    '',
-    lines.join('\n'),
-    '',
-    `${tEmail(locale, 'prepublish.cta')} ${contentUrl}`,
-    '',
-    tEmail(locale, 'prepublish.footer')
-  ].join('\n');
 }
 
 // ── Credit warning email ───────────────────────────────────────────────────────

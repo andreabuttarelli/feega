@@ -16,32 +16,23 @@ describe('social publishing flag', () => {
   });
 
   it.each([
-    ['/p/[projectId]/calendar', ''],
-    ['/p/[projectId]/ads', ''],
-    ['/p/[projectId]/promote', ''],
-    ['/p/[projectId]/promote', '?/propose_ad'],
-    ['/p/[projectId]/settings/connected-accounts', ''],
-    ['/p/[projectId]/settings/connect/[platform]', ''],
-    ['/p/[projectId]/settings/facebook', ''],
-    ['/(public)/docs/api/posts', ''],
-    ['/api/v1/brands/[slug]/social/connect', ''],
-    ['/api/v1/brands/[slug]/publishing', ''],
-    ['/api/v1/health/accounts/tick', ''],
-    ['/app/studio/[batchId]', '?/calendar']
-  ])('con il flag spento rifiuta %s%s', (routeId, search) => {
-    expect(routeRefused(SocialPublishing.Off, routeId, search)).toBe(true);
-    expect(routeRefused(SocialPublishing.On, routeId, search)).toBe(false);
+    '/p/[projectId]/ads',
+    '/p/[projectId]/promote',
+    '/p/[projectId]/settings/connected-accounts',
+    '/p/[projectId]/settings/connect/[platform]',
+    '/p/[projectId]/settings/facebook'
+  ])('con il flag spento rifiuta %s', (routeId) => {
+    expect(routeRefused(SocialPublishing.Off, routeId)).toBe(true);
+    expect(routeRefused(SocialPublishing.On, routeId)).toBe(false);
   });
 
   it.each([
-    ['/p/[projectId]/c/[canvasId]', '?/run'],
-    ['/p/[projectId]/c/[canvasId]', ''],
-    ['/p/[projectId]/calendarx', ''],
-    ['/api/v1/motion/agent', ''],
-    ['/p/[projectId]/settings/project', ''],
-    [null, '']
-  ])('lascia passare %s%s', (routeId, search) => {
-    expect(routeRefused(SocialPublishing.Off, routeId, search)).toBe(false);
+    '/p/[projectId]/c/[canvasId]',
+    '/api/v1/motion/agent',
+    '/p/[projectId]/settings/project',
+    null
+  ])('lascia passare %s', (routeId) => {
+    expect(routeRefused(SocialPublishing.Off, routeId)).toBe(false);
   });
 
   it('nasconde dalla lista solo le voci di pubblicazione', () => {

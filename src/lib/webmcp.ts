@@ -30,7 +30,6 @@
  */
 
 import { BRAND_ENDPOINTS, RESOURCE_SEGMENT, pathFor, type BrandEndpoint } from '@feega/api-contracts';
-import { SOCIAL_PUBLISHING_SURFACE, visibleUnder, type SocialPublishing } from '$lib/social-publishing';
 import { z } from 'zod';
 
 /** La forma che la specifica chiama `ModelContextTool`. */
@@ -127,8 +126,8 @@ export async function callApi(
  * server MCP — su HTTP l'autenticazione la fa l'host col giro OAuth, su stdio la sessione e' quella
  * della CLI. Le due superfici dicono la stessa cosa, adesso per lo stesso motivo.
  */
-export function brandWebMcpTools(slug: string, token: string, publishing: SocialPublishing): WebMcpTool[] {
-  return visibleUnder(publishing, SOCIAL_PUBLISHING_SURFACE.webTools, BRAND_ENDPOINTS, (endpoint) => endpoint.tool).map((endpoint) => ({
+export function brandWebMcpTools(slug: string, token: string): WebMcpTool[] {
+  return BRAND_ENDPOINTS.map((endpoint) => ({
     name: endpoint.tool,
     title: endpoint.title,
     description: endpoint.description,
@@ -143,10 +142,10 @@ export function brandWebMcpTools(slug: string, token: string, publishing: Social
  * Registra gli strumenti del brand aperto. Il segnale li toglie tutti insieme: cambiando brand si
  * abortisce il precedente, o un agente vedrebbe gli strumenti di due brand con lo stesso nome.
  */
-export async function registerBrandWebMcp(slug: string, token: string, publishing: SocialPublishing, signal: AbortSignal): Promise<number> {
+export async function registerBrandWebMcp(slug: string, token: string, signal: AbortSignal): Promise<number> {
   const context = modelContext();
   if (!context) return 0;
-  const tools = brandWebMcpTools(slug, token, publishing);
+  const tools = brandWebMcpTools(slug, token);
   await Promise.all(tools.map((tool) => context.registerTool(tool, { signal })));
   return tools.length;
 }

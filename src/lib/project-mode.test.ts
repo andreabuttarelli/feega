@@ -16,7 +16,7 @@ describe('project mode', () => {
     expect(modeOf('uncensored')).toBe(ProjectMode.Uncensored);
   });
 
-  it.each([Capability.Share, Capability.Publish, Capability.Schedule, Capability.Promote, Capability.CatalogueWrite])(
+  it.each([Capability.Share, Capability.Publish, Capability.Promote, Capability.CatalogueWrite])(
     'an uncensored project refuses %s, a standard one allows it',
     (capability) => {
       expect(modeAllows(ProjectMode.Uncensored, capability)).toBe(false);

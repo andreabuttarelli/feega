@@ -13,7 +13,7 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
   });
 
   it('il gruppo "workbench" è Calendar, Ads, Studio, Settings, in quest\'ordine', () => {
-    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['calendar', 'ads', 'studio', 'settings']);
+    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['ads', 'studio', 'settings']);
   });
 
   it('ogni voce del gruppo panel apre un pannello, ogni voce workbench un foglio o una pagina sua', () => {
@@ -39,7 +39,6 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
 
 describe('sheetEntryForPath: quale voce apre il foglio', () => {
   it('un path esatto apre il suo foglio', () => {
-    expect(sheetEntryForPath('/calendar')?.id).toBe('calendar');
     expect(sheetEntryForPath('/ads')?.id).toBe('ads');
     expect(sheetEntryForPath('/settings/connected-accounts')?.id).toBe('settings');
   });
@@ -55,7 +54,7 @@ describe('sheetEntryForPath: quale voce apre il foglio', () => {
   });
 
   it('uno slash finale non cambia il verdetto', () => {
-    expect(sheetEntryForPath('/calendar/')?.id).toBe('calendar');
+    expect(sheetEntryForPath('/ads/')?.id).toBe('ads');
   });
 });
 
@@ -72,7 +71,7 @@ describe('un foglio si riconosce anche con parametri nell\'indirizzo', () => {
   });
 
   it('un frammento non cambia il foglio', () => {
-    expect(sheetEntryForPath('/calendar#oggi')?.id).toBe('calendar');
+    expect(sheetEntryForPath('/ads#oggi')?.id).toBe('ads');
   });
 });
 
@@ -90,9 +89,8 @@ describe('il burger su mobile', () => {
 
 describe('un link diretto a un foglio su desktop apre la tela con il foglio', () => {
   const cases: Array<[string, string, 'mobile' | 'desktop', 'sheet' | 'page']> = [
-    ['/calendar', '', 'desktop', 'sheet'],
-    ['/calendar', '?month=2026-10', 'desktop', 'sheet'],
     ['/ads', '', 'desktop', 'sheet'],
+    ['/ads', '?month=2026-10', 'desktop', 'sheet'],
     ['/promote', '', 'desktop', 'sheet'],
     ['/settings/billing', '', 'desktop', 'sheet'],
     ['/settings/connected-accounts', '', 'desktop', 'sheet'],
@@ -100,7 +98,7 @@ describe('un link diretto a un foglio su desktop apre la tela con il foglio', ()
     ['/settings/facebook', '?tempToken=x', 'desktop', 'page'],
     ['/settings/linkedin', '', 'desktop', 'page'],
     ['/settings/connect/instagram', '', 'desktop', 'page'],
-    ['/calendar', '', 'mobile', 'page'],
+    ['/ads', '', 'mobile', 'page'],
     ['/settings/billing', '', 'mobile', 'page'],
     ['/assets', '', 'desktop', 'page'],
     ['/brands/new', '', 'desktop', 'page'],
@@ -114,9 +112,9 @@ describe('un link diretto a un foglio su desktop apre la tela con il foglio', ()
 });
 
 describe('la rail senza pubblicazione social', () => {
-  const SOCIAL = ['calendar', 'ads'];
+  const SOCIAL = ['ads'];
 
-  it('a flag spento nasconde calendario e ads', () => {
+  it('a flag spento nasconde ads', () => {
     const ids = visibleNav(SocialPublishing.Off, BURGER_ENTRIES).map((e) => e.id);
     expect(ids.filter((id) => SOCIAL.includes(id))).toEqual([]);
     expect(ids).toContain('assets');

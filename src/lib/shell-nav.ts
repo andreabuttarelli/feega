@@ -6,7 +6,7 @@ export type NavFamily = 'panel' | 'sheet' | 'route';
 export type NavEntry = {
   id: string;
   labelKey: string;
-  icon: 'images' | 'building' | 'user-round' | 'calendar-days' | 'megaphone' | 'settings' | 'camera' | 'layers';
+  icon: 'images' | 'building' | 'user-round' | 'megaphone' | 'settings' | 'camera' | 'layers';
   family: NavFamily;
   path: string;
   mobilePath?: string;
@@ -23,7 +23,6 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'assets', labelKey: 'app.nav2.materials', icon: 'images', family: 'panel', path: '/assets', group: 'panel' },
   { id: 'brands', labelKey: 'app.nav2.brands', icon: 'building', family: 'panel', path: '/brands', group: 'panel' },
   { id: 'influencers', labelKey: 'app.nav2.influencers', icon: 'user-round', family: 'panel', path: '/influencers', group: 'panel' },
-  { id: 'calendar', labelKey: 'app.hub.publish.calendar', icon: 'calendar-days', family: 'sheet', path: '/calendar', group: 'workbench' },
   { id: 'ads', labelKey: 'app.hub.ads.social', icon: 'megaphone', family: 'sheet', path: '/ads', group: 'workbench' },
   { id: 'studio', labelKey: 'app.nav2.studio', icon: 'camera', family: 'route', path: '/app/studio', group: 'workbench' },
   { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/project', mobilePath: '/settings', group: 'workbench' },

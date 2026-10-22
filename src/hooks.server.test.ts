@@ -295,19 +295,13 @@ describe('la pubblicazione social dietro il flag', () => {
 			resolve: async () => new Response('ok')
 		} as any);
 
-	it('con il flag spento il cron degli account non gira', async () => {
+	it('con il flag spento la pagina degli annunci non si apre', async () => {
 		publishingFlag = 'off';
-		await expect(hit('/api/v1/health/accounts/tick', '/api/v1/health/accounts/tick')).rejects.toMatchObject({ status: 404 });
-	});
-
-	it('con il flag spento lo studio rifiuta il calendario', async () => {
-		publishingFlag = 'off';
-		await expect(hit('/app/studio/[batchId]', '/app/studio/b1?/calendar')).rejects.toMatchObject({ status: 404 });
+		await expect(hit('/p/[projectId]/ads', '/p/p1/ads')).rejects.toMatchObject({ status: 404 });
 	});
 
 	it('con il flag acceso tutto passa come prima', async () => {
 		publishingFlag = 'on';
-		expect((await hit('/api/v1/health/accounts/tick', '/api/v1/health/accounts/tick')).status).toBe(200);
-		expect((await hit('/app/studio/[batchId]', '/app/studio/b1?/calendar')).status).toBe(200);
+		expect((await hit('/p/[projectId]/ads', '/p/p1/ads')).status).toBe(200);
 	});
 });
