@@ -63,6 +63,7 @@
   import { postPageAction } from '$lib/api/page-action';
   import { Grip, type Gap, type Guide, type Pt } from '$lib/motion/scene-select';
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
+  import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
@@ -2618,12 +2619,36 @@
     props.onPaste?.(at);
   }
 
-  function insertImageInFrame(file: File) {
-    const frame = coreFrames.find((f) => f.id === soleFrame);
-    if (!frame) {
+  async function insertImageInFrame(file: File) {
+    const nodeId = soleFrame;
+    const session = nodeId ? saverOf(nodeId) : null;
+    const extras = nodeId ? extrasOf(nodeId) : null;
+    if (!nodeId || !session || !extras || !frameChrome(kindOfNode(nodeId)).takesDrops) {
       return;
     }
-    props.onPasteData?.({ kind: Pasted.Image, file }, { x: frame.box.x + frame.box.w / HALF, y: frame.box.y + frame.box.h / HALF });
+    const size = await sizeOfImage(file);
+    const pendingId = `${PENDING_ASSET}${crypto.randomUUID()}`;
+    const pending = imageInFrame(session.history.present, { assetId: pendingId, name: file.name, ...size });
+    if (!pending.ok) {
+      return;
+    }
+    const local = URL.createObjectURL(file);
+    const uploading = extras.uploadMedia(file, () => undefined);
+    session.holdSave(uploading);
+    commit(nodeId, pending, 'Inserted image');
+    const shown = (assetId: string) => liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), assets: { ...liveOf(nodeId)?.assets, [assetId]: local } });
+    shown(pendingId);
+
+    const uploaded = await uploading;
+    if (!uploaded.ok) {
+      session.undo();
+      liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), doc: session.history.present });
+      props.onfail?.(uploaded.error);
+      return;
+    }
+    session.settleHeld(withAssetSwapped(session.history.present, pendingId, uploaded.asset.id));
+    liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), doc: session.history.present });
+    shown(uploaded.asset.id);
   }
 
   async function onPasteEvent(e: ClipboardEvent) {

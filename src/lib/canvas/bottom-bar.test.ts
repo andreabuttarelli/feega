@@ -12,7 +12,7 @@ describe('one bottom bar, its tools by selection', () => {
     expect(barSlots(BarContext.Canvas, BarMode.Generate)).toEqual([BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates]);
   });
 
-  it('a selected frame adds Insert image and Frame templates and keeps every Generate tool', () => {
+  it('a selected frame adds Insert image and Templates for this frame and keeps every Generate tool', () => {
     for (const mode of Object.values(BarMode)) {
       const base = barSlots(BarContext.Canvas, mode);
       expect(barSlots(BarContext.Frame, mode)).toEqual([...base, BarSlot.Image, BarSlot.FrameLibrary]);
