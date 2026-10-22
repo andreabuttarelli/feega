@@ -47,19 +47,6 @@ beforeEach(() => {
 });
 
 describe('settings +layout.server load', () => {
-	it('selects social_accounts.handle, not the non-existent username', async () => {
-		const supabase = fakeSupabase({ social_accounts: [], api_keys: [], orgs_invites: [] });
-
-		await (load as (e: unknown) => Promise<Record<string, unknown>>)({
-			parent: async () => ({ org: ORG, brand: { id: 'brand-1', slug: 'demo', org_id: 'org-1' } }),
-			url: new URL('https://feega.test/p/x/settings/team'),
-			locals: { supabase }
-		});
-
-		const select = (supabase as unknown as { __ops: unknown[] }).__ops;
-		expect(select.some((o: any) => o.table === 'social_accounts')).toBe(true);
-	});
-
 	it('reads org-level orgs_invites for the brand org, not a non-existent brand_invites', async () => {
 		const supabase = fakeSupabase({
 			social_accounts: [],
@@ -102,7 +89,7 @@ describe('settings +layout.server load', () => {
 		return { data, ops: (supabase as unknown as { __ops: any[] }).__ops };
 	}
 
-	it.each(['video', 'connected-accounts', 'danger', 'products'])(
+	it.each(['video', 'danger', 'products'])(
 		'senza brand, la sezione di brand %s chiude il cancello',
 		async (section) => {
 			const { data } = await loadWithoutBrand(section, { brands: [{ id: 'b-1', name: 'Acme', slug: 'acme' }] });

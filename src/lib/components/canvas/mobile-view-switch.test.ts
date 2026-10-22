@@ -19,10 +19,3 @@ describe('lo switch tela/chat sta in fondo, non nella top bar', () => {
     expect(viewSwitch).toBeGreaterThan(chat);
   });
 });
-
-describe('promuovere dalla top bar mobile', () => {
-  it('naviga alla pagina: su mobile nessuno monta il foglio', () => {
-    expect(topBar).not.toMatch(/openSheet/);
-    expect(topBar).toMatch(/<a[^>]*data-testid="mobile-promote"|<a[\s\S]*?href=\{`\/p\/\$\{projectId\}\$\{promotePath/);
-  });
-});

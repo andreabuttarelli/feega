@@ -10,9 +10,7 @@ export const ENTRY_PREFETCH: Record<string, () => Promise<{ default: unknown }>>
   assets: CHROME_LOADERS.leftPanel,
   brands: CHROME_LOADERS.leftPanel,
   influencers: CHROME_LOADERS.leftPanel,
-  ads: SHEET_PAGE_LOADERS.ads,
-  settings: SHEET_PAGE_LOADERS.settingsLayout,
-  promote: SHEET_PAGE_LOADERS.promote
+  settings: SHEET_PAGE_LOADERS.settingsLayout
 };
 
 export function prefetchEntry(entryId: string): void {

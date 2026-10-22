@@ -11,12 +11,7 @@
   import ConnectionDot from './ConnectionDot.svelte';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { ShareState } from '$lib/canvas/shared-view';
-  import { openSheet } from '$lib/canvas/sheet-nav';
   import { BILLING_PATH } from '$lib/billing-path';
-  import Megaphone from '@lucide/svelte/icons/megaphone';
-  import { page } from '$app/state';
-  import { SOCIAL_PUBLISHING_SURFACE, shownUnder } from '$lib/social-publishing';
-  import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
   import { CanvasAction, submitCanvasAction, renameProjectAction } from '$lib/canvas/canvas-list';
   import Plus from '@lucide/svelte/icons/plus';
@@ -342,18 +337,6 @@
       <CreditAmount amount={creditBalance} />
     </a>
 
-    {#if modeAllows(mode, Capability.Promote) && shownUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.topBarActions, 'promote')}
-      <button
-        type="button"
-        class="promote-btn"
-        data-testid="topbar-promote"
-        onclick={() => openSheet(projectId, promotePath($canvasSelection))}
-      >
-        <Megaphone size={14} />
-        Promote
-      </button>
-    {/if}
-
     {#if modeAllows(mode, Capability.Share)}
       <CanvasShare {shareToken} {onShare} />
     {/if}
@@ -534,23 +517,6 @@
     color: var(--ui-accent-text);
   }
 
-
-  .promote-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 10px;
-    flex-shrink: 0;
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-input);
-    color: var(--ui-text);
-    font: inherit;
-    font-size: var(--ui-type-label);
-    font-weight: var(--ui-weight-semibold);
-    cursor: pointer;
-  }
 
   .credits {
     display: inline-flex;

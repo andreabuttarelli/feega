@@ -125,7 +125,7 @@
   const viewport = $derived<Viewport>(isMobile ? 'mobile' : 'desktop');
   const innerPath = $derived(page.url.pathname.slice(`/p/${projectId}`.length));
   const sheetPending = $derived(
-    !onCanvasRoute && !page.state.sheet && directLoadMode(innerPath, page.url.search, viewport) === 'sheet'
+    !onCanvasRoute && !page.state.sheet && directLoadMode(innerPath, viewport) === 'sheet'
   );
 
   $effect(() => {

@@ -73,12 +73,6 @@ vi.mock('$lib/server/supabase-admin', () => ({
 	})
 }));
 
-let publishingFlag = 'off';
-
-vi.mock('$lib/server/social-publishing', () => ({
-	socialPublishing: async () => publishingFlag
-}));
-
 const { handle } = await import('./hooks.server');
 const { logAiCall } = await import('$lib/server/ai-log');
 
@@ -278,30 +272,5 @@ describe('the landing campaign survives the trip to signup', () => {
 		const { jar } = await landFrom('?utm_campaign=claymation-ai');
 		expect(vi.mocked(homePathFor).mock.lastCall?.[5]).toBe('claymation-ai');
 		expect(jar.feega_campaign).toBeUndefined();
-	});
-});
-
-describe('la pubblicazione social dietro il flag', () => {
-	const hit = (routeId: string, path: string) =>
-		handle({
-			event: {
-				request: new Request(`http://localhost${path}`, { method: 'POST' }),
-				url: new URL(`http://localhost${path}`),
-				route: { id: routeId },
-				params: {},
-				cookies: { getAll: () => [], get: () => undefined, set: vi.fn() },
-				locals: {}
-			},
-			resolve: async () => new Response('ok')
-		} as any);
-
-	it('con il flag spento la pagina degli annunci non si apre', async () => {
-		publishingFlag = 'off';
-		await expect(hit('/p/[projectId]/ads', '/p/p1/ads')).rejects.toMatchObject({ status: 404 });
-	});
-
-	it('con il flag acceso tutto passa come prima', async () => {
-		publishingFlag = 'on';
-		expect((await hit('/p/[projectId]/ads', '/p/p1/ads')).status).toBe(200);
 	});
 });

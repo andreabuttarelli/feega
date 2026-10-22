@@ -14,13 +14,11 @@ feega login
 
 # Quick commands
 feega brands                                    # List brands
-feega dashboard <slug>                          # Brand overview
-feega content <slug> --status pending_user      # Pending posts
-feega approve <slug> --all                      # Approve all pending
-feega post <slug> <id> edit --caption "..."     # Edit post
-feega calendar <slug>                           # Monthly scheduled posts
+feega projects                                  # List projects
+feega canvases <projectId>                      # List a project's canvases
+feega motion list                               # List motion frames
+feega motion ask <nodeId> "<prompt>"            # Ask the motion agent to change a frame
 feega products <slug> sync                      # Re-import catalog from the connected store
-feega ads <slug>                                 # List ad campaigns (--approve/--pause/--resume <id>)
 feega upgrade <slug>                            # Open billing checkout
 ```
 

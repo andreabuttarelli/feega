@@ -50,14 +50,6 @@ export const canvasViewportSchema = z.object({
   zoom: z.number()
 });
 
-/**
- * `ad_campaigns.targeting`: la STESSA `AdTargeting` di `src/lib/server/zernio-ads.ts`, il client
- * del provider — non una forma inventata per lo schema nuovo. Ridichiarata qui invece di
- * importata: `zernio-ads.ts` legge `$env/dynamic/private` al caricamento del modulo, e questo
- * file deve restare importabile da `write-tool.ts` senza trascinarsi dietro il client di un
- * provider che non chiama. Se `AdTargeting` cambia là, questa riga diverge finché qualcuno non se
- * ne accorge — lo stesso rischio che `checks.ts` accetta consapevolmente per gli stessi motivi.
- */
 export const adTargetingSchema = z.object({
   age_min: z.number().optional(),
   age_max: z.number().optional(),

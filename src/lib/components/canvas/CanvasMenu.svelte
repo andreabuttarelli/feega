@@ -14,7 +14,7 @@
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { CANVAS_SHORTCUTS } from '$lib/canvas/shortcuts';
   import { openSheet } from '$lib/canvas/sheet-nav';
-  import { BURGER_ENTRIES, mobileNavHref, visibleNav } from '$lib/shell-nav';
+  import { BURGER_ENTRIES, mobileNavHref } from '$lib/shell-nav';
   import { page } from '$app/state';
   import { NAV_ICONS } from './nav-icons';
   import Scale from '@lucide/svelte/icons/scale';
@@ -169,7 +169,7 @@
 
       <DropdownMenu.Group>
         <DropdownMenu.GroupHeading class="menu-heading">{$_('app.shell.menu.pages')}</DropdownMenu.GroupHeading>
-        {#each visibleNav(page.data.socialPublishing, BURGER_ENTRIES) as entry (entry.id)}
+        {#each BURGER_ENTRIES as entry (entry.id)}
           {@const Icon = NAV_ICONS[entry.icon]}
           <DropdownMenu.Item class="menu-row">
             {#snippet child({ props })}

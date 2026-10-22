@@ -33,7 +33,6 @@ vi.mock('$lib/server/dashboard/dashboard', () => ({ DASHBOARD_DEPS: {}, dashboar
 vi.mock('$lib/server/db/client', () => ({ createUserDb: () => db }));
 vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 vi.mock('$lib/server/seline', () => ({ selineSetUser: vi.fn() }));
-vi.mock('$lib/server/social-publishing', () => ({ socialPublishing: async () => 'off' }));
 
 const { GET } = await import('./+server');
 const { appShell } = await import('$lib/server/dashboard/app-shell');
