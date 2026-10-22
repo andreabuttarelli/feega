@@ -1,18 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { FrameProperties, typingInBar } from './frame-properties.svelte';
+import { DocMode } from '$lib/motion/doc';
 
 describe('frame properties handed to the right bar', () => {
   it('holds the session of the frame being edited until it is cleared', () => {
     const props = new FrameProperties();
     const session = { name: 'session' } as never;
 
-    props.publish(session, { name: 'tokens' } as never, null);
+    props.publish('n1', session, { name: 'tokens' } as never, null);
     expect(props.session).toBe(session);
 
     props.clear();
     expect(props.session).toBeNull();
     expect(props.tokens).toBeNull();
     expect(props.extras).toBeNull();
+  });
+
+  it('tells the chat agent which frame is open, so it can ask this tab to draw it', () => {
+    const props = new FrameProperties();
+    const session = { selection: ['c1'], history: { present: { still: null } } } as never;
+
+    expect(props.openFrame()).toBeNull();
+
+    props.publish('n1', session, {} as never, null);
+    expect(props.openFrame()).toEqual({ nodeId: 'n1', selection: ['c1'], playhead: 0, mode: DocMode.Video });
+
+    props.clear();
+    expect(props.openFrame()).toBeNull();
   });
 });
 

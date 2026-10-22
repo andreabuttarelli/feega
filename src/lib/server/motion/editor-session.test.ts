@@ -34,12 +34,11 @@ const locals = {
 } as unknown as App.Locals;
 
 const params = { projectId: 'p1', canvasId: 'c1', nodeId: 'n1' };
-const url = new URL('http://x/p/p1/c/c1/motion/n1/session');
 
 describe('loadEditorSession', () => {
   it('apre la sessione in tre giri: tela e appartenenze insieme, poi nodo e dati insieme', async () => {
     const started = performance.now();
-    const data = await loadEditorSession(locals, params, url);
+    const data = await loadEditorSession(locals, params);
     const elapsed = performance.now() - started;
 
     expect(data.head.version).toBe(3);
@@ -48,7 +47,7 @@ describe('loadEditorSession', () => {
 
   it('dice per fase dove è andato il tempo', async () => {
     const phases = serverTiming();
-    await loadEditorSession(locals, params, url, phases);
+    await loadEditorSession(locals, params, phases);
 
     expect(phases.header()).toMatch(/scope;dur=\d+/);
     expect(phases.header()).toMatch(/head;dur=\d+/);

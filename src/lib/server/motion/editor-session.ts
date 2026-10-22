@@ -12,7 +12,6 @@ import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { templateLibrary } from './templates';
 import type { Db } from '$lib/server/db/client';
 import { loadAttachments } from '$lib/server/chat-attachments/register';
-import { briefAttachmentIds } from '$lib/motion/video-brief';
 import { storyboardPath } from '$lib/canvas/motion-node';
 import { editorGallery } from '$lib/server/gallery/editor';
 
@@ -25,9 +24,9 @@ const HEADS = headCache();
 
 export const libraryOf = (scope: { db: Db; orgId: string; userId: string }) => templateLibrary(scope.db, { orgId: scope.orgId, actor: { kind: 'user', id: scope.userId } });
 
-export async function loadEditorSession(locals: App.Locals, params: EditorParams, url: URL, phases: Phases = serverTiming()) {
+export async function loadEditorSession(locals: App.Locals, params: EditorParams, phases: Phases = serverTiming()) {
   const canvas = await phases.time('scope', canvasScope(locals, params));
-  return editorSession(canvas, { projectId: params.projectId, nodeId: params.nodeId, briefIds: briefAttachmentIds(url) }, phases);
+  return editorSession(canvas, { projectId: params.projectId, nodeId: params.nodeId, briefIds: [] }, phases);
 }
 
 export async function editorSession(canvas: CanvasScope, params: SessionAsk, phases: Phases = serverTiming()) {

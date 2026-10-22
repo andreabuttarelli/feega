@@ -35,6 +35,7 @@
   import type { TextCaret } from '$lib/motion/gpu-full/display-list';
   import type { TextRun } from '$lib/motion/text-runs';
   import { frameProperties } from '../frame-properties.svelte';
+  import { trailerFrom } from '$lib/motion/trailer';
   import FrameDialogs from '../FrameDialogs.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
   import RemixBanner from '$lib/components/gallery/RemixBanner.svelte';
@@ -1506,10 +1507,10 @@
   });
 
   $effect(() => {
-    if (!panelSession || !panelTokens) {
+    if (!panelNodeId || !panelSession || !panelTokens) {
       return;
     }
-    frameProperties.publish(panelSession, panelTokens, panelExtras);
+    frameProperties.publish(panelNodeId, panelSession, panelTokens, panelExtras);
     frameProperties.part = pickedPart;
     return () => frameProperties.clear();
   });
@@ -1538,6 +1539,12 @@
     session?.apply(result, summary);
     if (session && result.ok) {
       liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
+    }
+  }
+
+  function startTrailer() {
+    if (panelNodeId) {
+      commit(panelNodeId, { ok: true, doc: trailerFrom(panelExtras?.assets ?? []) }, 'Started from the feega trailer');
     }
   }
 
@@ -3018,6 +3025,7 @@
       onupload={props.onUpload}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
+      ontrailer={panelNodeId ? startTrailer : undefined}
       context={props.barContext}
       zoom={view.zoom}
     />

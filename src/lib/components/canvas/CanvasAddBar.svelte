@@ -6,6 +6,7 @@
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
+  import Film from '@lucide/svelte/icons/film';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
   import Hash from '@lucide/svelte/icons/hash';
   import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barHidden, barKeys, barShift, barShown, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
@@ -31,9 +32,10 @@
     onupload,
     ontemplate,
     onframes,
+    ontrailer,
     context = BarContext.Canvas,
     zoom
-  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; context?: BarContext; zoom?: number } = $props();
+  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; ontrailer?: () => void; context?: BarContext; zoom?: number } = $props();
 
   const PERCENT = 100;
   const SWITCH_PX = 64;
@@ -154,6 +156,8 @@
   const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], icon: ADDABLE_ICON[what], run: () => onpick?.(what) });
   const drawTiles = $derived(DRAW_TOOLS.filter((t) => t.tool !== DrawTool.Select).map((t) => ({ id: `draw-${t.tool}`, label: t.name, icon: t.icon, run: () => (frameBar.tool = t.tool) })));
   const UPLOAD_TILE: Tile = { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile };
+  const TRAILER_LABEL = 'Start from the feega trailer';
+  const trailerTiles = $derived<Tile[]>(ontrailer ? [{ id: 'feega-trailer', label: TRAILER_LABEL, icon: Film, run: ontrailer }] : []);
 
   const INSERT_SECTIONS: Record<BarContext, () => Section[]> = {
     [BarContext.Canvas]: () => [
@@ -164,14 +168,15 @@
         title: 'Templates',
         tiles: [
           ...(ontemplate ? [{ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }] : []),
-          ...(onframes ? [{ id: 'frame-templates', label: 'Frame templates', icon: Clapperboard, run: onframes }] : [])
+          ...(onframes ? [{ id: 'frame-templates', label: 'Frame templates', icon: Clapperboard, run: onframes }] : []),
+          ...trailerTiles
         ]
       }
     ],
     [BarContext.Frame]: () => [
       { title: 'Design', tiles: drawTiles },
       { title: 'Media', tiles: [{ id: 'image', label: 'Insert image', icon: ImagePlus, run: () => frameBar.host?.act(FrameAction.Image) }] },
-      { title: 'Templates', tiles: [{ id: 'frame-library', label: 'Frame templates', icon: LayoutTemplate, run: () => frameBar.host?.act(FrameAction.Library) }] }
+      { title: 'Templates', tiles: [{ id: 'frame-library', label: 'Frame templates', icon: LayoutTemplate, run: () => frameBar.host?.act(FrameAction.Library) }, ...trailerTiles] }
     ]
   };
   const insertSections = $derived(INSERT_SECTIONS[context]().filter((section) => section.tiles.length));
@@ -291,6 +296,18 @@
       <span class="add-tip" role="tooltip">Frame templates</span>
     </span>
   {/if}
+  {@render trailerSlot()}
+{/snippet}
+
+{#snippet trailerSlot()}
+  {#if ontrailer}
+    <span class="tool">
+      <button type="button" class="keys-toggle" title={TRAILER_LABEL} aria-label={TRAILER_LABEL} data-testid="feega-trailer" onclick={ontrailer}>
+        <Film size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">{TRAILER_LABEL}</span>
+    </span>
+  {/if}
 {/snippet}
 
 {#snippet drawSlot()}
@@ -322,6 +339,7 @@
     </button>
     <span class="add-tip" role="tooltip">Frame templates</span>
   </span>
+  {@render trailerSlot()}
 {/snippet}
 
 <div bind:this={barEl} class="add-bar" class:phone class:covered={barHidden(context, frameBar.covered)} class:stowed={!barShown(context, frameBar.editMode)} aria-hidden={!barShown(context, frameBar.editMode)} inert={!barShown(context, frameBar.editMode)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${timelinePx}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>

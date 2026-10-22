@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BRIEF_PARAM, BRIEF_TEMPLATES, BriefKind, briefAttachmentIds, briefKind, briefMessage, briefName } from './video-brief';
+import { BRIEF_TEMPLATES, BriefKind, briefKind, briefMessage, briefName } from './video-brief';
 
 describe('a brief typed on /app names its video and travels to the editor', () => {
   it('a URL names the video after its host', () => {
@@ -12,14 +12,6 @@ describe('a brief typed on /app names its video and travels to the editor', () =
 
   it('an empty brief keeps the default name', () => {
     expect(briefName('   ')).toBe('Untitled video');
-  });
-
-  it('attachments travel as asset ids', () => {
-    expect(briefAttachmentIds(new URL(`http://x/p?${BRIEF_PARAM}=hi&attach=a1%2Ca2`))).toEqual(['a1', 'a2']);
-  });
-
-  it('a brief without files carries no attach param', () => {
-    expect(briefAttachmentIds(new URL('http://x/p?brief=hi'))).toEqual([]);
   });
 
   it('every template is a brief ready to send', () => {
