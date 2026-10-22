@@ -96,7 +96,7 @@
   </div>
   {#if rightBar.propertiesPane}
     <div class="properties" use:portalInto={rightBar.propertiesPane}>
-      <FrameInspectorPanel session={frameProperties.session} tokens={frameProperties.tokens} assets={frameProperties.extras?.assets ?? []} fonts={frameProperties.extras} upload={frameProperties.extras?.uploadMedia ?? null} analyses={frameProperties.extras?.analyses} />
+      <FrameInspectorPanel session={frameProperties.session} tokens={frameProperties.tokens} assets={frameProperties.extras?.assets ?? []} fonts={frameProperties.extras} upload={frameProperties.extras?.uploadMedia ?? null} analyses={frameProperties.extras?.analyses} part={frameProperties.part} />
     </div>
   {/if}
 {/if}

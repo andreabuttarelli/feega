@@ -21,6 +21,7 @@
   import type { Addable } from '$lib/canvas/addable';
   import { Stack } from '$lib/canvas/stacking';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
+  import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { enterFrame } from '$lib/canvas/enter-frame';
   import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
@@ -164,7 +165,8 @@
     group: () => ongroup?.(selected().map((n) => n.id)),
     ungroup: () => onungroup?.(selected().map((n) => n.id)),
     'bring-front': () => onrestack?.(selected().map((n) => n.id), Stack.Front),
-    'send-back': () => onrestack?.(selected().map((n) => n.id), Stack.Back)
+    'send-back': () => onrestack?.(selected().map((n) => n.id), Stack.Back),
+    help: () => (shortcutHelp.open = true)
   };
 
   function onKeydown(e: KeyboardEvent) {

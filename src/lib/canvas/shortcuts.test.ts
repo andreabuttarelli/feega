@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CANVAS_SHORTCUTS,
+  canvasGuide,
   NUDGE_STEP,
   preventable,
   NUDGE_STEP_BIG,
@@ -174,8 +175,26 @@ describe('quello che i tasti fanno sulla tela', () => {
  * sequenza per tutto il prodotto, `?` apre la scheda di aiuto, ⌘K la palette. Una lettera nuda qui
  * diventerebbe la SECONDA lettera di una sequenza già armata, e il gesto andrebbe a due padroni.
  */
+describe('the help card', () => {
+  it('? opens the shortcut help', () => {
+    expect(matchCanvasShortcut(ev('?', { shiftKey: true }))).toEqual({ id: 'help' });
+  });
+
+  it('? while typing stays a character', () => {
+    expect(matchCanvasShortcut(ev('?', { shiftKey: true, target: { tagName: 'TEXTAREA', isContentEditable: false } }))).toBeNull();
+  });
+
+  it('the card lists every canvas shortcut, ? included', () => {
+    const rows = canvasGuide('⌘').flatMap((s) => s.rows);
+
+    expect(rows).toHaveLength(CANVAS_SHORTCUTS.length);
+    expect(rows.some((r) => r.keys === '?')).toBe(true);
+    expect(rows.find((r) => r.name === 'Undo')?.keys).toBe('⌘ Z');
+  });
+});
+
 describe('non pesta i piedi al registro globale', () => {
-  for (const key of ['g', '?', 'k', 'c', 'l', 's', 'r', 'd', 't', 'h', 'b', 'm', 'w', 'p', 'z']) {
+  for (const key of ['g', 'k', 'c', 'l', 's', 'r', 'd', 't', 'h', 'b', 'm', 'w', 'p', 'z']) {
     it(`"${key}" nudo resta del registro globale`, () => {
       expect(matchCanvasShortcut(ev(key))).toBeNull();
     });

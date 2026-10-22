@@ -52,3 +52,16 @@ describe('ownClipToPick', () => {
     expect(ownClipToPick(null, 'e1', undefined)).toBeNull();
   });
 });
+
+describe('videoSide parts', () => {
+  it('picking a poster part keeps the part for the properties panel', () => {
+    const doc = newMotionDoc(MotionFormat.Landscape);
+    let picked: { clip: string; part: string } | null = null;
+    const side = videoSide({ nodeId: 'n1', doc: () => doc, selection: () => ['card'], part: () => 'lines.0', select: () => {}, selectPart: (clip, part) => (picked = { clip, part }), edit: () => {} });
+
+    side.selectPart('card', 'lines.0');
+
+    expect(picked).toEqual({ clip: 'card', part: 'lines.0' });
+    expect(side.part).toBe('card#lines.0');
+  });
+});
