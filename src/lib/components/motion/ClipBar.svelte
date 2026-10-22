@@ -8,7 +8,7 @@
 
   let { doc, selection, pick, extra = [], onrun, ondone }: Props = $props();
 
-  const actions = $derived([...clipActions(doc, selection), ...extra]);
+  const actions = $derived([...new Set([...clipActions(doc, selection), ...extra])]);
 </script>
 
 {#if actions.length}
