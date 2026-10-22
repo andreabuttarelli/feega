@@ -7,6 +7,8 @@ import { CLIP_TEXT, editablePart, PartEdit } from '$lib/motion/poster-parts';
 import { setProps, type OpResult } from '$lib/motion/timeline';
 import { styledComponent } from '$lib/motion/text-run-ops';
 import type { TextRun } from '$lib/motion/text-runs';
+import { mul2d, type Affine } from '$lib/motion/affine';
+import type { TextCaret } from '$lib/motion/gpu-full/display-list';
 
 type Size = { width: number; height: number };
 
@@ -56,4 +58,22 @@ export function textEditStyle(input: { clip: MotionClip; doc: MotionDoc; tokens:
     upper: p.textCase === 'upper',
     align: String(p.align)
   };
+}
+
+export type EditLayout = { transform: string; width: number; height: number; fontPx: number; wraps: boolean; centred: boolean };
+
+export function editLayout(caret: TextCaret, screen: Affine): EditLayout {
+  const m = mul2d(screen, caret.matrix);
+  return { transform: `matrix(${m.join(',')})`, width: caret.width, height: caret.height, fontPx: caret.size, wraps: caret.flow.wraps, centred: caret.centred };
+}
+
+const FLOW_CSS: Record<'wraps' | 'line', (layout: EditLayout) => string> = {
+  wraps: (layout) => `white-space:pre-wrap;width:${layout.width}px;`,
+  line: () => 'white-space:pre;'
+};
+
+export function editCss(look: TextEditStyle, layout: EditLayout): string {
+  const flow = FLOW_CSS[layout.wraps ? 'wraps' : 'line'](layout);
+  const font = `${look.italic ? 'italic ' : ''}${look.weight} ${layout.fontPx}px/${look.leading} ${look.family}`;
+  return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};${look.upper ? 'text-transform:uppercase;' : ''}`;
 }

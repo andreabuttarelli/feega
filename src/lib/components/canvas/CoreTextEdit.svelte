@@ -1,11 +1,9 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import type { TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { editCss, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { codeIndex, codePoints, RunToggle, shiftRuns, styledRange, type RunEdit, type TextRun } from '$lib/motion/text-runs';
 
-  type Rect = { left: number; top: number; width: number; height: number };
-
-  let { rect, look, text, runs: initialRuns = [], styled = false, oncommit }: { rect: Rect; look: TextEditStyle; text: string; runs?: TextRun[]; styled?: boolean; oncommit: (text: string, runs: TextRun[]) => void } = $props();
+  let { layout, look, text, runs: initialRuns = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; runs?: TextRun[]; styled?: boolean; oncommit: (text: string, runs: TextRun[]) => void } = $props();
 
   let field = $state<HTMLTextAreaElement>();
   let value = $state('');
@@ -18,20 +16,35 @@
   let composing = false;
   let ended = false;
 
-  const style = $derived(
-    `left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;font:${look.italic ? 'italic ' : ''}${look.weight} ${look.fontPx}px/${look.leading} ${look.family};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};${look.upper ? 'text-transform:uppercase' : ''}`
-  );
+  const style = $derived(editCss(look, layout));
+  let barAt = $state({ left: 0, top: 0 });
+  let laid: number | null = null;
+
+  const CARET_PX = 2;
+  const BAR_GAP_PX = 32;
 
   function fit() {
     if (!field) {
       return;
     }
-    field.style.paddingTop = '0';
     field.style.height = '0';
+    if (!layout.wraps) {
+      field.style.width = '0';
+      field.style.width = `${field.scrollWidth + CARET_PX}px`;
+    }
     const content = field.scrollHeight;
-    field.style.paddingTop = `${Math.max(0, (rect.height - content) / 2)}px`;
-    field.style.height = `${Math.max(rect.height, content)}px`;
+    laid ??= content;
+    field.style.marginTop = layout.centred ? `${(laid - content) / 2}px` : '0';
+    field.style.height = `${content}px`;
+    const own = field.getBoundingClientRect();
+    const host = field.offsetParent?.getBoundingClientRect() ?? own;
+    barAt = { left: own.left - host.left, top: own.top - host.top - BAR_GAP_PX };
   }
+
+  $effect(() => {
+    void style;
+    fit();
+  });
 
   function end() {
     if (ended) {
@@ -122,7 +135,7 @@
 ></textarea>
 
 {#if styled && picked.start !== picked.end}
-  <div bind:this={bar} class="range" data-testid="text-range-bar" role="toolbar" tabindex="-1" style="left:{rect.left}px;top:{rect.top - 32}px" onmousedown={(e) => e.target instanceof HTMLButtonElement && e.preventDefault()} onpointerdown={(e) => e.stopPropagation()}>
+  <div bind:this={bar} class="range" data-testid="text-range-bar" role="toolbar" tabindex="-1" style="left:{barAt.left}px;top:{barAt.top}px" onmousedown={(e) => e.target instanceof HTMLButtonElement && e.preventDefault()} onpointerdown={(e) => e.stopPropagation()}>
     <button type="button" data-testid="text-range-bold" title="Bold (⌘B)" onclick={() => restyle({ weight: RunToggle.Bold })}><b>B</b></button>
     <button type="button" data-testid="text-range-italic" title="Italic (⌘I)" onclick={() => restyle({ italic: RunToggle.Italic })}><i>I</i></button>
     <input type="color" data-testid="text-range-colour" title="Colour" bind:value={tint} onchange={() => {
@@ -173,6 +186,5 @@
     resize: none;
     overflow: hidden;
     pointer-events: auto;
-    white-space: pre-wrap;
   }
 </style>
