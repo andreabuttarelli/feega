@@ -1,6 +1,6 @@
 import { DrawTool } from '$lib/motion/draw-tool';
 import { TEXT_SIZINGS } from '$lib/motion/text-sizing';
-import { CanvasTheme, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
+import { CANVAS_INK, CanvasTheme, type CanvasBox, type DrawnWire, type PenPaint } from '$lib/motion/draw-create';
 import { mapOutline, parsePath, pathData } from '$lib/motion/shape/geometry';
 
 type Point = { x: number; y: number };
@@ -11,10 +11,22 @@ const TOOL_OF_CLIP: Record<string, DrawTool> = {
   Text: DrawTool.Text,
   'Shape:rect': DrawTool.Rectangle,
   'Shape:ellipse': DrawTool.Ellipse,
+  'Shape:polygon': DrawTool.Polygon,
+  'Shape:star': DrawTool.Star,
   'Shape:path': DrawTool.Pen
 };
 
 const toolOf = (clip: DrawnClip): DrawTool | undefined => TOOL_OF_CLIP[clip.component] ?? TOOL_OF_CLIP[`${clip.component}:${String(clip.props.shape)}`];
+
+const SOLID = 'solid';
+const NO_FILL = 'none';
+
+function strokedPaint(props: Record<string, unknown>, theme: CanvasTheme): PenPaint {
+  if (props.strokeKind !== SOLID) {
+    return {};
+  }
+  return { fill: props.fillKind === NO_FILL ? null : CANVAS_INK[theme], stroke: CANVAS_INK[theme] };
+}
 
 const num = (value: unknown) => (typeof value === 'number' ? value : 0);
 
@@ -39,5 +51,5 @@ export function drawnOnCanvas(clip: DrawnClip, host: CanvasBox, toFlow: ToFlow, 
   if (typeof outline === 'string') {
     return null;
   }
-  return { tool, path: pathData(mapOutline(outline, ([u, v]) => [box.left + u * box.width, box.top + v * box.height])) };
+  return { tool, path: pathData(mapOutline(outline, ([u, v]) => [box.left + u * box.width, box.top + v * box.height])), ...strokedPaint(clip.props, theme) };
 }

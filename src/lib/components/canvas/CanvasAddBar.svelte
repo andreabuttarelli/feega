@@ -119,6 +119,10 @@
     [DrawTool.Text]: Command.ToolText,
     [DrawTool.Rectangle]: Command.ToolRectangle,
     [DrawTool.Ellipse]: Command.ToolEllipse,
+    [DrawTool.Polygon]: Command.ToolPolygon,
+    [DrawTool.Star]: Command.ToolStar,
+    [DrawTool.Line]: Command.ToolLine,
+    [DrawTool.Arrow]: Command.ToolArrow,
     [DrawTool.Pen]: Command.ToolPen
   };
 

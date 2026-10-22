@@ -3,7 +3,7 @@
   import { TextSizing } from '$lib/motion/text-sizing';
   import type { MotionDoc } from '$lib/motion/doc';
   import { DrawTool, clickBox, closesOnFirst, dragRect, type DragPoint, type DrawBox } from '$lib/motion/draw-tool';
-  import { drawClip, penClip } from '$lib/motion/draw-create';
+  import { LINE_PAINT, drawClip, lineOutline, penClip, penPaint, type LineTool } from '$lib/motion/draw-create';
   import { mapOutline, pathData, type Outline, type Pt } from '$lib/motion/shape/geometry';
   import { Handle, Mirror, addPoint, dragHandle, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
   import type { OpResult } from '$lib/motion/timeline';
@@ -24,12 +24,19 @@
 
   const CLOSE_REACH_PX = 8;
   const TEXT_BOX = { width: 0.4, height: 0.12 };
+  const LINE_INK = 'brand.text';
+  const LINE_TOOLS: ReadonlySet<DrawTool> = new Set([DrawTool.Line, DrawTool.Arrow]);
+  const MIN_LINE_PX = 2;
 
   const SUMMARY: Record<DrawTool, string> = {
     [DrawTool.Select]: '',
     [DrawTool.Text]: 'Drew a text',
     [DrawTool.Rectangle]: 'Drew a rectangle',
     [DrawTool.Ellipse]: 'Drew an ellipse',
+    [DrawTool.Polygon]: 'Drew a polygon',
+    [DrawTool.Star]: 'Drew a star',
+    [DrawTool.Line]: 'Drew a line',
+    [DrawTool.Arrow]: 'Drew an arrow',
     [DrawTool.Pen]: 'Drew a path',
     [DrawTool.Frame]: 'Drew a frame'
   };
@@ -40,7 +47,20 @@
   let grab = $state<PointRef | null>(null);
 
   let held = $state.raw<DrawBox | null>(null);
-  const live = $derived(drag ? dragRect(drag.from, drag.to, drag.square) : held);
+  const lining = $derived(LINE_TOOLS.has(tool));
+  const live = $derived(drag && !lining ? dragRect(drag.from, drag.to, drag.square) : held);
+  const liveLine = $derived(drag && lining ? lineOutline(drag.from, snapped(drag.from, drag.to, drag.square), tool as LineTool) : null);
+
+  const SNAP_STEP = Math.PI / 4;
+
+  function snapped(from: DragPoint, to: DragPoint, snap: boolean): DragPoint {
+    if (!snap) {
+      return to;
+    }
+    const length = Math.hypot(to.x - from.x, to.y - from.y);
+    const angle = Math.round(Math.atan2(to.y - from.y, to.x - from.x) / SNAP_STEP) * SNAP_STEP;
+    return { x: from.x + length * Math.cos(angle), y: from.y + length * Math.sin(angle) };
+  }
   const newId = () => crypto.randomUUID().slice(0, 8);
 
   function local(e: PointerEvent): DragPoint {
@@ -93,6 +113,11 @@
     if (!drag) {
       return;
     }
+    if (lining) {
+      drawLine(drag.from, snapped(drag.from, drag.to, drag.square));
+      drag = null;
+      return;
+    }
     const dragged = drag ? live : null;
     const box = dragged ?? (tool === DrawTool.Text ? clickBox(drag.from, { width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height }) : null);
     drag = null;
@@ -102,6 +127,15 @@
     held = box;
     const id = newId();
     create(drawClip(doc, tool, unit(box), frame, id, dragged ? TextSizing.AutoHeight : TextSizing.AutoWidth), id);
+  }
+
+  function drawLine(from: DragPoint, to: DragPoint) {
+    if (Math.hypot(to.x - from.x, to.y - from.y) < MIN_LINE_PX) {
+      return;
+    }
+    const id = newId();
+    const outline = mapOutline(lineOutline(from, to, tool as LineTool), ([x, y]) => [x / doc.width, y / doc.height]);
+    create(penClip(doc, outline, frame, id, penPaint(LINE_PAINT[tool as LineTool](LINE_INK))), id);
   }
 
   function finish(done: Outline) {
@@ -129,6 +163,9 @@
       <ellipse class="ghost" cx={live.x} cy={live.y} rx={live.width / 2} ry={live.height / 2} />
     {:else if live}
       <rect class="ghost" x={live.x - live.width / 2} y={live.y - live.height / 2} width={live.width} height={live.height} />
+    {/if}
+    {#if liveLine}
+      <path class="ghost" d={pathData(liveLine)} />
     {/if}
     {#if outline.length}
       <path class="ghost" d={pathData(outline)} />

@@ -96,6 +96,10 @@ const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolText]: DrawTool.Text,
   [Command.ToolRectangle]: DrawTool.Rectangle,
   [Command.ToolEllipse]: DrawTool.Ellipse,
+  [Command.ToolPolygon]: DrawTool.Polygon,
+  [Command.ToolStar]: DrawTool.Star,
+  [Command.ToolLine]: DrawTool.Line,
+  [Command.ToolArrow]: DrawTool.Arrow,
   [Command.ToolPen]: DrawTool.Pen
 };
 

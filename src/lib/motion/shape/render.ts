@@ -1,4 +1,4 @@
-import { cornerRadii, ellipseOutline, parsePath, pathData, polygonOutline, rectOutline, scaled, starOutline, type Outline, type Size } from './geometry';
+import { FULL_ARC, cornerRadii, ellipseOutline, parsePath, pathData, polygonOutline, rectOutline, scaled, starOutline, type Outline, type Size } from './geometry';
 import { EMPTY_NETWORK, type VectorNetwork } from '../vector/model';
 import { networkFill, networkStroke } from '../vector/outline';
 import { morphOutline } from './morph';
@@ -19,6 +19,9 @@ export type ShapeLook = {
   sides: number;
   points: number;
   innerRadius: number;
+  arcStart?: number;
+  arcSweep?: number;
+  arcRatio?: number;
   morphs: string[];
   morph: number;
   morphStart: number;
@@ -53,7 +56,7 @@ const OUTLINE: Record<ShapeKind, (p: ShapeLook, size: Size) => Outline> = {
   [ShapeKind.Rect]: (p, size) => rectOutline(cornerRadii(p.roundness, p.corners ?? []), size, p.smoothing ?? 0),
   [ShapeKind.Line]: (_p, size) => rectOutline(0, size),
   [ShapeKind.Circle]: (_p, size) => ellipseOutline(size),
-  [ShapeKind.Ellipse]: (_p, size) => ellipseOutline(size),
+  [ShapeKind.Ellipse]: (p, size) => ellipseOutline(size, { start: p.arcStart ?? FULL_ARC.start, sweep: p.arcSweep ?? FULL_ARC.sweep, ratio: p.arcRatio ?? FULL_ARC.ratio }),
   [ShapeKind.Polygon]: (p, size) => polygonOutline(p.sides, p.roundness, size),
   [ShapeKind.Star]: (p, size) => starOutline(p.points, p.innerRadius, p.roundness, size),
   [ShapeKind.Path]: (p, size) => pathOutline(p.path, size),

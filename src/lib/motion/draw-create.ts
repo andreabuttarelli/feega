@@ -1,20 +1,24 @@
 import { COMPONENTS, TYPE_SIZE, type ComponentId } from './components';
 import { TextSizing } from './text-sizing';
 import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { DrawTool, type DrawBox } from './draw-tool';
-import { mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
+import { DrawTool, type DragPoint, type DrawBox } from './draw-tool';
+import { corner, mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
 import { FillKind, ShapeKind, StrokeKind } from './shape/schema';
 import { DocMode, docMode, setStill, settledStill } from './still';
 import { TOP_LEFT_START, addClip, type OpResult } from './timeline';
 
-type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse;
+type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star;
+
+export type LineTool = DrawTool.Line | DrawTool.Arrow;
 
 export const DRAWN_TEXT: ComponentId = 'Text';
 
 const BOX_CLIP: Record<BoxTool, { component: ComponentId; props: Record<string, unknown> }> = {
   [DrawTool.Text]: { component: DRAWN_TEXT, props: { text: 'Text' } },
   [DrawTool.Rectangle]: { component: 'Shape', props: { shape: ShapeKind.Rect } },
-  [DrawTool.Ellipse]: { component: 'Shape', props: { shape: ShapeKind.Ellipse } }
+  [DrawTool.Ellipse]: { component: 'Shape', props: { shape: ShapeKind.Ellipse } },
+  [DrawTool.Polygon]: { component: 'Shape', props: { shape: ShapeKind.Polygon, sides: 3 } },
+  [DrawTool.Star]: { component: 'Shape', props: { shape: ShapeKind.Star, points: 5 } }
 };
 
 const MIN_PEN_POINTS = 2;
@@ -45,7 +49,9 @@ function fittedSize(doc: MotionDoc, box: DrawBox): number {
 const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox, sizing: TextSizing) => Record<string, unknown>> = {
   [DrawTool.Text]: (doc, box, sizing) => ({ size: fittedSize(doc, box), sizing }),
   [DrawTool.Rectangle]: () => ({}),
-  [DrawTool.Ellipse]: () => ({})
+  [DrawTool.Ellipse]: () => ({}),
+  [DrawTool.Polygon]: () => ({}),
+  [DrawTool.Star]: () => ({})
 };
 
 export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = TextSizing.AutoHeight, extra: Record<string, unknown> = {}): OpResult {
@@ -55,6 +61,31 @@ export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: nu
   }
   return place(doc, made.component, { ...made.props, ...extra, ...BOX_SIZED[tool as BoxTool](doc, box, sizing), ...box }, frame, id);
 }
+
+const ARROW_HEAD = { length: 0.2, minLength: 12, maxLength: 80, spread: Math.PI / 7 };
+
+function arrowHead(from: DragPoint, to: DragPoint): Pt[] {
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  const span = Math.hypot(to.x - from.x, to.y - from.y);
+  const length = Math.min(ARROW_HEAD.maxLength, Math.max(ARROW_HEAD.minLength, span * ARROW_HEAD.length));
+  const wing = (side: number): Pt => [to.x - length * Math.cos(angle + side * ARROW_HEAD.spread), to.y - length * Math.sin(angle + side * ARROW_HEAD.spread)];
+  return [wing(1), [to.x, to.y], wing(-1)];
+}
+
+const LINE_ENDS: Record<LineTool, (from: DragPoint, to: DragPoint) => Pt[]> = {
+  [DrawTool.Line]: () => [],
+  [DrawTool.Arrow]: arrowHead
+};
+
+export function lineOutline(from: DragPoint, to: DragPoint, tool: LineTool): Outline {
+  const points: Pt[] = [[from.x, from.y], [to.x, to.y], ...LINE_ENDS[tool](from, to)];
+  return [{ vertices: points.map(corner), closed: false }];
+}
+
+export const LINE_PAINT: Record<LineTool, (ink: string) => PenPaint> = {
+  [DrawTool.Line]: (ink) => ({ fill: null, stroke: ink }),
+  [DrawTool.Arrow]: (ink) => ({ fill: null, stroke: ink })
+};
 
 function boundsOf(outline: Outline): DrawBox {
   const points: Pt[] = outline.flatMap((c) => c.vertices.flatMap((v) => [v.p, v.in, v.out]));
@@ -149,10 +180,18 @@ export function drawnFrame(box: CanvasBox, format: MotionFormat = MotionFormat.C
   return pinned.ok ? pinned.doc : doc;
 }
 
+const MIN_PEN_ELEMENT_SIDE = 24;
+const PEN_STROKE_CANVAS_UNITS = 2;
+const MAX_STROKE_WIDTH = 0.2;
+
 function canvasBoxOf(outline: Outline): CanvasBox {
   const box = boundsOf(outline);
-  return { left: box.x - box.width / 2, top: box.y - box.height / 2, width: Math.max(box.width, MIN_SIDE), height: Math.max(box.height, MIN_SIDE) };
+  const width = Math.max(box.width, MIN_PEN_ELEMENT_SIDE);
+  const height = Math.max(box.height, MIN_PEN_ELEMENT_SIDE);
+  return { left: box.x - width / 2, top: box.y - height / 2, width, height };
 }
+
+const strokeSized = (paint: PenPaint, box: CanvasBox) => (paint.stroke ? { strokeWidth: Math.min(MAX_STROKE_WIDTH, PEN_STROKE_CANVAS_UNITS / Math.min(box.width, box.height)) } : {});
 
 export function drawnElement(drawn: Drawn, id: string): DrawnElement {
   const box = drawn.tool === DrawTool.Pen ? canvasBoxOf(drawn.outline) : drawn.box;
@@ -162,7 +201,7 @@ export function drawnElement(drawn: Drawn, id: string): DrawnElement {
   }
   const made =
     drawn.tool === DrawTool.Pen
-      ? penClip(blank.doc, mapOutline(drawn.outline, ([x, y]) => [(x - box.left) / box.width, (y - box.top) / box.height]), 0, id, penPaint(drawn))
+      ? penClip(blank.doc, mapOutline(drawn.outline, ([x, y]) => [(x - box.left) / box.width, (y - box.top) / box.height]), 0, id, { ...penPaint(drawn), ...strokeSized(drawn, box) })
       : drawClip(blank.doc, drawn.tool, FULL_BOX, 0, id, drawn.sizing, drawn.text ? { text: drawn.text } : {});
   const theme = drawn.tool === DrawTool.Pen ? CanvasTheme.Light : (drawn.theme ?? CanvasTheme.Light);
   return made.ok ? { ok: true, doc: canvasReady(made.doc, theme), box } : made;

@@ -87,6 +87,10 @@ describe('gli strumenti di disegno sulla tela, in ogni set della barra', () => {
     expect(matchCanvasShortcut(ev('P', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Pen });
     expect(matchCanvasShortcut(ev('v'))).toEqual({ id: 'tool', tool: DrawTool.Select });
   });
+
+  it('⇧L disegna una linea, come gli altri strumenti della tela', () => {
+    expect(matchCanvasShortcut(ev('L', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Line });
+  });
 });
 
 describe('raggruppare sulla tela', () => {
