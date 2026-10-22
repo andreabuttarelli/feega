@@ -68,6 +68,7 @@
   import { withPlayhead } from '$lib/canvas/frame-playhead';
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
+  import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
   import SelectionToolbar from '../SelectionToolbar.svelte';

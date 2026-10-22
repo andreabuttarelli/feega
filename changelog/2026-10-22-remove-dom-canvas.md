@@ -21,3 +21,7 @@ instead of falling back.
 
 The share page (`/s/[token]`) moved from `CanvasFlow` to `GpuFlow` in view mode. `Tile` and the
 canvas props now live in `components/canvas/flow-types.ts`.
+
+GpuFlow still renders `svelte-flow__*` class names in its DOM overlay and silently depended on
+`@xyflow/svelte/dist/style.css`, which only `CanvasFlow` imported. The stylesheet is now vendored
+as `gpu/flow-base.css` (MIT) and imported by GpuFlow; without it `canvas-frames.spec.ts` failed.
