@@ -26,7 +26,8 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import { findClip, type MotionClip } from '$lib/motion/doc';
   import CoreTextEdit from '../CoreTextEdit.svelte';
-  import { commitText, editsText, hideText, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { commitText, editsText, hideText, runsOfClip, styledKind, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import type { TextRun } from '$lib/motion/text-runs';
   import { frameProperties } from '../frame-properties.svelte';
   import FrameDialogs from '../FrameDialogs.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
@@ -1608,7 +1609,7 @@
     return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
   }
 
-  type Typing = { nodeId: string; clip: string; text: string; world: { x: number; y: number; w: number; h: number }; look: TextEditStyle };
+  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; styled: boolean; world: { x: number; y: number; w: number; h: number }; look: TextEditStyle };
   let typing = $state<Typing | null>(null);
 
   function startTyping(nodeId: string, clip: string) {
@@ -1622,7 +1623,7 @@
       return;
     }
     const look = textEditStyle({ clip: found as MotionClip, doc: saver.history.present, tokens: at.live.tokens, frame: size, scale: world.w / frameRect.width });
-    typing = { nodeId, clip, world, look, text: String((found.props as { text?: unknown }).text ?? '') };
+    typing = { nodeId, clip, world, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), styled: styledKind(found) };
     liveDocs.set(nodeId, { ...at.live, doc: hideText(saver.history.present, clip) });
   }
 
@@ -1639,16 +1640,16 @@
     untrack(() => startTyping(id, clip.id));
   });
 
-  function stopTyping(text: string) {
+  function stopTyping(text: string, runs: TextRun[]) {
     const open = typing;
     const saver = open ? saverOf(open.nodeId) : null;
     typing = null;
     if (!open || !saver) {
       return;
     }
-    const result = commitText(saver.history.present, open.clip, text);
+    const result = commitText(saver.history.present, open.clip, text, runs);
     liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
-    if (result.ok && text !== open.text) {
+    if (result.ok && (text !== open.text || JSON.stringify(runs) !== JSON.stringify(open.runs))) {
       commit(open.nodeId, result, 'Edited text');
     }
   }
@@ -1662,6 +1663,8 @@
     const z = view.zoom;
     return {
       text: open.text,
+      runs: open.runs,
+      styled: open.styled,
       rect: { left: (open.world.x - box.x) * z, top: (open.world.y - box.y) * z, width: open.world.w * z, height: open.world.h * z },
       look: { ...open.look, fontPx: open.look.fontPx * z }
     };
@@ -2711,7 +2714,7 @@
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
-          <CoreTextEdit rect={edit.rect} look={edit.look} text={edit.text} oncommit={stopTyping} />
+          <CoreTextEdit rect={edit.rect} look={edit.look} text={edit.text} runs={edit.runs} styled={edit.styled} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} rect={mark.rect} kind={mark.kind} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />

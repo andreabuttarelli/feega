@@ -12,7 +12,9 @@ export enum Shaping {
 
 export type Flow = { spaces: Spaces; wraps: boolean };
 
-export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: number; inset: number; shaping: Shaping };
+export type RequestAt = (paragraph: number, char: number) => Omit<Request, 'size'>;
+
+export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: number; inset: number; shaping: Shaping; requestAt?: RequestAt };
 
 export type Glyph = { face: Face; glyph: number; skew: number; x: number; dy: number; char: number; pen: number; advance: number; word: number; letter: number };
 
@@ -37,13 +39,20 @@ const LAYOUT_UNIT = 64;
 
 const collapsed = (text: string, spaces: Spaces) => (spaces === Spaces.Collapse ? text.replace(COLLAPSIBLE, SPACE).trim() : text);
 
-function runsOf(text: string, type: Type, book: FaceBook): { runs: { text: string; face: Face; skew: number; at: number }[]; missing: boolean } {
-  const request = { ...type.request, size: type.size };
+type Asked = (char: number) => Request;
+
+const askedOf = (type: Type, paragraph: number): Asked => {
+  const plain = { ...type.request, size: type.size };
+  const at = type.requestAt;
+  return at ? (char) => ({ ...at(paragraph, char), size: type.size }) : () => plain;
+};
+
+function runsOf(text: string, first: number, asked: Asked, book: FaceBook): { runs: { text: string; face: Face; skew: number; at: number }[]; missing: boolean } {
   const runs: { text: string; face: Face; skew: number; at: number }[] = [];
   let missing = false;
   let at = 0;
   for (const char of text) {
-    const resolved = book(request, char.codePointAt(0)!);
+    const resolved = book(asked(first + at), char.codePointAt(0)!);
     if (!resolved) {
       missing ||= char !== SPACE;
       at += 1;
@@ -60,10 +69,10 @@ function runsOf(text: string, type: Type, book: FaceBook): { runs: { text: strin
   return { runs, missing };
 }
 
-function shapedOf(text: string, first: number, type: Type, book: FaceBook, extra: (char: number) => number): Token & { missing: boolean } {
+function shapedOf(text: string, first: number, type: Type, asked: Asked, book: FaceBook, extra: (char: number) => number): Token & { missing: boolean } {
   const ligatures = type.tracking === 0 ? Ligatures.On : Ligatures.Off;
   const tracking = type.tracking * type.size;
-  const { runs, missing } = runsOf(text, type, book);
+  const { runs, missing } = runsOf(text, first, asked, book);
   const glyphs: Glyph[] = [];
   let x = 0;
   for (const run of runs) {
@@ -79,11 +88,11 @@ function shapedOf(text: string, first: number, type: Type, book: FaceBook, extra
   return { glyphs, width: x, space: text.startsWith(SPACE), missing };
 }
 
-function tokenOf(text: string, first: number, word: number, type: Type, book: FaceBook, extra: (word: number, letter: number) => number): Token & { missing: boolean } {
+function tokenOf(text: string, first: number, word: number, type: Type, asked: Asked, book: FaceBook, extra: (word: number, letter: number) => number): Token & { missing: boolean } {
   const pieces = type.shaping === Shaping.Chars ? [...text] : [text];
   const token: Token & { missing: boolean } = { glyphs: [], width: 0, space: text.startsWith(SPACE), missing: false };
   for (const [i, piece] of pieces.entries()) {
-    const shaped = shapedOf(piece, first + i, type, book, (char) => (text.startsWith(SPACE) ? 0 : extra(word, char - first)));
+    const shaped = shapedOf(piece, first + i, type, asked, book, (char) => (text.startsWith(SPACE) ? 0 : extra(word, char - first)));
     token.glyphs.push(...shift(shaped.glyphs, token.width).map((g) => ({ ...g, word: token.space ? -1 : word, letter: g.char - first })));
     token.width += shaped.width;
     token.missing ||= shaped.missing;
@@ -152,10 +161,11 @@ export function layOut(paragraphs: string[], type: Type, flow: Flow, room: numbe
   let top = 0;
   const blocks = paragraphs.map((paragraph, at): Block => {
     const text = collapsed(paragraph, flow.spaces);
+    const asked = askedOf(type, at);
     let first = 0;
     let words = 0;
     const tokens = [...text.matchAll(TOKEN)].map((m) => {
-      const token = tokenOf(m[0], first, words, type, book, (word, letter) => extra(at, word, letter));
+      const token = tokenOf(m[0], first, words, type, asked, book, (word, letter) => extra(at, word, letter));
       words += token.space ? 0 : 1;
       first += [...m[0]].length;
       missing ||= token.missing;

@@ -29,7 +29,7 @@ import { stillSeconds } from '../still';
 import { animatorOfKey, COLOR_VALUE, SELECTOR_KEYS, type TextAnimator } from '../text-animators/model';
 import { textPathAt, type OnPath } from '../hyperframes/text-path';
 import { paintOnPath } from './text/on-path';
-import { caretOf, NO_TYPESET, paintText, planOf, TEXT_COMPONENTS, TextGap, type NativeFaces, type TextComponent, type TextPlan, type Typeset } from './text/painter';
+import { caretOf, NO_TYPESET, paintText, planOf, TEXT_COMPONENTS, TextGap, type NativeFaces, type TextComponent, type TextPlan, type Typeset, type UniformPlan } from './text/painter';
 import { resolvedRequest, type FaceRule } from './text/fonts';
 import type { CaretLine } from './text/caret';
 import type { Flow } from './text/layout';
@@ -84,7 +84,7 @@ export type LayerItem = { kind: ItemKind.Layer; clip: string; source: string; si
 
 export type Turn = { scale: number; rotation: number };
 
-export type TextItem = { kind: ItemKind.Text; clip: string; plan: TextPlan; turn: Turn; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+export type TextItem = { kind: ItemKind.Text; clip: string; plan: UniformPlan; turn: Turn; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
 export type LensItem = { kind: ItemKind.Lens; clip: string; lens: Lens; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
@@ -223,11 +223,12 @@ function nativeText(env: Env, native: NativeFaces): Painted {
   if (typeof plan === 'string') {
     return TEXT_GAP[plan];
   }
-  if (!plan.fills.every((f) => NATIVE_FILLS.has(f.kind)) || plan.animation?.looks.some((l) => (l.spacing ?? 0) !== 0)) {
+  if (!plan.fills.every((f) => NATIVE_FILLS.has(f.kind)) || plan.animation?.looks.some((l) => (l.spacing ?? 0) !== 0) || plan.runs.length) {
     return outlinedText(env);
   }
   const turn = { scale: Number(props.scale ?? 1), rotation: Number(props.rotation ?? 0) };
-  return [{ kind: ItemKind.Text, plan: { ...plan, request: resolvedRequest(plan.request, native.registry) }, turn, opacity: 1, matrix: IDENTITY }];
+  const { runs: _runs, starts: _starts, tints: _tints, ...uniform } = plan;
+  return [{ kind: ItemKind.Text, plan: { ...uniform, request: resolvedRequest(plan.request, native.registry) }, turn, opacity: 1, matrix: IDENTITY }];
 }
 
 function textPainter(env: Env): Painted {

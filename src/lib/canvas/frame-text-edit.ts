@@ -5,6 +5,8 @@ import { clipProps, findClip, type MotionClip, type MotionDoc } from '$lib/motio
 import { fontStack } from '$lib/motion/fonts/model';
 import { CLIP_TEXT, editablePart, PartEdit } from '$lib/motion/poster-parts';
 import { setProps, type OpResult } from '$lib/motion/timeline';
+import { styledComponent } from '$lib/motion/text-run-ops';
+import type { TextRun } from '$lib/motion/text-runs';
 
 type Size = { width: number; height: number };
 
@@ -30,7 +32,14 @@ export const hideText = (doc: MotionDoc, clipId: string): MotionDoc => {
   return hidden.ok ? hidden.doc : doc;
 };
 
-export const commitText = (doc: MotionDoc, clipId: string, text: string): OpResult => setProps(doc, clipId, { text });
+export const styledKind = (clip: Pick<MotionClip, 'component'>) => styledComponent(clip.component);
+
+export const runsOfClip = (clip: Pick<MotionClip, 'component' | 'props'>): TextRun[] => (styledKind(clip) ? ((clip.props.runs as TextRun[] | undefined) ?? []) : []);
+
+export function commitText(doc: MotionDoc, clipId: string, text: string, runs: TextRun[] = []): OpResult {
+  const clip = findClip(doc, clipId)?.clip;
+  return setProps(doc, clipId, clip && styledKind(clip) ? { text, runs: runs.length ? runs : undefined } : { text });
+}
 
 export function textEditStyle(input: { clip: MotionClip; doc: MotionDoc; tokens: BrandTokens; frame: Size; scale: number }): TextEditStyle {
   const verdict = clipProps(input.doc.components, input.clip.component, input.clip.props, Strictness.Lenient);
