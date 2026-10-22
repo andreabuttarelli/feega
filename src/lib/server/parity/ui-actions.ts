@@ -219,6 +219,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleLocked]: motion('set_visibility'),
   [Command.CopyProperties]: VIEW,
   [Command.PasteProperties]: motion('set_props'),
+  [Command.PasteReplace]: motion('add_clip'),
   [Command.CreateComponent]: motion('component'),
   [Command.DetachInstance]: motion('component'),
   [Command.ResetInstance]: motion('component'),
