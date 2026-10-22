@@ -44,8 +44,10 @@ const hmr = process.env.NO_HMR === '1' || process.env.NO_HMR === 'true' ? false 
 const TEST_TIMEOUT_MS = 120_000;
 
 const AGENT_WORKTREES = '**/.claude/worktrees/**';
+const OWN_DEPS_CACHE = '.vite-deps';
 
 export default defineConfig({
+  cacheDir: OWN_DEPS_CACHE,
   server: {
     hmr,
     fs: { allow: ['..', ...(nodeModulesReal ? [nodeModulesReal] : [])] },
