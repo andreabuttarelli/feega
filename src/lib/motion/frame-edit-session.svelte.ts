@@ -16,6 +16,7 @@ export type SessionPort = {
   viewPath: () => string[];
   show: (doc: MotionDoc | null) => void;
   recorded: () => void;
+  stepped: () => void;
   saved: (head: Revision) => void;
   pull: () => Promise<void>;
   send: (ops: DocOp[], version: number, summary: string) => Promise<SendResult>;
@@ -73,7 +74,11 @@ export class FrameEditSession {
     this.port.recorded();
     const now = Date.now();
     const root = mergeView(this.history.present, this.port.viewPath(), next);
-    this.history = summary === this.lastEdit.summary && now - this.lastEdit.at < COALESCE_MS ? amend(this.history, root) : record(this.history, root);
+    const typedOn = summary === this.lastEdit.summary && now - this.lastEdit.at < COALESCE_MS;
+    this.history = typedOn ? amend(this.history, root) : record(this.history, root);
+    if (!typedOn) {
+      this.port.stepped();
+    }
     this.lastEdit = { summary, at: now };
     this.scheduleSave(summary);
   }
@@ -85,6 +90,7 @@ export class FrameEditSession {
 
   recordRoot(root: MotionDoc, summary: string) {
     this.history = record(this.history, root);
+    this.port.stepped();
     this.scheduleSave(summary);
   }
 

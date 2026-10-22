@@ -8,7 +8,8 @@
   import { svgShapes } from '$lib/motion/shape/svg-import';
   import { mapOutline, parsePath, pathData } from '$lib/motion/shape/geometry';
   import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
-  import type { Stack } from '$lib/canvas/stacking';
+  import { stackedLocally, type Stack } from '$lib/canvas/stacking';
+  import type { FrameStep } from '$lib/canvas/frame-multi';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
@@ -429,8 +430,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function restack(ids: string[], to: Stack) {
-    const res = await post('restack', { ids: JSON.stringify(ids), to });
-    if (res) {
+    nodes = stackedLocally(nodes, ids, to);
+    if (!(await post('restack', { ids: JSON.stringify(ids), to }))) {
       await refresh();
     }
   }
@@ -1320,7 +1321,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * cronologia, non due stack separati: creare un nodo dopo averne spostato un altro e poi
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'turn'; turn: Turn };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -3250,9 +3251,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onAccepted(inverseMoveGesture(gesture));
   }
 
+  let historyTurn: Promise<void> = Promise.resolve();
+  const inTurn = (step: () => Promise<void>) => (historyTurn = historyTurn.then(step, step));
+
   async function undo() {
     const entry = undoStack.popUndo();
     if (!entry) { return; }
+    if (entry.source === 'frame') {
+      entry.step.back();
+      undoStack.pushRedo(entry);
+      return;
+    }
     if (entry.source === 'turn') {
       const back = undoTurn(entry.turn);
       if (turnGroup(back)) { undoStack.pushRedo({ source: 'turn', turn: back }); }
@@ -3268,6 +3277,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   async function redo() {
     const entry = undoStack.popRedo();
     if (!entry) { return; }
+    if (entry.source === 'frame') {
+      entry.step.forward();
+      undoStack.pushUndo(entry);
+      return;
+    }
     if (entry.source === 'turn') {
       const back = undoTurn(entry.turn);
       if (turnGroup(back)) { undoStack.pushUndo({ source: 'turn', turn: back }); }
@@ -3442,8 +3456,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onTemplate={insertTemplate}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     barContext={barContextOf(CanvasState.Browsing)}
-    onUndo={undo}
-    onRedo={redo}
+    onUndo={() => inTurn(undo)}
+    onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
+    onRedo={() => inTurn(redo)}
     onConnectNew={connectNew}
     {focus}
     onConnectExisting={connectExisting}

@@ -13,6 +13,7 @@ function open(send: SessionPort['send'] = accepted) {
     viewPath: () => [],
     show: vi.fn(),
     recorded: vi.fn(),
+    stepped: vi.fn(),
     saved: vi.fn(),
     pull: vi.fn(async () => {}),
     send: vi.fn(send)
@@ -28,6 +29,28 @@ function held() {
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
+
+describe('telling the host about a new undo step', () => {
+  it('a new edit is one step, the same edit typed on is not another', () => {
+    const { session, port } = open();
+
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    session.apply({ ok: true, doc: longer(70) }, 'Longer');
+    session.apply({ ok: true, doc: longer(80) }, 'Other');
+
+    expect(port.stepped).toHaveBeenCalledTimes(2);
+  });
+
+  it('undo and redo are not new steps', () => {
+    const { session, port } = open();
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+
+    session.undo();
+    session.redo();
+
+    expect(port.stepped).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('selection', () => {
   it('select replaces the selected ids', () => {
