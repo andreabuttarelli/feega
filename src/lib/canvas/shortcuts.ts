@@ -47,8 +47,8 @@ import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
 
 /** Di quante unità di tela sposta una freccia, e quanto con Shift. */
-export const NUDGE_STEP = 8;
-export const NUDGE_STEP_BIG = 64;
+export const NUDGE_STEP = 1;
+export const NUDGE_STEP_BIG = 10;
 
 export type CanvasCommandId =
   | 'delete'

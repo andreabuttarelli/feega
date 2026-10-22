@@ -65,6 +65,13 @@ describe('inspectorOf', () => {
 describe('barAction', () => {
   const ids = () => 'new1';
 
+  it('flips the selected clips horizontally and vertically', () => {
+    const scale = (doc: MotionDoc | undefined, key: 'scaleX' | 'scaleY') => doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'a')?.transform[key];
+
+    expect(scale(barAction(Action.FlipHorizontal, { doc: fixture(), selection: ['a'], frame: 0, newId: ids })?.doc, 'scaleX')).toBe(-1);
+    expect(scale(barAction(Action.FlipVertical, { doc: fixture(), selection: ['a'], frame: 0, newId: ids })?.doc, 'scaleY')).toBe(-1);
+  });
+
   it('deletes the selected clip', () => {
     const done = barAction(Action.Delete, { doc: fixture(), selection: ['a'], frame: 0, newId: ids });
 

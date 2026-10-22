@@ -179,6 +179,10 @@ describe('quello che i tasti fanno sulla tela', () => {
     const big = nudgeOf(matchCanvasShortcut(ev('ArrowRight', { shiftKey: true })) as CanvasCommand);
     expect(big).toEqual({ dx: NUDGE_STEP_BIG, dy: 0 });
   });
+
+  it('nudges like Figma: 1px, 10px with Shift', () => {
+    expect([NUDGE_STEP, NUDGE_STEP_BIG]).toEqual([1, 10]);
+  });
 });
 
 /**

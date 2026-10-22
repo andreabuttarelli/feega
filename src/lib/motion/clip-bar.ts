@@ -9,7 +9,7 @@ export enum PickMode {
   Many = 'many'
 }
 
-const BASE: ActionId[] = [Action.Split, Action.Duplicate, Action.Delete];
+const BASE: ActionId[] = [Action.Split, Action.Duplicate, Action.Delete, Action.FlipHorizontal, Action.FlipVertical];
 const TAIL: ActionId[] = [Action.ParentTo, Action.SelectSeveral, Action.ClipProperties];
 
 const isPrecomp = (doc: MotionDoc, id: string) => findClip(doc, id)?.clip.component === PRECOMP;

@@ -21,7 +21,7 @@ function fixture(): MotionDoc {
 
 describe('clip bar', () => {
   it('offers split, duplicate, delete, parent, select several and properties for a clip', () => {
-    expect(clipActions(fixture(), ['a'])).toEqual([Action.Split, Action.Duplicate, Action.Delete, Action.ParentTo, Action.SelectSeveral, Action.ClipProperties]);
+    expect(clipActions(fixture(), ['a'])).toEqual([Action.Split, Action.Duplicate, Action.Delete, Action.FlipHorizontal, Action.FlipVertical, Action.ParentTo, Action.SelectSeveral, Action.ClipProperties]);
   });
 
   it('adds Open for a single precomp, the touch path to what a double click does', () => {
