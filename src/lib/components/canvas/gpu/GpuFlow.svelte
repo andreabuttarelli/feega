@@ -2133,10 +2133,10 @@
       return;
     }
     const moves = ids.flatMap((id) => (overrides.get(id) ? [{ id, x: overrides.get(id)!.x, y: overrides.get(id)!.y }] : []));
+    props.onMoveEnd?.(moves);
     for (const m of moves) {
       props.onMove?.(m.id, m.x, m.y);
     }
-    props.onMoveEnd?.(moves);
     settleOverrides();
   }
 
@@ -2227,10 +2227,10 @@
     if (!moves.length) {
       return;
     }
+    props.onMoveEnd?.(moves);
     for (const m of moves) {
       props.onMove?.(m.id, m.x, m.y);
     }
-    props.onMoveEnd?.(moves);
   }
 
   const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));

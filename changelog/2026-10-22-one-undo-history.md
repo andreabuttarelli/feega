@@ -13,3 +13,7 @@ Restack reorders `nodes` locally (`stackedLocally`, draw order = array order, ma
 server's `order by z`) and only refreshes if the save fails.
 
 Discarded: a merged timestamp log across two stacks — one stack is simpler and already exists.
+
+Found by the e2e: GpuFlow called `onMove` before `onMoveEnd`, so the page read `before` after
+`nodes` already held `after`, and `buildMoveGesture` dropped every drag — tile drags on the GPU
+canvas never reached the undo stack. `onMoveEnd` now runs first.
