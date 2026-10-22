@@ -58,6 +58,7 @@
   import LutPicker from './LutPicker.svelte';
   import TextCounterSection from './TextCounterSection.svelte';
   import TextPathSection from './TextPathSection.svelte';
+  import TextPresetGallery from './TextPresetGallery.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
   import { registerFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
@@ -76,7 +77,7 @@
   import { SHAPE_KINDS, ShapeKind, modifierKey, type Modifier } from '$lib/motion/shape/schema';
   import { cornerRadii, withCorner } from '$lib/motion/shape/geometry';
   import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '$lib/motion/text-animators/model';
-  import { TEXT_COMPONENTS, TEXT_PRESETS, applyPreset as applyTextPreset, removeAnimator, setAnimator, type TextPreset } from '$lib/motion/text-animators/ops';
+  import { TEXT_COMPONENTS, removeAnimator, setAnimator } from '$lib/motion/text-animators/ops';
   import { BLEND_MODES, blendLabel, type BlendMode } from '$lib/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
@@ -316,15 +317,6 @@
   let effectsRoot = $state<HTMLElement | null>(null);
 
   const animatorRows = (id: string) => animated.params.filter((p) => p.source === Source.Animator && p.key.startsWith(animatorKey(id, '')));
-  const TEXT_PRESET_SECONDS = 1;
-
-  function addTextPreset(select: HTMLSelectElement) {
-    const preset = select.value as TextPreset;
-    select.value = '';
-    if (preset) {
-      commit(applyTextPreset(doc, clip.id, preset, { start: Math.max(0, frame - clip.from), duration: TEXT_PRESET_SECONDS * doc.fps }, crypto.randomUUID().slice(0, 8)), `Added ${preset}`);
-    }
-  }
 
   const addEffectOf = (kind: EffectKind) => commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${EFFECTS[kind].label.toLowerCase()}`);
 
@@ -767,10 +759,7 @@
           {@render animList(animatorRows(animator.id).filter((p) => p.kind === ValueKind.Number), afterDot)}
         </div>
       {/each}
-      <select class="add" aria-label="Add text preset" data-testid="add-text-preset" value="" onchange={(e) => addTextPreset(e.currentTarget)}>
-        <option value="">Add text animation…</option>
-        {#each TEXT_PRESETS as preset (preset)}<option value={preset}>{preset}</option>{/each}
-      </select>
+      <TextPresetGallery {doc} {clip} {frame} {commit} />
     </div>
     <TextCounterSection {doc} {clip} {commit} />
     <TextPathSection {doc} {clip} params={animated.params} row={animField} {commit} />
