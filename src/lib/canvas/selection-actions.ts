@@ -56,6 +56,9 @@ export type SelectionActionId =
   | 'flatten'
   | 'outline-stroke'
   | 'outline-text'
+  | 'create-component'
+  | 'detach-instance'
+  | 'reset-instance'
   | 'create-formats'
   | 'export'
   | 'delete'
@@ -105,6 +108,9 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'flatten', label: 'Flatten', group: 'menu', minNodes: 1, shortcut: 'Mod+E' },
   { id: 'outline-stroke', label: 'Outline stroke', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+O' },
   { id: 'outline-text', label: 'Outline text', group: 'menu', minNodes: 1, shortcut: 'Mod+Shift+O' },
+  { id: 'create-component', label: 'Create component', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+K' },
+  { id: 'detach-instance', label: 'Detach instance', group: 'menu', minNodes: 1 },
+  { id: 'reset-instance', label: 'Reset all overrides', group: 'menu', minNodes: 1 },
   { id: 'create-formats', label: 'Create formats…', group: 'menu', minNodes: 1 },
   { id: 'export', label: 'Export…', group: 'overflow', minNodes: 1 },
   { id: 'frame-voice', label: 'Add voice-over…', group: 'overflow', minNodes: 1 },

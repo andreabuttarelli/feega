@@ -167,6 +167,7 @@ import { fileSnippet } from '$lib/motion/interactive/bundle';
 import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, removeVar, unbindVar, type VarDecl } from '$lib/motion/interactive/vars';
 import { flattenComps } from '$lib/motion/precomp';
 import { clearTextRuns, styleTextRange } from '$lib/motion/text-run-ops';
+import { createComponent, detachInstance, overrideInstance, resetOverrides } from '$lib/motion/main-component';
 import { RunToggle, type RunEdit } from '$lib/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
@@ -2668,6 +2669,39 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const out = apply(precompose(session.doc, input.clip_ids, { comp, clip }, input.name ?? `Comp ${Object.keys(session.doc.comps).length + 1}`), `precomposed ${input.clip_ids.length} clip(s)`);
         return out.ok ? { ...out, comp, clip_id: clip } : out;
       }
+    }),
+
+    create_component: tool({
+      description: 'Figma-style main component (⌥⌘K): move clips into a main component and leave one instance (a Precomp clip) in their place. Duplicate the instance (duplicate_clip) for more instances; edit the main with edit_comp and every instance follows. Returns clip_id (the instance) and comp (the main).',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), name: z.string().min(1).max(60).optional() }),
+      execute: async (input) => {
+        const ids: string[] = [];
+        const newId = () => {
+          const id = deps.newId();
+          ids.push(id);
+          return id;
+        };
+        const out = apply(createComponent(session.doc, input.clip_ids, newId, input.name ?? `Component ${Object.values(session.doc.comps).filter((c) => c.component).length + 1}`), `made a component of ${input.clip_ids.length} clip(s)`);
+        return out.ok ? { ...out, comp: ids[0], clip_id: ids[1] } : out;
+      }
+    }),
+
+    override_instance: tool({
+      description: 'Override props of one element inside one instance of a component (inner_clip_id is the element id in the main); other instances and the main keep theirs. Example: change the label text of one button.',
+      inputSchema: z.object({ clip_id: z.string(), inner_clip_id: z.string(), props: z.record(z.string(), z.unknown()) }),
+      execute: async (input) => apply(overrideInstance(session.doc, input.clip_id, input.inner_clip_id, input.props), `overrode ${input.inner_clip_id} in ${input.clip_id}`)
+    }),
+
+    reset_overrides: tool({
+      description: 'Drop every override of a component instance: it looks like its main again.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(resetOverrides(session.doc, input.clip_id), `reset ${input.clip_id}`)
+    }),
+
+    detach_instance: tool({
+      description: 'Detach an instance from its component: it becomes a plain group with its overrides baked in and stops following the main.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(detachInstance(session.doc, input.clip_id, deps.newId), `detached ${input.clip_id}`)
     }),
 
     ungroup: tool({

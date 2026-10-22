@@ -4,6 +4,7 @@
   import LookInspector from '$lib/components/motion/LookInspector.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
+  import InstanceInspector from '$lib/components/motion/InstanceInspector.svelte';
   import CameraInspector from '$lib/components/motion/CameraInspector.svelte';
   import DevicePresets from '$lib/components/motion/DevicePresets.svelte';
   import ParticlePresets from '$lib/components/motion/ParticlePresets.svelte';
@@ -78,6 +79,7 @@
       <TemplateInspector gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
     {:else}
       {@const Presets = CLIP_PRESETS[shown.clip.component]}
+      <InstanceInspector {doc} clipId={shown.clip.id} onchange={edit} onrun={(id) => void runBar(id)} />
       <MotionInspector gesture={session.live} lead={partLead} {doc} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={FIRST_FRAME} onchange={edit} />
       {#if Presets}<Presets {doc} clip={shown.clip} onchange={edit} />{/if}
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}
