@@ -6,7 +6,7 @@ import { fontStack } from '$lib/motion/fonts/model';
 import { CLIP_TEXT, editablePart, PartEdit } from '$lib/motion/poster-parts';
 import { setProps, type OpResult } from '$lib/motion/timeline';
 import { styledComponent } from '$lib/motion/text-run-ops';
-import type { TextRun } from '$lib/motion/text-runs';
+import type { RunCase, RunStyle, TextRun } from '$lib/motion/text-runs';
 import { mul2d, type Affine } from '$lib/motion/affine';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
 
@@ -37,6 +37,11 @@ export const hideText = (doc: MotionDoc, clipId: string): MotionDoc => {
 export const styledKind = (clip: Pick<MotionClip, 'component'>) => styledComponent(clip.component);
 
 export const runsOfClip = (clip: Pick<MotionClip, 'component' | 'props'>): TextRun[] => (styledKind(clip) ? ((clip.props.runs as TextRun[] | undefined) ?? []) : []);
+
+export function baseStyle(clip: Pick<MotionClip, 'props'>): RunStyle {
+  const p = clip.props;
+  return { color: String(p.color), weight: Number(p.weight), italic: p.italic === true, font: String(p.font), size: Number(p.size), tracking: Number(p.tracking), leading: Number(p.leading), underline: false, strike: false, textCase: (p.textCase as RunCase | undefined) ?? 'as-typed', opacity: 1 };
+}
 
 export function commitText(doc: MotionDoc, clipId: string, text: string, runs: TextRun[] = []): OpResult {
   const clip = findClip(doc, clipId)?.clip;

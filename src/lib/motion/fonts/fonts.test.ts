@@ -157,3 +157,17 @@ describe('fonts', () => {
     expect(fontsFrom('Typography: Playfair Display for titles, Inter for body. Not Helvetica.', CATALOGUE)).toEqual(['Playfair Display', 'Inter']);
   });
 });
+
+describe('fonts a styled range asks for', () => {
+  it('are loaded with the clip font', () => {
+    const doc = {
+      tracks: [{ clips: [{ component: 'Text', props: { font: 'Inter', weight: 400, italic: false, runs: [{ start: 0, end: 2, font: 'Fraunces', weight: 700 }, { start: 3, end: 4, italic: true }] } }] }],
+      components: {}
+    } as unknown as Parameters<typeof usedFaces>[0];
+    expect(usedFaces(doc)).toEqual([
+      { family: 'Inter', weight: 400, italic: false },
+      { family: 'Fraunces', weight: 700, italic: false },
+      { family: 'Inter', weight: 400, italic: true }
+    ]);
+  });
+});

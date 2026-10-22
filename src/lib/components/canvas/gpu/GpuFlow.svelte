@@ -29,11 +29,11 @@
   import GradientHandles from '../GradientHandles.svelte';
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
   import type { Fill } from '$lib/motion/fill/model';
-  import { commitText, editLayout, editsText, hideText, runsOfClip, styledKind, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { baseStyle, commitText, editLayout, editsText, hideText, runsOfClip, styledKind, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
   import { measuredTexts } from '$lib/canvas/text-autosize';
   import type { TextCaret } from '$lib/motion/gpu-full/display-list';
-  import type { TextRun } from '$lib/motion/text-runs';
+  import type { RunStyle, TextRun } from '$lib/motion/text-runs';
   import { frameProperties } from '../frame-properties.svelte';
   import { trailerFrom } from '$lib/motion/trailer';
   import FrameDialogs from '../FrameDialogs.svelte';
@@ -1686,7 +1686,7 @@
     return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
   }
 
-  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; styled: boolean; caret: TextCaret; look: TextEditStyle };
+  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle };
   let typing = $state<Typing | null>(null);
 
   async function startTyping(nodeId: string, clip: string) {
@@ -1703,7 +1703,7 @@
       return;
     }
     const look = textEditStyle({ clip: found as MotionClip, doc, tokens: at.live.tokens, frame: size, scale: 1 });
-    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), styled: styledKind(found) };
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), styled: styledKind(found), base: baseStyle(found) };
     liveDocs.set(nodeId, { ...at.live, doc: hideText(doc, clip) });
   }
 
@@ -1743,7 +1743,7 @@
     const z = view.zoom;
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
-    return { text: open.text, runs: open.runs, styled: open.styled, layout: editLayout(open.caret, screen), look: open.look };
+    return { text: open.text, runs: open.runs, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look };
   }
 
   const autosizing = new Map<string, ReturnType<typeof setTimeout>>();
@@ -2502,7 +2502,7 @@
     if (!spec.chrome || keyRegion.current !== Region.Canvas) {
       return;
     }
-    const frameAction = inside?.level.clip && picks.length ? frameKeyAction(e) : null;
+    const frameAction = inside?.level.clip && picks.length && !typing ? frameKeyAction(e) : null;
     if (frameAction) {
       e.preventDefault();
       void runFrameAction(frameAction);
@@ -2863,7 +2863,7 @@
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
-          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} styled={edit.styled} oncommit={stopTyping} />
+          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} styled={edit.styled} base={edit.base} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
