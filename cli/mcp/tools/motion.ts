@@ -100,7 +100,7 @@ export function registerMotionTools(server: McpServer) {
         resolution: z.enum(['720p', '1080p', '1440p', '2160p']).optional(),
         format: z.string().optional().describe('server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif'),
         quality: z.enum(['standard', 'high', 'max']).optional(),
-        fps: z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60)]).optional(),
+        fps: z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60), z.literal(120)]).optional().describe('120 renders on our servers only'),
         gif: z.object({ loop: z.enum(['forever', 'once', 'boomerang']).optional(), fps: z.number().int().min(8).max(30).optional(), width: z.number().int().min(64).max(1920).optional() }).optional().describe('format gif only: loop forever (default), once or boomerang; fps 8-30 (15); width 64-1920 px (640); the video can be up to 30 s')
       }),
       annotations: { readOnlyHint: false, destructiveHint: false }
