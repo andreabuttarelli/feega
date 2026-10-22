@@ -1,5 +1,6 @@
 import { composeHtml } from '$lib/motion/hyperframes/compose';
-import { pickAt, rectOf } from '$lib/motion/gpu/pick';
+import { pickOwnersAt, rectOf } from '$lib/motion/gpu/pick';
+import { findClip } from '$lib/motion/doc';
 import { compileScene, type Scene } from '$lib/motion/gpu/scene';
 import { frameOfLive } from '$lib/canvas/core/frame-source';
 import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
@@ -50,7 +51,7 @@ export function framePicker(live: LiveDoc, playhead: () => number | undefined = 
       if (x < 0 || y < 0 || x > s.width || y > s.height) {
         return null;
       }
-      return pickAt(s, [x, y], time());
+      return pickOwnersAt(s, [x, y], time()).findLast((id) => findClip(live.doc, id)) ?? null;
     },
     unitAt(world: World, space: FrameSpace): World {
       const s = scene();

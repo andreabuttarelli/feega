@@ -5,6 +5,7 @@ import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { toWorld } from '$lib/canvas/gpu/camera';
 import { framePicker, frameSpace } from './frame-pick';
+import { groupClips } from '$lib/motion/group';
 
 const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 900, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 } }, 'card');
 if (!added.ok) {
@@ -101,5 +102,18 @@ describe('framePicker at the playhead', () => {
     head = 200;
 
     expect(blink.pick(centre, space)).toBeNull();
+  });
+});
+
+describe('framePicker on a group', () => {
+  it('picks the group, the element the doc knows, not its namespaced member', () => {
+    const grouped = groupClips(added.doc, ['card'], () => 'grp');
+    if (!grouped.ok) {
+      throw new Error(grouped.error);
+    }
+    const inGroup = framePicker({ ...live, doc: grouped.doc });
+    const outline = inGroup.outline('grp', space)!;
+
+    expect(inGroup.pick({ x: outline.x + outline.w / 2, y: outline.y + outline.h / 2 }, space)).toBe('grp');
   });
 });

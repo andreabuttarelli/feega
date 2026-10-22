@@ -4,11 +4,11 @@
   import { PickMode, clipActions } from '$lib/motion/clip-bar';
   import IconButton from './IconButton.svelte';
 
-  type Props = { doc: MotionDoc; selection: readonly string[]; pick: PickMode; onrun: (id: ActionId) => void; ondone: () => void };
+  type Props = { doc: MotionDoc; selection: readonly string[]; pick: PickMode; extra?: readonly ActionId[]; onrun: (id: ActionId) => void; ondone: () => void };
 
-  let { doc, selection, pick, onrun, ondone }: Props = $props();
+  let { doc, selection, pick, extra = [], onrun, ondone }: Props = $props();
 
-  const actions = $derived(clipActions(doc, selection));
+  const actions = $derived([...clipActions(doc, selection), ...extra]);
 </script>
 
 {#if actions.length}

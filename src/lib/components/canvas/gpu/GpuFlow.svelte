@@ -12,8 +12,10 @@
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
   import { alignSide } from '$lib/canvas/frame-tools';
-  import { barAction } from '$lib/canvas/frame-inspector';
-  import { Action } from '$lib/motion/actions';
+  import { FRAME_ELEMENT_MENU, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
+  import { Action, type ActionId } from '$lib/motion/actions';
+  import { loadOutliner } from '$lib/motion/fonts/outliner';
+  import { frameSummaries } from '$lib/motion/frame-menu';
   import { followDocks } from '$lib/canvas/dock-lift';
   import { frameScreenRect } from '$lib/canvas/frame-screen';
   import FrameSelection from '../FrameSelection.svelte';
@@ -38,7 +40,7 @@
   import { FRAME_DIALOG_ACTIONS, FrameDialog, isFrameDialogAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Reach, clickTarget, frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
   import { GRIP_SUMMARY, SelectionKind, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
@@ -1228,6 +1230,7 @@
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
 
+  const PRIMARY_BUTTON = 0;
   let picks = $state<string[]>([]);
   let bandDrag = $state<{ nodeId: string; from: Point; to: Point } | null>(null);
 
@@ -1274,14 +1277,65 @@
     return true;
   }
 
+  function elementAt(w: Point, reach: Reach) {
+    const hit = framePickAt(w);
+    const doc = hit?.clip && !frameChrome(kindOfNode(hit.nodeId)).dragsHost ? liveOf(hit.nodeId)?.doc : null;
+    if (!hit?.clip || !doc) {
+      return null;
+    }
+    return { nodeId: hit.nodeId, clip: clickTarget(doc, hit.clip, inside?.nodeId === hit.nodeId ? picks : [], reach) };
+  }
+
   function pickElement(e: PointerEvent, w: Point): boolean {
-    const hit = e.button === 0 && !e.shiftKey && !e.metaKey && !e.ctrlKey && e.pointerType === 'mouse' ? framePickAt(w) : null;
-    if (!hit?.clip || frameChrome(kindOfNode(hit.nodeId)).dragsHost) {
+    const deep = e.metaKey || e.ctrlKey;
+    const hit = e.button === 0 && !e.shiftKey && e.pointerType === 'mouse' ? elementAt(w, deep ? Reach.Deep : Reach.Top) : null;
+    if (!hit) {
       return false;
     }
     select([hit.nodeId]);
-    goInside(hit.nodeId, Gesture.Click, hit.clip);
+    goInside(hit.nodeId, deep ? Gesture.Deep : Gesture.Click, hit.clip);
     return true;
+  }
+
+  async function runFrameAction(id: ActionId) {
+    const nodeId = inside?.nodeId;
+    const live = nodeId ? liveOf(nodeId) : null;
+    if (!nodeId || !live || !picks.length) {
+      return;
+    }
+    const picked = picksFor(id, live.doc, picks);
+    if (picked) {
+      pickMany(nodeId, picked);
+      return;
+    }
+    const done = await barActionLater(id, { doc: live.doc, selection: picks, frame: frameOfLive(live), newId: () => crypto.randomUUID().slice(0, 8), load: loadOutliner, assets: live.assets });
+    if (!done) {
+      return;
+    }
+    commit(nodeId, { ok: true, doc: done.doc }, done.summary);
+    pickMany(nodeId, done.selection);
+  }
+
+  let elementMenu = $state<Point | null>(null);
+
+  function openElementMenu(e: MouseEvent): boolean {
+    const hit = elementAt(toWorld(view, local(e)), Reach.Top);
+    if (!hit) {
+      return false;
+    }
+    if (inside?.nodeId !== hit.nodeId || !picks.includes(hit.clip)) {
+      select([hit.nodeId]);
+      goInside(hit.nodeId, Gesture.Click, hit.clip);
+    }
+    elementMenu = { x: e.clientX, y: e.clientY };
+    return true;
+  }
+
+  function runElementMenu(id: SelectionActionId) {
+    const action = frameMenuAction(id);
+    if (action) {
+      void runFrameAction(action);
+    }
   }
 
   let ownPicked: string | null = null;
@@ -1713,7 +1767,7 @@
       e.preventDefault();
       return;
     }
-    if (hit.kind === HitKind.Node && inside?.nodeId === hit.nodeId && !frameChrome(kindOfNode(hit.nodeId)).dragsHost) {
+    if (hit.kind === HitKind.Node && e.button === PRIMARY_BUTTON && inside?.nodeId === hit.nodeId && !frameChrome(kindOfNode(hit.nodeId)).dragsHost) {
       goInside(hit.nodeId, Gesture.Click, null);
     }
     const inDom = target.closest('.gpu-dom-node');
@@ -2174,7 +2228,7 @@
 
   function onContextMenu(e: MouseEvent) {
     e.preventDefault();
-    if (suppressMenu || !spec.chrome) {
+    if (suppressMenu || !spec.chrome || openElementMenu(e)) {
       return;
     }
     const node = topNodeAt(toWorld(view, local(e)));
@@ -2320,6 +2374,12 @@
       return;
     }
     if (!spec.chrome || keyRegion.current !== Region.Canvas) {
+      return;
+    }
+    const frameAction = inside?.level.clip && picks.length ? frameKeyAction(e) : null;
+    if (frameAction) {
+      e.preventDefault();
+      void runFrameAction(frameAction);
       return;
     }
     const command = matchCanvasShortcut(e);
@@ -2788,6 +2848,11 @@
       onpreview={(doc) => showDialogDoc(nodeId, doc)}
       onclose={() => closeDialog(nodeId)}
     />
+  {/if}
+
+  {#if elementMenu && inside && spec.chrome}
+    {@const doc = liveOf(inside.nodeId)?.doc}
+    {#if doc}<CanvasContextMenu at={elementMenu} summaries={frameSummaries(doc, picks)} available={FRAME_ELEMENT_MENU} onpick={runElementMenu} onclose={() => (elementMenu = null)} />{/if}
   {/if}
 
   {#if menuAt && spec.chrome}

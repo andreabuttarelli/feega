@@ -16,7 +16,8 @@
   import { THREE_D_COMPONENTS } from '$lib/motion/components';
   import { PickMode } from '$lib/motion/clip-bar';
   import { PropertiesView } from '$lib/motion/properties-view';
-  import { barAction, inspectorOf } from '$lib/canvas/frame-inspector';
+  import { barActionLater, frameBarActions, inspectorOf } from '$lib/canvas/frame-inspector';
+  import { loadOutliner } from '$lib/motion/fonts/outliner';
   import type { ActionId } from '$lib/motion/actions';
   import type { OpResult } from '$lib/motion/timeline';
 
@@ -47,11 +48,11 @@
   const edit = (next: NonNullable<typeof doc>, summary: string) => session?.edit(next, summary);
   const editGuides = (result: OpResult, summary: string) => result.ok && edit(result.doc, summary);
 
-  function runBar(id: ActionId) {
+  async function runBar(id: ActionId) {
     if (!session || !doc) {
       return;
     }
-    const done = barAction(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8) });
+    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: loadOutliner, assets: {} });
     if (!done) {
       return;
     }
@@ -70,7 +71,7 @@
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
-    <ClipBar {doc} selection={session.selection} pick={PickMode.One} onrun={runBar} ondone={() => {}} />
+    <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
     {#if shown.view === PropertiesView.Multiple}
       <MultiInspector {doc} ids={session.selection} frame={FIRST_FRAME} onchange={edit} />
     {:else if shown.view === PropertiesView.Template}

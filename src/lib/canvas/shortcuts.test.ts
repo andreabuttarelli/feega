@@ -291,3 +291,11 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('@', { shiftKey: true, code: 'Digit2' }))).toEqual({ id: 'zoom-selection' });
   });
 });
+
+describe('the shortcut sheet', () => {
+  it('speaks English', () => {
+    const label = (id: string) => CANVAS_SHORTCUTS.find((r) => r.id === id)?.label;
+
+    expect([label('select-all'), label('deselect'), label('redo'), label('paste'), label('fit'), label('zoom-in'), label('zoom-out')]).toEqual(['Select all', 'Deselect', 'Redo', 'Paste', 'Zoom to fit', 'Zoom in', 'Zoom out']);
+  });
+});

@@ -17,7 +17,7 @@ export type Paint =
 
 export type Link = { el: HTMLElement; size: Size; offset: Point; perspectiveFor: boolean };
 
-export type SceneLayer = { clip: string; paint: Paint; links: Link[]; windows: [number, number][]; z: number[]; order: number; content: Size; blend: string; covers: string[] };
+export type SceneLayer = { clip: string; paint: Paint; links: Link[]; windows: [number, number][]; z: number[]; order: number; content: Size; blend: string; covers: string[]; owners: string[] };
 
 type Timeline = { seek: (t: number) => void };
 
@@ -253,7 +253,7 @@ export function compileScene(html: string): Scene {
       const chain = chainOf(part.el, root);
       const links = part.paint.kind === PaintKind.Html ? [] : linksOf(chain, frame, part.paint);
       const content = links.length ? links[links.length - 1].size : frame;
-      return { clip: (layer as HTMLElement).dataset.clip ?? '', paint: part.paint, links, windows: windowsOf(outer, part.paint), z: zOf(outer), order: order++, content, blend, covers: [layer, ...layer.querySelectorAll('[data-clip]')].map((e) => (e as HTMLElement).dataset.clip ?? '') };
+      return { clip: (layer as HTMLElement).dataset.clip ?? '', paint: part.paint, links, windows: windowsOf(outer, part.paint), z: zOf(outer), order: order++, content, blend, covers: [layer, ...layer.querySelectorAll('[data-clip]')].map((e) => (e as HTMLElement).dataset.clip ?? ''), owners: outer.flatMap((el) => (el.dataset.clip ? [el.dataset.clip] : [])) };
     });
   });
   return { ...frame, background: background?.trim() ?? null, layers: layers.sort(compareZ), timeline, duration: px(root.dataset.duration), doc };
