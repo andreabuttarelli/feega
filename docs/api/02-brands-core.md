@@ -1,6 +1,6 @@
 # API — 02 · Brand core
 
-Endpoint per listare brand, leggere il dettaglio, calendario, publishing e media importati.
+Endpoint per listare brand, leggere il dettaglio e i media importati.
 Errori comuni di auth: vedi [01-overview](01-overview.md).
 
 ## `GET /api/v1/brands`
@@ -88,117 +88,6 @@ Note: `plan` è `null` senza piano attivo; `kit` è `null` senza riga `brand_kit
 
 ```bash
 curl -s "https://feega.app/api/v1/brands/mio-brand" -H "Authorization: Bearer $TOKEN"
-```
-
----
-## `GET /api/v1/brands/:slug/calendar`
-
-Calendario editoriale del mese: post programmati (per `scheduled_for` o per `slot`, deduplicati, esclusi i `pending_user`) più le bozze pending (flag `isDraft`).
-
-**Query params**
-
-| Param | Tipo | Obbligatorio | Descrizione |
-|---|---|---|---|
-| `month` | string `YYYY-MM` | No | Mese da visualizzare; se assente o non valido usa il mese corrente |
-
-**Response** `200`:
-
-```json
-{
-  "posts": [
-    {
-      "id": "…",
-      "platform": "instagram",
-      "caption": "…",
-      "media_url": "https://…",
-      "scheduled_for": "2026-08-14T09:00:00Z",
-      "status": "scheduled",
-      "slot": "2026-08-14"
-    },
-    {
-      "id": "…",
-      "platform": "tiktok",
-      "caption": "…",
-      "media_url": null,
-      "scheduled_for": null,
-      "status": "pending_user",
-      "slot": null,
-      "isDraft": true
-    }
-  ],
-  "year": 2026,
-  "month": 8,
-  "monthLabel": "August 2026",
-  "prevYM": "2026-07",
-  "nextYM": "2026-09",
-  "timezone": "Europe/Rome"
-}
-```
-
-Note: `monthLabel` segue la lingua del brand (`content_prefs.language`, fallback inglese); `prevYM`/`nextYM` gestiscono il riporto d'anno. Max 100 post programmati + 50 bozze; i post bozza non hanno `scheduled_for`/`slot`.
-
-**Esempio**:
-
-```bash
-curl -s "https://feega.app/api/v1/brands/mio-brand/calendar?month=2026-08" -H "Authorization: Bearer $TOKEN"
-```
-
----
-## `GET /api/v1/brands/:slug/publishing`
-
-Livello di pubblicazione corrente (`brands.content_prefs.publishing.mode`) e account attivi con flag `auto_publish`.
-
-**Response** `200`:
-
-```json
-{
-  "mode": "manual",
-  "accounts": [
-    { "id": "…", "platform": "instagram", "auto_publish": true },
-    { "id": "…", "platform": "tiktok", "auto_publish": false }
-  ]
-}
-```
-
-**Esempio**:
-
-```bash
-curl -s "https://feega.app/api/v1/brands/mio-brand/publishing" -H "Authorization: Bearer $TOKEN"
-```
-
----
-
-## `PUT /api/v1/brands/:slug/publishing`
-
-Imposta il livello di pubblicazione: `manual` (solo account auto-publish immediati, il resto attende l'approvazione email), `auto_curated` (pubblica tutto tranne i post `needs_attention`), `auto_all` (pubblica tutto).
-
-**Body**
-
-| Campo | Tipo | Obbligatorio | Descrizione |
-|---|---|---|---|
-| `mode` | string | Sì | `manual` \| `auto_curated` \| `auto_all` |
-
-**Response** `200`:
-
-```json
-{ "ok": true, "mode": "auto_curated" }
-```
-
-**Errori specifici**
-
-| Status | Body |
-|---|---|
-| `400` | `{"error":"Invalid JSON body"}` |
-| `400` | `{"error":"Invalid mode. Must be one of: manual, auto_curated, auto_all"}` |
-| `500` | `{"error":"<messaggio errore RPC>"}` |
-
-**Esempio**:
-
-```bash
-curl -s -X PUT "https://feega.app/api/v1/brands/mio-brand/publishing" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"mode":"auto_curated"}'
 ```
 
 ---

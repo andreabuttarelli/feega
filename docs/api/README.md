@@ -9,9 +9,8 @@ integrazioni esterne via API key — request, response, query params, body, erro
 | Pagina | Endpoint |
 |---|---|
 | [01 — Overview](01-overview.md) | Auth (JWT/API key), errori comuni, gate crediti, convenzioni |
-| [02 — Brand core](02-brands-core.md) | `GET /brands`, `GET /brands/:slug`, `/calendar`, `/publishing`, `/media` |
-| [03 — Posts](03-posts.md) | `/posts` (list/edit/delete), `/approve`, `/publish`, `/reschedule`, `/render`, `/revoke`, `/approve-all` |
-| [08 — Ads e gestione](08-ads-voice-gtm-misc.md) | `/ads`, `/ads/remix`, `/products`, `/api-keys` |
+| [02 — Brand core](02-brands-core.md) | `GET /brands`, `GET /brands/:slug`, `/media` |
+| [08 — Prodotti e API key](08-products-api-keys.md) | `/products`, `/api-keys` |
 | [11 — Billing](11-billing.md) | `/billing/portal`, `/billing/checkout` — link Stripe che l'agente consegna all'umano |
 | [12 — Impostazioni: modelli media](12-settings-models.md) | `/settings/models` — quale modello disegna e quale gira, per brand |
 

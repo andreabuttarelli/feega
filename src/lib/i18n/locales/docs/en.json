@@ -19,7 +19,6 @@
     "s30": "Overview",
     "s31": "Endpoints",
     "s32": "Brands",
-    "s37": "Analytics",
     "s38": "Products",
     "s40": "Close menu",
     "s41": "On this page",
@@ -171,13 +170,6 @@
     "s22": "Method not allowed",
     "s23": "Internal server error",
     "s24": "Quick Start"
-  },
-  "api_analytics": {
-    "s0": "Analytics — feega API",
-    "s1": "Analytics",
-    "s2": "Engagement analytics and content calendar.",
-    "s3": "Engagement analytics for published posts.",
-    "s4": "Analytics"
   },
   "api_brands": {
     "s0": "Brands — feega API",

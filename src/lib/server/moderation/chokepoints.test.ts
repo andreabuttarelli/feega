@@ -95,7 +95,6 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/lib/server/craft-model.ts': 'model resolver for prompt-enhance, screened at its callers',
   'src/lib/server/photo-craft-review.ts': 'unused by the canvas product',
   'src/lib/server/clip-craft-review.ts': 'unused by the canvas product',
-  'src/lib/server/rubrics.ts': 'unused by the canvas product',
   'src/lib/server/chat-models.ts': 'reads the model catalogue, calls no model',
   'src/lib/server/media-model-prefs.ts': 'reads video durations, calls no model',
   'src/lib/server/offerable-models.ts': 'reads video durations, calls no model',
