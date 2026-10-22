@@ -60,6 +60,17 @@ describe('properties inspector from the component schema', () => {
     expect(parseDecimal('abc')).toBeNull();
     expect(parseDecimal('')).toBeNull();
   });
+
+  it('a typed expression is worked out like a calculator', () => {
+    expect(parseDecimal('100+20')).toBe(120);
+    expect(parseDecimal('2 * (3 + 4)')).toBe(14);
+    expect(parseDecimal('2^3^2')).toBe(512);
+    expect(parseDecimal('-10/4')).toBe(-2.5);
+    expect(parseDecimal('1,5*2')).toBe(3);
+    expect(parseDecimal('1/0')).toBeNull();
+    expect(parseDecimal('2+')).toBeNull();
+    expect(parseDecimal('(1')).toBeNull();
+  });
 });
 
 describe('value at the playhead', () => {
