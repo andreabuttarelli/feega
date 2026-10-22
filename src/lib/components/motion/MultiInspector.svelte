@@ -18,7 +18,8 @@
   import { HORIZONTALS, VERTICALS } from '$lib/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { PropKind, STYLE_PROPS, placeBox, setPropAcross, sharedConstraint, sharedProp, type BoxPatch } from '$lib/motion/selection-props';
-  import { recolour, selectionColours } from '$lib/motion/selection-colours';
+  import { isBrandToken, recolour, selectionColours } from '$lib/motion/selection-colours';
+  import { BRAND_COLORS } from '$lib/motion/components';
   import NumberField from './NumberField.svelte';
 
   let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; onchange: (doc: MotionDoc, summary: string) => void } = $props();
@@ -174,7 +175,13 @@
         {#each colours as colour (colour)}
           <label class="line" data-colour={colour}>
             <span>{colour}</span>
-            <input type="color" aria-label={`Replace ${colour}`} value={colour.slice(0, 7)} onchange={(e) => swapColour(colour, e.currentTarget.value)} />
+            {#if isBrandToken(colour)}
+              <select aria-label={`Replace ${colour}`} data-testid="token-swap" value={colour} onchange={(e) => swapColour(colour, e.currentTarget.value)}>
+                {#each BRAND_COLORS as token (token)}<option value={token}>{token}</option>{/each}
+              </select>
+            {:else}
+              <input type="color" aria-label={`Replace ${colour}`} value={colour.slice(0, 7)} onchange={(e) => swapColour(colour, e.currentTarget.value)} />
+            {/if}
           </label>
         {/each}
       </section>
