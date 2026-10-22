@@ -3,7 +3,7 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, type OpResult } from './timeline';
 import { precompose } from './precomp';
 import { Action } from './actions';
-import { clipActions, parentChoices } from './clip-bar';
+import { barActions, clipActions, parentChoices } from './clip-bar';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -20,6 +20,13 @@ function fixture(): MotionDoc {
 }
 
 describe('clip bar', () => {
+  it('shows an extra action the bar already offers once, so flip is never drawn twice', () => {
+    const shown = barActions(fixture(), ['a'], [Action.Group, Action.FlipHorizontal, Action.FlipVertical]);
+
+    expect(shown.filter((id) => id === Action.FlipHorizontal)).toHaveLength(1);
+    expect(shown).toContain(Action.Group);
+  });
+
   it('offers split, duplicate, delete, parent, select several and properties for a clip', () => {
     expect(clipActions(fixture(), ['a'])).toEqual([Action.Split, Action.Duplicate, Action.Delete, Action.FlipHorizontal, Action.FlipVertical, Action.ParentTo, Action.SelectSeveral, Action.ClipProperties]);
   });

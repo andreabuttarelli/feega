@@ -6,7 +6,7 @@ import { TransitionKind } from '../design';
 import { addClip, setTransform, setTransition, Side, type OpResult } from '../timeline';
 import { composeHtml } from '../hyperframes/compose';
 import { compileScene } from './scene';
-import { pickAt, pickOwnersAt, rectOf } from './pick';
+import { pickAt, pickOwnersAt, quadOf, rectOf } from './pick';
 import { groupClips } from '../group';
 import { drawClip } from '../draw-create';
 import { DrawTool } from '../draw-tool';
@@ -92,6 +92,36 @@ describe('rectOf', () => {
     const turned = rectOf(sceneOf(must(setTransform(shape(empty, 'a', 0.5, 0.5, 0.2), 'a', { rotateZ: 45 }))), 'a', 0)!;
 
     expect(turned.width).toBeGreaterThan(flat.width);
+  });
+});
+
+describe('quadOf', () => {
+  const DEG = Math.PI / 180;
+  const edge = (a: [number, number], b: [number, number]) => ({ length: Math.hypot(b[0] - a[0], b[1] - a[1]), degrees: Math.atan2(b[1] - a[1], b[0] - a[0]) / DEG });
+
+  it('turns with a rotated shape and keeps its own size', () => {
+    const doc = must(setTransform(shape(empty, 'r', 0.5, 0.5, 0.2), 'r', { rotateZ: 30 }));
+    const q = quadOf(sceneOf(doc), 'r', 0)!;
+
+    expect(edge(q[0], q[1]).degrees).toBeCloseTo(30, 3);
+    expect(edge(q[0], q[1]).length).toBeCloseTo(384, 1);
+    expect(edge(q[1], q[2]).length).toBeCloseTo(216, 1);
+  });
+
+  it('is the axis-aligned rect of an unrotated shape', () => {
+    const doc = shape(empty, 'a', 0.5, 0.5, 0.2);
+    const r = rectOf(sceneOf(doc), 'a', 0)!;
+
+    expect(quadOf(sceneOf(doc), 'a', 0)).toEqual([
+      [r.left, r.top],
+      [r.left + r.width, r.top],
+      [r.left + r.width, r.top + r.height],
+      [r.left, r.top + r.height]
+    ]);
+  });
+
+  it('is null for an unknown clip', () => {
+    expect(quadOf(sceneOf(shape(empty, 'a', 0.2, 0.2, 0.1)), 'zzz', 0)).toBeNull();
   });
 });
 

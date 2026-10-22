@@ -6,7 +6,7 @@ import { addClip, type OpResult } from '$lib/motion/timeline';
 import { FieldType, exposeField } from '$lib/motion/template/fields';
 import { insertTemplate, templateFromComp } from '$lib/motion/template/library';
 import { precompose } from '$lib/motion/precomp';
-import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, inspectorOf, picksFor } from './frame-inspector';
+import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor } from './frame-inspector';
 import { findClip } from '$lib/motion/doc';
 import { addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
@@ -172,6 +172,11 @@ describe('frameKeyAction', () => {
     expect(frameKeyAction(press('e', { meta: true }))).toBe(Action.Flatten);
   });
 
+  it('flips with Shift H and Shift V', () => {
+    expect(frameKeyAction(press('H', { shift: true }))).toBe(Action.FlipHorizontal);
+    expect(frameKeyAction(press('V', { shift: true }))).toBe(Action.FlipVertical);
+  });
+
   it('leaves every other key to the canvas', () => {
     expect(frameKeyAction(press('z', { meta: true }))).toBeNull();
   });
@@ -197,5 +202,12 @@ describe('FRAME_ELEMENT_MENU', () => {
     expect(FRAME_ELEMENT_MENU.has('outline-text')).toBe(true);
     expect(FRAME_ELEMENT_MENU.has('delete')).toBe(true);
     expect(FRAME_ELEMENT_MENU.has('align-left')).toBe(false);
+  });
+
+  it('runs flip from the menu as the bar does', () => {
+    expect(FRAME_ELEMENT_MENU.has('flip-horizontal')).toBe(true);
+    expect(FRAME_ELEMENT_MENU.has('flip-vertical')).toBe(true);
+    expect(frameMenuAction('flip-horizontal')).toBe(Action.FlipHorizontal);
+    expect(frameBarActions(shapes(), ['top'])).toEqual(expect.arrayContaining([Action.FlipHorizontal, Action.FlipVertical]));
   });
 });

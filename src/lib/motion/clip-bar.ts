@@ -22,6 +22,8 @@ export function clipActions(doc: MotionDoc, selection: readonly string[]): Actio
   return [...BASE, ...open, ...TAIL];
 }
 
+export const barActions = (doc: MotionDoc, selection: readonly string[], extra: readonly ActionId[]): ActionId[] => [...new Set([...clipActions(doc, selection), ...extra])];
+
 export type ParentChoice = { id: string | null; name: string };
 
 const NO_PARENT = 'None';

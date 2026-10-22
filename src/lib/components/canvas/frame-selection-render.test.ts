@@ -10,6 +10,21 @@ import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 
 const RECT = { left: 10, top: 20, width: 100, height: 50 };
+const QUAD: [number, number][] = [
+  [10, 20],
+  [110, 20],
+  [110, 70],
+  [10, 70]
+];
+const turned = (degrees: number): [number, number][] => {
+  const r = (degrees * Math.PI) / 180;
+  return [
+    [0, 0],
+    [100, 0],
+    [100, 50],
+    [0, 50]
+  ].map(([x, y]) => [10 + x * Math.cos(r) - y * Math.sin(r), 20 + x * Math.sin(r) + y * Math.cos(r)]);
+};
 
 let unpublish = () => {};
 
@@ -17,7 +32,7 @@ afterEach(() => unpublish());
 
 describe('the selection drawn over a core frame', () => {
   it('outlines the element with a body to move and eight handles to resize', () => {
-    const body = render(FrameSelection, { props: { clip: 'card', rect: RECT, ongrab: () => {} } }).body;
+    const body = render(FrameSelection, { props: { clip: 'card', quad: QUAD, ongrab: () => {} } }).body;
 
     expect(body).toContain('data-clip="card"');
     expect(body).toContain('left:10px;top:20px;width:100px;height:50px');
@@ -25,14 +40,21 @@ describe('the selection drawn over a core frame', () => {
     expect(body).toContain('data-testid="frame-selection-body"');
   });
 
+  it('turns with a rotated element, handles included', () => {
+    const body = render(FrameSelection, { props: { clip: 'card', quad: turned(30), ongrab: () => {} } }).body;
+
+    expect(body).toContain('left:10px;top:20px;width:100px;height:50px;transform:rotate(30deg)');
+    expect(body.match(/data-testid="frame-selection-handle"/g)).toHaveLength(8);
+  });
+
   it('offers four rotate targets outside the corners', () => {
-    const body = render(FrameSelection, { props: { clip: 'card', rect: RECT, ongrab: () => {} } }).body;
+    const body = render(FrameSelection, { props: { clip: 'card', quad: QUAD, ongrab: () => {} } }).body;
 
     expect(body.match(/data-testid="frame-selection-rotate"/g)).toHaveLength(4);
   });
 
   it('draws a member of a group as an outline the group box transforms', () => {
-    const body = render(FrameSelection, { props: { clip: 'card', rect: RECT, kind: SelectionKind.Member, ongrab: () => {} } }).body;
+    const body = render(FrameSelection, { props: { clip: 'card', quad: QUAD, kind: SelectionKind.Member, ongrab: () => {} } }).body;
 
     expect(body).toContain('data-testid="frame-selection"');
     expect(body).not.toContain('frame-selection-handle');
@@ -40,7 +62,7 @@ describe('the selection drawn over a core frame', () => {
   });
 
   it('draws the group box with its own handles', () => {
-    const body = render(FrameSelection, { props: { clip: '', rect: RECT, kind: SelectionKind.Group, ongrab: () => {} } }).body;
+    const body = render(FrameSelection, { props: { clip: '', quad: QUAD, kind: SelectionKind.Group, ongrab: () => {} } }).body;
 
     expect(body).toContain('data-testid="frame-group-selection"');
     expect(body.match(/data-testid="frame-selection-handle"/g)).toHaveLength(8);

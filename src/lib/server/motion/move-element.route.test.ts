@@ -106,6 +106,18 @@ describe('placeOutput action', () => {
   });
 });
 
+describe('upload action over a frame', () => {
+  it('a pasted picture lands inside the frame and makes no node of its own', async () => {
+    const input = event({ path: 'org/project/pasted.png', file_name: 'pasted.png', mime_type: 'image/png', bytes: '10', width: '400', height: '300', drop: JSON.stringify({ on: 'frame', nodeId: TARGET, at: { x: 0.25, y: 0.5 } }) });
+
+    const result = await actions.upload(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', frameId: TARGET });
+    expect(written(input, TARGET)[0].doc.tracks[0].clips[0]).toMatchObject({ component: 'Image', props: { assetId: '99999999-9999-4999-8999-999999999999', x: 0.25, y: 0.5 } });
+    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'insert')).toBe(false);
+  });
+});
+
 describe('a generated output placed on the empty canvas', () => {
   const asset = (type: string, width: number, height: number) => ({ id: ASSET, org_id: 'org', project_id: 'project', type, url: 'x', content: type === 'text' ? 'Hello' : null, mime_type: 'image/png', bytes: 1, width, height, duration_s: type === 'video' ? 3 : null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' });
   const placed = (input: ReturnType<typeof event>) => ({

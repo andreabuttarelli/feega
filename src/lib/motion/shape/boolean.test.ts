@@ -12,6 +12,7 @@ const ok = (r: OpResult): MotionDoc => {
   return r.doc;
 };
 
+const SIDE = { width: 0.2, height: 0.2 * (16 / 9) };
 const square = (x: number) => ({ component: 'Shape' as const, from: 0, durationInFrames: 60, props: { shape: 'rect', x, y: 0.5, width: 0.2, height: 0.2 * (16 / 9) } });
 
 function overlapping(): MotionDoc {
@@ -26,7 +27,17 @@ function areaOf(doc: MotionDoc): number {
   if (typeof outline === 'string') {
     throw new Error(outline);
   }
-  return outline.reduce((sum, c) => sum + polygonArea(flatten(c)), 0);
+  const local = outline.reduce((sum, c) => sum + polygonArea(flatten(c)), 0);
+  return (local * Number(clip.props.width) * Number(clip.props.height)) / (SIDE.width * SIDE.height);
+}
+
+function spanOf(doc: MotionDoc): { left: number; right: number; top: number; bottom: number } {
+  const outline = parsePath(String(findClip(doc, 'bottom')!.clip.props.path));
+  if (typeof outline === 'string') {
+    throw new Error(outline);
+  }
+  const points = outline.flatMap((c) => c.vertices.map((v) => v.p));
+  return { left: Math.min(...points.map((p) => p[0])), right: Math.max(...points.map((p) => p[0])), top: Math.min(...points.map((p) => p[1])), bottom: Math.max(...points.map((p) => p[1])) };
 }
 
 describe('boolean operations on shapes', () => {
@@ -35,6 +46,19 @@ describe('boolean operations on shapes', () => {
     expect(findClip(doc, 'top')).toBeNull();
     expect(findClip(doc, 'bottom')!.clip.props.shape).toBe('path');
     expect(areaOf(doc)).toBeCloseTo(1.5, 2);
+  });
+
+  it('union fits the kept box to the merged outline, so its selection covers both', () => {
+    const doc = ok(combineShapes(overlapping(), ['top', 'bottom'], BooleanOp.Union, 0));
+    const props = findClip(doc, 'bottom')!.clip.props;
+    const span = spanOf(doc);
+
+    expect(Number(props.width)).toBeCloseTo(0.3, 5);
+    expect(Number(props.x)).toBeCloseTo(0.45, 5);
+    expect(span.left).toBeCloseTo(0, 5);
+    expect(span.right).toBeCloseTo(1, 5);
+    expect(span.top).toBeCloseTo(0, 5);
+    expect(span.bottom).toBeCloseTo(1, 5);
   });
 
   it('subtract cuts the upper shapes out of the bottom one', () => {
@@ -99,3 +123,4 @@ function areaOfClip(doc: MotionDoc, id: string): number {
   }
   return outline.reduce((sum, c) => sum + polygonArea(flatten(c)), 0);
 }
+

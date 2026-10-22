@@ -117,3 +117,29 @@ describe('framePicker on a group', () => {
     expect(inGroup.pick({ x: outline.x + outline.w / 2, y: outline.y + outline.h / 2 }, space)).toBe('grp');
   });
 });
+
+describe('framePicker chain', () => {
+  it('lists the group and the member under the point, outermost first', () => {
+    const grouped = groupClips(added.doc, ['card'], () => 'grp');
+    if (!grouped.ok) {
+      throw new Error(grouped.error);
+    }
+    const inGroup = framePicker({ ...live, doc: grouped.doc });
+    const outline = inGroup.outline('grp', space)!;
+
+    expect(inGroup.chain({ x: outline.x + outline.w / 2, y: outline.y + outline.h / 2 }, space)).toEqual(['grp', 'grp__0__card']);
+  });
+});
+
+describe('framePicker outlineQuad', () => {
+  it('is the outline rect of an unrotated clip, in world space', () => {
+    const outline = picker.outline('card', space)!;
+
+    expect(picker.outlineQuad('card', space)).toEqual([
+      { x: outline.x, y: outline.y },
+      { x: outline.x + outline.w, y: outline.y },
+      { x: outline.x + outline.w, y: outline.y + outline.h },
+      { x: outline.x, y: outline.y + outline.h }
+    ]);
+  });
+});

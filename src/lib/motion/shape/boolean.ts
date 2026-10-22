@@ -1,6 +1,6 @@
 import { findClip, type MotionClip, type MotionDoc } from '../doc';
 import { removeClips, setProps, type OpResult } from '../timeline';
-import { flatten, mapOutline, pathData, polyline, type Pt } from './geometry';
+import { flatten, mapOutline, pathData, polyline, type Outline, type Pt } from './geometry';
 import { baseOutline, type ShapeLook } from './render';
 import { ShapeKind } from './schema';
 import { pathSpace } from './space';
@@ -49,6 +49,31 @@ function polygonsInFrame(doc: MotionDoc, clip: MotionClip, frame: number): Pt[][
   return baseOutline(clip.props as unknown as ShapeLook, UNIT).map((contour) => flatten(contour).map(space.toFrame));
 }
 
+function spanOf(outline: Outline) {
+  const points = outline.flatMap((c) => c.vertices.flatMap((v) => [v.p, v.in, v.out]));
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
+  return { left: Math.min(...xs), top: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs) || 1, height: Math.max(...ys) - Math.min(...ys) || 1 };
+}
+
+function reshapedTo(doc: MotionDoc, clip: MotionClip, outline: Outline, frame: number): OpResult {
+  const span = spanOf(outline);
+  const space = pathSpace(doc, clip.id, frame);
+  const [fromX, fromY] = space.toFrame([0.5, 0.5]);
+  const [toX, toY] = space.toFrame([span.left + span.width / 2, span.top + span.height / 2]);
+  const props = clip.props as { x: number; y: number; width: number; height: number };
+  const path = pathData(mapOutline(outline, (p) => [(p[0] - span.left) / span.width, (p[1] - span.top) / span.height]));
+  return setProps(doc, clip.id, {
+    shape: ShapeKind.Path,
+    path,
+    morphs: [],
+    x: props.x + (toX - fromX) / doc.width,
+    y: props.y + (toY - fromY) / doc.height,
+    width: props.width * span.width,
+    height: props.height * span.height
+  });
+}
+
 function shapesOf(doc: MotionDoc, ids: readonly string[], least: number): MotionClip[] | string {
   const clips: MotionClip[] = [];
   for (const id of ids) {
@@ -84,8 +109,7 @@ export function combineShapes(doc: MotionDoc, ids: readonly string[], op: Boolea
 
   const bottom = ordered[0];
   const local = pathSpace(doc, bottom.id, frame);
-  const path = pathData(result.map((poly) => polyline(poly.map(local.toLocal), true)));
-  const reshaped = setProps(doc, bottom.id, { shape: ShapeKind.Path, path, morphs: [] });
+  const reshaped = reshapedTo(doc, bottom, result.map((poly) => polyline(poly.map(local.toLocal), true)), frame);
   return reshaped.ok ? removeClips(reshaped.doc, ordered.slice(1).map((c) => c.id)) : reshaped;
 }
 
@@ -102,6 +126,6 @@ export function flattenShapes(doc: MotionDoc, ids: readonly string[], frame: num
     const space = pathSpace(doc, clip.id, frame);
     return mapOutline(baseOutline(clip.props as unknown as ShapeLook, UNIT), (p) => local.toLocal(space.toFrame(p)));
   });
-  const reshaped = setProps(doc, bottom.id, { shape: ShapeKind.Path, path: pathData(outline), morphs: [] });
+  const reshaped = reshapedTo(doc, bottom, outline, frame);
   return reshaped.ok ? removeClips(reshaped.doc, ordered.slice(1).map((c) => c.id)) : reshaped;
 }
