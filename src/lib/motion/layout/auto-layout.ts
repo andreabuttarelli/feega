@@ -10,7 +10,9 @@ export enum Justify {
   Start = 'start',
   Center = 'center',
   End = 'end',
-  SpaceBetween = 'space-between'
+  SpaceBetween = 'space-between',
+  SpaceAround = 'space-around',
+  SpaceEvenly = 'space-evenly'
 }
 
 export enum Align {
@@ -71,7 +73,9 @@ const JUSTIFIED_IN_CELL: Record<Justify, (free: number) => number> = {
   [Justify.Start]: () => 0,
   [Justify.Center]: (free) => free / 2,
   [Justify.End]: (free) => free,
-  [Justify.SpaceBetween]: () => 0
+  [Justify.SpaceBetween]: () => 0,
+  [Justify.SpaceAround]: (free) => free / 2,
+  [Justify.SpaceEvenly]: (free) => free / 2
 };
 
 const ALIGNED: Record<Align, (free: number) => number> = {
@@ -84,7 +88,9 @@ const JUSTIFIED: Record<Justify, (free: number, gap: number, count: number) => {
   [Justify.Start]: (_free, gap) => ({ offset: 0, gap }),
   [Justify.Center]: (free, gap) => ({ offset: free / 2, gap }),
   [Justify.End]: (free, gap) => ({ offset: free, gap }),
-  [Justify.SpaceBetween]: (free, gap, count) => ({ offset: 0, gap: count > 1 && free > 0 ? gap + free / (count - 1) : gap })
+  [Justify.SpaceBetween]: (free, gap, count) => ({ offset: 0, gap: count > 1 && free > 0 ? gap + free / (count - 1) : gap }),
+  [Justify.SpaceAround]: (free, gap, count) => (free > 0 ? { offset: free / count / 2, gap: gap + free / count } : { offset: 0, gap }),
+  [Justify.SpaceEvenly]: (free, gap, count) => (free > 0 ? { offset: free / (count + 1), gap: gap + free / (count + 1) } : { offset: 0, gap })
 };
 
 const flowing = (item: Item): Item[] => (item.children ?? []).filter((c) => !c.absolute);
