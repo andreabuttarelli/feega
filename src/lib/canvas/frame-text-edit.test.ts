@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { findClip, MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { commitText, editsText, hideText, textEditStyle } from './frame-text-edit';
+import { commitText, editsText, hideText, runsOfClip, textEditStyle } from './frame-text-edit';
 
 function withText() {
   const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Hello', size: 0.1 } }, 'title');
@@ -35,6 +35,22 @@ describe('text editing inside a core frame', () => {
     const result = commitText(withText(), 'title', 'Bye');
 
     expect(result.ok && textOf(result.doc)).toBe('Bye');
+  });
+
+  it('commits styled ranges with the text, so bold survives the edit', () => {
+    const result = commitText(withText(), 'title', 'Hello you', [{ start: 6, end: 9, weight: 700 }]);
+    const clip = result.ok ? findClip(result.doc, 'title')!.clip : null;
+
+    expect(clip && runsOfClip(clip)).toEqual([{ start: 6, end: 9, weight: 700 }]);
+  });
+
+  it('a text kind without styled ranges commits the text alone', () => {
+    const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Kicker', from: 0, durationInFrames: 90, props: { text: 'k' } }, 'k');
+    if (!added.ok) {
+      throw new Error(added.error);
+    }
+
+    expect(commitText(added.doc, 'k', 'kk', [{ start: 0, end: 1, weight: 700 }]).ok).toBe(true);
   });
 
   it('sizes the caret font from the frame unit and the screen scale', () => {

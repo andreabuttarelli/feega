@@ -20,6 +20,7 @@ import { SEEKABLE_EFFECTS, SHADER_EFFECT_IDS, ShaderEffectId } from './shader-ef
 import { effectProblem } from './shader-effects/preset';
 import { fillsSchema } from './fill/model';
 import { strokesSchema } from './stroke/model';
+import { runsSchema } from './text-runs';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -280,7 +281,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), ...layout({ y: 0.65, height: 0.2 }) })
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), ...layout({ y: 0.65, height: 0.2 }) })
       .strict()
   },
   Kicker: {

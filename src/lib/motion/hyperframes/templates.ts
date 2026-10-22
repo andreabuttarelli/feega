@@ -21,6 +21,7 @@ import { elementFills } from '../fill/elements';
 import { textPaint } from '../fill/render';
 import { elementStrokes } from '../stroke/elements';
 import { textStroke } from '../stroke/render';
+import { segmentsOf, type TextRun } from '../text-runs';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
 
@@ -138,6 +139,20 @@ const glyphStroke = (ctx: GlyphCtx & { unit: number }, component: string) => tex
 const glyphStyle = (paint: Record<string, string>) => (paint.backgroundImage ? ` style="${css(paint)}"` : '');
 const glyphWrap = (paint: Record<string, string>, html: string) => (paint.backgroundImage ? `<span${glyphStyle(paint)}>${html}</span>` : html);
 
+function runCss(ctx: TemplateCtx<'Text'>, run: TextRun): string {
+  const colour = run.color ? ctx.color(run.color) : undefined;
+  return css({ color: colour, webkitTextFillColor: colour, fontWeight: run.weight === undefined ? undefined : ctx.weight(ctx.p.font, run.weight), fontStyle: run.italic === undefined ? undefined : run.italic ? 'italic' : 'normal' });
+}
+
+function textBody(ctx: TemplateCtx<'Text'>): string {
+  if (!ctx.p.runs?.length || ctx.text.id !== null) {
+    return ctx.text.lines(ctx.p.text).join('\n');
+  }
+  return segmentsOf(ctx.p.text, ctx.p.runs)
+    .map((s) => (s.run ? `<span style="${runCss(ctx, s.run)}">${esc(s.text)}</span>` : esc(s.text)))
+    .join('');
+}
+
 const Title: Template<'Title'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
@@ -169,7 +184,7 @@ const Text: Template<'Text'> = {
     const paint = glyphPaint(ctx, 'Text');
     const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], ...ctx.text.vars });
     const fit = FITS[ctx.p.sizing] ? ` data-fit="${size}"` : ' data-text';
-    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}"${fit} style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, TEXT_BOX[ctx.p.sizing](ctx.p.truncate));
+    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}"${fit} style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${textBody(ctx)}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, TEXT_BOX[ctx.p.sizing](ctx.p.truncate));
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]
 };

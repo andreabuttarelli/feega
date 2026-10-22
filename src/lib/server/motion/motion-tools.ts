@@ -166,6 +166,8 @@ import { liveLanes } from '$lib/motion/interactive/spec';
 import { fileSnippet } from '$lib/motion/interactive/bundle';
 import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, removeVar, unbindVar, type VarDecl } from '$lib/motion/interactive/vars';
 import { flattenComps } from '$lib/motion/precomp';
+import { clearTextRuns, styleTextRange } from '$lib/motion/text-run-ops';
+import { RunToggle, type RunEdit } from '$lib/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
 import { registerFont, removeFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
@@ -960,6 +962,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: propsError(session.doc, input.clip_id, input.props, result.error) };
         }
         return apply(registered(result, input.props.assetId), `edited ${input.clip_id}`);
+      }
+    }),
+
+    style_text_range: tool({
+      description: 'Rich text: style a range of a Text clip (start inclusive, end exclusive, in characters of props.text) with its own color (#rrggbb or brand.*), weight (100-900) and/or italic; the rest of the box keeps the clip style. bold: true toggles 700, italic "toggle" toggles. clear: true drops every styled range of the clip.',
+      inputSchema: z.object({ clip_id: z.string(), start: z.number().int().min(0).optional(), end: z.number().int().min(1).optional(), color: z.string().optional(), weight: z.number().int().min(100).max(900).optional(), italic: z.union([z.boolean(), z.literal('toggle')]).optional(), bold: z.boolean().optional(), clear: z.boolean().optional() }),
+      execute: async (input) => {
+        if (input.clear) {
+          return apply(clearTextRuns(session.doc, input.clip_id), `cleared styled ranges of ${input.clip_id}`);
+        }
+        if (input.start === undefined || input.end === undefined) {
+          return { ok: false, error: 'start and end are required unless clear is true' };
+        }
+        const edit: RunEdit = { color: input.color, weight: input.bold ? RunToggle.Bold : input.weight, italic: input.italic === 'toggle' ? RunToggle.Italic : input.italic };
+        return apply(styleTextRange(session.doc, input.clip_id, { start: input.start, end: input.end }, edit), `styled ${input.clip_id} ${input.start}..${input.end}`);
       }
     }),
 

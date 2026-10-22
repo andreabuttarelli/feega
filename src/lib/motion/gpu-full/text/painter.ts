@@ -19,11 +19,12 @@ import type { Face, FaceBook, Request } from './face';
 import type { FaceRule } from './fonts';
 import type { FontFace } from '../../fonts/model';
 import { caretLines, type CaretLine } from './caret';
-import { layOut, NO_EXTRA, Shaping, Spaces, type Extra, type Flow, type Glyph, type Laid, type Line, type Type } from './layout';
+import { layOut, NO_EXTRA, Shaping, Spaces, type Extra, type Flow, type Glyph, type Laid, type Line, type RequestAt, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
 import { clipped, contoursOf, dilated, within, type Rect } from './outline';
 import { blended } from '../blend-colour';
+import { normalRuns, runAt, type TextRun } from '../../text-runs';
 
 export type TextComponent = 'Title' | 'Text' | 'Kicker' | 'Caption';
 
@@ -412,7 +413,12 @@ export type TextPlan = {
   outline: Outline | null;
   animation: { finest: AnimatorUnit; looks: Tinted[] } | null;
   smoothing: Smoothing;
+  runs: TextRun[];
+  starts: number[];
+  tints: Record<string, Rgba>;
 };
+
+export type UniformPlan = Omit<TextPlan, 'runs' | 'starts' | 'tints'>;
 
 type Word = { line: number; chars: number };
 
@@ -446,6 +452,7 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
   const run = animation(cased, env.animators);
   const paragraphs = kind.paragraphs(cased);
   const frame = kind.frame(p, env.box, env.stage);
+  const runs = normalRuns(p.runs as TextRun[] | undefined, [...cased].length);
   return {
     text: cased,
     paragraphs,
@@ -466,14 +473,32 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
     fills,
     outline: outlineOf(env, colour),
     animation: run ? { finest: run.finest, looks: looksOf(cased, run, colour, throughText(visibleFills), Number(p.tracking)) } : null,
-    smoothing: env.smoothing
+    smoothing: env.smoothing,
+    runs,
+    starts: startsOf(paragraphs),
+    tints: Object.fromEntries(runs.flatMap((r) => (r.color ? [[r.color, faded(colour(r.color), 1)]] : [])))
+  };
+}
+
+const startsOf = (paragraphs: string[]) => paragraphs.map((_, i) => paragraphs.slice(0, i).reduce((n, para) => n + [...para].length + 1, 0));
+
+const runOf = (plan: TextPlan, paragraph: number, char: number) => (plan.runs.length ? runAt(plan.runs, (plan.starts[paragraph] ?? 0) + char) : null);
+
+function requestAtOf(plan: TextPlan): RequestAt | undefined {
+  if (!plan.runs.length) {
+    return undefined;
+  }
+  return (paragraph, char) => {
+    const run = runOf(plan, paragraph, char);
+    return run ? { ...plan.request, weight: run.weight ?? plan.request.weight, italic: run.italic ?? plan.request.italic } : plan.request;
   };
 }
 
 type Placed = { laid: Laid; type: Type; room: number };
 
 function place(plan: TextPlan, fonts: FaceBook): Placed {
-  const typeAt = (size: number): Type => ({ request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping });
+  const requestAt = requestAtOf(plan);
+  const typeAt = (size: number): Type => ({ request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping, ...(requestAt ? { requestAt } : {}) });
   const looks = plan.animation?.looks;
   const words = wordsOf(plan.text);
   const before = charsBeforeOf(words);
@@ -501,7 +526,7 @@ function slotsOf(text: string, paragraphs: string[], finest: AnimatorUnit): (par
 
 type Positioned = { face: Face; skew: number; glyph: number; x: number; y: number };
 
-type Unit = { look: Tinted; contours: number[][]; outlines: number[][]; glyphs: Positioned[]; box: Rect; area: Rect };
+type Unit = { look: Tinted; contours: number[][]; outlines: number[][]; glyphs: Positioned[]; box: Rect; area: Rect; colour: string | null };
 
 function runsOf(glyphs: Positioned[], size: number): GlyphRun[] | null {
   if (!glyphs.every((g) => g.face.key && g.skew === 0)) {
@@ -550,8 +575,9 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
       }
       for (const g of line.glyphs) {
         const slot = slots && g.word >= 0 ? slots(i, g) : null;
-        const key = `${slot ? slot.key : -1}:${plan.area === Area.Line ? l : 0}`;
-        const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], glyphs: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area] };
+        const colour = runOf(plan, i, g.char)?.color ?? null;
+        const key = `${slot ? slot.key : -1}:${plan.area === Area.Line ? l : 0}:${colour}`;
+        const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], glyphs: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area], colour };
         units.set(key, unit);
         unit.contours.push(...moved(glyphContours(g.face, g.glyph, type.size, g.skew, smoothing.darken(type.size)), x + g.x, baseline - g.dy));
         unit.glyphs.push({ face: g.face, skew: g.skew, glyph: g.glyph, x: x + g.x, y: baseline - g.dy });
@@ -573,7 +599,8 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
       const shown = placed(unit.contours);
       const runs = output === TextOutput.Glyphs && rise === 0 ? runsOf(unit.glyphs, type.size) : null;
       const asRuns = (paint: Paint) => runs!.map((run): Ink => ({ contours: [], paint, rule: FillRule.NonZero, opacity: plan.fade * look.opacity, matrix: look === UNTINTED ? matrix : mul2d(matrix, turn), blur: look.blur * scaleOf(look.turn), run }));
-      const filled = plan.fills.flatMap((f) => shadesOf(f, unit.area)).flatMap((shade) => (runs && !shade.clip && shade.squash === 1 && !shade.picture ? asRuns(tinted(shade.paint, look)) : [ink(shade.clip ? within(shown, shade.clip) : shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash, shade.picture)]));
+      const fills: FillPlan[] = unit.colour ? [{ kind: PaintKind.Solid, color: plan.tints[unit.colour] }] : plan.fills;
+      const filled = fills.flatMap((f) => shadesOf(f, unit.area)).flatMap((shade) => (runs && !shade.clip && shade.squash === 1 && !shade.picture ? asRuns(tinted(shade.paint, look)) : [ink(shade.clip ? within(shown, shade.clip) : shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash, shade.picture)]));
       const outline = plan.outline;
       const stroked = outline ? [ink(placed(unit.outlines.flatMap((c) => strokePolygons(c, true, outline.width, Cap.Butt, Join.Miter))), tinted({ kind: PaintKind.Solid, color: outline.colour }, look), FillRule.Union)] : [];
       inks.push(...(outline?.under ? [...stroked, ...filled] : [...filled, ...stroked]).filter((i) => (i.contours.length || i.run) && visible(i.paint)));
