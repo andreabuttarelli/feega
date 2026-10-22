@@ -3,7 +3,8 @@
   import { postPageAction } from '$lib/api/page-action';
   import type { ActionResult } from '@sveltejs/kit';
   import { goto, invalidateAll } from '$app/navigation';
-  import { ArrowLeft, Check } from '@lucide/svelte';
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import Check from '@lucide/svelte/icons/check';
   import PageHead from '$lib/components/PageHead.svelte';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import PhotoDrop, { type Checked } from '$lib/components/studio/PhotoDrop.svelte';

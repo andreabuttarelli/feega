@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LoaderCircle } from "@lucide/svelte";
+	import LoaderCircle from "@lucide/svelte/icons/loader-circle";
 	import { cn } from "$lib/utils.js";
 
 	let { label, class: className }: { label: string; class?: string } = $props();

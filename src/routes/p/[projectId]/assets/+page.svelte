@@ -1,6 +1,7 @@
 <script lang="ts">
   import PageHead from '$lib/components/PageHead.svelte';
-  import { Upload, Images } from '@lucide/svelte';
+  import Upload from '@lucide/svelte/icons/upload';
+  import Images from '@lucide/svelte/icons/images';
   import { Button } from '$lib/components/ui/button';
   import { Badge } from '$lib/components/ui/badge';
   import { Notice } from '$lib/components/ui/notice';

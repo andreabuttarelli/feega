@@ -4,7 +4,14 @@
   import { apiEnhance } from '$lib/dashboard/api-enhance';
   import { postPageAction } from '$lib/api/page-action';
   import { invalidate } from '$app/navigation';
-  import { ArrowLeft, Check, Columns2, Download, RotateCcw, X, ChevronLeft, ChevronRight } from '@lucide/svelte';
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import Check from '@lucide/svelte/icons/check';
+  import Columns2 from '@lucide/svelte/icons/columns-2';
+  import Download from '@lucide/svelte/icons/download';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+  import X from '@lucide/svelte/icons/x';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import PageHead from '$lib/components/PageHead.svelte';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
