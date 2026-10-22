@@ -10,7 +10,7 @@ export enum Join {
   Bevel = 'bevel'
 }
 
-const MITER_LIMIT = 4;
+export const MITER_LIMIT = 4;
 const ROUND_STEPS = 24;
 const EPSILON = 1e-9;
 const DASH_SLACK = 1e-6;
@@ -34,7 +34,7 @@ function band(a: Pt, b: Pt, hw: number, extendA: number, extendB: number): numbe
   return [s[0] + nx * hw, s[1] + ny * hw, e[0] + nx * hw, e[1] + ny * hw, e[0] - nx * hw, e[1] - ny * hw, s[0] - nx * hw, s[1] - ny * hw];
 }
 
-function joinAt(prev: Pt, at: Pt, next: Pt, hw: number, join: Join): number[][] {
+function joinAt(prev: Pt, at: Pt, next: Pt, hw: number, join: Join, miter: number): number[][] {
   if (join === Join.Round) {
     return [disc(at, hw)];
   }
@@ -48,13 +48,13 @@ function joinAt(prev: Pt, at: Pt, next: Pt, hw: number, join: Join): number[][] 
     const my = n0[1] + n1[1];
     const mlen = Math.hypot(mx, my);
     const cos = mlen / 2;
-    const mitred = join === Join.Miter && mlen > EPSILON && 1 / cos <= MITER_LIMIT;
+    const mitred = join === Join.Miter && mlen > EPSILON && 1 / cos <= miter;
     out.push(mitred ? [at[0], at[1], a[0], a[1], at[0] + (side * mx * hw) / (mlen * cos), at[1] + (side * my * hw) / (mlen * cos), b[0], b[1]] : [at[0], at[1], a[0], a[1], b[0], b[1]]);
   }
   return out;
 }
 
-export function strokePolygons(flat: number[], closed: boolean, width: number, cap: Cap, join: Join): number[][] {
+export function strokePolygons(flat: number[], closed: boolean, width: number, cap: Cap, join: Join, miter = MITER_LIMIT): number[][] {
   const pts = pointsOf(flat);
   const hw = width / 2;
   if (pts.length < 2 || hw <= 0) {
@@ -67,7 +67,7 @@ export function strokePolygons(flat: number[], closed: boolean, width: number, c
   const corners = closed && pts.length > 2 ? ring.slice(0, -1).map((_, i) => i) : ring.slice(1, -1).map((_, i) => i + 1);
   for (const i of corners) {
     const prev = ring[(i - 1 + ring.length - 1) % (ring.length - 1)];
-    polys.push(...joinAt(prev, ring[i], ring[i + 1] ?? ring[1], hw, join));
+    polys.push(...joinAt(prev, ring[i], ring[i + 1] ?? ring[1], hw, join, miter));
   }
   if (cap === Cap.Round && !closed) {
     polys.push(disc(ring[0], hw), disc(ring[ring.length - 1], hw));

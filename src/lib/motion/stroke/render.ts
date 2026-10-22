@@ -1,6 +1,6 @@
 import { FillType, type Fill, type FillOf } from '../fill/model';
 import { blendStyle, opacityAttr, svgPaint, type FillPaint } from '../fill/render';
-import { StrokeAlign, type Stroke } from './model';
+import { DEFAULT_MITER, StrokeAlign, type Stroke } from './model';
 
 export type StrokePaint = Omit<FillPaint, 'asset'> & { unit: number };
 export type StrokeShape = { sided: boolean };
@@ -48,7 +48,8 @@ const blended = (s: Stroke) => blendStyle(s.paint);
 function line(s: Stroke, colour: string, paint: StrokePaint, id: string, paths: string): { def: string; body: string } {
   const a = ALIGN[s.align];
   const dashed = s.dash > 0 ? `;stroke-dasharray:${round(s.dash * paint.unit)} ${round((s.gap || s.dash) * paint.unit)}` : '';
-  const style = `fill:none;stroke:${colour};stroke-width:${round(s.width * paint.unit * a.stretch)};stroke-linecap:${s.cap};stroke-linejoin:${s.join}${dashed}${blended(s)}`;
+  const mitred = s.miter === DEFAULT_MITER ? '' : `;stroke-miterlimit:${s.miter}`;
+  const style = `fill:none;stroke:${colour};stroke-width:${round(s.width * paint.unit * a.stretch)};stroke-linecap:${s.cap};stroke-linejoin:${s.join}${mitred}${dashed}${blended(s)}`;
   return { def: a.def(id, paths, paint.size), body: `<g style="${style}"${look(s)}${a.attr(id)}>${paths}</g>` };
 }
 
