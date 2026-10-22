@@ -7,14 +7,17 @@
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
+  import { FillField, fillKey } from '$lib/motion/fill/keys';
+  import { KeyMark } from '$lib/motion/timeline-layers';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import MediaPicker from './MediaPicker.svelte';
   import type { MediaUploader } from './media-upload';
   import { MediaKind, type MediaPick } from '$lib/motion/media/pick';
 
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
+  type Keys = { mark: (key: string) => KeyMark; toggle: (key: string) => void };
 
-  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, onchange }: { gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, keys = null, onchange }: { keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const ICON = cn('inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-ui-icon hover:bg-ui-wash hover:text-ui-text', FOCUS_RING);
@@ -117,9 +120,16 @@
   </svg>
 {/snippet}
 
-{#snippet colour(name: string, value: string, write: (next: string) => void)}
+{#snippet diamond(key: string)}
+  {#if keys}
+    <button type="button" class={cn('relative inline-flex h-6 w-4 shrink-0 items-center justify-center before:size-[5px] before:rotate-45 before:border before:border-ui-accent-solid before:content-[""]', FOCUS_RING, keys.mark(key) === KeyMark.None ? 'before:opacity-50 hover:before:opacity-100' : keys.mark(key) === KeyMark.Here ? 'before:bg-ui-accent-solid' : 'before:bg-ui-accent-solid/50')} data-testid="fill-key" data-key={key} data-mark={keys.mark(key)} title="Keyframe at playhead" aria-label={`Keyframe ${key}`} aria-pressed={keys.mark(key) === KeyMark.Here} onclick={() => keys.toggle(key)}></button>
+  {/if}
+{/snippet}
+
+{#snippet colour(name: string, value: string, write: (next: string) => void, key: string | null = null)}
   {@const { base, alpha } = colourAlpha(value)}
   <div class="flex min-w-0 items-center gap-1">
+    {#if key}{@render diamond(key)}{/if}
     <div class="min-w-0 flex-1"><ColorField {name} {gesture} value={base} {tokens} onchange={(next) => write(recolour(next, alpha))} /></div>
     <input class={cn(FIELD_INPUT, 'w-12')} type="number" min="0" max="100" step="1" data-testid="fill-alpha" aria-label={`${name} alpha`} title="Alpha %" value={pct(alpha)} onchange={(e) => write(recolour(base, percentOf(e)))} />
   </div>
@@ -206,7 +216,7 @@
           </select>
         </label>
         {#if fill.type === FillType.Solid}
-          {@render colour('Fill colour', fill.color, (next) => patch(index, { color: next }, 'Fill colour'))}
+          {@render colour('Fill colour', fill.color, (next) => patch(index, { color: next }, 'Fill colour'), fillKey(index, FillField.Colour))}
         {:else if fill.type !== FillType.Image}
           {@const at = Math.min(stopAt, fill.stops.length - 1)}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -226,10 +236,11 @@
               ></button>
             {/each}
           </div>
-          {@render colour(`Stop ${at + 1} colour`, fill.stops[at].color, (next) => setStop(index, at, { color: next }))}
+          {@render colour(`Stop ${at + 1} colour`, fill.stops[at].color, (next) => setStop(index, at, { color: next }), fillKey(index, FillField.StopColor, at))}
           <div class={FIELD_ROW}>
             <span class={LABEL}>Position</span>
             <span class="flex items-center gap-1">
+              {@render diamond(fillKey(index, FillField.StopPos, at))}
               <input class={cn(FIELD_INPUT, 'w-14')} type="number" min="0" max="100" aria-label="Stop position" value={pct(fill.stops[at].pos)} onchange={(e) => setStop(index, at, { pos: percentOf(e) })} />
               <button
                 type="button"
@@ -244,15 +255,15 @@
             </span>
           </div>
           {#if fill.type === FillType.Linear}
-            <label class={FIELD_ROW}><span class={LABEL}>Angle</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Angle</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.Angle))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></span></label>
           {:else if fill.type === FillType.Angular}
-            <label class={FIELD_ROW}><span class={LABEL}>Angle</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></label>
-            <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></label>
-            <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Angle</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.Angle))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></span></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreX))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></span></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreY))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></span></label>
           {:else if fill.type === FillType.Radial}
-            <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></label>
-            <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></label>
-            <label class={FIELD_ROW}><span class={LABEL}>Radius</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="400" step="1" data-testid="fill-radius" value={pct(fill.radius)} onchange={(e) => patch(index, { radius: Math.max(1, Number(e.currentTarget.value)) / PERCENT }, 'Gradient radius')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreX))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></span></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.CentreY))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></span></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Radius</span><span class="flex items-center gap-1">{@render diamond(fillKey(index, FillField.Radius))}<input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="400" step="1" data-testid="fill-radius" value={pct(fill.radius)} onchange={(e) => patch(index, { radius: Math.max(1, Number(e.currentTarget.value)) / PERCENT }, 'Gradient radius')} /></span></label>
           {/if}
         {:else}
           <MediaPicker label="Fill image" value={imagePick(fill)} {assets} uploader={upload} onpick={(pick) => patch(index, IMAGE_PATCH(pick), 'Fill image')} />

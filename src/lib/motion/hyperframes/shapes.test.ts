@@ -29,6 +29,25 @@ describe('shape bake', () => {
     expect(bake.frames[bake.index[3]]).toContain('Z"');
   });
 
+  it('a keyed gradient stop colour bakes a new gradient each frame', () => {
+    const stops = [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }];
+    const graded = clip({ fills: [{ type: 'linear-gradient', stops, angle: 90 }] }, { 'fill.0.stop.0.color': [{ frame: 0, value: '#000000', ease: Ease.Linear }, { frame: 3, value: '#ff0000', ease: Ease.Linear }] });
+    const bake = shapeBake(graded, env)!;
+
+    expect(bake.frames[bake.index[0]]).toContain('stop-color:#000000');
+    expect(bake.frames[bake.index[3]]).toContain('stop-color:#ff0000');
+    expect(new Set(bake.index).size).toBe(4);
+  });
+
+  it('a keyed gradient angle moves the gradient end points', () => {
+    const stops = [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }];
+    const turning = clip({ fills: [{ type: 'linear-gradient', stops, angle: 0 }] }, { 'fill.0.angle': [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 3, value: 90, ease: Ease.Linear }] });
+    const bake = shapeBake(turning, env)!;
+
+    expect(bake.frames[bake.index[0]]).toContain('x1="0" y1="2"');
+    expect(bake.frames[bake.index[3]]).toContain('x1="400"');
+  });
+
   it('a wiggle with speed animates without keyframes, and bakes the same twice', () => {
     const wiggly = clip({ modifiers: [{ id: 'w', kind: ModifierKind.Wiggle, params: { speed: 5 } }] });
     expect(shapeBake(wiggly, env)).toEqual(shapeBake(wiggly, env));

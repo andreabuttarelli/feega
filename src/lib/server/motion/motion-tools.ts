@@ -1107,7 +1107,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     set_keyframes: tool({
       description:
-        `Animate one prop of a clip: replaces its keyframes. time is seconds from the clip start; ease is the curve leaving that keyframe: standard (default, feega.inOut: expo in-out with a soft settle, for moves), enter (feega.out, for entrances), exit (feega.in, for exits), linear (only a drift or a loop), overshoot (a visible bounce: off-style), elastic or bounce (springy: only when asked, with intensity 0..1, default 0.5), or a cubic-bezier [x1,y1,x2,y2]. ${INTERP_HELP} Colour props take #rrggbb or brand colours. list_components says what each component animates.`,
+        `Animate one prop of a clip: replaces its keyframes. time is seconds from the clip start; ease is the curve leaving that keyframe: standard (default, feega.inOut: expo in-out with a soft settle, for moves), enter (feega.out, for entrances), exit (feega.in, for exits), linear (only a drift or a loop), overshoot (a visible bounce: off-style), elastic or bounce (springy: only when asked, with intensity 0..1, default 0.5), or a cubic-bezier [x1,y1,x2,y2]. ${INTERP_HELP} Colour props take #rrggbb or brand colours. A Shape's gradient fills animate by fill index (from 0): fill.<i>.stop.<n>.color, fill.<i>.stop.<n>.pos (0..1), fill.<i>.angle (linear, angular), fill.<i>.cx / cy (radial, angular centre 0..1), fill.<i>.radius (radial). list_components says what each component animates.`,
       inputSchema: z.object({
         clip_id: z.string(),
         prop: z.string(),

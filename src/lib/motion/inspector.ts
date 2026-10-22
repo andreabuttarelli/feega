@@ -14,6 +14,8 @@ import { removeKeyframes, setKeyframe, setMask, setProps, setTransform, type OpR
 import { PropFormat, type PropSpec, type PropsSchema } from './custom/component';
 import { withParams } from './custom/params';
 import { effectOfKey } from './effects/model';
+import { applyFillKeys } from './fill/keys';
+import { fillsOf } from './fill/model';
 import { setEffect } from './effects/ops';
 import { SELECTOR, animatorOfKey } from './text-animators/model';
 import { setAnimator } from './text-animators/ops';
@@ -252,6 +254,7 @@ const EDIT_BASE: Record<Source, (doc: MotionDoc, clip: MotionClip, key: string, 
     const next = ref ? withModifierParam((clip.props.modifiers as Modifier[] | undefined) ?? [], ref.id, ref.param, Number(value)) : `no modifier for ${key}`;
     return typeof next === 'string' ? { ok: false, error: next } : setProps(doc, clip.id, { modifiers: next });
   },
+  [Source.Fill]: (doc, clip, key, value) => setProps(doc, clip.id, { fills: applyFillKeys(fillsOf(clip.props), { [key]: value }) }),
   [Source.TextPath]: (doc, clip, key, value) => {
     const patch = textPathPatch(key, value);
     return patch ? setTextPath(doc, clip.id, patch) : { ok: false, error: `no text path for ${key}` };

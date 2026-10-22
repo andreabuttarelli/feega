@@ -44,6 +44,19 @@ describe('motion agent keyframe tools', () => {
     expect(String(out.error)).toContain('rotateY');
   });
 
+  it('set_keyframes animates a gradient stop colour and angle of a shape fill', async () => {
+    const { session, run } = setup();
+    const fills = [{ type: 'linear-gradient', angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
+    await run('add_clip', { component: 'Shape', start: 0, duration: 2, props: { shape: 'rect', fills } });
+    const colour = await run('set_keyframes', { clip_id: 'id1', prop: 'fill.0.stop.0.color', keyframes: [{ time: 0, value: '#000000' }, { time: 1, value: '#ff0000' }] });
+    const angle = await run('set_keyframes', { clip_id: 'id1', prop: 'fill.0.angle', keyframes: [{ time: 0, value: 0 }, { time: 1, value: 180 }] });
+
+    expect(colour.ok).toBe(true);
+    expect(angle.ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.keyframes['fill.0.stop.0.color'].map((k) => k.value)).toEqual(['#000000', '#ff0000']);
+    expect(findClip(session.doc, 'id1')!.clip.keyframes['fill.0.angle'].map((k) => k.frame)).toEqual([0, 30]);
+  });
+
   it('remove_keyframes drops a lane, or only the given times', async () => {
     const { session, run } = setup();
     await run('add_clip', { component: 'Title', start: 0 });
