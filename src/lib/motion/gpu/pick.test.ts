@@ -7,6 +7,9 @@ import { addClip, setTransform, setTransition, Side, type OpResult } from '../ti
 import { composeHtml } from '../hyperframes/compose';
 import { compileScene } from './scene';
 import { pickAt, rectOf } from './pick';
+import { drawClip } from '../draw-create';
+import { DrawTool } from '../draw-tool';
+import { TextSizing } from '../text-sizing';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -88,5 +91,16 @@ describe('rectOf', () => {
     const turned = rectOf(sceneOf(must(setTransform(shape(empty, 'a', 0.5, 0.5, 0.2), 'a', { rotateZ: 45 }))), 'a', 0)!;
 
     expect(turned.width).toBeGreaterThan(flat.width);
+  });
+});
+
+describe('a text the text tool just made', () => {
+  const REST_S = 1;
+  const made = (sizing: TextSizing) => must(drawClip(empty, DrawTool.Text, { x: 0.3, y: 0.46, width: 0.4, height: 0.12 }, 0, 'text1', sizing));
+
+  it.each([TextSizing.AutoWidth, TextSizing.AutoHeight, TextSizing.Fixed])('is picked under its glyphs (%s)', (sizing) => {
+    const doc = made(sizing);
+
+    expect(pickAt(sceneOf(doc), centre(doc, 'text1'), REST_S)).toBe('text1');
   });
 });

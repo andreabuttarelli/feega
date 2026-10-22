@@ -60,10 +60,11 @@ export function strokePad(markup: string): number {
 }
 
 const TEXT_EXTRAS = '.tu,.tw,.tg,img,svg,video,canvas';
+const TEXT_BLOCK = '[data-fit],[data-text]';
 
 function textParts(layer: Element): { el: HTMLElement; paint: Paint }[] {
-  const block = layer.querySelector('[data-fit]') as HTMLElement | null;
-  if (!block || !boxedChild(block) || block.querySelector(TEXT_EXTRAS) || layer.querySelectorAll('[data-fit]').length !== 1) {
+  const block = layer.querySelector(TEXT_BLOCK) as HTMLElement | null;
+  if (!block || !boxedChild(block) || block.querySelector(TEXT_EXTRAS) || layer.querySelectorAll(TEXT_BLOCK).length !== 1) {
     return [];
   }
   const box = block.parentElement!.parentElement as HTMLElement;
@@ -121,12 +122,14 @@ function contentSize(paint: Paint, parent: Size): Size {
   return SIZE[paint.kind]();
 }
 
+const lengthOf = (style: string, placed: string | undefined) => (Number.isFinite(parseFloat(style)) ? px(style) : px(placed));
+
 function linksOf(chain: HTMLElement[], frame: Size, paint: Paint): Link[] {
   const links: Link[] = [];
   let parent: Size = frame;
   for (const el of chain) {
     const placed = el.style.position === 'absolute' && el.style.width;
-    const size: Size = placed ? { width: px(el.style.width), height: px(el.style.height) } : parent;
+    const size: Size = placed ? { width: lengthOf(el.style.width, el.dataset.placedWidth), height: lengthOf(el.style.height, el.dataset.placedHeight) } : parent;
     const offset: Point = placed && !insetFull(el) ? [px(el.style.left), px(el.style.top)] : [0, 0];
     links.push({ el, size, offset, perspectiveFor: false });
     parent = size;
