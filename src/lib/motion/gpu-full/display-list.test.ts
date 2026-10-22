@@ -105,6 +105,15 @@ describe('displayListAt', () => {
     expect(corners(band).right - corners(band).left).toBeCloseTo(192 + 21.6);
   });
 
+  it('draws arrow heads at the ends of an open path inside its stroke band', () => {
+    const strokes = [{ paint: { type: FillType.Solid, color: '#ffffff' }, width: 0.01, endCap: 'triangle-arrow' }];
+    const plain = patch(withCard, 'card', { props: { ...cardProps, shape: 'path', path: 'M0 0.5L1 0.5', strokes: [{ ...strokes[0], endCap: 'none' }] } });
+    const arrowed = patch(withCard, 'card', { props: { ...cardProps, shape: 'path', path: 'M0 0.5L1 0.5', strokes } });
+    const band = (doc: MotionDoc) => list(doc).items.filter((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'card').at(-1)!;
+
+    expect(band(arrowed).contours.length).toBe(band(plain).contours.length + 1);
+  });
+
   it('plays an entrance transition on the whole layer', () => {
     const sliding = patch(withCard, 'card', { transitionIn: { kind: TransitionKind.SlideUp, durationInFrames: 10 } });
 

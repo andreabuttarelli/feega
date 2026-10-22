@@ -15,6 +15,7 @@ import { mattePairs, MATTE_READ } from '../matte';
 import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, fillsOf, type Fill, type FillOf } from '../fill/model';
 import { StrokeAlign, dashOf, strokesOf, type Stroke } from '../stroke/model';
 import { Cap, Join, dashes, strokePolygons } from './stroke';
+import { arrowHeads } from '../stroke/arrows';
 import { shapeLayers, type ShapeLook } from '../shape/render';
 import { lookAt } from '../hyperframes/shapes';
 import { modifierFilter } from '../shape/modifiers';
@@ -159,7 +160,8 @@ function strokeBands(s: Stroke, outline: Outline, unit: number): number[][] {
     const pattern = dashOf(s);
     return pattern.length ? dashes(pts, c.closed, pattern.map((d) => d * unit)).map((d) => ({ pts: d, closed: false })) : [{ pts, closed: c.closed }];
   });
-  return runs.flatMap((r) => strokePolygons(r.pts, r.closed, width, s.cap as Cap, s.join as Join, s.miter));
+  const heads = arrowHeads(outline, { start: s.startCap, end: s.endCap }, s.width * unit);
+  return [...runs.flatMap((r) => strokePolygons(r.pts, r.closed, width, s.cap as Cap, s.join as Join, s.miter)), ...heads];
 }
 
 function shapePainter({ clip, props, size, unit, colour, time, fps }: Env): Painted {

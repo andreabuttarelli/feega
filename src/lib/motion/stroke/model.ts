@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { FillType, PAINTED_AS, PaintedAs, fillSchema } from '../fill/model';
 import { CAPS, JOINS, ShapeKind } from '../shape/schema';
+import { ARROW_CAPS, ArrowCap } from './arrows';
 
 export enum StrokeAlign {
   Inside = 'inside',
@@ -36,6 +37,8 @@ export const strokeSchema = z.object({
   cap: z.enum(CAPS).default('butt'),
   join: z.enum(JOINS).default('miter'),
   miter: z.number().min(1).max(MAX_MITER).default(DEFAULT_MITER),
+  startCap: z.enum(ARROW_CAPS).default(ArrowCap.None),
+  endCap: z.enum(ARROW_CAPS).default(ArrowCap.None),
   visible: z.boolean().default(true)
 });
 

@@ -3,7 +3,7 @@ import { blendStyle, opacityAttr, svgPaint, type FillPaint } from '../fill/rende
 import { DEFAULT_MITER, StrokeAlign, dashOf, type Stroke } from './model';
 
 export type StrokePaint = Omit<FillPaint, 'asset'> & { unit: number };
-export type StrokeShape = { sided: boolean };
+export type StrokeShape = { sided: boolean; heads?: (s: Stroke) => string };
 
 const DIGITS = 1000;
 const round = (n: number) => Math.round(n * DIGITS) / DIGITS;
@@ -73,7 +73,9 @@ export function svgStrokes(strokes: readonly Stroke[], paint: StrokePaint, paths
     }
     const { def: gradient, fill } = svgPaint(s.paint as Painted, own, i);
     const layer = shape.sided && s.sides ? frame(s, fill, paint) : line(s, fill, paint, maskId(paint.id, i), paths);
-    return { def: gradient + layer.def, body: layer.body };
+    const heads = shape.heads?.(s) ?? '';
+    const capped = heads ? `<g style="fill:${fill};stroke:none"${look(s)}>${heads}</g>` : '';
+    return { def: gradient + layer.def, body: layer.body + capped };
   });
   return { defs: drawn.map((d) => d.def).join(''), body: drawn.map((d) => d.body).join('') };
 }

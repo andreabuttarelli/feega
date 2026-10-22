@@ -6,7 +6,8 @@ import { IDENTITY, applyModifiers, modifierFilter, modifierReach, type AppliedMo
 import { ShapeKind, modifierValues, type Modifier } from './schema';
 import { fillsOf } from '../fill/model';
 import { svgFills } from '../fill/render';
-import { SIDED, strokesOf } from '../stroke/model';
+import { SIDED, strokesOf, type Stroke } from '../stroke/model';
+import { arrowHeads, hasArrows } from '../stroke/arrows';
 import { strokeReach, svgStrokes } from '../stroke/render';
 
 export type ShapeLook = {
@@ -119,6 +120,12 @@ const NO_ASSET = () => null;
 const matrixAttr = (m: Layer['matrix']) => (m.every((n, i) => n === IDENTITY[i]) ? '' : ` transform="matrix(${m.map(round).join(' ')})"`);
 const opacityAttr = (o: number) => (o === 1 ? '' : ` opacity="${round(o)}"`);
 
+const polygonData = (poly: number[]) => `M${poly.map((v) => round(v)).join(' ')}Z`;
+
+function headMarkup(polys: number[][], matrix: Layer['matrix']): string {
+  return polys.map((poly) => `<path d="${polygonData(poly)}"${matrixAttr(matrix)}/>`).join('');
+}
+
 export function shapeMarkup(p: ShapeLook, paint: Paint): string {
   return shapeDrawing(p, paint).markup;
 }
@@ -131,7 +138,8 @@ export function shapeDrawing(p: ShapeLook, paint: Paint): { markup: string; exte
   const extent = paintedExtent(p, paint, layers);
   const filter = filterOf(p, paint, extent);
   const fills = fillPaths ? svgFills(fillsOf(p), { id: paint.id, size: paint.size, color: paint.color, asset: paint.asset ?? NO_ASSET }, fillPaths, p.fillRule) : { defs: '', body: '' };
-  const strokes = svgStrokes(strokesOf(p), paint, paths, { sided: SIDED[p.shape] });
+  const heads = (s: Stroke) => (hasArrows({ start: s.startCap, end: s.endCap }) ? layers.map((l) => headMarkup(arrowHeads(l.outline, { start: s.startCap, end: s.endCap }, s.width * paint.unit), l.matrix)).join('') : '');
+  const strokes = svgStrokes(strokesOf(p), paint, paths, { sided: SIDED[p.shape], heads });
   const inner = fills.defs + strokes.defs + filter;
   const defs = inner ? `<defs>${inner}</defs>` : '';
   const filtered = filter ? ` filter="url(#${filterId(paint.id)})"` : '';
