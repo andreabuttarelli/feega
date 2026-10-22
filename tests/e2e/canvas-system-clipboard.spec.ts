@@ -1,4 +1,5 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -140,10 +141,34 @@ test.describe('system clipboard on the canvas @real', () => {
     await pasteOverCanvas(page);
     await expect.poll(async () => (await clipsOf(admin, frame.id)).map((c) => c.props.text), { timeout: 20_000 }).toContain('Inside the frame');
 
+    const text = (await clipsOf(admin, frame.id)).find((c) => c.component === 'Text')!;
+    expect(text.props).toMatchObject({ sizing: 'auto', color: 'brand.text' });
+
     await putOnClipboard(page, { 'text/plain': ICON });
     await pasteOverCanvas(page);
-    await expect.poll(async () => (await clipsOf(admin, frame.id)).length, { timeout: 30_000 }).toBe(3);
+    await expect.poll(async () => (await clipsOf(admin, frame.id)).length, { timeout: 30_000 }).toBe(2);
+    expect((await elements(admin, session.canvasId)).map((n) => n.id)).toEqual([frame.id]);
     await page.waitForTimeout(2000);
     await shoot(page, '7-pasted-into-frame');
+  });
+
+  test('an image pasted over a frame lands inside it, with no node of its own', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const frame = await seedNode({ type: 'motion', x: 0, y: 0, data: LANDSCAPE });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frame.id, version: 1, doc: EMPTY_FRAME, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const png = readFileSync(new URL('./fixtures/blue-square.png', import.meta.url)).toString('base64');
+    await page.evaluate(async (b64) => {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': new Blob([bytes], { type: 'image/png' }) })]);
+    }, png);
+    await pasteOverCanvas(page);
+
+    await expect.poll(async () => (await clipsOf(admin, frame.id)).map((c) => c.component), { timeout: 30_000 }).toEqual(['Image']);
+    expect((await elements(admin, session.canvasId)).map((n) => n.id)).toEqual([frame.id]);
+    await page.waitForTimeout(2000);
+    await shoot(page, '8-image-into-frame');
   });
 });

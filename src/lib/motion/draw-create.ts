@@ -106,7 +106,7 @@ export function drawnOf(wire: DrawnWire): Drawn | string {
   return typeof outline === 'string' ? outline : { ...paint, outline };
 }
 
-function penPaint({ fill, stroke }: PenPaint): Record<string, unknown> {
+export function penPaint({ fill, stroke }: PenPaint): Record<string, unknown> {
   return {
     ...(fill === null ? { fillKind: FillKind.None } : {}),
     ...(fill ? { fillKind: FillKind.Solid, fill } : {}),

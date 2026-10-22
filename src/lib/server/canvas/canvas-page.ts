@@ -86,7 +86,8 @@ import { exportElementsSchema, exportRowsSchema } from '$lib/motion/export-rows'
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
-import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { DropOn, OutputKind } from '$lib/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -502,6 +503,21 @@ export const actions: Actions<CanvasParams> = {
     }
 
     try {
+      const drop = fd.has('drop') ? dropSchema.safeParse(jsonField(fd, 'drop')) : null;
+      if (drop) {
+        if (!drop.success || drop.data.on !== DropOn.Frame) {
+          return fail(400, { error: 'invalid drop' });
+        }
+        const { asset, kind } = await registerUploadedAsset(scope.db, {
+          orgId: scope.orgId, projectId: scope.canvas.projectId, path, fileName, mimeType, bytes
+        });
+        if (kind !== OutputKind.Image) {
+          return fail(400, { error: 'only pictures land inside a frame' });
+        }
+        const size = { width: coord(fd.get('width')), height: coord(fd.get('height')) };
+        return movedAnswer(await placeMedia(canvasFrames(scope), { kind: OutputKind.Image, assetId: asset.id, name: fileName, width: size.width, height: size.height }, drop.data));
+      }
+
       if (fd.get('into') === 'library') {
         const { asset } = await registerUploadedAsset(scope.db, {
           orgId: scope.orgId, projectId: scope.canvas.projectId, path, fileName, mimeType, bytes

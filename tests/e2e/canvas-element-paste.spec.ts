@@ -1,6 +1,8 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+const SETTLE_MS = 2500;
+const ELEMENT_X = 0.3;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 
 type Doc = { tracks: { clips: { id: string; props: Record<string, unknown> }[] }[] };
@@ -35,9 +37,13 @@ test.describe('copy and paste elements @real', () => {
     expect(error).toBeNull();
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.locator(`[data-motion-node="${frame.id}"] [data-frame-stage]`).click({ position: { x: 4, y: 4 } });
-    await expect(page.getByTestId('selection-overlay')).toBeVisible({ timeout: 15_000 });
-    await page.getByTestId('selection-overlay').click({ position: { x: 4, y: 4 } });
+    await page.waitForTimeout(SETTLE_MS);
+    const stage = (await page.locator(`[data-frame="${frame.id}"]`).boundingBox())!;
+    const element = { x: stage.x + stage.width * ELEMENT_X, y: stage.y + stage.height / 2 };
+    await page.mouse.click(element.x, element.y);
+    await page.waitForTimeout(SETTLE_MS);
+    await page.mouse.click(element.x, element.y);
+    await expect(page.getByTestId('frame-selection')).toHaveCount(1, { timeout: 15_000 });
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('ControlOrMeta+c');
     await page.keyboard.press('ControlOrMeta+v');

@@ -85,6 +85,7 @@ const SUMMARY = {
   movedIn: 'Moved an element in from another frame',
   copiedIn: 'Pasted an element from another frame',
   placed: 'Placed a generated output',
+  pasted: 'Pasted a picture',
   linked: 'Updated from a connected node',
   putBack: 'Put back after a failed move'
 };
@@ -358,6 +359,18 @@ export async function placeOutput(store: FrameStore, ask: OutputAsk): Promise<Mo
     return landing;
   }
   return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
+}
+
+export async function placeMedia(store: FrameStore, output: Output, drop: Extract<Drop, { on: DropOn.Frame }>): Promise<Moved> {
+  const target = await targetOf(store, drop);
+  if (!target || !('doc' in target)) {
+    return target ?? refused(MoveOutcome.NotFound);
+  }
+  const landing = await landInFrame(store, target, mediaElement(output, target.doc.fps), drop, SUMMARY.pasted);
+  if (!isLanding(landing)) {
+    return landing;
+  }
+  return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: false, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
 }
 
 async function linkFrame(store: FrameStore, ask: { sourceNodeId: string; frameNodeId: string }): Promise<Moved> {

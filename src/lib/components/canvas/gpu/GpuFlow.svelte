@@ -2,7 +2,7 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { framePicker, type WorldRect } from '$lib/canvas/frame-pick';
+  import { framePicker } from '$lib/canvas/frame-pick';
   import { onMount, untrack, type ComponentProps } from 'svelte';
   import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
@@ -44,7 +44,10 @@
   import { FRAME_DIALOG_ACTIONS, FrameDialog, isFrameDialogAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Reach, clickTarget, frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Reach, frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { chainTarget, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
+  import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
+  import { quadBox, quadStyle } from '$lib/canvas/quad-box';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
   import { GRIP_SUMMARY, SelectionKind, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
@@ -99,7 +102,7 @@
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
-  import { HTML_MIME, TEXT_MIME, clipboardHtml, readPaste, type ClipboardPayload, type PasteData, type PasteSource } from '$lib/canvas/system-clipboard';
+  import { HTML_MIME, Pasted, TEXT_MIME, clipboardHtml, readPaste, type ClipboardPayload, type PasteData, type PasteSource } from '$lib/canvas/system-clipboard';
   import { eventSource, systemSource, writeSystem } from '$lib/canvas/system-clipboard-browser';
   import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { isTypingTarget } from '$lib/shortcuts';
@@ -217,7 +220,7 @@
   let selected = $state<string[]>([]);
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
-  let pickHover = $state<{ nodeId: string; clip: string; rect: WorldRect } | null>(null);
+  let pickHover = $state<{ nodeId: string; clip: string; quad: Point[] } | null>(null);
   let overrides = $state<Map<string, Box>>(new Map());
   let copies = $state<Map<string, Box>>(new Map());
   let marquee = $state<Box | null>(null);
@@ -1124,6 +1127,11 @@
     const hit = hitAt(world);
     const id = hit.kind === HitKind.Node ? hit.nodeId : null;
     const deeper = id ? framePickAt(world) : null;
+    const entered = id && deeper && inside?.nodeId === id ? enteredFrom(deeper.picker.chain(world, deeper.space), picks) : null;
+    if (id && entered) {
+      pickMany(id, [entered]);
+      return;
+    }
     if (id && deeper?.clip) {
       select([id]);
       goInside(id, Gesture.Double, deeper.clip);
@@ -1216,8 +1224,8 @@
 
   function hoverElement(w: Point) {
     const hit = framePickAt(w);
-    const rect = hit?.clip ? hit.picker.outline(hit.clip, hit.space) : null;
-    pickHover = hit?.clip && rect ? { nodeId: hit.nodeId, clip: hit.clip, rect } : null;
+    const quad = hit?.clip ? hit.picker.outlineQuad(hit.clip, hit.space) : null;
+    pickHover = hit?.clip && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad } : null;
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
@@ -1306,7 +1314,13 @@
     if (!hit?.clip || !doc) {
       return null;
     }
-    return { nodeId: hit.nodeId, clip: clickTarget(doc, hit.clip, inside?.nodeId === hit.nodeId ? picks : [], reach) };
+    const clip = chainTarget(doc, hit.picker.chain(w, hit.space), inside?.nodeId === hit.nodeId ? picks : [], reach);
+    return clip ? { nodeId: hit.nodeId, clip } : null;
+  }
+
+  function groupOfPick(nodeId: string): string | null {
+    const live = liveOf(nodeId);
+    return live ? parentPick(live.doc, picks[0]) : null;
   }
 
   function pickElement(e: PointerEvent, w: Point): boolean {
@@ -1326,17 +1340,21 @@
     if (!nodeId || !live || !picks.length) {
       return;
     }
-    const picked = picksFor(id, live.doc, picks);
-    if (picked) {
-      pickMany(nodeId, picked);
+    const at = scoped(live.doc, picks, frameOfLive(live));
+    if (!at) {
       return;
     }
-    const done = await barActionLater(id, { doc: live.doc, selection: picks, frame: frameOfLive(live), newId: () => crypto.randomUUID().slice(0, 8), load: loadOutliner, assets: live.assets });
+    const picked = picksFor(id, at.view, at.ids);
+    if (picked) {
+      pickMany(nodeId, at.scene(picked));
+      return;
+    }
+    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: loadOutliner, assets: live.assets });
     if (!done) {
       return;
     }
-    commit(nodeId, { ok: true, doc: done.doc }, done.summary);
-    pickMany(nodeId, done.selection);
+    commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
+    pickMany(nodeId, at.scene(done.selection));
   }
 
   let elementMenu = $state<Point | null>(null);
@@ -1508,7 +1526,7 @@
     }
     liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
     if (inside?.nodeId === nodeId) {
-      picks = picks.filter((id) => findClip(session.history.present, id));
+      picks = picks.filter((id) => scopeOf(session.history.present, id));
     }
   }
 
@@ -1566,9 +1584,10 @@
       return [];
     }
     const kind = picks.length > 1 ? SelectionKind.Member : SelectionKind.Element;
+    const onScreen = (p: Point): [number, number] => [(p.x - at.frame.box.x) * view.zoom, (p.y - at.frame.box.y) * view.zoom];
     return picks.flatMap((clip) => {
-      const rect = at.picker.outline(clip, at.space);
-      return rect ? [{ clip, kind, rect: { left: (rect.x - at.frame.box.x) * view.zoom, top: (rect.y - at.frame.box.y) * view.zoom, width: rect.w * view.zoom, height: rect.h * view.zoom } }] : [];
+      const quad = at.picker.outlineQuad(clip, at.space);
+      return quad ? [{ clip, kind, quad: quad.map(onScreen) }] : [];
     });
   }
 
@@ -1576,7 +1595,7 @@
     const mark = picks.length === 1 && typing?.nodeId !== nodeId ? selectionMarks(nodeId)[0] : null;
     const saver = mark ? saverOf(nodeId) : null;
     const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip) : null;
-    return mark && target ? { clip: mark.clip, rect: mark.rect, index: target.index, fill: target.fill } : null;
+    return mark && target ? { clip: mark.clip, rect: quadBox(mark.quad), index: target.index, fill: target.fill } : null;
   }
 
   function dragGradient(nodeId: string, clip: string, index: number, fill: Fill) {
@@ -1594,13 +1613,20 @@
     }
   }
 
-  function groupMark(nodeId: string) {
+  function groupMark(nodeId: string): [number, number][] | null {
     const marks = selectionMarks(nodeId);
     if (marks.length < 2) {
       return null;
     }
-    const b = unionBounds(marks.map(({ rect: r }) => ({ left: r.left, top: r.top, right: r.left + r.width, bottom: r.top + r.height })));
-    return { left: b.left, top: b.top, width: b.right - b.left, height: b.bottom - b.top };
+    const xs = marks.flatMap((m) => m.quad.map(([x]) => x));
+    const ys = marks.flatMap((m) => m.quad.map(([, y]) => y));
+    const [left, top, right, bottom] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+    return [
+      [left, top],
+      [right, top],
+      [right, bottom],
+      [left, bottom]
+    ];
   }
 
   let frameViews = $state<FrameViews>(FRAME_VIEW_DEFAULT);
@@ -1625,11 +1651,12 @@
   function deletePicks(): boolean {
     const nodeId = inside?.nodeId;
     const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
-    const done = tools ? barAction(Action.Delete, { doc: tools.doc, selection: picks, frame: tools.frame, newId: () => crypto.randomUUID().slice(0, 8) }) : null;
-    if (!nodeId || !done) {
+    const at = tools ? scoped(tools.doc, picks, tools.frame) : null;
+    const done = at ? barAction(Action.Delete, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8) }) : null;
+    if (!nodeId || !at || !done) {
       return false;
     }
-    commit(nodeId, { ok: true, doc: done.doc }, done.summary);
+    commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
     picks = [];
     return true;
   }
@@ -1719,6 +1746,10 @@
   }
 
   function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
+    if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && pickElement(e, toWorld(view, local(e)))) {
+      e.stopPropagation();
+      return;
+    }
     const at = pickerOf(nodeId);
     const saver = saverOf(nodeId);
     if (!at || !saver || e.button !== 0 || frameChrome(kindOfNode(nodeId)).dragsHost) {
@@ -1728,17 +1759,19 @@
     e.stopPropagation();
     dropHover();
     const start = saver.history.present;
-    const frame = frameOfLive({ doc: start, playhead: at.live.playhead });
-    const ids = clip && !picks.includes(clip) ? [clip] : picks;
-    const boxes = guessedBoxes(withAutoLayout(start));
-    const framePt = (ev: PointerEvent): Pt => at.picker.framePoint(toWorld(view, local(ev)), at.space);
+    const inScope = scoped(start, clip && !picks.includes(clip) ? [clip] : picks, frameOfLive({ doc: start, playhead: at.live.playhead }));
+    if (!inScope) {
+      return;
+    }
+    const boxes = guessedBoxes(withAutoLayout(inScope.view));
+    const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
     const from = framePt(e);
     const reach = frameReach(at);
     let result: OpResult | null = null;
 
     const move = (ev: PointerEvent) => {
-      const dragged = dragClips({ doc: start, ids, frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey }, reach });
-      result = dragged.result;
+      const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey }, reach });
+      result = dragged.result.ok ? { ok: true, doc: inScope.merge(dragged.result.doc) } : dragged.result;
       frameGuides = { nodeId, guides: dragged.guides, gaps: dragged.gaps };
       if (result.ok) {
         liveDocs.set(nodeId, { ...at.live, doc: result.doc });
@@ -2333,9 +2366,10 @@
     if (!nodeId || !tools) {
       return false;
     }
-    const result = nudgeClips(tools.doc, picks, tools.frame, [dx, dy]);
-    if (result.ok) {
-      commit(nodeId, result, GRIP_SUMMARY[Grip.Move]);
+    const at = scoped(tools.doc, picks, tools.frame);
+    const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy]) : null;
+    if (at && result?.ok) {
+      commit(nodeId, { ok: true, doc: at.merge(result.doc) }, GRIP_SUMMARY[Grip.Move]);
     }
     return true;
   }
@@ -2406,6 +2440,11 @@
     altHeld = e.altKey;
     if (e.key === ' ' && !(e.target as HTMLElement).closest?.(INTERACTIVE)) {
       space = true;
+    }
+    const group = e.key === 'Escape' && inside && picks.length === 1 ? groupOfPick(inside.nodeId) : null;
+    if (inside && group) {
+      pickMany(inside.nodeId, [group]);
+      return;
     }
     if (e.key === 'Escape' && inside?.level.clip) {
       goInside(inside.nodeId, Gesture.Leave, null);
@@ -2487,8 +2526,37 @@
     return inView ? toFlow(pointer!) : viewCentre();
   }
 
+  const IN_FRAME: { [K in Pasted]?: (data: Extract<PasteData<File>, { kind: K }>) => FramePaste } = {
+    [Pasted.Svg]: ({ svg }) => ({ svg }),
+    [Pasted.Text]: ({ text }) => ({ text })
+  };
+  const PASTED_SUMMARY = 'Pasted';
+
+  function pasteInFrame(data: PasteData<File>, at: Point): boolean {
+    const paste = (IN_FRAME[data.kind] as ((d: PasteData<File>) => FramePaste) | undefined)?.(data);
+    const hit = paste ? framePickAt(at) : null;
+    const saver = hit && frameChrome(kindOfNode(hit.nodeId)).takesDrops ? saverOf(hit.nodeId) : null;
+    if (!paste || !hit || !saver) {
+      return false;
+    }
+    const doc = saver.history.present;
+    const [x0, y0] = hit.picker.framePoint(at, hit.space);
+    const [x1, y1] = hit.picker.framePoint({ x: at.x + 1, y: at.y }, hit.space);
+    const done = pastedInFrame(doc, paste, hit.picker.unitAt(at, hit.space), Math.hypot(x1 - x0, y1 - y0), frameOfLive({ doc, playhead: liveOf(hit.nodeId)?.playhead }), () => crypto.randomUUID().slice(0, 8));
+    if (!done) {
+      return false;
+    }
+    select([hit.nodeId]);
+    commit(hit.nodeId, { ok: true, doc: done.doc }, PASTED_SUMMARY);
+    pickMany(hit.nodeId, done.selection);
+    return true;
+  }
+
   function pasteFrom(source: PasteSource<File> | null, at: Point) {
     const data = source ? readPaste(source) : null;
+    if (data && pasteInFrame(data, at)) {
+      return;
+    }
     if (data) {
       props.onPasteData?.(data, at);
       return;
@@ -2761,7 +2829,7 @@
           <CoreTextEdit rect={edit.rect} look={edit.look} text={edit.text} runs={edit.runs} styled={edit.styled} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} rect={mark.rect} kind={mark.kind} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}
@@ -2769,7 +2837,7 @@
         {/if}
         {@const group = typing?.nodeId === frame.id ? null : groupMark(frame.id)}
         {#if group}
-          <FrameSelection clip="" rect={group} kind={SelectionKind.Group} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
+          <FrameSelection clip="" quad={group} kind={SelectionKind.Group} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
         {/if}
         {@const guideArea = inside?.nodeId === frame.id ? frameArea(frame.id) : null}
         {@const measuredGapsIn = measuredIn(frame.id)}
@@ -2777,7 +2845,7 @@
           <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} measured={measuredGapsIn} />
         {/if}
         {#if pickHover?.nodeId === frame.id}
-          <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={`left:${(pickHover.rect.x - frame.x) * view.zoom}px;top:${(pickHover.rect.y - frame.y) * view.zoom}px;width:${pickHover.rect.w * view.zoom}px;height:${pickHover.rect.h * view.zoom}px`}></div>
+          <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
         {/if}
         {@const live = peering ? liveOf(frame.id) : null}
         {@const peers = peering ? peering.peersOf(frame.id, onCanvas) : []}
@@ -3080,6 +3148,7 @@
     box-sizing: border-box;
     border: 1px solid var(--ui-hover-outline, var(--ui-accent));
     pointer-events: none;
+    transform-origin: 0 0;
   }
 
   .gpu-node {

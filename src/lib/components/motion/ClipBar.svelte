@@ -1,14 +1,14 @@
 <script lang="ts">
   import type { MotionDoc } from '$lib/motion/doc';
   import { Caption, type ActionId } from '$lib/motion/actions';
-  import { PickMode, clipActions } from '$lib/motion/clip-bar';
+  import { PickMode, barActions } from '$lib/motion/clip-bar';
   import IconButton from './IconButton.svelte';
 
   type Props = { doc: MotionDoc; selection: readonly string[]; pick: PickMode; extra?: readonly ActionId[]; onrun: (id: ActionId) => void; ondone: () => void };
 
   let { doc, selection, pick, extra = [], onrun, ondone }: Props = $props();
 
-  const actions = $derived([...new Set([...clipActions(doc, selection), ...extra])]);
+  const actions = $derived(barActions(doc, selection, extra));
 </script>
 
 {#if actions.length}

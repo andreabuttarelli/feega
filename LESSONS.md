@@ -3226,3 +3226,11 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## A group inside a canvas frame picks as `<group>__0__<id>`
 
 **Signal:** after ⌘G inside a GPU frame the selection outline vanishes and clicks on the group select nothing the doc knows. **Move:** Precomp members compose with namespaced `data-clip`s; resolve a pick through the layer's `owners` chain to the deepest id `findClip` finds (`framePicker.pick`), never trust the leaf id.
+
+## Frame overlays stop updating while an element is picked
+
+**Signal:** selection boxes, drags and resizes inside a GPU frame look frozen (the doc changes, nothing redraws), no console error; `page.on('pageerror')` shows `each_key_duplicate`. **Move:** a keyed `{#each}` with a repeated key throws inside Svelte's flush and halts every later effect. Listen for `pageerror`, not only `console`, and dedupe lists merged from two sources (`barActions`).
+
+## A worktree dev server ignores your edits
+
+**Signal:** a `console.log` you just added never shows; `curl` of the module from vite lacks it. **Move:** vite does not watch files under `.claude/worktrees/`; restart the dev server after every edit.

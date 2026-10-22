@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, type OpResult } from '$lib/motion/timeline';
-import { Grip, aabb, quadOf, type Bounds } from '$lib/motion/scene-select';
+import { addClip, setTransform, type OpResult } from '$lib/motion/timeline';
+import { Grip, aabb, handlesOf, quadOf, type Bounds } from '$lib/motion/scene-select';
 import { guessedBoxes } from '$lib/motion/move-element';
 import { transformAt } from '$lib/motion/parent';
 import { dragClips, measuredGaps, nudgeClips, type Drag } from './frame-transform';
@@ -49,6 +49,20 @@ describe('dragClips', () => {
     const after = boundsOf(must(result), 'card');
     expect(centre(after)[0]).toBeCloseTo(centre(corner)[0]);
     expect(after.right - after.left).toBeCloseTo(corner.right - corner.left + 100);
+  });
+
+  it('Alt-resizes a rotated element along its own sides, from its centre', () => {
+    const turned = must(setTransform(DOC, 'card', { rotateZ: 90 }));
+    const side = handlesOf(quadOf(turned, 'card', 0, BOXES.card)).findIndex((h) => h.unit[0] === 1 && h.unit[1] === 0.5);
+    const at = handlesOf(quadOf(turned, 'card', 0, BOXES.card))[side].at;
+
+    const { result } = dragClips(drag({ doc: turned, grip: Grip.Scale, handle: side, from: at, to: [at[0], at[1] + 40], keys: { shift: false, alt: true }, reach: 0 }));
+
+    const card = findClip(must(result), 'card')!.clip;
+    expect(transformAt(card, 'rotateZ', 0)).toBe(90);
+    expect(transformAt(card, 'scaleX', 0)).toBeGreaterThan(1);
+    expect(transformAt(card, 'scaleY', 0)).toBeCloseTo(1);
+    expect(centre(aabb(quadOf(must(result), 'card', 0, BOXES.card)))).toEqual(centre(aabb(quadOf(turned, 'card', 0, BOXES.card))).map((n) => expect.closeTo(n, 5)));
   });
 
   it('resizes several elements as one group', () => {

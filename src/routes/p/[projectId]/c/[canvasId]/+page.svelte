@@ -10,6 +10,7 @@
   import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
   import { stackedLocally, type Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
+  import { MAX_PASTED_SHAPES, TEXT_BOX } from '$lib/canvas/frame-paste';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
@@ -1636,7 +1637,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  async function upload(file: File, at = { x: 0, y: 0 }) {
+  async function pictureSize(file: File): Promise<{ width: number; height: number } | null> {
+    const bitmap = await createImageBitmap(file).catch(() => null);
+    const size = bitmap ? { width: bitmap.width, height: bitmap.height } : null;
+    bitmap?.close();
+    return size;
+  }
+
+  async function upload(file: File, at = { x: 0, y: 0 }, hold: FrameHold | null = null) {
     if (FONT_FILE.test(file.name)) {
       await uploadFontFile(file);
       return;
@@ -1653,6 +1661,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
     if (up.error) {
       failed = up.error.message;
+      return;
+    }
+
+    if (hold) {
+      const size = await pictureSize(file);
+      landed(await post('upload', {
+        path, file_name: file.name, mime_type: file.type, bytes: file.size, ...(size ?? {}),
+        drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at })
+      }));
       return;
     }
 
@@ -3064,8 +3081,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return { tiles: clipboard };
   }
 
-  const MAX_PASTED_SHAPES = 200;
-  const TEXT_BOX = { lineHeight: 32, charWidth: 0.55, maxChars: 48 };
   const FIGMA_PASTE = 'Figma layers cannot be pasted directly. In Figma use Copy as → Copy as SVG, then paste here.';
 
   function shiftedPath(path: string, dx: number, dy: number): string | null {
@@ -3118,7 +3133,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const longest = Math.min(TEXT_BOX.maxChars, Math.max(...text.split('\n').map((line) => line.length)));
     const width = longest * TEXT_BOX.lineHeight * TEXT_BOX.charWidth;
     const height = TEXT_BOX.lineHeight;
-    void drawElement({ tool: DrawTool.Text, box: { left: at.x - width / 2, top: at.y - height / 2, width, height }, text, sizing: TextSizing.AutoHeight });
+    void drawElement({ tool: DrawTool.Text, box: { left: at.x - width / 2, top: at.y - height / 2, width, height }, text, sizing: TextSizing.AutoWidth });
   }
 
   const PASTE_DATA: { [K in Pasted]: (data: Extract<PasteData<File>, { kind: K }>, at: { x: number; y: number }) => void } = {
@@ -3133,7 +3148,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       void paste(at);
     },
     [Pasted.Svg]: ({ svg }, at) => void pasteSvg(svg, at),
-    [Pasted.Image]: ({ file }, at) => void upload(file, at),
+    [Pasted.Image]: ({ file }, at) => void upload(file, at, frameHolding(nodes, { left: at.x, top: at.y, width: 0, height: 0 })),
     [Pasted.Text]: ({ text }, at) => pasteText(text, at),
     [Pasted.Figma]: () => (failed = FIGMA_PASTE)
   };
@@ -3145,9 +3160,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   /** ⌘V: quel che `copy` ha in mano, riposato attorno al punto dato — vuoto se non si è mai copiato. */
   const PASTE_STAGGER = 24;
 
+  function pastedDrop(at: { x: number; y: number }): Drop {
+    const hold = frameHolding(nodes, { left: at.x, top: at.y, width: 0, height: 0 });
+    return hold ? { on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at } : { on: DropOn.Canvas, x: at.x, y: at.y };
+  }
+
   async function pasteElementsAt(at: { x: number; y: number }, copied: CopiedElements) {
     for (const [i, clip] of copied.clipIds.entries()) {
-      landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Canvas, x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER }) }));
+      landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify(pastedDrop({ x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER })) }));
     }
   }
 

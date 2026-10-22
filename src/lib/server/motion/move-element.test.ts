@@ -4,7 +4,7 @@ import { addClip } from '$lib/motion/timeline';
 import { setStill } from '$lib/motion/still';
 import { OutputKind, type Output } from '$lib/motion/move-element';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
-import { DropOn, MoveOutcome, copyElement, moveElement, placeOutput, retireFrameInputs, type FrameStore, type StoredFrame } from './move-element';
+import { DropOn, MoveOutcome, copyElement, moveElement, placeMedia, placeOutput, retireFrameInputs, type FrameStore, type StoredFrame } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const VIDEO_ID = '33333333-2222-4333-8444-555555555555';
@@ -154,6 +154,23 @@ describe('dropping an element on the empty canvas', () => {
 
     expect(moved.outcome).toBe(MoveOutcome.Conflict);
     expect(m.removed).toEqual(['frame-1']);
+  });
+});
+
+describe('a pasted picture over a frame', () => {
+  it('lands inside the frame as an image element, with no node of its own', async () => {
+    const m = memory();
+    seed(m, 'b', newMotionDoc(MotionFormat.Square));
+
+    const placed = await placeMedia(m.store, { kind: OutputKind.Image, assetId: IMAGE_ID, name: 'pasted.png', width: 400, height: 300 }, { on: DropOn.Frame, nodeId: 'b', at: { x: 0.3, y: 0.6 } });
+
+    expect(placed).toMatchObject({ outcome: MoveOutcome.Done, frameId: 'b', created: false });
+    expect(clipsOf(headOf(m, 'b').doc)[0]).toMatchObject({ component: 'Image', props: { assetId: IMAGE_ID, x: 0.3, y: 0.6 } });
+    expect(placed.outcome === MoveOutcome.Done && placed.undo).toEqual([{ kind: 'doc.revision', nodeId: 'b', before: 1, after: 2 }]);
+  });
+
+  it('an unknown frame is refused', async () => {
+    expect((await placeMedia(memory().store, { kind: OutputKind.Image, assetId: IMAGE_ID, name: 'x' }, { on: DropOn.Frame, nodeId: 'nope', at: { x: 0.5, y: 0.5 } })).outcome).toBe(MoveOutcome.NotFound);
   });
 });
 
