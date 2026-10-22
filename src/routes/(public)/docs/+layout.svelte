@@ -56,7 +56,6 @@
     ]},
     { label: $_('docs.layout.s31'), items: [
       { title: $_('docs.layout.s32'), href: '/docs/api/brands', icon: 'layers' },
-      { title: $_('docs.layout.s37'), href: '/docs/api/analytics', icon: 'bar-chart' },
       { title: $_('docs.layout.s38'), href: '/docs/api/products', icon: 'package' },
     ]},
   ]);

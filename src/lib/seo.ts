@@ -22,7 +22,6 @@ export const MARKETING_PATHS = [
   '/docs/cli',
   '/docs/mcp',
   '/docs/api',
-  '/docs/api/analytics',
   '/docs/api/brands',
   '/docs/api/products',
   '/docs/agents',
