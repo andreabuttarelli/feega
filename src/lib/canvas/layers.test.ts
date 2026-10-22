@@ -219,10 +219,18 @@ describe('layer edits go through the doc operations the editor and the agent alr
     expect(ok(layerEdit(doc, track, LayerAction.Rename, 'Front')).tracks[0].name).toBe('Front');
   });
 
+  it('renames any element, and a blank name gives back its own', () => {
+    const named = ok(layerEdit(video(), 't1', LayerAction.Rename, '  Headline '));
+
+    expect(layerRows(NODES, { nodeId: 'm1', doc: named }).find((r) => r.id === 't1')!.label).toBe('Headline');
+
+    const cleared = ok(layerEdit(named, 't1', LayerAction.Rename, ' '));
+    expect(layerRows(NODES, { nodeId: 'm1', doc: cleared }).find((r) => r.id === 't1')!.label).toBe('Title');
+  });
+
   it('refuses what the model has no place for', () => {
     const doc = video();
 
-    expect(layerEdit(doc, 't1', LayerAction.Rename, 'x').ok).toBe(false);
     expect(layerEdit(doc, doc.tracks[0].id, LayerAction.Up).ok).toBe(false);
     expect(layerEdit(doc, 'nope', LayerAction.Hide).ok).toBe(false);
   });

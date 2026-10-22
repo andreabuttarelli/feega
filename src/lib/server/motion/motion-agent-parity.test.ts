@@ -50,6 +50,7 @@ const TRACK: Record<string, Access> = {
 
 const CLIP: Record<string, Access> = {
   id: { write: ['add_clip'], read: 'id' },
+  name: { write: ['rename_clip'], read: 'name' },
   from: { write: ['set_timing', 'move_clip'], read: 'start' },
   durationInFrames: { write: ['set_timing', 'trim_clip'], read: 'duration' },
   trimStart: { write: ['trim_clip'], read: 'trimStart' },

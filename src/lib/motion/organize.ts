@@ -81,6 +81,16 @@ export function setClipFlags(doc: MotionDoc, clipId: string, flags: ClipFlags): 
   return findClip(doc, clipId) ? ok(withClip(doc, clipId, (c) => ({ ...c, ...flags }))) : fail(`no clip ${clipId}`);
 }
 
+export const CLIP_NAME_MAX = 60;
+
+export function renameClip(doc: MotionDoc, clipId: string, name: string): OpResult {
+  if (!findClip(doc, clipId)) {
+    return fail(`no clip ${clipId}`);
+  }
+  const trimmed = name.trim().slice(0, CLIP_NAME_MAX);
+  return ok(withClip(doc, clipId, ({ name: _old, ...clip }) => (trimmed ? { ...clip, name: trimmed } : clip)));
+}
+
 export function withoutHidden(doc: MotionDoc): MotionDoc {
   return { ...doc, tracks: doc.tracks.filter((t) => !t.hidden).map((t) => ({ ...t, clips: t.clips.filter((c) => !c.hidden) })) };
 }
