@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Bundle, FileFormat, SizeBy, bundleOf, exportFiles, exportRowsSchema, rowSize } from './export-rows';
+import { Bundle, EXPORT_PRESETS, FileFormat, SizeBy, bundleOf, exportFiles, exportRowsSchema, rowSize } from './export-rows';
 
 const frame = { width: 1080, height: 1350 };
 
@@ -49,5 +49,15 @@ describe('export rows', () => {
   it('one file downloads as itself, several as one zip', () => {
     expect(bundleOf(1)).toBe(Bundle.File);
     expect(bundleOf(2)).toBe(Bundle.Zip);
+  });
+});
+
+describe('export presets', () => {
+  it('offer PNG at 1x to 4x and SVG, each a valid single row', () => {
+    expect(EXPORT_PRESETS.map((p) => p.label)).toEqual(['1×', '2×', '3×', '4×', 'SVG']);
+    for (const preset of EXPORT_PRESETS) {
+      expect(exportRowsSchema.safeParse([preset.row]).success).toBe(true);
+    }
+    expect(EXPORT_PRESETS[3].row).toMatchObject({ format: FileFormat.Png, by: SizeBy.Scale, value: 4 });
   });
 });

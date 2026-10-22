@@ -108,6 +108,21 @@ describe('drawing an element on the canvas, outside any frame', () => {
     expect(findClip(drawn.doc, 'p1')!.clip.props).toMatchObject({ shape: 'path', x: 0.5, y: 0.5, width: 1, height: 1 });
   });
 
+  it('a pasted path keeps its fill, and a stroke-only path draws its stroke without fill', () => {
+    const outline = parsePath('M 0 0 L 10 0 L 10 10 Z') as Outline;
+    const filled = made(drawnElement({ tool: DrawTool.Pen, outline, fill: '#ff0000' }, 'f1'));
+    const stroked = made(drawnElement({ tool: DrawTool.Pen, outline, fill: null, stroke: '#00ff00' }, 's1'));
+
+    expect(findClip(filled.doc, 'f1')!.clip.props).toMatchObject({ fill: '#ff0000', fillKind: 'solid' });
+    expect(findClip(stroked.doc, 's1')!.clip.props).toMatchObject({ fillKind: 'none', strokeKind: 'solid', stroke: '#00ff00' });
+  });
+
+  it('a pasted text carries its words', () => {
+    const drawn = made(drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 60 }, text: 'hello there' }, 't2'));
+
+    expect(findClip(drawn.doc, 't2')!.clip.props.text).toBe('hello there');
+  });
+
   it('a big box stays inside the frame resolution limits', () => {
     const drawn = made(drawnElement({ tool: DrawTool.Ellipse, box: { left: 0, top: 0, width: 5000, height: 2500 } }, 'e1'));
 

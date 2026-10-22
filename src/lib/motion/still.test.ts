@@ -3,7 +3,7 @@ import { FORMATS, MotionFormat, newClip, newMotionDoc, parseMotionDoc } from './
 import { Quality, TIMELINE_ONLY, docProblems } from './direction';
 import { ANIMATE_SECONDS, coverFrame, DocMode, animateStill, docMode, setStill, stillFrame } from './still';
 import { setCanvas } from './timeline';
-import { ImageFormat, IMAGE_FORMATS, ImageScale, stillExport } from './still-model';
+import { ImageFormat, IMAGE_FORMATS, IMAGE_SCALES, ImageScale, stillExport } from './still-model';
 
 describe('a still is a motion doc pinned to one frame', () => {
   it('a new doc is a video', () => {
@@ -95,6 +95,11 @@ describe('poster formats', () => {
 });
 
 describe('image export settings', () => {
+  it('scales from 1x to 4x', () => {
+    expect([...IMAGE_SCALES]).toEqual([1, 2, 3, 4]);
+    expect(stillExport(ImageFormat.Png, ImageScale.Four).size({ width: 100, height: 50 } as never)).toEqual({ width: 400, height: 200 });
+  });
+
   it('png, jpg and webp each carry their mime and extension', () => {
     expect(IMAGE_FORMATS.map((f) => stillExport(f, ImageScale.One).mime)).toEqual(['image/png', 'image/jpeg', 'image/webp']);
     expect(stillExport(ImageFormat.Jpg, ImageScale.One).ext).toBe('jpg');

@@ -46,7 +46,7 @@
   import { marqueeIds, primaryOf, redoRoute, spanOf, toggleId, undoRoute, UndoRoute } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
   import { Grip, type Gap, type Guide, type Pt } from '$lib/motion/scene-select';
-  import { guessedBoxes } from '$lib/motion/move-element';
+  import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
@@ -93,6 +93,10 @@
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
+  import { HTML_MIME, TEXT_MIME, clipboardHtml, readPaste, type ClipboardPayload, type PasteData, type PasteSource } from '$lib/canvas/system-clipboard';
+  import { eventSource, systemSource, writeSystem } from '$lib/canvas/system-clipboard-browser';
+  import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
+  import { isTypingTarget } from '$lib/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
   import { DropVerdict, pointOf } from '$lib/canvas/canvas-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
@@ -150,7 +154,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]> } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void } = $props();
 
   const DOM_CAP = 6;
   const CORE = 'core';
@@ -2278,8 +2282,8 @@
     'zoom-in': () => zoomStep(STEP_ZOOM),
     'zoom-out': () => zoomStep(1 / STEP_ZOOM),
     duplicate: () => selected.length && props.onDuplicate?.(selected),
-    copy: () => selected.length && props.onCopy?.(selected),
-    paste: () => props.onPaste?.(viewCentre()),
+    copy: () => void copySystem(),
+    paste: () => undefined,
     undo: () => (frameHistory(undoRoute) === UndoRoute.Frame ? stepFrame(Step.Back) : props.onUndo?.()),
     redo: () => (frameHistory(redoRoute) === UndoRoute.Frame ? stepFrame(Step.Forward) : props.onRedo?.()),
     group: () => props.onGroup?.(selected),
@@ -2326,10 +2330,77 @@
     if (!command) {
       return;
     }
-    if (preventable(command)) {
+    if (preventable(command) && !NATIVE_CLIPBOARD.has(command.id)) {
       e.preventDefault();
     }
     KEY_RUN[command.id](command);
+  }
+
+  const NATIVE_CLIPBOARD = new Set(['copy', 'paste']);
+  let pointer: Point | null = null;
+
+  function clipboardTarget(e: ClipboardEvent): boolean {
+    return Boolean(spec.chrome && !frameDialog && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
+  }
+
+  const framePicks = (): string[] => (inside && picks.length && !frameChrome(kindOfNode(inside.nodeId)).selectsOwnClip ? picks : []);
+
+  function clipOfSelection(): ClipboardPayload | null {
+    const tools = inside && framePicks().length ? toolsOf(inside.nodeId) : null;
+    if (inside && tools) {
+      const elements = copyElements(tools.doc, picks);
+      elementClipboard.copyElements(inside.nodeId, [...picks], elements);
+      return { elements: elementClipboard.elements! };
+    }
+    return selected.length ? (props.onClip?.(selected) ?? null) : null;
+  }
+
+  const CLIP_TEXT = ' ';
+
+  function copySystem() {
+    const payload = clipOfSelection();
+    return payload ? writeSystem(clipboardHtml(payload), CLIP_TEXT) : false;
+  }
+
+  function onCopy(e: ClipboardEvent, cut: boolean) {
+    const payload = clipboardTarget(e) ? clipOfSelection() : null;
+    if (!payload) {
+      return;
+    }
+    e.preventDefault();
+    e.clipboardData!.setData(HTML_MIME, clipboardHtml(payload));
+    e.clipboardData!.setData(TEXT_MIME, CLIP_TEXT);
+    if (cut) {
+      void ((framePicks().length && deletePicks()) || dropSelection(selected, []));
+    }
+  }
+
+  function pasteAt(): Point {
+    const s = screenSize();
+    const inView = pointer && pointer.x >= s.left && pointer.x <= s.left + s.width && pointer.y >= s.top && pointer.y <= s.top + s.height;
+    return inView ? toFlow(pointer!) : viewCentre();
+  }
+
+  function pasteFrom(source: PasteSource<File> | null, at: Point) {
+    const data = source ? readPaste(source) : null;
+    if (data) {
+      props.onPasteData?.(data, at);
+      return;
+    }
+    props.onPaste?.(at);
+  }
+
+  async function onPasteEvent(e: ClipboardEvent) {
+    if (!clipboardTarget(e)) {
+      return;
+    }
+    e.preventDefault();
+    const at = pasteAt();
+    pasteFrom(await eventSource(e.clipboardData!), at);
+  }
+
+  async function pasteSystem(at: Point) {
+    pasteFrom(await systemSource(), at);
   }
 
   const SELECTION_RUN: Record<CanvasActionId, (ids: string[]) => void> = {
@@ -2351,12 +2422,12 @@
     report: (ids) => void window.open(reportHref({ node: ids[0] }), '_blank', 'noopener'),
     group: (ids) => props.onGroup?.(ids),
     ungroup: (ids) => props.onUngroup?.(ids),
-    copy: (ids) => props.onCopy?.(ids),
-    paste: () => menuAt && props.onPaste?.(toFlow(menuAt)),
+    copy: () => void copySystem(),
+    paste: () => menuAt && void pasteSystem(toFlow(menuAt)),
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
-    export: (ids) => (coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
+    export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
     delete: (ids) => props.onDelete?.(ids)
   };
 
@@ -2535,7 +2606,7 @@
   if (e.key === ' ') {
     space = false;
   }
-}} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
+}} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} onpointermove={(e) => (pointer = { x: e.clientX, y: e.clientY })} oncopy={(e) => onCopy(e, false)} oncut={(e) => onCopy(e, true)} onpaste={onPasteEvent} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="wrap svelte-flow" onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? (coreOn ? CORE : 'pending')} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
