@@ -7,7 +7,9 @@ export enum FrameDialog {
   Templates = 'templates',
   Branches = 'branches',
   History = 'history',
-  Chat = 'chat'
+  Chat = 'chat',
+  SaveTemplate = 'save-template',
+  Publish = 'publish'
 }
 
 export const FRAME_DIALOG_ACTIONS = {
@@ -18,7 +20,9 @@ export const FRAME_DIALOG_ACTIONS = {
   'frame-templates': FrameDialog.Templates,
   'frame-branches': FrameDialog.Branches,
   'frame-history': FrameDialog.History,
-  'frame-chat': FrameDialog.Chat
+  'frame-chat': FrameDialog.Chat,
+  'frame-save-template': FrameDialog.SaveTemplate,
+  'frame-publish': FrameDialog.Publish
 } as const;
 
 export type FrameDialogActionId = keyof typeof FRAME_DIALOG_ACTIONS;

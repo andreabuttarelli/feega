@@ -3,6 +3,9 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { Action } from '$lib/motion/actions';
 import { PropertiesView } from '$lib/motion/properties-view';
 import { addClip, type OpResult } from '$lib/motion/timeline';
+import { FieldType, exposeField } from '$lib/motion/template/fields';
+import { insertTemplate, templateFromComp } from '$lib/motion/template/library';
+import { precompose } from '$lib/motion/precomp';
 import { barAction, inspectorOf } from './frame-inspector';
 
 const must = (r: OpResult): MotionDoc => {
@@ -18,6 +21,11 @@ function fixture(): MotionDoc {
   return must(addClip(d, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Two' } }, 'b'));
 }
 
+const ids = () => {
+  let n = 0;
+  return () => `i${++n}`;
+};
+
 describe('inspectorOf', () => {
   it('shows nothing for an empty selection', () => {
     expect(inspectorOf(fixture(), [])).toBeNull();
@@ -32,6 +40,21 @@ describe('inspectorOf', () => {
 
   it('shows the multi inspector for several', () => {
     expect(inspectorOf(fixture(), ['a', 'b'])?.view).toBe(PropertiesView.Multiple);
+  });
+
+  it('shows the template fields for an inserted template instance', () => {
+    let card = must(precompose(fixture(), ['a'], { comp: 'card', clip: 'p' }, 'Card'));
+    card = must(exposeField(card, { key: 'headline', label: 'Headline', type: FieldType.Text, clipId: 'a', prop: 'text' }));
+    const template = templateFromComp(card, 'card', { name: 'Card' });
+    if (!template.ok) {
+      throw new Error(template.error);
+    }
+    const placed = insertTemplate(newMotionDoc(MotionFormat.Square), { id: 'org:card', template: template.template }, { from: 0, newId: ids() });
+    if (!placed.ok) {
+      throw new Error(placed.error);
+    }
+
+    expect(inspectorOf(placed.doc, [placed.clipId])).toMatchObject({ view: PropertiesView.Template, clip: { id: placed.clipId } });
   });
 
   it('shows nothing for an id the doc no longer has', () => {

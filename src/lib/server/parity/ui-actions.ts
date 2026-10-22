@@ -302,6 +302,8 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'frame-branches': editor('list_branches'),
   'frame-history': tool('list_motion_revisions'),
   'frame-chat': tool('ask_motion_agent'),
+  'frame-save-template': editor('save_template'),
+  'frame-publish': tool('publish_to_gallery'),
   delete: canvas('delete_node')
 };
 

@@ -95,6 +95,8 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'frame-branches', label: 'Branches…', group: 'overflow', minNodes: 1 },
   { id: 'frame-history', label: 'Version history…', group: 'overflow', minNodes: 1 },
   { id: 'frame-chat', label: 'Chat history…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-save-template', label: 'Save as template…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-publish', label: 'Publish to gallery…', group: 'overflow', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
   { id: 'report', label: 'Report content', group: 'overflow', minNodes: 1 },
   { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, shortcut: 'Backspace' }

@@ -9,6 +9,9 @@
   import VarsPanel from '$lib/components/motion/VarsPanel.svelte';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
   import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
+  import StillExport from '$lib/components/motion/StillExport.svelte';
+  import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
+  import PublishDialog, { type Listed } from '$lib/components/gallery/PublishDialog.svelte';
   import FrameDialogCard from './FrameDialogCard.svelte';
   import { postPageAction } from '$lib/api/page-action';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
@@ -17,7 +20,7 @@
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { BrandTokens } from '$lib/motion/brand';
   import { AssetKind } from '$lib/motion/components';
-  import { findClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { DocMode, docMode, findClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import { addClip, type OpResult } from '$lib/motion/timeline';
   import { SaveState } from '$lib/motion/editor-bar';
   import { Liveness } from '$lib/motion/interactive/settings';
@@ -28,6 +31,7 @@
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
   import type { ExportRow } from '$lib/motion/export-rows';
+  import type { FrameSource } from '$lib/motion/export/browser-render';
 
   type Branch = { id: string; frameId: string; name: string; baseVersion: number };
   type Conflict = { path: string; branch: unknown; main: unknown };
@@ -37,6 +41,7 @@
   const ID_LENGTH = 8;
   const newId = () => crypto.randomUUID().slice(0, ID_LENGTH);
   const SOUND_LABEL: Record<SoundKind, string> = { voice: 'Voice-over', music: 'Music' };
+  const CAPTURING: ReadonlySet<FrameDialog> = new Set([FrameDialog.Export, FrameDialog.SaveTemplate]);
   const SOUND_OF: Partial<Record<FrameDialog, SoundKind>> = { [FrameDialog.Voice]: 'voice', [FrameDialog.Music]: 'music' };
 
   let {
@@ -93,6 +98,13 @@
   });
 
   const renderer: NonNullable<MotionPreview['render']> = (...args) => (capture ? capture.render(...args) : Promise.reject(new Error('the preview is still loading')));
+
+  const framesFor = (d: MotionDoc): FrameSource => (times, size, onFrame, signal) => renderer(times, size, onFrame, signal, composeDraft(d));
+
+  const assetHref = (id: string) => canvasAssetUrl(projectId, canvasId, id, AssetSize.Full);
+
+  let relisted = $state<{ item: Listed | null } | null>(null);
+  const listed = $derived(relisted ? relisted.item : (data?.gallery.listed ?? null));
 
   let templates = $state<TemplateEntry[]>([]);
   $effect(() => {
@@ -250,7 +262,9 @@
 </script>
 
 <div class="layer">
-{#if dialog === FrameDialog.Export && data}
+{#if dialog === FrameDialog.Export && data && docMode(doc) === DocMode.Still}
+  <StillExport {doc} {editorUrl} fileName={data.node.name ?? 'still'} saved={session.saveState === SaveState.Saved} {onclose} />
+{:else if dialog === FrameDialog.Export && data}
   <ExportDialog
     {doc}
     {assetUrls}
@@ -261,14 +275,39 @@
     fallbackRender={renderer}
     {tokens}
     analyses={extras.analyses}
-    server={{ ...data.serverRender, version: session.version, saved: session.saveState === SaveState.Saved, assetHref: (id: string) => canvasAssetUrl(projectId, canvasId, id, AssetSize.Full) }}
+    server={{ ...data.serverRender, version: session.version, saved: session.saveState === SaveState.Saved, assetHref }}
     images={{ count: 1, onexport: onimages }}
     onpresets={() => onswitch(FrameDialog.Interactive)}
     {onclose}
   />
-  <div class="capture" aria-hidden="true">
-    <MotionPreview bind:this={capture} html={captureHtml} width={doc.width} height={doc.height} fps={doc.fps} background={doc.background} />
-  </div>
+{:else if dialog === FrameDialog.SaveTemplate && data}
+  <TemplateDialog
+    {doc}
+    clip={selected}
+    {editorUrl}
+    version={session.version}
+    saved={session.saveState === SaveState.Saved}
+    batch={data.batch}
+    {assetHref}
+    {assetUrls}
+    scope={{ orgId: data.orgId, projectId, nodeId }}
+    {framesFor}
+    onchange={onedit}
+    onpreview={() => {}}
+    {onclose}
+  />
+{:else if dialog === FrameDialog.Publish && data}
+  <PublishDialog
+    actionUrl={editorUrl}
+    {doc}
+    assets={assetUrls}
+    {tokens}
+    name={data.node.name ?? ''}
+    {listed}
+    saved={session.saveState === SaveState.Saved}
+    onlisted={(item) => (relisted = { item })}
+    {onclose}
+  />
 {:else if sound}
   <SoundDialog kind={sound} {editorUrl} seconds={doc.durationInFrames / doc.fps} {onclose} onmade={(made) => placeSound(sound, made)} />
 {:else if dialog === FrameDialog.Components && data}
@@ -313,6 +352,11 @@
   <FrameDialogCard title="Chat history" testid="frame-chat" {onclose}>
     <FrameChatHistory historyUrl={`/api/v1/projects/${projectId}/motion/${nodeId}/agent`} {projectId} open />
   </FrameDialogCard>
+{/if}
+{#if CAPTURING.has(dialog)}
+  <div class="capture" aria-hidden="true">
+    <MotionPreview bind:this={capture} html={captureHtml} width={doc.width} height={doc.height} fps={doc.fps} background={doc.background} />
+  </div>
 {/if}
 </div>
 

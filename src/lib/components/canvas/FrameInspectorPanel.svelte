@@ -2,6 +2,7 @@
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
   import MultiInspector from '$lib/components/motion/MultiInspector.svelte';
   import LookInspector from '$lib/components/motion/LookInspector.svelte';
+  import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import CameraInspector from '$lib/components/motion/CameraInspector.svelte';
   import DevicePresets from '$lib/components/motion/DevicePresets.svelte';
@@ -72,6 +73,8 @@
     <ClipBar {doc} selection={session.selection} pick={PickMode.One} onrun={runBar} ondone={() => {}} />
     {#if shown.view === PropertiesView.Multiple}
       <MultiInspector {doc} ids={session.selection} frame={FIRST_FRAME} onchange={edit} />
+    {:else if shown.view === PropertiesView.Template}
+      <TemplateInspector gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
     {:else}
       {@const Presets = CLIP_PRESETS[shown.clip.component]}
       <MotionInspector gesture={session.live} lead={partLead} {doc} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={FIRST_FRAME} onchange={edit} />
