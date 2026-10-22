@@ -51,7 +51,7 @@ import { unionBounds } from '$lib/motion/multi-select';
 import { AXES, EDGES, alignSpace, distributeSpace, moveBy, tidySpace, propBoxes, type Axis, type Edge } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import type { Pt } from '$lib/motion/scene-select';
-import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '$lib/motion/organize';
+import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, renameClip, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '$lib/motion/organize';
 
 const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) => `distribute_${a}` as const), 'tidy', 'move', 'scale', 'scale_group', 'rotate_group'] as const;
 
@@ -394,6 +394,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
       locked: t.locked ?? false,
       clips: t.clips.map((c) => ({
         id: c.id,
+        name: c.name ?? null,
         component: c.component,
         start: secs(c.from),
         duration: secs(c.durationInFrames),
@@ -1038,6 +1039,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const result = input.clip_id ? setClipFlags(session.doc, input.clip_id, flags) : input.track_id ? setTrackFlags(session.doc, input.track_id, flags) : { ok: false as const, error: 'give a track_id or a clip_id' };
         return apply(result, 'changed visibility');
       }
+    }),
+
+    rename_clip: tool({
+      description: 'Name a clip as it shows in Layers. An empty name gives back its default name.',
+      inputSchema: z.object({ clip_id: z.string(), name: z.string().max(60) }),
+      execute: async (input) => apply(renameClip(session.doc, input.clip_id, input.name), `renamed ${input.clip_id}`)
     }),
 
     arrange_clips: tool({

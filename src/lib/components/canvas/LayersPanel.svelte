@@ -176,6 +176,15 @@
   const visible = $derived(shown.slice(span.start, span.end));
   const ROW_HUE: Record<string, string> = { motion: 'var(--ui-type-frame)', image: 'var(--ui-type-media)', video: 'var(--ui-type-media)', text: 'var(--ui-type-text)' };
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
+  const renamable = (row: LayerRow) => editable(row) && row.kind !== LayerKind.Part;
+
+  function enterRow(row: LayerRow, e: KeyboardEvent) {
+    if (isPicked(row) && renamable(row)) {
+      renaming = row.id;
+      return;
+    }
+    choose(row, e as unknown as MouseEvent);
+  }
 
   const pickOf = (e: MouseEvent | KeyboardEvent): Pick => pickFor({ shift: e.shiftKey, mod: e.metaKey || e.ctrlKey });
 
@@ -218,7 +227,7 @@
     [LayerAction.Down]: 'Sent a layer backward',
     [LayerAction.Hide]: 'Toggled a layer',
     [LayerAction.Lock]: 'Locked a layer',
-    [LayerAction.Rename]: 'Renamed a track'
+    [LayerAction.Rename]: 'Renamed a layer'
   };
 
   function onKey(e: KeyboardEvent) {
@@ -234,7 +243,7 @@
 
   function rename(row: LayerRow, name: string) {
     renaming = null;
-    if (name.trim() && name !== row.label) {
+    if (name.trim() !== row.label) {
       run([row.id], LayerAction.Rename, SUMMARY[LayerAction.Rename], name);
     }
   }
@@ -302,8 +311,8 @@
       onclick={(e) => choose(row, e)}
       onpointerenter={() => layersSource.hover({ nodeId: row.nodeId, id: row.id })}
       onpointerleave={() => layersSource.hover(null)}
-      onkeydown={(e) => e.key === 'Enter' && choose(row, e as unknown as MouseEvent)}
-      ondblclick={() => row.kind === LayerKind.Track && !row.nested && (renaming = row.id)}
+      onkeydown={(e) => e.target === e.currentTarget && e.key === 'Enter' && enterRow(row, e)}
+      ondblclick={() => renamable(row) && (renaming = row.id)}
       ondragstart={(e) => ((dragged = row.id), (block = isPicked(row) && picked.length > 1 ? [...picked] : [row.id]), e.dataTransfer?.setData('text/plain', row.id))}
       data-drop={landing?.key === row.key ? landing.place : undefined}
       ondragover={(e) => over(row, e)}
@@ -323,7 +332,7 @@
       <span class="icon" class:instance={row.instance} data-instance={row.instance || undefined} style:--hue={ROW_HUE[row.type]}><RowIcon size={ICON} /></span>
       {#if renaming === row.id}
         <!-- svelte-ignore a11y_autofocus -->
-        <input class="name-input" value={row.label} autofocus aria-label="Track name" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+        <input class="name-input" value={row.label} autofocus aria-label="Layer name" data-testid="layer-rename" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => (e.stopPropagation(), e.key === 'Escape' ? ((e.currentTarget.value = row.label), e.currentTarget.blur()) : e.key === 'Enter' && e.currentTarget.blur())} onclick={(e) => e.stopPropagation()} />
       {:else}
         <span class="name">{row.label}</span>
       {/if}

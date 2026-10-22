@@ -83,6 +83,7 @@ export type Marker = z.infer<typeof markerSchema>;
 
 const clipSchema = z.object({
   id: z.string().min(1),
+  name: z.string().max(60).optional(),
   from: z.number().int().min(0).max(FRAMES_CEILING),
   durationInFrames: z.number().int().min(1).max(FRAMES_CEILING),
   trimStart: z.number().int().min(0).default(0),
