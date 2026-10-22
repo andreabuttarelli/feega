@@ -50,7 +50,7 @@ describe('POST /api/v1/motion/from-template', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body).toEqual({ node_id: 'n-1', project_id: 'p-1', canvas_id: 'c-motion', version: 1, editor_url: '/p/p-1/c/c-motion/motion/n-1' });
+    expect(body).toEqual({ node_id: 'n-1', project_id: 'p-1', canvas_id: 'c-motion', version: 1, editor_url: '/p/p-1/c/c-motion?frame=n-1' });
     expect(store.nodes[0]).toMatchObject({ projectId: 'p-1', type: 'motion', actor: { kind: 'agent', id: 'u-1' } });
     expect(Object.values(store.revisions[0].doc.comps).some((c) => c.template?.id === 'builtin:prompt-input')).toBe(true);
   });

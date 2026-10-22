@@ -50,7 +50,7 @@ describe('/app/motion lists videos and starts a new one on a canvas', () => {
 
   it('lists the motion videos of the org, each opening its editor', async () => {
     const data = (await load({ url: new URL('http://x/app/motion') } as never)) as { motions: { href: string }[]; projectId: string; canvases: { id: string }[] };
-    expect(data.motions.map((m) => m.href)).toEqual(['/p/p1/c/c1/motion/m1']);
+    expect(data.motions.map((m) => m.href)).toEqual(['/p/p1/c/c1?frame=m1']);
     expect(data.projectId).toBe('p1');
     expect(data.canvases.map((c) => c.id)).toEqual(['c1']);
   });
@@ -60,13 +60,13 @@ describe('/app/motion lists videos and starts a new one on a canvas', () => {
 
     expect(toolScope).toHaveBeenCalledWith(expect.anything(), 'p1');
     expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org', projectId: 'p1', name: 'Motion' });
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion?frame=m-new' });
   });
 
   it('a new video on a chosen canvas stays there', async () => {
     const redirected = await thrown(() => actions.create({ request: form({ project: 'p1', canvas: 'c1', name: '' }) } as never));
     expect(createNode).toHaveBeenCalledWith({}, expect.objectContaining({ canvasId: 'c1', type: 'motion', displayName: 'Untitled video' }));
-    expect(redirected).toMatchObject({ location: '/p/p1/c/c1/motion/m-new' });
+    expect(redirected).toMatchObject({ location: '/p/p1/c/c1?frame=m-new' });
   });
 
   it('a canvas from another project is refused', async () => {

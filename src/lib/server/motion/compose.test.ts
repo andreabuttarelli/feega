@@ -167,7 +167,7 @@ describe('openCanvasComposition: an existing canvas composition node becomes the
 
     const opened = await openCanvasComposition(db, d, { orgId: 'org', projectId: 'p1', canvasId: 'c1', nodeId: 'comp-node', userId: 'u1' });
 
-    expect(opened).toEqual({ ok: true, start: { projectId: 'p1', canvasId: 'c1', nodeId: 'm-new' }, editor: '/p/p1/c/c1/motion/m-new' });
+    expect(opened).toEqual({ ok: true, start: { projectId: 'p1', canvasId: 'c1', nodeId: 'm-new' }, editor: '/p/p1/c/c1?frame=m-new' });
     const doc = vi.mocked(d.saveMotionDoc).mock.calls[0][1].doc as MotionDoc;
     const comp = Object.values(doc.comps).find((c) => c.template?.id === STRIP_TEMPLATE_ID);
     expect(doc.height).toBeGreaterThan(doc.width);

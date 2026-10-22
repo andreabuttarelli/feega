@@ -39,7 +39,7 @@ vi.mock('$lib/server/motion/chromium-frames', () => ({
   }
 }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/frame-editor/editor-page');
 
 function fakeDb() {
   const uploads: { path: string; type: string }[] = [];

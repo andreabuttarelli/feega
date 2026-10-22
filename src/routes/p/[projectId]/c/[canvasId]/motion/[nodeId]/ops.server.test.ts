@@ -15,7 +15,7 @@ vi.mock('$lib/server/motion/editor', async (original) => ({
   findMotionNode: async () => ({ record: { id: 'n1' }, node: { format: 'landscape' } })
 }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/frame-editor/editor-page');
 
 const SCOPE = { orgId: 'org-a', nodeId: 'n1' };
 const user = { kind: 'user' as const, id: 'u1' };

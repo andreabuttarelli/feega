@@ -1,4 +1,3 @@
-import { motionEditorPath } from '$lib/canvas/motion-node';
 import { parseAttachments } from '$lib/chat-attachments';
 
 export const BRIEF_PARAM = 'brief';
@@ -63,15 +62,6 @@ export function briefMessage(brief: string): string {
 }
 
 const ID_SEPARATOR = ',';
-
-export function briefEditorPath(start: { projectId: string; canvasId: string; nodeId: string }, brief: string, attachmentIds: readonly string[] = []): string {
-  const params = new URLSearchParams({ [BRIEF_PARAM]: brief });
-  if (attachmentIds.length) {
-    params.set(ATTACH_PARAM, attachmentIds.join(ID_SEPARATOR));
-  }
-
-  return `${motionEditorPath(start)}?${params}`;
-}
 
 export function briefAttachmentIds(url: URL): string[] {
   return parseAttachments(url.searchParams.get(ATTACH_PARAM)?.split(ID_SEPARATOR) ?? []);

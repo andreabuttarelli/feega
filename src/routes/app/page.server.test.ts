@@ -172,7 +172,7 @@ describe('/app is the dashboard for a returning user', () => {
     const doc = (appendRevision.mock.calls[0][1] as { doc: { tracks: { clips: { component: string }[] }[]; height: number; width: number; still?: unknown } }).doc;
     expect(doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual(['Custom']);
     expect(doc).toMatchObject({ width: 1080, height: 1350, still: expect.anything() });
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new/motion/m-new' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?frame=m-new' });
   });
 
   it('a video template opens a new canvas whose frame already holds it', async () => {
@@ -183,7 +183,7 @@ describe('/app is the dashboard for a returning user', () => {
     const doc = (appendRevision.mock.calls[0][1] as { doc: { comps: Record<string, { template?: { id: string } }>; height: number; width: number } }).doc;
     expect(Object.values(doc.comps).some((c) => c.template?.id === 'builtin:prompt-input')).toBe(true);
     expect(doc.height).toBeGreaterThan(doc.width);
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new/motion/m-new' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?frame=m-new' });
   });
 
   it('an unknown component creates nothing', async () => {

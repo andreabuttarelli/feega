@@ -21,7 +21,7 @@ vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => loo
 vi.mock('$lib/server/canvas/sign-media', async (real) => ({ ...(await real<object>()), createAssetSigningDb: () => ({}), signAssetPaths: async (_db: unknown, _s: unknown, paths: { uploaded: string[] }) => new Map(paths.uploaded.map((p) => [p, `signed:${p}`])) }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/frame-editor/editor-page');
 const { POST } = await import('../../../../../../api/v1/motion/[nodeId]/ops/+server');
 
 const nodeRow = { id: NODE, org_id: ORG, project_id: PROJECT, canvas_id: CANVAS, type: 'motion', display_name: 'V', x: 0, y: 0, z: 0, width: null, height: null, data: {}, version: 1, deleted_at: null };

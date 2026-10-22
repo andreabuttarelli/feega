@@ -79,7 +79,7 @@ describe('the gallery API the CLI and MCP call', () => {
   it('remixes into a project of the caller and returns the editor link', async () => {
     const res = await remix.POST({ request: post({ project_id: 'p-1' }), params: { id: 'item-1' }, url: new URL('https://feega.app/x') } as never);
     expect(res.status).toBe(201);
-    expect(await res.json()).toMatchObject({ project_id: 'p-1', canvas_id: 'c-1', editor_url: expect.stringMatching(/^https:\/\/feega\.app\/p\/p-1\/c\/c-1\/motion\//) });
+    expect(await res.json()).toMatchObject({ project_id: 'p-1', canvas_id: 'c-1', editor_url: expect.stringMatching(/^https:\/\/feega\.app\/p\/p-1\/c\/c-1\?frame=/) });
   });
 
   it('remixing into a project that is not yours is a 404', async () => {

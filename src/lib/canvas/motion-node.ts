@@ -183,20 +183,26 @@ export function motionOf(row: { id: string; type: string; data: Record<string, u
   return { id: row.id, ...data, kind: data.kind ?? FrameKind.Frame };
 }
 
-export function motionEditorPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
+export const FRAME_PARAM = 'frame';
+
+export function motionNodePath(input: { projectId: string; canvasId: string; nodeId: string }): string {
   return `/p/${input.projectId}/c/${input.canvasId}/motion/${input.nodeId}`;
 }
 
+export function motionEditorPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
+  return `/p/${input.projectId}/c/${input.canvasId}?${FRAME_PARAM}=${input.nodeId}`;
+}
+
 export function motionSourcePath(input: { projectId: string; canvasId: string; nodeId: string; revision: number }): string {
-  return `${motionEditorPath(input)}/source?rev=${input.revision}`;
+  return `${motionNodePath(input)}/source?rev=${input.revision}`;
 }
 
 export function motionPreviewPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
-  return grantedPath(`${motionEditorPath(input)}/preview`);
+  return grantedPath(`${motionNodePath(input)}/preview`);
 }
 
 export function motionLivePath(input: { projectId: string; canvasId: string; nodeId: string }): string {
-  return grantedPath(`${motionEditorPath(input)}/live`);
+  return grantedPath(`${motionNodePath(input)}/live`);
 }
 
 export function storyboardPath(projectId: string, data: Record<string, unknown>): string | null {

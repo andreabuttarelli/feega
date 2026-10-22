@@ -38,7 +38,7 @@ describe('GET /api/v1/motion/[nodeId]', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body).toMatchObject({ node_id: NODE, name: 'Trailer', version: 0, editor_url: `/p/p-1/c/c-1/motion/${NODE}` });
+    expect(body).toMatchObject({ node_id: NODE, name: 'Trailer', version: 0, editor_url: `/p/p-1/c/c-1?frame=${NODE}` });
     expect(typeof body.doc.duration).toBe('number');
     expect(Array.isArray(body.doc.tracks)).toBe(true);
   });
