@@ -23,7 +23,6 @@ export type StillPort = { open: (viewport: Viewport) => Promise<StillPage> };
 export type PageBox = { left: number; top: number; width: number; height: number };
 
 export type ExportPage = StillPage & {
-  freeze: () => Promise<string>;
   boxOf: (clipId: string) => Promise<PageBox | null>;
   shot: (mime: string, quality: number | undefined, clip: PageBox | null) => Promise<Buffer>;
 };

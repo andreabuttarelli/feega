@@ -3017,13 +3017,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     await saves.flush(picked.frameId);
     const elements = picked.elementIds.map((elementId) => ({ frameId: picked.frameId, elementId }));
     const out = await post('exportSelection', { elements: JSON.stringify(elements), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
-    return out?.url ? (out as { url: string; name: string; files: string[] }) : 'Export failed';
+    return out?.url ? (out as { url: string; name: string; files: string[]; skipped?: string[] }) : 'Export failed';
   }
 
   async function exportFrames(frameIds: string[], rows: ExportRow[]) {
     await Promise.all(frameIds.map((id) => saves.flush(id)));
     const out = await post('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
-    return out?.url ? (out as { url: string; name: string; files: string[] }) : 'Export failed';
+    return out?.url ? (out as { url: string; name: string; files: string[]; skipped?: string[] }) : 'Export failed';
   }
 
   async function createFormats(nodeId: string, targets: FormatTarget[]) {

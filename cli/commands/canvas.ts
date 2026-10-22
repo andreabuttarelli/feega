@@ -53,7 +53,7 @@ export async function cmdCanvasModels(project: string, opts: { medium: string; o
 }
 
 export async function cmdCanvasExport(project: string, frames: string[], opts: ExportFlags & { out?: string; org?: string }) {
-  const result = (await canvasApi.run(await token(), { project, op: 'export_selection', input: exportAsk(frames, opts) }, opts.org)) as { url?: string; name?: string };
+  const result = (await canvasApi.run(await token(), { project, op: 'export_selection', input: exportAsk(frames, opts) }, opts.org)) as { url?: string; name?: string; skipped?: string[] };
   if (!result.url || !result.name) {
     console.log(JSON.stringify(result, null, 2));
     process.exit(1);
@@ -61,4 +61,7 @@ export async function cmdCanvasExport(project: string, frames: string[], opts: E
   const out = opts.out ?? result.name;
   await writeFile(out, new Uint8Array(await (await fetch(result.url)).arrayBuffer()));
   console.log(out);
+  if (result.skipped?.length) {
+    console.error(`Left out of the vector file: ${result.skipped.join('; ')}`);
+  }
 }

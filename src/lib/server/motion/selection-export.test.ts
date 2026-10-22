@@ -36,7 +36,7 @@ function ports() {
     read: async (nodeId) => (nodeId === 'gone' ? null : { name: `Frame ${nodeId}`, doc: withTitle }),
     draw: async (targets, row) => {
       drawn.push({ targets, format: row.format });
-      return Buffer.from('x');
+      return { bytes: Buffer.from('x'), skipped: row.format === 'svg' ? ['t1: blend mode multiply'] : [] };
     },
     store: async (packed) => {
       stored.push({ name: packed.name, mime: packed.mime });
@@ -56,6 +56,14 @@ describe('exporting a selection', () => {
     expect(drawn[0].targets[0].doc.background).toBe(Background.Transparent);
     expect(drawn[1].targets[0].doc.background).not.toBe(Background.Transparent);
     expect(stored).toEqual([{ name: 'Canvas.zip', mime: 'application/zip' }]);
+  });
+
+  it('says what the vector drawing left out, once, in the result', async () => {
+    const { base } = ports();
+    const svgs = exportRowsSchema.parse([{ format: 'svg', by: 'scale', value: 1 }, { format: 'svg', by: 'scale', value: 2, suffix: '@2x' }]);
+    const out = await exportSelection(base, { targets: [{ nodeId: 'a' }], rows: svgs, name: 'X' });
+
+    expect(out).toMatchObject({ outcome: ExportOutcome.Done, skipped: ['t1: blend mode multiply'] });
   });
 
   it('a PDF draws all frames at once as its pages', async () => {
