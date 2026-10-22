@@ -3,7 +3,7 @@ import type { SvgNode } from '../../effects/registry';
 import { flatten, type Outline } from '../../shape/geometry';
 import { FillRule, MAX_STOPS, PaintKind, type Paint, type Stop } from '../paint';
 import { rgbaOf } from '../rgba';
-import { Cap, Join, dashes, strokePolygons } from '../stroke';
+import { Cap, Join, MITER_LIMIT, dashes, strokePolygons } from '../stroke';
 import { isNone, lengthOf, type Size } from './css';
 import type { RawNode } from './tree';
 
@@ -171,13 +171,14 @@ export function svgStroke(style: Style, defs: Defs, shape: Shape): Fill[] | Pain
   const cap = style['stroke-linecap'] ?? Cap.Butt;
   const join = style['stroke-linejoin'] ?? Join.Miter;
   const dash = dashPattern(style['stroke-dasharray']);
+  const miter = num(style['stroke-miterlimit'], MITER_LIMIT);
   if (!CAPS.has(cap) || !JOINS.has(join) || dash === false) {
     return PaintGap.Stroke;
   }
   const contours = shape.outline.flatMap((c) => {
     const pts = flatten(c).flatMap(([x, y]) => [x, y]);
     const pieces = dash ? dashes(pts, c.closed, dash[0], dash[1]).map((d) => ({ pts: d, closed: false })) : [{ pts, closed: c.closed }];
-    return pieces.flatMap((p) => strokePolygons(p.pts, p.closed, width, cap as Cap, join as Join));
+    return pieces.flatMap((p) => strokePolygons(p.pts, p.closed, width, cap as Cap, join as Join, miter));
   });
   const fills = painted(style.stroke, defs, { contours, rule: FillRule.Union, opacity: num(style['stroke-opacity'], 1), matrix: shape.matrix, viewport: shape.viewport, rect: false });
   return typeof fills === 'string' ? PaintGap.Stroke : fills;

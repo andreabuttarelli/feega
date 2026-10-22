@@ -7,6 +7,16 @@ const PATHS = '<path d="M0 0L200 0L200 100L0 100Z"/>';
 const stack = (raw: unknown[]) => strokesSchema.parse(raw);
 const solid = (extra: Record<string, unknown> = {}) => ({ paint: { type: 'solid', color: '#111111' }, ...extra });
 
+describe('stroke miter limit', () => {
+  it('a non-default miter limit reaches the svg', () => {
+    expect(svgStrokes(stack([solid({ miter: 10 })]), paint, PATHS).body).toContain('stroke-miterlimit:10');
+  });
+
+  it('the default miter limit stays implicit', () => {
+    expect(svgStrokes(stack([solid()]), paint, PATHS).body).not.toContain('miterlimit');
+  });
+});
+
 describe('stroke stack in svg', () => {
   it('a centred stroke draws on the outline in frame units', () => {
     const { body } = svgStrokes(stack([solid({ width: 0.01, dash: 0.02, gap: 0.01, cap: 'round', join: 'bevel' })]), paint, PATHS);

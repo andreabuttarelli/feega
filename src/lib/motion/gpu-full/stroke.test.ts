@@ -16,6 +16,16 @@ const extent = (polys: number[][]) => {
   return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
 };
 
+describe('miter limit', () => {
+  const sharp = [0, 0, 100, 10, 0, 20];
+
+  it('a higher miter limit keeps a sharp corner pointed', () => {
+    const bevelled = extent(strokePolygons(sharp, false, 4, Cap.Butt, Join.Miter));
+    const pointed = extent(strokePolygons(sharp, false, 4, Cap.Butt, Join.Miter, 50));
+    expect(pointed[2]).toBeGreaterThan(bevelled[2] + 5);
+  });
+});
+
 describe('strokePolygons', () => {
   it('covers a butt line as one width-wide band', () => {
     const polys = strokePolygons([0, 0, 100, 0], false, 10, Cap.Butt, Join.Miter);

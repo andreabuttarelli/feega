@@ -158,7 +158,7 @@ function strokeBands(s: Stroke, outline: Outline, unit: number): number[][] {
     const pts = flatten(c).flatMap(([x, y]) => [x, y]);
     return s.dash > 0 ? dashes(pts, c.closed, s.dash * unit, (s.gap || s.dash) * unit).map((d) => ({ pts: d, closed: false })) : [{ pts, closed: c.closed }];
   });
-  return runs.flatMap((r) => strokePolygons(r.pts, r.closed, width, s.cap as Cap, s.join as Join));
+  return runs.flatMap((r) => strokePolygons(r.pts, r.closed, width, s.cap as Cap, s.join as Join, s.miter));
 }
 
 function shapePainter({ clip, props, size, unit, colour, time, fps }: Env): Painted {

@@ -60,6 +60,7 @@ export const READ_STYLES = [
   'stroke-opacity',
   'stroke-linecap',
   'stroke-linejoin',
+  'stroke-miterlimit',
   'stroke-dasharray'
 ] as const;
 

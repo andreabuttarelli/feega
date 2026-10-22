@@ -16,6 +16,8 @@ const DEFAULT_WIDTH = 0.01;
 const DEFAULT_COLOR = '#000000';
 const DEFAULT_END = '#ffffff';
 const DEFAULT_ANGLE = 90;
+export const DEFAULT_MITER = 4;
+const MAX_MITER = 100;
 
 const width = z.number().min(0).max(MAX_STROKE_WIDTH);
 const dashLength = z.number().min(0).max(MAX_DASH).default(0);
@@ -31,6 +33,7 @@ export const strokeSchema = z.object({
   gap: dashLength,
   cap: z.enum(CAPS).default('butt'),
   join: z.enum(JOINS).default('miter'),
+  miter: z.number().min(1).max(MAX_MITER).default(DEFAULT_MITER),
   visible: z.boolean().default(true)
 });
 
