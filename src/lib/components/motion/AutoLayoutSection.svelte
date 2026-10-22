@@ -9,6 +9,7 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import LogOut from '@lucide/svelte/icons/log-out';
   import SpaceBetween from '@lucide/svelte/icons/align-horizontal-space-between';
+  import Baseline from '@lucide/svelte/icons/baseline';
   import SpaceAround from '@lucide/svelte/icons/align-horizontal-space-around';
   import SpaceEvenly from '@lucide/svelte/icons/align-horizontal-distribute-center';
   import { FIELD_INPUT, FOCUS_RING, Field, IconButton, IconSize, Section, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
@@ -57,7 +58,7 @@
   ];
   const CELL_ALIGNS = ['', Align.Start, Align.Center, Align.End] as const;
   const CELL_ALIGN_LABEL: Record<(typeof CELL_ALIGNS)[number], string> = { '': 'Auto', [Align.Start]: 'Start', [Align.Center]: 'Center', [Align.End]: 'End' };
-  const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End };
+  const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End, [Align.Baseline]: Justify.Start };
 
   const layout = $derived(clip.autoLayout ?? null);
   let splitPadding = $state(false);
@@ -138,6 +139,9 @@
             {/each}
           {/each}
         </div>
+        {#if layout.direction === Direction.Horizontal}
+          <IconButton label="Align baselines" size={IconSize.Sm} pressed={layout.align === Align.Baseline} data-testid="auto-layout-baseline" onclick={() => set({ align: layout.align === Align.Baseline ? Align.Start : Align.Baseline }, 'Changed the alignment')}><Baseline /></IconButton>
+        {/if}
         {#each SPREADS as spread (spread.justify)}
           <IconButton label={spread.label} size={IconSize.Sm} pressed={layout.justify === spread.justify} data-testid={spread.testid} onclick={() => set({ justify: layout.justify === spread.justify ? Justify.Start : spread.justify }, 'Changed the spacing')}><spread.icon /></IconButton>
         {/each}

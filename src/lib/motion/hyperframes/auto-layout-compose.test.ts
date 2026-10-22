@@ -4,7 +4,7 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import { setAutoLayout } from '../layout/ops';
 import { setParent } from '../parent-ops';
 import { addClip, type OpResult } from '../timeline';
-import { Direction, Justify, TrackType } from '../layout/auto-layout';
+import { Align, Direction, Justify, TrackType } from '../layout/auto-layout';
 import { composeHtml } from './compose';
 
 function must(r: OpResult): MotionDoc {
@@ -48,5 +48,10 @@ describe('auto layout in the composition', () => {
   it('exports grid tracks', () => {
     const grid = must(setAutoLayout(row, 'box', { direction: Direction.Grid, columnTracks: [{ type: TrackType.Fixed, value: 300 }, { type: TrackType.Hug, value: 0 }] }));
     expect(styleOf(composeHtml({ doc: grid, tokens: FEEGA_TOKENS, assets: {} }), 'k2')).toContain('left:300px');
+  });
+
+  it('exports baseline alignment', () => {
+    const html = composeHtml({ doc: must(setAutoLayout(row, 'box', { align: Align.Baseline })), tokens: FEEGA_TOKENS, assets: {} });
+    expect(styleOf(html, 'k1')).toContain('top:513px');
   });
 });

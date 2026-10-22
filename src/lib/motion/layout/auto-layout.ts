@@ -18,7 +18,8 @@ export enum Justify {
 export enum Align {
   Start = 'start',
   Center = 'center',
-  End = 'end'
+  End = 'end',
+  Baseline = 'baseline'
 }
 
 export enum Sizing {
@@ -69,6 +70,7 @@ export type Item = {
   min?: Partial<Size>;
   max?: Partial<Size>;
   absolute?: boolean;
+  baseline?: number;
   cell?: Cell;
   flow?: Flow;
   children?: Item[];
@@ -100,7 +102,8 @@ const JUSTIFIED_IN_CELL: Record<Justify, (free: number) => number> = {
 const ALIGNED: Record<Align, (free: number) => number> = {
   [Align.Start]: () => 0,
   [Align.Center]: (free) => free / 2,
-  [Align.End]: (free) => free
+  [Align.End]: (free) => free,
+  [Align.Baseline]: () => 0
 };
 
 const JUSTIFIED: Record<Justify, (free: number, gap: number, count: number) => { offset: number; gap: number }> = {
@@ -113,6 +116,15 @@ const JUSTIFIED: Record<Justify, (free: number, gap: number, count: number) => {
 };
 
 const flowing = (item: Item): Item[] => (item.children ?? []).filter((c) => !c.absolute);
+
+const byBaseline = (flow: Flow) => flow.align === Align.Baseline && flow.direction === Direction.Horizontal;
+
+const baselineOf = (item: Item, height: number) => item.baseline ?? height;
+
+function baselineLine(heights: number[], baselines: number[]): { baseline: number; height: number } {
+  const baseline = Math.max(0, ...baselines);
+  return { baseline, height: baseline + Math.max(0, ...heights.map((h, i) => h - baselines[i])) };
+}
 
 function clamp(item: Item, dim: Dim, value: number): number {
   const max = item.max?.[dim] ?? Infinity;
@@ -149,7 +161,11 @@ function hugCross(item: Item, flow: Flow, main: number): number {
   const kids = flowing(item);
   const room = main - PAD[m](flow.padding);
   const rows = flow.wrap ? lines(kids, (k) => measure(k)[m], room, flow.gap) : [kids];
-  const crosses = rows.filter((r) => r.length).map((r) => Math.max(...r.map((k) => measure(k)[c])));
+  const lineCross = (r: Item[]) => {
+    const sizes = r.map((k) => measure(k)[c]);
+    return byBaseline(flow) ? baselineLine(sizes, r.map((k, i) => baselineOf(k, sizes[i]))).height : Math.max(...sizes);
+  };
+  const crosses = rows.filter((r) => r.length).map(lineCross);
   return sum(crosses) + gaps(crosses.length, flow.crossGap) + PAD[c](flow.padding);
 }
 
@@ -377,11 +393,13 @@ function place(item: Item, at: Box, out: Map<string, Box>): void {
     const crossOf = (k: Item, i: number) => measure(k, { [m]: mains[i] })[c];
     const lineCross = flow.wrap ? Math.max(...row.map(crossOf)) : inner[c];
     const crosses = row.map((k, i) => (k.sizing[c] === Sizing.Fill ? clamp(k, c, lineCross) : crossOf(k, i)));
+    const line = baselineLine(crosses, row.map((k, i) => baselineOf(k, crosses[i])));
+    const crossOffset = (i: number) => (byBaseline(flow) ? line.baseline - baselineOf(row[i], crosses[i]) : ALIGNED[flow.align](lineCross - crosses[i]));
     const { offset, gap } = JUSTIFIED[flow.justify](inner[m] - sum(mains) - gaps(row.length, flow.gap), flow.gap, row.length);
     let mainAt = inner[ax.mainStart] + offset;
 
     row.forEach((k, i) => {
-      const box = { [ax.mainStart]: mainAt, [ax.crossStart]: crossAt + ALIGNED[flow.align](lineCross - crosses[i]), [m]: mains[i], [c]: crosses[i] } as Box;
+      const box = { [ax.mainStart]: mainAt, [ax.crossStart]: crossAt + crossOffset(i), [m]: mains[i], [c]: crosses[i] } as Box;
       place(k, box, out);
       mainAt += mains[i] + gap;
     });

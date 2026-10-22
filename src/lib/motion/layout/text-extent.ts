@@ -3,6 +3,7 @@ import type { Size } from './auto-layout';
 
 export const AVERAGE_ADVANCE = 0.5;
 export const CAPITAL_ADVANCE = 0.62;
+export const ASCENT = 0.8;
 
 type TextProps = { text?: unknown; size?: unknown; leading?: unknown; tracking?: unknown; textCase?: unknown };
 type Inset = { across: number; down: number };
@@ -33,4 +34,11 @@ export function textExtent(component: ComponentId, props: TextProps, unit: numbe
   const room = width === undefined ? Infinity : Math.max(advance, width - inset.across * em);
   const rows = widths.reduce((n, w) => n + Math.max(1, Math.ceil(w / room)), 0);
   return { width: width ?? Math.max(...widths) + inset.across * em, height: rows * em * Number(props.leading ?? 1) + inset.down * em };
+}
+
+export function textBaseline(component: ComponentId, props: TextProps, unit: number): number {
+  const inset = TEXT_INSET[component] ?? NO_INSET;
+  const em = Number(props.size ?? 0) * unit;
+  const leading = Number(props.leading ?? 1);
+  return (inset.down * em) / 2 + (em * (leading - 1)) / 2 + em * ASCENT;
 }
