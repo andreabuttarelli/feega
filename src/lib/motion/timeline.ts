@@ -11,7 +11,7 @@ import { matteSource } from './matte';
 import { CAMERA_LANE, type CameraKey } from './camera';
 import { editCameraLane } from './camera-ops';
 import { Around, EASE_PRESETS, Half, presetEase, withHalf, type EasePreset } from './graph';
-import { Interp, keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
+import { Interp, isSpring, keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 import { partStylesSchema, type PartStyle } from './part-style-model';
 import { drivenVars } from './interactive/driven-vars';
 
@@ -468,8 +468,13 @@ export function deleteKeyframes(doc: MotionDoc, refs: readonly KeyRef[]): OpResu
   return editRefs(doc, refs, (track, frames) => track.filter((k) => !frames.includes(k.frame)));
 }
 
-export function setKeyEase(doc: MotionDoc, ref: KeyRef, ease: EaseSpec): OpResult {
-  return editRefs(doc, [ref], (track) => track.map((k) => (k.frame === ref.frame ? { ...k, ease } : k)));
+function eased(key: Keyframe, ease: EaseSpec, intensity?: number): Keyframe {
+  const { intensity: _previous, ...rest } = key;
+  return isSpring(ease) && intensity !== undefined ? { ...rest, ease, intensity } : { ...rest, ease };
+}
+
+export function setKeyEase(doc: MotionDoc, ref: KeyRef, ease: EaseSpec, intensity?: number): OpResult {
+  return editRefs(doc, [ref], (track) => track.map((k) => (k.frame === ref.frame ? eased(k, ease, intensity) : k)));
 }
 
 export type KeyShape = { in?: Interp; out?: Interp; roving?: boolean };
