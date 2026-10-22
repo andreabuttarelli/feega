@@ -75,11 +75,25 @@ export function strokePolygons(flat: number[], closed: boolean, width: number, c
   return polys;
 }
 
-export function dashes(flat: number[], closed: boolean, dash: number, gap: number): number[][] {
+const evened = (pattern: readonly number[]): number[] => (pattern.length % 2 ? [...pattern, ...pattern] : [...pattern]);
+
+function phaseOf(pattern: number[], at: number): { on: boolean; left: number } {
+  let rest = at;
+  for (let i = 0; i < pattern.length; i++) {
+    if (rest < pattern[i] - DASH_SLACK) {
+      return { on: i % 2 === 0, left: pattern[i] - rest };
+    }
+    rest -= pattern[i];
+  }
+  return { on: true, left: pattern[0] };
+}
+
+export function dashes(flat: number[], closed: boolean, pattern: readonly number[]): number[][] {
+  const steps = evened(pattern);
+  const period = steps.reduce((a, b) => a + b, 0);
   const pts = pointsOf(flat);
   const path = closed ? [...pts, pts[0]] : pts;
   const out: number[][] = [];
-  const period = dash + gap;
   let travelled = 0;
   let current: number[] = [];
   for (let i = 0; i < path.length - 1; i++) {
@@ -87,9 +101,8 @@ export function dashes(flat: number[], closed: boolean, dash: number, gap: numbe
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
     let at = 0;
     while (at < len) {
-      const phase = (travelled + at) % period;
-      const on = dash - phase > DASH_SLACK;
-      const step = Math.max(DASH_SLACK, Math.min(len - at, on ? dash - phase : period - phase));
+      const { on, left } = phaseOf(steps, (travelled + at) % period);
+      const step = Math.max(DASH_SLACK, Math.min(len - at, left));
       const p = (t: number): number[] => [a[0] + ((b[0] - a[0]) * t) / len, a[1] + ((b[1] - a[1]) * t) / len];
       if (on) {
         current = current.length ? current : p(at);

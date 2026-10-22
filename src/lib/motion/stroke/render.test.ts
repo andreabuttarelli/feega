@@ -17,6 +17,12 @@ describe('stroke miter limit', () => {
   });
 });
 
+describe('stroke dash pattern', () => {
+  it('a dash pattern becomes the svg dasharray', () => {
+    expect(svgStrokes(stack([solid({ pattern: [0.02, 0.01, 0.005, 0.01] })]), paint, PATHS).body).toContain('stroke-dasharray:20 10 5 10');
+  });
+});
+
 describe('stroke stack in svg', () => {
   it('a centred stroke draws on the outline in frame units', () => {
     const { body } = svgStrokes(stack([solid({ width: 0.01, dash: 0.02, gap: 0.01, cap: 'round', join: 'bevel' })]), paint, PATHS);
