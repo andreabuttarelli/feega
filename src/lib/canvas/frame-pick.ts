@@ -22,20 +22,33 @@ function turn(p: World, about: World, degrees: number): World {
   return { x: about.x + dx * Math.cos(r) - dy * Math.sin(r), y: about.y + dx * Math.sin(r) + dy * Math.cos(r) };
 }
 
-export function frameSpace(box: Box, frame: Size, rotation: number): FrameSpace {
-  const fit = containFit({ width: box.w, height: box.h }, frame);
-  const scale = fit.width / frame.width;
+export enum FrameFit {
+  Contain = 'contain',
+  Stretch = 'stretch'
+}
+
+function fitted(box: Box, frame: Size, fit: FrameFit) {
+  if (fit === FrameFit.Stretch) {
+    return { left: 0, top: 0, sx: box.w / frame.width, sy: box.h / frame.height };
+  }
+  const contained = containFit({ width: box.w, height: box.h }, frame);
+  const scale = contained.width / frame.width;
+  return { left: contained.left, top: contained.top, sx: scale, sy: scale };
+}
+
+export function frameSpace(box: Box, frame: Size, rotation: number, fit = FrameFit.Contain): FrameSpace {
+  const { left, top, sx, sy } = fitted(box, frame, fit);
   const centre = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
   return {
     toFrame(world) {
       const local = turn(world, centre, -rotation);
-      return [(local.x - box.x - fit.left) / scale, (local.y - box.y - fit.top) / scale];
+      return [(local.x - box.x - left) / sx, (local.y - box.y - top) / sy];
     },
     toWorld(r) {
-      return { x: box.x + fit.left + r.left * scale, y: box.y + fit.top + r.top * scale, w: r.width * scale, h: r.height * scale };
+      return { x: box.x + left + r.left * sx, y: box.y + top + r.top * sy, w: r.width * sx, h: r.height * sy };
     },
     pointToWorld([x, y]) {
-      return { x: box.x + fit.left + x * scale, y: box.y + fit.top + y * scale };
+      return { x: box.x + left + x * sx, y: box.y + top + y * sy };
     }
   };
 }
@@ -53,9 +66,9 @@ export function framePicker(live: LiveDoc, playhead: () => number | undefined = 
     return pickOwnersAt(s, [x, y], time());
   };
   return {
-    spaceOf(box: Box, rotation: number): FrameSpace {
+    spaceOf(box: Box, rotation: number, fit = FrameFit.Contain): FrameSpace {
       const s = scene();
-      return frameSpace(box, { width: s.width, height: s.height }, rotation);
+      return frameSpace(box, { width: s.width, height: s.height }, rotation, fit);
     },
     pick(world: World, space: FrameSpace): string | null {
       return ownersAt(world, space).findLast((id) => findClip(live.doc, id)) ?? null;

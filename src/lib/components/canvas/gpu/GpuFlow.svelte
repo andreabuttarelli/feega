@@ -2,7 +2,7 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { framePicker } from '$lib/canvas/frame-pick';
+  import { FrameFit, framePicker } from '$lib/canvas/frame-pick';
   import { onMount, untrack, type ComponentProps } from 'svelte';
   import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
@@ -61,7 +61,7 @@
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
-  import { Grip, type Gap, type Guide, type Pt } from '$lib/motion/scene-select';
+  import { Grip, handlesOf, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
@@ -144,8 +144,8 @@
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
-  import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, Corner, type Box, type Port } from '$lib/canvas/gpu/geometry';
-  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
+  import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
+  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
@@ -1070,7 +1070,7 @@
   type Active =
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
     | { kind: GestureKind.Drag; id: string; start: Point; origins: Map<string, Point>; moved: boolean; toggle: boolean }
-    | { kind: GestureKind.Resize; id: string; corner: Corner; start: Point; box: Box; min: { w: number; h: number } }
+    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number } }
     | { kind: GestureKind.Marquee; start: Point; base: string[]; additive: boolean; moved: boolean }
     | { kind: GestureKind.Connect; from: Port }
     | { kind: GestureKind.PickEdge; edgeId: string };
@@ -1098,9 +1098,9 @@
       return { kind: HitKind.Port, nodeId: port.nodeId, handle: port.handle };
     }
     if (resizable) {
-      const corner = resizeCornerAt(selectedBoxes[0], w, view.zoom);
-      if (corner) {
-        return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, corner };
+      const unit = resizeHandleAt(selectedBoxes[0], w, view.zoom);
+      if (unit) {
+        return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
       }
     }
     const node = topNodeAt(w);
@@ -1237,13 +1237,12 @@
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
-  const CORNER_OUTWARD: Record<Corner, [number, number]> = { [Corner.TopLeft]: [-1, -1], [Corner.TopRight]: [1, -1], [Corner.BottomLeft]: [-1, 1], [Corner.BottomRight]: [1, 1] };
   let cornerCursor = $state<ResizeCursor | null>(null);
 
   function hoverCorner(w: Point) {
     const box = resizable ? selectedBoxes[0] : null;
-    const corner = box ? resizeCornerAt(box, w, view.zoom) : null;
-    cornerCursor = box && corner ? resizeCursor(CORNER_OUTWARD[corner], box.rotation ?? 0) : null;
+    const unit = box ? resizeHandleAt(box, w, view.zoom) : null;
+    cornerCursor = box && unit ? resizeCursor([unit[0] * 2 - 1, unit[1] * 2 - 1], box.rotation ?? 0) : null;
   }
 
   function dropHover() {
@@ -1581,7 +1580,7 @@
     const held = pickers.get(nodeId);
     const picker = held?.live === live.doc ? held.picker : framePicker(live, () => liveOf(nodeId)?.playhead);
     pickers.set(nodeId, { live: live.doc, picker });
-    return { picker, space: picker.spaceOf(frame.box, byId.get(nodeId)?.rotation ?? 0), frame, live };
+    return { picker, space: picker.spaceOf(frame.box, byId.get(nodeId)?.rotation ?? 0, resizing.has(nodeId) ? FrameFit.Stretch : FrameFit.Contain), frame, live };
   }
 
   let timed: string | null = null;
@@ -1806,7 +1805,33 @@
     return Math.hypot(b[0] - a[0], b[1] - a[1]);
   }
 
+  const UNIT_SQUARE: Quad = [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 1]
+  ];
+
+  function resizeOf(nodeId: string, unit: [number, number], start: Point): Active {
+    const t = byId.get(nodeId)!;
+    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
+  }
+
+  function resizeHost(nodeId: string, handle: number, e: PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    downAt = local(e);
+    captureId = e.pointerId;
+    holdSelection(true);
+    active = resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e)));
+    gesturing = true;
+  }
+
   function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
+    if (grip === Grip.Scale && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.has(nodeId)) {
+      resizeHost(nodeId, handle, e);
+      return;
+    }
     if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && pickElement(e, toWorld(view, local(e)))) {
       e.stopPropagation();
       return;
@@ -1953,8 +1978,7 @@
         if (hit.kind !== HitKind.Corner) {
           return null;
         }
-        const t = byId.get(hit.nodeId)!;
-        return { kind: GestureKind.Resize, id: t.id, corner: hit.corner, start: w, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
+        return resizeOf(hit.nodeId, hit.unit, w);
       },
       [GestureKind.Marquee]: () => ({ kind: GestureKind.Marquee, start: w, base: selected, additive: e.shiftKey || e.metaKey || e.ctrlKey, moved: false }),
       [GestureKind.Connect]: () => {
@@ -2074,7 +2098,7 @@
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
-        const box = resized(a.box, a.corner, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min);
+        const box = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
         overrides = new Map([[a.id, box]]);
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
       },
