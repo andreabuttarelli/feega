@@ -5,6 +5,7 @@
   import { FILL_TYPES, FillType, PAINTED_AS, PaintedAs, colourAlpha, retypeFill, withAlpha, type Fill, type Stop } from '$lib/motion/fill/model';
   import { CAPS, JOINS } from '$lib/motion/shape/schema';
   import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, patternPx, removeStroke, setStroke, type Stroke, type StrokePatch } from '$lib/motion/stroke/model';
+  import { ARROW_CAPS } from '$lib/motion/stroke/arrows';
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
@@ -174,6 +175,14 @@
             {#each CAPS as cap (cap)}<option value={cap}>{cap}</option>{/each}
           </select>
         </label>
+        {#each [['startCap', 'Start'], ['endCap', 'End']] as const as [key, label] (key)}
+          <label class={FIELD_ROW}
+            ><span class={LABEL}>{label}</span>
+            <select class={cn(FIELD_INPUT, 'w-28')} data-testid={`stroke-${key}`} value={stroke[key]} onchange={(e) => patch(index, { [key]: e.currentTarget.value }, `Stroke ${label.toLowerCase()} cap`)}>
+              {#each ARROW_CAPS as cap (cap)}<option value={cap}>{cap.replace('-', ' ')}</option>{/each}
+            </select>
+          </label>
+        {/each}
         <label class={FIELD_ROW}
           ><span class={LABEL}>Join</span>
           <select class={cn(FIELD_INPUT, 'w-28')} data-testid="stroke-join" value={stroke.join} onchange={(e) => patch(index, { join: e.currentTarget.value }, 'Stroke join')}>

@@ -1,0 +1,3 @@
+# Arrow caps
+
+Strokes gain `startCap`/`endCap` (none, line-arrow, triangle-arrow, reversed-triangle, circle, diamond = Figma ARROW_LINES, ARROW_EQUILATERAL, TRIANGLE_FILLED, CIRCLE_FILLED, DIAMOND_FILLED). `stroke/arrows.ts` builds the head polygons once from the outline ends (tangent from the bezier handle, else the neighbour vertex), sized by stroke width. Export draws them as filled paths in the stroke paint; the GPU display list adds the same polygons to the stroke band, so both render the same geometry. SVG `<marker>` was discarded: the GPU DOM reader does not read markers. Closed contours get no caps. MCP: fields on `strokesSchema`.

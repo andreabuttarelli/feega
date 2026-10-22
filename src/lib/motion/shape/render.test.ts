@@ -60,6 +60,11 @@ describe('shape markup', () => {
     expect(svg).toContain('mask="url(#sk-a-s1)"');
   });
 
+  it('an arrow cap draws its head in the stroke colour', () => {
+    const svg = shapeMarkup(look({ shape: 'path', path: 'M0 0.5L1 0.5', strokes: [{ paint: { type: 'solid', color: '#111111' }, endCap: 'triangle-arrow' }] }), paint);
+    expect(svg).toMatch(/<g style="fill:#111111;stroke:none"><path d="M[^"]+Z"/);
+  });
+
   it('per-side widths frame a rectangle', () => {
     expect(shapeMarkup(look({ strokes: [{ paint: { type: 'solid', color: '#111111' }, align: 'inside', sides: [0.01, 0, 0, 0] }] }), paint)).toContain('fill-rule:evenodd');
   });
