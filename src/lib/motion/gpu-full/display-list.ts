@@ -30,7 +30,7 @@ import { stillSeconds } from '../still';
 import { animatorOfKey, COLOR_VALUE, SELECTOR_KEYS, type TextAnimator } from '../text-animators/model';
 import { textPathAt, type OnPath } from '../hyperframes/text-path';
 import { paintOnPath } from './text/on-path';
-import { caretOf, NO_TYPESET, paintText, planOf, TEXT_COMPONENTS, TextGap, type NativeFaces, type TextComponent, type TextPlan, type Typeset, type UniformPlan } from './text/painter';
+import { caretOf, coreTypography, NO_TYPESET, paintText, planOf, TEXT_COMPONENTS, TextGap, type NativeFaces, type TextComponent, type TextPlan, type Typeset, type UniformPlan } from './text/painter';
 import { resolvedRequest, type FaceRule } from './text/fonts';
 import type { CaretLine } from './text/caret';
 import type { Flow } from './text/layout';
@@ -226,11 +226,11 @@ function nativeText(env: Env, native: NativeFaces): Painted {
   if (typeof plan === 'string') {
     return TEXT_GAP[plan];
   }
-  if (!plan.fills.every((f) => NATIVE_FILLS.has(f.kind)) || plan.animation?.looks.some((l) => (l.spacing ?? 0) !== 0) || plan.runs.length) {
+  if (!plan.fills.every((f) => NATIVE_FILLS.has(f.kind)) || plan.animation?.looks.some((l) => (l.spacing ?? 0) !== 0) || plan.runs.length || !coreTypography(plan)) {
     return outlinedText(env);
   }
   const turn = { scale: Number(props.scale ?? 1), rotation: Number(props.rotation ?? 0) };
-  const { runs: _runs, starts: _starts, tints: _tints, gradients: _gradients, share: _share, ...uniform } = plan;
+  const { runs: _runs, starts: _starts, tints: _tints, gradients: _gradients, share: _share, typography: _typography, ...uniform } = plan;
   return [{ kind: ItemKind.Text, plan: { ...uniform, request: resolvedRequest(plan.request, native.registry) }, turn, opacity: 1, matrix: IDENTITY }];
 }
 
@@ -505,7 +505,7 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
 
 export const displayListAt = (doc: MotionDoc, frame: number, tokens: BrandTokens, typeset: Typeset = NO_TYPESET): DisplayList => drawFrame(prepare(doc, tokens, {}, typeset), frame);
 
-export type TextCaret = { lines: CaretLine[]; matrix: Affine; text: string; paragraphs: string[]; flow: Flow; width: number; height: number; size: number; centred: boolean };
+export type TextCaret = { lines: CaretLine[]; matrix: Affine; text: string; paragraphs: string[]; flow: Flow; width: number; height: number; size: number; vertical: number };
 
 export type TextBox = { left: number; top: number; width: number; height: number };
 
@@ -546,5 +546,5 @@ export function textCaretAt(prepared: Prepared, frame: number, clipId: string): 
   const world = mul2d(posed(edgeAt(clip, frame), size.width, size.height), worldAt(doc, clip.id, frame, size));
   const placed = mul2d(mul2d(world, [1, 0, 0, 1, box.left, box.top]), posed(moveAt(clip, frame), box.width, box.height));
   const turn = scaleAbout(caret.left + caret.width / 2, caret.top + caret.height / 2, Number(props.rotation ?? 0), Number(props.scale ?? 1));
-  return { lines: caret.lines, matrix: mul2d(mul2d(placed, turn), [1, 0, 0, 1, caret.left, caret.top]), text: plan.text, paragraphs: plan.paragraphs, flow: plan.flow, width: caret.width, height: caret.height, size: caret.size, centred: caret.centred };
+  return { lines: caret.lines, matrix: mul2d(mul2d(placed, turn), [1, 0, 0, 1, caret.left, caret.top]), text: plan.text, paragraphs: plan.paragraphs, flow: plan.flow, width: caret.width, height: caret.height, size: caret.size, vertical: caret.vertical };
 }

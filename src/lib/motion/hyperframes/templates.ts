@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { COMPONENTS, ComponentId } from '../components';
+import type { COMPONENTS, ComponentId, TextAlign, VerticalAlign } from '../components';
 import { TextSizing } from '../text-sizing';
 import { Ease } from '../design';
 import { boxOf, type Box } from '../layout';
@@ -70,7 +70,9 @@ const hostId = (ctx: { text: TextRender }) => (ctx.text.id ? ` id="${ctx.text.id
 const typeSize = (ctx: { p: { size: number }; unit: number }) => Math.round(ctx.p.size * ctx.unit * 100) / 100;
 export const INK = { paper: '#ffffff', paper2: '#f5f5f3', line: '#e4e4e2', ink: '#111111', inkSoft: '#6b6b6b', select: '#a855f7' } as const;
 
-const JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' } as const;
+const JUSTIFY: Record<TextAlign, string> = { left: 'flex-start', center: 'center', right: 'flex-end', justify: 'stretch' };
+const VERTICAL: Record<VerticalAlign, string> = { top: 'flex-start', center: 'center', bottom: 'flex-end' };
+const EMPTY_LINE = '&#8203;';
 const REVEAL = 16;
 const LINE_STAGGER = 5;
 const FADE = 18;
@@ -84,7 +86,7 @@ const TEXT_BOX: Record<TextSizing, (truncate: boolean) => Record<string, string>
 
 const FITS: Record<TextSizing, boolean> = { [TextSizing.Fixed]: true, [TextSizing.AutoWidth]: false, [TextSizing.AutoHeight]: false };
 
-type Placed = Pick<PropsOf<'Title'>, 'x' | 'y' | 'width' | 'height' | 'align' | 'opacity' | 'scale' | 'rotation'>;
+type Placed = Pick<PropsOf<'Title'>, 'x' | 'y' | 'width' | 'height' | 'opacity' | 'scale' | 'rotation'> & { align: TextAlign };
 
 function boxCss(box: Box): Record<string, string> {
   return { position: 'absolute', left: px(box.left), top: px(box.top), width: px(box.width), height: px(box.height) };
@@ -166,13 +168,29 @@ function runCss(ctx: TemplateCtx<'Text'>, run: TextRun): string {
   });
 }
 
-function textBody(ctx: TemplateCtx<'Text'>): string {
-  if (!ctx.p.runs?.length || ctx.text.id !== null) {
-    return ctx.text.lines(ctx.p.text).join('\n');
+function runParagraphs(ctx: TemplateCtx<'Text'>): string[] {
+  const paragraphs: string[] = [''];
+  for (const segment of segmentsOf(ctx.p.text, ctx.p.runs)) {
+    segment.text.split('\n').forEach((piece, i) => {
+      if (i > 0) {
+        paragraphs.push('');
+      }
+      const html = esc(piece);
+      paragraphs[paragraphs.length - 1] += segment.run && piece ? `<span style="${runCss(ctx, segment.run)}">${html}</span>` : html;
+    });
   }
-  return segmentsOf(ctx.p.text, ctx.p.runs)
-    .map((s) => (s.run ? `<span style="${runCss(ctx, s.run)}">${esc(s.text)}</span>` : esc(s.text)))
-    .join('');
+  return paragraphs;
+}
+
+const paragraphsOf = (ctx: TemplateCtx<'Text'>): string[] => (!ctx.p.runs?.length || ctx.text.id !== null ? ctx.text.lines(ctx.p.text) : runParagraphs(ctx));
+
+function textBody(ctx: TemplateCtx<'Text'>): string {
+  const paragraphs = paragraphsOf(ctx);
+  const { paragraphSpacing: spacing, paragraphIndent: indent } = ctx.p;
+  if (!spacing && !indent) {
+    return paragraphs.join('\n');
+  }
+  return paragraphs.map((html, i) => `<div style="${css({ textIndent: `${indent}em`, marginBottom: `${i < paragraphs.length - 1 ? spacing : 0}em` })}">${html || EMPTY_LINE}</div>`).join('');
 }
 
 const Title: Template<'Title'> = {
@@ -206,7 +224,7 @@ const Text: Template<'Text'> = {
     const paint = glyphPaint(ctx, 'Text');
     const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], ...ctx.text.vars });
     const fit = FITS[ctx.p.sizing] ? ` data-fit="${size}"` : ' data-text';
-    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}"${fit} style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${textBody(ctx)}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, TEXT_BOX[ctx.p.sizing](ctx.p.truncate));
+    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}"${fit} style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${textBody(ctx)}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, { justifyContent: VERTICAL[ctx.p.verticalAlign], ...TEXT_BOX[ctx.p.sizing](ctx.p.truncate) });
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]
 };

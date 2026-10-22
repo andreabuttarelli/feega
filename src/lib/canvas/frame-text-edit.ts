@@ -9,8 +9,11 @@ import { styledComponent } from '$lib/motion/text-run-ops';
 import type { RunCase, RunStyle, TextRun } from '$lib/motion/text-runs';
 import { mul2d, type Affine } from '$lib/motion/affine';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
+import type { TextCase } from '$lib/motion/components';
 
 type Size = { width: number; height: number };
+
+const TEXT_TRANSFORM: Record<TextCase, string> = { 'as-typed': 'none', upper: 'uppercase', lower: 'lowercase', title: 'capitalize' };
 
 export type TextEditStyle = {
   fontPx: number;
@@ -20,7 +23,7 @@ export type TextEditStyle = {
   trackingEm: number;
   leading: number;
   color: string;
-  upper: boolean;
+  textTransform: string;
   align: string;
 };
 
@@ -60,16 +63,16 @@ export function textEditStyle(input: { clip: MotionClip; doc: MotionDoc; tokens:
     trackingEm: Number(p.tracking),
     leading: Number(p.leading),
     color: resolveColor(p.color, input.tokens),
-    upper: p.textCase === 'upper',
+    textTransform: TEXT_TRANSFORM[(p.textCase as TextCase) ?? 'as-typed'] ?? 'none',
     align: String(p.align)
   };
 }
 
-export type EditLayout = { transform: string; width: number; height: number; fontPx: number; wraps: boolean; centred: boolean };
+export type EditLayout = { transform: string; width: number; height: number; fontPx: number; wraps: boolean; vertical: number };
 
 export function editLayout(caret: TextCaret, screen: Affine): EditLayout {
   const m = mul2d(screen, caret.matrix);
-  return { transform: `matrix(${m.join(',')})`, width: caret.width, height: caret.height, fontPx: caret.size, wraps: caret.flow.wraps, centred: caret.centred };
+  return { transform: `matrix(${m.join(',')})`, width: caret.width, height: caret.height, fontPx: caret.size, wraps: caret.flow.wraps, vertical: caret.vertical };
 }
 
 const FLOW_CSS: Record<'wraps' | 'line', (layout: EditLayout) => string> = {
@@ -80,5 +83,5 @@ const FLOW_CSS: Record<'wraps' | 'line', (layout: EditLayout) => string> = {
 export function editCss(look: TextEditStyle, layout: EditLayout): string {
   const flow = FLOW_CSS[layout.wraps ? 'wraps' : 'line'](layout);
   const font = `${look.italic ? 'italic ' : ''}${look.weight} ${layout.fontPx}px/${look.leading} ${look.family}`;
-  return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};${look.upper ? 'text-transform:uppercase;' : ''}`;
+  return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};text-transform:${look.textTransform};`;
 }

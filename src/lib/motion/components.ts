@@ -100,7 +100,11 @@ const BLEED_REACH = 2;
 export const TITLE_LOOK = { weight: SEMIBOLD, tracking: -0.05 } as const;
 export const TITLE_RANGE = { weight: [MEDIUM, SEMIBOLD], tracking: [-0.07, -0.04] } as const;
 export const ALIGNS = ['left', 'center', 'right'] as const;
-export const TEXT_CASES = ['as-typed', 'upper', 'lower'] as const;
+export const TEXT_CASES = ['as-typed', 'upper', 'lower', 'title'] as const;
+export const TEXT_ALIGNS = [...ALIGNS, 'justify'] as const;
+export type TextAlign = (typeof TEXT_ALIGNS)[number];
+export const VERTICAL_ALIGNS = ['top', 'center', 'bottom'] as const;
+export type VerticalAlign = (typeof VERTICAL_ALIGNS)[number];
 export { TEXT_SIZINGS, TextSizing } from './text-sizing';
 export type TextCase = (typeof TEXT_CASES)[number];
 export const MOVES = ['none', 'drift-up', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'] as const;
@@ -148,6 +152,18 @@ const typography = (size: number, fallbackColor: string, look: Look) => ({
   stretch: range(TYPE.stretch.min, TYPE.stretch.max, TYPE.stretch.step, TYPE.stretch.fallback, 'Width axis', Group.Style),
   slant: range(TYPE.slant.min, TYPE.slant.max, TYPE.slant.step, TYPE.slant.fallback, 'Slant axis', Group.Style),
   axes: z.string().max(200).regex(AXES, "axes look like 'GRAD' 50, 'CASL' 1").default('').meta({ control: Control.Text, label: 'Other axes', group: Group.Style })
+});
+
+export const PARAGRAPH = {
+  spacing: { min: 0, max: 4, step: 0.05 },
+  indent: { min: 0, max: 10, step: 0.1 }
+} as const;
+
+const paragraph = () => ({
+  align: choice(TEXT_ALIGNS, 'center', 'Align', Group.Layout),
+  verticalAlign: choice(VERTICAL_ALIGNS, 'center', 'Vertical align', Group.Layout),
+  paragraphSpacing: range(PARAGRAPH.spacing.min, PARAGRAPH.spacing.max, PARAGRAPH.spacing.step, 0, 'Paragraph spacing', Group.Style),
+  paragraphIndent: range(PARAGRAPH.indent.min, PARAGRAPH.indent.max, PARAGRAPH.indent.step, 0, 'Indent', Group.Style)
 });
 
 export const LIGHTINGS = ['studio', 'soft', 'dramatic'] as const;
@@ -281,7 +297,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), ...layout({ y: 0.65, height: 0.2 }) })
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
       .strict()
   },
   Kicker: {

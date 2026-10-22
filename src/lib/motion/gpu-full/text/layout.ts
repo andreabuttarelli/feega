@@ -16,7 +16,16 @@ export type Look = { request: Omit<Request, 'size'>; size: number; tracking: num
 
 export type RequestAt = (paragraph: number, char: number) => Look;
 
-export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: number; inset: number; shaping: Shaping; requestAt?: RequestAt };
+export enum Justify {
+  Off = 'off',
+  On = 'on'
+}
+
+export type Paragraph = { indent: number; spacing: number; justify: Justify };
+
+export const PLAIN_PARAGRAPH: Paragraph = { indent: 0, spacing: 0, justify: Justify.Off };
+
+export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: number; inset: number; shaping: Shaping; requestAt?: RequestAt; paragraph?: Paragraph };
 
 export type Glyph = { face: Face; glyph: number; skew: number; x: number; dy: number; char: number; pen: number; advance: number; word: number; letter: number; size: number; leading: number };
 
@@ -112,11 +121,11 @@ function shift(glyphs: Glyph[], by: number): Glyph[] {
   return glyphs.map((g) => ({ ...g, x: g.x + by, pen: g.pen + by }));
 }
 
-function wrapped(tokens: Token[], flow: Flow, room: number, inset: number): { glyphs: Glyph[]; width: number }[] {
+function wrapped(tokens: Token[], flow: Flow, room: number, inset: number, indent: number): { glyphs: Glyph[]; width: number }[] {
   const lines: { glyphs: Glyph[]; width: number }[] = [];
   let glyphs: Glyph[] = [];
-  let pen = inset;
-  let inked = inset;
+  let pen = inset + indent;
+  let inked = pen;
   let words = 0;
   let kept = 0;
   const close = () => {
@@ -151,6 +160,35 @@ function wrapped(tokens: Token[], flow: Flow, room: number, inset: number): { gl
   lines[lines.length - 1].width += inset;
   return lines;
 }
+
+function gapsOf(glyphs: Glyph[]): number[] {
+  const starts: number[] = [];
+  glyphs.forEach((g, i) => {
+    const after = glyphs[i - 1];
+    if (g.word >= 0 && after && after.word < 0 && glyphs.slice(0, i).some((h) => h.word >= 0)) {
+      starts.push(i);
+    }
+  });
+  return starts;
+}
+
+function justified(line: { glyphs: Glyph[]; width: number }, room: number): { glyphs: Glyph[]; width: number } {
+  const gaps = gapsOf(line.glyphs);
+  if (!gaps.length || line.width >= room) {
+    return line;
+  }
+  const extra = (room - line.width) / gaps.length;
+  const glyphs = line.glyphs.map((g, i) => {
+    const by = gaps.filter((at) => at <= i).length * extra;
+    return { ...g, x: g.x + by, pen: g.pen + by };
+  });
+  return { glyphs, width: room };
+}
+
+const JUSTIFIED: Record<Justify, (lines: { glyphs: Glyph[]; width: number }[], room: number) => { glyphs: Glyph[]; width: number }[]> = {
+  [Justify.Off]: (lines) => lines,
+  [Justify.On]: (lines, room) => lines.map((line, i) => (i < lines.length - 1 ? justified(line, room) : line))
+};
 
 function primary(type: Type, book: FaceBook, text: string): Face | null {
   const request = { ...type.request, size: type.size };
@@ -190,10 +228,11 @@ export function layOut(paragraphs: string[], type: Type, flow: Flow, room: numbe
   const descent = Math.round((face?.descent ?? 0) * scale);
   const lineHeight = lineHeightOf(type.size, type.leading);
   const baseline = Math.floor((lineHeight - ascent - descent) / 2) + ascent;
+  const paragraph = type.paragraph ?? PLAIN_PARAGRAPH;
   let missing = false;
   let top = 0;
-  const blocks = paragraphs.map((paragraph, at): Block => {
-    const text = collapsed(paragraph, flow.spaces);
+  const blocks = paragraphs.map((source, at): Block => {
+    const text = collapsed(source, flow.spaces);
     const asked = askedOf(type, at);
     let first = 0;
     let words = 0;
@@ -204,12 +243,12 @@ export function layOut(paragraphs: string[], type: Type, flow: Flow, room: numbe
       missing ||= token.missing;
       return token;
     });
-    const laid = wrapped(tokens, flow, room, type.inset);
+    const laid = JUSTIFIED[flow.wraps ? paragraph.justify : Justify.Off](wrapped(tokens, flow, room, type.inset, paragraph.indent), room);
     const lines = type.requestAt ? mixedLines(laid, { above: baseline, below: lineHeight - baseline }) : laid.map((l, i) => ({ ...l, top: i * lineHeight, height: lineHeight, baseline: i * lineHeight + baseline }));
     const block = { lines, top, height: lines.reduce((n, l) => n + l.height, 0) };
-    top += block.height;
+    top += block.height + paragraph.spacing;
     return block;
   });
   const width = Math.max(0, ...blocks.flatMap((b) => b.lines.map((l) => l.width)));
-  return { blocks, width, height: top, ascent, descent, lineHeight, missing };
+  return { blocks, width, height: Math.max(0, top - paragraph.spacing), ascent, descent, lineHeight, missing };
 }

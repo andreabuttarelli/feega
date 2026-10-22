@@ -1,5 +1,5 @@
 import { apply2d, mul2d, type Affine } from '../../affine';
-import { TYPE, type TextCase } from '../../components';
+import { TYPE, type TextAlign, type TextCase, type VerticalAlign } from '../../components';
 import { Ease } from '../../design';
 import { safeBox } from '../../fit';
 import { elementFills } from '../../fill/elements';
@@ -19,7 +19,7 @@ import type { Face, FaceBook, Request } from './face';
 import type { FaceRule } from './fonts';
 import type { FontFace } from '../../fonts/model';
 import { caretLines, type CaretLine } from './caret';
-import { layOut, NO_EXTRA, Shaping, Spaces, type Extra, type Flow, type Glyph, type Laid, type Line, type Look, type RequestAt, type Type } from './layout';
+import { Justify, layOut, PLAIN_PARAGRAPH, NO_EXTRA, Shaping, Spaces, type Paragraph, type Extra, type Flow, type Glyph, type Laid, type Line, type Look, type RequestAt, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
 import { clipped, contoursOf, dilated, within, type Rect } from './outline';
@@ -123,9 +123,18 @@ type Kind = {
   area: Area;
 };
 
-type Props = Record<string, unknown> & { text: string; size: number; align: keyof typeof ALIGN_SHARE; sizing?: TextSizing; easing: Ease };
+type Props = Record<string, unknown> & { text: string; size: number; align: TextAlign; sizing?: TextSizing; easing: Ease; verticalAlign?: VerticalAlign; paragraphSpacing?: number; paragraphIndent?: number };
 
-const ALIGN_SHARE = { left: 0, center: 0.5, right: 1 } as const;
+const ALIGN_SHARE: Record<TextAlign, number> = { left: 0, center: 0.5, right: 1, justify: 0 };
+const JUSTIFY_OF: Record<TextAlign, Justify> = { left: Justify.Off, center: Justify.Off, right: Justify.Off, justify: Justify.On };
+const VERTICAL_SHARE: Record<VerticalAlign, number> = { top: 0, center: 0.5, bottom: 1 };
+
+export type Typography = { vertical: number; paragraph: Paragraph };
+
+export const coreTypography = ({ typography: { vertical, paragraph } }: Pick<TextPlan, 'typography'>) =>
+  vertical === VERTICAL_SHARE.center && paragraph.indent === PLAIN_PARAGRAPH.indent && paragraph.spacing === PLAIN_PARAGRAPH.spacing && paragraph.justify === PLAIN_PARAGRAPH.justify;
+
+const paragraphOf = (p: Props): Paragraph => ({ indent: Number(p.paragraphIndent ?? 0), spacing: Number(p.paragraphSpacing ?? 0), justify: JUSTIFY_OF[p.align] ?? Justify.Off });
 const PERCENT = 100;
 const rounded = (p: Props, unit: number) => Math.round(p.size * unit * PERCENT) / PERCENT;
 const lines = (text: string) => text.split('\n');
@@ -154,7 +163,9 @@ const KINDS: Record<TextComponent, Kind> = {
   Caption: { size: (p, unit) => p.size * unit, paragraphs: whole, flow: () => NORMAL, fits: () => true, upper: false, inset: 0.5, frame: centred, motion: Motion.None, area: Area.Line }
 };
 
-const CASE: Record<TextCase, (s: string) => string> = { 'as-typed': (s) => s, upper: (s) => s.toUpperCase(), lower: (s) => s.toLowerCase() };
+const WORD_START = /(^|\s)(\S)/gu;
+
+const CASE: Record<TextCase, (s: string) => string> = { 'as-typed': (s) => s, upper: (s) => s.toUpperCase(), lower: (s) => s.toLowerCase(), title: (s) => s.replace(WORD_START, (_, gap: string, first: string) => gap + first.toUpperCase()) };
 
 export const casedOf = (component: TextComponent, p: Record<string, unknown>) => CASE[KINDS[component].upper ? 'upper' : ((p.textCase as TextCase) ?? 'as-typed')](String(p.text));
 
@@ -405,6 +416,7 @@ export type TextPlan = {
   flow: Flow;
   frame: PlanFrame;
   align: number;
+  typography: Typography;
   fade: number;
   rises: number[] | null;
   area: Area;
@@ -420,7 +432,7 @@ export type TextPlan = {
   share: number;
 };
 
-export type UniformPlan = Omit<TextPlan, 'runs' | 'starts' | 'tints' | 'gradients' | 'share'>;
+export type UniformPlan = Omit<TextPlan, 'runs' | 'starts' | 'tints' | 'gradients' | 'share' | 'typography'>;
 
 type Word = { line: number; chars: number };
 
@@ -473,6 +485,7 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
     flow: kind.flow(p),
     frame: { left: frame.box.left - env.box.left, top: frame.box.top - env.box.top, width: frame.box.width, height: frame.box.height, anchor: frame.anchor, hugs: frame.hugs },
     align: ALIGN_SHARE[p.align] ?? 0,
+    typography: { vertical: VERTICAL_SHARE[p.verticalAlign ?? 'center'], paragraph: paragraphOf(p) },
     fade: kind.motion === Motion.FadeUp ? progress(env, { at: 0, duration: FADE_FRAMES / env.fps }, p.easing) : 1,
     rises: kind.motion === Motion.LinesRise ? paragraphs.map((_, i) => progress(env, { at: (i * LINE_STAGGER) / env.fps, duration: REVEAL_FRAMES / env.fps }, p.easing)) : null,
     area: kind.area,
@@ -533,10 +546,13 @@ function decorations(run: TextRun | null, g: Glyph, x: number, baseline: number)
 
 type Placed = { laid: Laid; type: Type; room: number };
 
+const topOf = (plan: TextPlan, laid: Laid) => plan.frame.top + (plan.frame.anchor === Anchor.Centre ? (plan.frame.height - laid.height) * plan.typography.vertical : 0);
+
 function place(plan: TextPlan, fonts: FaceBook): Placed {
   const typeAt = (size: number): Type => {
     const requestAt = requestAtOf(plan, size);
-    return { request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping, ...(requestAt ? { requestAt } : {}) };
+    const paragraph = { ...plan.typography.paragraph, indent: plan.typography.paragraph.indent * size, spacing: plan.typography.paragraph.spacing * size };
+    return { request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping, paragraph, ...(requestAt ? { requestAt } : {}) };
   };
   const looks = plan.animation?.looks;
   const words = wordsOf(plan.text);
@@ -588,7 +604,7 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
   }
   const smoothing = SMOOTHING[plan.smoothing];
   const { left } = plan.frame;
-  const top = plan.frame.top + (plan.frame.anchor === Anchor.Centre ? (plan.frame.height - laid.height) / 2 : 0);
+  const top = topOf(plan, laid);
   const matrix: Affine = [1, 0, 0, 1, left, top + FADE_RISE_PX * (1 - plan.fade)];
   const inks: Ink[] = [];
   const stripWidth = laid.blocks.reduce((n, b) => n + b.lines.reduce((m, line) => m + inkedWidth(line), 0), 0);
@@ -664,7 +680,7 @@ function spaceOf(laid: Laid, paragraphs: string[], size: number): number {
   return glyphs[0]?.advance ?? size * SPACE_EM;
 }
 
-export type Caret = { lines: CaretLine[]; left: number; top: number; width: number; height: number; size: number; centred: boolean };
+export type Caret = { lines: CaretLine[]; left: number; top: number; width: number; height: number; size: number; vertical: number };
 
 export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
   const { laid, room, type } = place(plan, fonts);
@@ -674,7 +690,7 @@ export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
   if (laid.missing) {
     return TextGap.Glyph;
   }
-  const top = plan.frame.top + (plan.frame.anchor === Anchor.Centre ? (plan.frame.height - laid.height) / 2 : 0);
+  const top = topOf(plan, laid);
   return {
     lines: caretLines(laid, plan.paragraphs, { room, align: plan.align, top: 0, space: spaceOf(laid, plan.paragraphs, type.size) }),
     left: plan.frame.left,
@@ -682,6 +698,6 @@ export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
     width: plan.frame.hugs ? laid.width : plan.frame.width,
     height: plan.frame.anchor === Anchor.Top ? laid.height : plan.frame.height,
     size: type.size,
-    centred: plan.frame.anchor === Anchor.Centre
+    vertical: plan.frame.anchor === Anchor.Centre ? plan.typography.vertical : 0
   };
 }

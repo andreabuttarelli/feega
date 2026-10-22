@@ -2,6 +2,10 @@ export enum SegmentIcon {
   AlignLeft = 'align-left',
   AlignCenter = 'align-center',
   AlignRight = 'align-right',
+  Justify = 'justify',
+  Top = 'top',
+  Middle = 'middle',
+  Bottom = 'bottom',
   AutoWidth = 'auto-width',
   AutoHeight = 'auto-height',
   FixedSize = 'fixed-size'
@@ -13,7 +17,13 @@ const SEGMENTS: Record<string, Record<string, Omit<Segment, 'value'>>> = {
   align: {
     left: { label: 'Align left', icon: SegmentIcon.AlignLeft },
     center: { label: 'Align centre', icon: SegmentIcon.AlignCenter },
-    right: { label: 'Align right', icon: SegmentIcon.AlignRight }
+    right: { label: 'Align right', icon: SegmentIcon.AlignRight },
+    justify: { label: 'Justify', icon: SegmentIcon.Justify }
+  },
+  verticalAlign: {
+    top: { label: 'Align top', icon: SegmentIcon.Top },
+    center: { label: 'Align middle', icon: SegmentIcon.Middle },
+    bottom: { label: 'Align bottom', icon: SegmentIcon.Bottom }
   },
   fit: {
     cover: { label: 'Cover', icon: null },
@@ -27,7 +37,8 @@ const SEGMENTS: Record<string, Record<string, Omit<Segment, 'value'>>> = {
   textCase: {
     'as-typed': { label: 'As typed', icon: null },
     upper: { label: 'AA', icon: null },
-    lower: { label: 'aa', icon: null }
+    lower: { label: 'aa', icon: null },
+    title: { label: 'Aa', icon: null }
   }
 };
 
