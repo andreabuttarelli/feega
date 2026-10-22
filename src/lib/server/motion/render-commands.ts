@@ -83,6 +83,7 @@ const FINISH: Record<ExportFormat, Finisher> = {
   [ExportFormat.ProRes422]: { decode: [], map: VIDEO, video: ['-c:v', 'prores_ks', '-profile:v', '3', '-pix_fmt', 'yuv422p10le'], audio: PCM, tail: [], target: AS_IS },
   [ExportFormat.WebmAlpha]: { decode: [], map: VIDEO, video: ['-c:v', 'copy'], audio: ['-c:a', 'libopus', '-b:a', OPUS_BITRATE], tail: [], target: AS_IS },
   [ExportFormat.Gif]: gifFinish,
+  [ExportFormat.Apng]: { decode: ['-c:v', 'libvpx-vp9'], map: VIDEO, video: ['-pix_fmt', 'rgba'], audio: null, tail: ['-f', 'apng', '-plays', '0'], target: AS_IS },
   [ExportFormat.PngSequence]: { decode: [], map: VIDEO, video: ['-pix_fmt', 'rgba'], audio: null, tail: [], target: (out) => `${out}/${PNG_PATTERN}` }
 };
 

@@ -93,6 +93,7 @@ describe('saving a server render in another format', () => {
     [ExportFormat.WebmAlpha, 'webm', 'video/webm', 'video'],
     [ExportFormat.ProRes4444, 'mov', 'video/quicktime', 'video'],
     [ExportFormat.Gif, 'gif', 'image/gif', 'image'],
+    [ExportFormat.Apng, 'png', 'image/apng', 'image'],
     [ExportFormat.PngSequence, 'zip', 'application/zip', 'document']
   ])('%s is stored as .%s with %s, as a %s asset', async (format, ext, mime, type) => {
     const { db } = fakeDb(MP4);

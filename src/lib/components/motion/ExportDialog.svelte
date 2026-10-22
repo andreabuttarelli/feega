@@ -42,6 +42,7 @@
     [ExportFormat.Mp4H264]: 'MP4',
     [ExportFormat.Mp4H265]: 'MP4 HEVC',
     [ExportFormat.Gif]: 'GIF',
+    [ExportFormat.Apng]: 'APNG',
     [ExportFormat.WebmAlpha]: 'WebM alpha',
     [ExportFormat.ProRes422]: 'ProRes',
     [ExportFormat.ProRes4444]: 'ProRes alpha',
