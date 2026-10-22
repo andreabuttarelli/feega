@@ -12,7 +12,7 @@
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
   import { alignSide } from '$lib/canvas/frame-tools';
-  import { FRAME_ELEMENT_MENU, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
+  import { FRAME_ELEMENT_MENU, canRunInFrame, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { loadOutliner } from '$lib/motion/fonts/outliner';
   import { frameSummaries } from '$lib/motion/frame-menu';
@@ -109,7 +109,8 @@
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
-  import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
+  import { CANVAS_COMMAND_OF, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
+  import type { Command } from '$lib/motion/shortcuts';
   import { HTML_MIME, Pasted, TEXT_MIME, clipboardHtml, readPaste, type ClipboardPayload, type PasteData, type PasteSource } from '$lib/canvas/system-clipboard';
   import { eventSource, systemSource, writeSystem } from '$lib/canvas/system-clipboard-browser';
   import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
@@ -2493,6 +2494,17 @@
     }
   };
 
+  function runPaletteCommand(command: Command) {
+    if (inside?.level.clip && picks.length && canRunInFrame(command)) {
+      void runFrameAction(command);
+      return;
+    }
+    const canvasCommand = CANVAS_COMMAND_OF[command];
+    if (canvasCommand) {
+      KEY_RUN[canvasCommand.id](canvasCommand);
+    }
+  }
+
   function onKeydown(e: KeyboardEvent) {
     if (frameDialog) {
       return;
@@ -3108,7 +3120,7 @@
   {/if}
 
   {#if spec.chrome}
-    <CommandPalette />
+    <CommandPalette onrun={runPaletteCommand} />
   {/if}
 
   {#if menuAt && spec.chrome}

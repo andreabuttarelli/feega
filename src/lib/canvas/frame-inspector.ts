@@ -199,6 +199,8 @@ export const picksFor = (id: ActionId, doc: MotionDoc, picks: readonly string[])
 
 const runs = (id: ActionId) => id in BAR_OPS || id in LATER_OPS || id in PICKS;
 
+export const canRunInFrame = runs;
+
 export const frameMenuAction = (id: SelectionActionId): ActionId | null => {
   const run = frameMenuRun(id);
   return run && 'command' in run ? run.command : null;
