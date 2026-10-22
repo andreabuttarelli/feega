@@ -5,6 +5,7 @@ import { groupClips, ungroupClip } from '$lib/motion/group';
 import { addAutoLayout, removeAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
 import { isText } from '$lib/motion/layout/text-extent';
 import { Flip, flipClips } from '$lib/motion/layer-props';
+import { setClipFlags } from '$lib/motion/organize';
 import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
@@ -98,6 +99,14 @@ const oneInstance = (doc: MotionDoc, selection: readonly string[]) => selection.
 const COMPONENT_NAME = 'Component';
 const componentName = (doc: MotionDoc) => `${COMPONENT_NAME} ${Object.values(doc.comps).filter((c) => c.component).length + 1}`;
 
+type Flag = 'hidden' | 'locked';
+
+function toggleFlag(ctx: BarCtx, flag: Flag, summary: string): Done | null {
+  const on = !ctx.selection.every((id) => findClip(ctx.doc, id)?.clip[flag]);
+  const result = ctx.selection.reduce<OpResult>((r, id) => (r.ok ? setClipFlags(r.doc, id, { [flag]: on }) : r), { ok: true, doc: ctx.doc });
+  return kept(ctx, result, summary);
+}
+
 const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx.doc)), 'Created a component') },
   [Action.DetachInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, detachInstance(ctx.doc, ctx.selection[0], ctx.newId), 'Detached the instance') },
@@ -116,7 +125,9 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.Flatten]: { shown: shapes(1), run: (ctx) => kept(ctx, flattenShapes(ctx.doc, ctx.selection, ctx.frame), 'Flattened shapes') },
   [Action.OutlineStroke]: { shown: someShape, run: (ctx) => kept(ctx, outlineStrokes(ctx.doc, ctx.selection, ctx.frame, ctx.newId), 'Outlined the stroke') },
   [Action.FlipHorizontal]: flip(Flip.Horizontal, 'Flipped horizontally'),
-  [Action.FlipVertical]: flip(Flip.Vertical, 'Flipped vertically')
+  [Action.FlipVertical]: flip(Flip.Vertical, 'Flipped vertically'),
+  [Action.ToggleHidden]: { shown: any, run: (ctx) => toggleFlag(ctx, 'hidden', 'Toggled visibility') },
+  [Action.ToggleLocked]: { shown: any, run: (ctx) => toggleFlag(ctx, 'locked', 'Toggled lock') }
 };
 
 export type LaterCtx = BarCtx & { load: OutlinerLoader; assets: Record<string, string> };
@@ -168,7 +179,7 @@ export const FRAME_ELEMENT_MENU: ReadonlySet<SelectionActionId> = new Set(
   })
 );
 
-const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, Command.SelectMatching, Command.SelectAll]);
+const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
 
 export function frameKeyAction(e: KeyboardEvent): ActionId | null {
   const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, EditMode.Design);

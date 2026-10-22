@@ -163,6 +163,19 @@ describe('frameKeyAction', () => {
   const press = (key: string, mods: { meta?: boolean; shift?: boolean; alt?: boolean } = {}) =>
     ({ key, code: `Key${key.toUpperCase()}`, metaKey: !!mods.meta, ctrlKey: false, shiftKey: !!mods.shift, altKey: !!mods.alt }) as KeyboardEvent;
 
+  it('⇧⌘H hides and ⇧⌘L locks the selection, and pressing again undoes it', () => {
+    const flag = (doc: MotionDoc | undefined, key: 'hidden' | 'locked') => doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'a')?.[key];
+    const ctx = (doc: MotionDoc) => ({ doc, selection: ['a'], frame: 0, newId: () => 'x' });
+    const hide = frameKeyAction(press('h', { meta: true, shift: true }))!;
+    const lock = frameKeyAction(press('l', { meta: true, shift: true }))!;
+
+    const hidden = barAction(hide, ctx(fixture()))!.doc;
+    expect(flag(hidden, 'hidden')).toBe(true);
+    expect(flag(barAction(hide, ctx(hidden))!.doc, 'hidden')).toBe(false);
+    expect(flag(barAction(lock, ctx(fixture()))!.doc, 'locked')).toBe(true);
+    expect(frameBarActions(fixture(), ['a'])).not.toContain(hide);
+  });
+
   it('maps the Figma structure keys to frame actions', () => {
     expect(frameKeyAction(press('g', { meta: true }))).toBe(Action.Group);
     expect(frameKeyAction(press('g', { meta: true, shift: true }))).toBe(Action.Ungroup);
