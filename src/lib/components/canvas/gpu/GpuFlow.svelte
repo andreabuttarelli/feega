@@ -26,6 +26,9 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import { findClip, type MotionClip } from '$lib/motion/doc';
   import CoreTextEdit from '../CoreTextEdit.svelte';
+  import GradientHandles from '../GradientHandles.svelte';
+  import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
+  import type { Fill } from '$lib/motion/fill/model';
   import { commitText, editsText, hideText, runsOfClip, styledKind, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import type { TextRun } from '$lib/motion/text-runs';
   import { frameProperties } from '../frame-properties.svelte';
@@ -1554,6 +1557,28 @@
     });
   }
 
+  function gradientMark(nodeId: string) {
+    const mark = picks.length === 1 && typing?.nodeId !== nodeId ? selectionMarks(nodeId)[0] : null;
+    const saver = mark ? saverOf(nodeId) : null;
+    const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip) : null;
+    return mark && target ? { clip: mark.clip, rect: mark.rect, index: target.index, fill: target.fill } : null;
+  }
+
+  function dragGradient(nodeId: string, clip: string, index: number, fill: Fill) {
+    const saver = saverOf(nodeId);
+    const result = saver ? withFill(saver.history.present, clip, index, fill) : null;
+    if (result?.ok) {
+      liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), doc: result.doc });
+    }
+  }
+
+  function dropGradient(nodeId: string, clip: string, index: number, fill: Fill) {
+    const saver = saverOf(nodeId);
+    if (saver) {
+      commit(nodeId, withFill(saver.history.present, clip, index, fill), 'Edited gradient');
+    }
+  }
+
   function groupMark(nodeId: string) {
     const marks = selectionMarks(nodeId);
     if (marks.length < 2) {
@@ -2719,6 +2744,10 @@
         {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} rect={mark.rect} kind={mark.kind} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
+        {@const gradient = gradientMark(frame.id)}
+        {#if gradient}
+          <GradientHandles rect={gradient.rect} fill={gradient.fill} onchange={(f) => dragGradient(frame.id, gradient.clip, gradient.index, f)} ondone={(f) => dropGradient(frame.id, gradient.clip, gradient.index, f)} />
+        {/if}
         {@const group = typing?.nodeId === frame.id ? null : groupMark(frame.id)}
         {#if group}
           <FrameSelection clip="" rect={group} kind={SelectionKind.Group} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
