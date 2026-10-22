@@ -18,6 +18,7 @@
   import { HORIZONTALS, VERTICALS } from '$lib/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { PropKind, STYLE_PROPS, placeBox, setPropAcross, sharedConstraint, sharedProp, type BoxPatch } from '$lib/motion/selection-props';
+  import { recolour, selectionColours } from '$lib/motion/selection-colours';
   import NumberField from './NumberField.svelte';
 
   let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; onchange: (doc: MotionDoc, summary: string) => void } = $props();
@@ -69,6 +70,15 @@
     const result = bounds ? placeBox(doc, [...ids], frame, bounds, patch, mode) : null;
     if (result?.ok) {
       onchange(result.doc, `Placed ${ids.length} layers`);
+    }
+  }
+
+  const colours = $derived(selectionColours(doc, ids));
+
+  function swapColour(from: string, to: string) {
+    const result = recolour(doc, ids, from, to);
+    if (result.ok) {
+      onchange(result.doc, `Recoloured ${from} on ${ids.length} layers`);
     }
   }
 
@@ -155,6 +165,17 @@
               <input type="text" aria-label={f.label} placeholder="Mixed" value={textProp(f.key)} onchange={(e) => setStyle(f.key, e.currentTarget.value)} />
             </label>
           {/if}
+        {/each}
+      </section>
+    {/if}
+    {#if colours.length}
+      <section class="section" data-section="colours">
+        <h3>Selection colours</h3>
+        {#each colours as colour (colour)}
+          <label class="line" data-colour={colour}>
+            <span>{colour}</span>
+            <input type="color" aria-label={`Replace ${colour}`} value={colour.slice(0, 7)} onchange={(e) => swapColour(colour, e.currentTarget.value)} />
+          </label>
         {/each}
       </section>
     {/if}
