@@ -168,6 +168,7 @@ import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, rem
 import { flattenComps } from '$lib/motion/precomp';
 import { clearTextRuns, styleTextRange } from '$lib/motion/text-run-ops';
 import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, resetOverrides } from '$lib/motion/main-component';
+import { addVariant, pickVariant, swapInstance } from '$lib/motion/variants';
 import { RunToggle, type RunEdit } from '$lib/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
@@ -2672,8 +2673,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     component: tool({
-      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props): one instance only. reset / detach (clip_id).',
-      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional() }),
+      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props): one instance only. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value).',
+      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.string().optional() }),
       execute: async (input) => {
         const ids: string[] = [];
         const newId = () => {
@@ -2686,7 +2687,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           [ComponentAction.Create]: () => createComponent(session.doc, input.clip_ids ?? [], newId, input.name ?? `Component ${Object.values(session.doc.comps).filter((c) => c.component).length + 1}`),
           [ComponentAction.Override]: () => overrideInstance(session.doc, id, input.inner_clip_id ?? '', input.props ?? {}),
           [ComponentAction.Reset]: () => resetOverrides(session.doc, id),
-          [ComponentAction.Detach]: () => detachInstance(session.doc, id, newId)
+          [ComponentAction.Detach]: () => detachInstance(session.doc, id, newId),
+          [ComponentAction.AddVariant]: () => addVariant(session.doc, input.comp ?? '', input.variant ?? {}, newId),
+          [ComponentAction.Swap]: () => (input.comp ? swapInstance(session.doc, id, input.comp) : pickVariant(session.doc, id, input.prop ?? '', input.value ?? ''))
         };
         const out = apply(run[input.action](), `component ${input.action}`);
         return out.ok && ids.length ? { ...out, comp: ids[0], clip_id: ids[1] ?? id } : out;
