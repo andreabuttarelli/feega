@@ -89,7 +89,16 @@ type Ring = { points: Pt[]; closed: boolean };
 const ringOf = (c: Contour): Ring => ({ points: resample(c, MORPH_POINTS), closed: c.closed });
 const dotOf = (other: Ring): Ring => ({ points: Array.from({ length: MORPH_POINTS }, () => centroid(other.points)), closed: other.closed });
 
-export function morphBetween(a: Outline, b: Outline, t: number, startShift: number): Outline {
+function area(contour: Contour): number {
+  const ring = flatten(contour);
+  return Math.abs(ring.reduce((sum, p, i) => sum + (p[0] * ring[(i + 1) % ring.length][1] - ring[(i + 1) % ring.length][0] * p[1]), 0) / 2);
+}
+
+const bySize = (outline: Outline): Outline => [...outline].sort((x, y) => area(y) - area(x));
+
+export function morphBetween(first: Outline, second: Outline, t: number, startShift: number): Outline {
+  const a = bySize(first);
+  const b = bySize(second);
   const count = Math.max(a.length, b.length);
   const from = Array.from({ length: count }, (_, i) => (a[i] ? ringOf(a[i]) : null));
   const to = Array.from({ length: count }, (_, i) => (b[i] ? ringOf(b[i]) : null));
