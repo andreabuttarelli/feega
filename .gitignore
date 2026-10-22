@@ -106,3 +106,6 @@ bun.lock
 /static/motion-libs/
 tests/e2e/.auth/
 /build-spa
+
+# per-checkout vite deps cache (worktrees share node_modules)
+.vite-deps/
