@@ -3,7 +3,7 @@ import type { Box } from '../layout';
 import { pivotBox, type Size } from '../parent';
 import { Sizing, layoutTree, type Item } from './auto-layout';
 import { DEFAULT_LAYOUT_ITEM, type AutoLayout } from './model';
-import { isText, textExtent } from './text-extent';
+import { isText, textBaseline, textExtent } from './text-extent';
 
 type Clips = Map<string, MotionClip>;
 
@@ -39,6 +39,7 @@ function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size): Ite
     min: { width: own.minWidth, height: own.minHeight },
     max: { width: own.maxWidth, height: own.maxHeight },
     absolute: own.absolute,
+    baseline: isText(clip.component) ? textBaseline(clip.component, clip.props, Math.min(size.width, size.height)) : undefined,
     cell: { column: own.column, row: own.row, columnSpan: own.columnSpan, rowSpan: own.rowSpan, x: own.cellX, y: own.cellY }
   };
   if (!isContainer(clip)) {

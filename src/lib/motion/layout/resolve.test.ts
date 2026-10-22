@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newClip, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from '../doc';
-import { Direction, Justify, Sizing } from './auto-layout';
+import { Align, Direction, Justify, Sizing } from './auto-layout';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, type AutoLayout } from './model';
 import { withAutoLayout } from './resolve';
-import { textExtent } from './text-extent';
+import { textBaseline, textExtent } from './text-extent';
 
 const W = 1000;
 const H = 1000;
@@ -60,6 +60,14 @@ describe('withAutoLayout', () => {
     const doc = docOf([text, shape('c', { x: 0.5, y: 0.5, width: 1, height: 1 }, { autoLayout: flow() })]);
     const extent = textExtent('Kicker', text.props, 1000);
     expect(propsOf(withAutoLayout(doc), 't')).toMatchObject({ width: extent.width / W, height: extent.height / H });
+  });
+
+  it('baseline alignment sits a text on the bottom of a box', () => {
+    const text = newClip({ id: 't', from: 0, durationInFrames: 30, component: 'Kicker', props: { text: 'HI', size: 0.05, leading: 1, tracking: 0, x: 0, y: 0, width: 0.2, height: 0.1 }, parent: 'c' });
+    const doc = docOf([text, shape('a', { x: 0, y: 0, width: 0.1, height: 0.2 }, { parent: 'c' }), shape('c', { x: 0.5, y: 0.5, width: 1, height: 1 }, { autoLayout: flow({ align: Align.Baseline }) })]);
+    const out = withAutoLayout(doc);
+    const top = (propsOf(out, 't').y as number) - 0.05;
+    expect(top * H + textBaseline('Kicker', text.props, 1000)).toBeCloseTo(200, 5);
   });
 
   it('absolute and hidden children keep their own box and take no slot', () => {

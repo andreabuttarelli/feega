@@ -335,3 +335,26 @@ describe('grid tracks', () => {
   });
 });
 
+describe('baseline alignment', () => {
+  it('lines up the first baselines of a row', () => {
+    const out = layoutTree(box('c', 300, 100, [leaf('a', 50, 40, { baseline: 30 }), leaf('b', 50, 20, { baseline: 10 })], { align: Align.Baseline }));
+    expect(out.get('a')!.top).toBe(0);
+    expect(out.get('b')!.top).toBe(20);
+  });
+
+  it('a box without text sits on its bottom edge', () => {
+    const out = layoutTree(box('c', 300, 100, [leaf('a', 50, 40, { baseline: 30 }), leaf('b', 50, 10)], { align: Align.Baseline }));
+    expect(out.get('b')!.top).toBe(20);
+  });
+
+  it('a hugging row grows to hold what hangs below the baseline', () => {
+    const size = measure(box('c', 0, 0, [leaf('a', 50, 40, { baseline: 10 }), leaf('b', 50, 20, { baseline: 20 })], { align: Align.Baseline }, { sizing: hug }));
+    expect(size.height).toBe(50);
+  });
+
+  it('a column ignores baseline and starts at the top', () => {
+    const out = layoutTree(box('c', 300, 100, [leaf('a', 50, 40, { baseline: 30 })], { direction: Direction.Vertical, align: Align.Baseline }));
+    expect(out.get('a')!.left).toBe(0);
+  });
+});
+
