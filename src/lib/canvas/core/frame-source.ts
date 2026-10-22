@@ -1,6 +1,8 @@
 import { FrameKind, MOTION_NODE_BAR_H, frameChrome } from '$lib/canvas/motion-node';
 import { posterSecond } from '$lib/motion/poster-time';
 import { stillFrame as docStill } from '$lib/motion/still';
+import { contentEnd } from '$lib/motion/fit-duration';
+import type { MotionDoc } from '$lib/motion/doc';
 import type { DisplayList } from '$lib/motion/gpu-full/display-list';
 import type { Rgba } from '$lib/motion/gpu-full/rgba';
 import type { Box } from './canvas-scene';
@@ -31,7 +33,11 @@ export function framesOnCanvas(tiles: readonly FrameTile[], dataOf: (id: string)
   });
 }
 
-export const stillFrame = (doc: { fps: number; durationInFrames: number; still?: { frame: number } }): number => docStill(doc) ?? Math.round(posterSecond(doc) * doc.fps);
+type StillDoc = Pick<MotionDoc, 'fps' | 'durationInFrames' | 'still' | 'tracks' | 'comps'>;
+
+const shownLength = (doc: StillDoc): number => Math.min(doc.durationInFrames, contentEnd(doc as MotionDoc) || doc.durationInFrames);
+
+export const stillFrame = (doc: StillDoc): number => docStill(doc) ?? Math.round(posterSecond({ fps: doc.fps, durationInFrames: shownLength(doc) }) * doc.fps);
 
 export const frameOfLive = (live: { doc: Parameters<typeof stillFrame>[0]; playhead?: number }): number => live.playhead ?? stillFrame(live.doc);
 

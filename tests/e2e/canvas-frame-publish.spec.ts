@@ -11,6 +11,7 @@ const MORE = 'More actions';
 const PEER = { userId: 'e2e-peer', name: 'peer@feega.app' };
 const PEER_AT = { x: 0.25, y: 0.75 };
 const ALIGN_PX = 4;
+const PAN_LEFT_PX = 260;
 
 const shape = (id: string, x: number, color: string) => ({ id, from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x, y: 0.5, width: 0.25, height: 0.4, fills: [{ type: 'solid', color }] } });
 
@@ -67,6 +68,11 @@ test.describe('publish, template and peers from a selected canvas frame @real', 
     await pickMore(page, 'Publish to gallery…');
     await expect(page.getByTestId('publish-dialog')).toBeVisible();
     await page.getByTestId('publish-title').fill('Not published: e2e');
+    const preview = page.getByTestId('publish-dialog').getByTestId('motion-preview');
+    const holder = (await page.getByTestId('publish-dialog').locator('.preview').boundingBox())!;
+    const stage = (await preview.boundingBox())!;
+    expect(stage.width).toBeLessThanOrEqual(holder.width + ALIGN_PX);
+    expect(stage.height).toBeLessThanOrEqual(holder.height + ALIGN_PX);
     await page.screenshot({ path: `${SHOTS}-02-publish.png` });
     await page.getByTestId('publish-dialog').getByRole('button', { name: 'Close' }).click();
     await expect(page.getByTestId('publish-dialog')).toBeHidden();
@@ -119,5 +125,29 @@ test.describe('publish, template and peers from a selected canvas frame @real', 
     await page.getByTestId('frame-timeline').getByRole('button', { name: /card4/ }).first().click();
     await expect(page.getByTestId('template-inspector')).toBeVisible();
     await page.screenshot({ path: `${SHOTS}-06-template-inspector.png` });
+  });
+
+  test('a batch row previews on the canvas frame', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    await seedFrame(seedNode, admin, session, instance);
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await openFrame(page);
+    const tile = page.locator('[data-testid="gpu-node"][data-kind="motion"]').first();
+    await page.mouse.move(700, 450);
+    await page.mouse.wheel(PAN_LEFT_PX, 0);
+    await page.waitForTimeout(SETTLE_MS);
+
+    await pickMore(page, 'Save as template…');
+    const shot = async () => {
+      const box = (await tile.boundingBox())!;
+      const dialog = (await page.getByTestId('template-dialog').boundingBox())!;
+      return page.screenshot({ clip: { ...box, width: Math.min(box.width, dialog.x - box.x) } });
+    };
+    await page.getByTestId('batch-csv').fill('headline\nA much longer row headline');
+    await page.waitForTimeout(SETTLE_MS);
+    const before = await shot();
+    await page.getByTestId('batch-preview').click();
+    await expect(async () => expect((await shot()).equals(before)).toBe(false)).toPass({ timeout: 15_000 });
+    await page.screenshot({ path: `${SHOTS}-07-batch-preview.png` });
   });
 });

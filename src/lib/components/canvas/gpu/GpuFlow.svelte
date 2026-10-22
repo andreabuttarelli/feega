@@ -1352,6 +1352,19 @@
   const dialogExtras = $derived(frameDialog ? extrasOf(frameDialog.nodeId) : null);
   const dialogTokens = $derived(frameDialog ? (liveOf(frameDialog.nodeId)?.tokens ?? null) : null);
 
+  function showDialogDoc(nodeId: string, doc: LiveDoc['doc'] | null) {
+    const live = liveOf(nodeId);
+    const shown = doc ?? dialogSession?.history.present;
+    if (live && shown) {
+      liveDocs.set(nodeId, { ...live, doc: shown });
+    }
+  }
+
+  function closeDialog(nodeId: string) {
+    showDialogDoc(nodeId, null);
+    frameDialog = null;
+  }
+
   let pickedPart = $state<string | null>(null);
   const soleFrame = $derived(selected.length === 1 && coreFrames.some((f) => f.id === selected[0]) ? selected[0] : null);
   const panelNodeId = $derived(inside ? inside.nodeId : soleFrame);
@@ -2710,7 +2723,8 @@
       onswitch={(next) => (frameDialog = { nodeId, dialog: next })}
       onfocus={(id) => select([id])}
       onimages={(rows) => props.onExportRows?.([nodeId], rows) ?? Promise.resolve('Export failed')}
-      onclose={() => (frameDialog = null)}
+      onpreview={(doc) => showDialogDoc(nodeId, doc)}
+      onclose={() => closeDialog(nodeId)}
     />
   {/if}
 

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
 import { drawsWhole, framesOnCanvas, onStage, stillFrame } from './frame-source';
+import instance from '../../../../tests/e2e/fixtures/motion-doc-template-instance.json';
+import type { MotionDoc } from '$lib/motion/doc';
 
 const tile = (id: string, kind = 'motion') => ({ id, kind, x: 10, y: 20, w: 300, h: 200 });
 
@@ -41,11 +43,15 @@ describe('handing a frame to the core', () => {
 
 describe('still frame', () => {
   it('draws a resting frame at the same instant its poster was taken', () => {
-    expect(stillFrame({ fps: 30, durationInFrames: 90 })).toBe(36);
+    expect(stillFrame({ fps: 30, durationInFrames: 90, tracks: [], comps: {} })).toBe(36);
   });
 
   it('a still doc rests on its own still frame', () => {
-    expect(stillFrame({ fps: 30, durationInFrames: 60, still: { frame: 0 } })).toBe(0);
+    expect(stillFrame({ fps: 30, durationInFrames: 60, still: { frame: 0 }, tracks: [], comps: {} })).toBe(0);
+  });
+
+  it('a doc longer than its content rests inside the content, not on an empty black frame', () => {
+    expect(stillFrame(instance as unknown as MotionDoc)).toBe(60);
   });
 });
 

@@ -36,6 +36,7 @@
   .composition-player {
     width: 100%;
     height: 100%;
+    container-type: size;
     pointer-events: none;
   }
 </style>

@@ -57,6 +57,7 @@
     onswitch,
     onfocus,
     onimages,
+    onpreview,
     onclose
   }: {
     dialog: FrameDialog;
@@ -71,6 +72,7 @@
     onswitch: (next: FrameDialog) => void;
     onfocus: (nodeId: string) => void;
     onimages: (rows: ExportRow[]) => Promise<ImagesMade | string>;
+    onpreview: (doc: MotionDoc | null) => void;
     onclose: () => void;
   } = $props();
 
@@ -293,7 +295,7 @@
     scope={{ orgId: data.orgId, projectId, nodeId }}
     {framesFor}
     onchange={onedit}
-    onpreview={() => {}}
+    {onpreview}
     {onclose}
   />
 {:else if dialog === FrameDialog.Publish && data}
