@@ -502,13 +502,13 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
 
 export const displayListAt = (doc: MotionDoc, frame: number, tokens: BrandTokens, typeset: Typeset = NO_TYPESET): DisplayList => drawFrame(prepare(doc, tokens, {}, typeset), frame);
 
-export type TextCaret = { lines: CaretLine[]; matrix: Affine; text: string; paragraphs: string[]; flow: Flow };
+export type TextCaret = { lines: CaretLine[]; matrix: Affine; text: string; paragraphs: string[]; flow: Flow; width: number; height: number; size: number; centred: boolean };
 
-export function textCaretAt({ doc, tokens, assets, typeset }: Prepared, frame: number, clipId: string): TextCaret | null {
-  const clip = doc.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id === clipId);
-  if (!clip || !(TEXT_COMPONENTS as readonly string[]).includes(clip.component)) {
-    return null;
-  }
+export type TextBox = { left: number; top: number; width: number; height: number };
+
+const isText = (clip: MotionClip) => (TEXT_COMPONENTS as readonly string[]).includes(clip.component);
+
+function laidText({ doc, tokens, assets, typeset }: Prepared, frame: number, clip: MotionClip) {
   const size = { width: doc.width, height: doc.height };
   const css = (v: string) => resolveColor(v, tokens);
   const props = propsAt(clip, frame, css);
@@ -518,11 +518,30 @@ export function textCaretAt({ doc, tokens, assets, typeset }: Prepared, frame: n
     return null;
   }
   const caret = caretOf(plan, typeset.fonts);
-  if (typeof caret === 'string') {
+  return typeof caret === 'string' ? null : { caret, plan, props, box, size };
+}
+
+export function textBoxesAt(prepared: Prepared, frame: number): Record<string, TextBox> {
+  const boxes: Record<string, TextBox> = {};
+  for (const clip of prepared.doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter(isText)) {
+    const laid = laidText(prepared, frame, clip);
+    if (laid) {
+      boxes[clip.id] = { left: laid.box.left + laid.caret.left, top: laid.box.top + laid.caret.top, width: laid.caret.width, height: laid.caret.height };
+    }
+  }
+  return boxes;
+}
+
+export function textCaretAt(prepared: Prepared, frame: number, clipId: string): TextCaret | null {
+  const { doc } = prepared;
+  const clip = doc.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id === clipId);
+  const laid = clip && isText(clip) ? laidText(prepared, frame, clip) : null;
+  if (!clip || !laid) {
     return null;
   }
+  const { caret, plan, props, box, size } = laid;
   const world = mul2d(posed(edgeAt(clip, frame), size.width, size.height), worldAt(doc, clip.id, frame, size));
   const placed = mul2d(mul2d(world, [1, 0, 0, 1, box.left, box.top]), posed(moveAt(clip, frame), box.width, box.height));
   const turn = scaleAbout(caret.left + caret.width / 2, caret.top + caret.height / 2, Number(props.rotation ?? 0), Number(props.scale ?? 1));
-  return { lines: caret.lines, matrix: mul2d(mul2d(placed, turn), [1, 0, 0, 1, caret.left, caret.top]), text: plan.text, paragraphs: plan.paragraphs, flow: plan.flow };
+  return { lines: caret.lines, matrix: mul2d(mul2d(placed, turn), [1, 0, 0, 1, caret.left, caret.top]), text: plan.text, paragraphs: plan.paragraphs, flow: plan.flow, width: caret.width, height: caret.height, size: caret.size, centred: caret.centred };
 }

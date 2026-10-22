@@ -6,10 +6,10 @@ const LOOK = { fontPx: 54, family: "'DM Sans', sans-serif", weight: 600, italic:
 
 describe('the caret over core-drawn text', () => {
   it('sits at the clip box with the font the core draws', () => {
-    const body = render(CoreTextEdit, { props: { rect: { left: 10, top: 20, width: 300, height: 60 }, look: LOOK, text: 'Hello', oncommit: () => {} } }).body;
+    const body = render(CoreTextEdit, { props: { layout: { transform: 'matrix(1,0,0,1,10,20)', width: 300, height: 60, fontPx: 54, wraps: true, centred: true }, look: LOOK, text: 'Hello', oncommit: () => {} } }).body;
 
     expect(body).toContain('data-testid="core-text-edit"');
-    expect(body).toContain('left:10px;top:20px;width:300px;height:60px');
+    expect(body).toContain('transform:matrix(1,0,0,1,10,20);white-space:pre-wrap;width:300px;height:60px');
     expect(body).toContain("font:600 54px/1.2 'DM Sans', sans-serif");
     expect(body).toContain('letter-spacing:-0.02em');
     expect(body).toContain('text-align:center');

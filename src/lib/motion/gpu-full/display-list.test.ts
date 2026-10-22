@@ -5,7 +5,7 @@ import { Ease, TransitionKind } from '../design';
 import { addClip, setKeyframes, type OpResult } from '../timeline';
 import { FillType } from '../fill/model';
 import { BlendMode } from '../blend';
-import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, textCaretAt, Unsupported, type ImageItem, type PathItem } from './display-list';
+import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, textBoxesAt, textCaretAt, Unsupported, type ImageItem, type PathItem } from './display-list';
 import { apply2d } from '../affine';
 import { caretRect } from './text/caret';
 import { boxBook, boxFace } from './text/test-face';
@@ -274,5 +274,39 @@ describe('textCaretAt', () => {
 
   it('is null for a clip that is not text', () => {
     expect(textCaretAt(prepare(withCard, FEEGA_TOKENS, {}, boxType), 0, 'card')).toBeNull();
+  });
+});
+
+describe('textBoxesAt', () => {
+  const texted = (props: Record<string, unknown>) => must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'a long line of words', size: 0.05, align: 'center', x: 0.5, y: 0.5, width: 0.1, height: 0.1, ...props } }, 'text'));
+
+  it('hugs the laid line of an auto-width text instead of the stored box', () => {
+    const doc = texted({ sizing: 'auto' });
+    const box = textBoxesAt(prepare(doc, FEEGA_TOKENS, {}, boxType), 0).text;
+    const caret = textCaretAt(prepare(doc, FEEGA_TOKENS, {}, boxType), 0, 'text')!;
+
+    expect(box.width).toBeGreaterThan(0.1 * doc.width);
+    expect(box.width).toBeCloseTo(caret.width, 3);
+    expect(box.left).toBeCloseTo(0.45 * doc.width, 3);
+    expect(caret.lines).toHaveLength(1);
+  });
+
+  it('keeps the width of an auto-height text and grows its height to the wrapped lines', () => {
+    const doc = texted({ sizing: 'auto-height' });
+    const box = textBoxesAt(prepare(doc, FEEGA_TOKENS, {}, boxType), 0).text;
+
+    expect(box.width).toBeCloseTo(0.1 * doc.width, 3);
+    expect(box.height).toBeGreaterThan(0.1 * doc.height);
+  });
+
+  it('tells the editor the laid size, anchor and wrapping', () => {
+    const fixed = textCaretAt(prepare(texted({ sizing: 'fixed' }), FEEGA_TOKENS, {}, boxType), 0, 'text')!;
+    const auto = textCaretAt(prepare(texted({ sizing: 'auto' }), FEEGA_TOKENS, {}, boxType), 0, 'text')!;
+
+    expect(fixed.centred).toBe(true);
+    expect(fixed.flow.wraps).toBe(true);
+    expect(fixed.size).toBeLessThanOrEqual(0.05 * Math.min(withBg.width, withBg.height));
+    expect(auto.centred).toBe(false);
+    expect(auto.flow.wraps).toBe(false);
   });
 });

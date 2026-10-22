@@ -622,7 +622,7 @@ function spaceOf(laid: Laid, paragraphs: string[], size: number): number {
   return glyphs[0]?.advance ?? size * SPACE_EM;
 }
 
-export type Caret = { lines: CaretLine[]; left: number; top: number; width: number; height: number };
+export type Caret = { lines: CaretLine[]; left: number; top: number; width: number; height: number; size: number; centred: boolean };
 
 export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
   const { laid, room, type } = place(plan, fonts);
@@ -638,6 +638,8 @@ export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
     left: plan.frame.left,
     top,
     width: plan.frame.hugs ? laid.width : plan.frame.width,
-    height: plan.frame.anchor === Anchor.Top ? laid.height : plan.frame.height
+    height: plan.frame.anchor === Anchor.Top ? laid.height : plan.frame.height,
+    size: type.size,
+    centred: plan.frame.anchor === Anchor.Centre
   };
 }
