@@ -57,6 +57,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   create: canvas('create_node'),
   move: canvas('move_node'),
   resize: canvas('resize_node'),
+  rename: canvas('rename_node'),
   write: canvas('update_node'),
   apply_effects: tool('apply_effects'),
   effects_pair: tool('make_effects_pair'),

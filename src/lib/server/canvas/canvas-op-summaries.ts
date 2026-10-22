@@ -45,6 +45,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   list_connections: 'Lines of a canvas.',
   disconnect_nodes: 'Remove a line.',
   set_edge_mode: 'Set a line to fixed or iterate.',
+  rename_node: 'Name a node as it shows in Layers and on the canvas; empty gives the default name back.',
   resize_node: 'Set the width and height of a node.',
   duplicate_nodes: 'Duplicate nodes with the lines among them.',
   share_canvas: 'Turn the view-only link of a canvas on or off.',
