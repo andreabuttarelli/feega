@@ -130,8 +130,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { fitElementToNode, fitToNode } from '$lib/motion/custom-size';
-  import { barContextOf } from '$lib/canvas/bottom-bar';
-  import { CanvasState, NodeMode } from '$lib/canvas/inline-motion';
+  import { NodeMode } from '$lib/canvas/inline-motion';
   import { decoded, painted } from '$lib/canvas/paint-wait';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -3475,7 +3474,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
-    barContext={barContextOf(CanvasState.Browsing)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
     onRedo={() => inTurn(redo)}

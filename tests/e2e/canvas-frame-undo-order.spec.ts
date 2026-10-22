@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { SHOT_PREFIX } from './fixtures/shots';
 
-const SHOTS = process.env.SHOT_PREFIX ?? '';
+const SHOTS = SHOT_PREFIX;
 const SETTLE_MS = 2500;
 const SAVED_MS = 20_000;
 const START_X = 0.3;

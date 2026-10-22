@@ -46,7 +46,6 @@
   import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import CanvasAddBar from './CanvasAddBar.svelte';
-  import { BarContext } from '$lib/canvas/bottom-bar';
   import CanvasDrawLayer from './CanvasDrawLayer.svelte';
   import type { NameTag } from '$lib/canvas/node-label';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
@@ -174,7 +173,6 @@
     onTemplate,
     onFrameTemplates,
     onNodeClicked,
-    barContext,
     onDraw,
     onDrawFrame,
     onRotate,
@@ -267,7 +265,6 @@
     onFrameTemplates?: (at: { x: number; y: number }) => void;
     onNodeClicked?: (id: string) => void;
     onNodeDoubled?: (id: string) => void;
-    barContext?: BarContext;
     onDraw?: (drawn: DrawnWire) => Promise<string>;
     onDrawFrame?: (target: { box: CanvasBox } | { at: { x: number; y: number } }) => Promise<void>;
     onRotate?: (id: string, degrees: number) => void;
@@ -1021,7 +1018,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if onDraw && toFlow && barContext === BarContext.Canvas && frameBar.tool !== DrawTool.Select}
+  {#if onDraw && toFlow && frameBar.tool !== DrawTool.Select}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
@@ -1037,7 +1034,7 @@
   {/if}
 
   {#if spec.chrome && onCreate}
-    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} onframes={onFrameTemplates ? framesAtCentre : undefined} context={barContext} zoom={selection.zoom} />
+    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} onframes={onFrameTemplates ? framesAtCentre : undefined} zoom={selection.zoom} />
   {/if}
 
   {#if spec.chrome}

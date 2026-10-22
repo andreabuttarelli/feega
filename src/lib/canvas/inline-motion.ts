@@ -9,7 +9,3 @@ export enum Opening {
   OnRequest = 'on-request'
 }
 
-export enum CanvasState {
-  Browsing = 'browsing',
-  Editing = 'editing'
-}

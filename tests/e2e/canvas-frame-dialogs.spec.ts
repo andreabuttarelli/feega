@@ -1,9 +1,10 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
 import path from 'node:path';
+import { SHOT_PREFIX } from './fixtures/shots';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
-const SHOTS = process.env.SHOT_PREFIX ?? '';
+const SHOTS = SHOT_PREFIX;
 const TILE_AT = { x: 200, y: 80 };
 const SETTLE_MS = 1500;
 const BLUE_SQUARE = path.join(import.meta.dirname, 'fixtures', 'blue-square.png');

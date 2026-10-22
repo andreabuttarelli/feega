@@ -1,7 +1,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { SHOT_PREFIX } from './fixtures/shots';
 
-const SHOTS = process.env.SHOT_PREFIX ?? '';
+const SHOTS = SHOT_PREFIX;
 const SETTLE_MS = 2500;
 const AUTO_LAYOUT_DEFAULTS = { wrap: false, crossGap: 0, padding: { top: 0, right: 0, bottom: 0, left: 0 }, align: 'center', columns: 2, order: [] };
 const square = (id: string, parent: string, color: string) => ({ id, from: 0, durationInFrames: 150, component: 'Shape', parent, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.1, height: 0.15, fills: [{ type: 'solid', color }] } });
