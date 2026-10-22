@@ -62,7 +62,7 @@ describe('layer effects', () => {
   });
 
   it('a paired alpha is edited inside its colour, not as its own field', () => {
-    expect(editedParams(EffectKind.DropShadow).map((p) => p.key)).toEqual(['distance', 'angle', 'blur', 'color']);
+    expect(editedParams(EffectKind.DropShadow).map((p) => p.key)).toEqual(['distance', 'angle', 'x', 'y', 'blur', 'spread', 'color', 'behind']);
     expect(editedParams(EffectKind.GaussianBlur).map((p) => p.key)).toEqual(['radius']);
   });
 
