@@ -17,6 +17,9 @@
   import { readChatTab, writeChatTab } from '$lib/shell-prefs';
   import FrameInspectorPanel from './FrameInspectorPanel.svelte';
   import { frameProperties, typingInBar } from './frame-properties.svelte';
+  import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
+  import { answerAgent } from '$lib/canvas/agent-requests';
+  import { browserPorts, type AskedFrame } from '$lib/canvas/agent-capture';
 
   let { open }: { open: boolean } = $props();
 
@@ -56,6 +59,22 @@
     replaceState(withoutHandoff($page.url), $page.state);
   });
 
+  let asked: AskedFrame | null = null;
+
+  function context() {
+    const frame = frameProperties.openFrame();
+    const params = get(page).params;
+    asked = frame && frameProperties.tokens ? { projectId: params.projectId ?? '', nodeId: frame.nodeId, tokens: frameProperties.tokens, assets: frameProperties.extras?.assetUrls ?? {}, analyses: frameProperties.extras?.analyses } : null;
+    return { canvasId: params.canvasId ?? null, selection: get(canvasSelection), ...(frame ? { frame } : {}) };
+  }
+
+  function answerFrameRequest(part: StreamData) {
+    if (!asked) {
+      return;
+    }
+    void answerAgent(part, browserPorts(asked)).catch((e) => console.error('[canvas] agent request not answered', part.type, e));
+  }
+
   function onResizeStart(e: PointerEvent) {
     e.preventDefault();
     const startX = e.clientX;
@@ -91,7 +110,7 @@
       onpointerdown={onResizeStart}
     ></div>
     <div class="chat-column">
-      <BarSlot {prefill} {properties} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
+      <BarSlot {prefill} {properties} {context} ondata={answerFrameRequest} />
     </div>
   </div>
   {#if rightBar.propertiesPane}

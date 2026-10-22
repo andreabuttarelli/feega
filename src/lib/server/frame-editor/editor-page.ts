@@ -18,7 +18,7 @@ const HTTP_BAD_REQUEST = 400;
 
 type EditorParams = { projectId: string; canvasId: string; nodeId: string };
 
-export const load = ({ locals, params, url }: ServerLoadEvent<EditorParams>) => loadEditorSession(locals, params, url);
+export const load = ({ locals, params }: ServerLoadEvent<EditorParams>) => loadEditorSession(locals, params);
 
 const editorCtx = (scope: MotionEditorScope): EditorCtx => ({
   ...scope,

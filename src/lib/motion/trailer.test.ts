@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseMotionDoc, clipsOf } from './doc';
-import { feegaTrailer } from './trailer';
+import { feegaTrailer, trailerFrom } from './trailer';
+import { AssetKind } from './components';
 
 describe('feega trailer', () => {
   it('is a valid 18 second landscape doc', () => {
@@ -17,5 +18,16 @@ describe('feega trailer', () => {
 
   it('text sits on the top track, above media and background', () => {
     expect(feegaTrailer({ modelId: null, imageId: null }).tracks.map((t) => t.id)).toEqual(['text', 'media', 'bg', 'a1']);
+  });
+
+  it('starts from the first 3D model and image the frame already has', () => {
+    const doc = trailerFrom([
+      { id: 'clip', kind: AssetKind.Video },
+      { id: 'glb', kind: AssetKind.Model3d },
+      { id: 'img', kind: AssetKind.Image },
+      { id: 'img2', kind: AssetKind.Image }
+    ]);
+
+    expect(doc).toEqual(feegaTrailer({ modelId: 'glb', imageId: 'img' }));
   });
 });

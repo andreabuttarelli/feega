@@ -1,4 +1,4 @@
-import { TrackKind } from './components';
+import { AssetKind, TrackKind } from './components';
 import { FPS, TransitionKind } from './design';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, addTrack, setCanvas, type NewClip, type OpResult } from './timeline';
@@ -71,4 +71,9 @@ export function feegaTrailer(assets: TrailerAssets): MotionDoc {
     throw new Error(result.error);
   }
   return result.doc;
+}
+
+export function trailerFrom(assets: readonly { id: string; kind: AssetKind }[]): MotionDoc {
+  const first = (kind: AssetKind) => assets.find((a) => a.kind === kind)?.id ?? null;
+  return feegaTrailer({ modelId: first(AssetKind.Model3d), imageId: first(AssetKind.Image) });
 }
