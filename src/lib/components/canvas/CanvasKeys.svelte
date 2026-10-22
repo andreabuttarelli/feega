@@ -166,7 +166,8 @@
     ungroup: () => onungroup?.(selected().map((n) => n.id)),
     'bring-front': () => onrestack?.(selected().map((n) => n.id), Stack.Front),
     'send-back': () => onrestack?.(selected().map((n) => n.id), Stack.Back),
-    help: () => (shortcutHelp.open = true)
+    help: () => (shortcutHelp.open = true),
+    view: () => {}
   };
 
   function onKeydown(e: KeyboardEvent) {

@@ -44,6 +44,7 @@ import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { Command, commandFor } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
+import { FrameView } from './frame-view';
 
 /** Di quante unità di tela sposta una freccia, e quanto con Shift. */
 export const NUDGE_STEP = 8;
@@ -75,7 +76,8 @@ export type CanvasCommandId =
   | 'tool'
   | 'bring-front'
   | 'send-back'
-  | 'help';
+  | 'help'
+  | 'view';
 
 /**
  * Il comando riconosciuto. `add` e `nudge` portano con sé il loro argomento perché è il tasto a
@@ -86,7 +88,8 @@ export type CanvasCommand =
   | { id: 'nudge'; dx: number; dy: number }
   | { id: 'tool'; tool: DrawTool }
   | { id: 'align'; edge: Edge }
-  | { id: Exclude<CanvasCommandId, 'add' | 'nudge' | 'tool' | 'align'> };
+  | { id: 'view'; view: FrameView }
+  | { id: Exclude<CanvasCommandId, 'add' | 'nudge' | 'tool' | 'align' | 'view'> };
 
 const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolSelect]: DrawTool.Select,
@@ -95,6 +98,17 @@ const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolEllipse]: DrawTool.Ellipse,
   [Command.ToolPen]: DrawTool.Pen
 };
+
+const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
+  [Command.TogglePixelGrid]: FrameView.PixelGrid,
+  [Command.ToggleLayoutGuides]: FrameView.Guides,
+  [Command.ToggleOutlines]: FrameView.Outlines
+};
+
+function viewFor(e: KeyboardEvent): FrameView | null {
+  const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
+  return command ? (VIEW_OF_COMMAND[command] ?? null) : null;
+}
 
 function toolFor(e: KeyboardEvent): DrawTool | null {
   const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey });
@@ -150,6 +164,9 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
 
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key;
+
+  const view = viewFor(e);
+  if (view) return { id: 'view', view };
 
   if (mod) {
     // ⌘Z e ⇧⌘Z sono lo stesso tasto, e lo shift decide fra i due: va riconosciuto PRIMA del
@@ -235,6 +252,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'paste', keys: ['mod', 'V'], label: 'Incolla' },
   { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
+  { id: 'view', keys: ["⇧'", '⇧G', 'mod Y'], label: 'Pixel grid, layout guides, outline view' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
   { id: 'fit', keys: ['0', '⇧1'], label: 'Inquadra tutto' },
   { id: 'zoom-actual', keys: ['⇧0'], label: 'Zoom to 100%' },
@@ -279,7 +297,8 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   'zoom-selection': GuideGroup.View,
   'zoom-in': GuideGroup.View,
   'zoom-out': GuideGroup.View,
-  help: GuideGroup.View
+  help: GuideGroup.View,
+  view: GuideGroup.View
 };
 
 export const canvasGuide = (mod: string): { group: string; rows: CanvasGuideRow[] }[] =>

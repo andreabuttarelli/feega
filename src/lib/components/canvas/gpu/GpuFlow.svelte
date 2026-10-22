@@ -18,6 +18,9 @@
   import { frameScreenRect } from '$lib/canvas/frame-screen';
   import FrameSelection from '../FrameSelection.svelte';
   import FrameTools from '../FrameTools.svelte';
+  import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from '$lib/canvas/frame-view';
+  import type { Boxes } from '$lib/motion/scene-select';
+  import type { MotionDoc } from '$lib/motion/doc';
   import { findClip, type MotionClip } from '$lib/motion/doc';
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import { commitText, editsText, hideText, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
@@ -1449,6 +1452,20 @@
     });
   }
 
+  let frameViews = $state<FrameViews>(FRAME_VIEW_DEFAULT);
+
+  function outlineBoxes(nodeId: string, doc: MotionDoc): Boxes {
+    const at = shows(frameViews, FrameView.Outlines) ? pickerOf(nodeId) : null;
+    if (!at) {
+      return {};
+    }
+    const ids = doc.tracks.flatMap((t) => t.clips.map((c) => c.id));
+    return Object.fromEntries(ids.flatMap((id) => {
+      const rect = at.picker.frameRect(id);
+      return rect ? [[id, rect]] : [];
+    }));
+  }
+
   function toolsOf(nodeId: string) {
     const live = inside?.nodeId === nodeId ? liveOf(nodeId) : null;
     return live ? { doc: live.doc, frame: frameOfLive(live) } : null;
@@ -2176,7 +2193,12 @@
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),
     'send-back': () => props.onRestack?.(selected, Stack.Back),
-    help: () => (shortcutHelp.open = true)
+    help: () => (shortcutHelp.open = true),
+    view: (c) => {
+      if (c.id === 'view') {
+        frameViews = flipView(frameViews, c.view);
+      }
+    }
   };
 
   function onKeydown(e: KeyboardEvent) {
@@ -2475,7 +2497,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
+          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
