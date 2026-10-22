@@ -18,14 +18,19 @@ const pickable = (d: Drawn) => d.paint.kind !== PaintKind.Html && d.opacity > 0;
 
 const holds = (d: Drawn, p: Point) => inside(d.quad, p) && d.clips.every((c) => inside(c, p));
 
+const topAt = (scene: Scene, point: Point, time: number) => frameAt(scene, time).filter(pickable).findLast((d) => holds(d, point));
+
 export function pickAt(scene: Scene, point: Point, time: number): string | null {
-  const top = frameAt(scene, time).filter(pickable).findLast((d) => holds(d, point));
-  return top?.clip ?? null;
+  return topAt(scene, point, time)?.clip ?? null;
+}
+
+export function pickOwnersAt(scene: Scene, point: Point, time: number): string[] {
+  return topAt(scene, point, time)?.layer.owners ?? [];
 }
 
 export function rectOf(scene: Scene, clip: string, time: number): FrameRect | null {
   const corners = frameAt(scene, time)
-    .filter((d) => d.layer.covers.includes(clip))
+    .filter((d) => d.layer.covers.includes(clip) || d.layer.owners.includes(clip))
     .flatMap((d) => d.quad);
   if (!corners.length) {
     return null;

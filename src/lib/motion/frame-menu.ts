@@ -15,6 +15,16 @@ const FRAME_COMMAND: Partial<Record<SelectionActionId, Command>> = {
   'flip-vertical': Command.FlipVertical,
   'use-as-mask': Command.UseAsMask,
   'release-mask': Command.RemoveMask,
+  'select-matching': Command.SelectMatching,
+  'frame-selection': Command.FrameSelection,
+  'auto-layout': Command.AutoLayout,
+  'union': Command.Union,
+  'subtract': Command.Subtract,
+  'intersect': Command.Intersect,
+  'exclude': Command.Exclude,
+  'flatten': Command.Flatten,
+  'outline-stroke': Command.OutlineStroke,
+  'outline-text': Command.TextToPath,
   delete: Command.Delete
 };
 

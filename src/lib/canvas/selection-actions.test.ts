@@ -40,6 +40,16 @@ describe('group and ungroup', () => {
       ['flip-vertical', 'Shift+V'],
       ['use-as-mask', 'Mod+Ctrl+M'],
       ['release-mask', null],
+      ['select-matching', 'Mod+Alt+A'],
+      ['frame-selection', 'Mod+Alt+G'],
+      ['auto-layout', 'Shift+A'],
+      ['union', 'Alt+Shift+U'],
+      ['subtract', 'Alt+Shift+S'],
+      ['intersect', 'Alt+Shift+I'],
+      ['exclude', 'Alt+Shift+E'],
+      ['flatten', 'Mod+E'],
+      ['outline-stroke', 'Mod+Alt+O'],
+      ['outline-text', 'Mod+Shift+O'],
       ['delete', 'Backspace']
     ]);
   });

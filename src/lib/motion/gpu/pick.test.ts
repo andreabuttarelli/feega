@@ -6,7 +6,8 @@ import { TransitionKind } from '../design';
 import { addClip, setTransform, setTransition, Side, type OpResult } from '../timeline';
 import { composeHtml } from '../hyperframes/compose';
 import { compileScene } from './scene';
-import { pickAt, rectOf } from './pick';
+import { pickAt, pickOwnersAt, rectOf } from './pick';
+import { groupClips } from '../group';
 import { drawClip } from '../draw-create';
 import { DrawTool } from '../draw-tool';
 import { TextSizing } from '../text-sizing';
@@ -102,5 +103,28 @@ describe('a text the text tool just made', () => {
     const doc = made(sizing);
 
     expect(pickAt(sceneOf(doc), centre(doc, 'text1'), REST_S)).toBe('text1');
+  });
+});
+
+describe('a group', () => {
+  const grouped = () => {
+    let n = 0;
+    return must(groupClips(shape(shape(empty, 'a', 0.2, 0.5, 0.1), 'b', 0.4, 0.5, 0.1), ['a', 'b'], () => `g${++n}`));
+  };
+
+  it('has a rect, the box around its members', () => {
+    const doc = grouped();
+    const group = doc.tracks.flatMap((t) => t.clips).map((c) => c.id)[0];
+
+    expect(rectOf(sceneOf(doc), group, 0)?.width).toBeGreaterThan(0);
+  });
+
+  it('owns what is picked inside it, outermost first', () => {
+    const doc = grouped();
+    const group = doc.tracks.flatMap((t) => t.clips).map((c) => c.id)[0];
+
+    const r = rectOf(sceneOf(doc), group, 0)!;
+
+    expect(pickOwnersAt(sceneOf(doc), [r.left + 5, r.top + r.height / 2], 0)[0]).toBe(group);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Depth, Gesture } from '$lib/motion/drill';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { frameLevel, ownClipToPick, stepInside, videoSide } from './frame-select';
+import { Reach, clickTarget, frameLevel, ownClipToPick, siblingsOf, stepInside, videoSide } from './frame-select';
 
 const FRAME = frameLevel();
 const clipLevel = (clip: string) => ({ depth: Depth.Clip, clip, part: null });
@@ -63,5 +63,33 @@ describe('videoSide parts', () => {
 
     expect(picked).toEqual({ clip: 'card', part: 'lines.0' });
     expect(side.part).toBe('card#lines.0');
+  });
+});
+
+const clip = (id: string, parent: string | null) => ({ id, component: 'Shape', from: 0, durationInFrames: 30, props: {}, parent });
+
+function nested() {
+  const doc = newMotionDoc(MotionFormat.Square);
+  return { ...doc, tracks: [{ id: 't', kind: 'visual', name: 'T', clips: [clip('outer', null), clip('inner', 'outer'), clip('leaf', 'inner'), clip('other', null)] }] } as unknown as typeof doc;
+}
+
+describe('clickTarget', () => {
+  it('a click selects the outermost container, like Figma', () => {
+    expect(clickTarget(nested(), 'leaf', [], Reach.Top)).toBe('outer');
+  });
+
+  it('a click stays at the depth of the current pick', () => {
+    expect(clickTarget(nested(), 'leaf', ['inner'], Reach.Top)).toBe('inner');
+  });
+
+  it('a cmd-click selects the deepest element', () => {
+    expect(clickTarget(nested(), 'leaf', [], Reach.Deep)).toBe('leaf');
+  });
+});
+
+describe('siblingsOf', () => {
+  it('selects every element sharing the parent of the pick', () => {
+    expect(siblingsOf(nested(), ['leaf'])).toEqual(['leaf']);
+    expect(siblingsOf(nested(), ['other']).sort()).toEqual(['other', 'outer']);
   });
 });

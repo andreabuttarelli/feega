@@ -3222,3 +3222,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## A local image export times out in the server renderer
 
 **Signal:** `exportSelection` answers 502 `the images could not be drawn: Waiting failed: 20000ms exceeded` against a local `vite dev`; the dialog only says `Export failed`. **Move:** the composed page loads its libs from `PUBLIC_APP_URL` (production in `.env`), which lags the branch. Start the dev server with `PUBLIC_APP_URL=http://localhost:<port>` so the renderer loads the libs it was composed for.
+
+## A group inside a canvas frame picks as `<group>__0__<id>`
+
+**Signal:** after ⌘G inside a GPU frame the selection outline vanishes and clicks on the group select nothing the doc knows. **Move:** Precomp members compose with namespaced `data-clip`s; resolve a pick through the layer's `owners` chain to the deepest id `findClip` finds (`framePicker.pick`), never trust the leaf id.

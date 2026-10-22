@@ -41,6 +41,16 @@ import GitBranch from '@lucide/svelte/icons/git-branch';
 import History from '@lucide/svelte/icons/history';
 import MessageSquareText from '@lucide/svelte/icons/message-square-text';
 import Proportions from '@lucide/svelte/icons/proportions';
+import ListChecks from '@lucide/svelte/icons/list-checks';
+import Frame from '@lucide/svelte/icons/frame';
+import Columns2 from '@lucide/svelte/icons/columns-2';
+import SquaresUnite from '@lucide/svelte/icons/squares-unite';
+import SquaresSubtract from '@lucide/svelte/icons/squares-subtract';
+import SquaresIntersect from '@lucide/svelte/icons/squares-intersect';
+import SquaresExclude from '@lucide/svelte/icons/squares-exclude';
+import Combine from '@lucide/svelte/icons/combine';
+import PenLine from '@lucide/svelte/icons/pen-line';
+import TypeIcon from '@lucide/svelte/icons/type';
 import type { Component } from 'svelte';
 import type { SelectionActionId } from './selection-actions';
 
@@ -70,6 +80,16 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'flip-vertical': FlipVertical2,
   'use-as-mask': SquareDashed,
   'release-mask': Square,
+  'select-matching': ListChecks,
+  'frame-selection': Frame,
+  'auto-layout': Columns2,
+  'union': SquaresUnite,
+  'subtract': SquaresSubtract,
+  'intersect': SquaresIntersect,
+  'exclude': SquaresExclude,
+  'flatten': Combine,
+  'outline-stroke': PenLine,
+  'outline-text': TypeIcon,
   'create-formats': Proportions,
   export: Download,
   'frame-voice': Mic,
