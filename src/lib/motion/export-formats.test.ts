@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ExportFormat, EXPORT_FORMATS, FORMAT, Preset, PRESETS, estimateBytes, exportProblem, parseSettings, settingsOf } from './export-formats';
+import { ExportFormat, EXPORT_FORMATS, FORMAT, GIF_LIMITS, GifLoop, Preset, PRESETS, estimateBytes, exportProblem, gifOf, parseSettings, settingsOf } from './export-formats';
 import { MotionFormat, newMotionDoc } from './doc';
 import { Resolution } from './render-quote';
 
@@ -47,6 +47,29 @@ describe('export formats', () => {
   });
 
   it('a GIF longer than its cap is refused', () => {
-    expect(exportProblem(doc(30), PRESETS[Preset.Gif])).toMatch(/GIF/);
+    expect(exportProblem(doc(GIF_LIMITS.maxSeconds + 1), PRESETS[Preset.Gif])).toMatch(/GIF/);
+    expect(exportProblem(doc(GIF_LIMITS.maxSeconds), PRESETS[Preset.Gif])).toBeNull();
+  });
+
+  it('a GIF loops forever at 15 fps and 640 px unless told otherwise', () => {
+    expect(gifOf(PRESETS[Preset.Gif])).toEqual({ loop: GifLoop.Forever, fps: 15, width: 640 });
+  });
+
+  it('GIF options are taken within their limits and refused beyond', () => {
+    const gif = (options: object) => parseSettings(JSON.stringify({ ...PRESETS[Preset.Gif], gif: options })).ok;
+
+    expect(gif({ loop: GifLoop.Boomerang, fps: 30, width: 1280 })).toBe(true);
+    expect(gif({ fps: 31 })).toBe(false);
+    expect(gif({ fps: 7 })).toBe(false);
+    expect(gif({ width: 1921 })).toBe(false);
+    expect(gif({ loop: 'twice' })).toBe(false);
+  });
+
+  it('a wider, faster GIF is estimated bigger, and a boomerang twice as long', () => {
+    const d = doc(5);
+    const base = estimateBytes(d, PRESETS[Preset.Gif]);
+
+    expect(estimateBytes(d, { ...PRESETS[Preset.Gif], gif: { loop: GifLoop.Forever, fps: 30, width: 640 } })).toBeGreaterThan(base);
+    expect(estimateBytes(d, { ...PRESETS[Preset.Gif], gif: { loop: GifLoop.Boomerang, fps: 15, width: 640 } })).toBe(base * 2);
   });
 });

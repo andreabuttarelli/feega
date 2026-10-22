@@ -3,12 +3,12 @@ import { chunkPlan, type ChunkPlan } from '$lib/motion/server-render';
 import { FLAT_FRAME_MS, frameCosts, type CostSpan } from '$lib/motion/render-cost';
 import { CHUNK_VCPUS, RenderClass, WHOLE_VCPUS } from '$lib/motion/render-quote';
 import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from '$lib/motion/hyperframes/csp';
-import { ExportFormat, FORMAT, Master, Quality } from '$lib/motion/export-formats';
+import { ExportFormat, FORMAT, Master, Quality, type GifOptions } from '$lib/motion/export-formats';
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
 import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';
 import { privateVideos, stripSteps, stripVideos } from './video-strips';
 
-export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; motionBlur: Shutter | null; cost?: CostSpan[]; renderClass?: RenderClass };
+export type FarmJob = { html: string; width: number; height: number; fps: number; totalFrames: number; audio: AudioEntry[]; allowHosts: string[]; format: ExportFormat; quality: Quality; gif?: GifOptions; motionBlur: Shutter | null; cost?: CostSpan[]; renderClass?: RenderClass };
 
 export type Slice = { index: number; size: number };
 
@@ -296,11 +296,11 @@ export async function launchPiece(farm: RenderFarm, job: FarmJob, slice: Slice, 
 
 function joinSteps(job: FarmJob, audio: string | null): Step[] {
   if (job.format !== ExportFormat.PngSequence) {
-    return [{ what: 'assemble', cmd: 'ffmpeg', args: assembleArgs({ list: LIST, audio, out: outPath(job), format: job.format }) }];
+    return [{ what: 'assemble', cmd: 'ffmpeg', args: assembleArgs({ list: LIST, audio, out: outPath(job), format: job.format, gif: job.gif }) }];
   }
   return [
     { what: 'frames folder', cmd: 'mkdir', args: ['-p', FRAMES_DIR] },
-    { what: 'assemble', cmd: 'ffmpeg', args: assembleArgs({ list: LIST, audio, out: FRAMES_DIR, format: job.format }) },
+    { what: 'assemble', cmd: 'ffmpeg', args: assembleArgs({ list: LIST, audio, out: FRAMES_DIR, format: job.format, gif: job.gif }) },
     { what: 'zip', cmd: 'bash', args: zipArgs(FRAMES_DIR, outPath(job)) }
   ];
 }

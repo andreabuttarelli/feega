@@ -14,7 +14,7 @@ import { audioPlan } from '$lib/motion/audio-plan';
 import { holdCredits, releaseCredits, splitPortions, type Portion } from '$lib/server/credit-hold';
 import { checkTask, FarmTask, farmChunks, farmProblem, firstSlices, framesOf, halves, launchAssembly, launchPiece, MAX_ATTEMPTS, pieceFile, stopWorker, TaskState, WORKER_GONE, type FarmJob, type Slice, type TaskCheck } from './farm-render';
 import { costSpans } from '$lib/motion/render-cost';
-import { FORMAT, exportProblem, type ExportFormat, type RenderSettings } from '$lib/motion/export-formats';
+import { ExportFormat, FORMAT, exportProblem, gifOf, type RenderSettings } from '$lib/motion/export-formats';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { lengthProblem } from '$lib/motion/render-length';
 import { saveExport } from './export';
@@ -78,6 +78,7 @@ export function farmJob(input: ComposeInput, settings: RenderSettings): FarmJob 
     allowHosts: reachable.map((origin) => new URL(origin).host),
     format: settings.format,
     quality: settings.quality,
+    gif: settings.format === ExportFormat.Gif ? gifOf(settings) : undefined,
     motionBlur: doc.motionBlur.enabled ? { shutterAngle: doc.motionBlur.shutterAngle, shutterPhase: doc.motionBlur.shutterPhase, samples: doc.motionBlur.samples } : null,
     cost: costSpans(doc, out.width * out.height),
     renderClass: renderClass(doc)

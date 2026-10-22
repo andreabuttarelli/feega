@@ -50,14 +50,32 @@ export const EXPORT_FORMATS = Object.values(ExportFormat) as [ExportFormat, ...E
 
 export const QUALITY_SCALE: Record<Quality, number> = { [Quality.Standard]: 1, [Quality.High]: 2.8, [Quality.Max]: 5 };
 
-export const GIF = { fps: 15, maxWidth: 640, maxSeconds: 15 } as const;
+
+export enum GifLoop {
+  Forever = 'forever',
+  Once = 'once',
+  Boomerang = 'boomerang'
+}
+
+export const GIF_LIMITS = { minFps: 8, maxFps: 30, minWidth: 64, maxWidth: 1920, maxSeconds: 30 } as const;
+
+export const gifOptionsSchema = z.object({
+  loop: z.enum(GifLoop).default(GifLoop.Forever),
+  fps: z.number().int().min(GIF_LIMITS.minFps).max(GIF_LIMITS.maxFps).default(15),
+  width: z.number().int().min(GIF_LIMITS.minWidth).max(GIF_LIMITS.maxWidth).default(640)
+});
+
+export type GifOptions = z.infer<typeof gifOptionsSchema>;
+
+export const gifOf = (settings: { gif?: Partial<GifOptions> }): GifOptions => gifOptionsSchema.parse(settings.gif ?? {});
 const BITS_PER_BYTE = 8;
 
 export const settingsSchema = z.object({
   format: z.enum(EXPORT_FORMATS),
   fps: z.literal(FRAME_RATES),
   quality: z.enum(Quality),
-  resolution: z.enum(Object.values(Resolution) as [Resolution, ...Resolution[]]).default(Resolution.P1080)
+  resolution: z.enum(Object.values(Resolution) as [Resolution, ...Resolution[]]).default(Resolution.P1080),
+  gif: gifOptionsSchema.optional()
 });
 
 export type RenderSettings = z.infer<typeof settingsSchema>;
@@ -95,23 +113,23 @@ export function settingsOf(preset: Preset): RenderSettings {
   return { format, fps, quality, resolution };
 }
 
-function gifSize(doc: Pick<MotionDoc, 'width' | 'height'>): { width: number; height: number } {
-  const scale = Math.min(1, GIF.maxWidth / doc.width);
+function gifSize(doc: Pick<MotionDoc, 'width' | 'height'>, width: number): { width: number; height: number } {
+  const scale = Math.min(1, width / doc.width);
   return { width: doc.width * scale, height: doc.height * scale };
 }
 
 export function estimateBytes(doc: Pick<MotionDoc, 'width' | 'height' | 'durationInFrames' | 'fps'>, settings: RenderSettings): number {
   const seconds = doc.durationInFrames / doc.fps;
-  const gif = settings.format === ExportFormat.Gif;
-  const { width, height } = gif ? gifSize(doc) : outputSize(doc, settings.resolution);
-  const frames = seconds * (gif ? GIF.fps : settings.fps);
+  const gif = settings.format === ExportFormat.Gif ? gifOf(settings) : null;
+  const { width, height } = gif ? gifSize(doc, gif.width) : outputSize(doc, settings.resolution);
+  const frames = gif ? seconds * gif.fps * (gif.loop === GifLoop.Boomerang ? 2 : 1) : seconds * settings.fps;
   return Math.round((width * height * frames * FORMAT[settings.format].bitsPerPixel * QUALITY_SCALE[settings.quality]) / BITS_PER_BYTE);
 }
 
 export function exportProblem(doc: Pick<MotionDoc, 'width' | 'height' | 'durationInFrames' | 'fps'>, settings: RenderSettings): string | null {
   const seconds = doc.durationInFrames / doc.fps;
-  if (settings.format === ExportFormat.Gif && seconds > GIF.maxSeconds) {
-    return `a GIF can be at most ${GIF.maxSeconds} s: shorten the video or pick a video format`;
+  if (settings.format === ExportFormat.Gif && seconds > GIF_LIMITS.maxSeconds) {
+    return `a GIF can be at most ${GIF_LIMITS.maxSeconds} s: shorten the video or pick a video format`;
   }
   const out = outputSize(doc, settings.resolution);
   if (Math.max(out.width, out.height) > MAX_RENDER_SIDE) {

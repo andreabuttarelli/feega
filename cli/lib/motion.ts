@@ -27,7 +27,8 @@ export const RUN_WAIT_MS = 240_000;
 export type RenderMode = 'browser' | 'server';
 export type RenderStart = { mode: RenderMode; run_id: string; render_url?: string; expires_at?: string; revision?: number; credits: number };
 export type RenderState = { run_id: string; mode: RenderMode; status: MotionRun['status']; asset_id: string | null; file_url: string | null; error: string | null; credits: number | null };
-export type RenderOptions = { mode?: RenderMode; resolution?: string; format?: string; quality?: string; fps?: number };
+export type GifOptions = { loop?: string; fps?: number; width?: number };
+export type RenderOptions = { mode?: RenderMode; resolution?: string; format?: string; quality?: string; fps?: number; gif?: GifOptions };
 export type MotionVideo = { node_id: string; name: string | null; project_id: string; canvas_id: string; format: string; version: number; poster_url: string | null; last_render_url: string | null; editor_url: string };
 export type MotionFrames = { revision: number; frames: { time: number; mime: string; data: string }[]; quality: string[]; blocking: string[] };
 
@@ -38,7 +39,7 @@ export type VideoBudget = { ok: true; spent_usd: number; cap_usd: number; raise_
 export type EmbedState = { published: boolean; url?: string; snippet?: string; react?: string; flutter?: string; revision?: number };
 
 function renderBody(opts: RenderOptions): Record<string, unknown> {
-  const settings = Object.fromEntries(Object.entries({ resolution: opts.resolution, format: opts.format, quality: opts.quality, fps: opts.fps }).filter(([, v]) => v !== undefined));
+  const settings = Object.fromEntries(Object.entries({ resolution: opts.resolution, format: opts.format, quality: opts.quality, fps: opts.fps, gif: opts.gif }).filter(([, v]) => v !== undefined));
   return Object.keys(settings).length ? { mode: opts.mode ?? 'browser', settings } : { mode: opts.mode ?? 'browser' };
 }
 
