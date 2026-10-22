@@ -185,7 +185,6 @@
 		"scrapecreators_cache": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/competitor-ads.ts:110",
 		"social_accounts.profile_url": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/scrapecreators.ts:917",
 		"social_accounts.username": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/scrapecreators.ts:917",
-		"social_post_history": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/brand-context.ts:310",
-		"social_thumb_cache": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/design-visual-refs.ts:30"
+		"social_post_history": "legacy old-product code path, fails soft (empty read); delete with its code: src/lib/server/brand-context.ts:310"
 	}
 }

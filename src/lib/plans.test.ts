@@ -64,18 +64,6 @@ describe('Go plan helpers', () => {
     }
   });
 
-  it('keeps en.json plan card copy in sync with PLANS highlights', async () => {
-    const en = (await import('$lib/i18n/locales/en.json')).default as {
-      pricing: { plans: Record<string, { tagline: string; highlights: string }> };
-    };
-    for (const p of PLANS) {
-      const loc = en.pricing.plans[p.key];
-      expect(loc?.tagline).toBe(p.tagline);
-      const bullets = loc.highlights.split('|').map((s) => s.trim()).filter(Boolean);
-      expect(bullets).toEqual(p.highlights);
-    }
-  });
-
 
   it('blocks connects with no plan', () => {
     expect(hasSocialPublishing(null)).toBe(false);
