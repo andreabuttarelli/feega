@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  */
 const dir = dirname(fileURLToPath(import.meta.url));
 const bar = readFileSync(join(dir, '..', 'components', 'canvas', 'CanvasAddBar.svelte'), 'utf8');
-const flow = readFileSync(join(dir, '..', 'components', 'canvas', 'CanvasFlow.svelte'), 'utf8');
+const flow = readFileSync(join(dir, '..', 'components', 'canvas', 'gpu', 'GpuFlow.svelte'), 'utf8');
 
 describe('la barra per aggiungere un nodo', () => {
   it('offre tutto ciò che si può aggiungere, preso dal modello e non riscritto', () => {

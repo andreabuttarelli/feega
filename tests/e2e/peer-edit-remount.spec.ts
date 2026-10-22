@@ -4,7 +4,7 @@ import { test, expect, REAL_STACK, gotoHydrated, signInE2e } from './fixtures/se
 const DESKTOP = { width: 1440, height: 900 };
 const HEAVY = process.env.HEAVY_CANVAS_PATH;
 const SETTLE_MS = 4000;
-const RENDERERS = ['gpu', 'dom'];
+const RENDERERS = ['gpu'];
 
 test.use({ viewport: DESKTOP, actionTimeout: 20_000 });
 

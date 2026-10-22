@@ -62,7 +62,7 @@ async function watchFill(frame: Frame) {
   });
 }
 
-for (const renderer of ['gpu', 'dom']) {
+for (const renderer of ['gpu']) {
   test.describe(`colour drag paints live on the ${renderer} canvas @real`, () => {
     test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
     test.setTimeout(120_000);

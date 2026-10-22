@@ -1,34 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { Backend } from './backend';
-import { Renderer, Switch, backendOf, rendererOf } from './renderer-flag';
+import { Renderer, backendOf, rendererOf } from './renderer-flag';
 
 const at = (q: string) => new URL(`https://x.app/p/1/c/2${q}`);
 
 describe('renderer flag', () => {
   it('the core canvas is the default', () => {
-    expect(rendererOf(at(''), Switch.Open)).toBe(Renderer.Core);
-    expect(rendererOf(at('?renderer=nonsense'), Switch.Open)).toBe(Renderer.Core);
-    expect(rendererOf(at('?renderer=core'), Switch.Open)).toBe(Renderer.Core);
+    expect(rendererOf(at(''))).toBe(Renderer.Core);
+    expect(rendererOf(at('?renderer=nonsense'))).toBe(Renderer.Core);
+    expect(rendererOf(at('?renderer=core'))).toBe(Renderer.Core);
+  });
+
+  it('?renderer=dom no longer exists: it opens the core canvas', () => {
+    expect(rendererOf(at('?renderer=dom'))).toBe(Renderer.Core);
   });
 
   it('?renderer=gpu, webgpu or webgl returns to the PixiJS canvas', () => {
-    expect(rendererOf(at('?renderer=gpu'), Switch.Open)).toBe(Renderer.Gpu);
-    expect(rendererOf(at('?renderer=webgpu'), Switch.Open)).toBe(Renderer.Gpu);
-    expect(rendererOf(at('?renderer=webgl'), Switch.Open)).toBe(Renderer.Gpu);
-  });
-
-  it('?renderer=dom stays the escape hatch', () => {
-    expect(rendererOf(at('?renderer=dom'), Switch.Open)).toBe(Renderer.Dom);
-  });
-
-  it('the kill switch forces the DOM canvas for everyone', () => {
-    expect(rendererOf(at(''), Switch.ForceDom)).toBe(Renderer.Dom);
-    expect(rendererOf(at('?renderer=webgpu'), Switch.ForceDom)).toBe(Renderer.Dom);
-  });
-
-  it('the kill switch beats an explicit core choice', () => {
-    expect(rendererOf(at('?renderer=core'), Switch.ForceDom)).toBe(Renderer.Dom);
-    expect(rendererOf(at('?renderer=gpu'), Switch.ForceDom)).toBe(Renderer.Dom);
+    expect(rendererOf(at('?renderer=gpu'))).toBe(Renderer.Gpu);
+    expect(rendererOf(at('?renderer=webgpu'))).toBe(Renderer.Gpu);
+    expect(rendererOf(at('?renderer=webgl'))).toBe(Renderer.Gpu);
   });
 
   it('webgl forces the fallback backend, anything else prefers WebGPU', () => {

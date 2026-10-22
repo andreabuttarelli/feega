@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * verificare.
  */
 const dir = dirname(fileURLToPath(import.meta.url));
-const flow = readFileSync(join(dir, '..', 'components', 'canvas', 'CanvasFlow.svelte'), 'utf8');
+const flow = readFileSync(join(dir, '..', 'components', 'canvas', 'gpu', 'GpuFlow.svelte'), 'utf8');
 
 describe('il rilascio di un nodo già pieno', () => {
   it('CanvasFlow legge CANVAS_DRAG_FILLED_NODE', () => {

@@ -69,7 +69,7 @@ test.describe('a cold GPU canvas paints every node at once @real', () => {
     expect(blank, 'nodes still blank 2 s after the canvas appeared').toEqual([]);
   });
 
-  test('the copy of a real heavy canvas paints every visible node within 2 s on a revisit, as the DOM canvas does', async ({ page }) => {
+  test('the copy of a real heavy canvas paints every visible node within 2 s on a revisit', async ({ page }) => {
     test.setTimeout(180_000);
     test.skip(!process.env.GPU_FIXTURE_CANVAS, 'GPU_FIXTURE_PROJECT + GPU_FIXTURE_CANVAS: a copy made by copy-canvas.mjs in the test org');
     await page.setViewportSize({ width: 1600, height: 1000 });
@@ -102,11 +102,10 @@ test.describe('a cold GPU canvas paints every node at once @real', () => {
       await page.screenshot({ path: test.info().outputPath(`real-copy-${renderer}.png`) });
       return blank;
     };
-    const dom = await blankOn('dom');
     const cold = await blankOn('webgpu');
     await page.waitForTimeout(WARM_UP_MS);
     const warm = await blankOn('webgpu');
-    console.log(`[cold-real] dom=${dom.length} gpu-cold=${cold.length} gpu-warm=${warm.length} logs=${JSON.stringify(logs.slice(0, 3))}`);
-    expect(warm.filter((id) => !dom.includes(id)), 'on a revisit, nodes blank on the GPU canvas but painted on the DOM one').toEqual([]);
+    console.log(`[cold-real] gpu-cold=${cold.length} gpu-warm=${warm.length} logs=${JSON.stringify(logs.slice(0, 3))}`);
+    expect(warm, 'on a revisit, no visible node stays blank').toEqual([]);
   });
 });

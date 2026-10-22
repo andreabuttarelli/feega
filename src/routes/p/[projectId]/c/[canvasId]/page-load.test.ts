@@ -18,7 +18,6 @@ vi.mock('$lib/server/repos/posts', () => ({ listSourcesForNodes: async () => [] 
 vi.mock('$lib/server/onboarding/first-run', () => ({ firstRunFor: async () => null, endOnboarding: vi.fn(), runDemo: vi.fn() }));
 vi.mock('$lib/server/motion/templates', () => ({ templateLibrary: () => ({ own, list }) }));
 vi.mock('$lib/server/canvas/chat-handoff', () => ({ chatHandoff: async () => null }));
-vi.mock('$lib/server/canvas-renderer-switch', () => ({ rendererSwitch: async () => null }));
 vi.mock('$lib/server/canvas/card-previews', () => ({ cardPreviews: (...a: unknown[]) => cardPreviews(...a) }));
 
 import { load } from '$lib/server/canvas/canvas-page';

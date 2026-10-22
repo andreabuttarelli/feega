@@ -71,10 +71,7 @@
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { onMount, untrack } from 'svelte';
-  import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
-  import { Renderer, Switch, rendererOf } from '$lib/canvas/gpu/renderer-flag';
-  import RendererBadge from '$lib/components/canvas/gpu/RendererBadge.svelte';
-  import { dev } from '$app/environment';
+  import { Renderer, rendererOf } from '$lib/canvas/gpu/renderer-flag';
   import { feedView, personView, productsView } from '$lib/canvas/source-thumbs';
 import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type NodeView } from '$lib/canvas/node-view';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
@@ -1162,8 +1159,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return mediaView(row) ?? selectedView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
   }
 
-  let domReason = $state<string | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Dom ? (data.rendererSwitch === Switch.ForceDom ? 'kill switch' : '?renderer=dom') : null);
-  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) !== Renderer.Dom ? null : (CanvasFlow as unknown as typeof GpuFlow));
+  let Flow = $state<typeof GpuFlow | null>(null);
   $effect(() => {
     if (Flow) {
       return;
@@ -1355,8 +1351,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     cursors.port.update({ selection: ids });
   }
 
-  const core = $derived(rendererOf(page.url, data.rendererSwitch) === Renderer.Core);
-  const liveHost = $derived(domReason ? LiveHost.Node : LiveHost.Canvas);
+  const core = $derived(rendererOf(page.url) === Renderer.Core);
+  const liveHost = LiveHost.Canvas;
 
   $effect(() => {
     canvasSelection.set(selectedIds);
@@ -3494,11 +3490,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     viewOf={sourceView}
     cardPreviews={data.cardPreviews}
     previewsAt={`/p/${data.projectId}/c/${data.canvas.id}/card-previews`}
-    onfail={(why) => {
-      console.warn(`[canvas] GPU renderer failed: ${why} → dom`);
-      domReason = why;
-      Flow = CanvasFlow as unknown as typeof GpuFlow;
-    }}
     peers={drawnPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
     onLive={(live) => {
@@ -3733,9 +3724,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {/if}
     {/snippet}
   </Flow>
-  {/if}
-  {#if dev && domReason}
-    <RendererBadge renderer="dom" reason={domReason} />
   {/if}
   {#if !viewOnly && showsEmptyState(nodes.length)}
     <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />

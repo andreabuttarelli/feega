@@ -11,7 +11,7 @@ async function tileRect(page: Page) {
   return (await tile.boundingBox())!;
 }
 
-for (const [renderer, query] of [['gpu', ''], ['dom', '?renderer=dom']]) {
+for (const [renderer, query] of [['gpu', '']]) {
   test.describe(`a free text on the ${renderer} canvas is one object of the drawn size @real`, () => {
     test.skip(!REAL_STACK, 'richiede E2E_REAL_STACK=1');
 
