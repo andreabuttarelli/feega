@@ -6,7 +6,9 @@ import { fontStack } from '$lib/motion/fonts/model';
 import { CLIP_TEXT, editablePart, PartEdit } from '$lib/motion/poster-parts';
 import { setProps, type OpResult } from '$lib/motion/timeline';
 import { styledComponent } from '$lib/motion/text-run-ops';
-import type { RunCase, RunStyle, TextRun } from '$lib/motion/text-runs';
+import { segmentsOf, type RunCase, type RunStyle, type TextRun } from '$lib/motion/text-runs';
+import { textPaint } from '$lib/motion/fill/render';
+import { css } from '$lib/motion/hyperframes/html';
 import { mul2d, type Affine } from '$lib/motion/affine';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
 
@@ -81,4 +83,16 @@ export function editCss(look: TextEditStyle, layout: EditLayout): string {
   const flow = FLOW_CSS[layout.wraps ? 'wraps' : 'line'](layout);
   const font = `${look.italic ? 'italic ' : ''}${look.weight} ${layout.fontPx}px/${look.leading} ${look.family}`;
   return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};${look.upper ? 'text-transform:uppercase;' : ''}`;
+}
+
+export type PaintedSpan = { text: string; style: string };
+
+const asWritten = (value: string) => value;
+const noAsset = () => null;
+
+export function gradientSpans(text: string, runs: readonly TextRun[]): PaintedSpan[] {
+  if (!runs.some((r) => r.fill)) {
+    return [];
+  }
+  return segmentsOf(text, runs).map(({ text: part, run }) => ({ text: part, style: run?.fill ? css(textPaint([run.fill], asWritten, noAsset)) : '' }));
 }
