@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { SaveState } from './editor-bar';
 import { FrameEditSession, type SessionPort, type SendResult } from './frame-edit-session.svelte';
+import { outgoing } from './frame-sync';
 
 const base = newMotionDoc(MotionFormat.Landscape);
 const longer = (frames: number): MotionDoc => ({ ...base, durationInFrames: frames });
@@ -216,5 +217,24 @@ describe('unsaved', () => {
     release({ ok: true, version: 2, doc: longer(60) });
     await vi.runAllTimersAsync();
     expect(session.unsaved()).toBe(false);
+  });
+});
+
+describe('holding the save until an upload is done', () => {
+  it('sends the edit as it is when the hold ends, not as it was when it began', async () => {
+    const { session, port } = open();
+    let finish: () => void = () => {};
+    session.holdSave(new Promise<void>((resolve) => (finish = resolve)));
+
+    session.apply({ ok: true, doc: longer(60) }, 'Pending');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(port.send).not.toHaveBeenCalled();
+
+    session.settleHeld(longer(90));
+    finish();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(port.send).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(port.send).mock.calls[0][0]).toEqual(outgoing({ version: 1, doc: base }, longer(90)));
   });
 });
