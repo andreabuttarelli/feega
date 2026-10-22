@@ -8,6 +8,7 @@ import { vercelAnalyticsDefine } from './scripts/vercel-analytics';
 import { devCrons } from './scripts/dev-crons';
 import { motionBundles } from './scripts/motion-bundles';
 import { motionLibs } from './scripts/motion-libs';
+import { changelogEntries } from './scripts/changelog-entries';
 
 /** Worktree `node_modules` is often a symlink into another checkout; Vite resolves it and
  *  rejects the real path unless it is on the allow list. */
@@ -59,7 +60,7 @@ export default defineConfig({
     org: "021-6z",
     project: "021-1m",
     autoInstrument: { load: false, serverLoad: true }
-  }), sveltekit(), tailwindcss(), devCrons(), motionBundles(), motionLibs()],
+  }), sveltekit(), tailwindcss(), devCrons(), motionBundles(), motionLibs(), changelogEntries()],
   worker: { format: 'es', plugins: () => [motionBundles(), motionLibs()] },
   // Modern baselines: skip legacy transforms (e.g. Array.from) that PSI flags as unused
   // on current Chrome/Safari/Firefox. Aligns with "Baseline widely available" guidance.
