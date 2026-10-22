@@ -72,6 +72,29 @@ export const GRAIN_TILE = 256;
 const shadowNode = (dx: number, dy: number, blur: number, colour: string, opacity: number, link: SvgNode['attrs'] = {}): SvgNode =>
   node('feDropShadow', { ...link, dx, dy, stdDeviation: r(blur / 2), 'flood-color': colour, 'flood-opacity': r(opacity) });
 
+const shadowOffset = (v: Values): [number, number] => {
+  const a = rad(n(v, 'angle'));
+  return [r(Math.cos(a) * n(v, 'distance') + (n(v, 'x') || 0)), r(Math.sin(a) * n(v, 'distance') + (n(v, 'y') || 0))];
+};
+
+const plainShadow = (v: Values) => !n(v, 'spread') && n(v, 'behind') !== 0;
+
+function shapedShadow(v: Values): SvgNode[] {
+  const spread = n(v, 'spread') || 0;
+  const [dx, dy] = shadowOffset(v);
+  const grown = spread ? [node('feMorphology', { in: 'SourceAlpha', operator: spread > 0 ? 'dilate' : 'erode', radius: Math.abs(spread), result: 'grown' })] : [];
+  const cut = n(v, 'behind') === 0 ? [node('feComposite', { in: 'shade', in2: 'SourceAlpha', operator: 'out', result: 'shade' })] : [];
+  return [
+    ...grown,
+    node('feOffset', { in: spread ? 'grown' : 'SourceAlpha', dx, dy, result: 'moved' }),
+    node('feGaussianBlur', { in: 'moved', stdDeviation: r(n(v, 'blur') / 2), result: 'soft' }),
+    node('feFlood', { 'flood-color': String(v.color), 'flood-opacity': r(n(v, 'opacity')), result: 'ink' }),
+    node('feComposite', { in: 'ink', in2: 'soft', operator: 'in', result: 'shade' }),
+    ...cut,
+    node('feMerge', {}, [node('feMergeNode', { in: 'shade' }), node('feMergeNode', { in: 'SourceGraphic' })])
+  ];
+}
+
 function tintMatrix(black: string, white: string, amount: number): string {
   const lo = rgb(black);
   const hi = rgb(white);
@@ -200,16 +223,25 @@ export const EFFECTS: Record<EffectKind, Spec> = {
   [EffectKind.DropShadow]: {
     label: 'Drop shadow',
     about: 'shadow at distance px and angle degrees, blur px, colour and opacity',
-    params: [num('distance', 'Distance', 0, 300, 1, 16), num('angle', 'Angle', -180, 180, 1, 135), num('blur', 'Softness', 0, 200, 0.5, 24), colour('color', 'Colour', '#000000'), num('opacity', 'Opacity', 0, 1, 0.01, 0.5)],
-    reach: (v) => n(v, 'distance') + (n(v, 'blur') / 2) * GAUSS_TAIL,
-    boxed: (v, id) => {
-      const a = rad(n(v, 'angle'));
-      return svg(id, [shadowNode(r(Math.cos(a) * n(v, 'distance')), r(Math.sin(a) * n(v, 'distance')), n(v, 'blur'), String(v.color), n(v, 'opacity'))]);
-    },
-    render: (v) => {
-      const d = n(v, 'distance');
-      const a = rad(n(v, 'angle'));
-      return css(`drop-shadow(${r(Math.cos(a) * d)}px ${r(Math.sin(a) * d)}px ${r(n(v, 'blur'))}px ${rgba(String(v.color), n(v, 'opacity'))})`);
+    params: [
+      num('distance', 'Distance', 0, 300, 1, 16),
+      num('angle', 'Angle', -180, 180, 1, 135),
+      num('x', 'X', -300, 300, 1, 0),
+      num('y', 'Y', -300, 300, 1, 0),
+      num('blur', 'Softness', 0, 200, 0.5, 24),
+      num('spread', 'Spread', -100, 100, 1, 0),
+      colour('color', 'Colour', '#000000'),
+      num('opacity', 'Opacity', 0, 1, 0.01, 0.5),
+      num('behind', 'Show behind', 0, 1, 1, 1)
+    ],
+    reach: (v) => n(v, 'distance') + Math.hypot(n(v, 'x'), n(v, 'y')) + Math.max(0, n(v, 'spread')) + (n(v, 'blur') / 2) * GAUSS_TAIL,
+    boxed: (v, id) => (plainShadow(v) ? svg(id, [shadowNode(...shadowOffset(v), n(v, 'blur'), String(v.color), n(v, 'opacity'))]) : svg(id, shapedShadow(v))),
+    render: (v, _f, id) => {
+      if (!plainShadow(v)) {
+        return svg(id, shapedShadow(v));
+      }
+      const [dx, dy] = shadowOffset(v);
+      return css(`drop-shadow(${dx}px ${dy}px ${r(n(v, 'blur'))}px ${rgba(String(v.color), n(v, 'opacity'))})`);
     }
   },
   [EffectKind.InnerShadow]: {
