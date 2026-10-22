@@ -32,7 +32,7 @@ something unpaid and connecting a social account stops working, by design.
 **Production builds are supported.** `svelte.config.js` still defaults to `@sveltejs/adapter-vercel`,
 so the cloud deploy is untouched; setting `DEPLOY_TARGET=node` selects `@sveltejs/adapter-node`
 instead. `npm run build:node && npm run start` goes through the exact same chain as the cloud build
-(`scripts/typecheck-runtime.mjs`, then Vite) and serves the compiled app on port 3000 (`PORT` to
+(Vite; the runtime typecheck gate runs in CI) and serves the compiled app on port 3000 (`PORT` to
 change). Or don't build anything yourself: [`infra/app/Dockerfile`](../infra/app/Dockerfile) is a
 multi-stage non-root image built from that same target (give the build stage a few GB of RAM —
 the adapter re-bundles the whole server, and Node's default 4 GB heap OOMs on it), and
