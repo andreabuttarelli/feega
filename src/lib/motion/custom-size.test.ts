@@ -12,14 +12,23 @@ describe('customSize', () => {
   });
 
   it('keeps the aspect when a video side is over the limit', () => {
-    const size = customSize({ width: 4000, height: 1000 });
+    const size = customSize({ width: 16000, height: 1000 });
 
     expect(size.width).toBe(MAX_SIDE);
-    expect(Math.abs(ratio(size) - 4)).toBeLessThan(0.01);
+    expect(Math.abs(ratio(size) - 16)).toBeLessThan(0.01);
   });
 
-  it('caps the short side at 1080p', () => {
-    expect(customSize({ width: 3000, height: 3000 })).toEqual({ width: MAX_SHORT_SIDE, height: MAX_SHORT_SIDE });
+  it('caps the short side at 2160p', () => {
+    expect(customSize({ width: 5000, height: 5000 })).toEqual({ width: MAX_SHORT_SIDE, height: MAX_SHORT_SIDE });
+  });
+
+  it('allows a 4K frame', () => {
+    expect(customSize({ width: 3840, height: 2160 })).toEqual({ width: 3840, height: 2160 });
+    expect(motionDocSchema.safeParse({ ...newMotionDoc(MotionFormat.Landscape), width: 3840, height: 2160 }).success).toBe(true);
+  });
+
+  it('keeps 4K as the ceiling of a frame', () => {
+    expect([MAX_SIDE, MAX_SHORT_SIDE]).toEqual([3840, 2160]);
   });
 
   it('gives even sides the doc accepts', () => {
@@ -58,8 +67,8 @@ describe('custom format', () => {
     expect(back.ok && formatOf(back.doc)).toBe(MotionFormat.Square);
   });
 
-  it('refuses a size above 1080p', () => {
-    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 1920, height: 1920 } }).ok).toBe(false);
+  it('refuses a size above 4K', () => {
+    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 3840, height: 3840 } }).ok).toBe(false);
   });
 });
 

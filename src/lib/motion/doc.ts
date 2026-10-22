@@ -59,8 +59,8 @@ export const MOTION_FORMATS = Object.values(MotionFormat) as [MotionFormat, ...M
 
 export { MAX_SECONDS };
 const FRAMES_CEILING = maxFrames(FASTEST_RATE);
-export const MAX_SIDE = 1920;
-export const MAX_SHORT_SIDE = 1080;
+export const MAX_SIDE = 3840;
+export const MAX_SHORT_SIDE = 2160;
 export const LARGE_SQUARE = 1440;
 export const DEFAULT_SECONDS = 15;
 export const DOC_VERSION = 5;
@@ -165,7 +165,7 @@ const assetRefSchema = z.object({
 export const MIN_SIDE = 16;
 export const DESIGN_MAX_SIDE = 16384;
 export const DESIGN_MIN_SIDE = 1;
-export const RESOLUTION_PROBLEM = `a video is at most 1080p (a 1440 square is the one exception); a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} px a side`;
+export const RESOLUTION_PROBLEM = `a video is at most 4K (3840x2160); a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} px a side`;
 
 export function sideRange(d: { still?: unknown }): { min: number; max: number } {
   return d.still ? { min: DESIGN_MIN_SIDE, max: DESIGN_MAX_SIDE } : { min: MIN_SIDE, max: MAX_SIDE };

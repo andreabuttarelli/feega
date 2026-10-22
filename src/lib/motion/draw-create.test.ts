@@ -124,10 +124,10 @@ describe('drawing an element on the canvas, outside any frame', () => {
   });
 
   it('a big box stays inside the frame resolution limits', () => {
-    const drawn = made(drawnElement({ tool: DrawTool.Ellipse, box: { left: 0, top: 0, width: 5000, height: 2500 } }, 'e1'));
+    const drawn = made(drawnElement({ tool: DrawTool.Ellipse, box: { left: 0, top: 0, width: 9000, height: 4500 } }, 'e1'));
 
-    expect(drawn.doc.width).toBeLessThanOrEqual(1920);
-    expect(drawn.doc.height).toBeLessThanOrEqual(1080);
+    expect(drawn.doc.width).toBeLessThanOrEqual(3840);
+    expect(drawn.doc.height).toBeLessThanOrEqual(2160);
   });
 });
 
