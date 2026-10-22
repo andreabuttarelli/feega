@@ -154,6 +154,7 @@ test.describe('dialogs from a selected canvas frame @real', () => {
     await page.getByTestId('insert-template').click();
     await frameKept(page, before, '09b-templates-after');
 
+    await page.keyboard.press('Escape');
     await pickMore(page, 'Export…');
     await expect(page.getByTestId('export-dialog')).toBeVisible();
     await page.screenshot({ path: `${SHOTS}-10-export.png` });

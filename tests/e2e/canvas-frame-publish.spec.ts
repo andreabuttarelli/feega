@@ -110,6 +110,7 @@ test.describe('publish, template and peers from a selected canvas frame @real', 
     await seedFrame(seedNode, admin, session, still);
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await openFrame(page);
+    await page.keyboard.press('Escape');
 
     await pickMore(page, 'Export…');
     await expect(page.getByTestId('still-export')).toBeVisible();
