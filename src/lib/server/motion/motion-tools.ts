@@ -172,7 +172,7 @@ import { addVariant, pickVariant, swapInstance } from '$lib/motion/variants';
 import { runEditSchema, type RunEdit } from '$lib/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
-import { registerFont, removeFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+import { registerFont, removeFont, replaceFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
 import type { FontFamily } from '$lib/motion/fonts/library';
 import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
@@ -2101,6 +2101,15 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => {
         const picked = withUploaded(session.doc, input.family, await uploadedFonts());
         return apply(registerFont(picked.doc, picked.family, GOOGLE_FONTS), `registered font ${picked.family}`);
+      }
+    }),
+
+    replace_font: tool({
+      description: 'Replace a font everywhere in the video, missing or not: every clip, styled range and composition using family "from" switches to "to" (Google family, uploaded font or built-in), and "from" leaves the video.',
+      inputSchema: z.object({ from: z.string().max(64), to: z.string().max(64) }),
+      execute: async (input) => {
+        const picked = withUploaded(session.doc, input.to, await uploadedFonts());
+        return apply(replaceFont(picked.doc, input.from, picked.family, GOOGLE_FONTS), `replaced ${input.from} with ${picked.family}`);
       }
     }),
 
