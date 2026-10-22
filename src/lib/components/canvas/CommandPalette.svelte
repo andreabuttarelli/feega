@@ -1,10 +1,13 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { Kbd } from '$lib/components/ui/shell';
-  import { keyEventOf, searchPalette, type PaletteEntry } from '$lib/canvas/command-palette';
+  import { searchPalette, type PaletteEntry } from '$lib/canvas/command-palette';
+  import type { Command } from '$lib/motion/shortcuts';
 
   const PALETTE_KEY = 'k';
   const SHOWN_MAX = 40;
+
+  let { onrun }: { onrun: (command: Command) => void } = $props();
 
   let open = $state(false);
   let query = $state('');
@@ -23,7 +26,7 @@
   async function run(entry: PaletteEntry) {
     open = false;
     await tick();
-    window.dispatchEvent(new KeyboardEvent('keydown', keyEventOf(entry)));
+    onrun(entry.command);
   }
 
   function onWindowKey(e: KeyboardEvent) {
@@ -72,7 +75,7 @@
       {#each found as entry, i (entry.command)}
         <button type="button" role="option" aria-selected={i === active} class:active={i === active} onpointerenter={() => (active = i)} onclick={() => run(entry)}>
           <span class="name">{entry.name}</span>
-          <Kbd shortcut={entry.label} class="text-ui-text-3" />
+          {#if entry.label}<Kbd shortcut={entry.label} class="text-ui-text-3" />{/if}
         </button>
       {:else}
         <p class="empty">No action matches</p>
