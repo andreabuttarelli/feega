@@ -140,7 +140,7 @@ const templateMarkSchema = z.object({
   keyFields: keyFieldsSchema
 });
 
-export const mainComponentSchema = z.object({ name: z.string().min(1).max(60) }).strict();
+export const mainComponentSchema = z.object({ name: z.string().min(1).max(60), set: z.string().min(1).max(60).optional(), variant: z.record(z.string().min(1).max(40), z.string().min(1).max(40)).optional() }).strict();
 
 const compSchema = z.object({
   template: templateMarkSchema.optional(),

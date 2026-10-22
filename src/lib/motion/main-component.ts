@@ -8,7 +8,9 @@ export enum ComponentAction {
   Create = 'create',
   Override = 'override',
   Reset = 'reset',
-  Detach = 'detach'
+  Detach = 'detach',
+  AddVariant = 'add-variant',
+  Swap = 'swap'
 }
 
 export const COMPONENT_ACTIONS = Object.values(ComponentAction) as [ComponentAction, ...ComponentAction[]];
