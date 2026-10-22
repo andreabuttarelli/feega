@@ -203,14 +203,7 @@ export function secondsLabel(frames: number, fps: number = FPS): string {
   return String(Math.round((frames / fps) * SECONDS_PRECISION) / SECONDS_PRECISION);
 }
 
-export function parseDecimal(text: string): number | null {
-  const trimmed = text.trim().replace(',', '.');
-  if (!trimmed) {
-    return null;
-  }
-  const value = Number(trimmed);
-  return Number.isFinite(value) ? value : null;
-}
+export { parseDecimal } from './arithmetic';
 
 type Placed = Animated & { from: number };
 
