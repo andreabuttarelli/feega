@@ -18,6 +18,11 @@ describe('frame dialog entry points', () => {
     ).toEqual([...opened].sort());
   });
 
+  it('reach publishing and saving as a template', () => {
+    expect(FRAME_DIALOG_ACTIONS['frame-publish']).toBe('publish');
+    expect(FRAME_DIALOG_ACTIONS['frame-save-template']).toBe('save-template');
+  });
+
   it('are rows of the selection table in the overflow group, with an icon', () => {
     for (const id of ids) {
       const row = SELECTION_ACTIONS.find((a) => a.id === id);

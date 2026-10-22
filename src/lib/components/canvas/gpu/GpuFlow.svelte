@@ -23,6 +23,13 @@
   import { commitText, editsText, hideText, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { frameProperties } from '../frame-properties.svelte';
   import FrameDialogs from '../FrameDialogs.svelte';
+  import FramePeers from '$lib/components/motion/FramePeers.svelte';
+  import RemixBanner from '$lib/components/gallery/RemixBanner.svelte';
+  import { FramePeering, peerBoxes } from '$lib/canvas/frame-peering.svelte';
+  import { framePresence } from '$lib/realtime/frame-presence';
+  import { handoffPath } from '$lib/canvas/chat-handoff';
+  import { BRAND_REMIX_PROMPT } from '$lib/gallery/model';
+  import { goto } from '$app/navigation';
   import { FrameExtras } from '$lib/canvas/frame-extras.svelte';
   import { FRAME_DIALOG_ACTIONS, FrameDialog, isFrameDialogAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
@@ -1353,6 +1360,32 @@
     void panelExtras?.load();
   });
 
+  const soleFrame = $derived(selected.length === 1 && coreFrames.some((f) => f.id === selected[0]) ? selected[0] : null);
+  const soleExtras = $derived(soleFrame ? extrasOf(soleFrame) : null);
+  const remixOf = $derived(soleExtras?.data?.gallery.remixOf ?? null);
+
+  $effect(() => {
+    void soleExtras?.load();
+  });
+
+  const brandRemix = () => goto(handoffPath({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '' }, BRAND_REMIX_PROMPT));
+
+  const presence = framePresence();
+  const peering = presence ? new FramePeering(presence) : null;
+  const pointedFrame = $derived(inside?.nodeId ?? soleFrame);
+  const onCanvas = $derived(new Set((props.peers ?? []).filter((p) => p.cursor).map((p) => p.userId)));
+
+  onMount(() => peering?.start());
+
+  $effect(() => {
+    peering?.select(pointedFrame, picks);
+  });
+
+  function peerMeasure(nodeId: string, ids: readonly string[]) {
+    const at = pickerOf(nodeId);
+    return Promise.resolve(at ? peerBoxes(at.picker, ids) : {});
+  }
+
   $effect(() => {
     layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks[0]?.clips[0])] as const] : []))));
   });
@@ -2473,6 +2506,11 @@
         {#if pickHover?.nodeId === frame.id}
           <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={`left:${(pickHover.rect.x - frame.x) * view.zoom}px;top:${(pickHover.rect.y - frame.y) * view.zoom}px;width:${pickHover.rect.w * view.zoom}px;height:${pickHover.rect.h * view.zoom}px`}></div>
         {/if}
+        {@const live = peering ? liveOf(frame.id) : null}
+        {@const peers = peering ? peering.peersOf(frame.id, onCanvas) : []}
+        {#if peering && live && (peers.length || pointedFrame === frame.id)}
+          <FramePeers doc={live.doc} frame={frameOfLive(live)} redraws={0} {peers} measure={() => peerMeasure(frame.id, peers.flatMap((p) => p.selection))} onpointer={(cursor) => pointedFrame === frame.id && peering.point(frame.id, cursor, picks)} />
+        {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
           <FrameTools doc={tools.doc} frame={tools.frame} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
@@ -2633,6 +2671,12 @@
     {#if props.postAction}
       <NextStepChips postAction={props.postAction} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
     {/if}
+  {/if}
+
+  {#if remixOf && spec.chrome}
+    <div class="remix-banner">
+      <RemixBanner origin={remixOf} onbrand={brandRemix} />
+    </div>
   {/if}
 
   {#if frameDialog && dialogSession && dialogExtras && dialogTokens}
@@ -2895,6 +2939,15 @@
     user-select: text;
   }
 
+
+  .remix-banner {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    translate: -50% 0;
+    max-width: calc(100% - 32px);
+    z-index: 5;
+  }
 
   .edge-refusal {
     position: absolute;

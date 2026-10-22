@@ -3,6 +3,8 @@
  * di Lucide qui, dati puri in `selection-actions.ts`, perché quella tabella la legge anche codice
  * che non disegna niente.
  */
+import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
+import Globe from '@lucide/svelte/icons/globe';
 import Copy from '@lucide/svelte/icons/copy';
 import Download from '@lucide/svelte/icons/download';
 import Workflow from '@lucide/svelte/icons/workflow';
@@ -78,5 +80,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'frame-branches': GitBranch,
   'frame-history': History,
   'frame-chat': MessageSquareText,
+  'frame-save-template': BookmarkPlus,
+  'frame-publish': Globe,
   delete: Trash2
 };
