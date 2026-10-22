@@ -117,6 +117,7 @@ const ARRANGE: Record<(typeof ARRANGE_OPS)[number], (doc: MotionDoc, ids: string
 import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { COUNTER_FORMATS } from '$lib/motion/text-counter';
 import { setTextCounter } from '$lib/motion/text-counter-ops';
+import { animateTo } from '$lib/motion/animate-to';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
@@ -1110,6 +1111,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         keyframes: z.array(z.object({ time: z.number().min(0), value: z.union([z.number(), z.string()]), ease: easeSchema.default(Ease.Standard), intensity: z.number().min(0).max(1).optional(), ...keyShape })).min(1)
       }),
       execute: async (input) => apply(setKeyframes(session.doc, input.clip_id, input.prop, input.keyframes.map(keyIn(ownerOf(input.clip_id), input.prop))), `animated ${input.prop} of ${input.clip_id}`)
+    }),
+
+    animate_to: tool({
+      description: `Animate a clip to a target: for each prop in to, key its current value at start (s from the clip start, default 0) and the target duration s later (default 1). Units of set_transform; keys in the span are replaced. ease as in set_keyframes.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        to: z.record(z.string(), z.union([z.number(), z.string()])).refine((to) => Object.keys(to).length > 0, 'give at least one prop'),
+        start: z.number().min(0).default(0),
+        duration: z.number().positive().default(1),
+        ease: easeSchema.default(Ease.Standard)
+      }),
+      execute: async (input) => {
+        const owner = ownerOf(input.clip_id);
+        const targets = Object.fromEntries(Object.entries(input.to).map(([prop, value]) => [prop, typeof value === 'number' ? toStored(owner, prop, value, session.doc) : value]));
+        return apply(animateTo(session.doc, input.clip_id, targets, { start: frames(input.start), duration: Math.max(1, frames(input.duration)), ease: input.ease }, (c) => c), `animated ${input.clip_id} to ${Object.keys(input.to).join(', ')}`);
+      }
     }),
 
     set_key_interpolation: tool({
