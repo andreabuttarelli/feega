@@ -11,8 +11,7 @@ Reuse inside frames existed only as groups/precomps: copies drifted, no main to 
   detach (bakes overrides into a plain copy). Registered in the frame bar registry
   (`frame-inspector.ts`), so keys, right-click menu and Properties bar share them.
 - UI: Layers shows instances with a purple diamond; Properties shows an instance section with the
-  main's texts as override fields, Reset and Detach. MCP: `create_component`,
-  `override_instance`, `reset_overrides`, `detach_instance`.
+  main's texts as override fields, Reset and Detach. MCP: one `component` tool (create, override, reset, detach; it fits the canvas chat 30k prompt budget).
 
 Not done: overrides on non-text props from the panel (MCP takes any prop), editing an element
 inside an instance directly on canvas writing an override (it edits through the panel).

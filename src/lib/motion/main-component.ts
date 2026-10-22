@@ -3,6 +3,15 @@ import { precompose } from './precomp';
 import { setProps, type OpResult } from './timeline';
 
 export type NewId = () => string;
+
+export enum ComponentAction {
+  Create = 'create',
+  Override = 'override',
+  Reset = 'reset',
+  Detach = 'detach'
+}
+
+export const COMPONENT_ACTIONS = Object.values(ComponentAction) as [ComponentAction, ...ComponentAction[]];
 export type Overrides = Record<string, Record<string, unknown>>;
 export type MainComponent = NonNullable<MotionComp['component']>;
 export type Instance = { clip: MotionClip; compId: string; comp: MotionComp; overrides: Overrides };
