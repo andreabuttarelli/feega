@@ -11,11 +11,7 @@ type World = { x: number; y: number };
 export type WorldRect = { x: number; y: number; w: number; h: number };
 export type FrameSpace = { toFrame(world: World): [number, number]; toWorld(rect: { left: number; top: number; width: number; height: number }): WorldRect };
 
-const FLAG = 'unifiedFrames';
-const OFF = '0';
 const ORIGIN = 'https://app.local';
-
-export const unifiedFrames = (url: URL): boolean => url.searchParams.get(FLAG) !== OFF;
 
 function turn(p: World, about: World, degrees: number): World {
   const r = (degrees * Math.PI) / 180;

@@ -14,9 +14,7 @@ export const EMPTY_ACTIONS: readonly { action: EmptyAction; label: string }[] = 
   { action: EmptyAction.Video, label: 'Generate a video' }
 ];
 
-export function showsEmptyState(nodeCount: number, inlineMotion: string | null): boolean {
-  return nodeCount === 0 && inlineMotion === null;
-}
+export const showsEmptyState = (nodeCount: number): boolean => nodeCount === 0;
 
 export const chatOpenRequest = writable(0);
 

@@ -84,25 +84,12 @@ async function leave(page: Page, pane: { x: number; y: number; height: number })
   await page.mouse.click(pane.x + 20, pane.y + pane.height - 120);
 }
 
-async function posterOfHead(admin: SupabaseClient, nodeId: string) {
-  await expect
-    .poll(
-      async () => {
-        const { data } = await admin.from('nodes').select('data').eq('id', nodeId).single();
-        const d = data?.data as { docHeadRevision?: number; posterRevision?: number };
-        return d.posterRevision === d.docHeadRevision;
-      },
-      { timeout: 30_000, message: 'the canvas poster pictures the edited text, not the first draft' }
-    )
-    .toBe(true);
-}
-
 async function visibleText(page: Page, nodeId: string) {
   await expect(page.locator(`[data-motion-node="${nodeId}"]`)).toBeVisible({ timeout: 20_000 });
   await expect.poll(async () => (await inkPixels(page, nodeId)).count, { timeout: 20_000, message: 'the text paints real pixels on the canvas' }).toBeGreaterThan(MIN_INK_PIXELS);
 }
 
-const editableText = (page: Page) => page.frameLocator('[data-testid="motion-preview"] iframe').first().locator('[contenteditable]');
+const textCaret = (page: Page) => page.getByTestId('core-text-edit');
 
 test.describe('free text on the canvas @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
@@ -127,13 +114,10 @@ test.describe('free text on the canvas @real', () => {
         expect(element.height).toBeCloseTo(DRAG.height, -1);
       }
 
-      await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
-      await expect(editableText(page), 'typing goes straight into the new text, where it is drawn').toHaveAttribute('contenteditable', /plaintext-only|true/, { timeout: 15_000 });
+      await expect(textCaret(page), 'typing goes straight into the new text, where it is drawn').toBeFocused({ timeout: 15_000 });
       await page.keyboard.type('Hello');
       await leave(page, pane);
       await expect.poll(async () => (await clipsOf(admin, element.id)).map((c) => c.props.text), { timeout: 10_000 }).toEqual(['Hello']);
-
-      await posterOfHead(admin, element.id);
       await visibleText(page, element.id);
       if (SHOTS) {
         await page.screenshot({ path: `${SHOTS}/${gesture}-${theme}.png` });
@@ -154,24 +138,22 @@ test.describe('free text on the canvas @real', () => {
     const pane = await draw(page, Gesture.Drag);
     await expect.poll(async () => (await elements(admin, session)).length, { timeout: 10_000 }).toBe(1);
     const [element] = await elements(admin, session);
-    await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
-    await expect(editableText(page)).toHaveAttribute('contenteditable', /plaintext-only|true/, { timeout: 15_000 });
+    await expect(textCaret(page)).toBeFocused({ timeout: 15_000 });
     await page.keyboard.type('Hello');
     await leave(page, pane);
     await expect.poll(async () => (await clipsOf(admin, element.id)).map((c) => c.props.text), { timeout: 10_000 }).toEqual(['Hello']);
-    await posterOfHead(admin, element.id);
     await visibleText(page, element.id);
     const before = await inkPixels(page, element.id);
     const sizeBefore = await shownSize(admin, element.id);
 
-    await page.locator(`[data-motion-node="${element.id}"]`).dblclick();
-    await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
-    const field = page.locator('aside.props [data-field="Size"] input');
+    await page.locator(`[data-motion-node="${element.id}"]`).click();
+    await expect(page.getByTestId('frame-inspector')).toBeVisible({ timeout: 15_000 });
+    const field = page.getByTestId('frame-inspector').locator('[data-field="Size"] input');
     await field.scrollIntoViewIfNeeded();
     if (SHOTS) {
       await page.screenshot({ path: `${SHOTS}/size-inspector.png` });
     }
-    const props = page.locator('aside.props');
+    const props = page.getByTestId('frame-inspector');
     for (const name of ['Weight', 'Size', 'Tracking', 'Leading']) {
       await expect(props.locator(`[data-field="${name}"]`), `${name} is in the inspector`).toBeVisible();
     }
@@ -183,7 +165,6 @@ test.describe('free text on the canvas @real', () => {
     await field.press('Enter');
     await expect.poll(() => shownSize(admin, element.id), { timeout: 10_000 }).toBeLessThan(sizeBefore);
     await leave(page, pane);
-    await posterOfHead(admin, element.id);
 
     await page.reload();
     await page.waitForLoadState('networkidle');

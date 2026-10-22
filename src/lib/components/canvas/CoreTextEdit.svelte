@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import type { TextEditStyle } from '$lib/canvas/frame-text-edit';
 
   type Rect = { left: number; top: number; width: number; height: number };
@@ -42,8 +42,9 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
     value = text;
+    await tick();
     fit();
     field?.focus();
     field?.select();

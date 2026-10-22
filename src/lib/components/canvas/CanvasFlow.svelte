@@ -268,7 +268,7 @@
     onNodeClicked?: (id: string) => void;
     onNodeDoubled?: (id: string) => void;
     barContext?: BarContext;
-    onDraw?: (drawn: DrawnWire) => Promise<void>;
+    onDraw?: (drawn: DrawnWire) => Promise<string>;
     onDrawFrame?: (target: { box: CanvasBox } | { at: { x: number; y: number } }) => Promise<void>;
     onRotate?: (id: string, degrees: number) => void;
     onGroup?: (ids: string[]) => void;

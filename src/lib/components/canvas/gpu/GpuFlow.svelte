@@ -2,7 +2,7 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { framePicker, unifiedFrames, type WorldRect } from '$lib/canvas/frame-pick';
+  import { framePicker, type WorldRect } from '$lib/canvas/frame-pick';
   import { onMount, untrack, type ComponentProps } from 'svelte';
   import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
@@ -250,9 +250,8 @@
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
-  const unified = $derived(unifiedFrames(page.url));
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
-  const editIds = $derived(editableIds(selected, DOM_CAP, unified ? new Set(coreFrames.map((f) => f.id)) : new Set()));
+  const editIds = $derived(editableIds(selected, DOM_CAP, new Set(coreFrames.map((f) => f.id))));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
@@ -910,8 +909,11 @@
     if (gone.length) {
       select(selected.filter((id) => known.has(id)));
     }
-    if (!fitted && (scene || coreOn) && incoming.length) {
-      fitted = true;
+    if (fitted || !(scene || coreOn)) {
+      return;
+    }
+    fitted = true;
+    if (incoming.length) {
       fitTo(incoming);
     }
   }
@@ -1097,7 +1099,7 @@
     const world = toWorld(view, local(e as PointerEvent));
     const hit = hitAt(world);
     const id = hit.kind === HitKind.Node ? hit.nodeId : null;
-    const deeper = id && unified ? framePickAt(world) : null;
+    const deeper = id ? framePickAt(world) : null;
     if (id && deeper?.clip) {
       select([id]);
       goInside(id, Gesture.Double, deeper.clip);
@@ -1160,9 +1162,6 @@
   }
 
   $effect(() => {
-    if (!unified) {
-      return;
-    }
     const due = coreFrames.filter((f) => !asked.has(`${f.id}:${f.revision}`));
     if (!due.length) {
       return;
@@ -1178,7 +1177,7 @@
 
   function framePickAt(w: Point) {
     const id = topNodeAt(w);
-    const frame = unified && id && !domIds.has(id) ? coreFrames.find((f) => f.id === id) : null;
+    const frame = id && !domIds.has(id) ? coreFrames.find((f) => f.id === id) : null;
     const live = frame ? (liveDocs.map.get(frame.id) ?? fetched.get(frame.id)?.live) : null;
     if (!frame || !live) {
       return null;
@@ -1262,7 +1261,7 @@
 
   function pickElement(e: PointerEvent, w: Point): boolean {
     const hit = e.button === 0 && !e.shiftKey && !e.metaKey && !e.ctrlKey && e.pointerType === 'mouse' ? framePickAt(w) : null;
-    if (!hit?.clip) {
+    if (!hit?.clip || frameChrome(kindOfNode(hit.nodeId)).dragsHost) {
       return false;
     }
     select([hit.nodeId]);
@@ -1274,7 +1273,7 @@
 
   $effect(() => {
     const only = selected.length === 1 ? selected[0] : null;
-    if (unified && only && coreFrames.some((f) => f.id === only)) {
+    if (only && coreFrames.some((f) => f.id === only)) {
       if (inside?.nodeId !== only) {
         inside = { nodeId: only, level: frameLevel() };
         picks = [];
@@ -1340,7 +1339,7 @@
   const dialogExtras = $derived(frameDialog ? extrasOf(frameDialog.nodeId) : null);
   const dialogTokens = $derived(frameDialog ? (liveOf(frameDialog.nodeId)?.tokens ?? null) : null);
 
-  const panelNodeId = $derived(unified && picks.length && inside ? inside.nodeId : null);
+  const panelNodeId = $derived(picks.length && inside ? inside.nodeId : null);
   const panelSession = $derived(panelNodeId ? saverOf(panelNodeId) : null);
   const panelTokens = $derived(panelNodeId ? (liveOf(panelNodeId)?.tokens ?? null) : null);
   const panelExtras = $derived(panelNodeId ? extrasOf(panelNodeId) : null);
@@ -1427,7 +1426,7 @@
   const kindOfNode = (id: string) => (summaries.get(id)?.data.kind as FrameKind | undefined) ?? FrameKind.Frame;
 
   const timeline = $derived.by(() => {
-    const nodeId = unified ? inside?.nodeId : null;
+    const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
     const shown = nodeId ? frameChrome(kindOfNode(nodeId)).timeline : false;
     return nodeId && live && shown ? { nodeId, doc: live.doc, frame: frameOfLive(live) } : null;
@@ -1494,6 +1493,19 @@
     liveDocs.set(nodeId, { ...at.live, doc: hideText(saver.history.present, clip) });
   }
 
+  let typeOnArrival = $state<string | null>(null);
+
+  $effect(() => {
+    const id = typeOnArrival;
+    const saver = id ? saverOf(id) : null;
+    const clip = saver?.history.present.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Text');
+    if (!id || !clip || !pickerOf(id)) {
+      return;
+    }
+    typeOnArrival = null;
+    untrack(() => startTyping(id, clip.id));
+  });
+
   function stopTyping(text: string) {
     const open = typing;
     const saver = open ? saverOf(open.nodeId) : null;
@@ -1526,7 +1538,7 @@
     const at = pickerOf(nodeId);
     const saver = saverOf(nodeId);
     const rect = at?.picker.frameRect(clip);
-    if (!at || !saver || !rect || e.button !== 0) {
+    if (!at || !saver || !rect || e.button !== 0 || frameChrome(kindOfNode(nodeId)).dragsHost) {
       return;
     }
     e.preventDefault();
@@ -1562,7 +1574,7 @@
 
   $effect(() => {
     const nodeId = inside?.nodeId;
-    if (!unified || !nodeId || !liveOf(nodeId)) {
+    if (!nodeId || !liveOf(nodeId)) {
       return;
     }
     return layersSource.publishVideo(
@@ -1596,7 +1608,7 @@
       e.preventDefault();
       return;
     }
-    if (unified && hit.kind === HitKind.Node && inside?.nodeId === hit.nodeId) {
+    if (hit.kind === HitKind.Node && inside?.nodeId === hit.nodeId && !frameChrome(kindOfNode(hit.nodeId)).dragsHost) {
       goInside(hit.nodeId, Gesture.Click, null);
     }
     const inDom = target.closest('.gpu-dom-node');
@@ -2217,7 +2229,7 @@
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
-    export: (ids) => (unified && coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
+    export: (ids) => (coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
     delete: (ids) => props.onDelete?.(ids)
   };
 
@@ -2437,30 +2449,28 @@
         <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
-    {#if unified}
-      <FrameOverlays {view} frames={overlayFrames}>
-        {#snippet children(frame)}
-          {@const edit = typingMark(frame.id)}
-          {#if edit}
-            <CoreTextEdit rect={edit.rect} look={edit.look} text={edit.text} oncommit={stopTyping} />
-          {/if}
-          {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
-            <FrameSelection clip={mark.clip} rect={mark.rect} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
-          {/each}
-          {#if pickHover?.nodeId === frame.id}
-            <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={`left:${(pickHover.rect.x - frame.x) * view.zoom}px;top:${(pickHover.rect.y - frame.y) * view.zoom}px;width:${pickHover.rect.w * view.zoom}px;height:${pickHover.rect.h * view.zoom}px`}></div>
-          {/if}
-          {@const tools = toolsOf(frame.id)}
-          {#if tools}
-            <FrameTools doc={tools.doc} frame={tools.frame} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
-          {/if}
-          {@const band = marqueeRect(frame.id)}
-          {#if band}
-            <div class="frame-marquee" data-testid="frame-marquee" style={`left:${band.left}px;top:${band.top}px;width:${band.width}px;height:${band.height}px`}></div>
-          {/if}
-        {/snippet}
-      </FrameOverlays>
-    {/if}
+    <FrameOverlays {view} frames={overlayFrames}>
+      {#snippet children(frame)}
+        {@const edit = typingMark(frame.id)}
+        {#if edit}
+          <CoreTextEdit rect={edit.rect} look={edit.look} text={edit.text} oncommit={stopTyping} />
+        {/if}
+        {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
+          <FrameSelection clip={mark.clip} rect={mark.rect} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+        {/each}
+        {#if pickHover?.nodeId === frame.id}
+          <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={`left:${(pickHover.rect.x - frame.x) * view.zoom}px;top:${(pickHover.rect.y - frame.y) * view.zoom}px;width:${pickHover.rect.w * view.zoom}px;height:${pickHover.rect.h * view.zoom}px`}></div>
+        {/if}
+        {@const tools = toolsOf(frame.id)}
+        {#if tools}
+          <FrameTools doc={tools.doc} frame={tools.frame} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
+        {/if}
+        {@const band = marqueeRect(frame.id)}
+        {#if band}
+          <div class="frame-marquee" data-testid="frame-marquee" style={`left:${band.left}px;top:${band.top}px;width:${band.width}px;height:${band.height}px`}></div>
+        {/if}
+      {/snippet}
+    </FrameOverlays>
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
         {#each curves as c (c.edge.id)}
@@ -2570,7 +2580,8 @@
       tool={frameBar.tool}
       {toFlow}
       ondraw={async (drawn) => {
-        await props.onDraw?.(drawn);
+        const id = await props.onDraw?.(drawn);
+        typeOnArrival = drawn.tool === DrawTool.Text && id ? id : null;
         frameBar.tool = DrawTool.Select;
       }}
       onframe={async (target) => {
@@ -2602,7 +2613,7 @@
       choicesFor={props.modelChoicesFor}
       catalogueSynced={selectionMedium && props.catalogueSyncedFor ? props.catalogueSyncedFor(selectionMedium) : true}
       runQuote={props.runQuoteFor?.(selected) ?? null}
-      frameTools={unified}
+      frameTools
       onrun={() => props.onRunNode?.(selected[0])}
       onaction={runSelectionAction}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}

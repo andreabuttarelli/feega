@@ -4,7 +4,7 @@ import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { toWorld } from '$lib/canvas/gpu/camera';
-import { framePicker, frameSpace, unifiedFrames } from './frame-pick';
+import { framePicker, frameSpace } from './frame-pick';
 
 const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 900, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 } }, 'card');
 if (!added.ok) {
@@ -101,12 +101,5 @@ describe('framePicker at the playhead', () => {
     head = 200;
 
     expect(blink.pick(centre, space)).toBeNull();
-  });
-});
-
-describe('unifiedFrames', () => {
-  it('is on unless switched off in the address', () => {
-    expect(unifiedFrames(new URL('https://app.test/p'))).toBe(true);
-    expect(unifiedFrames(new URL('https://app.test/p?unifiedFrames=0'))).toBe(false);
   });
 });

@@ -190,11 +190,8 @@
   import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, openingFrame, PART_DOCK, Part, Stage, ToolsPlace, Zoom, timelineFits } from '$lib/motion/editor-mount';
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
-  import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { liveDocs } from '$lib/canvas/core/live-docs.svelte';
   import { caretSource } from '$lib/canvas/core/text-caret';
-  import { claimsWidth } from '$lib/canvas/claim-width';
-  import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHover } from '$lib/canvas/layers';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -381,23 +378,9 @@
         })
       : undefined
   );
-  const TOP_SLOT = '[data-top-slot]';
   const menu = $derived(menuPlace(mount, viewport));
   const inCanvasBar = $derived(rules.closes && BAR_PLACE[viewport] === BarPlace.CanvasBar);
-  const barHost = $derived(inCanvasBar && typeof document !== 'undefined' ? document.querySelector<HTMLElement>(TOP_SLOT) : undefined);
   const dockOf = (part: Part) => ({ [DOCK_ATTR]: PART_DOCK[viewport][part] });
-  const stageHost = $derived(rules.stage === Stage.Node ? inlineStage.of(data.node.id) : undefined);
-  const stageShown = $derived(rules.stage === Stage.Node ? nodeLayers(NodeMode.Edit, inlineStage.paintOf(data.node.id)).editor : true);
-  const stageTakesPointer = $derived(stageShown && inlineStage.leaving !== data.node.id);
-
-  const PANELS_LATE_MS = 4000;
-  let panelsLate = $state(false);
-  const panelsDue = $derived(stageShown || panelsLate);
-
-  $effect(() => {
-    const timer = setTimeout(() => (panelsLate = true), PANELS_LATE_MS);
-    return () => clearTimeout(timer);
-  });
 
   $effect(() => {
     const el = stageEl;
@@ -2000,7 +1983,7 @@
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
 <div class="editor" ondragover={(e) => e.dataTransfer?.types.includes('Files') && e.preventDefault()} ondrop={dropFontFile} bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} data-sheet={sheet === Sheet.None ? undefined : detent} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
-  <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost} use:claimsWidth={barHost}>
+  <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar">
     <div class="group lead" {...dockOf(Part.Bar)}>
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
       <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(session.history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
@@ -2194,7 +2177,7 @@
   {/if}
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${rightBar.width}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && (!sideOpen || barSeat === BarSeat.InPlace)} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
-    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost} ondblclick={enterVectorEdit}>
+    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} ondblclick={enterVectorEdit}>
       {#snippet player()}
       <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} fullDoc={{ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls }} background={doc.background} width={(previewDoc ?? doc).width} height={(previewDoc ?? doc).height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if outlineView === OutlineView.On}<OutlineOverlay doc={previewDoc ?? doc} {frame} boxes={spaceBoxes()} />{/if}
@@ -2231,7 +2214,6 @@
     {#snippet properties()}
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
-      {#if panelsDue}
       {#if session.selection.length > 1}<AlignBar count={session.selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
       {#if cameraOpen && !session.selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
@@ -2258,13 +2240,12 @@
           <LayoutGuidesSection {doc} onchange={apply} />
         </div>
       {/if}
-      {/if}
     </aside>
     {/snippet}
     {#snippet chat()}
     <aside class="chat" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Chat</span><span class="editing" data-testid="chat-editing">{editingLabel(editingName)}</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
-      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} />{/if}<BarSlot reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} properties={docked ? barProperties : undefined} seat={barSeat} />
+<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} /><BarSlot reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} properties={docked ? barProperties : undefined} seat={barSeat} />
     </aside>
     {/snippet}
     </SideColumn>

@@ -58,10 +58,9 @@ test.describe('free elements on the canvas @real', () => {
     const tile = page.locator('.svelte-flow__node', { has: node });
     await expect(tile.locator('.node-label'), 'a shape has no name tag').toHaveCount(0);
     await expect(tile.locator('.typed-port'), 'a shape has no ports').toHaveCount(0);
-    await expect(page.getByTestId('motion-editor'), 'the new element opens on its properties').toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 30_000 });
-    await expect(page.locator('aside.props').getByTestId('selection-head'), 'the inspector of frames, on the shape').toContainText('Shape', { timeout: 10_000 });
-    await expect(page.locator('aside.props').getByTestId('selection-head')).toBeVisible();
+    await expect(page.getByTestId('frame-inspector'), 'the new element opens on its properties').toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('frame-inspector').getByTestId('selection-head'), 'the inspector of frames, on the shape').toContainText('Shape', { timeout: 10_000 });
+    await expect(page.getByTestId('frame-inspector').getByTestId('selection-head')).toBeVisible();
     await shoot(page, '2-element-editing');
 
     await page.keyboard.press('Escape');
@@ -69,7 +68,7 @@ test.describe('free elements on the canvas @real', () => {
     await page.keyboard.press('Escape');
     await expect(bar).toHaveAttribute('data-context', 'canvas', { timeout: 10_000 });
     await page.mouse.click(pane.x + 20, pane.y + pane.height - 120);
-    await expect(node.getByTestId('motion-node-poster'), 'a see-through poster replaces the live picture').toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(`[data-testid="gpu-node"][data-id="${element.id}"]`), 'the core keeps drawing the element after the deselect').toHaveAttribute('data-core', 'true', { timeout: 20_000 });
     await shoot(page, '3-element-poster');
 
     await page.keyboard.press('ControlOrMeta+z');

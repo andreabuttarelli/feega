@@ -29,7 +29,6 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { matching, needsSearch, recentFirst } from '$lib/canvas/switcher-list';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { Capability, modeAllows, modeOf, ProjectMode } from '$lib/project-mode';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string; mode?: string };
@@ -207,7 +206,7 @@
     </DropdownMenu.Root>
     {/if}
 
-    <div class="canvas-title" class:centred={!inlineStage.editing} data-testid="canvas-title">
+    <div class="canvas-title centred" data-testid="canvas-title">
     <span class="sep">/</span>
 
     {#if renaming}
@@ -336,7 +335,7 @@
   <div class="top-slot" data-top-slot></div>
   <div class="top-box right">
     <div class="top-peers" data-top-peers></div>
-    {#if $canvasLink && !inlineStage.editing}
+    {#if $canvasLink}
       <ConnectionDot state={$canvasLink} />
     {/if}
     <a href={BILLING_PATH} class="credits">

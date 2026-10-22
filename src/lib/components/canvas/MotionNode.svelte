@@ -20,9 +20,7 @@
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { Background, FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
-  import { NodeMode, Paint, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { DRAWN_EVENT, TILE_PAINTED } from '$lib/motion/hyperframes/measure';
-  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
   import { posterDue, tiles } from '$lib/canvas/live-tiles.svelte';
   import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
@@ -30,12 +28,7 @@
   import { coverFrame } from '$lib/motion/still';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, previewMode, releaseCapture, stop as stopIn } from '$lib/canvas/motion-preview';
 
-  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onenter = null, liveHost = LiveHost.Node, liveUrl = '' }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onenter?: (() => void) | null; liveHost?: LiveHost; liveUrl?: string } = $props();
-
-  let host = $state<HTMLDivElement | null>(null);
-  const nodeId = $derived(node.id);
-
-  $effect(() => (host ? inlineStage.offer(nodeId, host) : undefined));
+  let { node, href, previewUrl, posterUrl = null, onenter = null, liveHost = LiveHost.Node, liveUrl = '' }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; onenter?: (() => void) | null; liveHost?: LiveHost; liveUrl?: string } = $props();
 
   let root = $state<HTMLDivElement | null>(null);
   let player = $state<ReturnType<typeof MotionPreview> | null>(null);
@@ -57,21 +50,17 @@
   const mode = $derived(previewMode(sight, intent, still));
   const capturing = $derived(mode === PreviewMode.Capture && slots.capturing === node.id);
   const last = $derived(Math.max(0, (preview?.durationInFrames ?? 1) - 1));
-  const paint = $derived(inlineStage.paintOf(node.id));
-  const layers = $derived(nodeLayers(nodeMode, paint));
   const chrome = $derived(frameChrome(node.kind));
-  const previewing = $derived(nodeMode === NodeMode.Preview);
-  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
-  const liveTile = $derived(liveHere && (!!local || node.docHeadRevision > 0) && (!previewing || tiles.live(node.id)));
-  const capturable = $derived(nodeMode !== NodeMode.Edit && !liveTile);
+  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far);
+  const liveTile = $derived(liveHere && (!!local || node.docHeadRevision > 0) && tiles.live(node.id));
+  const capturable = $derived(!liveTile);
   let ownDrawn = $state(false);
   let decodedPoster = $state<string | null>(untrack(() => poster));
   const shownPoster = $derived(posterCurrent(local) && decodedPoster === poster ? decodedPoster : null);
   let loadedPoster = $state<string | null>(null);
-  const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster && loadedPoster === poster));
   const shows = $derived(ownDrawn || (!!shownPoster && loadedPoster === shownPoster));
+  const mounted = $derived(mode === PreviewMode.Live || capturing || liveTile);
   const playerUp = $derived(mounted && !!preview);
-  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
@@ -164,7 +153,7 @@
 
   $effect(() => {
     const key = posterKey;
-    const ask = { live: liveTile && previewing, drawn: ownDrawn, unsaved: frameDocs.unsaved(node.id, node.docHeadRevision), atHead: local ? local.version === node.docHeadRevision : previewRevision === node.docHeadRevision, hasPoster: !!posterUrl || posters.has(key), shooting: shooting.has(key) };
+    const ask = { live: liveTile, drawn: ownDrawn, unsaved: frameDocs.unsaved(node.id, node.docHeadRevision), atHead: local ? local.version === node.docHeadRevision : previewRevision === node.docHeadRevision, hasPoster: !!posterUrl || posters.has(key), shooting: shooting.has(key) };
     if (!player || !preview || !posterDue(ask)) {
       return;
     }
@@ -207,12 +196,6 @@
   $effect(() => {
     if (shows) {
       root?.dispatchEvent(new CustomEvent(TILE_PAINTED, { bubbles: true }));
-    }
-  });
-
-  $effect(() => {
-    if (nodeMode === NodeMode.Leaving && painted) {
-      inlineStage.landed(node.id);
     }
   });
 
@@ -288,7 +271,6 @@
 
 <div
   class="motion"
-  class:editing={!previewing}
   class:bare={!chrome.bar}
   data-kind={node.kind}
   data-testid="motion-node"
@@ -299,23 +281,17 @@
   bind:this={root}
 >
   <div class="stage" data-testid="motion-node-stage" data-frame-stage>
-    {#if layers.own || mounted}
-      {#if shownPoster && !(playerUp && ownDrawn)}
-        <img class="poster" class:under={playerUp} class:kept={!layers.own} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" onload={(e) => void posterPainted(e.currentTarget as HTMLImageElement)} />
-      {/if}
-      {#if mounted && preview}
-        <div class="own" class:kept={!layers.own} class:veiled={!ownDrawn} data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing muted={true} loop={false} /></div>
-      {:else if shownPoster}
-      {:else if !previewing}
-        <div class="skeleton" data-testid="motion-node-skeleton"></div>
-      {:else if !chrome.bar}
-        <div class="placeholder" data-testid="element-placeholder"></div>
-      {/if}
+    {#if shownPoster && !(playerUp && ownDrawn)}
+      <img class="poster" class:under={playerUp} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" onload={(e) => void posterPainted(e.currentTarget as HTMLImageElement)} />
     {/if}
-    {#if !previewing}<div class="host" class:nodrag={layers.editor} class:nopan={layers.editor} data-testid="motion-node-editing" bind:this={host}></div>{/if}
-    {#if previewing && node.docHeadRevision}<FrameHover nodeId={node.id} revision={node.docHeadRevision} {previewUrl} width={size.width} height={size.height} />{/if}
+    {#if mounted && preview}
+      <div class="own" class:veiled={!ownDrawn} data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing muted={true} loop={false} /></div>
+    {:else if !shownPoster && !chrome.bar}
+      <div class="placeholder" data-testid="element-placeholder"></div>
+    {/if}
+    {#if node.docHeadRevision}<FrameHover nodeId={node.id} revision={node.docHeadRevision} {previewUrl} width={size.width} height={size.height} />{/if}
   </div>
-  {#if liveHost === LiveHost.Node}<FrameLiveControls nodeId={node.id} interactive={!!node.interactive && previewing} src={liveUrl} />{/if}
+  {#if liveHost === LiveHost.Node}<FrameLiveControls nodeId={node.id} interactive={!!node.interactive} src={liveUrl} />{/if}
 </div>
 
 <style>
@@ -348,10 +324,6 @@
     color: #f0eee9;
   }
 
-  .kept {
-    visibility: hidden;
-  }
-
   .own.veiled {
     opacity: 0;
   }
@@ -367,11 +339,6 @@
   }
 
   .poster.under {
-    position: absolute;
-    inset: 0;
-  }
-
-  .host {
     position: absolute;
     inset: 0;
   }
@@ -397,10 +364,5 @@
     object-fit: cover;
   }
 
-  .skeleton {
-    position: absolute;
-    inset: 0;
-    background: var(--ui-field, #f2f2f2);
-  }
 
 </style>

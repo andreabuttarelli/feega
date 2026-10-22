@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { customSize } from './custom-size';
-import { MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, formatOf, newMotionDoc, motionDocSchema } from './doc';
+import { customSize, fitElementToNode } from './custom-size';
+import { Horizontal, Vertical } from './constraints/model';
+import { MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, formatOf, newMotionDoc, motionDocSchema, type MotionDoc } from './doc';
 import { setCanvas } from './timeline';
 
 const ratio = (s: { width: number; height: number }) => s.width / s.height;
@@ -59,5 +60,18 @@ describe('custom format', () => {
 
   it('refuses a size above 1080p', () => {
     expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 1920, height: 1920 } }).ok).toBe(false);
+  });
+});
+
+describe('fitElementToNode', () => {
+  it('stretches a pinned shape with its element node, so the shape keeps filling it', () => {
+    const base = newMotionDoc(MotionFormat.Landscape);
+    const shape = { id: 's', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 }, transform: {}, keyframes: {}, constraints: { horizontal: Horizontal.Left, vertical: Vertical.Top } };
+    const doc = { ...base, width: 200, height: 100, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [shape] }] } as unknown as MotionDoc;
+
+    const sized = fitElementToNode(doc, { width: 300, height: 100 });
+
+    expect(sized.ok && sized.doc.tracks[0].clips[0].props).toMatchObject({ x: 0.5, width: 1 });
+    expect(sized.ok && sized.doc.tracks[0].clips[0].constraints).toEqual(shape.constraints);
   });
 });
