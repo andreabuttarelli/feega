@@ -23,6 +23,7 @@ import { BENTO_LAYOUT, cellFrames } from '../bento/model';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, ENGINE, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
+import { withoutMutedLanes } from '../playback';
 import { threeGrains, withoutGrain } from './three-grain';
 import { MASK_CSS, MaskScope, maskArea, maskLayer, startValues } from './masks';
 import { COMPOSITION_ID, captureScript, contentStamp } from './capture';
@@ -646,7 +647,7 @@ function onlyClips(doc: MotionDoc, only: ReadonlySet<string> | undefined): Motio
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).filter(kept) })) };
 }
 
-const shownDoc = (raw: ComposeInput): MotionDoc => withAutoLayout(withoutHidden(boundDoc(withVars(raw.doc, raw.vars))));
+const shownDoc = (raw: ComposeInput): MotionDoc => withAutoLayout(withoutHidden(withoutMutedLanes(boundDoc(withVars(raw.doc, raw.vars)))));
 
 const liveDoc = (raw: ComposeInput, shown: MotionDoc): MotionDoc => bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), raw.only)));
 
