@@ -158,7 +158,10 @@ fn body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, inne
     let mask = mask(surface, look, pictures, region)?;
     let fx = Fx { runner: surface.runner() };
     let filtered = match &look.filters {
-        Some(filters) => fx.apply(drawn, filters, look.space.unwrap_or(UNIT_SPACE)),
+        Some(filters) => {
+            let [ox, oy] = look.origin.unwrap_or([0.0, 0.0]);
+            fx.apply(drawn, filters, look.space.unwrap_or(UNIT_SPACE), [ox - region.x0, oy - region.y0])
+        }
         None => drawn,
     };
     let blurred = fx.blurred(filtered, look.blur);

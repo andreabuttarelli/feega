@@ -1,4 +1,4 @@
-import { mul2d, type Affine } from '$lib/motion/affine';
+import { apply2d, mul2d, type Affine } from '$lib/motion/affine';
 import { BlendMode } from '$lib/motion/blend';
 import { ItemKind, type DisplayList, type Item, type Linear, type PathItem, type Scissor } from '$lib/motion/gpu-full/display-list';
 import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
@@ -43,7 +43,8 @@ function placed(item: Item, m: Affine, rect: Scissor, scale: number): Item {
     ...(masks ? { masks } : {}),
     ...(matte ? { matte } : {}),
     ...(item.kind === ItemKind.Group ? { items: item.items.map((i) => placed(i, m, rect, scale)) } : {}),
-    ...(item.space ? { space: linearThrough(m, item.space) } : {})
+    ...(item.space ? { space: linearThrough(m, item.space) } : {}),
+    ...(item.origin ? { origin: apply2d(m, item.origin) as [number, number] } : {})
   };
 }
 

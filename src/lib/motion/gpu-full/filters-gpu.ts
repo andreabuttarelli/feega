@@ -98,8 +98,14 @@ void main() {
 const FLOOD_FS = `#version 300 es
 precision highp float;
 uniform vec4 u_color;
+uniform vec4 u_region;
+uniform float u_height;
 out vec4 outColor;
-void main() { outColor = vec4(u_color.rgb * u_color.a, u_color.a); }`;
+void main() {
+  vec2 p = vec2(gl_FragCoord.x, u_height - gl_FragCoord.y);
+  if (p.x < u_region.x || p.y < u_region.y || p.x >= u_region.x + u_region.z || p.y >= u_region.y + u_region.w) { outColor = vec4(0.0); return; }
+  outColor = vec4(u_color.rgb * u_color.a, u_color.a);
+}`;
 
 const COMPOSITE_FS = `#version 300 es
 precision highp float;
@@ -263,6 +269,7 @@ void main() {
 
 const CHANNEL_INDEX: Record<string, number> = { R: 0, G: 1, B: 2, A: 3 };
 const TURBULENCE_CENTER = 1;
+const SUBREGION = ['x', 'y', 'width', 'height'];
 
 const COMPOSITE_OPS: Record<string, number> = { over: 0, in: 1, out: 2, atop: 3, xor: 4, arithmetic: 5 };
 
@@ -271,7 +278,7 @@ const BLEND_INDEX: Record<string, number> = Object.fromEntries(Object.values(Ble
 
 type Target = { fbo: WebGLFramebuffer; texture: WebGLTexture };
 
-export type FilterRunner = { apply: (src: WebGLTexture, filters: Filter[], space: Linear) => WebGLTexture };
+export type FilterRunner = { apply: (src: WebGLTexture, filters: Filter[], space: Linear, origin: [number, number]) => WebGLTexture };
 
 const num = (v: unknown, fallback = 0) => {
   const n = parseFloat(String(v ?? ''));
@@ -358,7 +365,13 @@ export function createFilters(gl: WebGL2RenderingContext, width: number, height:
       gl.uniform1i(u(programs.offset, 'u_alpha'), alpha ? 1 : 0);
     });
 
-  const flood = (color: Rgba) => run(programs.flood, [], () => gl.uniform4fv(u(programs.flood, 'u_color'), color));
+  const floodIn = (color: Rgba, region: [number, number, number, number]) =>
+    run(programs.flood, [], () => {
+      gl.uniform4fv(u(programs.flood, 'u_color'), color);
+      gl.uniform4fv(u(programs.flood, 'u_region'), region);
+      gl.uniform1f(u(programs.flood, 'u_height'), height);
+    });
+  const flood = (color: Rgba) => floodIn(color, [0, 0, width, height]);
 
   const composite = (a: WebGLTexture, b: WebGLTexture, op: string, k: [number, number, number, number] = [0, 0, 0, 0]) =>
     run(programs.composite, [a, b], () => {
@@ -499,7 +512,19 @@ export function createFilters(gl: WebGL2RenderingContext, width: number, height:
     });
   }
 
-  function svgGraph(srgbSource: WebGLTexture, filter: SvgNode, space: Linear): WebGLTexture {
+  function cropped(out: WebGLTexture, node: SvgNode, space: Linear, origin: [number, number]): WebGLTexture {
+    if (node.tag === 'feTurbulence' || !SUBREGION.some((k) => node.attrs[k] !== undefined)) {
+      return out;
+    }
+    const [x, y, w, h] = SUBREGION.map((k) => num(node.attrs[k], 0));
+    const corners = [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].map(([px, py]) => [space[0] * px + space[2] * py + origin[0], space[1] * px + space[3] * py + origin[1]]);
+    const xs = corners.map((c) => c[0]);
+    const ys = corners.map((c) => c[1]);
+    const [x0, y0] = [Math.min(...xs), Math.min(...ys)];
+    return composite(out, floodIn([1, 1, 1, 1], [x0, y0, Math.max(...xs) - x0, Math.max(...ys) - y0]), 'in');
+  }
+
+  function svgGraph(srgbSource: WebGLTexture, filter: SvgNode, space: Linear, origin: [number, number]): WebGLTexture {
     const linear = filter.attrs[INTERPOLATION] !== SRGB;
     const source = linear ? encode(srgbSource, Encoding.Linear) : srgbSource;
     const results = new Map<string, WebGLTexture>();
@@ -538,7 +563,7 @@ export function createFilters(gl: WebGL2RenderingContext, width: number, height:
       if (!run) {
         continue;
       }
-      last = run(node);
+      last = cropped(run(node), node, space, origin);
       if (node.attrs.result !== undefined) {
         results.set(String(node.attrs.result), last);
       }
@@ -565,11 +590,11 @@ export function createFilters(gl: WebGL2RenderingContext, width: number, height:
     }, source);
   }
 
-  function apply(src: WebGLTexture, filters: Filter[], space: Linear): WebGLTexture {
+  function apply(src: WebGLTexture, filters: Filter[], space: Linear, origin: [number, number]): WebGLTexture {
     used = 0;
     regions.clear();
     gl.disable(gl.BLEND);
-    const out = filters.reduce((tex, f) => (f.kind === FilterKind.Css ? cssGraph(tex, f.fns, space) : f.nodes.reduce((t, node) => svgGraph(t, node, space), tex)), src);
+    const out = filters.reduce((tex, f) => (f.kind === FilterKind.Css ? cssGraph(tex, f.fns, space) : f.nodes.reduce((t, node) => svgGraph(t, node, space, origin), tex)), src);
     gl.enable(gl.BLEND);
     return out;
   }
