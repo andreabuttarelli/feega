@@ -49,7 +49,7 @@
   import type { OpResult } from '$lib/motion/timeline';
   import { GRIP_SUMMARY, SelectionKind, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
-  import { marqueeIds, primaryOf, redoRoute, spanOf, toggleId, undoRoute, UndoRoute } from '$lib/canvas/frame-multi';
+  import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
   import { Grip, type Gap, type Guide, type Pt } from '$lib/motion/scene-select';
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
@@ -160,7 +160,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
 
   const DOM_CAP = 6;
   const CORE = 'core';
@@ -1381,6 +1381,7 @@
         viewPath: () => [],
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
         recorded: () => {},
+        stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
         saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: session.history.present }),
         pull: async () => {},
         send: async (ops, version, summary) => {
@@ -1480,12 +1481,9 @@
   const Step = { Back: 'back', Forward: 'forward' } as const;
   type Step = (typeof Step)[keyof typeof Step];
 
-  const frameHistory = (route: typeof undoRoute) => (panelSession ? route(panelSession.history) : UndoRoute.Canvas);
-
-  function stepFrame(step: Step) {
-    const session = panelSession;
-    const nodeId = panelNodeId;
-    if (!session || !nodeId) {
+  function stepFrame(nodeId: string, step: Step) {
+    const session = savers.get(nodeId);
+    if (!session) {
       return;
     }
     if (step === Step.Back) {
@@ -1494,7 +1492,9 @@
       session.redo();
     }
     liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
-    picks = picks.filter((id) => findClip(session.history.present, id));
+    if (inside?.nodeId === nodeId) {
+      picks = picks.filter((id) => findClip(session.history.present, id));
+    }
   }
 
   function commit(nodeId: string, result: OpResult, summary: string) {
@@ -2366,8 +2366,8 @@
     duplicate: () => selected.length && props.onDuplicate?.(selected),
     copy: () => void copySystem(),
     paste: () => undefined,
-    undo: () => (frameHistory(undoRoute) === UndoRoute.Frame ? stepFrame(Step.Back) : props.onUndo?.()),
-    redo: () => (frameHistory(redoRoute) === UndoRoute.Frame ? stepFrame(Step.Forward) : props.onRedo?.()),
+    undo: () => props.onUndo?.(),
+    redo: () => props.onRedo?.(),
     group: () => props.onGroup?.(selected),
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),

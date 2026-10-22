@@ -1,10 +1,6 @@
 import type { FrameRect } from '$lib/motion/gpu/pick';
-import { canRedo, canUndo, type History } from '$lib/motion/history';
 
-export enum UndoRoute {
-  Frame = 'frame',
-  Canvas = 'canvas'
-}
+export type FrameStep = { back: () => void; forward: () => void };
 
 export function toggleId(ids: readonly string[], id: string): string[] {
   return ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
@@ -21,7 +17,3 @@ export function marqueeIds(rects: Record<string, FrameRect>, marquee: FrameRect)
 }
 
 export const spanOf = (a: [number, number], b: [number, number]): FrameRect => ({ left: Math.min(a[0], b[0]), top: Math.min(a[1], b[1]), width: Math.abs(a[0] - b[0]), height: Math.abs(a[1] - b[1]) });
-
-export const undoRoute = (history: History | null): UndoRoute => (history && canUndo(history) ? UndoRoute.Frame : UndoRoute.Canvas);
-
-export const redoRoute = (history: History | null): UndoRoute => (history && canRedo(history) ? UndoRoute.Frame : UndoRoute.Canvas);
