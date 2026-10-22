@@ -155,12 +155,12 @@ export function svgFill(style: Style, defs: Defs, shape: Shape): Fill[] | PaintG
   return painted(style.fill, defs, { contours, rule, opacity: num(style['fill-opacity'], 1), matrix: shape.matrix, viewport: shape.viewport, rect: shape.rect });
 }
 
-function dashPattern(value: string | undefined): [number, number] | null | false {
+function dashPattern(value: string | undefined): number[] | null | false {
   if (isNone(value)) {
     return null;
   }
   const parts = (value ?? '').split(/[\s,]+/).filter(Boolean).map((v) => parseFloat(v));
-  return parts.length > 2 || parts.some((v) => !Number.isFinite(v)) ? false : [parts[0], parts[1] ?? parts[0]];
+  return parts.some((v) => !Number.isFinite(v) || v < 0) || parts.every((v) => v === 0) ? false : parts;
 }
 
 export function svgStroke(style: Style, defs: Defs, shape: Shape): Fill[] | PaintGap {
@@ -177,7 +177,7 @@ export function svgStroke(style: Style, defs: Defs, shape: Shape): Fill[] | Pain
   }
   const contours = shape.outline.flatMap((c) => {
     const pts = flatten(c).flatMap(([x, y]) => [x, y]);
-    const pieces = dash ? dashes(pts, c.closed, dash[0], dash[1]).map((d) => ({ pts: d, closed: false })) : [{ pts, closed: c.closed }];
+    const pieces = dash ? dashes(pts, c.closed, dash).map((d) => ({ pts: d, closed: false })) : [{ pts, closed: c.closed }];
     return pieces.flatMap((p) => strokePolygons(p.pts, p.closed, width, cap as Cap, join as Join, miter));
   });
   const fills = painted(style.stroke, defs, { contours, rule: FillRule.Union, opacity: num(style['stroke-opacity'], 1), matrix: shape.matrix, viewport: shape.viewport, rect: false });

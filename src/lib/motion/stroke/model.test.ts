@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FillType } from '../fill/model';
 import { ShapeKind } from '../shape/schema';
-import { MAX_STROKES, StrokeAlign, addStroke, moveStroke, removeStroke, setStroke, sidesShown, strokeSchema, strokesOf, strokesSchema } from './model';
+import { MAX_STROKES, StrokeAlign, addStroke, moveStroke, patternPx, removeStroke, setStroke, sidesShown, strokeSchema, strokesOf, strokesSchema } from './model';
 
 describe('stroke stack model', () => {
   it('a fresh stroke is a centred solid line with butt caps and miter joins', () => {
@@ -58,5 +58,12 @@ describe('stroke stack model', () => {
       many = addStroke(many);
     }
     expect(many).toHaveLength(MAX_STROKES);
+  });
+});
+
+describe('dash pattern text', () => {
+  it('reads the figma syntax, dash and gap separated by commas', () => {
+    expect(patternPx('10, 20, 10, 20, 80')).toEqual([10, 20, 10, 20, 80]);
+    expect(patternPx('4 x -1 2')).toEqual([4, 2]);
   });
 });

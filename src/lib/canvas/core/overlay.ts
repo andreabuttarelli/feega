@@ -62,7 +62,7 @@ export function edgeItems(id: string, c: Curve, look: EdgeLook, theme: CoreTheme
   if (look !== EdgeLook.Iterate) {
     return [solid(clip, line(path, WIRE_WIDTH), colour)];
   }
-  return [...dashes(path, false, ITERATE_DASH, ITERATE_GAP).map((d) => solid(clip, line(d, WIRE_WIDTH), colour)), ...badge(id, c, theme)];
+  return [...dashes(path, false, [ITERATE_DASH, ITERATE_GAP]).map((d) => solid(clip, line(d, WIRE_WIDTH), colour)), ...badge(id, c, theme)];
 }
 
 export function marqueeItems(m: Box, zoom: number, theme: CoreTheme): PathItem[] {

@@ -214,14 +214,14 @@ describe('readTree', () => {
     expect(item.masks?.[0].cover).toEqual({ kind: CoverKind.Path, contours: [[0, 0, 75, 0, 75, 30, 0, 30]], matrix: [1, 0, 0, 1, 10, 10] });
   });
 
-  it('draws an svg fill without a stroke it cannot dash and names the stroke', () => {
+  it('draws an svg stroke with a dash pattern of any length', () => {
     const svg = el({ parent: 0, tag: 'svg', svg: true, size: [100, 100] });
     const rect = el({ parent: 1, tag: 'rect', svg: true, at: null, attrs: { x: '10', y: '10', width: '20', height: '20' }, style: { fill: 'rgb(0, 0, 0)', stroke: 'rgb(255, 255, 255)', 'stroke-width': '2px', 'stroke-dasharray': '1 2 3' } });
 
     const read = readTree(tree(root(), svg, rect));
 
-    expect(read.drawn).toHaveLength(1);
-    expect(read.gaps.map((g) => g.reason)).toEqual([DomGap.Stroke]);
+    expect(read.drawn).toHaveLength(2);
+    expect(read.gaps).toEqual([]);
   });
 
   it('skips a transparent svg fill, the hit area of an editable part', () => {

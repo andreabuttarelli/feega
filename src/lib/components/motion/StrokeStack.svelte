@@ -4,7 +4,7 @@
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import { FILL_TYPES, FillType, PAINTED_AS, PaintedAs, colourAlpha, retypeFill, withAlpha, type Fill, type Stop } from '$lib/motion/fill/model';
   import { CAPS, JOINS } from '$lib/motion/shape/schema';
-  import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, removeStroke, setStroke, type Stroke, type StrokePatch } from '$lib/motion/stroke/model';
+  import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, patternPx, removeStroke, setStroke, type Stroke, type StrokePatch } from '$lib/motion/stroke/model';
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
@@ -165,6 +165,7 @@
             {#each STROKE_ALIGNS as align (align)}<option value={align}>{ALIGN_LABEL[align]}</option>{/each}
           </select>
         </label>
+        <label class={FIELD_ROW}><span class={LABEL}>Dashes</span><input class={cn(FIELD_INPUT, 'w-28')} type="text" placeholder="10, 5, 2, 5" data-testid="stroke-pattern" value={(stroke.pattern ?? []).map(toPx).join(', ')} onchange={(e) => patch(index, { pattern: patternPx(e.currentTarget.value).map((n) => n / short) }, 'Stroke dash pattern')} /></label>
         <label class={FIELD_ROW}><span class={LABEL}>Dash</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-dash" value={toPx(stroke.dash)} onchange={(e) => patch(index, { dash: fromPx(e) }, 'Stroke dash')} /></label>
         <label class={FIELD_ROW}><span class={LABEL}>Gap</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-gap" value={toPx(stroke.gap)} onchange={(e) => patch(index, { gap: fromPx(e) }, 'Stroke gap')} /></label>
         <label class={FIELD_ROW}

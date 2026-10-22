@@ -12,6 +12,7 @@ export const STROKE_ALIGNS = Object.values(StrokeAlign) as [StrokeAlign, ...Stro
 export const MAX_STROKES = 8;
 export const MAX_STROKE_WIDTH = 0.2;
 const MAX_DASH = 0.5;
+const MAX_PATTERN = 16;
 const DEFAULT_WIDTH = 0.01;
 const DEFAULT_COLOR = '#000000';
 const DEFAULT_END = '#ffffff';
@@ -31,11 +32,22 @@ export const strokeSchema = z.object({
   sides: z.tuple([width, width, width, width]).optional(),
   dash: dashLength,
   gap: dashLength,
+  pattern: z.array(z.number().min(0).max(MAX_DASH)).max(MAX_PATTERN).optional(),
   cap: z.enum(CAPS).default('butt'),
   join: z.enum(JOINS).default('miter'),
   miter: z.number().min(1).max(MAX_MITER).default(DEFAULT_MITER),
   visible: z.boolean().default(true)
 });
+
+export const dashOf = (s: Pick<Stroke, 'dash' | 'gap' | 'pattern'>): number[] => (s.pattern?.some((d) => d > 0) ? s.pattern : s.dash > 0 ? [s.dash, s.gap || s.dash] : []);
+
+export const patternPx = (text: string): number[] =>
+  text
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n >= 0)
+    .slice(0, MAX_PATTERN);
 
 export const strokesSchema = z.array(strokeSchema).max(MAX_STROKES);
 

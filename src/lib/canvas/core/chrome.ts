@@ -94,7 +94,7 @@ function hover(t: StateTile): PathItem[] {
 const RINGS: Record<NodeChrome, (t: StateTile) => PathItem[]> = {
   [NodeChrome.None]: () => [],
   [NodeChrome.Selected]: (t) => [item(t, ChromePart.Ring, band(t, RING_WIDTH), t.ringColor)],
-  [NodeChrome.Editing]: (t) => [item(t, ChromePart.Ring, dashes(outline(t, EDITING_WIDTH), true, DASH, DASH).flatMap((d) => line(d, EDITING_WIDTH)), t.ringColor, EDITING_OPACITY)]
+  [NodeChrome.Editing]: (t) => [item(t, ChromePart.Ring, dashes(outline(t, EDITING_WIDTH), true, [DASH, DASH]).flatMap((d) => line(d, EDITING_WIDTH)), t.ringColor, EDITING_OPACITY)]
 };
 
 const spaced = (t: ChromeTile, i: number, n: number) => t.y + ((i + 1) / (n + 1)) * t.height;

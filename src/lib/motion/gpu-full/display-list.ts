@@ -13,7 +13,7 @@ import { BlendMode } from '../blend';
 import { MASK_KEYS } from '../mask';
 import { mattePairs, MATTE_READ } from '../matte';
 import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, fillsOf, type Fill, type FillOf } from '../fill/model';
-import { StrokeAlign, strokesOf, type Stroke } from '../stroke/model';
+import { StrokeAlign, dashOf, strokesOf, type Stroke } from '../stroke/model';
 import { Cap, Join, dashes, strokePolygons } from './stroke';
 import { shapeLayers, type ShapeLook } from '../shape/render';
 import { lookAt } from '../hyperframes/shapes';
@@ -156,7 +156,8 @@ function strokeBands(s: Stroke, outline: Outline, unit: number): number[][] {
   const width = s.width * unit * STRETCH[s.align];
   const runs = outline.flatMap((c) => {
     const pts = flatten(c).flatMap(([x, y]) => [x, y]);
-    return s.dash > 0 ? dashes(pts, c.closed, s.dash * unit, (s.gap || s.dash) * unit).map((d) => ({ pts: d, closed: false })) : [{ pts, closed: c.closed }];
+    const pattern = dashOf(s);
+    return pattern.length ? dashes(pts, c.closed, pattern.map((d) => d * unit)).map((d) => ({ pts: d, closed: false })) : [{ pts, closed: c.closed }];
   });
   return runs.flatMap((r) => strokePolygons(r.pts, r.closed, width, s.cap as Cap, s.join as Join, s.miter));
 }

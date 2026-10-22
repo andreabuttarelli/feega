@@ -26,6 +26,25 @@ describe('miter limit', () => {
   });
 });
 
+describe('dash pattern', () => {
+  it('walks a pattern longer than one dash and one gap', () => {
+    expect(dashes([0, 0, 40, 0], false, [10, 5, 2, 5])).toEqual([
+      [0, 0, 10, 0],
+      [15, 0, 17, 0],
+      [22, 0, 32, 0],
+      [37, 0, 39, 0]
+    ]);
+  });
+
+  it('repeats an odd pattern twice, as svg does', () => {
+    expect(dashes([0, 0, 40, 0], false, [10, 5, 5])).toEqual([
+      [0, 0, 10, 0],
+      [15, 0, 20, 0],
+      [30, 0, 35, 0]
+    ]);
+  });
+});
+
 describe('strokePolygons', () => {
   it('covers a butt line as one width-wide band', () => {
     const polys = strokePolygons([0, 0, 100, 0], false, 10, Cap.Butt, Join.Miter);
@@ -53,7 +72,7 @@ describe('strokePolygons', () => {
 
 describe('dashes', () => {
   it('cuts a line into dash-long pieces separated by gaps', () => {
-    expect(dashes([0, 0, 100, 0], false, 20, 10)).toEqual([
+    expect(dashes([0, 0, 100, 0], false, [20, 10])).toEqual([
       [0, 0, 20, 0],
       [30, 0, 50, 0],
       [60, 0, 80, 0],
