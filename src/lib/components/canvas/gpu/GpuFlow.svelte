@@ -1360,13 +1360,7 @@
     void panelExtras?.load();
   });
 
-  const soleFrame = $derived(selected.length === 1 && coreFrames.some((f) => f.id === selected[0]) ? selected[0] : null);
-  const soleExtras = $derived(soleFrame ? extrasOf(soleFrame) : null);
-  const remixOf = $derived(soleExtras?.data?.gallery.remixOf ?? null);
-
-  $effect(() => {
-    void soleExtras?.load();
-  });
+  const remixOf = $derived(panelExtras?.data?.gallery.remixOf ?? null);
 
   const brandRemix = () => goto(handoffPath({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '' }, BRAND_REMIX_PROMPT));
 
