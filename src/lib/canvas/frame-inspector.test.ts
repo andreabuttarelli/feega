@@ -172,6 +172,18 @@ describe('frameKeyAction', () => {
   const press = (key: string, mods: { meta?: boolean; shift?: boolean; alt?: boolean } = {}) =>
     ({ key, code: `Key${key.toUpperCase()}`, metaKey: !!mods.meta, ctrlKey: false, shiftKey: !!mods.shift, altKey: !!mods.alt }) as KeyboardEvent;
 
+  it('⌥⌘C copies the properties of one element and ⌥⌘V pastes them on another', () => {
+    const ctx = (doc: MotionDoc, id: string) => ({ doc, selection: [id], frame: 0, newId: () => 'x' });
+    const copy = frameKeyAction(press('c', { meta: true, alt: true }))!;
+    const paste = frameKeyAction(press('v', { meta: true, alt: true }))!;
+    const doc = fixture();
+
+    expect(barAction(copy, ctx(doc, 'a'))).toBeNull();
+    const pasted = barAction(paste, ctx(doc, 'b'))!.doc;
+    expect(pasted.tracks.flatMap((t) => t.clips).find((c) => c.id === 'b')!.blend).toBe(doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'a')!.blend);
+    expect(frameBarActions(doc, ['a'])).not.toContain(paste);
+  });
+
   it('⇧⌘H hides and ⇧⌘L locks the selection, and pressing again undoes it', () => {
     const flag = (doc: MotionDoc | undefined, key: 'hidden' | 'locked') => doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'a')?.[key];
     const ctx = (doc: MotionDoc) => ({ doc, selection: ['a'], frame: 0, newId: () => 'x' });

@@ -255,6 +255,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.FlipHorizontal]: { name: 'Flip horizontal', icon: FlipHorizontal2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToggleHidden]: { name: 'Hide / show', icon: EyeOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToggleLocked]: { name: 'Lock / unlock', icon: Lock, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.CopyProperties]: { name: 'Copy properties', icon: ClipboardCopy, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.PasteProperties]: { name: 'Paste properties', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.CreateComponent]: { name: 'Create component', icon: ComponentIcon, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.DetachInstance]: { name: 'Detach instance', icon: Unlink, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ResetInstance]: { name: 'Reset all overrides', icon: RotateCcw, group: GuideGroup.Edit, menu: MenuSection.Layer },
