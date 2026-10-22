@@ -11,7 +11,8 @@ export enum ExportFormat {
   ProRes4444 = 'prores-4444',
   WebmAlpha = 'webm-alpha',
   PngSequence = 'png-sequence',
-  Gif = 'gif'
+  Gif = 'gif',
+  Apng = 'apng'
 }
 
 export enum Master {
@@ -43,7 +44,8 @@ export const FORMAT: Record<ExportFormat, FormatSpec> = {
   [ExportFormat.ProRes4444]: { label: 'ProRes 4444 with alpha (.mov)', ext: 'mov', mime: 'video/quicktime', asset: 'video', alpha: true, audio: true, master: Master.ProRes, bitsPerPixel: 5.3 },
   [ExportFormat.WebmAlpha]: { label: 'WebM · VP9 with alpha', ext: 'webm', mime: 'video/webm', asset: 'video', alpha: true, audio: true, master: Master.Vp9, bitsPerPixel: 0.15 },
   [ExportFormat.PngSequence]: { label: 'PNG sequence (.zip)', ext: 'zip', mime: 'application/zip', asset: 'document', alpha: true, audio: false, master: Master.ProRes, bitsPerPixel: 12 },
-  [ExportFormat.Gif]: { label: 'GIF', ext: 'gif', mime: 'image/gif', asset: 'image', alpha: true, audio: false, master: Master.Vp9, bitsPerPixel: 1.5 }
+  [ExportFormat.Gif]: { label: 'GIF', ext: 'gif', mime: 'image/gif', asset: 'image', alpha: true, audio: false, master: Master.Vp9, bitsPerPixel: 1.5 },
+  [ExportFormat.Apng]: { label: 'APNG (animated PNG)', ext: 'png', mime: 'image/apng', asset: 'image', alpha: true, audio: false, master: Master.Vp9, bitsPerPixel: 6 }
 };
 
 export const EXPORT_FORMATS = Object.values(ExportFormat) as [ExportFormat, ...ExportFormat[]];
@@ -56,6 +58,8 @@ export enum GifLoop {
   Once = 'once',
   Boomerang = 'boomerang'
 }
+
+export const APNG_MAX_SECONDS = 10;
 
 export const GIF_LIMITS = { minFps: 8, maxFps: 30, minWidth: 64, maxWidth: 1920, maxSeconds: 30 } as const;
 
@@ -130,6 +134,9 @@ export function exportProblem(doc: Pick<MotionDoc, 'width' | 'height' | 'duratio
   const seconds = doc.durationInFrames / doc.fps;
   if (settings.format === ExportFormat.Gif && seconds > GIF_LIMITS.maxSeconds) {
     return `a GIF can be at most ${GIF_LIMITS.maxSeconds} s: shorten the video or pick a video format`;
+  }
+  if (settings.format === ExportFormat.Apng && seconds > APNG_MAX_SECONDS) {
+    return `an APNG can be at most ${APNG_MAX_SECONDS} s: shorten the video or pick a video format`;
   }
   const out = outputSize(doc, settings.resolution);
   if (Math.max(out.width, out.height) > MAX_RENDER_SIDE) {

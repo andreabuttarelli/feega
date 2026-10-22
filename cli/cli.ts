@@ -108,7 +108,7 @@ motion
   .description('Render a video: a free link that renders in your browser')
   .option('--server', 'Render on our servers (not available yet)')
   .option('--resolution <r>', '720p, 1080p, 1440p or 2160p')
-  .option('--format <f>', 'With --server: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif')
+  .option('--format <f>', 'With --server: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif, apng')
   .option('--quality <q>', 'standard, high (default) or max')
   .option('--fps <n>', '24, 25, 30, 50 or 60')
   .option('--gif-loop <mode>', 'GIF: forever (default), once or boomerang')
