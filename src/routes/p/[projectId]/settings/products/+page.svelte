@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ShoppingBag } from '@lucide/svelte';
+  import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
   import { Panel } from '$lib/components/ui/panel';
   import { EmptyState } from '$lib/components/ui/empty-state';
 

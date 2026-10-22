@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { Check, Plus, UserRound } from '@lucide/svelte';
+  import Check from '@lucide/svelte/icons/check';
+  import Plus from '@lucide/svelte/icons/plus';
+  import UserRound from '@lucide/svelte/icons/user-round';
 
   type Influencer = { id: string; name: string; cover: string | null; allowed: boolean; why: string };
 

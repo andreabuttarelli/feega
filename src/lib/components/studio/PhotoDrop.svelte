@@ -6,7 +6,11 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Camera, ImageUp, Check, TriangleAlert, CircleX } from '@lucide/svelte';
+  import Camera from '@lucide/svelte/icons/camera';
+  import ImageUp from '@lucide/svelte/icons/image-up';
+  import Check from '@lucide/svelte/icons/check';
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+  import CircleX from '@lucide/svelte/icons/circle-x';
   import { photoQuality, Severity } from '$lib/studio/photo-quality';
 
   let { busy, stage, onpick }: { busy: boolean; stage: string | null; onpick: (photo: Checked) => void } = $props();

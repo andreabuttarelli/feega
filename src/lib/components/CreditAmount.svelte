@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CircleDollarSign } from '@lucide/svelte';
+  import CircleDollarSign from '@lucide/svelte/icons/circle-dollar-sign';
   import { formatCredits } from './credit-amount-format';
 
   let { amount, approx = false }: { amount: number; approx?: boolean } = $props();
