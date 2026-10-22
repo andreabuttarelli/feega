@@ -35,8 +35,8 @@ describe('settingsPageLoader: la sezione trova la sua pagina reale', () => {
 });
 
 describe('SHEET_PAGE_LOADERS: il foglio scarica le sue pagine solo quando si apre', () => {
-  it('calendar, ads e il guscio di settings sono moduli pigri, non import statici della tela', async () => {
-    for (const load of [SHEET_PAGE_LOADERS.calendar, SHEET_PAGE_LOADERS.ads, SHEET_PAGE_LOADERS.settingsLayout]) {
+  it('ads e il guscio di settings sono moduli pigri, non import statici della tela', async () => {
+    for (const load of [SHEET_PAGE_LOADERS.ads, SHEET_PAGE_LOADERS.settingsLayout]) {
       expect(typeof load).toBe('function');
       expect((await load()).default).toBeTruthy();
     }

@@ -4,7 +4,6 @@ import { sectionRefusal } from './section-guard';
 
 describe('sections of an uncensored project', () => {
   it.each([
-    ['/p/[projectId]/calendar', 'uncensored_not_publishable'],
     ['/p/[projectId]/promote', 'uncensored_not_publishable'],
     ['/p/[projectId]/ads/social', 'uncensored_not_publishable'],
     ['/p/[projectId]/influencers', 'uncensored_not_in_catalogue'],
@@ -15,6 +14,6 @@ describe('sections of an uncensored project', () => {
   });
 
   it('a standard project refuses no section', () => {
-    expect(sectionRefusal(ProjectMode.Standard, '/p/[projectId]/calendar')).toBeNull();
+    expect(sectionRefusal(ProjectMode.Standard, '/p/[projectId]/ads/social')).toBeNull();
   });
 });

@@ -71,10 +71,6 @@
       "schedule": "0 */6 * * *"
     },
     {
-      "path": "/api/v1/health/accounts/tick",
-      "schedule": "30 5 * * *"
-    },
-    {
       "path": "/api/v1/videos/render/work",
       "schedule": "*/1 * * * *"
     },

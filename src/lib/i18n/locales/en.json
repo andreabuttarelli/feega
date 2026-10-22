@@ -170,96 +170,6 @@
       "titleSignup": "feega — Create account"
     }
   },
-  "warnings": {
-    "title": "Notifications",
-    "close": "Close",
-    "resolve": "Fix it",
-    "empty": "Nothing here — you're all set.",
-    "all": "All",
-    "errors": "Errors",
-    "warnings": "Warnings",
-    "suggestions": "Suggestions",
-    "noPlatforms": {
-      "title": "No platforms selected",
-      "msg": "Pick the socials the AI should create content for in Studio."
-    },
-    "notConnected": {
-      "title": "Platforms not connected",
-      "msg": "You operate on {platforms} but haven't connected the account(s) — nothing can publish until you do."
-    },
-    "reconnect": {
-      "title": "Reconnect your account",
-      "msg": "The connection to {platforms} expired or broke — reconnect it in Settings or publishing will keep failing."
-    },
-    "proposed": {
-      "title": "A proposal is waiting",
-      "msg": "Autopilot proposed an updated strategy/plan — review and approve it so it can execute."
-    },
-    "strategyMismatch": {
-      "title": "Strategy out of sync",
-      "msg": "Your strategy was built for {strategy}, but you now operate on {current}. Regenerate it to fit your platforms."
-    },
-    "planMismatch": {
-      "title": "Editorial plan out of sync",
-      "msg": "Your plan was built for {plan}, but you now operate on {current}. Adjust it so the weekly content fits your platforms."
-    },
-    "crosspost": {
-      "title": "Cross-post opportunity",
-      "msg": "{count} generated posts don't yet cover {platforms}. You can cross-post them to your new platforms."
-    },
-    "failed": {
-      "title": "{count} posts failed to publish",
-      "msg": "Publishing failed — check the account connection and retry."
-    },
-    "attention": {
-      "title": "{count} posts need a look",
-      "msg": "Review these before they go out — weak media scores or a Director flag."
-    },
-    "quota": {
-      "title": "Monthly post budget used up",
-      "msg": "You've used all {quota} posts for this month — it resets next cycle, or upgrade your plan."
-    },
-    "noStrategy": {
-      "title": "No strategy yet",
-      "msg": "Generate your growth strategy — it steers every plan and post."
-    },
-    "noPlan": {
-      "title": "No editorial plan yet",
-      "msg": "Generate your 4-week editorial plan so the weekly autopilot has a roadmap to execute."
-    },
-    "continueOnboarding": {
-      "title": "Finish setting up your brand",
-      "msg": "Ask feega in chat to add people, competitors, strategy and your first posts — or keep exploring and come back anytime."
-    },
-    "pending": {
-      "title": "{count} posts to review",
-      "msg": "You have posts waiting for approval."
-    },
-    "calendarConflicts": {
-      "title": "{count} calendar clashes",
-      "msg": "Posts are double-booked at the same time — let the AI rearrange your calendar."
-    },
-    "studioLogo": {
-      "title": "No logo yet",
-      "msg": "Add your logo in Studio so the AI reproduces it instead of inventing a wordmark."
-    },
-    "studioVisual": {
-      "title": "No visual style yet",
-      "msg": "Add a visual style brief so generated images match your brand's look."
-    },
-    "studioCompetitors": {
-      "title": "No competitors added",
-      "msg": "Add competitors so the AI can claim the visual and content white space they leave."
-    },
-    "studioHashtags": {
-      "title": "No preferred hashtags",
-      "msg": "Set hashtags per platform to control which ones the AI uses instead of inventing them."
-    },
-    "blogOff": {
-      "title": "Blog not active",
-      "msg": "Turn on the blog so feega also generates articles — from your editorial plan and from radar news, not just social posts."
-    }
-  },
   "app": {
     "nav2": {
       "layers": "Layers",
@@ -278,7 +188,6 @@
     },
     "hub": {
       "publish": {
-        "calendar": "Calendar",
         "promote": "Promote"
       },
       "overview": {

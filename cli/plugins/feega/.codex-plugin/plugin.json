@@ -1,7 +1,7 @@
 {
   "name": "feega",
   "version": "1.0.0",
-  "description": "Operate feega (social media AI autopilot) via MCP or CLI: brands, posts, plans, studio, SEO/GEO, and blog.",
+  "description": "Operate feega (infinite canvas for motion video and images) via MCP or CLI: canvases, nodes, generations, motion, gallery.",
   "author": {
     "name": "Andrea Buttarelli",
     "email": "andreabuttarelli.design@gmail.com",
@@ -23,8 +23,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "feega",
-    "shortDescription": "Social media AI autopilot — MCP + skill",
-    "longDescription": "Drive feega from Codex or ChatGPT: approve and edit social posts, run editorial plans, SEO/GEO audits, and blog workflows. Prefer the bundled MCP tools when connected; otherwise use the feega CLI after OAuth login.",
+    "shortDescription": "Motion video canvas — MCP + skill",
+    "longDescription": "Drive feega from Codex or ChatGPT: edit canvases and nodes, run generations, and work with motion videos and the gallery. Prefer the bundled MCP tools when connected; otherwise use the feega CLI after OAuth login.",
     "developerName": "Andrea Buttarelli",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
@@ -32,9 +32,8 @@
     "privacyPolicyURL": "https://www.feega.app/privacy",
     "termsOfServiceURL": "https://www.feega.app/terms",
     "defaultPrompt": [
-      "List my feega brands and show pending posts for the first one.",
-      "Approve all pending posts for brand <slug>.",
-      "Run an SEO audit for brand <slug> and summarize the top issues."
+      "List my feega canvases and describe what is on the first one.",
+      "Add an image node with a minimal hero shot and run its generation."
     ]
   }
 }

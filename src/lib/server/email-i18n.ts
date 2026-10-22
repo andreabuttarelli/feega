@@ -30,12 +30,6 @@ const EMAIL: Record<Locale, Dict> = {
     'scheduler.cta': 'Approve all & schedule →',
     'scheduler.footer':
       'feega runs your planner automatically. Manage or pause it in Settings. Link expires in 3 days.',
-    'conflict.subject': '{brand}: {count, plural, one {# time slot is} other {# time slots are}} double-booked',
-    'conflict.heading': '{brand}: {count, plural, one {# calendar clash} other {# calendar clashes}}',
-    'conflict.intro':
-      'You have {count, plural, one {# time slot with two or more posts} other {# time slots with two or more posts each}} set to go out at the same moment. Open the calendar and let the AI rebalance the schedule for you.',
-    'conflict.cta': 'Fix the calendar →',
-    'conflict.footer': 'On the calendar, tap “Rearrange with AI” and it’ll spread the posts out for you.',
     'recap.subject': '{brand}: your social strategy is ready',
     'recap.heading': '{brand} is ready to launch',
     'recap.intro':
@@ -94,11 +88,6 @@ const EMAIL: Record<Locale, Dict> = {
     'recap_weekly.no_accounts_desc': 'Connect your social accounts so feega can publish posts, track engagement, and give you better suggestions.',
     'recap_weekly.cta': 'Open dashboard \u2192',
     'recap_weekly.footer': 'Sent every Monday by feega. Manage your preferences in Settings.',
-    'digest.subject': 'Yesterday on {brand}: {count, plural, one {# post} other {# posts}}',
-    'digest.heading': '{brand}: {count, plural, one {# post} other {# posts}} published yesterday',
-    'digest.intro':
-      'Here’s what went live for {brand} yesterday — tap a post to see it live.',
-    'digest.footer': 'Sent daily by feega. Manage your preferences in Settings.',
     'invite.subject': '{inviter} invited you to {brand} on feega',
     'invite.heading': 'Join {brand} on feega',
     'invite.intro':
@@ -156,15 +145,6 @@ const EMAIL: Record<Locale, Dict> = {
     'lifecycle.step.line.approve': 'Your week of posts is ready 👏 Review and approve them.',
     'lifecycle.step.line.connect': 'Posts approved 👏 Connect your social accounts to publish.',
     'lifecycle.step.line.publish': 'You’re connected 👏 Turn on autopilot and go live.',
-    'prepublish.subject':
-      '{brand}: {count, plural, one {# scheduled post was held back} other {# scheduled posts were held back}}',
-    'prepublish.heading':
-      '{brand}: {count, plural, one {a post did not go live} other {# posts did not go live}}',
-    'prepublish.intro':
-      'feega stopped this from publishing because it looked broken or empty. It is back in your drafts — fix it and approve again.',
-    'prepublish.reason': 'Why: {reason}',
-    'prepublish.cta': 'Open drafts →',
-    'prepublish.footer': 'This last-minute check runs just before publish so empty or broken posts never go out.'
   }
 };
 

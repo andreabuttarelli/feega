@@ -103,8 +103,8 @@ There is **no** `FEEGA_TOKEN` / API-key path by design.
 
 1. `query({ table: "brands", columns: ["id","slug","name","plan","status"] })` — confirm auth and
    learn which brands/orgs this session can see.
-2. `query({ table: "posts", columns: ["id","status","caption"], where: [{ column: "status", op: "eq", value: "draft" }] })`
-   — a brand's pending posts (add a `brand_id` filter once you have one).
+2. `query({ table: "canvases", columns: ["id","name","project_id"] })`
+   — the canvases of the org (add a `project_id` filter once you have one).
 
 Ids from list-derived reads accept short unambiguous prefixes (same rule as the CLI); a `where` on
 `id` in `delete_row`/`update_row` needs the full id.

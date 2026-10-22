@@ -143,7 +143,7 @@
 
     const abort = new AbortController();
     import('$lib/webmcp')
-      .then(({ registerBrandWebMcp }) => registerBrandWebMcp(brand, token, data.socialPublishing, abort.signal))
+      .then(({ registerBrandWebMcp }) => registerBrandWebMcp(brand, token, abort.signal))
       .catch((error) => console.warn('web mcp registration failed', error));
     return () => abort.abort();
   });
