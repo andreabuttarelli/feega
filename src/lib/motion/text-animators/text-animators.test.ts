@@ -6,8 +6,9 @@ import { FEEGA_TOKENS } from '../brand';
 import { composeHtml } from '../hyperframes/compose';
 import { setExpression } from '../expression/ops';
 import { AnimatorUnit, SelectorShape, animatorKey } from './model';
-import { addAnimator, applyPreset, removeAnimator, setAnimator, TextPreset } from './ops';
-import { selection, splitText } from './split';
+import { addAnimator, applyPreset, PRESETS, removeAnimator, setAnimator, TEXT_PRESETS, TextPreset } from './ops';
+import { restLook, startLook } from './preset-preview';
+import { selection, splitText, unitPositions } from './split';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -128,6 +129,36 @@ describe('a preset sweeps over the units the text really has', () => {
     expect(steps.at(-1)).toBe(0);
     expect(Math.max(...jumps)).toBeLessThan(MAX_STEP);
     expect(jumps.every((j) => j >= 0)).toBe(true);
+  });
+});
+
+describe('the preset gallery', () => {
+  it('covers fade, slide, scale, blur and typewriter at char, word and line level', () => {
+    expect(TEXT_PRESETS.length).toBeGreaterThanOrEqual(12);
+    expect(new Set(TEXT_PRESETS.map((p) => PRESETS[p].animator.unit))).toEqual(new Set([AnimatorUnit.Char, AnimatorUnit.Word, AnimatorUnit.Line]));
+    expect(TEXT_PRESETS).toEqual(expect.arrayContaining(['fade-chars', 'slide-words', 'scale-chars', 'blur-words', 'typewriter']));
+  });
+});
+
+describe.each(TEXT_PRESETS)('preset %s', (preset) => {
+  const STEPS = 24;
+
+  it('hides every unit at its start and shows every unit at its end', () => {
+    const doc = ok(applyPreset(ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 60, props: { text: 'one two\nthree' } }, 'title')), 'title', preset, { start: 0, duration: STEPS }, 'p'));
+    const clip = clipOf(doc);
+    const [from, to] = clip.keyframes[animatorKey('p', 'offset')].map((k) => k.value as number);
+    const positions = unitPositions('one two\nthree', clip.animators[0].unit);
+    const at = (offset: number) => positions.map((p) => selection({ ...clip.animators[0], offset }, p));
+
+    expect(at(from).every((a) => a === 1)).toBe(true);
+    expect(at(to).every((a) => a === 0)).toBe(true);
+  });
+
+  it('is described, and its preview starts away from rest and ends at rest', () => {
+    const { values } = PRESETS[preset].animator;
+
+    expect(PRESETS[preset].about.length).toBeGreaterThan(10);
+    expect(startLook(values)).not.toEqual(restLook());
   });
 });
 
