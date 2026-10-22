@@ -98,7 +98,7 @@
   let strips = $state<Record<string, Strip>>({});
 
   let open = $state<string[]>([]);
-  let easing = $state<{ ref: KeyRef; next: KeyRef; ease: EaseSpec; left: number; top: number } | null>(null);
+  let easing = $state<{ ref: KeyRef; next: KeyRef; ease: EaseSpec; intensity?: number; left: number; top: number } | null>(null);
   let whip = $state<{ clipId: string; x0: number; y0: number; x: number; y: number } | null>(null);
 
   let draft = $state<MotionDoc | null>(null);
@@ -400,16 +400,16 @@
   function openEase(e: MouseEvent, clip: KeyOwner, ref: KeyRef, next: KeyRef, ease: EaseSpec) {
     e.stopPropagation();
     const rect = lanes!.getBoundingClientRect();
-    easing = { ref, next, ease, left: e.clientX - rect.left + lanes!.scrollLeft, top: e.clientY - rect.top + lanes!.scrollTop + 8 };
+    easing = { ref, next, ease, intensity: keyAt(ref)?.intensity, left: e.clientX - rect.left + lanes!.scrollLeft, top: e.clientY - rect.top + lanes!.scrollTop + 8 };
   }
 
-  function pickEase(ease: EaseSpec) {
+  function pickEase(ease: EaseSpec, intensity?: number) {
     if (!easing) {
       return;
     }
-    const result = setKeyEase(doc, easing.ref, ease);
+    const result = setKeyEase(doc, easing.ref, ease, intensity);
     if (result.ok) {
-      easing = { ...easing, ease };
+      easing = { ...easing, ease, intensity };
       onchange(result.doc, 'Changed an ease');
     }
   }
@@ -888,7 +888,7 @@
 
     {#if easing}
       <div class="ease-at" style={`left: ${Math.max(headPx, easing.left - 120)}px; top: ${easing.top}px;`}>
-        <EasePicker ease={easing.ease} kinds={segmentKinds(easing)} onpick={pickEase} onkind={pickKind} onclose={() => (easing = null)} />
+        <EasePicker ease={easing.ease} intensity={easing.intensity} kinds={segmentKinds(easing)} onpick={pickEase} onkind={pickKind} onclose={() => (easing = null)} />
       </div>
     {/if}
 

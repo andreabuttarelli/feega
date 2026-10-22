@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { motionEngine } from './engine/engine';
 import { Ease } from './design';
-import { ANIMATABLE, EASE_BEZIER, Interp, TRANSFORM, easeName, isAnimatable, keyframesProblem, mixColor, sampleTrack, type Keyframe } from './keyframes';
+import { ANIMATABLE, EASE_BEZIER, Interp, TRANSFORM, easeName, isAnimatable, isSpring, keyframesProblem, mixColor, sampleTrack, type Keyframe } from './keyframes';
 
 const track: Keyframe[] = [
   { frame: 0, value: 0, ease: Ease.Linear },
@@ -32,7 +32,7 @@ describe('keyframe interpolation', () => {
 
   it('every named ease matches the engine ease the generator emits', () => {
     const engine = motionEngine({ document: undefined } as unknown as Window & Record<string, unknown>);
-    for (const ease of Object.values(Ease)) {
+    for (const ease of Object.values(Ease).filter((e) => !isSpring(e))) {
       const engineEase = engine.parseEase(easeName(ease));
       for (let i = 0; i <= 20; i++) {
         const p = i / 20;

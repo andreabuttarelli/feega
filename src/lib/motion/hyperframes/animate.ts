@@ -1,5 +1,5 @@
 import type { MotionClip } from '../doc';
-import { Source, TRANSFORM, ValueKind, animProp, easeName, isPlainTrack, sampleColor, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
+import { Source, TRANSFORM, ValueKind, animProp, easeName, isPlainTrack, isSpring, sampleColor, sampleTrack, type EaseSpec, type Keyframe, type SceneKey, type TransformKey } from '../keyframes';
 import { css, js, px } from './html';
 import { Ease } from '../design';
 import { MASK_LANES, MaskScope, maskTarget } from './masks';
@@ -159,7 +159,7 @@ export function keyframeTweens(clip: MotionClip, frame: Frame, resolve: (color: 
         to: lane.vars(next.value),
         at: (clip.from + k.frame) / frame.fps,
         duration: (next.frame - k.frame) / frame.fps,
-        ease: easeName(k.ease)
+        ease: easeName(k.ease, k.intensity)
       };
     })
   );
@@ -189,13 +189,13 @@ function initial(clip: MotionClip, frame: Frame, resolve: (color: string) => str
 }
 
 function bezierEases(clips: MotionClip[]): string[] {
-  const curves = new Map<string, EaseSpec>();
+  const curves = new Map<string, { ease: EaseSpec; intensity?: number }>();
   for (const k of clips.flatMap((c) => Object.values(c.keyframes).flat())) {
-    if (typeof k.ease !== 'string') {
-      curves.set(easeName(k.ease), k.ease);
+    if (typeof k.ease !== 'string' || isSpring(k.ease)) {
+      curves.set(easeName(k.ease, k.intensity), { ease: k.ease, intensity: k.intensity });
     }
   }
-  return [...curves].map(([name, ease]) => `${ENGINE}.registerEase(${js(name)},function(p){return KF_SAMPLE([{frame:0,value:0,ease:${js(ease)}},{frame:1,value:1,ease:"linear"}],p);});`);
+  return [...curves].map(([name, { ease, intensity }]) => `${ENGINE}.registerEase(${js(name)},function(p){return KF_SAMPLE([{frame:0,value:0,ease:${js(ease)}${intensity === undefined ? '' : `,intensity:${js(intensity)}`}},{frame:1,value:1,ease:"linear"}],p);});`);
 }
 
 export function animationScript(clips: MotionClip[], frame: Frame, resolve: (color: string) => string, parents: Parents = new Set()): { setup: string; timeline: string } {

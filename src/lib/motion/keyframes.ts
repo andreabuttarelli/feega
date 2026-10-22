@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { COLOR, IMAGE_ZOOM, TYPE, type ComponentId } from './components';
-import { EASE_IDS, Ease } from './design';
+import { KEY_EASE_IDS, Ease } from './design';
 import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mask';
 import { RING_NUMBERS, RING_NUMBER_KEYS } from '../canvas/composition/ring';
 import { PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS } from './particles/model';
@@ -28,18 +28,19 @@ export const INTERP_LABEL: Record<Interp, string> = {
   [Interp.Continuous]: 'Continuous'
 };
 
-export type Keyframe = { frame: number; value: KeyValue; ease: EaseSpec; in?: Interp; out?: Interp; roving?: boolean };
+export type Keyframe = { frame: number; value: KeyValue; ease: EaseSpec; intensity?: number; in?: Interp; out?: Interp; roving?: boolean };
 export type Keyframes = Record<string, Keyframe[]>;
 
 const unit = z.number().min(0).max(1);
 const ordinate = z.number().min(-2).max(3);
 
-export const easeSchema = z.union([z.enum(EASE_IDS), z.tuple([unit, ordinate, unit, ordinate])]);
+export const easeSchema = z.union([z.enum(KEY_EASE_IDS), z.tuple([unit, ordinate, unit, ordinate])]);
 
 export const keyframeSchema = z.object({
   frame: z.number().int().min(0),
   value: z.union([z.number(), z.string()]),
   ease: easeSchema.default(Ease.Standard),
+  intensity: z.number().min(0).max(1).optional(),
   in: z.enum(INTERPS).optional(),
   out: z.enum(INTERPS).optional(),
   roving: z.boolean().optional()
@@ -334,7 +335,9 @@ export const EASE_BEZIER: Record<Ease, Bezier> = {
   [Ease.Enter]: [0.16, 1, 0.3, 1],
   [Ease.Exit]: [0.7, 0, 0.84, 0],
   [Ease.Linear]: [1 / 3, 1 / 3, 2 / 3, 2 / 3],
-  [Ease.Overshoot]: [0.175, 0.885, 0.32, 1.275]
+  [Ease.Overshoot]: [0.175, 0.885, 0.32, 1.275],
+  [Ease.Elastic]: [0.34, 1.56, 0.64, 1],
+  [Ease.Bounce]: [0.33, 1, 0.68, 1]
 };
 
 export const EASE_NAME: Record<Ease, string> = {
@@ -342,10 +345,21 @@ export const EASE_NAME: Record<Ease, string> = {
   [Ease.Enter]: 'feega.out',
   [Ease.Exit]: 'feega.in',
   [Ease.Linear]: 'none',
-  [Ease.Overshoot]: 'back.out(1.7)'
+  [Ease.Overshoot]: 'back.out(1.7)',
+  [Ease.Elastic]: 'elastic.out(1, 0.4)',
+  [Ease.Bounce]: 'bounce.out'
 };
 
-export function easeName(ease: EaseSpec): string {
+export const SPRING_EASES: readonly Ease[] = [Ease.Elastic, Ease.Bounce];
+
+export const DEFAULT_INTENSITY = 0.5;
+
+export const isSpring = (ease: EaseSpec): ease is Ease => typeof ease === 'string' && SPRING_EASES.includes(ease);
+
+export function easeName(ease: EaseSpec, intensity = DEFAULT_INTENSITY): string {
+  if (isSpring(ease)) {
+    return `kf-${ease}-${Math.round(intensity * 100)}`;
+  }
   return typeof ease === 'string' ? EASE_NAME[ease] : `kf-bz-${ease.map((n) => String(n).replace('.', '_').replace('-', 'm')).join('-')}`;
 }
 

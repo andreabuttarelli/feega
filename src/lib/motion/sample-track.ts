@@ -1,13 +1,13 @@
 import { Ease } from './design';
 
-export type SampledKey = { frame: number; value: number | string; ease: string | number[]; in?: string; out?: string; roving?: boolean };
+export type SampledKey = { frame: number; value: number | string; ease: string | number[]; intensity?: number; in?: string; out?: string; roving?: boolean };
 
 export function sampleTrack(track: SampledKey[], frame: number): number {
   const expoIn = (p: number) => 2 ** (10 * (p - 1)) * p + p ** 6 * (1 - p);
   const expoOut = (p: number) => 1 - expoIn(1 - p);
   const expoInOut = (p: number) => (p < 0.5 ? expoIn(p * 2) / 2 : 1 - expoIn((1 - p) * 2) / 2);
   const settled = (ease: (p: number) => number, depth: number, lateness: number) => (p: number) => ease(p) + depth * p ** lateness * (1 - p);
-  const curves: Record<string, (p: number) => number> = {
+  const curves: Record<string, (p: number, s: number) => number> = {
     standard: settled(expoInOut, 0.35, 12),
     enter: settled(expoOut, 0.2, 6),
     exit: expoIn,
@@ -15,6 +15,26 @@ export function sampleTrack(track: SampledKey[], frame: number): number {
     overshoot: (p) => {
       const q = p - 1;
       return p ? q * q * (2.7 * q + 1.7) + 1 : 0;
+    },
+    elastic: (p, s) => (p ? 1 + 2 ** (-(14 - 6 * s) * p) * Math.sin((p * 10 - 0.75) * ((2 * Math.PI) / 3)) : 0),
+    bounce: (p, s) => {
+      const restitution = 0.25 + 0.5 * s;
+      const bounces = [1, 2, 3, 4, 5, 6];
+      const total = bounces.reduce((sum, n) => sum + 2 * restitution ** n, 1);
+      const u = p * total;
+      if (u < 1) {
+        return u * u;
+      }
+      let start = 1;
+      for (const n of bounces) {
+        const span = 2 * restitution ** n;
+        if (u < start + span) {
+          const x = (u - start) / span;
+          return 1 - restitution ** (2 * n) * (1 - (2 * x - 1) ** 2);
+        }
+        start += span;
+      }
+      return 1;
     }
   };
   const handles: Record<string, number[]> = {
@@ -22,7 +42,9 @@ export function sampleTrack(track: SampledKey[], frame: number): number {
     enter: [0.16, 1, 0.3, 1],
     exit: [0.7, 0, 0.84, 0],
     linear: [1 / 3, 1 / 3, 2 / 3, 2 / 3],
-    overshoot: [0.175, 0.885, 0.32, 1.275]
+    overshoot: [0.175, 0.885, 0.32, 1.275],
+    elastic: [0.34, 1.56, 0.64, 1],
+    bounce: [0.33, 1, 0.68, 1]
   };
   const cubic = (a: number, b: number, c: number, d: number, t: number) => {
     const u = 1 - t;
@@ -94,7 +116,7 @@ export function sampleTrack(track: SampledKey[], frame: number): number {
     return va;
   }
   if (out === 'bezier' && into === 'bezier') {
-    const eased = typeof a.ease === 'string' ? curves[a.ease](p) : bezier(a.ease, p);
+    const eased = typeof a.ease === 'string' ? curves[a.ease](p, a.intensity ?? 0.5) : bezier(a.ease, p);
     return va + dv * eased;
   }
 

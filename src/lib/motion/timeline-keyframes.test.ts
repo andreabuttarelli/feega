@@ -142,6 +142,15 @@ describe('keyframe ops', () => {
     expect(findClip(doc, 't')!.clip.keyframes.rotateY[0].ease).toEqual([0.1, 0.7, 0.1, 1]);
   });
 
+  it('stores the intensity of an elastic ease and drops it for any other ease', () => {
+    const ref = { clipId: 't', prop: 'rotateY', frame: 0 };
+    const springy = must(setKeyEase(keyed, ref, Ease.Elastic, 0.8));
+    const plain = must(setKeyEase(springy, ref, Ease.Standard, 0.8));
+
+    expect(findClip(springy, 't')!.clip.keyframes.rotateY[0]).toMatchObject({ ease: Ease.Elastic, intensity: 0.8 });
+    expect(findClip(plain, 't')!.clip.keyframes.rotateY[0]).not.toHaveProperty('intensity');
+  });
+
   it('copies keyframes relative to the earliest and pastes them at a frame of another clip', () => {
     const other = must(addClip(keyed, { component: 'Text', from: 0, durationInFrames: 90 }, 'x'));
     const board = copyKeyframes(other, [

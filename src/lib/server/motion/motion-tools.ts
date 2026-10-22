@@ -494,7 +494,7 @@ const SPRING_HELP = '(soft by default; stiffness and damping override it: keep d
 
 const INTERP_HELP = `in/out set how the value enters and leaves a keyframe: bezier (default, uses ease), linear, hold (no change until the next keyframe), auto (smooth, never overshoots), continuous (smooth, keeps speed through). roving true (${SPATIAL_KEYS.join(', ')} only) retimes a middle keyframe so the speed is even.`;
 
-type KeyInput = { time: number; value: Keyframe['value']; ease: Keyframe['ease']; in?: Keyframe['in']; out?: Keyframe['out']; roving?: boolean };
+type KeyInput = { time: number; value: Keyframe['value']; ease: Keyframe['ease']; intensity?: number; in?: Keyframe['in']; out?: Keyframe['out']; roving?: boolean };
 
 const MODIFIER_CATALOGUE = MODIFIER_KINDS.map((k) => `${k} (${MODIFIERS[k].params.map((p) => `${p.key} ${p.options ? p.options.map((o, i) => `${i}=${o}`).join('/') : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
 const PATH_GUIDE = 'SVG path data (M L H V C S Q T Z, absolute or relative) in the shape box: 0,0 is its top-left and 1,1 its bottom-right';
@@ -639,7 +639,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
   const { session } = deps;
   const frames = (s: number) => framesAt(s, session.doc.fps);
-  const asKey = (k: KeyInput): Keyframe => shaped({ frame: frames(k.time), value: k.value, ease: k.ease }, { in: k.in, out: k.out, roving: k.roving });
+  const asKey = (k: KeyInput): Keyframe => shaped({ frame: frames(k.time), value: k.value, ease: k.ease, ...(k.intensity === undefined ? {} : { intensity: k.intensity }) }, { in: k.in, out: k.out, roving: k.roving });
   const ownerOf = (clipId: string): Owner => findClip(session.doc, clipId)?.clip.component ?? null;
   const propsOf = (clipId: string): Owner => {
     const owner = ownerOf(clipId);
@@ -1101,11 +1101,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     set_keyframes: tool({
       description:
-        `Animate one prop of a clip: replaces its keyframes. time is seconds from the clip start; ease is the curve leaving that keyframe: standard (default, feega.inOut: expo in-out with a soft settle, for moves), enter (feega.out, for entrances), exit (feega.in, for exits), linear (only a drift or a loop), overshoot (a visible bounce: off-style), or a cubic-bezier [x1,y1,x2,y2]. ${INTERP_HELP} Colour props take #rrggbb or brand colours. list_components says what each component animates.`,
+        `Animate one prop of a clip: replaces its keyframes. time is seconds from the clip start; ease is the curve leaving that keyframe: standard (default, feega.inOut: expo in-out with a soft settle, for moves), enter (feega.out, for entrances), exit (feega.in, for exits), linear (only a drift or a loop), overshoot (a visible bounce: off-style), elastic or bounce (springy: only when asked, with intensity 0..1, default 0.5), or a cubic-bezier [x1,y1,x2,y2]. ${INTERP_HELP} Colour props take #rrggbb or brand colours. list_components says what each component animates.`,
       inputSchema: z.object({
         clip_id: z.string(),
         prop: z.string(),
-        keyframes: z.array(z.object({ time: z.number().min(0), value: z.union([z.number(), z.string()]), ease: easeSchema.default(Ease.Standard), ...keyShape })).min(1)
+        keyframes: z.array(z.object({ time: z.number().min(0), value: z.union([z.number(), z.string()]), ease: easeSchema.default(Ease.Standard), intensity: z.number().min(0).max(1).optional(), ...keyShape })).min(1)
       }),
       execute: async (input) => apply(setKeyframes(session.doc, input.clip_id, input.prop, input.keyframes.map(keyIn(ownerOf(input.clip_id), input.prop))), `animated ${input.prop} of ${input.clip_id}`)
     }),

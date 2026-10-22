@@ -11,17 +11,23 @@ export enum Ease {
   Enter = 'enter',
   Exit = 'exit',
   Linear = 'linear',
-  Overshoot = 'overshoot'
+  Overshoot = 'overshoot',
+  Elastic = 'elastic',
+  Bounce = 'bounce'
 }
 
 export const EASE_IDS = [Ease.Standard, Ease.Enter, Ease.Exit, Ease.Linear, Ease.Overshoot] as const;
+
+export const KEY_EASE_IDS = [...EASE_IDS, Ease.Elastic, Ease.Bounce] as const;
 
 export const EASE_LABEL: Record<Ease, string> = {
   [Ease.Standard]: 'Standard',
   [Ease.Enter]: 'Ease out',
   [Ease.Exit]: 'Ease in',
   [Ease.Linear]: 'Linear',
-  [Ease.Overshoot]: 'Overshoot'
+  [Ease.Overshoot]: 'Overshoot',
+  [Ease.Elastic]: 'Elastic',
+  [Ease.Bounce]: 'Bounce'
 };
 
 export const DURATION = { quick: 8, base: 15, slow: 24 } as const;
