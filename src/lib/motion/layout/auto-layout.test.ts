@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Align, Direction, Justify, Sizing, layoutTree, measure, type Flow, type Item } from './auto-layout';
+import { Align, AutoFlow, Direction, Justify, Sizing, TrackType, layoutTree, measure, type Flow, type Item } from './auto-layout';
 
 const flow = (over: Partial<Flow> = {}): Flow => ({
   direction: Direction.Horizontal,
@@ -276,3 +276,62 @@ describe('a grid', () => {
     expect(size).toEqual({ width: 4 + 70 + 10 + 70 + 2, height: 1 + 60 + 20 + 30 + 3 });
   });
 });
+
+describe('grid tracks', () => {
+  const fixed = (value: number) => ({ type: TrackType.Fixed, value });
+  const flex = (value = 1) => ({ type: TrackType.Flex, value });
+  const hugged = { type: TrackType.Hug, value: 0 };
+  const fill = { width: Sizing.Fill, height: Sizing.Fill };
+  const grid = (over: Partial<Flow> = {}) => ({ direction: Direction.Grid, gap: 10, crossGap: 20, ...over });
+
+  it('sizes fixed, flex and hug columns', () => {
+    const out = layoutTree(box('c', 400, 300, [leaf('a', 50, 10), leaf('b', 50, 10), leaf('d', 70, 10)], grid({ columnTracks: [fixed(100), flex(), hugged] })));
+    expect([out.get('a')!.left, out.get('b')!.left, out.get('d')!.left]).toEqual([0, 110, 330]);
+  });
+
+  it('shares free space by fr', () => {
+    const out = layoutTree(box('c', 410, 300, [leaf('a', 10, 10, { sizing: fill }), leaf('b', 10, 10, { sizing: fill })], grid({ columnTracks: [flex(1), flex(3)] })));
+    expect(out.get('a')!.width).toBe(100);
+    expect(out.get('b')).toMatchObject({ left: 110, width: 300 });
+  });
+
+  it('spans columns and places the next child after the span', () => {
+    const out = layoutTree(box('c', 320, 300, [leaf('a', 10, 10, { sizing: fill, cell: { columnSpan: 2 } }), leaf('b', 10, 10)], grid({ columnTracks: [flex(), flex(), flex()] })));
+    expect(out.get('a')!.width).toBe(210);
+    expect(out.get('b')!.left).toBe(220);
+  });
+
+  it('anchors a child to a cell and auto-places the rest around it', () => {
+    const out = layoutTree(box('c', 210, 300, [leaf('a', 50, 40), leaf('b', 50, 40, { cell: { column: 0, row: 0 } })], grid({ columnTracks: [flex(), flex()] })));
+    expect(out.get('b')).toMatchObject({ left: 0, top: 0 });
+    expect(out.get('a')).toMatchObject({ left: 110, top: 0 });
+  });
+
+  it('spans rows', () => {
+    const out = layoutTree(box('c', 210, 300, [leaf('a', 10, 10, { sizing: fill, cell: { rowSpan: 2 } }), leaf('b', 50, 40), leaf('d', 50, 30)], grid({ columnTracks: [flex(), flex()] })));
+    expect(out.get('d')).toMatchObject({ left: 110, top: 60 });
+    expect(out.get('a')!.height).toBe(90);
+  });
+
+  it('sizes fixed and flex rows in a fixed-height grid', () => {
+    const out = layoutTree(box('c', 210, 300, [leaf('a', 50, 10), leaf('b', 50, 10), leaf('d', 10, 10, { sizing: fill })], grid({ columnTracks: [flex(), flex()], rowTracks: [fixed(50), flex()] })));
+    expect(out.get('d')).toMatchObject({ top: 70, height: 230 });
+  });
+
+  it('flows down the columns first', () => {
+    const out = layoutTree(box('c', 210, 300, [leaf('a', 50, 40), leaf('b', 50, 40), leaf('d', 50, 40)], grid({ columnTracks: [flex(), flex()], rowTracks: [hugged, hugged], autoFlow: AutoFlow.Column })));
+    expect(out.get('b')).toMatchObject({ left: 0, top: 60 });
+    expect(out.get('d')).toMatchObject({ left: 110, top: 0 });
+  });
+
+  it('aligns one child in its cell over the grid alignment', () => {
+    const out = layoutTree(box('c', 210, 300, [leaf('a', 50, 40), leaf('b', 50, 20, { cell: { x: Align.End, y: Align.Center } })], grid({ columnTracks: [flex(), flex()] })));
+    expect(out.get('b')).toMatchObject({ left: 160, top: 10 });
+  });
+
+  it('a hugging grid sizes flex tracks to their content, like css', () => {
+    const size = measure(box('c', 0, 0, [leaf('a', 50, 40), leaf('b', 70, 60)], grid({ columnTracks: [flex(1), fixed(30)] }), { sizing: hug }));
+    expect(size.width).toBe(50 + 10 + 30);
+  });
+});
+

@@ -15,7 +15,8 @@
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
-  import { Align, Direction, Justify, Sizing } from '$lib/motion/layout/auto-layout';
+  import { Align, AutoFlow, Direction, Justify, Sizing } from '$lib/motion/layout/auto-layout';
+  import { formatTracks, parseTracks } from '$lib/motion/layout/tracks-text';
   import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '$lib/motion/layout/model';
   import { hasBox, layoutParent, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
   import { childrenInOrder } from '$lib/motion/layout/resolve';
@@ -50,6 +51,12 @@
     { justify: Justify.SpaceAround, label: 'Space around', testid: 'auto-layout-space-around', icon: SpaceAround },
     { justify: Justify.SpaceEvenly, label: 'Space evenly', testid: 'auto-layout-space-evenly', icon: SpaceEvenly }
   ];
+  const AUTO_FLOWS: SegmentOption[] = [
+    { value: AutoFlow.Row, label: 'Rows first' },
+    { value: AutoFlow.Column, label: 'Columns first' }
+  ];
+  const CELL_ALIGNS = ['', Align.Start, Align.Center, Align.End] as const;
+  const CELL_ALIGN_LABEL: Record<(typeof CELL_ALIGNS)[number], string> = { '': 'Auto', [Align.Start]: 'Start', [Align.Center]: 'Center', [Align.End]: 'End' };
   const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End };
 
   const layout = $derived(clip.autoLayout ?? null);
@@ -57,6 +64,7 @@
   const evenPadding = $derived(!!layout && SIDES.every((side) => layout.padding[side] === layout.padding.top));
   const perSide = $derived(splitPadding || !evenPadding);
   const parent = $derived(layoutParent(doc, clip));
+  const inGrid = $derived(parent?.autoLayout?.direction === Direction.Grid);
   const item = $derived(clip.layoutItem ?? DEFAULT_LAYOUT_ITEM);
   const FLOW_OF: Record<Direction, Flow> = { [Direction.Horizontal]: Flow.Row, [Direction.Vertical]: Flow.Column, [Direction.Grid]: Flow.Grid };
   const flow = $derived(layout?.wrap ? Flow.Wrap : FLOW_OF[layout?.direction ?? Direction.Horizontal]);
@@ -69,6 +77,16 @@
   const size = (patch: Partial<LayoutItem>, summary: string) => commit(setLayoutItem(doc, clip.id, patch), summary);
   const px = (value: string) => Math.max(0, Math.round(Number(value) || 0));
   const signedPx = (value: string) => Math.round(Number(value) || 0);
+  const span = (value: string) => Math.max(1, Math.round(Number(value) || 1));
+  const cellAlign = (value: string) => (value === '' ? undefined : (value as Align));
+
+  function setTracks(key: 'columnTracks' | 'rowTracks', text: string, summary: string) {
+    const tracks = parseTracks(text);
+    if (tracks) {
+      set({ [key]: tracks }, summary);
+    }
+  }
+
   const optionalPx = (value: string) => (value.trim() === '' ? undefined : px(value));
 
   function spotPressed(layout: AutoLayout, column: Align, row: Align): boolean {
@@ -101,6 +119,15 @@
       {#if layout.direction === Direction.Grid}
         <Field label="Columns" id="auto-layout-columns">
           <input id="auto-layout-columns" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" max={MAX_GRID_COLUMNS} value={layout.columns} data-testid="auto-layout-columns" onchange={(e) => set({ columns: Math.min(MAX_GRID_COLUMNS, Math.max(1, px(e.currentTarget.value))) }, 'Changed the columns')} />
+        </Field>
+        <Field label="Column sizes" id="auto-layout-column-tracks">
+          <input id="auto-layout-column-tracks" class={cn(FIELD_INPUT, 'w-full')} placeholder="1fr 120 hug" value={formatTracks(layout.columnTracks)} data-testid="auto-layout-column-tracks" onchange={(e) => setTracks('columnTracks', e.currentTarget.value, 'Changed the column sizes')} />
+        </Field>
+        <Field label="Row sizes" id="auto-layout-row-tracks">
+          <input id="auto-layout-row-tracks" class={cn(FIELD_INPUT, 'w-full')} placeholder="hug" value={formatTracks(layout.rowTracks)} data-testid="auto-layout-row-tracks" onchange={(e) => setTracks('rowTracks', e.currentTarget.value, 'Changed the row sizes')} />
+        </Field>
+        <Field label="Fill order">
+          <div class="flex min-w-0 flex-1" data-testid="auto-layout-auto-flow"><SegmentedControl label="Fill order" options={AUTO_FLOWS} value={layout.autoFlow} onchange={(v) => set({ autoFlow: v as AutoFlow }, 'Changed the fill order')} /></div>
         </Field>
       {/if}
       <Field label="Align">
@@ -147,6 +174,21 @@
       <Field label="Min / max H">
         <input aria-label="Min height" placeholder="min" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.minHeight ?? ''} onchange={(e) => size({ minHeight: optionalPx(e.currentTarget.value) }, 'Changed the min height')} />
         <input aria-label="Max height" placeholder="max" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.maxHeight ?? ''} onchange={(e) => size({ maxHeight: optionalPx(e.currentTarget.value) }, 'Changed the max height')} />
+      </Field>
+    {/if}
+
+    {#if inGrid}
+      <Field label="Span">
+        <input aria-label="Column span" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" value={item.columnSpan} data-testid="auto-layout-column-span" onchange={(e) => size({ columnSpan: span(e.currentTarget.value) }, 'Changed the column span')} />
+        <input aria-label="Row span" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" value={item.rowSpan} data-testid="auto-layout-row-span" onchange={(e) => size({ rowSpan: span(e.currentTarget.value) }, 'Changed the row span')} />
+      </Field>
+      <Field label="In cell">
+        <select aria-label="Horizontal in cell" class={cn(FIELD_INPUT, 'w-full')} value={item.cellX ?? ''} data-testid="auto-layout-cell-x" onchange={(e) => size({ cellX: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
+          {#each CELL_ALIGNS as value (value)}<option {value}>{CELL_ALIGN_LABEL[value]}</option>{/each}
+        </select>
+        <select aria-label="Vertical in cell" class={cn(FIELD_INPUT, 'w-full')} value={item.cellY ?? ''} data-testid="auto-layout-cell-y" onchange={(e) => size({ cellY: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
+          {#each CELL_ALIGNS as value (value)}<option {value}>{CELL_ALIGN_LABEL[value]}</option>{/each}
+        </select>
       </Field>
     {/if}
 
