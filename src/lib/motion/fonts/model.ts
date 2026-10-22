@@ -187,7 +187,9 @@ function clipFaces(clip: TextClip, doc: FontDoc): Face[] {
   if (typeof clip.props.font !== 'string') {
     return [];
   }
-  return [{ family: clip.props.font, weight: Number(clip.props.weight ?? DEFAULT_WEIGHT), italic: clip.props.italic === true }];
+  const own = { family: clip.props.font, weight: Number(clip.props.weight ?? DEFAULT_WEIGHT), italic: clip.props.italic === true };
+  const runs = Array.isArray(clip.props.runs) ? (clip.props.runs as { font?: string; weight?: number; italic?: boolean }[]) : [];
+  return [own, ...runs.map((r) => ({ family: r.font ?? own.family, weight: r.weight ?? own.weight, italic: r.italic ?? own.italic }))];
 }
 
 function allFaces(doc: FontDoc): Face[] {

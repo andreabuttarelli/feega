@@ -5,29 +5,55 @@ const MAX_WEIGHT = 900;
 const MAX_RUNS = 200;
 export const BOLD = 700;
 
+const MIN_SIZE = 0.005;
+const MAX_SIZE = 1;
+const MIN_TRACKING = -0.2;
+const MAX_TRACKING = 1;
+const MIN_LEADING = 0.6;
+const MAX_LEADING = 3;
+
+export const RUN_CASES = ['as-typed', 'upper', 'lower'] as const;
+export type RunCase = (typeof RUN_CASES)[number];
+
 const runStyleShape = {
   color: z.string().min(1).max(64).optional(),
   weight: z.number().int().min(MIN_WEIGHT).max(MAX_WEIGHT).optional(),
-  italic: z.boolean().optional()
+  italic: z.boolean().optional(),
+  font: z.string().min(1).max(64).optional(),
+  size: z.number().min(MIN_SIZE).max(MAX_SIZE).optional(),
+  tracking: z.number().min(MIN_TRACKING).max(MAX_TRACKING).optional(),
+  leading: z.number().min(MIN_LEADING).max(MAX_LEADING).optional(),
+  underline: z.boolean().optional(),
+  strike: z.boolean().optional(),
+  textCase: z.enum(RUN_CASES).optional(),
+  opacity: z.number().min(0).max(1).optional()
 };
 
 export const runSchema = z.object({ start: z.number().int().min(0), end: z.number().int().min(1), ...runStyleShape }).strict();
 
+export const runEditSchema = z.object(Object.fromEntries(Object.entries(runStyleShape).map(([k, v]) => [k, v.unwrap().nullable().optional()])) as { [K in keyof typeof runStyleShape]: z.ZodOptional<z.ZodNullable<ReturnType<(typeof runStyleShape)[K]['unwrap']>>> }).strict();
+
 export const runsSchema = z.array(runSchema).max(MAX_RUNS).optional();
 
-export type RunStyle = { color?: string; weight?: number; italic?: boolean };
+export type RunStyle = { color?: string; weight?: number; italic?: boolean; font?: string; size?: number; tracking?: number; leading?: number; underline?: boolean; strike?: boolean; textCase?: RunCase; opacity?: number };
 export type TextRun = { start: number; end: number } & RunStyle;
 export type Range = { start: number; end: number };
 export type Segment = { text: string; run: TextRun | null };
 
 export enum RunToggle {
   Bold = 'bold',
-  Italic = 'italic'
+  Italic = 'italic',
+  Underline = 'underline',
+  Strike = 'strike'
 }
 
-export type RunEdit = { color?: string | null; weight?: number | RunToggle.Bold | null; italic?: boolean | RunToggle.Italic | null };
+type Toggled = { weight: RunToggle.Bold; italic: RunToggle.Italic; underline: RunToggle.Underline; strike: RunToggle.Strike };
 
-const STYLE_KEYS = ['color', 'weight', 'italic'] as const;
+export type RunEdit = { [K in keyof RunStyle]?: RunStyle[K] | (K extends keyof Toggled ? Toggled[K] : never) | null };
+
+export const STYLE_KEYS = ['color', 'weight', 'italic', 'font', 'size', 'tracking', 'leading', 'underline', 'strike', 'textCase', 'opacity'] as const;
+
+export type StyleKey = (typeof STYLE_KEYS)[number];
 
 type Chars = (RunStyle | null)[];
 
@@ -72,17 +98,29 @@ export const normalRuns = (runs: readonly TextRun[] | undefined, length: number)
 
 const everyChar = (chars: Chars, range: Range, has: (s: RunStyle | null) => boolean) => chars.slice(range.start, range.end).every(has);
 
-const TOGGLES: { [K in keyof RunEdit]-?: (edit: NonNullable<RunEdit[K]>, chars: Chars, range: Range) => RunStyle[K] } = {
-  color: (edit) => edit as string,
-  weight: (edit, chars, range) => (edit === RunToggle.Bold ? (everyChar(chars, range, (s) => (s?.weight ?? 0) >= BOLD) ? undefined : BOLD) : (edit as number)),
-  italic: (edit, chars, range) => (edit === RunToggle.Italic ? (everyChar(chars, range, (s) => s?.italic === true) ? undefined : true) : (edit as boolean))
+const flag = (key: 'italic' | 'underline' | 'strike', toggle: RunToggle) => (edit: unknown, chars: Chars, range: Range) => (edit === toggle ? (everyChar(chars, range, (s) => s?.[key] === true) ? undefined : true) : edit);
+
+const plain = (edit: unknown) => edit;
+
+const TOGGLES: Record<StyleKey, (edit: unknown, chars: Chars, range: Range) => unknown> = {
+  color: plain,
+  weight: (edit, chars, range) => (edit === RunToggle.Bold ? (everyChar(chars, range, (s) => (s?.weight ?? 0) >= BOLD) ? undefined : BOLD) : edit),
+  italic: flag('italic', RunToggle.Italic),
+  underline: flag('underline', RunToggle.Underline),
+  strike: flag('strike', RunToggle.Strike),
+  font: plain,
+  size: plain,
+  tracking: plain,
+  leading: plain,
+  textCase: plain,
+  opacity: plain
 };
 
 export function styledRange(runs: readonly TextRun[] | undefined, range: Range, edit: RunEdit, length: number): TextRun[] {
   const chars = charsOf(runs ?? [], length);
   const span = { start: Math.max(0, range.start), end: Math.min(length, range.end) };
   const resolved = Object.fromEntries(
-    STYLE_KEYS.filter((k) => edit[k] !== undefined).map((k) => [k, edit[k] === null ? undefined : (TOGGLES[k] as (e: unknown, c: Chars, r: Range) => unknown)(edit[k], chars, span)])
+    STYLE_KEYS.filter((k) => edit[k] !== undefined).map((k) => [k, edit[k] === null ? undefined : TOGGLES[k](edit[k], chars, span)])
   ) as RunStyle;
   for (let i = span.start; i < span.end; i++) {
     const next = { ...chars[i], ...resolved };
@@ -126,3 +164,18 @@ export function segmentsOf(text: string, runs: readonly TextRun[] | undefined): 
 }
 
 export const runAt = (runs: readonly TextRun[] | undefined, char: number): TextRun | null => (runs ?? []).find((r) => char >= r.start && char < r.end) ?? null;
+
+export const MIXED = 'mixed' as const;
+
+export type RangeValues = { [K in StyleKey]: RunStyle[K] | typeof MIXED };
+
+export function rangeValues(runs: readonly TextRun[] | undefined, range: Range, base: Required<Pick<RunStyle, StyleKey>> | RunStyle, length: number): RangeValues {
+  const chars = charsOf(runs ?? [], length).slice(range.start, Math.max(range.end, range.start + 1));
+  const valueAt = (k: StyleKey, c: RunStyle | null) => c?.[k] ?? base[k];
+  return Object.fromEntries(
+    STYLE_KEYS.map((k) => {
+      const values = new Set(chars.map((c) => valueAt(k, c)));
+      return [k, values.size > 1 ? MIXED : (chars.length ? valueAt(k, chars[0]) : base[k])];
+    })
+  ) as RangeValues;
+}

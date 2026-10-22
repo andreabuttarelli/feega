@@ -1,18 +1,19 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { editCss, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
-  import { codeIndex, codePoints, RunToggle, shiftRuns, styledRange, type RunEdit, type TextRun } from '$lib/motion/text-runs';
+  import { textRange } from '$lib/canvas/text-range.svelte';
+  import { codeIndex, RunToggle, STYLE_KEYS, type RunEdit, type RunStyle, type TextRun } from '$lib/motion/text-runs';
 
-  let { layout, look, text, runs: initialRuns = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; runs?: TextRun[]; styled?: boolean; oncommit: (text: string, runs: TextRun[]) => void } = $props();
+  let { layout, look, text, clipId = '', base = {}, runs: initialRuns = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; clipId?: string; base?: RunStyle; runs?: TextRun[]; styled?: boolean; oncommit: (text: string, runs: TextRun[]) => void } = $props();
 
   let field = $state<HTMLTextAreaElement>();
   let value = $state('');
-  let runs = $state<TextRun[]>([]);
-  let typed = '';
-  let picked = $state({ start: 0, end: 0 });
   let tint = $state('#000000');
 
-  const SHORTCUTS: Record<string, RunEdit> = { b: { weight: RunToggle.Bold }, i: { italic: RunToggle.Italic } };
+  const SHORTCUTS: Record<string, RunEdit> = { b: { weight: RunToggle.Bold }, i: { italic: RunToggle.Italic }, u: { underline: RunToggle.Underline } };
+  const PANEL = '[data-text-range-panel]';
+  const CLEARED: RunEdit = Object.fromEntries(STYLE_KEYS.map((k) => [k, null]));
+  const picked = $derived(textRange.range);
   let composing = false;
   let ended = false;
 
@@ -51,16 +52,26 @@
       return;
     }
     ended = true;
+    const runs = textRange.runs;
+    textRange.close();
     oncommit(value, runs);
   }
 
   let bar = $state<HTMLDivElement>();
 
+  const kept = (target: EventTarget | null) => target instanceof Element && ((bar?.contains(target) ?? false) || target === field || target.closest(PANEL) !== null);
+
   function left(e: FocusEvent) {
-    if (bar && e.relatedTarget instanceof Node && bar.contains(e.relatedTarget)) {
+    if (kept(e.relatedTarget)) {
       return;
     }
     end();
+  }
+
+  function outside(e: PointerEvent) {
+    if (!kept(e.target)) {
+      end();
+    }
   }
 
   function refocus() {
@@ -68,8 +79,7 @@
   }
 
   function retyped() {
-    runs = shiftRuns(runs, typed, value);
-    typed = value;
+    textRange.retype(value);
     fit();
   }
 
@@ -77,14 +87,11 @@
     if (!field) {
       return;
     }
-    picked = { start: codeIndex(value, field.selectionStart), end: codeIndex(value, field.selectionEnd) };
+    textRange.select({ start: codeIndex(value, field.selectionStart), end: codeIndex(value, field.selectionEnd) });
   }
 
   function restyle(edit: RunEdit) {
-    if (picked.start === picked.end) {
-      return;
-    }
-    runs = styledRange(runs, picked, edit, codePoints(value).length);
+    textRange.restyle(edit);
   }
 
   function onKey(e: KeyboardEvent) {
@@ -103,14 +110,21 @@
     }
   }
 
-  onMount(async () => {
+  onMount(() => {
     value = text;
-    typed = text;
-    runs = initialRuns;
-    await tick();
-    fit();
-    field?.focus();
-    field?.select();
+    textRange.open({ clipId: styled ? clipId : '', text, runs: initialRuns, base });
+    window.addEventListener('pointerdown', outside, true);
+    const follow = () => document.activeElement === field && selected();
+    document.addEventListener('selectionchange', follow);
+    void tick().then(() => {
+      fit();
+      field?.focus();
+      field?.select();
+    });
+    return () => {
+      window.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('selectionchange', follow);
+    };
   });
 </script>
 
@@ -142,7 +156,7 @@
         restyle({ color: tint });
         refocus();
       }} />
-    <button type="button" data-testid="text-range-clear" title="Clear range style" onclick={() => restyle({ color: null, weight: null, italic: null })}>×</button>
+    <button type="button" data-testid="text-range-clear" title="Clear range style" onclick={() => restyle(CLEARED)}>×</button>
   </div>
 {/if}
 

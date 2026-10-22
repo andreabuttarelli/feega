@@ -12,13 +12,15 @@ export enum Shaping {
 
 export type Flow = { spaces: Spaces; wraps: boolean };
 
-export type RequestAt = (paragraph: number, char: number) => Omit<Request, 'size'>;
+export type Look = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: number };
+
+export type RequestAt = (paragraph: number, char: number) => Look;
 
 export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: number; inset: number; shaping: Shaping; requestAt?: RequestAt };
 
-export type Glyph = { face: Face; glyph: number; skew: number; x: number; dy: number; char: number; pen: number; advance: number; word: number; letter: number };
+export type Glyph = { face: Face; glyph: number; skew: number; x: number; dy: number; char: number; pen: number; advance: number; word: number; letter: number; size: number; leading: number };
 
-export type Line = { glyphs: Glyph[]; width: number; baseline: number };
+export type Line = { glyphs: Glyph[]; width: number; baseline: number; top: number; height: number };
 
 export type Block = { lines: Line[]; top: number; height: number };
 
@@ -39,30 +41,35 @@ const LAYOUT_UNIT = 64;
 
 const collapsed = (text: string, spaces: Spaces) => (spaces === Spaces.Collapse ? text.replace(COLLAPSIBLE, SPACE).trim() : text);
 
-type Asked = (char: number) => Request;
+type Asked = (char: number) => Look;
 
 const askedOf = (type: Type, paragraph: number): Asked => {
-  const plain = { ...type.request, size: type.size };
+  const plain: Look = { request: type.request, size: type.size, tracking: type.tracking, leading: type.leading };
   const at = type.requestAt;
-  return at ? (char) => ({ ...at(paragraph, char), size: type.size }) : () => plain;
+  return at ? (char) => at(paragraph, char) : () => plain;
 };
 
-function runsOf(text: string, first: number, asked: Asked, book: FaceBook): { runs: { text: string; face: Face; skew: number; at: number }[]; missing: boolean } {
-  const runs: { text: string; face: Face; skew: number; at: number }[] = [];
+type Run = { text: string; face: Face; skew: number; at: number; look: Look };
+
+const sameLook = (a: Look, b: Look) => a === b || (a.size === b.size && a.tracking === b.tracking && a.leading === b.leading);
+
+function runsOf(text: string, first: number, asked: Asked, book: FaceBook): { runs: Run[]; missing: boolean } {
+  const runs: Run[] = [];
   let missing = false;
   let at = 0;
   for (const char of text) {
-    const resolved = book(asked(first + at), char.codePointAt(0)!);
+    const look = asked(first + at);
+    const resolved = book({ ...look.request, size: look.size }, char.codePointAt(0)!);
     if (!resolved) {
       missing ||= char !== SPACE;
       at += 1;
       continue;
     }
     const last = runs.at(-1);
-    if (last && last.face === resolved.face && last.skew === resolved.skew && last.at + [...last.text].length === at) {
+    if (last && last.face === resolved.face && last.skew === resolved.skew && sameLook(last.look, look) && last.at + [...last.text].length === at) {
       last.text += char;
     } else {
-      runs.push({ text: char, face: resolved.face, skew: resolved.skew, at });
+      runs.push({ text: char, face: resolved.face, skew: resolved.skew, at, look });
     }
     at += 1;
   }
@@ -70,17 +77,18 @@ function runsOf(text: string, first: number, asked: Asked, book: FaceBook): { ru
 }
 
 function shapedOf(text: string, first: number, type: Type, asked: Asked, book: FaceBook, extra: (char: number) => number): Token & { missing: boolean } {
-  const ligatures = type.tracking === 0 ? Ligatures.On : Ligatures.Off;
-  const tracking = type.tracking * type.size;
   const { runs, missing } = runsOf(text, first, asked, book);
   const glyphs: Glyph[] = [];
   let x = 0;
   for (const run of runs) {
-    const scale = type.size / run.face.unitsPerEm;
+    const { size, leading } = run.look;
+    const ligatures = run.look.tracking === 0 ? Ligatures.On : Ligatures.Off;
+    const tracking = run.look.tracking * size;
+    const scale = size / run.face.unitsPerEm;
     let char = first + run.at;
     for (const g of run.face.shape(run.text, ligatures)) {
-      const advance = g.advance * scale + tracking * g.chars + Array.from({ length: g.chars }, (_, k) => extra(char + k)).reduce((n, e) => n + e, 0) * type.size;
-      glyphs.push({ face: run.face, glyph: g.glyph, skew: run.skew, x: x + g.dx * scale, dy: g.dy * scale, char, pen: x, advance, word: -1, letter: char - first });
+      const advance = g.advance * scale + tracking * g.chars + Array.from({ length: g.chars }, (_, k) => extra(char + k)).reduce((n, e) => n + e, 0) * size;
+      glyphs.push({ face: run.face, glyph: g.glyph, skew: run.skew, x: x + g.dx * scale, dy: g.dy * scale, char, pen: x, advance, word: -1, letter: char - first, size, leading });
       x += advance;
       char += g.chars;
     }
@@ -150,12 +158,37 @@ function primary(type: Type, book: FaceBook, text: string): Face | null {
   return (book(request, SPACE_CODE) ?? (first === undefined ? null : book(request, first)))?.face ?? null;
 }
 
+const lineHeightOf = (size: number, leading: number) => Math.floor((Math.round(size * LAYOUT_UNIT) / LAYOUT_UNIT) * leading * LAYOUT_UNIT) / LAYOUT_UNIT;
+
+type Metrics = { above: number; below: number };
+
+function glyphMetrics(g: Glyph): Metrics {
+  const scale = g.size / g.face.unitsPerEm;
+  const ascent = Math.round(g.face.ascent * scale);
+  const descent = Math.round(g.face.descent * scale);
+  const height = lineHeightOf(g.size, g.leading);
+  const above = Math.floor((height - ascent - descent) / 2) + ascent;
+  return { above, below: height - above };
+}
+
+function mixedLines(lines: { glyphs: Glyph[]; width: number }[], uniform: Metrics): Line[] {
+  let top = 0;
+  return lines.map((l) => {
+    const metrics = l.glyphs.length ? l.glyphs.map(glyphMetrics) : [uniform];
+    const above = Math.max(...metrics.map((m) => m.above));
+    const height = above + Math.max(...metrics.map((m) => m.below));
+    const line = { ...l, top, height, baseline: top + above };
+    top += height;
+    return line;
+  });
+}
+
 export function layOut(paragraphs: string[], type: Type, flow: Flow, room: number, book: FaceBook, extra: Extra = NO_EXTRA): Laid {
   const face = primary(type, book, paragraphs.join(''));
   const scale = face ? type.size / face.unitsPerEm : 0;
   const ascent = Math.round((face?.ascent ?? 0) * scale);
   const descent = Math.round((face?.descent ?? 0) * scale);
-  const lineHeight = Math.floor((Math.round(type.size * LAYOUT_UNIT) / LAYOUT_UNIT) * type.leading * LAYOUT_UNIT) / LAYOUT_UNIT;
+  const lineHeight = lineHeightOf(type.size, type.leading);
   const baseline = Math.floor((lineHeight - ascent - descent) / 2) + ascent;
   let missing = false;
   let top = 0;
@@ -171,8 +204,9 @@ export function layOut(paragraphs: string[], type: Type, flow: Flow, room: numbe
       missing ||= token.missing;
       return token;
     });
-    const lines = wrapped(tokens, flow, room, type.inset).map((l, i) => ({ ...l, baseline: i * lineHeight + baseline }));
-    const block = { lines, top, height: lines.length * lineHeight };
+    const laid = wrapped(tokens, flow, room, type.inset);
+    const lines = type.requestAt ? mixedLines(laid, { above: baseline, below: lineHeight - baseline }) : laid.map((l, i) => ({ ...l, top: i * lineHeight, height: lineHeight, baseline: i * lineHeight + baseline }));
+    const block = { lines, top, height: lines.reduce((n, l) => n + l.height, 0) };
     top += block.height;
     return block;
   });

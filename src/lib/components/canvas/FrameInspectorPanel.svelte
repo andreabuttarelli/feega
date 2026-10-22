@@ -5,6 +5,8 @@
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import InstanceInspector from '$lib/components/motion/InstanceInspector.svelte';
+  import RangeTextInspector from '$lib/components/motion/RangeTextInspector.svelte';
+  import { textRange } from '$lib/canvas/text-range.svelte';
   import CameraInspector from '$lib/components/motion/CameraInspector.svelte';
   import DevicePresets from '$lib/components/motion/DevicePresets.svelte';
   import ParticlePresets from '$lib/components/motion/ParticlePresets.svelte';
@@ -83,6 +85,7 @@
     {:else}
       {@const Presets = CLIP_PRESETS[shown.clip.component]}
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
+      {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
       <MotionInspector gesture={session.live} lead={partLead} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={FIRST_FRAME} onchange={editShown} />
       {#if Presets}<Presets doc={shownDoc!} clip={shown.clip} onchange={editShown} />{/if}
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}

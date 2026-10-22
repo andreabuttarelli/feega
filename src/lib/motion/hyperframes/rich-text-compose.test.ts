@@ -21,6 +21,18 @@ describe('rich text in the HTML export', () => {
     expect(html).toMatch(/<span style="[^"]*color:#ff0000[^"]*">bold/);
   });
 
+  it('carries family, size, spacing, decoration, case and opacity on the span', () => {
+    const html = compose(docWith({ text: 'plain big', runs: [{ start: 6, end: 9, font: 'Inter', size: 0.2, tracking: 0.1, leading: 1.5, underline: true, strike: true, textCase: 'upper', opacity: 0.5 }] }));
+    const span = html.match(/<span style="([^"]*)">big<\/span>/)?.[1] ?? '';
+    expect(span).toContain('font-size:5em');
+    expect(span).toContain('letter-spacing:0.1em');
+    expect(span).toContain('line-height:1.5');
+    expect(span).toContain('text-decoration:underline line-through');
+    expect(span).toContain('text-transform:uppercase');
+    expect(span).toContain('opacity:0.5');
+    expect(span).toMatch(/font-family:[^;]*Inter/);
+  });
+
   it('a text without runs renders as before', () => {
     expect(compose(docWith({ text: 'plain' }))).not.toContain('font-style:italic');
   });

@@ -21,7 +21,7 @@ import { elementFills } from '../fill/elements';
 import { textPaint } from '../fill/render';
 import { elementStrokes } from '../stroke/elements';
 import { textStroke } from '../stroke/render';
-import { segmentsOf, type TextRun } from '../text-runs';
+import { segmentsOf, type RunCase, type TextRun } from '../text-runs';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
 
@@ -139,9 +139,25 @@ const glyphStroke = (ctx: GlyphCtx & { unit: number }, component: string) => tex
 const glyphStyle = (paint: Record<string, string>) => (paint.backgroundImage ? ` style="${css(paint)}"` : '');
 const glyphWrap = (paint: Record<string, string>, html: string) => (paint.backgroundImage ? `<span${glyphStyle(paint)}>${html}</span>` : html);
 
+const EM_PRECISION = 10000;
+const RUN_TRANSFORM: Record<RunCase, string> = { 'as-typed': 'none', upper: 'uppercase', lower: 'lowercase' };
+
 function runCss(ctx: TemplateCtx<'Text'>, run: TextRun): string {
   const colour = run.color ? ctx.color(run.color) : undefined;
-  return css({ color: colour, webkitTextFillColor: colour, fontWeight: run.weight === undefined ? undefined : ctx.weight(ctx.p.font, run.weight), fontStyle: run.italic === undefined ? undefined : run.italic ? 'italic' : 'normal' });
+  const family = run.font ?? ctx.p.font;
+  return css({
+    color: colour,
+    webkitTextFillColor: colour,
+    fontFamily: run.font === undefined ? undefined : ctx.font(run.font),
+    fontSize: run.size === undefined ? undefined : `${Math.round((run.size / ctx.p.size) * EM_PRECISION) / EM_PRECISION}em`,
+    fontWeight: run.weight === undefined ? undefined : ctx.weight(family, run.weight),
+    fontStyle: run.italic === undefined ? undefined : run.italic ? 'italic' : 'normal',
+    letterSpacing: run.tracking === undefined ? undefined : `${run.tracking}em`,
+    lineHeight: run.leading,
+    textDecoration: run.underline || run.strike ? [run.underline ? 'underline' : '', run.strike ? 'line-through' : ''].filter(Boolean).join(' ') : undefined,
+    textTransform: run.textCase === undefined ? undefined : RUN_TRANSFORM[run.textCase],
+    opacity: run.opacity
+  });
 }
 
 function textBody(ctx: TemplateCtx<'Text'>): string {
