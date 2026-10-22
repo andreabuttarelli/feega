@@ -36,4 +36,13 @@ describe('rich text in the HTML export', () => {
   it('a text without runs renders as before', () => {
     expect(compose(docWith({ text: 'plain' }))).not.toContain('font-style:italic');
   });
+
+  it('a gradient run clips its gradient to the glyphs of the span', () => {
+    const fill = { type: 'linear-gradient', stops: [{ color: '#ff0000', pos: 0 }, { color: '#0000ff', pos: 1 }], angle: 90 };
+    const html = compose(docWith({ text: 'plain grad', runs: [{ start: 6, end: 10, fill }] }));
+    const span = html.match(/<span style="([^"]*)">grad<\/span>/)?.[1] ?? '';
+    expect(span).toContain('linear-gradient');
+    expect(span).toMatch(/background-clip:text/);
+    expect(span).toContain('-webkit-text-fill-color:transparent');
+  });
 });

@@ -142,12 +142,18 @@ const glyphWrap = (paint: Record<string, string>, html: string) => (paint.backgr
 const EM_PRECISION = 10000;
 const RUN_TRANSFORM: Record<RunCase, string> = { 'as-typed': 'none', upper: 'uppercase', lower: 'lowercase' };
 
-function runCss(ctx: TemplateCtx<'Text'>, run: TextRun): string {
+function runPaint(ctx: TemplateCtx<'Text'>, run: TextRun): Record<string, string | undefined> {
+  if (run.fill) {
+    return textPaint([run.fill], ctx.color, ctx.asset);
+  }
   const colour = run.color ? ctx.color(run.color) : undefined;
+  return { color: colour, webkitTextFillColor: colour };
+}
+
+function runCss(ctx: TemplateCtx<'Text'>, run: TextRun): string {
   const family = run.font ?? ctx.p.font;
   return css({
-    color: colour,
-    webkitTextFillColor: colour,
+    ...runPaint(ctx, run),
     fontFamily: run.font === undefined ? undefined : ctx.font(run.font),
     fontSize: run.size === undefined ? undefined : `${Math.round((run.size / ctx.p.size) * EM_PRECISION) / EM_PRECISION}em`,
     fontWeight: run.weight === undefined ? undefined : ctx.weight(family, run.weight),

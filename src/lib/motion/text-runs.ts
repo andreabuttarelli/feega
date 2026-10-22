@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fillSchema, FillType, type Fill } from './fill/model';
 
 const MIN_WEIGHT = 100;
 const MAX_WEIGHT = 900;
@@ -15,7 +16,14 @@ const MAX_LEADING = 3;
 export const RUN_CASES = ['as-typed', 'upper', 'lower'] as const;
 export type RunCase = (typeof RUN_CASES)[number];
 
+export type GradientFill = Exclude<Fill, { type: FillType.Solid | FillType.Image }>;
+
+const NOT_GRADIENT = new Set<FillType>([FillType.Solid, FillType.Image]);
+
+const gradientSchema = fillSchema.refine((f) => !NOT_GRADIENT.has(f.type), 'a range takes a gradient: use color for a solid') as unknown as z.ZodType<GradientFill>;
+
 const runStyleShape = {
+  fill: gradientSchema.optional(),
   color: z.string().min(1).max(64).optional(),
   weight: z.number().int().min(MIN_WEIGHT).max(MAX_WEIGHT).optional(),
   italic: z.boolean().optional(),
@@ -35,7 +43,7 @@ export const runEditSchema = z.object(Object.fromEntries(Object.entries(runStyle
 
 export const runsSchema = z.array(runSchema).max(MAX_RUNS).optional();
 
-export type RunStyle = { color?: string; weight?: number; italic?: boolean; font?: string; size?: number; tracking?: number; leading?: number; underline?: boolean; strike?: boolean; textCase?: RunCase; opacity?: number };
+export type RunStyle = { fill?: GradientFill; color?: string; weight?: number; italic?: boolean; font?: string; size?: number; tracking?: number; leading?: number; underline?: boolean; strike?: boolean; textCase?: RunCase; opacity?: number };
 export type TextRun = { start: number; end: number } & RunStyle;
 export type Range = { start: number; end: number };
 export type Segment = { text: string; run: TextRun | null };
@@ -51,7 +59,7 @@ type Toggled = { weight: RunToggle.Bold; italic: RunToggle.Italic; underline: Ru
 
 export type RunEdit = { [K in keyof RunStyle]?: RunStyle[K] | (K extends keyof Toggled ? Toggled[K] : never) | null };
 
-export const STYLE_KEYS = ['color', 'weight', 'italic', 'font', 'size', 'tracking', 'leading', 'underline', 'strike', 'textCase', 'opacity'] as const;
+export const STYLE_KEYS = ['fill', 'color', 'weight', 'italic', 'font', 'size', 'tracking', 'leading', 'underline', 'strike', 'textCase', 'opacity'] as const;
 
 export type StyleKey = (typeof STYLE_KEYS)[number];
 
@@ -62,7 +70,9 @@ const styleOf = (run: TextRun): RunStyle | null => {
   return Object.keys(style).length ? style : null;
 };
 
-const sameStyle = (a: RunStyle | null, b: RunStyle | null) => STYLE_KEYS.every((k) => a?.[k] === b?.[k]);
+const sameValue = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+
+const sameStyle = (a: RunStyle | null, b: RunStyle | null) => STYLE_KEYS.every((k) => sameValue(a?.[k], b?.[k]));
 
 function charsOf(runs: readonly TextRun[], length: number): Chars {
   const chars: Chars = Array.from({ length }, () => null);
@@ -103,6 +113,7 @@ const flag = (key: 'italic' | 'underline' | 'strike', toggle: RunToggle) => (edi
 const plain = (edit: unknown) => edit;
 
 const TOGGLES: Record<StyleKey, (edit: unknown, chars: Chars, range: Range) => unknown> = {
+  fill: plain,
   color: plain,
   weight: (edit, chars, range) => (edit === RunToggle.Bold ? (everyChar(chars, range, (s) => (s?.weight ?? 0) >= BOLD) ? undefined : BOLD) : edit),
   italic: flag('italic', RunToggle.Italic),
@@ -116,6 +127,8 @@ const TOGGLES: Record<StyleKey, (edit: unknown, chars: Chars, range: Range) => u
   opacity: plain
 };
 
+const REPLACES: Partial<Record<StyleKey, StyleKey>> = { fill: 'color', color: 'fill' };
+
 export function styledRange(runs: readonly TextRun[] | undefined, range: Range, edit: RunEdit, length: number): TextRun[] {
   const chars = charsOf(runs ?? [], length);
   const span = { start: Math.max(0, range.start), end: Math.min(length, range.end) };
@@ -124,6 +137,7 @@ export function styledRange(runs: readonly TextRun[] | undefined, range: Range, 
   ) as RunStyle;
   for (let i = span.start; i < span.end; i++) {
     const next = { ...chars[i], ...resolved };
+    STYLE_KEYS.filter((k) => resolved[k] !== undefined && REPLACES[k]).forEach((k) => delete next[REPLACES[k]!]);
     STYLE_KEYS.forEach((k) => next[k] === undefined && delete next[k]);
     chars[i] = Object.keys(next).length ? next : null;
   }
@@ -174,7 +188,7 @@ export function rangeValues(runs: readonly TextRun[] | undefined, range: Range, 
   const valueAt = (k: StyleKey, c: RunStyle | null) => c?.[k] ?? base[k];
   return Object.fromEntries(
     STYLE_KEYS.map((k) => {
-      const values = new Set(chars.map((c) => valueAt(k, c)));
+      const values = new Set(chars.map((c) => JSON.stringify(valueAt(k, c))));
       return [k, values.size > 1 ? MIXED : (chars.length ? valueAt(k, chars[0]) : base[k])];
     })
   ) as RangeValues;

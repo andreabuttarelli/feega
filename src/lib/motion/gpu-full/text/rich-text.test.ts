@@ -85,4 +85,40 @@ describe('rich text on the GPU path', () => {
     expect(asked.some((r) => r.weight === 700 && r.italic)).toBe(true);
     expect(asked.some((r) => r.weight === 400 && !r.italic)).toBe(true);
   });
+
+  const fillOf = (type: string, extra: Record<string, unknown> = {}) => ({ type, stops: [{ color: '#ff0000', pos: 0 }, { color: '#0000ff', pos: 1 }], opacity: 1, visible: true, blend: 'normal', ...extra });
+  const xs = (all: Ink[]) => all.flatMap((i) => i.contours.flatMap((c) => c.filter((_, k) => k % 2 === 0)));
+  const book = () => ({ face: boxFace, skew: 0 });
+
+  it('a gradient run spans the glyphs of the range, not the whole text', () => {
+    const painted = inks(paintText(env({ text: 'abcd', sizing: 'auto', runs: [{ start: 2, end: 4, fill: fillOf('linear-gradient', { angle: 0 }) }] }, book)));
+    const gradient = painted.find((i) => i.paint.kind === PaintKind.Linear);
+    const plain = painted.find((i) => i.paint.kind === PaintKind.Solid);
+    expect(gradient).toBeDefined();
+    expect(plain).toBeDefined();
+    if (gradient?.paint.kind !== PaintKind.Linear) {
+      throw new Error('not linear');
+    }
+    const own = xs([gradient]);
+    const reach = gradient.paint.to[0] - gradient.paint.from[0];
+    expect(gradient.paint.from[0] - Math.min(...xs([plain!]))).toBeGreaterThan(reach * 0.9);
+    expect(gradient.paint.to[0]).toBeCloseTo(Math.max(...own), -1);
+  });
+
+  it('a radial gradient run paints a radial paint', () => {
+    const painted = inks(paintText(env({ text: 'abcd', runs: [{ start: 0, end: 2, fill: fillOf('radial-gradient') }] }, book)));
+    expect(painted.some((i) => i.paint.kind === PaintKind.Radial)).toBe(true);
+  });
+
+  it('an angular gradient run paints wedges clipped to the range', () => {
+    const painted = inks(paintText(env({ text: 'abcd', runs: [{ start: 0, end: 2, fill: fillOf('angular-gradient', { angle: 0, center: { x: 0.5, y: 0.5 } }) }] }, book)));
+    expect(painted.filter((i) => i.paint.kind === PaintKind.Linear).length).toBeGreaterThan(1);
+  });
+
+  it('two ranges with the same gradient each get their own span', () => {
+    const f = fillOf('linear-gradient');
+    const painted = inks(paintText(env({ text: 'abcdef', sizing: 'auto', runs: [{ start: 0, end: 2, fill: f }, { start: 4, end: 6, fill: f }] }, book)));
+    const linear = painted.filter((i) => i.paint.kind === PaintKind.Linear);
+    expect(linear).toHaveLength(2);
+  });
 });

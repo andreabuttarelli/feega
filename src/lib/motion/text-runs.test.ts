@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MIXED, RunToggle, codeIndex, normalRuns, rangeValues, runEditSchema, runAt, runsSchema, segmentsOf, shiftRuns, styledRange } from './text-runs';
+import { BlendMode } from './blend';
+import { FillType } from './fill/model';
+import { MIXED, type GradientFill, RunToggle, codeIndex, normalRuns, rangeValues, runEditSchema, runAt, runsSchema, segmentsOf, shiftRuns, styledRange } from './text-runs';
 
 describe('text runs', () => {
   it('an old text clip without runs still parses', () => {
@@ -87,5 +89,36 @@ describe('text runs', () => {
 
   it('turns a textarea caret offset into a code point offset', () => {
     expect(codeIndex('😀ab', 3)).toBe(2);
+  });
+
+  const RED_BLUE: GradientFill = { type: FillType.Linear, stops: [{ color: '#ff0000', pos: 0 }, { color: '#0000ff', pos: 1 }], angle: 90, opacity: 1, visible: true, blend: BlendMode.Normal };
+
+  it('a range takes a gradient fill, and an agent edit can set or drop it', () => {
+    expect(runEditSchema.parse({ fill: RED_BLUE }).fill?.type).toBe('linear-gradient');
+    expect(runEditSchema.parse({ fill: null })).toEqual({ fill: null });
+    expect(runEditSchema.safeParse({ fill: { type: 'solid', color: '#fff' } }).success).toBe(false);
+    expect(runEditSchema.safeParse({ fill: { type: 'linear-gradient', stops: [{ color: '#fff', pos: 0 }] } }).success).toBe(false);
+    const runs = styledRange([], { start: 0, end: 2 }, { fill: RED_BLUE }, 4);
+    expect(runs).toEqual([{ start: 0, end: 2, fill: RED_BLUE }]);
+    expect(styledRange(runs, { start: 0, end: 2 }, { fill: null }, 4)).toEqual([]);
+  });
+
+  it('equal gradients merge into one run and different ones stay apart', () => {
+    const same = styledRange(styledRange([], { start: 0, end: 2 }, { fill: RED_BLUE }, 4), { start: 2, end: 4 }, { fill: { ...RED_BLUE } }, 4);
+    expect(same).toHaveLength(1);
+    const other = styledRange(styledRange([], { start: 0, end: 2 }, { fill: RED_BLUE }, 4), { start: 2, end: 4 }, { fill: { ...RED_BLUE, angle: 0 } }, 4);
+    expect(other).toHaveLength(2);
+  });
+
+  it('reads a range gradient as one value, mixed when the fills differ', () => {
+    const runs = styledRange([], { start: 0, end: 2 }, { fill: RED_BLUE }, 4);
+    expect(rangeValues(runs, { start: 0, end: 2 }, {}, 4).fill).toEqual(RED_BLUE);
+    expect(rangeValues(runs, { start: 1, end: 3 }, {}, 4).fill).toBe(MIXED);
+  });
+
+  it('a gradient replaces the colour of a range and a colour replaces its gradient', () => {
+    const gradient = styledRange([{ start: 0, end: 4, color: '#00ff00' }], { start: 0, end: 2 }, { fill: RED_BLUE }, 4);
+    expect(gradient).toEqual([{ start: 0, end: 2, fill: RED_BLUE }, { start: 2, end: 4, color: '#00ff00' }]);
+    expect(styledRange(gradient, { start: 0, end: 4 }, { color: '#0000ff' }, 4)).toEqual([{ start: 0, end: 4, color: '#0000ff' }]);
   });
 });
