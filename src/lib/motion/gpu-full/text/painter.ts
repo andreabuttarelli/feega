@@ -416,10 +416,11 @@ export type TextPlan = {
   runs: TextRun[];
   starts: number[];
   tints: Record<string, Rgba>;
+  gradients: Record<number, FillPlan[]>;
   share: number;
 };
 
-export type UniformPlan = Omit<TextPlan, 'runs' | 'starts' | 'tints' | 'share'>;
+export type UniformPlan = Omit<TextPlan, 'runs' | 'starts' | 'tints' | 'gradients' | 'share'>;
 
 type Word = { line: number; chars: number };
 
@@ -451,6 +452,10 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
   }
   const whole = casedOf(env.component, p);
   const runs = normalRuns(p.runs as TextRun[] | undefined, [...whole].length);
+  const gradients = gradientPlans(runs, colour, env.asset);
+  if (!gradients) {
+    return TextGap.Fill;
+  }
   const cased = runCased(whole, runs);
   const run = animation(cased, env.animators);
   const paragraphs = kind.paragraphs(cased);
@@ -479,8 +484,14 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
     runs,
     starts: startsOf(paragraphs),
     tints: Object.fromEntries(runs.flatMap((r) => (r.color ? [[r.color, faded(colour(r.color), 1)]] : []))),
+    gradients,
     share: Number(p.size)
   };
+}
+
+function gradientPlans(runs: readonly TextRun[], colour: Colour, asset: (id: string) => string | null): Record<number, FillPlan[]> | null {
+  const plans = runs.flatMap((r) => (r.fill ? [[r.start, fillPlans([r.fill], colour, asset)] as const] : []));
+  return plans.every(([, plan]) => plan !== null) ? Object.fromEntries(plans as [number, FillPlan[]][]) : null;
 }
 
 const RUN_CASE: Record<RunCase, (c: string) => string> = { 'as-typed': (c) => c, upper: (c) => [...c.toUpperCase()][0] ?? c, lower: (c) => [...c.toLowerCase()][0] ?? c };
@@ -554,7 +565,7 @@ function slotsOf(text: string, paragraphs: string[], finest: AnimatorUnit): (par
 
 type Positioned = { face: Face; skew: number; glyph: number; x: number; y: number };
 
-type Unit = { look: Tinted; contours: number[][]; outlines: number[][]; glyphs: Positioned[]; box: Rect; area: Rect; colour: string | null; opacity: number };
+type Unit = { look: Tinted; contours: number[][]; outlines: number[][]; glyphs: Positioned[]; box: Rect; area: Rect; colour: string | null; gradient: number | null; opacity: number };
 
 function runsOf(glyphs: Positioned[], size: number): GlyphRun[] | null {
   if (!glyphs.every((g) => g.face.key && g.skew === 0)) {
@@ -604,9 +615,10 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
       for (const g of line.glyphs) {
         const slot = slots && g.word >= 0 ? slots(i, g) : null;
         const style = runOf(plan, i, g.char);
-        const colour = style?.color ?? null;
-        const key = `${slot ? slot.key : -1}:${plan.area === Area.Line ? l : 0}:${colour}:${style?.opacity ?? 1}`;
-        const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], glyphs: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area], colour, opacity: style?.opacity ?? 1 };
+        const gradient = style?.fill ? style.start : null;
+        const colour = gradient === null ? (style?.color ?? null) : null;
+        const key = `${slot ? slot.key : -1}:${plan.area === Area.Line ? l : 0}:${colour}:${gradient}:${style?.opacity ?? 1}`;
+        const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], glyphs: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area], colour, gradient, opacity: style?.opacity ?? 1 };
         units.set(key, unit);
         unit.contours.push(...moved(glyphContours(g.face, g.glyph, g.size, g.skew, smoothing.darken(g.size)), x + g.x, baseline - g.dy), ...decorations(style, g, x, baseline));
         unit.glyphs.push({ face: g.face, skew: g.skew, glyph: g.glyph, x: x + g.x, y: baseline - g.dy });
@@ -628,8 +640,9 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
       const shown = placed(unit.contours);
       const runs = output === TextOutput.Glyphs && rise === 0 ? runsOf(unit.glyphs, type.size) : null;
       const asRuns = (paint: Paint) => runs!.map((run): Ink => ({ contours: [], paint, rule: FillRule.NonZero, opacity: plan.fade * look.opacity * unit.opacity, matrix: look === UNTINTED ? matrix : mul2d(matrix, turn), blur: look.blur * scaleOf(look.turn), run }));
-      const fills: FillPlan[] = unit.colour ? [{ kind: PaintKind.Solid, color: plan.tints[unit.colour] }] : plan.fills;
-      const filled = fills.flatMap((f) => shadesOf(f, unit.area)).flatMap((shade) => (runs && !shade.clip && shade.squash === 1 && !shade.picture ? asRuns(tinted(shade.paint, look)) : [ink(shade.clip ? within(shown, shade.clip) : shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash, shade.picture)]));
+      const fills: FillPlan[] = unit.gradient !== null ? plan.gradients[unit.gradient] : unit.colour ? [{ kind: PaintKind.Solid, color: plan.tints[unit.colour] }] : plan.fills;
+      const area: Rect = unit.gradient !== null ? unit.box : unit.area;
+      const filled = fills.flatMap((f) => shadesOf(f, area)).flatMap((shade) => (runs && !shade.clip && shade.squash === 1 && !shade.picture ? asRuns(tinted(shade.paint, look)) : [ink(shade.clip ? within(shown, shade.clip) : shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash, shade.picture)]));
       const outline = plan.outline;
       const stroked = outline ? [ink(placed(unit.outlines.flatMap((c) => strokePolygons(c, true, outline.width, Cap.Butt, Join.Miter))), tinted({ kind: PaintKind.Solid, color: outline.colour }, look), FillRule.Union)] : [];
       inks.push(...(outline?.under ? [...stroked, ...filled] : [...filled, ...stroked]).filter((i) => (i.contours.length || i.run) && visible(i.paint)));

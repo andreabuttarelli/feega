@@ -230,7 +230,7 @@ function nativeText(env: Env, native: NativeFaces): Painted {
     return outlinedText(env);
   }
   const turn = { scale: Number(props.scale ?? 1), rotation: Number(props.rotation ?? 0) };
-  const { runs: _runs, starts: _starts, tints: _tints, share: _share, ...uniform } = plan;
+  const { runs: _runs, starts: _starts, tints: _tints, gradients: _gradients, share: _share, ...uniform } = plan;
   return [{ kind: ItemKind.Text, plan: { ...uniform, request: resolvedRequest(plan.request, native.registry) }, turn, opacity: 1, matrix: IDENTITY }];
 }
 

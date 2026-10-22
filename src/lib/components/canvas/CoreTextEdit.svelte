@@ -2,11 +2,15 @@
   import { onMount, tick } from 'svelte';
   import { editCss, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { textRange } from '$lib/canvas/text-range.svelte';
-  import { codeIndex, RunToggle, STYLE_KEYS, type RunEdit, type RunStyle, type TextRun } from '$lib/motion/text-runs';
+  import GradientHandles from './GradientHandles.svelte';
+  import { codeIndex, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '$lib/motion/text-runs';
 
   let { layout, look, text, clipId = '', base = {}, runs: initialRuns = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; clipId?: string; base?: RunStyle; runs?: TextRun[]; styled?: boolean; oncommit: (text: string, runs: TextRun[]) => void } = $props();
 
+  type Box = { left: number; top: number; width: number; height: number };
+
   let field = $state<HTMLTextAreaElement>();
+  let rangeBox = $state<Box | null>(null);
   let value = $state('');
   let tint = $state('#000000');
 
@@ -45,6 +49,32 @@
   $effect(() => {
     void style;
     fit();
+  });
+
+  function measureRange(): Box | null {
+    const host = field?.offsetParent;
+    if (!field || !host || field.selectionStart === field.selectionEnd) {
+      return null;
+    }
+    const mirror = document.createElement('div');
+    mirror.style.cssText = field.style.cssText;
+    Object.assign(mirror.style, { position: 'absolute', visibility: 'hidden', pointerEvents: 'none', height: 'auto', margin: field.style.marginTop ? `${field.style.marginTop} 0 0` : '0', overflowWrap: 'break-word' });
+    const [before, within, after] = [value.slice(0, field.selectionStart), value.slice(field.selectionStart, field.selectionEnd), value.slice(field.selectionEnd)];
+    const mark = document.createElement('span');
+    mark.textContent = within;
+    mirror.append(before, mark, after);
+    host.append(mirror);
+    const own = mark.getBoundingClientRect();
+    const origin = host.getBoundingClientRect();
+    mirror.remove();
+    return { left: own.left - origin.left, top: own.top - origin.top, width: own.width, height: own.height };
+  }
+
+  $effect(() => {
+    void style;
+    void value;
+    void picked;
+    rangeBox = textRange.values?.fill && textRange.values.fill !== MIXED ? measureRange() : null;
   });
 
   function end() {
@@ -148,12 +178,18 @@
   ondblclick={(e) => e.stopPropagation()}
 ></textarea>
 
+{#if rangeBox && textRange.values?.fill && textRange.values.fill !== MIXED}
+  <div data-text-range-panel style="display:contents">
+    <GradientHandles rect={rangeBox} fill={textRange.values.fill} onchange={(f) => restyle({ fill: f as GradientFill })} ondone={(f) => restyle({ fill: f as GradientFill })} />
+  </div>
+{/if}
+
 {#if styled && picked.start !== picked.end}
   <div bind:this={bar} class="range" data-testid="text-range-bar" role="toolbar" tabindex="-1" style="left:{barAt.left}px;top:{barAt.top}px" onmousedown={(e) => e.target instanceof HTMLButtonElement && e.preventDefault()} onpointerdown={(e) => e.stopPropagation()}>
     <button type="button" data-testid="text-range-bold" title="Bold (⌘B)" onclick={() => restyle({ weight: RunToggle.Bold })}><b>B</b></button>
     <button type="button" data-testid="text-range-italic" title="Italic (⌘I)" onclick={() => restyle({ italic: RunToggle.Italic })}><i>I</i></button>
     <input type="color" data-testid="text-range-colour" title="Colour" bind:value={tint} onchange={() => {
-        restyle({ color: tint });
+        restyle({ color: tint, fill: null });
         refocus();
       }} />
     <button type="button" data-testid="text-range-clear" title="Clear range style" onclick={() => restyle(CLEARED)}>×</button>

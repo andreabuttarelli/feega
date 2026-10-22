@@ -7,7 +7,9 @@
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { registerFont, withUploaded } from '$lib/motion/fonts/ops';
   import { textRange } from '$lib/canvas/text-range.svelte';
-  import { MIXED, RUN_CASES, type RunEdit, type StyleKey } from '$lib/motion/text-runs';
+  import { MIXED, RUN_CASES, type GradientFill, type RunEdit, type StyleKey } from '$lib/motion/text-runs';
+  import { FILL_LABEL, FillType, addStop, removeStop } from '$lib/motion/fill/model';
+  import { GRADIENT_TYPES, RunPaint, asGradient, gradientPatched, paintOf } from '$lib/motion/run-fill';
 
   let { doc, tokens, fonts = null, onchange }: { doc: MotionDoc; tokens: BrandTokens; fonts?: FontLibrary | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
@@ -54,6 +56,34 @@
   }
 
   const colourOf = (v: unknown) => (v === MIXED || typeof v !== 'string' ? '#000000' : resolveColor(v, tokens));
+
+  const SOLID = 'solid';
+  const DEFAULT_STOP = 0.5;
+  const paint = $derived(values ? paintOf(values) : RunPaint.Solid);
+  const gradient = $derived(values && values.fill !== MIXED ? (values.fill ?? null) : null);
+  const baseColour = $derived(colourOf(values?.color));
+
+  function pickPaint(kind: string) {
+    if (kind === SOLID) {
+      set({ color: baseColour, fill: null });
+      return;
+    }
+    set({ fill: asGradient(gradient ?? undefined, kind as (typeof GRADIENT_TYPES)[number], baseColour), color: null });
+  }
+
+  function patchGradient(patch: Record<string, unknown>) {
+    if (gradient) {
+      set({ fill: gradientPatched(gradient, patch) });
+    }
+  }
+
+  function patchStop(i: number, patch: Partial<GradientFill['stops'][number]>) {
+    if (gradient) {
+      patchGradient({ stops: gradient.stops.map((s, k) => (k === i ? { ...s, ...patch } : s)) });
+    }
+  }
+
+  const setStopPos = (i: number, raw: string) => Number.isFinite(Number(raw)) && raw.trim() !== '' && patchStop(i, { pos: Math.max(0, Math.min(1, Number(raw) / PERCENT)) });
 </script>
 
 {#if values}
@@ -71,10 +101,35 @@
       </label>
     {/each}
     <label class="row">
-      <span>Colour</span>
-      <input type="color" data-testid="range-color" value={colourOf(values.color)} onchange={(e) => set({ color: e.currentTarget.value })} />
-      {#if values.color === MIXED}<span class="mixed">{MIXED_LABEL}</span>{/if}
+      <span>Fill</span>
+      <select data-testid="range-fill-type" value={paint === RunPaint.Mixed ? '' : paint === RunPaint.Solid ? SOLID : (gradient?.type ?? SOLID)} onchange={(e) => pickPaint(e.currentTarget.value)}>
+        {#if paint === RunPaint.Mixed}<option value="">{MIXED_LABEL}</option>{/if}
+        <option value={SOLID}>Solid</option>
+        {#each GRADIENT_TYPES as type (type)}<option value={type}>{FILL_LABEL[type]}</option>{/each}
+      </select>
     </label>
+    {#if paint !== RunPaint.Gradient}
+      <label class="row">
+        <span>Colour</span>
+        <input type="color" data-testid="range-color" value={colourOf(values.color)} onchange={(e) => set({ color: e.currentTarget.value, fill: null })} />
+        {#if values.color === MIXED}<span class="mixed">{MIXED_LABEL}</span>{/if}
+      </label>
+    {:else if gradient}
+      {#if gradient.type === FillType.Linear || gradient.type === FillType.Angular}
+        <label class="row">
+          <span>Angle</span>
+          <input type="number" step="5" data-testid="range-gradient-angle" value={Math.round(gradient.angle)} onchange={(e) => patchGradient({ angle: Number(e.currentTarget.value) })} />
+        </label>
+      {/if}
+      {#each gradient.stops as stop, i (i)}
+        <div class="row stop" data-testid="range-gradient-stop">
+          <input type="color" value={colourOf(stop.color)} onchange={(e) => patchStop(i, { color: e.currentTarget.value })} />
+          <input type="number" min="0" max="100" step="1" value={Math.round(stop.pos * PERCENT)} onchange={(e) => setStopPos(i, e.currentTarget.value)} />
+          <button type="button" title="Remove stop" disabled={gradient.stops.length <= 2} onclick={() => patchGradient({ stops: removeStop(gradient.stops, i) })}>×</button>
+        </div>
+      {/each}
+      <button type="button" class="add" data-testid="range-gradient-add" onclick={() => patchGradient({ stops: addStop(gradient.stops, DEFAULT_STOP) })}>Add stop</button>
+    {/if}
     <label class="row">
       <span>Case</span>
       <select data-testid="range-case" value={values.textCase === MIXED ? '' : values.textCase} onchange={(e) => set({ textCase: e.currentTarget.value as (typeof RUN_CASES)[number] })}>
@@ -127,6 +182,20 @@
   input[type='color'] {
     padding: 0;
     height: 24px;
+  }
+
+  .stop {
+    grid-template-columns: 1fr 2fr auto;
+  }
+
+  .stop button,
+  .add {
+    height: 24px;
+    border: 1px solid var(--ui-line);
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text);
+    cursor: pointer;
   }
 
   .mixed {
