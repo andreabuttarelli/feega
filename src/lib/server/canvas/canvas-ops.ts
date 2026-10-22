@@ -177,7 +177,7 @@ const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame
 const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
 
 const drawElementInput = z
-  .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse|polygon|star, box:{left,top,width,height}}, or {tool:pen, path:SVG d, fill?:#hex|null, stroke?:#hex} in canvas units; a line is a two-point pen path with stroke and fill null, an arrow adds a closed head with fill') })
+  .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse|polygon|star, box:{left,top,width,height}}, or {tool:pen, path:SVG d}, in canvas units') })
   .strict();
 
 const drawFrameInput = z

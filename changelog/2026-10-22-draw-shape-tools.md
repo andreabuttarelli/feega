@@ -15,7 +15,7 @@ them; lines and arcs did not exist.
   global). In the old editor's Design mode L line, ⇧L arrow.
 - Ellipse `arcStart` (°), `arcSweep` (−1..1), `arcRatio` (hole): pie, arc and
   ring outlines in `ellipseOutline`, shown in Properties for ellipses only.
-- MCP: the canvas `draw` op takes polygon/star and pen fill/stroke; motion
+- MCP: the canvas `draw` op takes polygon/star (pen fill/stroke stay on the UI wire to keep the chat tool budget; agents stroke a path with the motion tools); motion
   tools take the arc props through the Shape schema.
 
 Not done: arrow caps as a stroke property (start/end cap kinds), on-canvas
