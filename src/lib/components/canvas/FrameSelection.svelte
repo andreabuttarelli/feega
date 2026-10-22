@@ -24,7 +24,7 @@
   <div class="body" data-testid="frame-selection-body" onpointerdown={(e) => ongrab(Grip.Move, 0, e)} role="presentation"></div>
   {#each corners as h, i (i)}
     {@const [ux, uy] = outwardOf(quad, h.at)}
-    <div class="rotate" data-testid="frame-selection-rotate" data-handle={i} style={`left:${h.at[0] + ux * ROTATE_REACH_PX}px;top:${h.at[1] + uy * ROTATE_REACH_PX}px`} onpointerdown={(e) => ongrab(Grip.Rotate, i, e)} role="presentation"></div>
+    <div class="rotate" data-testid="frame-selection-rotate" data-rotate={i} style={`left:${h.at[0] + ux * ROTATE_REACH_PX}px;top:${h.at[1] + uy * ROTATE_REACH_PX}px`} onpointerdown={(e) => ongrab(Grip.Rotate, i, e)} role="presentation"></div>
   {/each}
   {#each handles as h, i (i)}
     <div class="handle" data-testid="frame-selection-handle" data-handle={i} style={`left:${h.at[0]}px;top:${h.at[1]}px`} onpointerdown={(e) => ongrab(Grip.Scale, i, e)} role="presentation"></div>
