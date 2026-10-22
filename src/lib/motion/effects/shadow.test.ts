@@ -24,9 +24,11 @@ describe('drop shadow like figma', () => {
     expect(morph?.attrs).toMatchObject({ operator: 'erode', radius: 4 });
   });
 
-  it('hiding the shadow behind cuts it out under the layer', () => {
-    const cut = tags(drop({ behind: 0 }).nodes).find((n) => n.tag === 'feComposite' && n.attrs.operator === 'out');
-    expect(cut?.attrs.in2).toBe('SourceAlpha');
+  it('hiding the shadow behind cuts it out under the whole shape, even a see-through one', () => {
+    const nodes = tags(drop({ behind: 0 }).nodes);
+    const cut = nodes.find((n) => n.tag === 'feComposite' && n.attrs.operator === 'out');
+    const solid = nodes.find((n) => n.attrs.result === cut?.attrs.in2);
+    expect(solid?.attrs).toMatchObject({ in: 'SourceAlpha', type: 'matrix' });
   });
 
   it('the boxed render carries spread too', () => {

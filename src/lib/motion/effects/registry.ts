@@ -77,13 +77,18 @@ const shadowOffset = (v: Values): [number, number] => {
   return [r(Math.cos(a) * n(v, 'distance') + (n(v, 'x') || 0)), r(Math.sin(a) * n(v, 'distance') + (n(v, 'y') || 0))];
 };
 
+const SOLID_ALPHA = '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 255 0';
+
 const plainShadow = (v: Values) => !n(v, 'spread') && n(v, 'behind') !== 0;
 
 function shapedShadow(v: Values): SvgNode[] {
   const spread = n(v, 'spread') || 0;
   const [dx, dy] = shadowOffset(v);
   const grown = spread ? [node('feMorphology', { in: 'SourceAlpha', operator: spread > 0 ? 'dilate' : 'erode', radius: Math.abs(spread), result: 'grown' })] : [];
-  const cut = n(v, 'behind') === 0 ? [node('feComposite', { in: 'shade', in2: 'SourceAlpha', operator: 'out', result: 'shade' })] : [];
+  const hidden = n(v, 'behind') === 0;
+  const cut = hidden
+    ? [node('feColorMatrix', { in: 'SourceAlpha', type: 'matrix', values: SOLID_ALPHA, result: 'solid' }), node('feComposite', { in: 'shade', in2: 'solid', operator: 'out', result: 'cut' })]
+    : [];
   return [
     ...grown,
     node('feOffset', { in: spread ? 'grown' : 'SourceAlpha', dx, dy, result: 'moved' }),
@@ -91,7 +96,7 @@ function shapedShadow(v: Values): SvgNode[] {
     node('feFlood', { 'flood-color': String(v.color), 'flood-opacity': r(n(v, 'opacity')), result: 'ink' }),
     node('feComposite', { in: 'ink', in2: 'soft', operator: 'in', result: 'shade' }),
     ...cut,
-    node('feMerge', {}, [node('feMergeNode', { in: 'shade' }), node('feMergeNode', { in: 'SourceGraphic' })])
+    node('feMerge', {}, [node('feMergeNode', { in: hidden ? 'cut' : 'shade' }), node('feMergeNode', { in: 'SourceGraphic' })])
   ];
 }
 
