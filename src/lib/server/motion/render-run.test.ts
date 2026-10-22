@@ -31,7 +31,7 @@ import { HOLD_BUFFER, Resolution, renderClass, renderQuote, sandboxCostUsd } fro
 import { addClip } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import type { NodeRun } from '$lib/server/repos/node-runs';
-import { ExportFormat, Preset, settingsOf } from '$lib/motion/export-formats';
+import { ExportFormat, GIF_LIMITS, Preset, settingsOf } from '$lib/motion/export-formats';
 
 const farm = { open: vi.fn(), attach: vi.fn(), running: vi.fn(), usage: vi.fn() };
 const MINUTE_OF_8GB = { cpuMs: 30_000, memoryMb: 8192, wallMs: 60_000 };
@@ -45,6 +45,10 @@ const running = { state: TaskState.Running, error: null };
 
 function trailer(): MotionDoc {
   return { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 840 };
+}
+
+function pastGifCap(): MotionDoc {
+  return { ...trailer(), durationInFrames: (GIF_LIMITS.maxSeconds + 1) * trailer().fps };
 }
 
 function sevenChunks(): MotionDoc {
@@ -520,7 +524,7 @@ describe('render settings', () => {
   it('a GIF over its length cap is refused before a run is created, with the reason', async () => {
     const { db } = fakeDb(request(sevenChunks()).job);
 
-    const result = await startRender(db, farm, scope, request(trailer(), settingsOf(Preset.Gif)), storage);
+    const result = await startRender(db, farm, scope, request(pastGifCap(), settingsOf(Preset.Gif)), storage);
 
     expect(result).toMatchObject({ ok: false, error: RenderRefusal.Unsupported, detail: expect.stringMatching(/GIF/) });
     expect(runs.createRun).not.toHaveBeenCalled();
@@ -610,7 +614,7 @@ describe('startBatch', () => {
 
   it('a row the farm cannot render refuses the whole batch before anything is spent, naming the row', async () => {
     const { db } = fakeDb(request(sevenChunks()).job);
-    const bad = { req: request(trailer(), settingsOf(Preset.Gif)), name: 'gif' };
+    const bad = { req: request(pastGifCap(), settingsOf(Preset.Gif)), name: 'gif' };
 
     expect(await startBatch(db, farm, scope, [...rows(2), bad], storage)).toMatchObject({ ok: false, error: RenderRefusal.Unsupported, detail: expect.stringMatching(/^row 3: .*GIF/) });
     expect(runs.createRun).not.toHaveBeenCalled();
