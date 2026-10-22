@@ -58,16 +58,17 @@ describe('MotionDoc', () => {
     expect(parseMotionDoc({ ...doc, tracks }).ok).toBe(false);
   });
 
-  it('refuses a resolution above 1080p', () => {
-    const doc = { ...newMotionDoc(MotionFormat.Landscape), width: 3840, height: 2160 };
+  it('takes a 4K frame and refuses anything above', () => {
+    expect(parseMotionDoc({ ...newMotionDoc(MotionFormat.Landscape), width: 3840, height: 2160 }).ok).toBe(true);
+    const doc = { ...newMotionDoc(MotionFormat.Landscape), width: 3842, height: 2160 };
 
     expect(parseMotionDoc(doc).ok).toBe(false);
   });
 
-  it('takes a 1440 square for UI reels, and nothing else above 1080p', () => {
+  it('takes a 1440 square for UI reels', () => {
     expect(parseMotionDoc(newMotionDoc(MotionFormat.SquareLarge)).ok).toBe(true);
     expect(FORMATS[MotionFormat.SquareLarge]).toMatchObject({ width: 1440, height: 1440 });
-    expect(parseMotionDoc({ ...newMotionDoc(MotionFormat.Landscape), width: 1920, height: 1440 }).ok).toBe(false);
+    expect(parseMotionDoc({ ...newMotionDoc(MotionFormat.Landscape), width: 1920, height: 1440 }).ok).toBe(true);
   });
 
   it('a new doc carries the current schema version', () => {

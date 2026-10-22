@@ -175,13 +175,13 @@ describe('a still design frame is not held to the video resolution', () => {
     expect(setCanvas(page(), { size: { width: 1440, height: 16385 } }).ok).toBe(false);
   });
 
-  it('a video keeps the 1080p cap', () => {
-    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 1440, height: 4000 } }).ok).toBe(false);
-    expect(parseMotionDoc({ ...page(), width: 1440, height: 4000, still: undefined }).ok).toBe(false);
+  it('a video keeps the 4K cap', () => {
+    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 1440, height: 5000 } }).ok).toBe(false);
+    expect(parseMotionDoc({ ...page(), width: 1440, height: 5000, still: undefined }).ok).toBe(false);
   });
 
   it('a tall design frame cannot turn into a video', () => {
-    const tall = setCanvas(page(), { size: { width: 1440, height: 4000 } });
+    const tall = setCanvas(page(), { size: { width: 1440, height: 5000 } });
 
     expect(tall.ok && setStill(tall.doc, null).ok).toBe(false);
   });

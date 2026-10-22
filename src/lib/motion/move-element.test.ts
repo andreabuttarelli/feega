@@ -178,11 +178,11 @@ describe('a new frame made of one element', () => {
   });
 
   it('a generated picture makes a frame its own size, within the limits', () => {
-    const element = mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'gen', width: 3000, height: 2000 });
+    const element = mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'gen', width: 6000, height: 4000 });
 
     const doc = frameOf(element, DocMode.Still, null, ids());
 
-    expect({ width: doc.width, height: doc.height }).toEqual({ width: 1620, height: 1080 });
+    expect({ width: doc.width, height: doc.height }).toEqual({ width: 3240, height: 2160 });
     expect(doc.tracks[0].clips[0].props).toMatchObject({ assetId: IMAGE_ID, width: 1, height: 1 });
   });
 });
