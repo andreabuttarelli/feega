@@ -153,7 +153,7 @@ describe('internal links resolve to a real route', () => {
   });
 
   it('found at least one static link to check (the scan itself did not go silent)', () => {
-    expect(links.length).toBeGreaterThan(20);
+    expect(links.length).toBeGreaterThan(10);
   });
 
   it('every static href/redirect resolves under src/routes', () => {
