@@ -211,6 +211,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.TidyUp]: motion('arrange_space'),
   [Command.FlipHorizontal]: motion('set_transform'),
   [Command.FlipVertical]: motion('set_transform'),
+  [Command.ToggleHidden]: motion('set_visibility'),
+  [Command.ToggleLocked]: motion('set_visibility'),
   [Command.CreateComponent]: motion('component'),
   [Command.DetachInstance]: motion('component'),
   [Command.ResetInstance]: motion('component'),
