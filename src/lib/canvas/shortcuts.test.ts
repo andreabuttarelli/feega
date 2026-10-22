@@ -13,6 +13,17 @@ import {
 import { CANVAS_ADD_BAR } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { Edge } from '$lib/motion/space';
+import { FrameView } from './frame-view';
+
+describe('frame view shortcuts', () => {
+  it('toggles the pixel grid, the guides and the outlines', () => {
+    const at = { tagName: 'DIV', isContentEditable: false };
+
+    expect(matchCanvasShortcut({ key: '"', shiftKey: true, metaKey: false, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.PixelGrid });
+    expect(matchCanvasShortcut({ key: 'G', shiftKey: true, metaKey: false, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Guides });
+    expect(matchCanvasShortcut({ key: 'y', shiftKey: false, metaKey: true, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Outlines });
+  });
+});
 
 /** Un evento tastiera finto: bastano i campi che il registro guarda. */
 function ev(

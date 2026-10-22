@@ -8,6 +8,7 @@
   import ParticlePresets from '$lib/components/motion/ParticlePresets.svelte';
   import PosterPartPanel from '$lib/components/motion/PosterPartPanel.svelte';
   import DocFields from '$lib/components/motion/DocFields.svelte';
+  import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { BrandTokens } from '$lib/motion/brand';
   import type { ComponentProps } from 'svelte';
@@ -16,6 +17,7 @@
   import { PropertiesView } from '$lib/motion/properties-view';
   import { barAction, inspectorOf } from '$lib/canvas/frame-inspector';
   import type { ActionId } from '$lib/motion/actions';
+  import type { OpResult } from '$lib/motion/timeline';
 
   const FIRST_FRAME = 0;
 
@@ -42,6 +44,7 @@
   const doc = $derived(session?.history.present ?? null);
   const shown = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
   const edit = (next: NonNullable<typeof doc>, summary: string) => session?.edit(next, summary);
+  const editGuides = (result: OpResult, summary: string) => result.ok && edit(result.doc, summary);
 
   function runBar(id: ActionId) {
     if (!session || !doc) {
@@ -62,6 +65,7 @@
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
     <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
     <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
+    <LayoutGuidesSection {doc} onchange={editGuides} />
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">

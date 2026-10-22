@@ -49,6 +49,11 @@ describe('frame inspector panel', () => {
     expect(html(['a'])).not.toContain('data-testid="poster-part"');
   });
 
+  it('offers the layout guides of the frame when no element is selected', () => {
+    expect(html([])).toContain('data-testid="layout-guides-section"');
+    expect(html(['a'])).not.toContain('data-testid="layout-guides-section"');
+  });
+
   it('says so when there is no frame session', () => {
     expect(render(FrameInspectorPanel, { props: { session: null, tokens: FEEGA_TOKENS } }).body).toContain('data-testid="properties-empty"');
   });

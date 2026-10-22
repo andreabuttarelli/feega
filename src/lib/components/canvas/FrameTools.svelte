@@ -6,6 +6,10 @@
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
   import LayoutGuidesOverlay from '$lib/components/motion/LayoutGuidesOverlay.svelte';
+  import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
+  import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
+  import OutlineOverlay from '$lib/components/motion/OutlineOverlay.svelte';
+  import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
   import { findClip, type MotionDoc } from '$lib/motion/doc';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -15,17 +19,44 @@
   import { isTyping } from '$lib/motion/shortcuts';
   import type { OpResult } from '$lib/motion/timeline';
   import { containFit } from '$lib/canvas/frame-hover';
+  import { withAutoLayout } from '$lib/motion/layout/resolve';
+  import type { Boxes } from '$lib/motion/scene-select';
+  import { GridToggle } from '$lib/motion/pixel-grid';
+  import { FRAME_VIEW_DEFAULT, FrameView, shows, type FrameViews } from '$lib/canvas/frame-view';
   import { activeAt, shownOverlays, AlignSide, FrameOverlay } from '$lib/canvas/frame-tools';
 
   type Size = { width: number; height: number };
 
-  let { doc, frame, size, picks, tool, side, apply, ondrawn }: { doc: MotionDoc; frame: number; size: Size; picks: string[]; tool: DrawTool; side: AlignSide; apply: (result: OpResult, summary: string) => void; ondrawn: (id: string) => void } = $props();
+  let {
+    doc,
+    frame,
+    size,
+    picks,
+    tool,
+    side,
+    views = FRAME_VIEW_DEFAULT,
+    boxes = {},
+    apply,
+    ondrawn
+  }: {
+    doc: MotionDoc;
+    frame: number;
+    size: Size;
+    picks: string[];
+    tool: DrawTool;
+    side: AlignSide;
+    views?: FrameViews;
+    boxes?: Boxes;
+    apply: (result: OpResult, summary: string) => void;
+    ondrawn: (id: string) => void;
+  } = $props();
 
   let pointEdit = $state<string | null>(null);
 
   const only = $derived(picks.length === 1 ? (findClip(doc, picks[0])?.clip ?? null) : null);
   const fit = $derived(containFit(size, { width: doc.width, height: doc.height }));
-  const shown = $derived(shownOverlays({ doc, clip: only, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false }));
+  const shown = $derived(shownOverlays({ doc, clip: only, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false, views }));
+  const laidOut = $derived(only && shown.has(FrameOverlay.Corners) ? (findClip(withAutoLayout(doc), only.id)?.clip ?? only) : null);
 
   $effect(() => {
     if (pointEdit && only?.id !== pointEdit) {
@@ -63,12 +94,16 @@
 <svelte:window onkeydowncapture={enter} />
 
 <div class="stage" data-testid="frame-tools" style={`left:${fit.left}px;top:${fit.top}px;width:${fit.width}px;height:${fit.height}px`}>
+  {#if shown.has(FrameOverlay.Outlines)}<div class="beneath"><OutlineOverlay {doc} {frame} {boxes} /></div>{/if}
+  <PixelGridOverlay width={doc.width} height={doc.height} toggle={shows(views, FrameView.PixelGrid) ? GridToggle.On : GridToggle.Off} />
   {#if shown.has(FrameOverlay.Guides)}<LayoutGuidesOverlay {doc} />{/if}
   {#if only && shown.has(FrameOverlay.Mask)}<MaskOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.Pen)}<PenOverlay {doc} clip={only} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
   {#if only && shown.has(FrameOverlay.Vector)}<VectorOverlay {doc} clip={only} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
   {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.TextPath)}<TextPathOverlay {doc} clip={only} {frame} />{/if}
+  {#if laidOut}<CornerOverlay {doc} {frame} clip={laidOut} onchange={edit} />{/if}
+  {#if only && shown.has(FrameOverlay.MotionPath)}<MotionPathOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if shown.has(FrameOverlay.Draw)}
     <div class="draw">
       <DrawOverlay {doc} {frame} {tool} onchange={apply} oncreated={created} />
@@ -83,6 +118,13 @@
 {/if}
 
 <style>
+  .beneath {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
   .stage {
     position: absolute;
     pointer-events: none;

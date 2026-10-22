@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { MotionClip, MotionDoc } from '$lib/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
+import { FRAME_VIEW_DEFAULT, FrameView, flipView } from './frame-view';
 import { AlignSide, FrameOverlay, activeAt, alignSide, shownOverlays } from './frame-tools';
 
 const clip = (patch: Partial<MotionClip> & { props?: Record<string, unknown> }): MotionClip => ({ id: 'c', from: 10, durationInFrames: 20, component: 'Shape', props: { shape: 'rect' }, ...patch }) as MotionClip;
 const doc = { layoutGuides: [{ id: 'g' }] } as unknown as MotionDoc;
-const plain = { doc: { layoutGuides: [] } as unknown as MotionDoc, clip: null, picks: 0, tool: DrawTool.Select, pointEdit: null, active: false };
+const plain = { doc: { layoutGuides: [] } as unknown as MotionDoc, clip: null, picks: 0, tool: DrawTool.Select, pointEdit: null, active: false, views: FRAME_VIEW_DEFAULT };
 
 describe('shownOverlays', () => {
   it('shows nothing for an empty selection with the select tool', () => {
@@ -18,6 +19,27 @@ describe('shownOverlays', () => {
 
   it('shows the guides the doc carries', () => {
     expect(shownOverlays({ ...plain, doc }).has(FrameOverlay.Guides)).toBe(true);
+  });
+
+  it('hides the guides once they are turned off', () => {
+    expect(shownOverlays({ ...plain, doc, views: flipView(FRAME_VIEW_DEFAULT, FrameView.Guides) }).has(FrameOverlay.Guides)).toBe(false);
+  });
+
+  it('shows the outline view only when it is turned on', () => {
+    expect(shownOverlays(plain).has(FrameOverlay.Outlines)).toBe(false);
+    expect(shownOverlays({ ...plain, views: flipView(FRAME_VIEW_DEFAULT, FrameView.Outlines) }).has(FrameOverlay.Outlines)).toBe(true);
+  });
+
+  it('shows corner handles for one rectangle on screen', () => {
+    const rect = clip({});
+    expect(shownOverlays({ ...plain, clip: rect, picks: 1, active: true }).has(FrameOverlay.Corners)).toBe(true);
+    expect(shownOverlays({ ...plain, clip: rect, picks: 1, active: false }).has(FrameOverlay.Corners)).toBe(false);
+    expect(shownOverlays({ ...plain, clip: clip({ props: { shape: 'ellipse' } }), picks: 1, active: true }).has(FrameOverlay.Corners)).toBe(false);
+  });
+
+  it('shows the motion path of a clip that moves along one', () => {
+    expect(shownOverlays({ ...plain, clip: clip({ path: { autoOrient: false, tangents: [] } as never }), picks: 1 }).has(FrameOverlay.MotionPath)).toBe(true);
+    expect(shownOverlays({ ...plain, clip: clip({}), picks: 1 }).has(FrameOverlay.MotionPath)).toBe(false);
   });
 
   it('shows align from two picks', () => {
