@@ -51,6 +51,7 @@
   import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
+  import CanvasShortcutHelp from '$lib/components/canvas/CanvasShortcutHelp.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
@@ -3233,6 +3234,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     {/if}
   {/if}
   <CursorChat onchat={(chat) => cursors.port.update({ chat })} />
+  <CanvasShortcutHelp />
   {#if presenter && following !== presenter.userId}
     <div class="presenting" role="status" data-testid="presenter-prompt">
       {displayName(presenter.name)} is presenting

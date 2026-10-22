@@ -79,6 +79,7 @@
   import { FocusMode, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
+  import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
   import { DropVerdict, pointOf } from '$lib/canvas/canvas-drop';
@@ -1219,11 +1220,13 @@
   let bandDrag = $state<{ nodeId: string; from: Point; to: Point } | null>(null);
 
   function goInside(nodeId: string, gesture: Gesture, clip: string | null) {
+    pickedPart = null;
     inside = { nodeId, level: stepInside(insideLevel(nodeId), gesture, clip) };
     picks = inside.level.clip ? [inside.level.clip] : [];
   }
 
   function pickMany(nodeId: string, ids: string[]) {
+    pickedPart = null;
     inside = { nodeId, level: stepInside(frameLevel(), Gesture.Click, primaryOf(ids)) };
     picks = ids;
   }
@@ -1339,7 +1342,9 @@
   const dialogExtras = $derived(frameDialog ? extrasOf(frameDialog.nodeId) : null);
   const dialogTokens = $derived(frameDialog ? (liveOf(frameDialog.nodeId)?.tokens ?? null) : null);
 
-  const panelNodeId = $derived(picks.length && inside ? inside.nodeId : null);
+  let pickedPart = $state<string | null>(null);
+  const soleFrame = $derived(selected.length === 1 && coreFrames.some((f) => f.id === selected[0]) ? selected[0] : null);
+  const panelNodeId = $derived(inside ? inside.nodeId : soleFrame);
   const panelSession = $derived(panelNodeId ? saverOf(panelNodeId) : null);
   const panelTokens = $derived(panelNodeId ? (liveOf(panelNodeId)?.tokens ?? null) : null);
   const panelExtras = $derived(panelNodeId ? extrasOf(panelNodeId) : null);
@@ -1361,6 +1366,7 @@
       return;
     }
     frameProperties.publish(panelSession, panelTokens, panelExtras);
+    frameProperties.part = pickedPart;
     return () => frameProperties.clear();
   });
 
@@ -1582,7 +1588,12 @@
         nodeId,
         doc: () => liveOf(nodeId)!.doc,
         selection: () => (inside?.nodeId === nodeId ? picks : []),
+        part: () => (inside?.nodeId === nodeId ? pickedPart : null),
         select: (ids) => pickMany(nodeId, ids),
+        selectPart: (clipId, part) => {
+          pickMany(nodeId, [clipId]);
+          pickedPart = part;
+        },
         edit: (result, summary) => commit(nodeId, result, summary)
       })
     );
@@ -2164,7 +2175,8 @@
     group: () => props.onGroup?.(selected),
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),
-    'send-back': () => props.onRestack?.(selected, Stack.Back)
+    'send-back': () => props.onRestack?.(selected, Stack.Back),
+    help: () => (shortcutHelp.open = true)
   };
 
   function onKeydown(e: KeyboardEvent) {

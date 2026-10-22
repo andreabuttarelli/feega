@@ -2,6 +2,7 @@ import type { MotionDoc } from '$lib/motion/doc';
 import { Depth, drill, type Gesture, type Level, type Probe } from '$lib/motion/drill';
 import { EditMode } from '$lib/motion/edit-mode';
 import type { OpResult } from '$lib/motion/timeline';
+import { PART_SEP } from '$lib/motion/poster-parts';
 import type { VideoSide } from './layers-source.svelte';
 
 export type Inside = { nodeId: string; level: Level };
@@ -16,7 +17,9 @@ type Hooks = {
   nodeId: string;
   doc: () => MotionDoc;
   selection: () => readonly string[];
+  part?: () => string | null;
   select: (ids: string[]) => void;
+  selectPart?: (clipId: string, part: string) => void;
   edit: (result: OpResult, summary: string) => void;
 };
 
@@ -30,10 +33,14 @@ export function videoSide(hooks: Hooks): VideoSide {
       return hooks.selection();
     },
     parts: {},
-    part: null,
+    get part() {
+      const part = hooks.part?.();
+      const [clip] = hooks.selection();
+      return part && clip ? `${clip}${PART_SEP}${part}` : null;
+    },
     mode: EditMode.Design,
     select: hooks.select,
-    selectPart: (clipId) => hooks.select([clipId]),
+    selectPart: hooks.selectPart ?? ((clipId) => hooks.select([clipId])),
     edit: hooks.edit,
     preview: () => {}
   };

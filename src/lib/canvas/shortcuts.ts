@@ -74,7 +74,8 @@ export type CanvasCommandId =
   | 'ungroup'
   | 'tool'
   | 'bring-front'
-  | 'send-back';
+  | 'send-back'
+  | 'help';
 
 /**
  * Il comando riconosciuto. `add` e `nudge` portano con sé il loro argomento perché è il tasto a
@@ -121,6 +122,9 @@ const ARROWS: Record<string, { dx: number; dy: number }> = {
 
 const ZOOM_IN_KEYS = ['+', '='];
 
+const HELP_KEY = '?';
+const MOD_KEY = 'mod';
+
 const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'> = { Digit0: 'zoom-actual', Digit1: 'fit', Digit2: 'zoom-selection' };
 
 /**
@@ -160,6 +164,8 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
     // Tutto il resto con modificatore è del browser o del registro globale (⌘K, ⌘,).
     return null;
   }
+
+  if (key === HELP_KEY) return { id: 'help' };
 
   const tool = toolFor(e);
   if (tool) return { id: 'tool', tool };
@@ -234,5 +240,50 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'zoom-actual', keys: ['⇧0'], label: 'Zoom to 100%' },
   { id: 'zoom-selection', keys: ['⇧2'], label: 'Zoom to selection' },
   { id: 'zoom-in', keys: ['+'], label: 'Ingrandisci' },
-  { id: 'zoom-out', keys: ['-'], label: 'Rimpicciolisci' }
+  { id: 'zoom-out', keys: ['-'], label: 'Rimpicciolisci' },
+  { id: 'help', keys: [HELP_KEY], label: 'Keyboard shortcuts' }
 ];
+
+export type CanvasGuideRow = { id: string; name: string; keys: string; gesture: string };
+
+enum GuideGroup {
+  Add = 'Add',
+  Select = 'Select',
+  Edit = 'Edit',
+  View = 'View'
+}
+
+const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
+  add: GuideGroup.Add,
+  delete: GuideGroup.Edit,
+  'select-all': GuideGroup.Select,
+  deselect: GuideGroup.Select,
+  enter: GuideGroup.Select,
+  'select-next': GuideGroup.Select,
+  'select-previous': GuideGroup.Select,
+  tool: GuideGroup.Select,
+  undo: GuideGroup.Edit,
+  redo: GuideGroup.Edit,
+  duplicate: GuideGroup.Edit,
+  copy: GuideGroup.Edit,
+  paste: GuideGroup.Edit,
+  group: GuideGroup.Edit,
+  ungroup: GuideGroup.Edit,
+  'bring-front': GuideGroup.Edit,
+  'send-back': GuideGroup.Edit,
+  align: GuideGroup.Edit,
+  tidy: GuideGroup.Edit,
+  nudge: GuideGroup.Edit,
+  fit: GuideGroup.View,
+  'zoom-actual': GuideGroup.View,
+  'zoom-selection': GuideGroup.View,
+  'zoom-in': GuideGroup.View,
+  'zoom-out': GuideGroup.View,
+  help: GuideGroup.View
+};
+
+export const canvasGuide = (mod: string): { group: string; rows: CanvasGuideRow[] }[] =>
+  Object.values(GuideGroup).map((group) => ({
+    group,
+    rows: CANVAS_SHORTCUTS.flatMap((row, i) => (GUIDE_GROUP[row.id] === group ? [{ id: `${row.id}-${i}`, name: row.label, keys: row.keys.map((k) => (k === MOD_KEY ? mod : k)).join(' '), gesture: '' }] : []))
+  }));

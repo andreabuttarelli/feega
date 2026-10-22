@@ -9,6 +9,7 @@ export class FrameProperties {
   session = $state.raw<FrameEditSession | null>(null);
   tokens = $state.raw<BrandTokens | null>(null);
   extras = $state.raw<FrameExtras | null>(null);
+  part = $state<string | null>(null);
 
   publish(session: FrameEditSession, tokens: BrandTokens, extras: FrameExtras | null) {
     this.session = session;
@@ -20,6 +21,7 @@ export class FrameProperties {
     this.session = null;
     this.tokens = null;
     this.extras = null;
+    this.part = null;
   }
 }
 
