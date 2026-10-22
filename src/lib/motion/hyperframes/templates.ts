@@ -109,7 +109,7 @@ export function placed(ctx: { id: string; width: number; height: number }, p: Pl
     overflow: clip ? 'hidden' : 'visible',
     ...own
   });
-  return `<div class="box"${BOX_ATTR[role]} style="${style}"><div class="mv" id="mv-${ctx.id}" style="${css({ width: '100%', height: clip ? '100%' : undefined })}">${inner}</div></div>`;
+  return `<div class="box"${BOX_ATTR[role]} style="${style}" data-placed-width="${box.width}" data-placed-height="${box.height}"><div class="mv" id="mv-${ctx.id}" style="${css({ width: '100%', height: clip ? '100%' : undefined })}">${inner}</div></div>`;
 }
 
 const frames = (ctx: { fps: number }, n: number) => n / ctx.fps;
@@ -168,7 +168,7 @@ const Text: Template<'Text'> = {
     const size = typeSize(ctx);
     const paint = glyphPaint(ctx, 'Text');
     const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], ...ctx.text.vars });
-    const fit = FITS[ctx.p.sizing] ? ` data-fit="${size}"` : '';
+    const fit = FITS[ctx.p.sizing] ? ` data-fit="${size}"` : ' data-text';
     return placed(ctx, ctx.p, `<div id="tx-${ctx.id}"${fit} style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, TEXT_BOX[ctx.p.sizing](ctx.p.truncate));
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]
