@@ -21,6 +21,7 @@ import { effectProblem } from './shader-effects/preset';
 import { fillsSchema } from './fill/model';
 import { strokesSchema } from './stroke/model';
 import { runsSchema } from './text-runs';
+import { LETTER_SPACING, LINE_HEIGHT } from './type-units';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -104,6 +105,10 @@ export const TEXT_CASES = ['as-typed', 'upper', 'lower', 'title'] as const;
 export const TEXT_ALIGNS = [...ALIGNS, 'justify'] as const;
 export type TextAlign = (typeof TEXT_ALIGNS)[number];
 export const VERTICAL_ALIGNS = ['top', 'center', 'bottom'] as const;
+export const TEXT_WRAPS = ['wrap', 'balance', 'pretty'] as const;
+export type TextWrap = (typeof TEXT_WRAPS)[number];
+export const LEADING_TRIMS = ['none', 'cap'] as const;
+export type LeadingTrim = (typeof LEADING_TRIMS)[number];
 export type VerticalAlign = (typeof VERTICAL_ALIGNS)[number];
 export { TEXT_SIZINGS, TextSizing } from './text-sizing';
 export type TextCase = (typeof TEXT_CASES)[number];
@@ -156,14 +161,20 @@ const typography = (size: number, fallbackColor: string, look: Look) => ({
 
 export const PARAGRAPH = {
   spacing: { min: 0, max: 4, step: 0.05 },
-  indent: { min: 0, max: 10, step: 0.1 }
+  indent: { min: 0, max: 10, step: 0.1 },
+  maxLines: { min: 0, max: 100, step: 1 }
 } as const;
 
 const paragraph = () => ({
   align: choice(TEXT_ALIGNS, 'center', 'Align', Group.Layout),
   verticalAlign: choice(VERTICAL_ALIGNS, 'center', 'Vertical align', Group.Layout),
   paragraphSpacing: range(PARAGRAPH.spacing.min, PARAGRAPH.spacing.max, PARAGRAPH.spacing.step, 0, 'Paragraph spacing', Group.Style),
-  paragraphIndent: range(PARAGRAPH.indent.min, PARAGRAPH.indent.max, PARAGRAPH.indent.step, 0, 'Indent', Group.Style)
+  paragraphIndent: range(PARAGRAPH.indent.min, PARAGRAPH.indent.max, PARAGRAPH.indent.step, 0, 'Indent', Group.Style),
+  lineHeight: z.string().regex(LINE_HEIGHT, 'line height is auto, 24px or 120%').default('').meta({ control: Control.Text, label: 'Line height', group: Group.Style }),
+  letterSpacing: z.string().regex(LETTER_SPACING, 'letter spacing is 2px or 5%').default('').meta({ control: Control.Text, label: 'Letter spacing', group: Group.Style }),
+  maxLines: range(PARAGRAPH.maxLines.min, PARAGRAPH.maxLines.max, PARAGRAPH.maxLines.step, 0, 'Max lines', Group.Style),
+  textWrap: choice(TEXT_WRAPS, 'wrap', 'Wrap', Group.Style),
+  leadingTrim: choice(LEADING_TRIMS, 'none', 'Vertical trim', Group.Style)
 });
 
 export const LIGHTINGS = ['studio', 'soft', 'dramatic'] as const;

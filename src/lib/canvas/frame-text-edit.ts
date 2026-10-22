@@ -10,6 +10,7 @@ import type { RunCase, RunStyle, TextRun } from '$lib/motion/text-runs';
 import { mul2d, type Affine } from '$lib/motion/affine';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
 import type { TextCase } from '$lib/motion/components';
+import { AUTO, CAP_TRIM_CSS, CSS_NORMAL, leadingOf, trackingOf } from '$lib/motion/type-units';
 
 type Size = { width: number; height: number };
 
@@ -21,10 +22,12 @@ export type TextEditStyle = {
   weight: number;
   italic: boolean;
   trackingEm: number;
-  leading: number;
+  leading: number | string;
   color: string;
   textTransform: string;
   align: string;
+  wrap: string;
+  trim: string;
 };
 
 export function editsText(doc: MotionDoc, clipId: string): boolean {
@@ -55,16 +58,19 @@ export function textEditStyle(input: { clip: MotionClip; doc: MotionDoc; tokens:
   const verdict = clipProps(input.doc.components, input.clip.component, input.clip.props, Strictness.Lenient);
   const p = (verdict.ok ? verdict.props : input.clip.props) as Record<string, unknown>;
   const unit = Math.min(input.frame.width, input.frame.height);
+  const sizePx = Number(p.size) * unit;
   return {
     fontPx: Number(p.size) * unit * input.scale,
     family: fontStack(String(p.font), input.doc.fonts),
     weight: Number(p.weight),
     italic: p.italic === true,
-    trackingEm: Number(p.tracking),
-    leading: Number(p.leading),
+    trackingEm: trackingOf(p, sizePx),
+    leading: leadingOf(p, sizePx) === AUTO ? CSS_NORMAL : leadingOf(p, sizePx),
     color: resolveColor(p.color, input.tokens),
     textTransform: TEXT_TRANSFORM[(p.textCase as TextCase) ?? 'as-typed'] ?? 'none',
-    align: String(p.align)
+    align: String(p.align),
+    wrap: String(p.textWrap ?? 'wrap'),
+    trim: p.leadingTrim === 'cap' ? CAP_TRIM_CSS : CSS_NORMAL
   };
 }
 
@@ -83,5 +89,5 @@ const FLOW_CSS: Record<'wraps' | 'line', (layout: EditLayout) => string> = {
 export function editCss(look: TextEditStyle, layout: EditLayout): string {
   const flow = FLOW_CSS[layout.wraps ? 'wraps' : 'line'](layout);
   const font = `${look.italic ? 'italic ' : ''}${look.weight} ${layout.fontPx}px/${look.leading} ${look.family}`;
-  return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};text-transform:${look.textTransform};`;
+  return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};text-transform:${look.textTransform};text-wrap:${look.wrap};text-box:${look.trim};`;
 }

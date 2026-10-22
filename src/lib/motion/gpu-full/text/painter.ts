@@ -1,5 +1,6 @@
 import { apply2d, mul2d, type Affine } from '../../affine';
-import { TYPE, type TextAlign, type TextCase, type VerticalAlign } from '../../components';
+import { TYPE, type LeadingTrim, type TextAlign, type TextCase, type TextWrap, type VerticalAlign } from '../../components';
+import { AUTO, leadingOf, trackingOf, type Leading } from '../../type-units';
 import { Ease } from '../../design';
 import { safeBox } from '../../fit';
 import { elementFills } from '../../fill/elements';
@@ -19,7 +20,7 @@ import type { Face, FaceBook, Request } from './face';
 import type { FaceRule } from './fonts';
 import type { FontFace } from '../../fonts/model';
 import { caretLines, type CaretLine } from './caret';
-import { Justify, layOut, PLAIN_PARAGRAPH, NO_EXTRA, Shaping, Spaces, type Paragraph, type Extra, type Flow, type Glyph, type Laid, type Line, type Look, type RequestAt, type Type } from './layout';
+import { Justify, layOut, NO_LIMIT, PLAIN_PARAGRAPH, Trim, Wrap, NO_EXTRA, Shaping, Spaces, type Paragraph, type Extra, type Flow, type Glyph, type Laid, type Line, type Look as RunLook, type RequestAt, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
 import { clipped, contoursOf, dilated, within, type Rect } from './outline';
@@ -123,18 +124,30 @@ type Kind = {
   area: Area;
 };
 
-type Props = Record<string, unknown> & { text: string; size: number; align: TextAlign; sizing?: TextSizing; easing: Ease; verticalAlign?: VerticalAlign; paragraphSpacing?: number; paragraphIndent?: number };
+type Props = Record<string, unknown> & { text: string; size: number; align: TextAlign; sizing?: TextSizing; easing: Ease; verticalAlign?: VerticalAlign; paragraphSpacing?: number; paragraphIndent?: number; textWrap?: TextWrap; leadingTrim?: LeadingTrim; maxLines?: number };
 
 const ALIGN_SHARE: Record<TextAlign, number> = { left: 0, center: 0.5, right: 1, justify: 0 };
 const JUSTIFY_OF: Record<TextAlign, Justify> = { left: Justify.Off, center: Justify.Off, right: Justify.Off, justify: Justify.On };
 const VERTICAL_SHARE: Record<VerticalAlign, number> = { top: 0, center: 0.5, bottom: 1 };
 
-export type Typography = { vertical: number; paragraph: Paragraph };
+export type Typography = { vertical: number; paragraph: Paragraph; clips: boolean };
 
-export const coreTypography = ({ typography: { vertical, paragraph } }: Pick<TextPlan, 'typography'>) =>
-  vertical === VERTICAL_SHARE.center && paragraph.indent === PLAIN_PARAGRAPH.indent && paragraph.spacing === PLAIN_PARAGRAPH.spacing && paragraph.justify === PLAIN_PARAGRAPH.justify;
+export const coreTypography = ({ leading, typography: { vertical, paragraph, clips } }: Pick<TextPlan, 'leading' | 'typography'>) =>
+  leading !== AUTO && !clips && vertical === VERTICAL_SHARE.center && (Object.keys(PLAIN_PARAGRAPH) as (keyof Paragraph)[]).every((key) => paragraph[key] === PLAIN_PARAGRAPH[key]);
 
-const paragraphOf = (p: Props): Paragraph => ({ indent: Number(p.paragraphIndent ?? 0), spacing: Number(p.paragraphSpacing ?? 0), justify: JUSTIFY_OF[p.align] ?? Justify.Off });
+const WRAP_OF: Record<TextWrap, Wrap> = { wrap: Wrap.Greedy, balance: Wrap.Balance, pretty: Wrap.Pretty };
+const TRIM_OF: Record<LeadingTrim, Trim> = { none: Trim.None, cap: Trim.Cap };
+
+const truncates = (p: Props) => p.truncate === true;
+
+const paragraphOf = (p: Props): Paragraph => ({
+  indent: Number(p.paragraphIndent ?? 0),
+  spacing: Number(p.paragraphSpacing ?? 0),
+  justify: JUSTIFY_OF[p.align] ?? Justify.Off,
+  wrap: WRAP_OF[p.textWrap ?? 'wrap'],
+  limit: truncates(p) ? Number(p.maxLines ?? NO_LIMIT) : NO_LIMIT,
+  trim: TRIM_OF[p.leadingTrim ?? 'none']
+});
 const PERCENT = 100;
 const rounded = (p: Props, unit: number) => Math.round(p.size * unit * PERCENT) / PERCENT;
 const lines = (text: string) => text.split('\n');
@@ -158,7 +171,7 @@ const sizingOf = (p: Props) => p.sizing ?? TextSizing.Fixed;
 
 const KINDS: Record<TextComponent, Kind> = {
   Title: { size: rounded, paragraphs: lines, flow: () => NORMAL, fits: () => true, upper: false, inset: 0, frame: (_p, box, stage) => ({ box: safeBox(box, stage), anchor: Anchor.Centre, hugs: false }), motion: Motion.LinesRise, area: Area.Block },
-  Text: { size: rounded, paragraphs: lines, flow: (p) => TEXT_FLOW[sizingOf(p)], fits: (p) => sizingOf(p) === TextSizing.Fixed, upper: false, inset: 0, frame: (p, box) => ({ box, ...TEXT_FRAME[sizingOf(p)] }), motion: Motion.FadeUp, area: Area.Line },
+  Text: { size: rounded, paragraphs: lines, flow: (p) => TEXT_FLOW[sizingOf(p)], fits: (p) => sizingOf(p) === TextSizing.Fixed && !truncates(p), upper: false, inset: 0, frame: (p, box) => ({ box, ...TEXT_FRAME[sizingOf(p)] }), motion: Motion.FadeUp, area: Area.Line },
   Kicker: { size: rounded, paragraphs: whole, flow: () => NORMAL, fits: () => true, upper: true, inset: 0, frame: centred, motion: Motion.None, area: Area.Whole },
   Caption: { size: (p, unit) => p.size * unit, paragraphs: whole, flow: () => NORMAL, fits: () => true, upper: false, inset: 0.5, frame: centred, motion: Motion.None, area: Area.Line }
 };
@@ -410,7 +423,7 @@ export type TextPlan = {
   size: number;
   fits: boolean;
   tracking: number;
-  leading: number;
+  leading: Leading;
   inset: number;
   shaping: Shaping;
   flow: Flow;
@@ -472,27 +485,28 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
   const run = animation(cased, env.animators);
   const paragraphs = kind.paragraphs(cased);
   const frame = kind.frame(p, env.box, env.stage);
+  const size = kind.size(p, Math.min(env.stage.width, env.stage.height));
   return {
     text: cased,
     paragraphs,
     request: { family: String(p.font), weight: Number(p.weight), italic: p.italic === true, axes: axesOf(p) },
-    size: kind.size(p, Math.min(env.stage.width, env.stage.height)),
+    size,
     fits: kind.fits(p),
-    tracking: Number(p.tracking),
-    leading: Number(p.leading),
+    tracking: trackingOf(p, size),
+    leading: leadingOf(p, size),
     inset: kind.inset,
     shaping: run?.finest === AnimatorUnit.Char ? Shaping.Chars : Shaping.Runs,
     flow: kind.flow(p),
     frame: { left: frame.box.left - env.box.left, top: frame.box.top - env.box.top, width: frame.box.width, height: frame.box.height, anchor: frame.anchor, hugs: frame.hugs },
     align: ALIGN_SHARE[p.align] ?? 0,
-    typography: { vertical: VERTICAL_SHARE[p.verticalAlign ?? 'center'], paragraph: paragraphOf(p) },
+    typography: { vertical: VERTICAL_SHARE[p.verticalAlign ?? 'center'], paragraph: paragraphOf(p), clips: truncates(p) && sizingOf(p) === TextSizing.Fixed },
     fade: kind.motion === Motion.FadeUp ? progress(env, { at: 0, duration: FADE_FRAMES / env.fps }, p.easing) : 1,
     rises: kind.motion === Motion.LinesRise ? paragraphs.map((_, i) => progress(env, { at: (i * LINE_STAGGER) / env.fps, duration: REVEAL_FRAMES / env.fps }, p.easing)) : null,
     area: kind.area,
     backdrop: kind.inset > 0 ? colour(String(p.background)) : null,
     fills,
     outline: outlineOf(env, colour),
-    animation: run ? { finest: run.finest, looks: looksOf(cased, run, colour, throughText(visibleFills), Number(p.tracking)) } : null,
+    animation: run ? { finest: run.finest, looks: looksOf(cased, run, colour, throughText(visibleFills), trackingOf(p, size)) } : null,
     smoothing: env.smoothing,
     runs,
     starts: startsOf(paragraphs),
@@ -524,7 +538,7 @@ function requestAtOf(plan: TextPlan, size: number): RequestAt | undefined {
   if (!plan.runs.length) {
     return undefined;
   }
-  const plain: Look = { request: plan.request, size, tracking: plan.tracking, leading: plan.leading };
+  const plain: RunLook = { request: plan.request, size, tracking: plan.tracking, leading: plan.leading };
   return (paragraph, char) => {
     const run = runOf(plan, paragraph, char);
     if (!run) {
@@ -549,9 +563,9 @@ type Placed = { laid: Laid; type: Type; room: number };
 const topOf = (plan: TextPlan, laid: Laid) => plan.frame.top + (plan.frame.anchor === Anchor.Centre ? (plan.frame.height - laid.height) * plan.typography.vertical : 0);
 
 function place(plan: TextPlan, fonts: FaceBook): Placed {
-  const typeAt = (size: number): Type => {
+  const typeAt = (size: number, limit = plan.typography.paragraph.limit): Type => {
     const requestAt = requestAtOf(plan, size);
-    const paragraph = { ...plan.typography.paragraph, indent: plan.typography.paragraph.indent * size, spacing: plan.typography.paragraph.spacing * size };
+    const paragraph = { ...plan.typography.paragraph, limit, indent: plan.typography.paragraph.indent * size, spacing: plan.typography.paragraph.spacing * size };
     return { request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping, paragraph, ...(requestAt ? { requestAt } : {}) };
   };
   const looks = plan.animation?.looks;
@@ -559,9 +573,11 @@ function place(plan: TextPlan, fonts: FaceBook): Placed {
   const before = charsBeforeOf(words);
   const wordsBefore = plan.paragraphs.map((_, i) => plan.paragraphs.slice(0, i).reduce((n, para) => n + (para.match(WORD)?.length ?? 0), 0));
   const extra: Extra = looks ? (paragraph, word, letter) => looks[(before[wordsBefore[paragraph] + word] ?? 0) + letter]?.spacing ?? 0 : NO_EXTRA;
-  const lay = (size: number) => layOut(plan.paragraphs, typeAt(size), plan.flow, plan.frame.width, fonts, extra);
+  const lay = (size: number, limit?: number) => layOut(plan.paragraphs, typeAt(size, limit), plan.flow, plan.frame.width, fonts, extra);
   const size = plan.fits ? fitSize(plan.size, (s) => lay(s), plan.frame) : plan.size;
-  const laid = lay(size);
+  const whole = lay(size);
+  const overflows = plan.typography.clips && plan.typography.paragraph.limit === NO_LIMIT && whole.height > plan.frame.height;
+  const laid = overflows ? lay(size, Math.max(1, Math.floor(plan.frame.height / whole.lineHeight))) : whole;
   return { laid, type: typeAt(size), room: plan.frame.hugs ? laid.width : plan.frame.width };
 }
 

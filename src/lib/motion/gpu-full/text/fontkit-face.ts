@@ -12,7 +12,8 @@ type KitFont = {
   unitsPerEm: number;
   ascent: number;
   descent: number;
-  'OS/2'?: { typoAscender: number; typoDescender: number; fsSelection: { useTypoMetrics: boolean } };
+  lineGap: number;
+  'OS/2'?: { typoAscender: number; typoDescender: number; typoLineGap: number; fsSelection: { useTypoMetrics: boolean } };
   fvar?: { axis: { axisTag: string; minValue: number; maxValue: number; defaultValue: number }[] };
   directory: { tables: Record<string, unknown> };
   variationCoords: number[] | null;
@@ -66,9 +67,9 @@ function outlinePoints(base: KitFont, id: number, processor: Processor | null): 
   );
 }
 
-function metricsOf(font: KitFont): { ascent: number; descent: number } {
+function metricsOf(font: KitFont): { ascent: number; descent: number; lineGap: number } {
   const os2 = font['OS/2'];
-  return os2?.fsSelection.useTypoMetrics ? { ascent: os2.typoAscender, descent: -os2.typoDescender } : { ascent: font.ascent, descent: -font.descent };
+  return os2?.fsSelection.useTypoMetrics ? { ascent: os2.typoAscender, descent: -os2.typoDescender, lineGap: os2.typoLineGap } : { ascent: font.ascent, descent: -font.descent, lineGap: font.lineGap };
 }
 
 function axesOf(font: KitFont): Axes {

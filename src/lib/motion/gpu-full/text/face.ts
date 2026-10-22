@@ -17,6 +17,7 @@ export type Face = {
   unitsPerEm: number;
   ascent: number;
   descent: number;
+  lineGap?: number;
   shape: (text: string, ligatures: Ligatures) => Shaped[];
   outline: (glyph: number) => Command[];
 };

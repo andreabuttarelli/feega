@@ -1,5 +1,6 @@
 import type { z } from 'zod';
-import type { COMPONENTS, ComponentId, TextAlign, VerticalAlign } from '../components';
+import type { COMPONENTS, ComponentId, LeadingTrim, TextAlign, VerticalAlign } from '../components';
+import { AUTO, CAP_TRIM_CSS, leadingOf, measured } from '../type-units';
 import { TextSizing } from '../text-sizing';
 import { Ease } from '../design';
 import { boxOf, type Box } from '../layout';
@@ -217,13 +218,27 @@ const Title: Template<'Title'> = {
     }))
 };
 
+const TEXT_BOX_TRIM: Record<LeadingTrim, string | undefined> = { none: undefined, cap: CAP_TRIM_CSS };
+const NORMAL_LEADING = 1.2;
+
+function clampLines(ctx: TemplateCtx<'Text'>, size: number): number | null {
+  if (!ctx.p.truncate || ctx.p.sizing !== TextSizing.Fixed) {
+    return null;
+  }
+  const leading = leadingOf(ctx.p, size);
+  return ctx.p.maxLines || Math.max(1, Math.floor(boxOf(ctx.p, ctx).height / (size * (leading === AUTO ? NORMAL_LEADING : leading))));
+}
+
+const clampCss = (lines: number | null): Record<string, string | number> => (lines === null ? {} : { display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical', overflow: 'hidden' });
+
 const Text: Template<'Text'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
     const size = typeSize(ctx);
     const paint = glyphPaint(ctx, 'Text');
-    const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], ...ctx.text.vars });
-    const fit = FITS[ctx.p.sizing] ? ` data-fit="${size}"` : ' data-text';
+    const lines = clampLines(ctx, size);
+    const style = css({ ...typeStyle(ctx, measured(ctx.p, size), size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], textWrap: ctx.p.textWrap === 'wrap' ? undefined : ctx.p.textWrap, textBox: TEXT_BOX_TRIM[ctx.p.leadingTrim], ...clampCss(lines), ...ctx.text.vars });
+    const fit = FITS[ctx.p.sizing] && lines === null ? ` data-fit="${size}"` : ' data-text';
     return placed(ctx, ctx.p, `<div id="tx-${ctx.id}"${fit} style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${textBody(ctx)}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, { justifyContent: VERTICAL[ctx.p.verticalAlign], ...TEXT_BOX[ctx.p.sizing](ctx.p.truncate) });
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]

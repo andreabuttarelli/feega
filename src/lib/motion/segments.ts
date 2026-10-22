@@ -34,6 +34,15 @@ const SEGMENTS: Record<string, Record<string, Omit<Segment, 'value'>>> = {
     'auto-height': { label: 'Auto height', icon: SegmentIcon.AutoHeight },
     fixed: { label: 'Fixed size', icon: SegmentIcon.FixedSize }
   },
+  textWrap: {
+    wrap: { label: 'Wrap', icon: null },
+    balance: { label: 'Balance', icon: null },
+    pretty: { label: 'Pretty', icon: null }
+  },
+  leadingTrim: {
+    none: { label: 'Standard', icon: null },
+    cap: { label: 'Cap to baseline', icon: null }
+  },
   textCase: {
     'as-typed': { label: 'As typed', icon: null },
     upper: { label: 'AA', icon: null },

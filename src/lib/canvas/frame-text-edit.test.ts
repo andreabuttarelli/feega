@@ -74,7 +74,7 @@ describe('text editing inside a core frame', () => {
 
 describe('the editing box follows the drawn text', () => {
   const caret = (over: Partial<TextCaret>): TextCaret => ({ lines: [], matrix: [1, 0, 0, 1, 100, 50], text: 'Hi', paragraphs: ['Hi'], flow: { spaces: 'keep', wraps: true } as TextCaret['flow'], width: 300, height: 80, size: 40, vertical: 0.5, ...over });
-  const look = { fontPx: 99, family: 'Inter', weight: 400, italic: false, trackingEm: 0, leading: 1.2, color: '#000', textTransform: 'none', align: 'left' };
+  const look = { fontPx: 99, family: 'Inter', weight: 400, italic: false, trackingEm: 0, leading: 1.2, color: '#000', textTransform: 'none', align: 'left', wrap: 'wrap', trim: 'normal' };
 
   it('lays the box out in stage pixels and maps it to the screen in one transform', () => {
     const laid = editLayout(caret({}), [0.5, 0, 0, 0.5, 10, 20]);
@@ -98,6 +98,22 @@ describe('the editing box follows the drawn text', () => {
     expect(css).toContain('width:300px');
     expect(css).toContain('text-align:left');
     expect(css).toContain('font:400 40px/1.2 Inter');
+  });
+
+  it('resolves px line height and % letter spacing against the type size', () => {
+    const doc = withText();
+    const clip = findClip(doc, 'title')!.clip;
+    const style = textEditStyle({ clip: { ...clip, props: { ...clip.props, lineHeight: '216px', letterSpacing: '10%' } }, doc, tokens: FEEGA_TOKENS, frame: { width: 1920, height: 1080 }, scale: 1 });
+
+    expect(style.leading).toBeCloseTo(2);
+    expect(style.trackingEm).toBeCloseTo(0.1);
+  });
+
+  it('balances and trims the way the canvas draws', () => {
+    const css = editCss({ ...look, wrap: 'balance', trim: 'trim-both cap alphabetic' }, editLayout(caret({}), [1, 0, 0, 1, 0, 0]));
+
+    expect(css).toContain('text-wrap:balance');
+    expect(css).toContain('text-box:trim-both cap alphabetic');
   });
 
   it('title-cases and justifies the way the canvas draws', () => {

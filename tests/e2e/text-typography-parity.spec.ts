@@ -19,7 +19,14 @@ export const CASES: Record<string, Record<string, unknown>> = {
   bottom: { verticalAlign: 'bottom' },
   top: { verticalAlign: 'top' },
   paragraphs: { paragraphSpacing: 1, paragraphIndent: 2, verticalAlign: 'top' },
-  title: { textCase: 'title' }
+  title: { textCase: 'title' },
+  'line-px': { lineHeight: '90px', verticalAlign: 'top' },
+  'line-auto': { lineHeight: 'auto', verticalAlign: 'top' },
+  'letter-percent': { letterSpacing: '8%' },
+  'max-lines': { truncate: true, maxLines: 2, verticalAlign: 'top' },
+  balance: { textWrap: 'balance' },
+  pretty: { textWrap: 'pretty' },
+  trim: { leadingTrim: 'cap', verticalAlign: 'top', lineHeight: '200%' }
 };
 
 const docOf = (props: Record<string, unknown>) => ({
