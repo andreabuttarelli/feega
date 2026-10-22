@@ -1,5 +1,3 @@
-import { publishes } from '$lib/social-publishing';
-import { socialPublishing } from '$lib/server/social-publishing';
 import { json } from '@sveltejs/kit';
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { env } from '$env/dynamic/private';
@@ -67,20 +65,6 @@ async function checkAiVision(): Promise<ServiceCheck> {
   });
 }
 
-async function checkZernio(): Promise<ServiceCheck> {
-  return timed('social:publishing', async () => {
-    const key = env.ZERNIO_API_KEY;
-    if (!key) throw new Error('publishing API key not set');
-    // Ping the profiles endpoint (HEAD-style: we just need a non-5xx response)
-    const res = await fetch('https://zernio.com/api/v1/profiles', {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${key}` },
-      signal: AbortSignal.timeout(10_000)
-    });
-    if (res.status >= 500) throw new Error(`publishing API returned ${res.status}`);
-  });
-}
-
 export const GET: RequestHandler = async ({ url }) => {
   const origin = url.origin;
   const endpointChecks = [
@@ -90,8 +74,7 @@ export const GET: RequestHandler = async ({ url }) => {
     }),
   ];
 
-  const publishingChecks = publishes(await socialPublishing()) ? [checkZernio()] : [];
-  const services = await Promise.all([checkSupabase(), checkAiText(), checkAiVision(), ...publishingChecks, ...endpointChecks]);
+  const services = await Promise.all([checkSupabase(), checkAiText(), checkAiVision(), ...endpointChecks]);
   const errorCount = services.filter((s) => s.status === 'error').length;
   const status = errorCount === 0 ? 'ok' : errorCount >= 2 ? 'critical' : 'degraded';
 

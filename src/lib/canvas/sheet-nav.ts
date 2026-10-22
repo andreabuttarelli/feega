@@ -9,7 +9,7 @@ export type SheetOutcome =
 
 /**
  * COSA FARE DEL RISULTATO DI `preloadData`, isolato dalla chiamata: un `redirect` (es.
- * `/settings` → `/settings/connected-accounts`) o un `load` fallito non hanno un `data` da
+ * `/settings` → `/settings/project`) o un `load` fallito non hanno un `data` da
  * mostrare in un foglio — si naviga per davvero, fuori dalla tela. Solo un `loaded` con 200 apre
  * il foglio.
  */

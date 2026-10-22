@@ -7,7 +7,7 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
-  import { canvasSelection } from '$lib/canvas/promote-sheet';
+  import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { replaceState } from '$app/navigation';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import { handoffOf, withoutHandoff, type ChatHandoff } from '$lib/canvas/chat-handoff';

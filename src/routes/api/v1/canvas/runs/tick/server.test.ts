@@ -17,7 +17,6 @@ vi.mock('$lib/server/canvas/generate', () => ({
 vi.mock('$lib/server/canvas/loop', () => ({ drainLoopQueue: step('loops', {}) }));
 vi.mock('$lib/server/canvas/workflow', () => ({ drainWorkflowQueue: step('workflows', {}) }));
 vi.mock('$lib/server/canvas/retention', () => ({ pruneOldCanvasEvents: step('events', {}) }));
-vi.mock('$lib/server/account-billing', () => ({ renewAccountSeats: step('seats', {}) }));
 vi.mock('$lib/server/provider-purgers', () => ({ configuredPurgers: () => ({}) }));
 vi.mock('$lib/server/reports/report-deps', () => ({ reportDeps: () => ({}) }));
 vi.mock('$lib/server/reports/reports', () => ({ restoreDueReports: step('reports', { restored: 1 }) }));

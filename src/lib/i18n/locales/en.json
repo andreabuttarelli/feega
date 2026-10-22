@@ -187,16 +187,10 @@
       "sectionProject": "Project"
     },
     "hub": {
-      "publish": {
-        "promote": "Promote"
-      },
       "overview": {
         "brand": {
           "products": "Products"
         }
-      },
-      "ads": {
-        "social": "Ads"
       }
     },
     "shell": {
@@ -256,52 +250,8 @@
       "team": {
         "title": "Team"
       },
-      "linkedin": {
-        "title": "Connect LinkedIn",
-        "subtitle": "Choose what to post to — your personal profile or a Company Page you admin.",
-        "personalDesc": "Post from your own LinkedIn profile",
-        "pagesTitle": "Company Pages",
-        "pagesDesc": "A LinkedIn Page you administer",
-        "noPages": "No Company Pages found — your LinkedIn account doesn't admin any Pages.",
-        "connectThis": "Connect",
-        "working": "Connecting…",
-        "back": "Back to settings",
-        "retry": "Reconnect LinkedIn",
-        "expired": "This connection link has expired. Please reconnect LinkedIn to try again.",
-        "missing": "Missing connection data. Please reconnect LinkedIn to try again.",
-        "failed": "Couldn't complete the connection. Please try again."
-      },
-      "facebook": {
-        "title": "Connect Facebook",
-        "subtitle": "Pick the Page to post to. Choosing a Page also connects its linked Instagram account.",
-        "pagesTitle": "Your Pages",
-        "pagesDesc": "A Facebook Page you manage",
-        "noPages": "No Pages found — your Facebook account doesn't manage any Pages.",
-        "connectThis": "Connect",
-        "working": "Connecting…",
-        "back": "Back to settings",
-        "retry": "Reconnect Facebook",
-        "expired": "This connection link has expired. Please reconnect Facebook to try again.",
-        "missing": "Missing connection data. Please reconnect Facebook to try again.",
-        "failed": "Couldn't complete the connection. Please try again."
-      },
-      "connectedAccounts": "Connected accounts",
-      "syncFromZernio": "Sync",
       "remove": "Remove",
       "keep": "Keep",
-      "active": "Active",
-      "disconnect": "Disconnect",
-      "noAccountsTitle": "No accounts connected yet",
-      "noAccountsBody": "Connect one below — feega imports it automatically when you come back.",
-      "syncedToast": "✓ Synced.",
-      "disconnectedToast": "✓ Disconnected.",
-      "connectPlatform": "Connect a platform",
-      "accountsUsed": "{used} of {limit} accounts",
-      "seatCostMsg": "Each connected account costs ${cost}/month, billed from your credit balance.",
-      "limitReachedMsg": "Not enough credits for another account's monthly fee ({limit} connected now). Buy more credits to connect another.",
-      "connectedAddAnother": "{count} connected · add another",
-      "connectViaOauth": "Connect via OAuth",
-      "connect": "Connect →",
       "save": "Save",
       "close": "Close",
       "profile": {
@@ -456,9 +406,6 @@
         "storeFailed": "The purchase did not go through. Nothing was charged.",
         "storePurchased": "Purchase complete. Your credits appear here in a few seconds."
       }
-    },
-    "ads": {
-      "syncing": "Syncing…"
     },
     "orgs": {
       "label": "Organisation",

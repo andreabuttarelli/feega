@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { SETTINGS_SECTIONS, sectionEditable, settingsGroupsFor } from '$lib/components/settings/platforms';
+  import { SETTINGS_SECTIONS, sectionEditable, SETTINGS_GROUPS } from '$lib/components/settings/platforms';
   import { Notice } from '$lib/components/ui/notice';
   import PageHead from '$lib/components/PageHead.svelte';
   import BrandGate from '$lib/components/settings/BrandGate.svelte';
@@ -45,9 +45,6 @@
       },
       [`${base}/products`]: {
         title: $_('app.studio.tabs.productsTitle')
-      },
-      [`${base}/connected-accounts`]: {
-        title: $_('app.settings.connectedAccounts')
       },
       [`${base}/api-keys`]: {
         title: $_('app.settings.apiKeys.title')
@@ -91,7 +88,7 @@
   <div class="settings-frame" class:has-nav={isRoutePage && !isIndex}>
   {#if isRoutePage && !isIndex}
     <nav class="settings-nav" aria-label={$_('app.nav.settings')}>
-      {#each settingsGroupsFor(data.socialPublishing) as group (group.labelKey)}
+      {#each SETTINGS_GROUPS as group (group.labelKey)}
         <p class="nav-group">{$_(group.labelKey)}</p>
         {#each group.items as item (item.section)}
           <a

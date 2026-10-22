@@ -139,7 +139,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import { DropVerdict, frameUnderPointer, type PointerPoint } from '$lib/canvas/canvas-drop';
-  import { canvasSelection } from '$lib/canvas/promote-sheet';
+  import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import { inputChanged } from '$lib/canvas/effects/editor';

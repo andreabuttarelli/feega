@@ -172,17 +172,6 @@ async function refuseUncensoredSection(event: RequestEvent): Promise<void> {
   }
 }
 
-async function refuseSocialPublishing(event: RequestEvent): Promise<void> {
-  const { routeRefused, SocialPublishing } = await import('$lib/social-publishing');
-  if (!routeRefused(SocialPublishing.Off, event.route.id)) {
-    return;
-  }
-  const { socialPublishing } = await import('$lib/server/social-publishing');
-  if (routeRefused(await socialPublishing(), event.route.id)) {
-    throw error(404, 'not_available');
-  }
-}
-
 export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
@@ -253,7 +242,6 @@ export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentr
     throw redirect(302, await rootRedirectTarget(event));
   }
 
-  await refuseSocialPublishing(event);
   await refuseUncensoredSection(event);
   await refuseSignedOutDashboard(event);
 

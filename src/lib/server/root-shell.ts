@@ -3,7 +3,6 @@ import { isPlanGoEnabled } from '$lib/server/feature-flags';
 import { selineSetUser } from '$lib/server/seline';
 import { isInternalEmail } from '$lib/server/internal-users';
 import { trackingAllowed } from '$lib/analytics';
-import { socialPublishing } from '$lib/server/social-publishing';
 import { firstRunFlags } from '$lib/server/dashboard/first-run-flags';
 
 export const APP_HOST_PARAM = 'host';
@@ -13,7 +12,7 @@ export const load = async ({ url, untrack, locals: { safeGetSession, db } }: Pic
 
   // Chi ha già accettato una versione dei termini vede l'avviso solo quando la versione corrente
   // è cambiata — non sul primo accesso, dove `landingPath` registra già quella corrente.
-  const [{ termsNoticeVersion, tour }, social] = await Promise.all([firstRunFlags(user ? await db() : null, user), socialPublishing()]);
+  const { termsNoticeVersion, tour } = await firstRunFlags(user ? await db() : null, user);
 
   // I due guard degli analytics, decisi qui una volta sola.
   //
@@ -49,7 +48,6 @@ export const load = async ({ url, untrack, locals: { safeGetSession, db } }: Pic
     analyticsOptOut,
     internalViewer,
     planGo: isPlanGoEnabled(),
-    socialPublishing: social,
     termsNoticeVersion,
     tour
   };

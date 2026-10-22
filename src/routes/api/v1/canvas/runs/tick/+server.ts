@@ -8,7 +8,6 @@ import { drainLoopQueue } from '$lib/server/canvas/loop';
 import { drainWorkflowQueue } from '$lib/server/canvas/workflow';
 import { drainStudio } from '$lib/server/studio/studio-drain';
 import { pruneOldCanvasEvents } from '$lib/server/canvas/retention';
-import { renewAccountSeats } from '$lib/server/account-billing';
 import { purgeProviderCopies } from '$lib/server/canvas/provider-purge';
 import { configuredPurgers } from '$lib/server/provider-purgers';
 import { restoreDueReports } from '$lib/server/reports/reports';
@@ -105,17 +104,6 @@ export const GET: RequestHandler = async ({ request }) => {
     return { pruned: 0 };
   });
 
-  // Idempotente per account+mese (l'indice unico su credit_ledger), quindi chiamarlo ogni minuto
-  // è corretto — ma scorrere ogni account attivo ogni minuto è spreco puro dopo il primo addebito
-  // del mese: gira solo al minuto 0 di ogni ora, non a ogni tick.
-  const seats =
-    new Date().getUTCMinutes() === 0
-      ? await renewAccountSeats(db).catch((e) => {
-          console.error('[account billing] seat renewal failed', e);
-          return { charged: 0, paused: 0, alreadyCharged: 0 };
-        })
-      : { charged: 0, paused: 0, alreadyCharged: 0, skipped: true };
-
   const reports = await restoreDueReports(reportDeps(new URL(request.url).origin)).catch((e) => {
     console.error('[reports] counter-notice restore failed', e);
     return { restored: 0 };
@@ -129,7 +117,7 @@ export const GET: RequestHandler = async ({ request }) => {
       })
     : null;
 
-  return json({ ...runs, videos, audios, wiro, renders, purge, loops, workflows, studio, events, seats, reports, voices });
+  return json({ ...runs, videos, audios, wiro, renders, purge, loops, workflows, studio, events, reports, voices });
 };
 
 export const POST = GET;

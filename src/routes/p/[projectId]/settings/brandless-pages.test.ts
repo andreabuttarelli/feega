@@ -9,7 +9,6 @@ vi.mock('$lib/server/supabase-admin', () => {
 vi.mock('$lib/server/projects/project-shell', () => ({ load: async () => ({ brand: null, isOwner: true }) }));
 
 const PAGES = {
-  'connected-accounts': () => import('./connected-accounts/+page.server'),
   danger: () => import('$lib/server/settings/pages/danger')
 };
 

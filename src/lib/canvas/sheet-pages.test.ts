@@ -9,7 +9,6 @@ describe('settingsSectionOf: quale cartella sotto settings/ risponde a questo pa
 
   it('ogni sezione usa il suo primo segmento', () => {
     expect(settingsSectionOf('/settings/brand')).toBe('brand');
-    expect(settingsSectionOf('/settings/connected-accounts')).toBe('connected-accounts');
     expect(settingsSectionOf('/settings/api-keys')).toBe('api-keys');
   });
 
@@ -20,7 +19,7 @@ describe('settingsSectionOf: quale cartella sotto settings/ risponde a questo pa
 
 describe('settingsPageLoader: la sezione trova la sua pagina reale', () => {
   it('ogni sezione esistente sotto settings/ ha un loader', () => {
-    for (const section of ['brand', 'connected-accounts', 'api-keys', 'team', 'profile', 'appearance', 'danger', 'products']) {
+    for (const section of ['brand', 'api-keys', 'team', 'profile', 'appearance', 'danger', 'products']) {
       expect(settingsPageLoader(`/settings/${section}`), `manca la pagina per ${section}`).not.toBeNull();
     }
   });
@@ -35,10 +34,7 @@ describe('settingsPageLoader: la sezione trova la sua pagina reale', () => {
 });
 
 describe('SHEET_PAGE_LOADERS: il foglio scarica le sue pagine solo quando si apre', () => {
-  it('ads e il guscio di settings sono moduli pigri, non import statici della tela', async () => {
-    for (const load of [SHEET_PAGE_LOADERS.ads, SHEET_PAGE_LOADERS.settingsLayout]) {
-      expect(typeof load).toBe('function');
-      expect((await load()).default).toBeTruthy();
-    }
+  it('il guscio di settings è un modulo pigro, non un import statico della tela', async () => {
+    expect((await SHEET_PAGE_LOADERS.settingsLayout()).default).toBeTruthy();
   });
 });
