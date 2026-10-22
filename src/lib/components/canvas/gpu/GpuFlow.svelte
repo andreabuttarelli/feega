@@ -71,6 +71,7 @@
   import SelectionToolbar from '../SelectionToolbar.svelte';
   import NextStepChips from '../NextStepChips.svelte';
   import CanvasContextMenu from '../CanvasContextMenu.svelte';
+  import CommandPalette from '../CommandPalette.svelte';
   import ConnectPicker from '../ConnectPicker.svelte';
   import PageZoomLock from '../PageZoomLock.svelte';
   import NodeBoundary from '../NodeBoundary.svelte';
@@ -3081,6 +3082,10 @@
   {#if elementMenu && inside && spec.chrome}
     {@const doc = liveOf(inside.nodeId)?.doc}
     {#if doc}<CanvasContextMenu at={elementMenu} summaries={frameSummaries(doc, picks)} available={FRAME_ELEMENT_MENU} onpick={runElementMenu} onclose={() => (elementMenu = null)} />{/if}
+  {/if}
+
+  {#if spec.chrome}
+    <CommandPalette />
   {/if}
 
   {#if menuAt && spec.chrome}
