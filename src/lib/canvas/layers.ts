@@ -64,6 +64,7 @@ export type LayerRow = {
   thumb?: string | null;
   foldable?: boolean;
   element?: boolean;
+  instance?: boolean;
 };
 
 type Track = MotionDoc['tracks'][number];
@@ -141,7 +142,8 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     nodeId,
     hidden: !!clip.hidden,
     locked: template || !!clip.locked,
-    nested
+    nested,
+    ...(doc.comps[comp]?.component ? { instance: true } : {})
   };
   const nests = comp !== '' && !template;
   row.foldable = nests || undefined;

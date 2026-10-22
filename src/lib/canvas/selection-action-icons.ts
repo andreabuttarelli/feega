@@ -49,6 +49,9 @@ import SquaresSubtract from '@lucide/svelte/icons/squares-subtract';
 import SquaresIntersect from '@lucide/svelte/icons/squares-intersect';
 import SquaresExclude from '@lucide/svelte/icons/squares-exclude';
 import Combine from '@lucide/svelte/icons/combine';
+import ComponentIcon from '@lucide/svelte/icons/component';
+import Unlink from '@lucide/svelte/icons/unlink';
+import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 import PenLine from '@lucide/svelte/icons/pen-line';
 import TypeIcon from '@lucide/svelte/icons/type';
 import type { Component } from 'svelte';
@@ -90,6 +93,9 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'flatten': Combine,
   'outline-stroke': PenLine,
   'outline-text': TypeIcon,
+  'create-component': ComponentIcon,
+  'detach-instance': Unlink,
+  'reset-instance': RotateCcw,
   'create-formats': Proportions,
   export: Download,
   'frame-voice': Mic,

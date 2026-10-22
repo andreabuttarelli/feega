@@ -167,6 +167,7 @@ import { fileSnippet } from '$lib/motion/interactive/bundle';
 import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, removeVar, unbindVar, type VarDecl } from '$lib/motion/interactive/vars';
 import { flattenComps } from '$lib/motion/precomp';
 import { clearTextRuns, styleTextRange } from '$lib/motion/text-run-ops';
+import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, resetOverrides } from '$lib/motion/main-component';
 import { RunToggle, type RunEdit } from '$lib/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
@@ -2667,6 +2668,28 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const clip = deps.newId();
         const out = apply(precompose(session.doc, input.clip_ids, { comp, clip }, input.name ?? `Comp ${Object.keys(session.doc.comps).length + 1}`), `precomposed ${input.clip_ids.length} clip(s)`);
         return out.ok ? { ...out, comp, clip_id: clip } : out;
+      }
+    }),
+
+    component: tool({
+      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props): one instance only. reset / detach (clip_id).',
+      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional() }),
+      execute: async (input) => {
+        const ids: string[] = [];
+        const newId = () => {
+          const id = deps.newId();
+          ids.push(id);
+          return id;
+        };
+        const id = input.clip_id ?? '';
+        const run: Record<ComponentAction, () => OpResult> = {
+          [ComponentAction.Create]: () => createComponent(session.doc, input.clip_ids ?? [], newId, input.name ?? `Component ${Object.values(session.doc.comps).filter((c) => c.component).length + 1}`),
+          [ComponentAction.Override]: () => overrideInstance(session.doc, id, input.inner_clip_id ?? '', input.props ?? {}),
+          [ComponentAction.Reset]: () => resetOverrides(session.doc, id),
+          [ComponentAction.Detach]: () => detachInstance(session.doc, id, newId)
+        };
+        const out = apply(run[input.action](), `component ${input.action}`);
+        return out.ok && ids.length ? { ...out, comp: ids[0], clip_id: ids[1] ?? id } : out;
       }
     }),
 

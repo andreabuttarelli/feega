@@ -9,6 +9,9 @@ import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 import PenLine from '@lucide/svelte/icons/pen-line';
 import Combine from '@lucide/svelte/icons/combine';
+import ComponentIcon from '@lucide/svelte/icons/component';
+import Unlink from '@lucide/svelte/icons/unlink';
+import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 import Scaling from '@lucide/svelte/icons/scaling';
 import Grid3x3 from '@lucide/svelte/icons/grid-3x3';
 import VectorSquare from '@lucide/svelte/icons/vector-square';
@@ -246,6 +249,9 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.AlignBottom]: { name: 'Align bottom', icon: AlignEndHorizontal, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.TidyUp]: { name: 'Tidy up', icon: LayoutGrid, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.FlipHorizontal]: { name: 'Flip horizontal', icon: FlipHorizontal2, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.CreateComponent]: { name: 'Create component', icon: ComponentIcon, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.DetachInstance]: { name: 'Detach instance', icon: Unlink, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.ResetInstance]: { name: 'Reset all overrides', icon: RotateCcw, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.FlipVertical]: { name: 'Flip vertical', icon: FlipVertical2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Tool.NullFromSelection]: { name: 'Null parent', icon: CircleDashed, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.StartHere]: { name: 'Move clip to start here', icon: AlignStart, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },

@@ -139,11 +139,21 @@ function placed(host: MotionClip, comp: MotionComp, tracks: MotionTrack[]): Moti
   return laid.map((t) => ({ ...t, clips: t.clips.map((c) => (c.parent && !present.has(c.parent) ? { ...c, parent: null } : c)) }));
 }
 
+type Overrides = Record<string, Record<string, unknown>>;
+
+function overridden(tracks: MotionTrack[], host: MotionClip): MotionTrack[] {
+  const overrides = host.props.overrides as Overrides | undefined;
+  if (!overrides) {
+    return tracks;
+  }
+  return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (overrides[c.id] ? { ...c, props: { ...c.props, ...overrides[c.id] } } : c)) }));
+}
+
 type Expander = (doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number) => MotionTrack[];
 
 function precompTracks(doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number): MotionTrack[] {
   const comp = doc.comps[compOf(host)!];
-  const inner = expand(doc, withoutHidden({ ...doc, tracks: comp.tracks }).tracks, depth + 1);
+  const inner = expand(doc, withoutHidden({ ...doc, tracks: overridden(comp.tracks, host) }).tracks, depth + 1);
   const laid = placed(host, comp, inner);
   const group: MotionClip = { ...host, props: { ...host.props, span: laid.length } };
   return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...laid];

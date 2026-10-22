@@ -19,6 +19,7 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Music from '@lucide/svelte/icons/music';
   import Component from '@lucide/svelte/icons/component';
+  import Diamond from '@lucide/svelte/icons/diamond';
   import Rows3 from '@lucide/svelte/icons/rows-3';
   import Contrast from '@lucide/svelte/icons/contrast';
   import { ACTIONS, shortcutOf } from '$lib/motion/actions';
@@ -283,7 +284,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" class:touch={density === Density.Touch} bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" style:padding-top={`${span.start * rowStep}px`} style:padding-bottom={`${(shown.length - span.end) * rowStep}px`} onkeydown={onKey}>
   {#each visible as row (`${row.nodeId}/${row.key}`)}
-    {@const RowIcon = KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square}
+    {@const RowIcon = row.instance ? Diamond : (KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square)}
     <div
       class="row"
       class:picked={isPicked(row)}
@@ -319,7 +320,7 @@
       {#if row.thumb}
         <img class="thumb" src={row.thumb} alt="" loading="lazy" decoding="async" data-testid="layer-thumb" />
       {/if}
-      <span class="icon" style:--hue={ROW_HUE[row.type]}><RowIcon size={ICON} /></span>
+      <span class="icon" class:instance={row.instance} data-instance={row.instance || undefined} style:--hue={ROW_HUE[row.type]}><RowIcon size={ICON} /></span>
       {#if renaming === row.id}
         <!-- svelte-ignore a11y_autofocus -->
         <input class="name-input" value={row.label} autofocus aria-label="Track name" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
@@ -473,6 +474,10 @@
     display: grid;
     place-items: center;
     color: var(--hue, var(--ui-icon-ink));
+  }
+
+  .icon.instance {
+    color: #9747ff;
   }
 
   .thumb {

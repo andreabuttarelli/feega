@@ -7,6 +7,7 @@ import { EditMode } from '$lib/motion/edit-mode';
 import { maskMembers, useAsMask } from '$lib/motion/mask-group';
 import { Command } from '$lib/motion/shortcuts';
 import { CUSTOM_CLIP } from '$lib/motion/poster-parts';
+import { createComponent } from '$lib/motion/main-component';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
 
 const NODES = [
@@ -32,6 +33,18 @@ const ok = (r: ReturnType<typeof layerEdit>) => {
 };
 
 describe('layer rows', () => {
+  it('mark a component instance so the panel draws its diamond', () => {
+    const made = createComponent(video(), ['t1'], (() => {
+      let n = 0;
+      return () => `c${++n}`;
+    })(), 'Button');
+    const doc = made.ok ? made.doc : video();
+    const rows = layerRows(NODES, { nodeId: 'm1', doc });
+
+    expect(rows.find((r) => r.id === 'c2')).toMatchObject({ instance: true, label: 'Button' });
+    expect(rows.find((r) => r.id === 'm1')?.instance).toBeUndefined();
+  });
+
   it('list every canvas node at the top level, named, and only the open video unfolds into its clips', () => {
     const doc = video();
     const rows = layerRows(NODES, { nodeId: 'm1', doc });
