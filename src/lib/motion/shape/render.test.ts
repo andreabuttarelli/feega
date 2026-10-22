@@ -14,6 +14,12 @@ describe('shape markup', () => {
     expect(svg).toContain('stroke:none');
   });
 
+  it('a half-swept ellipse draws a pie, not the whole ellipse', () => {
+    const svg = shapeMarkup(look({ shape: 'ellipse', fill: '#ff0000', arcSweep: 0.5 }), paint);
+    expect(svg).toContain('<path d="M200 50C');
+    expect(svg).toContain('L100 50Z');
+  });
+
   it('a rectangle from before per-corner radii has none and stays square', () => {
     expect(look({}).corners).toEqual([]);
   });

@@ -33,6 +33,11 @@ describe('the inspector shows only the geometry a shape kind uses', () => {
     }
   });
 
+  it('an ellipse shows its arc, a rectangle does not', () => {
+    expect(keysFor('ellipse')).toEqual(expect.arrayContaining(['arcStart', 'arcSweep', 'arcRatio']));
+    expect(keysFor('rect')).not.toContain('arcSweep');
+  });
+
   it('a rectangle has a field per corner, a star does not', () => {
     expect(keysFor('rect')).toContain('corners');
     expect(keysFor('star')).not.toContain('corners');

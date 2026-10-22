@@ -527,7 +527,7 @@ export const canvasBoxSchema = z.object({ left: z.number().finite(), top: z.numb
 const PASTED_TEXT_MAX = 5000;
 const hexColour = z.string().regex(/^#[0-9a-f]{6}$/i);
 
-const drawnBox = z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional(), sizing: z.enum(TEXT_SIZINGS).optional() }).strict();
+const drawnBox = z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse, DrawTool.Polygon, DrawTool.Star]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional(), sizing: z.enum(TEXT_SIZINGS).optional() }).strict();
 const drawnPen = z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(1).max(20_000) }).strict();
 
 export const drawnSchema = z.discriminatedUnion('tool', [drawnBox, drawnPen]);

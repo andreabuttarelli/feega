@@ -5,6 +5,10 @@ export enum DrawTool {
   Text = 'text',
   Rectangle = 'rectangle',
   Ellipse = 'ellipse',
+  Polygon = 'polygon',
+  Star = 'star',
+  Line = 'line',
+  Arrow = 'arrow',
   Pen = 'pen',
   Frame = 'frame'
 }
