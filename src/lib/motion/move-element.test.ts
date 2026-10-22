@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, setKeyframes, setTransform } from './timeline';
 import { Ease } from './design';
 import { DocMode, docMode, setStill } from './still';
-import { copyElements, frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, pasteElements, placeElement, OutputKind } from './move-element';
+import { copyElements, frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, pasteElements, placeElement, replaceElements, OutputKind } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const VIDEO_ID = '99999999-2222-4333-8444-555555555555';
@@ -266,5 +266,17 @@ describe('copy and paste of a multi-selection', () => {
 
     expect(pasted.ok && pasted.ids).toHaveLength(2);
     expect(pasted.ok && pasted.ids.map((id) => findClip(pasted.doc, id)!.clip.props.x)).toEqual([0.2, 0.7]);
+  });
+
+  it('paste to replace puts the copy where each selected element was, and removes them', () => {
+    let doc = two();
+    doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'ellipse', x: 0.5, y: 0.3, width: 0.05, height: 0.05 } }, 'dot'));
+    const replaced = replaceElements(doc, ['a', 'b'], copyElements(doc, ['dot']), ids());
+    if (!replaced.ok) throw new Error(replaced.error);
+
+    expect(findClip(replaced.doc, 'a')).toBeNull();
+    expect(findClip(replaced.doc, 'b')).toBeNull();
+    expect(replaced.ids.map((id) => findClip(replaced.doc, id)!.clip.props)).toMatchObject([{ shape: 'ellipse', x: 0.2, y: 0.5 }, { shape: 'ellipse', x: 0.7, y: 0.5 }]);
+    expect(replaceElements(doc, ['a'], [], ids()).ok).toBe(false);
   });
 });

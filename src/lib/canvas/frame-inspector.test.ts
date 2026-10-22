@@ -8,6 +8,8 @@ import { insertTemplate, templateFromComp } from '$lib/motion/template/library';
 import { precompose } from '$lib/motion/precomp';
 import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor } from './frame-inspector';
 import { findClip } from '$lib/motion/doc';
+import { copyElements } from '$lib/motion/move-element';
+import { elementClipboard } from './element-clipboard.svelte';
 import { addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
 
@@ -171,6 +173,17 @@ describe('frameBarActions', () => {
 describe('frameKeyAction', () => {
   const press = (key: string, mods: { meta?: boolean; shift?: boolean; alt?: boolean } = {}) =>
     ({ key, code: `Key${key.toUpperCase()}`, metaKey: !!mods.meta, ctrlKey: false, shiftKey: !!mods.shift, altKey: !!mods.alt }) as KeyboardEvent;
+
+  it('⇧⌘R replaces the selection with the copied element, selecting the result', () => {
+    const doc = fixture();
+    elementClipboard.copyElements('frame', ['a'], copyElements(doc, ['a']));
+    const replace = frameKeyAction(press('r', { meta: true, shift: true }))!;
+
+    const done = barAction(replace, { doc, selection: ['b'], frame: 0, newId: ids() })!;
+    expect(findClip(done.doc, 'b')).toBeNull();
+    expect(done.selection).toHaveLength(1);
+    expect(findClip(done.doc, done.selection[0])!.clip.props.text).toBe('One');
+  });
 
   it('⌥⌘C copies the properties of one element and ⌥⌘V pastes them on another', () => {
     const ctx = (doc: MotionDoc, id: string) => ({ doc, selection: [id], frame: 0, newId: () => 'x' });

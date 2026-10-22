@@ -6,6 +6,7 @@ import { addAutoLayout, removeAutoLayout, wrapInFrame } from '$lib/motion/layout
 import { isText } from '$lib/motion/layout/text-extent';
 import { Flip, flipClips } from '$lib/motion/layer-props';
 import { copyStyle, pasteStyle } from '$lib/motion/style-copy';
+import { replaceElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
 import { setClipFlags } from '$lib/motion/organize';
 import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
@@ -125,6 +126,12 @@ function pasteProperties(ctx: BarCtx): Done | null {
   return copied ? kept(ctx, pasteStyle(ctx.doc, ctx.selection, copied), 'Pasted properties') : null;
 }
 
+function pasteReplace(ctx: BarCtx): Done | null {
+  const copied = elementClipboard.elements;
+  const replaced = copied ? replaceElements(ctx.doc, ctx.selection, copied.elements, ctx.newId) : null;
+  return replaced?.ok ? { ok: true, doc: replaced.doc, summary: 'Pasted to replace', selection: replaced.ids } : null;
+}
+
 const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx.doc)), 'Created a component') },
   [Action.DetachInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, detachInstance(ctx.doc, ctx.selection[0], ctx.newId), 'Detached the instance') },
@@ -146,6 +153,7 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.FlipVertical]: flip(Flip.Vertical, 'Flipped vertically'),
   [Action.CopyProperties]: { shown: any, run: copyProperties },
   [Action.PasteProperties]: { shown: any, run: pasteProperties },
+  [Action.PasteReplace]: { shown: any, run: pasteReplace },
   [Action.ToggleHidden]: { shown: any, run: (ctx) => toggleFlag(ctx, 'hidden', 'Toggled visibility') },
   [Action.ToggleLocked]: { shown: any, run: (ctx) => toggleFlag(ctx, 'locked', 'Toggled lock') }
 };
@@ -203,7 +211,7 @@ export const FRAME_ELEMENT_MENU: ReadonlySet<SelectionActionId> = new Set(
   })
 );
 
-const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, Command.CopyProperties, Command.PasteProperties, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
+const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
 
 export function frameKeyAction(e: KeyboardEvent): ActionId | null {
   const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, EditMode.Design);
