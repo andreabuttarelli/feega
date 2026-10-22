@@ -26,7 +26,13 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'max-lines': { truncate: true, maxLines: 2, verticalAlign: 'top' },
   balance: { textWrap: 'balance' },
   pretty: { textWrap: 'pretty' },
-  trim: { leadingTrim: 'cap', verticalAlign: 'top', lineHeight: '200%' }
+  trim: { leadingTrim: 'cap', verticalAlign: 'top', lineHeight: '200%' },
+  underline: { decoration: 'underline', decorationOffset: 0.3, decorationThickness: 0.15 },
+  'underline-dashed': { decoration: 'underline', decorationStyle: 'dashed', decorationThickness: 0.08 },
+  'underline-wavy': { decoration: 'underline', decorationStyle: 'wavy', decorationColor: '#ff3366' },
+  strikethrough: { decoration: 'strikethrough', decorationThickness: 0.15 },
+  features: { features: "'tnum' 1, 'ss01' 1", text: 'Figures 1111 and 8888\nline for line' },
+  'small-caps': { textCase: 'small-caps' }
 };
 
 const docOf = (props: Record<string, unknown>) => ({

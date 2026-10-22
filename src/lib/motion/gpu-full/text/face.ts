@@ -18,9 +18,11 @@ export type Face = {
   ascent: number;
   descent: number;
   lineGap?: number;
-  shape: (text: string, ligatures: Ligatures) => Shaped[];
+  shape: (text: string, ligatures: Ligatures, features?: Features) => Shaped[];
   outline: (glyph: number) => Command[];
 };
+
+export type Features = Record<string, boolean>;
 
 export enum Ligatures {
   On = 'on',

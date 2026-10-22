@@ -1,4 +1,4 @@
-import { Ligatures, type Face, type FaceBook, type Request } from './face';
+import { Ligatures, type Face, type FaceBook, type Features, type Request } from './face';
 import { AUTO, type Leading } from '../../type-units';
 
 export enum Spaces {
@@ -39,7 +39,7 @@ export type Paragraph = { indent: number; spacing: number; justify: Justify; wra
 
 export const PLAIN_PARAGRAPH: Paragraph = { indent: 0, spacing: 0, justify: Justify.Off, wrap: Wrap.Greedy, limit: NO_LIMIT, trim: Trim.None };
 
-export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: Leading; inset: number; shaping: Shaping; requestAt?: RequestAt; paragraph?: Paragraph };
+export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: Leading; inset: number; shaping: Shaping; requestAt?: RequestAt; paragraph?: Paragraph; features?: Features };
 
 export type Glyph = { face: Face; glyph: number; skew: number; x: number; dy: number; char: number; pen: number; advance: number; word: number; letter: number; size: number; leading: Leading };
 
@@ -109,7 +109,7 @@ function shapedOf(text: string, first: number, type: Type, asked: Asked, book: F
     const tracking = run.look.tracking * size;
     const scale = size / run.face.unitsPerEm;
     let char = first + run.at;
-    for (const g of run.face.shape(run.text, ligatures)) {
+    for (const g of run.face.shape(run.text, ligatures, type.features)) {
       const advance = g.advance * scale + tracking * g.chars + Array.from({ length: g.chars }, (_, k) => extra(char + k)).reduce((n, e) => n + e, 0) * size;
       glyphs.push({ face: run.face, glyph: g.glyph, skew: run.skew, x: x + g.dx * scale, dy: g.dy * scale, char, pen: x, advance, word: -1, letter: char - first, size, leading });
       x += advance;

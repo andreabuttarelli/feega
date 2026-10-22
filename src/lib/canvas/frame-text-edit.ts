@@ -10,11 +10,13 @@ import type { RunCase, RunStyle, TextRun } from '$lib/motion/text-runs';
 import { mul2d, type Affine } from '$lib/motion/affine';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
 import type { TextCase } from '$lib/motion/components';
+import { css } from '$lib/motion/hyperframes/html';
+import { decorationCss } from '$lib/motion/decoration';
 import { AUTO, CAP_TRIM_CSS, CSS_AUTO, CSS_NORMAL, leadingOf, trackingOf } from '$lib/motion/type-units';
 
 type Size = { width: number; height: number };
 
-const TEXT_TRANSFORM: Record<TextCase, string> = { 'as-typed': 'none', upper: 'uppercase', lower: 'lowercase', title: 'capitalize' };
+const TEXT_TRANSFORM: Record<TextCase, string> = { 'as-typed': 'none', upper: 'uppercase', lower: 'lowercase', title: 'capitalize', 'small-caps': 'none' };
 
 export type TextEditStyle = {
   fontPx: number;
@@ -28,6 +30,7 @@ export type TextEditStyle = {
   align: string;
   wrap: string;
   trim: string;
+  decoration: string;
 };
 
 export function editsText(doc: MotionDoc, clipId: string): boolean {
@@ -70,7 +73,8 @@ export function textEditStyle(input: { clip: MotionClip; doc: MotionDoc; tokens:
     textTransform: TEXT_TRANSFORM[(p.textCase as TextCase) ?? 'as-typed'] ?? 'none',
     align: String(p.align),
     wrap: p.textWrap === 'balance' || p.textWrap === 'pretty' ? p.textWrap : CSS_AUTO,
-    trim: p.leadingTrim === 'cap' ? CAP_TRIM_CSS : CSS_NORMAL
+    trim: p.leadingTrim === 'cap' ? CAP_TRIM_CSS : CSS_NORMAL,
+    decoration: css(decorationCss(p, (v) => resolveColor(v, input.tokens)))
   };
 }
 
@@ -89,5 +93,5 @@ const FLOW_CSS: Record<'wraps' | 'line', (layout: EditLayout) => string> = {
 export function editCss(look: TextEditStyle, layout: EditLayout): string {
   const flow = FLOW_CSS[layout.wraps ? 'wraps' : 'line'](layout);
   const font = `${look.italic ? 'italic ' : ''}${look.weight} ${layout.fontPx}px/${look.leading} ${look.family}`;
-  return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};text-transform:${look.textTransform};text-wrap-style:${look.wrap};text-box:${look.trim};`;
+  return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};text-transform:${look.textTransform};text-wrap-style:${look.wrap};text-box:${look.trim};${look.decoration}`;
 }

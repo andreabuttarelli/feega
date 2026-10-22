@@ -92,8 +92,8 @@ function faceOf(base: KitFont, inst: KitFont): Face {
   return {
     unitsPerEm: base.unitsPerEm,
     ...metricsOf(base),
-    shape: (text, ligatures): Shaped[] => {
-      const run = inst.layout(text, FEATURES[ligatures]);
+    shape: (text, ligatures, features = {}): Shaped[] => {
+      const run = inst.layout(text, { ...FEATURES[ligatures], ...features });
       return run.glyphs.map((g, i) => ({ glyph: g.id, advance: run.positions[i].xAdvance, dx: run.positions[i].xOffset, dy: run.positions[i].yOffset, chars: Math.max(1, g.codePoints.length) }));
     },
     outline: (glyph): Command[] => (glyf ? quadraticPath(outlinePoints(base, glyph, processor)) : inst.getGlyph(glyph).path.commands.map((c) => ({ op: KIT_OP[c.command], at: c.args })))

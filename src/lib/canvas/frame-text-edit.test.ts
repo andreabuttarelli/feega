@@ -74,7 +74,7 @@ describe('text editing inside a core frame', () => {
 
 describe('the editing box follows the drawn text', () => {
   const caret = (over: Partial<TextCaret>): TextCaret => ({ lines: [], matrix: [1, 0, 0, 1, 100, 50], text: 'Hi', paragraphs: ['Hi'], flow: { spaces: 'keep', wraps: true } as TextCaret['flow'], width: 300, height: 80, size: 40, vertical: 0.5, ...over });
-  const look = { fontPx: 99, family: 'Inter', weight: 400, italic: false, trackingEm: 0, leading: 1.2, color: '#000', textTransform: 'none', align: 'left', wrap: 'auto', trim: 'normal' };
+  const look = { fontPx: 99, family: 'Inter', weight: 400, italic: false, trackingEm: 0, leading: 1.2, color: '#000', textTransform: 'none', align: 'left', wrap: 'auto', trim: 'normal', decoration: '' };
 
   it('lays the box out in stage pixels and maps it to the screen in one transform', () => {
     const laid = editLayout(caret({}), [0.5, 0, 0, 0.5, 10, 20]);
@@ -114,6 +114,16 @@ describe('the editing box follows the drawn text', () => {
 
     expect(css).toContain('text-wrap-style:balance');
     expect(css).toContain('text-box:trim-both cap alphabetic');
+  });
+
+  it('underlines and sets features the way the canvas draws', () => {
+    const doc = withText();
+    const clip = findClip(doc, 'title')!.clip;
+    const style = textEditStyle({ clip: { ...clip, props: { ...clip.props, decoration: 'underline', features: "'tnum' 1" } }, doc, tokens: FEEGA_TOKENS, frame: { width: 1920, height: 1080 }, scale: 1 });
+    const css = editCss(style, editLayout(caret({}), [1, 0, 0, 1, 0, 0]));
+
+    expect(css).toContain('text-decoration-line:underline');
+    expect(css).toContain("font-feature-settings:'tnum' 1");
   });
 
   it('title-cases and justifies the way the canvas draws', () => {

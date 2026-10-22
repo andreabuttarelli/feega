@@ -34,6 +34,11 @@ const SEGMENTS: Record<string, Record<string, Omit<Segment, 'value'>>> = {
     'auto-height': { label: 'Auto height', icon: SegmentIcon.AutoHeight },
     fixed: { label: 'Fixed size', icon: SegmentIcon.FixedSize }
   },
+  decoration: {
+    none: { label: 'None', icon: null },
+    underline: { label: 'Underline', icon: null },
+    strikethrough: { label: 'Strikethrough', icon: null }
+  },
   textWrap: {
     wrap: { label: 'Wrap', icon: null },
     balance: { label: 'Balance', icon: null },
@@ -47,7 +52,8 @@ const SEGMENTS: Record<string, Record<string, Omit<Segment, 'value'>>> = {
     'as-typed': { label: 'As typed', icon: null },
     upper: { label: 'AA', icon: null },
     lower: { label: 'aa', icon: null },
-    title: { label: 'Aa', icon: null }
+    title: { label: 'Aa', icon: null },
+    'small-caps': { label: 'Small caps', icon: null }
   }
 };
 

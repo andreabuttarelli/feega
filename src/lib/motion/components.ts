@@ -22,6 +22,7 @@ import { fillsSchema } from './fill/model';
 import { strokesSchema } from './stroke/model';
 import { runsSchema } from './text-runs';
 import { LETTER_SPACING, LINE_HEIGHT } from './type-units';
+import { DECORATION_STYLES, DECORATIONS, FEATURES, RULE } from './decoration';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -101,7 +102,7 @@ const BLEED_REACH = 2;
 export const TITLE_LOOK = { weight: SEMIBOLD, tracking: -0.05 } as const;
 export const TITLE_RANGE = { weight: [MEDIUM, SEMIBOLD], tracking: [-0.07, -0.04] } as const;
 export const ALIGNS = ['left', 'center', 'right'] as const;
-export const TEXT_CASES = ['as-typed', 'upper', 'lower', 'title'] as const;
+export const TEXT_CASES = ['as-typed', 'upper', 'lower', 'title', 'small-caps'] as const;
 export const TEXT_ALIGNS = [...ALIGNS, 'justify'] as const;
 export type TextAlign = (typeof TEXT_ALIGNS)[number];
 export const VERTICAL_ALIGNS = ['top', 'center', 'bottom'] as const;
@@ -174,7 +175,14 @@ const paragraph = () => ({
   letterSpacing: z.string().regex(LETTER_SPACING, 'letter spacing is 2px or 5%').default('').meta({ control: Control.Text, label: 'Letter spacing', group: Group.Style }),
   maxLines: range(PARAGRAPH.maxLines.min, PARAGRAPH.maxLines.max, PARAGRAPH.maxLines.step, 0, 'Max lines', Group.Style),
   textWrap: choice(TEXT_WRAPS, 'wrap', 'Wrap', Group.Style),
-  leadingTrim: choice(LEADING_TRIMS, 'none', 'Vertical trim', Group.Style)
+  leadingTrim: choice(LEADING_TRIMS, 'none', 'Vertical trim', Group.Style),
+  decoration: choice(DECORATIONS, 'none', 'Decoration', Group.Style),
+  decorationStyle: choice(DECORATION_STYLES, 'solid', 'Decoration style', Group.Style),
+  decorationThickness: range(RULE.thickness.min, RULE.thickness.max, RULE.thickness.step, RULE.thickness.fallback, 'Decoration thickness', Group.Style),
+  decorationOffset: range(RULE.offset.min, RULE.offset.max, RULE.offset.step, RULE.offset.fallback, 'Underline offset', Group.Style),
+  decorationColor: z.union([z.literal(''), z.string().regex(COLOR)]).default('').meta({ control: Control.Color, label: 'Decoration colour', group: Group.Style }),
+  skipInk: toggle(true, 'Skip ink', Group.Style),
+  features: z.string().max(200).regex(FEATURES, "features look like 'tnum' 1, 'liga' 0").default('').meta({ control: Control.Text, label: 'OpenType features', group: Group.Style })
 });
 
 export const LIGHTINGS = ['studio', 'soft', 'dramatic'] as const;
