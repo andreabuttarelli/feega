@@ -17,6 +17,7 @@
   import { followDocks } from '$lib/canvas/dock-lift';
   import { frameScreenRect } from '$lib/canvas/frame-screen';
   import FrameSelection from '../FrameSelection.svelte';
+  import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
   import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from '$lib/canvas/frame-view';
   import type { Boxes } from '$lib/motion/scene-select';
@@ -40,10 +41,11 @@
   import { frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
-  import { dragClip } from '$lib/canvas/frame-transform';
+  import { GRIP_SUMMARY, SelectionKind, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
+  import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, redoRoute, spanOf, toggleId, undoRoute, UndoRoute } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
-  import { Grip, type Pt } from '$lib/motion/scene-select';
+  import { Grip, type Gap, type Guide, type Pt } from '$lib/motion/scene-select';
   import { guessedBoxes } from '$lib/motion/move-element';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
@@ -1486,10 +1488,20 @@
     if (!at) {
       return [];
     }
+    const kind = picks.length > 1 ? SelectionKind.Member : SelectionKind.Element;
     return picks.flatMap((clip) => {
       const rect = at.picker.outline(clip, at.space);
-      return rect ? [{ clip, rect: { left: (rect.x - at.frame.box.x) * view.zoom, top: (rect.y - at.frame.box.y) * view.zoom, width: rect.w * view.zoom, height: rect.h * view.zoom } }] : [];
+      return rect ? [{ clip, kind, rect: { left: (rect.x - at.frame.box.x) * view.zoom, top: (rect.y - at.frame.box.y) * view.zoom, width: rect.w * view.zoom, height: rect.h * view.zoom } }] : [];
     });
+  }
+
+  function groupMark(nodeId: string) {
+    const marks = selectionMarks(nodeId);
+    if (marks.length < 2) {
+      return null;
+    }
+    const b = unionBounds(marks.map(({ rect: r }) => ({ left: r.left, top: r.top, right: r.left + r.width, bottom: r.top + r.height })));
+    return { left: b.left, top: b.top, width: b.right - b.left, height: b.bottom - b.top };
   }
 
   let frameViews = $state<FrameViews>(FRAME_VIEW_DEFAULT);
@@ -1597,29 +1609,35 @@
     };
   }
 
-  function grab(nodeId: string, clip: string, grip: Grip, handle: number, e: PointerEvent) {
+  let frameGuides = $state<{ nodeId: string; guides: Guide[]; gaps: Gap[] } | null>(null);
+
+  function frameReach(at: NonNullable<ReturnType<typeof pickerOf>>): number {
+    const a = at.picker.framePoint({ x: 0, y: 0 }, at.space);
+    const b = at.picker.framePoint({ x: SNAP_SCREEN_PX / view.zoom, y: 0 }, at.space);
+    return Math.hypot(b[0] - a[0], b[1] - a[1]);
+  }
+
+  function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
     const at = pickerOf(nodeId);
     const saver = saverOf(nodeId);
-    const rect = at?.picker.frameRect(clip);
-    if (!at || !saver || !rect || e.button !== 0 || frameChrome(kindOfNode(nodeId)).dragsHost) {
+    if (!at || !saver || e.button !== 0 || frameChrome(kindOfNode(nodeId)).dragsHost) {
       return;
     }
     e.preventDefault();
     e.stopPropagation();
     const start = saver.history.present;
     const frame = frameOfLive({ doc: start, playhead: at.live.playhead });
-    const ids = picks.includes(clip) ? picks : [clip];
+    const ids = clip && !picks.includes(clip) ? [clip] : picks;
     const boxes = guessedBoxes(withAutoLayout(start));
     const framePt = (ev: PointerEvent): Pt => at.picker.framePoint(toWorld(view, local(ev)), at.space);
     const from = framePt(e);
-    let result: ReturnType<typeof dragClip> | null = null;
+    const reach = frameReach(at);
+    let result: OpResult | null = null;
 
     const move = (ev: PointerEvent) => {
-      const to = framePt(ev);
-      result = ids.reduce<ReturnType<typeof dragClip>>((acc, id) => {
-        const doc = acc.ok ? acc.doc : start;
-        return dragClip({ doc, clipId: id, frame, box: boxes[id] ?? at.picker.frameRect(id) ?? rect, grip, handle, from, to });
-      }, { ok: true, doc: start });
+      const dragged = dragClips({ doc: start, ids, frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey }, reach });
+      result = dragged.result;
+      frameGuides = { nodeId, guides: dragged.guides, gaps: dragged.gaps };
       if (result.ok) {
         liveDocs.set(nodeId, { ...at.live, doc: result.doc });
       }
@@ -1627,12 +1645,31 @@
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      frameGuides = null;
       if (result?.ok) {
-        commit(nodeId, result, grip === Grip.Move ? 'Moved an element' : 'Resized an element');
+        commit(nodeId, result, GRIP_SUMMARY[grip]);
       }
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+  }
+
+  function frameArea(nodeId: string) {
+    const at = pickerOf(nodeId);
+    if (!at) {
+      return null;
+    }
+    const size = at.picker.frameSize();
+    const r = at.space.toWorld({ left: 0, top: 0, width: size.width, height: size.height });
+    return { size, rect: { left: (r.x - at.frame.box.x) * view.zoom, top: (r.y - at.frame.box.y) * view.zoom, width: r.w * view.zoom, height: r.h * view.zoom } };
+  }
+
+  function measuredIn(nodeId: string): Gap[] {
+    const live = altHeld && inside?.nodeId === nodeId && pickHover?.nodeId === nodeId && !frameGuides ? liveOf(nodeId) : null;
+    if (!live || !pickHover) {
+      return [];
+    }
+    return measuredGaps(live.doc, frameOfLive(live), guessedBoxes(withAutoLayout(live.doc)), picks, pickHover.clip);
   }
 
   $effect(() => {
@@ -2186,7 +2223,23 @@
     scaleBy: (factor) => zoomStep(factor)
   };
 
+  function nudgePicks(dx: number, dy: number): boolean {
+    const nodeId = inside?.nodeId;
+    const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
+    if (!nodeId || !tools) {
+      return false;
+    }
+    const result = nudgeClips(tools.doc, picks, tools.frame, [dx, dy]);
+    if (result.ok) {
+      commit(nodeId, result, GRIP_SUMMARY[Grip.Move]);
+    }
+    return true;
+  }
+
   function nudge(dx: number, dy: number) {
+    if (nudgePicks(dx, dy)) {
+      return;
+    }
     for (const id of selected) {
       const t = byId.get(id);
       if (t) {
@@ -2530,8 +2583,17 @@
           <CoreTextEdit rect={edit.rect} look={edit.look} text={edit.text} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} rect={mark.rect} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} rect={mark.rect} kind={mark.kind} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
+        {@const group = typing?.nodeId === frame.id ? null : groupMark(frame.id)}
+        {#if group}
+          <FrameSelection clip="" rect={group} kind={SelectionKind.Group} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
+        {/if}
+        {@const guideArea = inside?.nodeId === frame.id ? frameArea(frame.id) : null}
+        {@const measuredGapsIn = measuredIn(frame.id)}
+        {#if guideArea && ((frameGuides?.nodeId === frame.id && (frameGuides.guides.length || frameGuides.gaps.length)) || measuredGapsIn.length)}
+          <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} measured={measuredGapsIn} />
+        {/if}
         {#if pickHover?.nodeId === frame.id}
           <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={`left:${(pickHover.rect.x - frame.x) * view.zoom}px;top:${(pickHover.rect.y - frame.y) * view.zoom}px;width:${pickHover.rect.w * view.zoom}px;height:${pickHover.rect.h * view.zoom}px`}></div>
         {/if}
