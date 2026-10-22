@@ -3,7 +3,7 @@
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
   import { FrameFit, framePicker } from '$lib/canvas/frame-pick';
-  import { onMount, untrack, type ComponentProps } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
   import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
@@ -68,8 +68,8 @@
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
   import FrameTimeline from '../FrameTimeline.svelte';
-  import type CanvasFlow from '../CanvasFlow.svelte';
-  import type { Tile } from '../CanvasFlow.svelte';
+  import type { FlowProps, Tile } from '../flow-types';
+  import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
   import SelectionToolbar from '../SelectionToolbar.svelte';
@@ -174,7 +174,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -2847,11 +2847,10 @@
         })
         .catch((err: unknown) => {
           failed = err instanceof Error ? err.message : String(err);
-          props.onfail?.(failed);
         });
     const recover = (lost: GpuScene) => {
       const next = nextBackend(lost.backend);
-      console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'dom'}`);
+      console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'none'}`);
       lossNote = `${lost.backend} lost`;
       scene = null;
       built = null;
@@ -2861,7 +2860,7 @@
         lost.canvas.remove();
       }
       if (!next) {
-        props.onfail?.('GPU context lost');
+        failed = 'GPU context lost';
         return;
       }
       void start(next);

@@ -1,5 +1,4 @@
 import { cardPreviews } from '$lib/server/canvas/card-previews';
-import { rendererSwitch } from '$lib/server/canvas-renderer-switch';
 import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
@@ -204,7 +203,7 @@ async function spendOnVoice<T>(
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, listed, catalogue, shareToken, references, orgTemplates, handoff, killSwitch, previews] = await Promise.all([
+  const [nodes, listed, catalogue, shareToken, references, orgTemplates, handoff, previews] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
     projectCatalogue(db, { orgId, mode }),
@@ -212,7 +211,6 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     referenceLibrary(db, { orgId, projectId: canvas.projectId }),
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).own(),
     chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
-    rendererSwitch(),
     cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
   ]);
 
@@ -228,7 +226,6 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
 
   return {
-    rendererSwitch: killSwitch,
     handoff,
     canvas,
     nodes,

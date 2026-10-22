@@ -89,7 +89,7 @@ test.describe('canvas cursors across two tabs @real', () => {
     expect(latency).toBeLessThan(COMMIT_LATENCY_MS);
   });
 
-  for (const renderer of ['gpu', 'dom']) {
+  for (const renderer of ['gpu']) {
   test(`spotlight on the ${renderer} canvas: the other person is offered to follow, and their view then tracks mine`, async ({ page, browser, session }) => {
     const path = `/p/${session.projectId}/c/${session.canvasId}?renderer=${renderer}`;
     const elsewhere = await browser.newContext({ viewport: DESKTOP });
