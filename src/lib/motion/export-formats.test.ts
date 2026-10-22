@@ -29,6 +29,10 @@ describe('export formats', () => {
     expect(parseSettings(JSON.stringify({ ...PRESETS[Preset.Social], fps: 29 })).ok).toBe(false);
   });
 
+  it('120 fps is an export frame rate', () => {
+    expect(parseSettings(JSON.stringify({ ...PRESETS[Preset.Social], fps: 120 })).ok).toBe(true);
+  });
+
   it('a heavier codec makes a bigger file', () => {
     const d = doc(10);
 

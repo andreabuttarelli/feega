@@ -50,6 +50,12 @@ describe('export plan', () => {
     expect(Math.max(...frame(5)) - Math.min(...frame(5))).toBeGreaterThan(0);
   });
 
+  it('a 4K doc rendered at 2160p is native, not scaled', () => {
+    const native = { ...newMotionDoc(MotionFormat.Landscape), width: 3840, height: 2160 };
+
+    expect(outputSize(native, Resolution.P2160)).toEqual({ width: 3840, height: 2160, scale: 1 });
+  });
+
   it('a server render scales the doc up to the asked short side, 4K included', () => {
     expect(outputSize(newMotionDoc(MotionFormat.Landscape), Resolution.P2160)).toEqual({ width: 3840, height: 2160, scale: 2 });
     expect(outputSize(newMotionDoc(MotionFormat.Portrait), Resolution.P2160)).toEqual({ width: 2160, height: 2700, scale: 2 });

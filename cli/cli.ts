@@ -110,7 +110,7 @@ motion
   .option('--resolution <r>', '720p, 1080p, 1440p or 2160p')
   .option('--format <f>', 'With --server: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif')
   .option('--quality <q>', 'standard, high (default) or max')
-  .option('--fps <n>', '24, 25, 30, 50 or 60')
+  .option('--fps <n>', '24, 25, 30, 50, 60 or 120 (120 renders on our servers)')
   .option('--gif-loop <mode>', 'GIF: forever (default), once or boomerang')
   .option('--gif-fps <n>', 'GIF frame rate, 8 to 30 (default 15)')
   .option('--gif-width <px>', 'GIF width, 64 to 1920 (default 640)')

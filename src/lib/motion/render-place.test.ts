@@ -30,6 +30,11 @@ describe('renderPlace', () => {
     expect(renderPlace(input({ settings: { ...settingsOf(Preset.Social), format } }))).toMatchObject({ reason: FarmReason.Format });
   });
 
+  it('120 fps va al farm, 60 resta nel browser', () => {
+    expect(renderPlace(input({ settings: { ...settingsOf(Preset.Social), fps: 120 } }))).toMatchObject({ place: RenderPlace.Farm, reason: FarmReason.FrameRate });
+    expect(renderPlace(input({ settings: { ...settingsOf(Preset.Social), fps: 60 } }))).toEqual({ place: RenderPlace.Browser });
+  });
+
   it('senza WebCodecs H.264 va al farm', () => {
     expect(renderPlace(input({ capabilities: { webCodecs: false, h264: false, h264At720: false, aac: false } }))).toMatchObject({ reason: FarmReason.NoEncoder });
   });
