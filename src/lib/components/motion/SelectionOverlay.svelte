@@ -22,10 +22,9 @@
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
   import type { HeldPointer } from '$lib/canvas/frame-drill';
   import { Depth, FramePress, Gesture, Press, Under, drill, levelOf, pressOf, type Level, type Probe } from '$lib/motion/drill';
-  import type { OpResult } from '$lib/motion/timeline';
   import { EditMode } from '$lib/motion/edit-mode';
-  import { resizeFactors, rotateAround, scaleAroundXY, snappedHandle, turnedBy } from '$lib/motion/group-transform';
-  import { groupMove, rectOf, swept, toggled, unionBounds } from '$lib/motion/multi-select';
+  import { boundsQuad, groupDrag, outwardOf } from '$lib/motion/element-gesture';
+  import { rectOf, swept, toggled, unionBounds } from '$lib/motion/multi-select';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Bounds, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   type Asked = { at: Pt | null; gesture: Gesture; from: Depth; drag?: HeldPointer };
@@ -90,8 +89,6 @@
   const SETTLE_MS = 300;
   const EMPTY_RETRIES = 20;
   const ROTATE_REACH_PX = 44;
-  const ROTATE_STEP_DEG = 15;
-  const SIDE_UNIT = 0.5;
   const CORE_DRAWN_ATTRIBUTE = 'data-core-drawn';
   const CORE_SURFACE = '[data-canvas-surface][data-renderer="core"]';
 
@@ -616,41 +613,14 @@
     }
   }
 
-  const centreOf = (b: Bounds): Pt => [(b.left + b.right) / 2, (b.top + b.bottom) / 2];
-
-  function groupTransform(g: Grab & { group: string[] }, box: Bounds, e: PointerEvent): { result: OpResult; guides: Guide[] } {
-    const corners = handlesOf(boundsQuad(box));
-    const at = local(e);
-    if (g.grip === Grip.Rotate) {
-      const turn = turnedBy(centreOf(box), g.from, at);
-      return { result: rotateAround(laid, g.group, frame, centreOf(box), e.shiftKey ? Math.round(turn / ROTATE_STEP_DEG) * ROTATE_STEP_DEG : turn, mode), guides: [] };
-    }
-    const { unit, at: handleAt } = corners[g.handle];
-    const dragged: Pt = [handleAt[0] + at[0] - g.from[0], handleAt[1] + at[1] - g.from[1]];
-    const snapped = snappedHandle(dragged, [unit[0] !== SIDE_UNIT, unit[1] !== SIDE_UNIT], [...othersThan(g.group), ...layoutBounds], { width: doc.width, height: doc.height }, snapReach());
-    const { anchor, fx, fy } = resizeFactors(box, unit, snapped.point, e.shiftKey, e.altKey);
-    return { result: scaleAroundXY(laid, g.group, frame, anchor, fx, fy, mode), guides: snapped.guides };
-  }
-
-  const axisLocked = ([dx, dy]: Pt): Pt => (Math.abs(dx) >= Math.abs(dy) ? [dx, 0] : [0, dy]);
-
   function moveGroup(g: Grab & { group: string[] }, e: PointerEvent) {
     const to = client(e);
     g.travelled ||= Math.hypot(to.x - g.start.x, to.y - g.start.y) >= FRAME_SLOP_PX;
     if (!g.travelled) {
       return;
     }
-    const at = local(e);
     const box = unionBounds(g.group.map((id) => aabb(quadOf(laid, id, frame, boxes[id]))));
-    if (g.grip !== Grip.Move) {
-      const turned = groupTransform(g, box, e);
-      if (turned.result.ok) {
-        live = { doc: turned.result.doc, patch: {}, guides: turned.guides, gaps: [] };
-        onpreview(turned.result.doc);
-      }
-      return;
-    }
-    const { result, guides } = groupMove({ doc: laid, ids: g.group, frame, mode, offset: e.shiftKey ? axisLocked([at[0] - g.from[0], at[1] - g.from[1]]) : [at[0] - g.from[0], at[1] - g.from[1]], box, others: [...othersThan(g.group), ...layoutBounds], size: { width: doc.width, height: doc.height }, reach: snapReach() });
+    const { result, guides } = groupDrag({ doc: laid, ids: g.group, frame, mode, grip: g.grip, handle: g.handle, from: g.from, to: local(e), box, others: [...othersThan(g.group), ...layoutBounds], reach: snapReach(), keys: { shift: e.shiftKey, alt: e.altKey } });
     if (!result.ok) {
       return;
     }
@@ -794,19 +764,11 @@
   }
 
   const pct = ([x, y]: Pt) => `left: ${(x / doc.width) * 100}%; top: ${(y / doc.height) * 100}%;`;
-  const boundsQuad = (b: Bounds): Quad => [
-    [b.left, b.top],
-    [b.right, b.top],
-    [b.right, b.bottom],
-    [b.left, b.bottom]
-  ];
   const points = (q: Quad) => q.map((p) => p.join(',')).join(' ');
 
   function outward(q: Quad, corner: Pt): string {
-    const cx = (q[0][0] + q[2][0]) / 2;
-    const cy = (q[0][1] + q[2][1]) / 2;
-    const length = Math.hypot(corner[0] - cx, corner[1] - cy) || 1;
-    return `${pct(corner)} --dx: ${((corner[0] - cx) / length) * ROTATE_REACH_PX}px; --dy: ${((corner[1] - cy) / length) * ROTATE_REACH_PX}px;`;
+    const [ux, uy] = outwardOf(q, corner);
+    return `${pct(corner)} --dx: ${ux * ROTATE_REACH_PX}px; --dy: ${uy * ROTATE_REACH_PX}px;`;
   }
 </script>
 
