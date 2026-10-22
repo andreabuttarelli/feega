@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, Corner, containedIn } from './geometry';
+import { PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, Corner, containedIn, resizeHandleAt } from './geometry';
 
 const tile = { id: 'a', x: 100, y: 0, w: 200, h: 300, connectable: true, connectors: ['text', 'images'] as const, output: 'images' as const };
 
@@ -74,5 +74,15 @@ describe('wireCurve', () => {
 describe('containedIn', () => {
   it('a picture shot at another aspect is letterboxed in the box, never stretched', () => {
     expect(containedIn({ w: 400, h: 100 }, { x: 10, y: 0, w: 100, h: 100 })).toEqual({ x: 10, y: 37.5, w: 100, h: 25 });
+  });
+});
+
+describe('resizeHandleAt', () => {
+  const box = { x: 0, y: 0, w: 100, h: 50 };
+  it('finds corners first, then the sides, nothing inside', () => {
+    expect(resizeHandleAt(box, { x: 101, y: 51 }, 1)).toEqual([1, 1]);
+    expect(resizeHandleAt(box, { x: 102, y: 25 }, 1)).toEqual([1, 0.5]);
+    expect(resizeHandleAt(box, { x: 40, y: -3 }, 1)).toEqual([0.5, 0]);
+    expect(resizeHandleAt(box, { x: 50, y: 25 }, 1)).toBeNull();
   });
 });

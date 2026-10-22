@@ -108,4 +108,27 @@ describe('measuredGaps', () => {
   it('measures nothing over the picked element itself', () => {
     expect(measuredGaps(DOC, 0, BOXES, ['card'], 'card')).toEqual([]);
   });
+
+  it('a corner drag keeps the opposite corner fixed', () => {
+    const before = boundsOf(DOC, 'card');
+    const corner = handlesOf([[before.left, before.top], [before.right, before.top], [before.right, before.bottom], [before.left, before.bottom]])[CORNER_BOTTOM_RIGHT].at;
+    const { result } = dragClips(drag({ grip: Grip.Scale, handle: CORNER_BOTTOM_RIGHT, from: corner, to: [corner[0] + 60, corner[1] + 40], reach: 0 }));
+    const after = boundsOf(must(result), 'card');
+    expect(after.left).toBeCloseTo(before.left);
+    expect(after.top).toBeCloseTo(before.top);
+    expect(after.right).toBeCloseTo(before.right + 60);
+    expect(after.bottom).toBeCloseTo(before.bottom + 40);
+  });
+
+  it('a side drag resizes only that side', () => {
+    const before = boundsOf(DOC, 'card');
+    const RIGHT_SIDE = handlesOf([[0, 0], [1, 0], [1, 1], [0, 1]]).findIndex((h) => h.unit[0] === 1 && h.unit[1] === 0.5);
+    const from: [number, number] = [before.right, (before.top + before.bottom) / 2];
+    const { result } = dragClips(drag({ grip: Grip.Scale, handle: RIGHT_SIDE, from, to: [from[0] + 50, from[1] + 30], reach: 0 }));
+    const after = boundsOf(must(result), 'card');
+    expect(after.left).toBeCloseTo(before.left);
+    expect(after.right).toBeCloseTo(before.right + 50);
+    expect(after.top).toBeCloseTo(before.top);
+    expect(after.bottom).toBeCloseTo(before.bottom);
+  });
 });

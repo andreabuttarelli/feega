@@ -4,7 +4,7 @@ import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { toWorld } from '$lib/canvas/gpu/camera';
-import { framePicker, frameSpace } from './frame-pick';
+import { FrameFit, framePicker, frameSpace } from './frame-pick';
 import { groupClips } from '$lib/motion/group';
 
 const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 900, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 } }, 'card');
@@ -141,5 +141,13 @@ describe('framePicker outlineQuad', () => {
       { x: outline.x + outline.w, y: outline.y + outline.h },
       { x: outline.x, y: outline.y + outline.h }
     ]);
+  });
+});
+
+describe('a stretched frame space', () => {
+  it('maps the frame onto the whole box, each axis on its own', () => {
+    const stretched = frameSpace({ x: 10, y: 20, w: 400, h: 100 }, { width: 200, height: 200 }, 0, FrameFit.Stretch);
+    expect(stretched.pointToWorld([200, 200])).toEqual({ x: 410, y: 120 });
+    expect(stretched.toFrame({ x: 210, y: 70 })).toEqual([100, 100]);
   });
 });
