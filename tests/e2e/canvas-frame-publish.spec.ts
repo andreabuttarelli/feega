@@ -2,9 +2,10 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import instance from './fixtures/motion-doc-template-instance.json' with { type: 'json' };
+import { SHOT_PREFIX } from './fixtures/shots';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
-const SHOTS = process.env.SHOT_PREFIX ?? '';
+const SHOTS = SHOT_PREFIX;
 const TILE_AT = { x: 200, y: 80 };
 const SETTLE_MS = 1500;
 const MORE = 'More actions';

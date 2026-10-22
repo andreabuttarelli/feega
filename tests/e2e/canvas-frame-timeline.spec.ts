@@ -1,7 +1,8 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { SHOT_PREFIX } from './fixtures/shots';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
-const SHOTS = process.env.SHOT_PREFIX ?? '';
+const SHOTS = SHOT_PREFIX;
 const PLAY_MS = 1500;
 const CROP_HEIGHT = 560;
 const TILE_AT = { x: 200, y: 80 };

@@ -100,7 +100,7 @@
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import { FrameKind, MOTION_NODE_BAR_H, TileBody, frameChrome } from '$lib/canvas/motion-node';
-  import { BarContext } from '$lib/canvas/bottom-bar';
+  import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
@@ -175,6 +175,7 @@
   let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
 
   const DOM_CAP = 6;
+  const HALF = 2;
   const CORE = 'core';
   const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
   const SHELF_TICK_MS = 5000;
@@ -883,8 +884,6 @@
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && spec.flow.nodesDraggable);
 
-  const editing = $derived(props.barContext === BarContext.Frame);
-
   $effect(() => {
     scene?.setCards(cards);
   });
@@ -903,12 +902,6 @@
       iconed.add(kind);
       void iconBitmap(NODE_KIND_ICON[kind] as never).then((bitmap) => target.setIcon(kind, bitmap)).catch(() => iconed.delete(kind));
     }
-  });
-
-  $effect(() => {
-    const css = wrap ? getComputedStyle(wrap) : null;
-    const level = (name: string) => Number(css?.getPropertyValue(name) || 1);
-    scene?.setDim(editing ? { body: level('--neighbour-body'), edges: level('--neighbour-edges') } : null);
   });
 
   $effect(() => {
@@ -2625,6 +2618,14 @@
     props.onPaste?.(at);
   }
 
+  function insertImageInFrame(file: File) {
+    const frame = coreFrames.find((f) => f.id === soleFrame);
+    if (!frame) {
+      return;
+    }
+    props.onPasteData?.({ kind: Pasted.Image, file }, { x: frame.box.x + frame.box.w / HALF, y: frame.box.y + frame.box.h / HALF });
+  }
+
   async function onPasteEvent(e: ClipboardEvent) {
     if (!clipboardTarget(e)) {
       return;
@@ -3027,7 +3028,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && (scene || coreOn) && props.barContext === BarContext.Canvas && frameBar.tool !== DrawTool.Select && (frameBar.tool === DrawTool.Frame || !inside)}
+  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && (frameBar.tool === DrawTool.Frame || !inside)}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
@@ -3050,7 +3051,9 @@
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
-      context={props.barContext}
+      onimage={insertImageInFrame}
+      onframelibrary={soleFrame ? () => (frameDialog = { nodeId: soleFrame, dialog: FrameDialog.Templates }) : undefined}
+      context={barContextFor(soleFrame)}
       zoom={view.zoom}
     />
   {/if}

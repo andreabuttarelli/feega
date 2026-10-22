@@ -9,11 +9,10 @@
   import Film from '@lucide/svelte/icons/film';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
   import Hash from '@lucide/svelte/icons/hash';
-  import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barHidden, barKeys, barShift, barShown, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
+  import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
   import PenTool from '@lucide/svelte/icons/pen-tool';
   import Sparkles from '@lucide/svelte/icons/sparkles';
-  import { KEY_REGION_ATTR } from '$lib/canvas/key-region.svelte';
-  import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
+  import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { Command } from '$lib/motion/shortcuts';
   import { ACTIONS, tipText } from '$lib/motion/actions';
@@ -31,13 +30,24 @@
     ontemplate,
     onframes,
     ontrailer,
+    onimage,
+    onframelibrary,
     context = BarContext.Canvas,
     zoom
-  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; ontrailer?: () => void; context?: BarContext; zoom?: number } = $props();
+  }: {
+    onpick?: (what: Addable) => void;
+    onupload?: (file: File) => void;
+    ontemplate?: (id: string) => void;
+    onframes?: () => void;
+    ontrailer?: () => void;
+    onimage?: (file: File) => void;
+    onframelibrary?: () => void;
+    context?: BarContext;
+    zoom?: number;
+  } = $props();
 
   const PERCENT = 100;
   const SWITCH_PX = 64;
-  const FRAME_TABS_PX = 56;
 
   let barEl = $state<HTMLElement | null>(null);
   let timelinePx = $state(0);
@@ -89,6 +99,21 @@
     input.value = '';
   }
 
+  let imageInput = $state<HTMLInputElement | null>(null);
+
+  function pickImage() {
+    imageInput?.click();
+  }
+
+  function imageChosen(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) {
+      onimage?.(file);
+    }
+    input.value = '';
+  }
+
   const TOOL_COMMAND: Record<Exclude<DrawTool, DrawTool.Frame>, Command> = {
     [DrawTool.Select]: Command.ToolSelect,
     [DrawTool.Text]: Command.ToolText,
@@ -102,7 +127,7 @@
     return { tool, name: tip.name, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[command].icon };
   });
   const FRAME_TOOL = { tool: DrawTool.Frame, name: 'Frame', label: 'Frame', icon: Hash };
-  const DRAW_TOOLS = $derived(context === BarContext.Canvas ? [...SHAPE_TOOLS, FRAME_TOOL] : SHAPE_TOOLS);
+  const DRAW_TOOLS = [...SHAPE_TOOLS, FRAME_TOOL];
 
   let drawOpen = $state(false);
 
@@ -157,25 +182,26 @@
   const TRAILER_LABEL = 'Start from the feega trailer';
   const trailerTiles = $derived<Tile[]>(ontrailer ? [{ id: 'feega-trailer', label: TRAILER_LABEL, icon: Film, run: ontrailer }] : []);
 
+  const IMAGE_TILE: Tile = { id: 'image', label: 'Insert image', icon: ImagePlus, run: pickImage };
+  const frameLibraryTile = (): Tile[] => (onframelibrary ? [{ id: 'frame-library', label: 'Frame templates', icon: LayoutTemplate, run: onframelibrary }] : []);
+
+  const canvasSections = (): Section[] => [
+    { title: 'Design', tiles: drawTiles },
+    { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].map(addTile) },
+    { title: 'Media', tiles: [UPLOAD_TILE] },
+    {
+      title: 'Templates',
+      tiles: [
+        ...(ontemplate ? [{ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }] : []),
+        ...(onframes ? [{ id: 'frame-templates', label: 'Frame templates', icon: Clapperboard, run: onframes }] : []),
+        ...trailerTiles
+      ]
+    }
+  ];
+
   const INSERT_SECTIONS: Record<BarContext, () => Section[]> = {
-    [BarContext.Canvas]: () => [
-      { title: 'Design', tiles: drawTiles },
-      { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].map(addTile) },
-      { title: 'Media', tiles: [UPLOAD_TILE] },
-      {
-        title: 'Templates',
-        tiles: [
-          ...(ontemplate ? [{ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }] : []),
-          ...(onframes ? [{ id: 'frame-templates', label: 'Frame templates', icon: Clapperboard, run: onframes }] : []),
-          ...trailerTiles
-        ]
-      }
-    ],
-    [BarContext.Frame]: () => [
-      { title: 'Design', tiles: drawTiles },
-      { title: 'Media', tiles: [{ id: 'image', label: 'Insert image', icon: ImagePlus, run: () => frameBar.host?.act(FrameAction.Image) }] },
-      { title: 'Templates', tiles: [{ id: 'frame-library', label: 'Frame templates', icon: LayoutTemplate, run: () => frameBar.host?.act(FrameAction.Library) }, ...trailerTiles] }
-    ]
+    [BarContext.Canvas]: canvasSections,
+    [BarContext.Frame]: () => [...canvasSections(), { title: 'Frame', tiles: [IMAGE_TILE, ...frameLibraryTile()] }]
   };
   const insertSections = $derived(INSERT_SECTIONS[context]().filter((section) => section.tiles.length));
 
@@ -323,7 +349,7 @@
 
 {#snippet imageSlot()}
   <span class="tool">
-    <button type="button" class="keys-toggle" title="Insert image" aria-label="Insert image" data-testid="frame-image" onclick={() => frameBar.host?.act(FrameAction.Image)}>
+    <button type="button" class="keys-toggle" title="Insert image" aria-label="Insert image" data-testid="frame-image" onclick={pickImage}>
       <ImagePlus size={17} strokeWidth={1.7} />
     </button>
     <span class="add-tip" role="tooltip">Insert image</span>
@@ -331,24 +357,26 @@
 {/snippet}
 
 {#snippet frameLibrarySlot()}
-  <span class="tool">
-    <button type="button" class="keys-toggle" title="Frame templates" aria-label="Frame templates" data-testid="frame-library" onclick={() => frameBar.host?.act(FrameAction.Library)}>
-      <LayoutTemplate size={17} strokeWidth={1.7} />
-    </button>
-    <span class="add-tip" role="tooltip">Frame templates</span>
-  </span>
-  {@render trailerSlot()}
+  {#if onframelibrary}
+    <span class="tool">
+      <button type="button" class="keys-toggle" title="Frame templates" aria-label="Frame templates" data-testid="frame-library" onclick={onframelibrary}>
+        <LayoutTemplate size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Frame templates</span>
+    </span>
+  {/if}
 {/snippet}
 
-<div bind:this={barEl} class="add-bar" class:phone class:covered={barHidden(context, frameBar.covered)} class:stowed={!barShown(context, frameBar.editMode)} aria-hidden={!barShown(context, frameBar.editMode)} inert={!barShown(context, frameBar.editMode)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${timelinePx}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
+<div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" style:--lift={`${timelinePx}px`}>
   {#key `${context}:${mode}`}
     <div class="group" data-testid={`bar-${context}`}>
       {#each barSlots(context, mode) as s (s)}{@render SLOT[s]()}{/each}
     </div>
   {/key}
-  {#if zoom !== undefined && context === BarContext.Canvas}
+  {#if zoom !== undefined}
     <span class="zoom" data-testid="canvas-zoom" title="Zoom · 0 fits the canvas">{Math.round(zoom * PERCENT)}%</span>
   {/if}
+  <input bind:this={imageInput} type="file" class="sr-only" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" data-testid="frame-image-input" onchange={imageChosen} />
   <input
     bind:this={fileInput}
     type="file"
@@ -383,7 +411,7 @@
 </div>
 
 {#if phone}
-  <PhoneSheet name="insert" title="Insert" open={phoneSheets.shown === PhoneSheetKind.Insert} onclose={() => phoneSheets.close(PhoneSheetKind.Insert)} floorPx={context === BarContext.Frame ? FRAME_TABS_PX : SWITCH_PX} testid="insert-sheet">
+  <PhoneSheet name="insert" title="Insert" open={phoneSheets.shown === PhoneSheetKind.Insert} onclose={() => phoneSheets.close(PhoneSheetKind.Insert)} floorPx={SWITCH_PX} testid="insert-sheet">
     {#each insertSections as section (section.title)}
       <h4 class="insert-head">{section.title}</h4>
       <div class="insert-grid">
@@ -435,20 +463,11 @@
     background: var(--ui-pressed);
   }
 
-  .add-bar.covered {
-    visibility: hidden;
-  }
-
-  .add-bar.stowed {
-    opacity: 0;
-    pointer-events: none;
-  }
-
   .add-bar {
     position: absolute;
     z-index: 61;
     bottom: var(--lift, 0px);
-    left: calc(50% - var(--shift, 0px));
+    left: 50%;
     transform: translateX(-50%);
     transition: bottom var(--chrome-move) var(--ease-expo), left var(--chrome-move) var(--ease-expo), opacity var(--chrome-move) var(--ease-expo), translate var(--chrome-move) var(--ease-expo);
     display: flex;

@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { SHOT_PREFIX } from './fixtures/shots';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const BOX_ID = 'box';
@@ -10,7 +11,7 @@ const GRAB_SHARE = 0.25;
 const CORNER_COUNT = 4;
 const SETTLE_MS = 3000;
 const EDGE_TOLERANCE_PX = 3;
-const SHOTS = process.env.SHOT_PREFIX ?? '';
+const SHOTS = SHOT_PREFIX;
 
 const doc = {
   version: 5,
