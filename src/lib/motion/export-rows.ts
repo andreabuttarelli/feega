@@ -61,6 +61,13 @@ export const exportRowsSchema = z.array(rowSchema).min(1).max(MAX_ROWS);
 
 export type ExportRow = z.infer<typeof rowSchema>;
 
+const PRESET_SCALES = [1, 2, 3, 4];
+
+export const EXPORT_PRESETS: readonly { label: string; row: ExportRow }[] = [
+  ...PRESET_SCALES.map((value) => ({ label: `${value}×`, row: { format: FileFormat.Png, by: SizeBy.Scale, value, suffix: value === 1 ? '' : `@${value}x`, transparent: true } })),
+  { label: FILE[FileFormat.Svg].label, row: { format: FileFormat.Svg, by: SizeBy.Scale, value: 1, suffix: '', transparent: true } }
+];
+
 export const exportElementsSchema = z.array(z.object({ frameId: z.string(), elementId: z.string() }).strict()).max(50);
 
 type Size = { width: number; height: number };

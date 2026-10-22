@@ -297,6 +297,18 @@ describe('drawElement action', () => {
     expect(inserted(input)).toMatchObject([{ x: 10, y: 20, width: 100, height: 50 }]);
   });
 
+  it('a pasted svg path keeps its colour, and pasted text keeps its words', async () => {
+    const input = event({ drawn: JSON.stringify({ tool: 'pen', path: 'M 0 0 L 10 0 L 10 10 Z', fill: '#ff0000', stroke: null }) });
+    const text = event({ drawn: JSON.stringify({ tool: 'text', box: { left: 0, top: 0, width: 300, height: 100 }, text: 'pasted words' }) });
+
+    await actions.drawElement(input as never);
+    await actions.drawElement(text as never);
+
+    const props = (e: ReturnType<typeof event>) => e.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').flatMap((c) => (c.payload as { doc: MotionDoc }).doc.tracks.flatMap((t) => t.clips).map((c) => c.props));
+    expect(props(input)).toMatchObject([{ fill: '#ff0000' }]);
+    expect(props(text)).toMatchObject([{ text: 'pasted words' }]);
+  });
+
   it('an unreadable drawing is a 400, nothing written', async () => {
     const input = event({ drawn: JSON.stringify({ tool: 'select', box: { left: 0, top: 0, width: 1, height: 1 } }) });
 

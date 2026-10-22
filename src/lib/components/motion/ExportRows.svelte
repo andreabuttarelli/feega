@@ -1,6 +1,6 @@
 <script lang="ts">
   import { attachmentUrl } from '$lib/motion/still-model';
-  import { FILE, FILE_FORMATS, FileFormat, LOSSY, MAX_SCALE, MIN_SCALE, SizeBy, type ExportRow } from '$lib/motion/export-rows';
+  import { EXPORT_PRESETS, FILE, FILE_FORMATS, FileFormat, LOSSY, MAX_SCALE, MIN_SCALE, SizeBy, type ExportRow } from '$lib/motion/export-rows';
 
   type Made = { url: string; name: string; files: string[] };
 
@@ -44,6 +44,9 @@
 
 <div class="fx-rows">
   <h3>Export {count === 1 ? 'frame' : `${count} frames`}</h3>
+  <div class="fx-presets" role="group" aria-label="Presets">
+    {#each EXPORT_PRESETS as preset (preset.label)}<button type="button" class="fx-btn" data-testid="export-preset" onclick={() => (rows = [{ ...preset.row }])}>{preset.label}</button>{/each}
+  </div>
   {#each rows as row, i (i)}
     <div class="fx-line" data-testid="export-row">
       <input type="number" aria-label="Size" min={row.by === SizeBy.Scale ? MIN_SCALE : 1} max={row.by === SizeBy.Scale ? MAX_SCALE : undefined} step={row.by === SizeBy.Scale ? 0.5 : 1} value={row.value} onchange={(e) => patch(i, { value: Number(e.currentTarget.value) })} />
@@ -73,6 +76,7 @@
 <style>
   .fx-rows { display: flex; flex-direction: column; gap: 8px; }
   .fx-rows h3 { margin: 0 0 6px; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+  .fx-presets { display: flex; flex-wrap: wrap; gap: 6px; }
   .fx-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
   .fx-line input[type='number'] { width: 64px; }
   .fx-line input[type='text'] { width: 80px; }

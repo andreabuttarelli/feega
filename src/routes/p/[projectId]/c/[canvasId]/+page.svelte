@@ -4,6 +4,9 @@
   import type { ExportRow } from '$lib/motion/export-rows';
   import { localStore } from '$lib/browser-storage';
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
+  import { Pasted, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
+  import { svgShapes } from '$lib/motion/shape/svg-import';
+  import { mapOutline, parsePath, pathData } from '$lib/motion/shape/geometry';
   import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
   import type { Stack } from '$lib/canvas/stacking';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
@@ -118,6 +121,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
+  import { DrawTool } from '$lib/motion/draw-tool';
+  import { TextSizing } from '$lib/motion/text-sizing';
   import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, heightFollowsDoc, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
@@ -1612,7 +1617,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  async function upload(file: File) {
+  async function upload(file: File, at = { x: 0, y: 0 }) {
     if (FONT_FILE.test(file.name)) {
       await uploadFontFile(file);
       return;
@@ -1633,7 +1638,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
 
     const result = await post('upload', {
-      path, file_name: file.name, mime_type: file.type, bytes: file.size, x: 0, y: 0
+      path, file_name: file.name, mime_type: file.type, bytes: file.size, x: at.x, y: at.y
     });
     const created = result?.node as CanvasNodeRecord | undefined;
     if (created) { nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })]; }
@@ -2971,6 +2976,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let formatsFor = $state<string | null>(null);
   let exportFor = $state<string[] | null>(null);
+  let exportElements = $state<{ frameId: string; elementIds: string[] } | null>(null);
+
+  async function exportPicked(picked: { frameId: string; elementIds: string[] }, rows: ExportRow[]) {
+    await saves.flush(picked.frameId);
+    const elements = picked.elementIds.map((elementId) => ({ frameId: picked.frameId, elementId }));
+    const out = await post('exportSelection', { elements: JSON.stringify(elements), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
+    return out?.url ? (out as { url: string; name: string; files: string[] }) : 'Export failed';
+  }
 
   async function exportFrames(frameIds: string[], rows: ExportRow[]) {
     await Promise.all(frameIds.map((id) => saves.flush(id)));
@@ -3004,16 +3017,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * RELATIVE al centro della selezione: incollare altrove, o su un'altra tela della stessa org,
    * deve posare il gruppo dov'è il puntatore, non dov'era quando è stato copiato.
    */
-  type Clipboard = {
-    nodes: { type: string; data: Record<string, unknown>; dx: number; dy: number }[];
-    edges: { sourceIndex: number; targetIndex: number; sourceHandle: string | null; targetHandle: string | null }[];
-    freeIds: string[];
-  };
-  let clipboard = $state<Clipboard | null>(null);
+  let clipboard = $state<CopiedTiles | null>(null);
 
-  function copy(ids: string[]) {
+  function copy(ids: string[]): ClipboardPayload | null {
     const chosen = nodes.filter((n) => ids.includes(n.id));
-    if (!chosen.length) { return; }
+    if (!chosen.length) { return null; }
     elementClipboard.copyTiles();
 
     const indexOf = new Map(chosen.map((n, i) => [n.id, i]));
@@ -3034,6 +3042,85 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
           targetHandle: e.targetHandle ?? null
         }))
     };
+    return { tiles: clipboard };
+  }
+
+  const MAX_PASTED_SHAPES = 200;
+  const TEXT_BOX = { lineHeight: 32, charWidth: 0.55, maxChars: 48 };
+  const FIGMA_PASTE = 'Figma layers cannot be pasted directly. In Figma use Copy as → Copy as SVG, then paste here.';
+
+  function shiftedPath(path: string, dx: number, dy: number): string | null {
+    const outline = parsePath(path);
+    return typeof outline === 'string' ? null : pathData(mapOutline(outline, ([x, y]) => [x + dx, y + dy]));
+  }
+
+  function pathBox(path: string): CanvasBox | null {
+    const outline = parsePath(path);
+    if (typeof outline === 'string') { return null; }
+    const xs = outline.flatMap((c) => c.vertices.map((v) => v.p[0]));
+    const ys = outline.flatMap((c) => c.vertices.map((v) => v.p[1]));
+    return { left: Math.min(...xs), top: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+  }
+
+  async function pasteSvg(svg: string, at: { x: number; y: number }) {
+    const read = svgShapes(svg);
+    const shapes = read.shapes.slice(0, MAX_PASTED_SHAPES);
+    if (!shapes.length) {
+      failed = 'This SVG has no shapes to paste';
+      return;
+    }
+    const [dx, dy] = [at.x - read.size.width / 2, at.y - read.size.height / 2];
+    const made = await Promise.all(
+      shapes.map(async (shape) => {
+        const path = shiftedPath(shape.path, dx, dy);
+        const res = path ? await post('drawElement', { drawn: JSON.stringify({ tool: DrawTool.Pen, path, fill: shape.fill, stroke: shape.stroke }), node_id: crypto.randomUUID() }) : null;
+        const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+        return node ? { node, undo: (res?.undo ?? []) as UndoItem[], box: path ? pathBox(path) : null } : null;
+      })
+    );
+    const landedShapes = made.filter((m) => m !== null);
+    if (!landedShapes.length) { return; }
+    nodes = [...nodes, ...landedShapes.map((m) => toTile(m.node))];
+    pushGesture({ items: landedShapes.flatMap((m) => m.undo) });
+    const hold = frameHolding(nodes, { left: at.x, top: at.y, width: 0, height: 0 });
+    if (hold) {
+      for (const m of landedShapes) {
+        const own = m.box ? frameHolding(nodes, m.box) : null;
+        await intoFrame(m.node.id, own ?? hold);
+      }
+      return;
+    }
+    const ids = landedShapes.map((m) => m.node.id);
+    focusOn(ids, undefined, FocusMode.Select);
+    groupElements(ids);
+  }
+
+  function pasteText(text: string, at: { x: number; y: number }) {
+    const longest = Math.min(TEXT_BOX.maxChars, Math.max(...text.split('\n').map((line) => line.length)));
+    const width = longest * TEXT_BOX.lineHeight * TEXT_BOX.charWidth;
+    const height = TEXT_BOX.lineHeight;
+    void drawElement({ tool: DrawTool.Text, box: { left: at.x - width / 2, top: at.y - height / 2, width, height }, text, sizing: TextSizing.AutoHeight });
+  }
+
+  const PASTE_DATA: { [K in Pasted]: (data: Extract<PasteData<File>, { kind: K }>, at: { x: number; y: number }) => void } = {
+    [Pasted.Feega]: ({ payload }, at) => {
+      if (payload.elements) {
+        elementClipboard.copyElements(payload.elements.frameId, payload.elements.clipIds, payload.elements.elements);
+      }
+      if (payload.tiles) {
+        clipboard = payload.tiles;
+        elementClipboard.copyTiles();
+      }
+      void paste(at);
+    },
+    [Pasted.Svg]: ({ svg }, at) => void pasteSvg(svg, at),
+    [Pasted.Image]: ({ file }, at) => void upload(file, at),
+    [Pasted.Text]: ({ text }, at) => pasteText(text, at),
+    [Pasted.Figma]: () => (failed = FIGMA_PASTE)
+  };
+
+  function pasteData(data: PasteData<File>, at: { x: number; y: number }) {
+    (PASTE_DATA[data.kind] as (d: PasteData<File>, a: { x: number; y: number }) => void)(data, at);
   }
 
   /** ⌘V: quel che `copy` ha in mano, riposato attorno al punto dato — vuoto se non si è mai copiato. */
@@ -3273,6 +3360,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if exportFor}
     <ExportDialog count={exportFor.length} onexport={(rows) => exportFrames(exportFor!, rows)} onclose={() => (exportFor = null)} />
   {/if}
+  {#if exportElements}
+    <ExportDialog count={exportElements.elementIds.length} onexport={(rows) => exportPicked(exportElements!, rows)} onclose={() => (exportElements = null)} />
+  {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
   {/if}
@@ -3328,6 +3418,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDuplicate={duplicate}
     onCopy={copy}
     onPaste={paste}
+    onClip={copy}
+    onPasteData={pasteData}
+    onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     barContext={barContextOf(CanvasState.Browsing)}

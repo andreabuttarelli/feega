@@ -86,7 +86,7 @@ import { exportElementsSchema, exportRowsSchema } from '$lib/motion/export-rows'
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
-import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -1284,7 +1284,7 @@ export const actions: Actions<CanvasParams> = {
   drawElement: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = drawnSchema.safeParse(jsonField(fd, 'drawn'));
+    const ask = pastedSchema.safeParse(jsonField(fd, 'drawn'));
     const id = String(fd.get('node_id') ?? '') || undefined;
     if (!ask.success || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid drawing' });

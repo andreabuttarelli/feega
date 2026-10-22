@@ -3,7 +3,7 @@ import { TextSizing } from './text-sizing';
 import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { DrawTool, type DrawBox } from './draw-tool';
 import { mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
-import { ShapeKind } from './shape/schema';
+import { FillKind, ShapeKind, StrokeKind } from './shape/schema';
 import { DocMode, docMode, setStill, settledStill } from './still';
 import { TOP_LEFT_START, addClip, type OpResult } from './timeline';
 
@@ -48,12 +48,12 @@ const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox, sizing: TextSizi
   [DrawTool.Ellipse]: () => ({})
 };
 
-export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = TextSizing.AutoHeight): OpResult {
+export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = TextSizing.AutoHeight, extra: Record<string, unknown> = {}): OpResult {
   const made = BOX_CLIP[tool as BoxTool];
   if (!made) {
     return fail(`${tool} does not draw a box`);
   }
-  return place(doc, made.component, { ...made.props, ...BOX_SIZED[tool as BoxTool](doc, box, sizing), ...box }, frame, id);
+  return place(doc, made.component, { ...made.props, ...extra, ...BOX_SIZED[tool as BoxTool](doc, box, sizing), ...box }, frame, id);
 }
 
 function boundsOf(outline: Outline): DrawBox {
@@ -70,7 +70,7 @@ function boundsOf(outline: Outline): DrawBox {
 const PRECISION = 10000;
 const round = (n: number) => Math.round(n * PRECISION) / PRECISION;
 
-export function penClip(doc: MotionDoc, outline: Outline, frame: number, id: string): OpResult {
+export function penClip(doc: MotionDoc, outline: Outline, frame: number, id: string, paint: Record<string, unknown> = {}): OpResult {
   if (outline.reduce((n, c) => n + c.vertices.length, 0) < MIN_PEN_POINTS) {
     return fail('a path needs at least two points');
   }
@@ -79,7 +79,7 @@ export function penClip(doc: MotionDoc, outline: Outline, frame: number, id: str
   const top = box.y - box.height / 2;
   const unit = mapOutline(outline, ([x, y]) => [round(box.width ? (x - left) / box.width : 0), round(box.height ? (y - top) / box.height : 0)]);
   const placed = { x: round(box.x), y: round(box.y), width: round(Math.max(box.width, MIN_SIDE)), height: round(Math.max(box.height, MIN_SIDE)) };
-  return place(doc, 'Shape', { shape: ShapeKind.Path, path: pathData(unit), ...placed }, frame, id);
+  return place(doc, 'Shape', { shape: ShapeKind.Path, path: pathData(unit), ...paint, ...placed }, frame, id);
 }
 
 export type CanvasBox = { left: number; top: number; width: number; height: number };
@@ -89,16 +89,29 @@ export enum CanvasTheme {
   Dark = 'dark'
 }
 
-export type Drawn = { tool: BoxTool; box: CanvasBox; theme?: CanvasTheme; sizing?: TextSizing } | { tool: DrawTool.Pen; outline: Outline };
+export type PenPaint = { fill?: string | null; stroke?: string | null };
 
-export type DrawnWire = { tool: BoxTool; box: CanvasBox; theme?: CanvasTheme; sizing?: TextSizing } | { tool: DrawTool.Pen; path: string };
+type BoxDrawn = { tool: BoxTool; box: CanvasBox; theme?: CanvasTheme; sizing?: TextSizing; text?: string };
+
+export type Drawn = BoxDrawn | ({ tool: DrawTool.Pen; outline: Outline } & PenPaint);
+
+export type DrawnWire = BoxDrawn | ({ tool: DrawTool.Pen; path: string } & PenPaint);
 
 export function drawnOf(wire: DrawnWire): Drawn | string {
   if (wire.tool !== DrawTool.Pen) {
     return wire;
   }
-  const outline = parsePath(wire.path);
-  return typeof outline === 'string' ? outline : { tool: DrawTool.Pen, outline };
+  const { path, ...paint } = wire;
+  const outline = parsePath(path);
+  return typeof outline === 'string' ? outline : { ...paint, outline };
+}
+
+function penPaint({ fill, stroke }: PenPaint): Record<string, unknown> {
+  return {
+    ...(fill === null ? { fillKind: FillKind.None } : {}),
+    ...(fill ? { fillKind: FillKind.Solid, fill } : {}),
+    ...(stroke ? { strokeKind: StrokeKind.Solid, stroke } : {})
+  };
 }
 
 export type DrawnElement = { ok: true; doc: MotionDoc; box: CanvasBox } | { ok: false; error: string };
@@ -149,8 +162,8 @@ export function drawnElement(drawn: Drawn, id: string): DrawnElement {
   }
   const made =
     drawn.tool === DrawTool.Pen
-      ? penClip(blank.doc, mapOutline(drawn.outline, ([x, y]) => [(x - box.left) / box.width, (y - box.top) / box.height]), 0, id)
-      : drawClip(blank.doc, drawn.tool, FULL_BOX, 0, id, drawn.sizing);
+      ? penClip(blank.doc, mapOutline(drawn.outline, ([x, y]) => [(x - box.left) / box.width, (y - box.top) / box.height]), 0, id, penPaint(drawn))
+      : drawClip(blank.doc, drawn.tool, FULL_BOX, 0, id, drawn.sizing, drawn.text ? { text: drawn.text } : {});
   const theme = drawn.tool === DrawTool.Pen ? CanvasTheme.Light : (drawn.theme ?? CanvasTheme.Light);
   return made.ok ? { ok: true, doc: canvasReady(made.doc, theme), box } : made;
 }

@@ -14,10 +14,12 @@ export const IMAGE_FORMATS = Object.values(ImageFormat) as [ImageFormat, ...Imag
 
 export enum ImageScale {
   One = 1,
-  Two = 2
+  Two = 2,
+  Three = 3,
+  Four = 4
 }
 
-export const IMAGE_SCALES = [ImageScale.One, ImageScale.Two] as const;
+export const IMAGE_SCALES = [ImageScale.One, ImageScale.Two, ImageScale.Three, ImageScale.Four] as const;
 
 const LOSSY_QUALITY = 92;
 
