@@ -81,6 +81,6 @@ describe('storyboardStore', () => {
 
     expect(await store.link('far', ['clip'])).toMatchObject({ ok: false });
     expect(await store.link('c', ['clip'])).toMatchObject({ ok: true });
-    expect(fake.calls.find((c) => c.table === 'nodes' && c.op === 'update')?.payload).toMatchObject({ data: { beat: { editor: '/p/project/c/home/motion/motion', clipIds: ['clip'] } } });
+    expect(fake.calls.find((c) => c.table === 'nodes' && c.op === 'update')?.payload).toMatchObject({ data: { beat: { editor: '/p/project/c/home?frame=motion', clipIds: ['clip'] } } });
   });
 });

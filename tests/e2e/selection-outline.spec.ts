@@ -10,7 +10,6 @@ const FRAME_DATA = {
   lastRenderAssetId: null
 };
 const DESKTOP = { width: 1280, height: 860 };
-const NARROW = { width: 1000, height: 760 };
 const ZOOMS = [0.5, 1, 2];
 const ZOOM_TOLERANCE = 0.1;
 const MAX_ZOOM_STEPS = 20;
@@ -105,18 +104,6 @@ test.describe('the selection outline sits on the element @real', () => {
   });
 
   const nodeOf = (info: { annotations: { type: string; description?: string }[] }) => info.annotations.find((a) => a.type === 'node')!.description!;
-
-  test('on the full editor page, and after the stage resizes', async ({ page, session }, info) => {
-    const poster = posterSaved(page);
-    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${nodeOf(info)}`);
-    await page.locator('[data-clip-id="a"]').first().click();
-
-    await expectFollows(page, poster, 'full page');
-    await shoot(page, `page-${info.project.name}`);
-
-    await page.setViewportSize(NARROW);
-    await expectOutlined(page, page.getByTestId('selection-box'), TEXT, 'full page, narrower');
-  });
 
   for (const zoom of ZOOMS) {
     test(`inline on the canvas at zoom ${zoom}`, async ({ page, session }, info) => {

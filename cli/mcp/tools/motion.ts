@@ -7,7 +7,7 @@ import { MAX_ATTACHMENTS } from '../../lib/attachments.ts';
 const MAX_FRAMES = 6;
 const MAX_FRAME_WIDTH = 960;
 
-const EDITOR_READS = 'editor_session {briefIds?} (everything the editor page loads: head, assets, tokens, templates, render state, gallery), read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render), list_fonts {} (uploaded font families of the org, with their files)';
+const EDITOR_READS = 'editor_session {briefIds?} (everything the canvas loads for a frame: head, assets, tokens, templates, render state, gallery), read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render), list_fonts {} (uploaded font families of the org, with their files)';
 const EDITOR_WRITES =
   'save_doc {version,doc,summary?} (whole doc; 409 answers the head), apply_ops {version,ops,summary?} (doc ops, rebased on newer edits), ' +
   'record_export {path,width,height,seconds} (an mp4 already in storage becomes the render asset), upload_font {path} (a TTF, OTF, WOFF or WOFF2 already in canvas-assets under the org fonts folder; joins the org library), rename_font {family,to}, delete_font {family}, analyze_sounds {assetIds} (tempo, beats, speech), ' +
@@ -281,7 +281,7 @@ export function registerMotionTools(server: McpServer) {
       description:
         'The motion videos (`motion` canvas nodes) of the org, newest first, optionally of one project: `node_id`, `name`, ' +
         '`project_id`, `canvas_id`, `format`, saved revision `version` (0 = empty), signed `poster_url` and `last_render_url` ' +
-        '(one hour, null when none) and `editor_url`. Use it to find the `node_id` the other motion tools take. Reads only.',
+        '(one hour, null when none) and `editor_url` (the canvas with the frame selected). Use it to find the `node_id` the other motion tools take. Reads only.',
       inputSchema: z.object({ org, project_id: z.string().optional() }),
       annotations: { readOnlyHint: true }
     },

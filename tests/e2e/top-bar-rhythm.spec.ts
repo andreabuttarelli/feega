@@ -116,13 +116,5 @@ test.describe('the editor chrome keeps the same rhythm @real', () => {
       await page.screenshot({ path: `${SHOTS}/editor-${TAG}-menu-1440-light.png` });
     }
     await page.keyboard.press('Escape');
-
-    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
-    await expect(page.getByTestId('editor-bar')).toBeVisible({ timeout: 15_000 });
-    await page.waitForTimeout(1000);
-    if (SHOTS) {
-      await page.screenshot({ path: `${SHOTS}/editor-${TAG}-fullscreen-1440-light.png` });
-    }
-    await expectRhythm(page);
   });
 });

@@ -15,7 +15,7 @@ vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReac
 vi.mock('$lib/server/motion/sfx', () => ({ laySfx: async (_db: unknown, _scope: unknown, sfx: string) => ({ ok: true, assetId: `sfx-${sfx}`, url: null, seconds: 0.1 }) }));
 vi.mock('$lib/server/motion/editor', () => ({ findMotionNode: async () => ({ record: { id: 'n1' }, node: {} }), assetUrls: vi.fn(), headOrNew: vi.fn(), motionAssets: vi.fn(), motionTokens: vi.fn(), saveMotionDoc: vi.fn() }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/frame-editor/editor-page');
 
 function event(db: unknown, fields: Record<string, string>) {
   const form = new FormData();

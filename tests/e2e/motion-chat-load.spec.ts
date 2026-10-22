@@ -56,12 +56,4 @@ test.describe('motion chat loads fast @real', () => {
 
     expect(await chatReadyAfterOpen(page)).toBeLessThan(CHAT_BUDGET_MS);
   });
-
-  test('the full-screen editor shows its chat within the budget', async ({ page, session }, info) => {
-    const first = info.annotations.find((a) => a.type === 'node')!.description!;
-    await page.addInitScript(installProbe);
-    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${first}`);
-
-    expect(await chatReadyAfterOpen(page)).toBeLessThan(CHAT_BUDGET_MS);
-  });
 });

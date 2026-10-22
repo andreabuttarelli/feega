@@ -279,7 +279,7 @@ list. Returns how many combinations it actually stopped.
 
 `list_motion_videos({ org, project_id? })` lists `motion` nodes newest first: `node_id`, `name`,
 `project_id`, `canvas_id`, `format`, `version` (0 = empty), signed `poster_url` /
-`last_render_url` (one hour) and `editor_url`.
+`last_render_url` (one hour) and `editor_url` (the canvas, with the frame selected).
 
 `ask_motion_agent({ org, node_id, prompt, wait? })` runs one turn of the motion editor's agent on
 a `motion` node, with the editor's own tools, and saves a new revision. It returns at once with

@@ -16,8 +16,7 @@ describe('the bottom bar under an open frame dialog', () => {
     expect(frameBar.covered).toBe(false);
   });
 
-  it('the bar steps aside while the frame editor shows a dialog, so it never sits over the dialog buttons', () => {
+  it('the bar steps aside while the canvas shows a frame dialog, so it never sits over the dialog buttons', () => {
     expect(read('canvas/CanvasAddBar.svelte')).toMatch(/frameBar\.covered/);
-    expect(read('motion/MotionEditorShell.svelte')).toMatch(/frameBar\.covered = /);
   });
 });

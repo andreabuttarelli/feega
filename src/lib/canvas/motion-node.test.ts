@@ -38,7 +38,7 @@ describe('motion node', () => {
   });
 
   it('the editor lives under the canvas', () => {
-    expect(motionEditorPath({ projectId: 'p', canvasId: 'c', nodeId: 'n' })).toBe('/p/p/c/c/motion/n');
+    expect(motionEditorPath({ projectId: 'p', canvasId: 'c', nodeId: 'n' })).toBe('/p/p/c/c?frame=n');
   });
 
   it.each(MOTION_FORMATS)('a %s node is its picture plus the bar, so the selection frames what is visible', (format) => {

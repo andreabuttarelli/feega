@@ -12,7 +12,7 @@ import { renderQueue } from '$lib/server/motion/render-queue';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { listProjects } from '$lib/server/repos/projects';
 import { registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
-import { motionEditorPath } from '$lib/canvas/motion-node';
+import { motionNodePath } from '$lib/canvas/motion-node';
 import { uploadKindOf } from '$lib/canvas/upload-kind';
 import { draftFromDoc } from '$lib/motion/composition-draft';
 import { COMPOSITION_MEDIA_KINDS } from '$lib/motion/components';
@@ -58,7 +58,7 @@ export const load = async (event: ServerLoadEvent<ComposeParams>) => {
     tokens,
     assets,
     serverRender: { configured: motionRenderFarm() !== null && serverRenderOpen(), latest: renderView(runs), queue: renderQueue() },
-    editorUrl: motionEditorPath({ projectId, canvasId, nodeId: motion.record.id }),
+    editorUrl: motionNodePath({ projectId, canvasId, nodeId: motion.record.id }),
     canvasHref: `/p/${projectId}/c/${canvasId}`,
     gallery
   };

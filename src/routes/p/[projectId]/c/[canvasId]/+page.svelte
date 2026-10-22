@@ -68,7 +68,7 @@
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
   import { Renderer, Switch, rendererOf } from '$lib/canvas/gpu/renderer-flag';
   import RendererBadge from '$lib/components/canvas/gpu/RendererBadge.svelte';
@@ -123,7 +123,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { TextSizing } from '$lib/motion/text-sizing';
-  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, heightFollowsDoc, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, heightFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
@@ -247,6 +247,24 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   $effect(() => {
     untrack(announceWelcome);
+  });
+
+  function openLinkedFrame() {
+    const id = page.url.searchParams.get(FRAME_PARAM);
+    if (!id) {
+      return;
+    }
+
+    const clean = new URL(page.url);
+    clean.searchParams.delete(FRAME_PARAM);
+    replaceState(clean, page.state);
+    if (nodes.some((n) => n.id === id)) {
+      focusOn([id], undefined, FocusMode.Select);
+    }
+  }
+
+  onMount(() => {
+    requestAnimationFrame(openLinkedFrame);
   });
 
   let coachOpen = $state(untrack(() => data.onboarding.visible));
@@ -3673,7 +3691,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
           <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} {liveHost} liveUrl={motionLivePath(motionAt)} />
+          <MotionNode node={motion} href={motionNodePath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} {liveHost} liveUrl={motionLivePath(motionAt)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}
