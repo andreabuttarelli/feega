@@ -128,11 +128,12 @@
   import type { GenMedium } from '$lib/canvas/gen-node';
   import type { CanvasEdgeKind, FlowEdge, WireMode } from '$lib/canvas-edges';
   import { setTileRender } from '$lib/canvas/tile-render-context';
+  import { resizeCursor, type ResizeCursor } from '$lib/canvas/resize-cursor';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
-  import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
+  import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, Corner, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
@@ -1220,6 +1221,20 @@
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
+  const CORNER_OUTWARD: Record<Corner, [number, number]> = { [Corner.TopLeft]: [-1, -1], [Corner.TopRight]: [1, -1], [Corner.BottomLeft]: [-1, 1], [Corner.BottomRight]: [1, 1] };
+  let cornerCursor = $state<ResizeCursor | null>(null);
+
+  function hoverCorner(w: Point) {
+    const box = resizable ? selectedBoxes[0] : null;
+    const corner = box ? resizeCornerAt(box, w, view.zoom) : null;
+    cornerCursor = box && corner ? resizeCursor(CORNER_OUTWARD[corner], box.rotation ?? 0) : null;
+  }
+
+  function dropHover() {
+    pickHover = null;
+    layersSource.hover(null);
+  }
+
   let inside = $state<Inside | null>(null);
   const savers = new Map<string, FrameEditSession>();
 
@@ -1711,6 +1726,7 @@
     }
     e.preventDefault();
     e.stopPropagation();
+    dropHover();
     const start = saver.history.present;
     const frame = frameOfLive({ doc: start, playhead: at.live.playhead });
     const ids = clip && !picks.includes(clip) ? [clip] : picks;
@@ -1781,6 +1797,7 @@
 
   function onDown(e: PointerEvent) {
     glide = null;
+    dropHover();
     markBusy();
     measureSurface();
     const p = local(e);
@@ -1900,8 +1917,9 @@
     if (!active) {
       hovered = e.pointerType === 'mouse' ? topNodeAt(w) : null;
       hoverChrome = e.pointerType === 'mouse' ? (hovered ?? portAt(ports, w, view.zoom)?.nodeId ?? null) : null;
-      if (e.pointerType === 'mouse') {
+      if (e.pointerType === 'mouse' && !e.buttons) {
         hoverElement(w);
+        hoverCorner(w);
       }
       return;
     }
@@ -2728,6 +2746,7 @@
       pickHover = null;
     }}
     class:panning={space}
+    style:cursor={cornerCursor}
     data-owns-pinch
   >
     {#if coreOn}
@@ -2742,7 +2761,7 @@
           <CoreTextEdit rect={edit.rect} look={edit.look} text={edit.text} runs={edit.runs} styled={edit.styled} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} rect={mark.rect} kind={mark.kind} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} rect={mark.rect} kind={mark.kind} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}
@@ -2750,7 +2769,7 @@
         {/if}
         {@const group = typing?.nodeId === frame.id ? null : groupMark(frame.id)}
         {#if group}
-          <FrameSelection clip="" rect={group} kind={SelectionKind.Group} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
+          <FrameSelection clip="" rect={group} kind={SelectionKind.Group} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
         {/if}
         {@const guideArea = inside?.nodeId === frame.id ? frameArea(frame.id) : null}
         {@const measuredGapsIn = measuredIn(frame.id)}
