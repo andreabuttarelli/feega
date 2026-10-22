@@ -6,6 +6,7 @@
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import InstanceInspector from '$lib/components/motion/InstanceInspector.svelte';
   import RangeTextInspector from '$lib/components/motion/RangeTextInspector.svelte';
+  import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import CameraInspector from '$lib/components/motion/CameraInspector.svelte';
   import DevicePresets from '$lib/components/motion/DevicePresets.svelte';
@@ -74,6 +75,7 @@
     <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
     <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
     <LayoutGuidesSection {doc} onchange={editGuides} />
+    <StyleLibrarySection {tokens} />
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">

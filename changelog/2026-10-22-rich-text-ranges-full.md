@@ -17,7 +17,7 @@ strikethrough, case and opacity.
   shows a "Text · selection" section while typing (Mixed when values differ) and edits only the
   selection; clicking into it keeps the editor open, a click elsewhere commits. ⌘U underlines.
   Fixed: ⌘A inside the text editor selected frame elements instead of the text.
-- MCP: `style_text_range` takes `style` with every key.
+- MCP: `text_style` takes `style` with every key.
 
 Not done: gradient fills per range (a range takes a solid colour), live preview of range styles
 inside the textarea while typing (left to the WYSIWYG editor work).
