@@ -11,14 +11,15 @@ const ALIGNS = Object.values(Align) as [Align, ...Align[]];
 export const SIZINGS = Object.values(Sizing) as [Sizing, ...Sizing[]];
 
 const px = z.number().min(0).max(MAX_LAYOUT_PX);
+const signedPx = z.number().min(-MAX_LAYOUT_PX).max(MAX_LAYOUT_PX);
 
 export const paddingSchema = z.object({ top: px.default(0), right: px.default(0), bottom: px.default(0), left: px.default(0) });
 
 export const autoLayoutSchema = z.object({
   direction: z.enum(DIRECTIONS).default(Direction.Horizontal),
   wrap: z.boolean().default(false),
-  gap: px.default(0),
-  crossGap: px.default(0),
+  gap: signedPx.default(0),
+  crossGap: signedPx.default(0),
   padding: paddingSchema.default({ top: 0, right: 0, bottom: 0, left: 0 }),
   justify: z.enum(JUSTIFIES).default(Justify.Start),
   align: z.enum(ALIGNS).default(Align.Start),

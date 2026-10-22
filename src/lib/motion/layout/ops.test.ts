@@ -123,6 +123,7 @@ describe('editing a container', () => {
 describe('the patch schemas', () => {
   it('fill in nothing the caller did not send', () => {
     expect(autoLayoutPatchSchema.parse({ gap: 3 })).toEqual({ gap: 3 });
+    expect(autoLayoutPatchSchema.parse({ gap: -8, justify: 'space-evenly' })).toEqual({ gap: -8, justify: 'space-evenly' });
     expect(layoutItemPatchSchema.parse({})).toEqual({});
   });
 });

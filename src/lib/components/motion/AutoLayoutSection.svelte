@@ -9,6 +9,8 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import LogOut from '@lucide/svelte/icons/log-out';
   import SpaceBetween from '@lucide/svelte/icons/align-horizontal-space-between';
+  import SpaceAround from '@lucide/svelte/icons/align-horizontal-space-around';
+  import SpaceEvenly from '@lucide/svelte/icons/align-horizontal-distribute-center';
   import { FIELD_INPUT, FOCUS_RING, Field, IconButton, IconSize, Section, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
@@ -43,6 +45,11 @@
   const SIDES: (keyof Padding)[] = ['top', 'right', 'bottom', 'left'];
   const SIDE_LABEL: Record<keyof Padding, string> = { top: 'T', right: 'R', bottom: 'B', left: 'L' };
   const SPOTS = [Align.Start, Align.Center, Align.End] as const;
+  const SPREADS = [
+    { justify: Justify.SpaceBetween, label: 'Space between', testid: 'auto-layout-space-between', icon: SpaceBetween },
+    { justify: Justify.SpaceAround, label: 'Space around', testid: 'auto-layout-space-around', icon: SpaceAround },
+    { justify: Justify.SpaceEvenly, label: 'Space evenly', testid: 'auto-layout-space-evenly', icon: SpaceEvenly }
+  ];
   const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End };
 
   const layout = $derived(clip.autoLayout ?? null);
@@ -61,6 +68,7 @@
   const set = (patch: Partial<AutoLayout>, summary: string) => commit(setAutoLayout(doc, clip.id, patch), summary);
   const size = (patch: Partial<LayoutItem>, summary: string) => commit(setLayoutItem(doc, clip.id, patch), summary);
   const px = (value: string) => Math.max(0, Math.round(Number(value) || 0));
+  const signedPx = (value: string) => Math.round(Number(value) || 0);
   const optionalPx = (value: string) => (value.trim() === '' ? undefined : px(value));
 
   function spotPressed(layout: AutoLayout, column: Align, row: Align): boolean {
@@ -103,12 +111,14 @@
             {/each}
           {/each}
         </div>
-        <IconButton label="Space between" size={IconSize.Sm} pressed={layout.justify === Justify.SpaceBetween} data-testid="auto-layout-space-between" onclick={() => set({ justify: layout.justify === Justify.SpaceBetween ? Justify.Start : Justify.SpaceBetween }, 'Changed the spacing')}><SpaceBetween /></IconButton>
+        {#each SPREADS as spread (spread.justify)}
+          <IconButton label={spread.label} size={IconSize.Sm} pressed={layout.justify === spread.justify} data-testid={spread.testid} onclick={() => set({ justify: layout.justify === spread.justify ? Justify.Start : spread.justify }, 'Changed the spacing')}><spread.icon /></IconButton>
+        {/each}
       </Field>
       <Field label="Gap" id="auto-layout-gap">
-        <input id="auto-layout-gap" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.gap} data-testid="auto-layout-gap" onchange={(e) => set({ gap: px(e.currentTarget.value) }, 'Changed the gap')} />
+        <input id="auto-layout-gap" class={cn(FIELD_INPUT, 'w-full')} type="number" value={layout.gap} data-testid="auto-layout-gap" onchange={(e) => set({ gap: signedPx(e.currentTarget.value) }, 'Changed the gap')} />
         {#if lined}
-          <input aria-label="Gap between lines" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.crossGap} onchange={(e) => set({ crossGap: px(e.currentTarget.value) }, 'Changed the gap between lines')} />
+          <input aria-label="Gap between lines" class={cn(FIELD_INPUT, 'w-full')} type="number" value={layout.crossGap} onchange={(e) => set({ crossGap: signedPx(e.currentTarget.value) }, 'Changed the gap between lines')} />
         {/if}
       </Field>
       <Field label="Padding">

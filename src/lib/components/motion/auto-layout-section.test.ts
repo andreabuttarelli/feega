@@ -40,6 +40,13 @@ describe('the auto layout section', () => {
     expect(html(must(setAutoLayout(row, 'box', { justify: Justify.SpaceBetween })), 'box')).toMatch(/aria-pressed="true"[^>]*data-testid="auto-layout-space-between"|data-testid="auto-layout-space-between"[^>]*aria-pressed="true"/);
   });
 
+  it.each([
+    [Justify.SpaceAround, 'auto-layout-space-around'],
+    [Justify.SpaceEvenly, 'auto-layout-space-evenly']
+  ])('marks %s as pressed', (justify, testid) => {
+    expect(html(must(setAutoLayout(row, 'box', { justify })), 'box')).toMatch(new RegExp(`aria-pressed="true"[^>]*data-testid="${testid}"|data-testid="${testid}"[^>]*aria-pressed="true"`));
+  });
+
   it('a child offers fill, absolute, reorder and leaving', () => {
     const body = html(row, 'a');
     expect(body).toContain('>Fill<');

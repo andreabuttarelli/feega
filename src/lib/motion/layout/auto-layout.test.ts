@@ -41,6 +41,21 @@ describe('a row', () => {
     expect([out.get('a')!.left, out.get('b')!.left]).toEqual(lefts);
   });
 
+  it.each([
+    [Justify.SpaceAround, [45, 195]],
+    [Justify.SpaceEvenly, [60, 180]]
+  ])('distributes %s', (justify, lefts) => {
+    const out = layoutTree(box('c', 300, 100, [leaf('a', 50, 20), leaf('b', 60, 20)], { gap: 10, justify }));
+    expect(out.get('a')!.left).toBeCloseTo(lefts[0], 1);
+    expect(out.get('b')!.left).toBeCloseTo(lefts[1], 1);
+  });
+
+  it('a negative gap overlaps the children', () => {
+    const out = layoutTree(box('c', 300, 100, [leaf('a', 50, 20), leaf('b', 60, 20)], { gap: -20 }, { sizing: hug }));
+    expect(out.get('b')!.left).toBe(30);
+    expect(out.get('c')!.width).toBe(90);
+  });
+
   it('space-between with one child sits at the start', () => {
     const out = layoutTree(box('c', 300, 100, [leaf('a', 50, 20)], { justify: Justify.SpaceBetween }));
     expect(out.get('a')!.left).toBe(0);
