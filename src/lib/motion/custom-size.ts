@@ -1,6 +1,6 @@
-import { MAX_SHORT_SIDE, MAX_SIDE, MIN_SIDE, sideRange, type MotionDoc } from './doc';
+import { MAX_SHORT_SIDE, MAX_SIDE, MIN_SIDE, sideRange, type MotionClip, type MotionDoc } from './doc';
 import type { CanvasSize, OpResult } from './timeline';
-import { resizeFrame } from './constraints/constraints';
+import { Horizontal, Vertical, resizeFrame } from './constraints/constraints';
 
 const evenSide = (n: number) => Math.min(MAX_SIDE, Math.max(MIN_SIDE, Math.round(n / 2) * 2));
 
@@ -20,3 +20,13 @@ function stillSize(node: CanvasSize): CanvasSize {
 export const customSize = (node: CanvasSize, doc: Pick<MotionDoc, 'still'> = {}): CanvasSize => (doc.still ? stillSize(node) : videoSize(node));
 
 export const fitToNode = (doc: MotionDoc, node: CanvasSize): OpResult => resizeFrame(doc, customSize(node, doc));
+
+const SCALES_WITH_NODE = { horizontal: Horizontal.Scale, vertical: Vertical.Scale };
+
+const withConstraintsOf = (doc: MotionDoc, constraintsOf: (clip: MotionClip) => MotionClip['constraints']): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, constraints: constraintsOf(c as MotionClip) })) })) });
+
+export function fitElementToNode(doc: MotionDoc, node: CanvasSize): OpResult {
+  const own = new Map(doc.tracks.flatMap((t) => t.clips.map((c) => [c.id, (c as MotionClip).constraints] as const)));
+  const sized = fitToNode(withConstraintsOf(doc, () => SCALES_WITH_NODE), node);
+  return sized.ok ? { ok: true, doc: withConstraintsOf(sized.doc, (c) => own.get(c.id)) } : sized;
+}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { hostFit, keepTextSize, type HostShare } from '$lib/motion/text-fit';
+  import { keepTextSize } from '$lib/motion/text-fit';
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
   import { localStore } from '$lib/browser-storage';
@@ -39,7 +39,7 @@
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
-  import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
+  import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
@@ -117,26 +117,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, heightFollowsDoc, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, heightFollowsDoc, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
-  import { fitToNode } from '$lib/motion/custom-size';
+  import { fitElementToNode, fitToNode } from '$lib/motion/custom-size';
   import { barContextOf } from '$lib/canvas/bottom-bar';
-  import { CanvasState, NodeMode, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
-  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
-  import { unifiedFrames } from '$lib/canvas/frame-pick';
+  import { CanvasState, NodeMode } from '$lib/canvas/inline-motion';
   import { decoded, painted } from '$lib/canvas/paint-wait';
-  import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHead } from '$lib/canvas/frame-outlines';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
-  import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
-  import { framesToWarm } from '$lib/canvas/warm-frames';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
-  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type HostMove, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DropVerdict, frameUnderPointer, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
@@ -327,25 +322,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return true;
   }
 
-  async function moveOut(out: ElementOut, phase: DragPhase, version: number): Promise<number | null> {
-    const source = inlineMotion;
-    markFrame(phase === DragPhase.Over ? out.client : null, source);
-    const drop = phase === DragPhase.Drop && source ? dropAt(out.client, source) : null;
-    if (!source || !drop) {
-      return null;
-    }
-    const res = await post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), versions: JSON.stringify({ [source]: version }), ...(out.box ? { box: JSON.stringify(out.box) } : {}) });
-    return landed(res) ? ((res?.versions as Record<string, number>)[source] ?? null) : null;
-  }
-
-  const canvasundo: CanvasUndo = {
-    owns: (nodeId, version) => {
-      const next = undoStack.nextUndo();
-      return next?.source === 'server' && writesFrameAt(next.gesture, nodeId, version);
-    },
-    run: () => undo()
-  };
-
   const freeElement = (ids: string[]): string | null => {
     const row = ids.length === 1 ? nodes.find((n) => n.id === ids[0]) : null;
     const holdsNodes = row ? nodes.some((n) => layoutOf(n.data).groupId === row.id) : false;
@@ -370,83 +346,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       }
     });
     return DropVerdict.Taken;
-  }
-
-  type HostBox = { id: string; x: number; y: number; w: number; h: number };
-  const HOST_MIN_PX = 4;
-  let hostOrigin: HostBox | null = null;
-
-  const placeHost = (box: HostBox) => (nodes = nodes.map((n) => (n.id !== box.id ? n : n.w === box.w && n.h === box.h ? { ...n, x: box.x, y: box.y } : { ...n, x: box.x, y: box.y, w: box.w, h: box.h, userHeight: box.h })));
-
-  let turnFrom: { id: string; rotation: number } | null = null;
-
-  const turnTo = (id: string, rotation: number) => (nodes = nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, rotation } } : n)));
-
-  function hostTurn(id: string, rotation: number, turn: number, phase: DragPhase) {
-    turnFrom = turnFrom?.id === id ? turnFrom : { id, rotation };
-    const from = turnFrom.rotation;
-    if (phase !== DragPhase.Drop) {
-      turnTo(id, from + turn);
-      return;
-    }
-    turnFrom = null;
-    turnTo(id, from);
-    if (turn !== 0) {
-      rotateGroupBy(id, turn);
-    }
-  }
-
-  const fittedHosts = new Map<string, string>();
-
-  function fitHost(id: string | null, share: HostShare) {
-    const row = id ? nodes.find((n) => n.id === id) : null;
-    const settled = row ? `${row.w}x${row.h}@${motionOf(row)?.docHeadRevision ?? 0}` : "";
-    const next = row ? hostFit(row, share) : null;
-    if (!row || !next || fittedHosts.get(row.id) === settled) {
-      return;
-    }
-    fittedHosts.set(row.id, `${next.w}x${next.h}@${motionOf(row)?.docHeadRevision ?? 0}`);
-    void resize(row.id, next.w, next.h);
-  }
-
-  function hostDrag({ turn, ...shift }: HostMove, to: PointerPoint, phase: DragPhase) {
-    const id = inlineMotion;
-    const row = id ? nodes.find((n) => n.id === id) : null;
-    if (id && row && (turn !== 0 || turnFrom)) {
-      hostTurn(id, layoutOf(row.data).rotation, turn, phase);
-      return;
-    }
-    const zero = toFlow?.({ x: 0, y: 0 });
-    const unit = toFlow?.({ x: 1, y: 1 });
-    if (!id || !row || !zero || !unit) {
-      return;
-    }
-    const scale = unit.x - zero.x;
-    const origin = hostOrigin?.id === id ? hostOrigin : { id, x: row.x, y: row.y, w: row.w, h: row.h };
-    hostOrigin = origin;
-    const next = { id, x: origin.x + shift.dx * scale, y: origin.y + shift.dy * scale, w: Math.max(HOST_MIN_PX, origin.w + shift.dw * scale), h: Math.max(HOST_MIN_PX, origin.h + shift.dh * scale) };
-    const sized = next.w !== origin.w || next.h !== origin.h;
-    if (phase !== DragPhase.Drop) {
-      placeHost(next);
-      cursors.port.update({ live: [{ id, x: next.x, y: next.y }] });
-      if (!sized) {
-        tileDragOver([id], to);
-      }
-      return;
-    }
-    hostOrigin = null;
-    cursors.port.update({ live: [] });
-    placeHost(origin);
-    if (!sized && tileDrop([id], to) === DropVerdict.Taken) {
-      return;
-    }
-    if (next.x !== origin.x || next.y !== origin.y) {
-      void moveEnd([{ id, x: next.x, y: next.y }]);
-      void move(id, next.x, next.y);
-    }
-    if (sized) {
-      void resize(id, next.w, next.h);
-    }
   }
 
   const regroups = inOrder();
@@ -512,18 +411,20 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  async function drawElement(drawn: DrawnWire) {
+  async function drawElement(drawn: DrawnWire): Promise<string> {
     const id = crypto.randomUUID();
     const ghost = drawnTile(id, drawn);
     if (!ghost) {
-      void saveDrawn(id, drawn);
-      return;
+      void saveDrawn(id, drawn).then(() => focusOn([id], undefined, FocusMode.Select));
+      return id;
     }
     await decoded(ghost.look);
     catalogPosters.set(id, ghost.look);
     nodes = [...nodes, toTile(ghost.node)];
+    focusOn([id], undefined, FocusMode.Select);
     void saveDrawn(id, drawn);
     await painted();
+    return id;
   }
 
   async function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }) {
@@ -559,9 +460,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const hold = 'box' in drawn ? frameHolding(nodes, drawn.box) : null;
     if (hold) {
       intoFrame(id, hold);
-      return;
     }
-    focusOn([id], undefined, FocusMode.Select);
   }
 
   async function intoFrame(id: string, hold: FrameHold) {
@@ -572,13 +471,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     nodes = nodes.filter((n) => n.id !== id);
   }
-
-  $effect(() => {
-    const id = inlineMotion;
-    if (id && catalogPosters.has(id) && inlineStage.paintOf(id) === Paint.Swapped) {
-      catalogPosters.delete(id);
-    }
-  });
 
   async function dropOutput(nodeId: string, client: PointerPoint) {
     const drop = dropAt(client, null);
@@ -1133,9 +1025,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * lascia passare tutto.
    */
   function tileHeight(n: Tile): number {
-    if (n.id === inlineMotion) {
-      return frameFit(n.id, n.w, NodeMode.Edit)?.h ?? n.h;
-    }
     if (n.type !== 'text' || !(n.id in grownHeights)) return n.h;
     return grownTextNodeHeight(grownHeights[n.id], n.userHeight);
   }
@@ -1155,7 +1044,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       displayName: n.displayName,
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
-      rotatable: motionOf(n)?.kind === FrameKind.Group,
+      rotatable: !!motionOf(n) && chrome.turns,
       behind: chrome.behind,
       members: chrome.behind ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
@@ -1320,7 +1209,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const SAVE_MAX_WAIT_MS = 2000;
   const SAVE_BACKOFF_CAP_MS = 30000;
   const REMOTE_REFRESH_MS = 250;
-  const WARM_EVERY_MS = 1000;
   let saveStatus = $state(SaveStatus.Saved);
   let placeStatus = $state(SaveStatus.Saved);
   let unsentCount = $state(0);
@@ -1438,115 +1326,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   function selectionChanged(ids: string[]) {
     if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
-    const before = untrack(() => inlineMotion);
     selectedIds = ids;
     cursors.port.update({ selection: ids });
-    leaveNow(before);
   }
 
-  function leaveNow(before: string | null) {
-    const after = untrack(() => inlineMotion);
-    if (before && before !== after) {
-      inlineStage.leave(before);
-    }
-  }
-
+  const core = $derived(rendererOf(page.url, data.rendererSwitch) === Renderer.Core);
   const liveHost = $derived(domReason ? LiveHost.Node : LiveHost.Canvas);
-
-  let dismissedMotion = $state<string | null>(null);
-  let requestedMotion = $state<string | null>(null);
-  let pageWidth = $state(0);
-  const opening = $derived(openingOf(viewportOf(pageWidth)));
-  const openingHere = $derived.by(() => {
-    const row = selectedIds.length === 1 ? nodes.find((n) => n.id === selectedIds[0]) : null;
-    return row ? openingFor(row, opening) : opening;
-  });
-  const unifiedCore = $derived(unifiedFrames(page.url) && rendererOf(page.url, data.rendererSwitch) === Renderer.Core);
-  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, openingHere, requestedMotion, unifiedCore));
-  const editingMotion = $derived(editorOn(inlineMotion, inlineStage.leaving));
-  let lastOpen: string | null = null;
-
-  $effect(() => {
-    const open = inlineMotion;
-    const closed = lastOpen;
-    lastOpen = open;
-    untrack(() => {
-      if (open && open === inlineStage.leaving) {
-        inlineStage.landed(open);
-      }
-      if (closed && closed !== open && nodes.some((n) => n.id === closed)) {
-        inlineStage.leave(closed);
-      }
-    });
-  });
-
-  $effect(() => {
-    if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => dismissedMotion)) {
-      dismissedMotion = null;
-    }
-    if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => requestedMotion)) {
-      requestedMotion = null;
-    }
-  });
-
-  $effect(() => {
-    const [id] = selectedIds;
-    if (selectedIds.length === 1 && untrack(() => nodes.find((n) => n.id === id))?.type === 'motion') {
-      untrack(() => warmMotion(id));
-    }
-  });
-
-  function headRevisionOf(id: string): number {
-    const row = nodes.find((n) => n.id === id);
-    return row && row.type === 'motion' ? (motionOf(row)?.docHeadRevision ?? 0) : 0;
-  }
-
-  function warmMotion(id: string) {
-    if (!nodes.some((n) => n.id === id && n.version > 0)) {
-      return;
-    }
-    prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
-  }
-
-  function warmHovered(e: PointerEvent) {
-    const id = (e.target as Element | null)?.closest?.('[data-motion-node]')?.getAttribute('data-motion-node');
-    if (id) {
-      warmMotion(id);
-    }
-  }
-
-  const warmed = new Map<string, number>();
-
-  function warmInView() {
-    const corner = toFlow?.({ x: 0, y: 0 });
-    const far = toFlow?.({ x: innerWidth, y: innerHeight });
-    if (!corner || !far) {
-      return;
-    }
-    const view = { x: corner.x, y: corner.y, w: far.x - corner.x, h: far.y - corner.y };
-    const frames = nodes.filter((n) => n.type === 'motion' && n.version > 0).map((n) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, version: n.version }));
-    for (const id of framesToWarm(frames, view, warmed)) {
-      warmed.set(id, frames.find((f) => f.id === id)!.version);
-      warmMotion(id);
-    }
-  }
-
-  $effect(() => {
-    const timer = setInterval(() => (window.requestIdleCallback ? window.requestIdleCallback(warmInView) : warmInView()), WARM_EVERY_MS);
-    return () => clearInterval(timer);
-  });
-
-  function reframe(id: string | null, free: Insets) {
-    const row = id ? nodes.find((n) => n.id === id) : null;
-    if (id && reframesOn(viewportOf(pageWidth)) === Reframe.Frame) {
-      focusOn([id], free, row && !tileChromeOf(row).bar ? FocusMode.Reveal : FocusMode.Frame);
-    }
-  }
-
-  function requestMotion(id: string) {
-    dismissedMotion = null;
-    requestedMotion = id;
-  }
 
   $effect(() => {
     canvasSelection.set(selectedIds);
@@ -1556,12 +1341,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   $effect(() => {
     propertiesTarget.set(targetOf(selectedIds, nodes));
     return () => propertiesTarget.set(null);
-  });
-
-  $effect(() => {
-    if ($propertiesRequest) {
-      requestMotion($propertiesRequest);
-    }
   });
 
   let seenRevision = '';
@@ -2435,17 +2214,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     [FrameKind.Group]: (_, row) => ({ width: row.w, height: row.h })
   };
 
-  function frameFit(id: string, w: number, mode: NodeMode = NodeMode.Preview): { w: number; h: number } | null {
-    const row = nodes.find((node) => node.id === id);
-    const motion = motionOf(row ?? { id, type: '', data: {} });
-    if (!motion || !row) {
-      return null;
-    }
-    const open = layersSource.video;
-    const picture = open?.nodeId === id ? open.doc : PICTURE_OF_KIND[motion.kind](motion, row);
-    return frameNodeSize(w, picture, mode, motion.kind);
-  }
-
   $effect(() => {
     const open = layersSource.video;
     const row = open ? untrack(() => nodes.find((node) => node.id === open.nodeId)) : null;
@@ -2467,14 +2235,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const open = layersSource.video?.nodeId === id ? layersSource.video : null;
     const shown = open ? { ...motion, format: formatOf(open.doc) } : motion;
-    const mode = id === inlineMotion ? NodeMode.Edit : NodeMode.Preview;
-    return frameResize(shown, { w, h }, open?.doc ?? PICTURE_OF_KIND[motion.kind](motion, row), mode);
+    return frameResize(shown, { w, h }, open?.doc ?? PICTURE_OF_KIND[motion.kind](motion, row), NodeMode.Preview);
   }
 
   async function sizeFrameDoc(id: string, picture: { width: number; height: number }, was: { width: number; height: number } | null = null) {
     const open = layersSource.video;
     if (open?.nodeId === id) {
-      open.edit(fitToNode(was ? keepTextSize(open.doc, was, picture) : open.doc, picture), 'Resized the frame');
+      open.edit(was ? fitElementToNode(keepTextSize(open.doc, was, picture), picture) : fitToNode(open.doc, picture), 'Resized the frame');
       return;
     }
     const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height });
@@ -2764,10 +2531,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         return selectedIds;
       },
       select: (ids) => focusOn(ids, undefined, FocusMode.Select),
-      open: (id) => {
-        requestMotion(id);
-        focusOn([id], undefined, FocusMode.Select);
-      }
+      open: (id) => focusOn([id], undefined, FocusMode.Select)
     })
   );
 
@@ -3460,9 +3224,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
 
-<svelte:window bind:innerWidth={pageWidth} />
-
-<div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} class:view-only={viewOnly} style={inlineMotion ? neighbourStyle() : undefined}>
+<div class="canvas" class:view-only={viewOnly}>
   {#if peers.length || canvasPeers.length}
     {#if topPeers}
       <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></Portal>
@@ -3533,7 +3295,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if viewOnly}<p class="view-only-badge" data-testid="view-only">View only</p>{/if}
   {#if Flow}
   <Flow
-    core={rendererOf(page.url, data.rendererSwitch) === Renderer.Core}
+    {core}
     mode={canvasMode}
     postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
@@ -3566,9 +3328,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onPaste={paste}
     onTemplate={insertTemplate}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
-    onNodeClicked={(id) => (dismissedMotion = dismissedAfterClick(dismissedMotion, id))}
-    onNodeDoubled={requestMotion}
-    barContext={barContextOf(inlineMotion ? CanvasState.Editing : CanvasState.Browsing)}
+    barContext={barContextOf(CanvasState.Browsing)}
     onUndo={undo}
     onRedo={redo}
     onConnectNew={connectNew}
@@ -3608,10 +3368,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {@const overMotion = over ? motionOf(over) : null}
       {@const hoverNode = nodes.find((n) => n.id === id)}
       {@const hoverMotion = hoverNode ? motionOf(hoverNode) : null}
-      {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && !unifiedCore && tileMode(id, inlineMotion, inlineStage.leaving) === NodeMode.Preview}
+      {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && !core}
         <FrameHover nodeId={id} revision={hoverMotion.docHeadRevision} previewUrl={motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} width={FORMATS[hoverMotion.format].width} height={FORMATS[hoverMotion.format].height} />
       {/if}
-      {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive && tileMode(id, inlineMotion, inlineStage.leaving) === NodeMode.Preview} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
+      {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
     {/snippet}
     {#snippet tile({ id, selected })}
       {@const row = nodes.find((n) => n.id === id)}
@@ -3818,7 +3578,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
           <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} nodeMode={tileMode(id, inlineMotion, inlineStage.leaving)} onenter={() => requestMotion(id)} {liveHost} liveUrl={motionLivePath(motionAt)} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} {liveHost} liveUrl={motionLivePath(motionAt)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}
@@ -3831,15 +3591,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if dev && domReason}
     <RendererBadge renderer="dom" reason={domReason} />
   {/if}
-  {#if !viewOnly && showsEmptyState(nodes.length, inlineMotion)}
+  {#if !viewOnly && showsEmptyState(nodes.length)}
     <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
   {/if}
-  {#if editingMotion}
-    {#key editingMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onreveal={(free) => editingMotion && focusOn([editingMotion], free, FocusMode.Reveal)} onmoveout={moveOut} onhostdrag={hostDrag} onhostfit={(share) => fitHost(editingMotion, share)} {canvasundo} />
-    {/key}
-  {/if}
-
   {#if componentPicking}
     {@const pickingId = componentPicking.id}
     {@const pickingAssets = cardAssets(compositionCards(pickingId, edges, nodes))}
@@ -3913,28 +3667,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     color: var(--ui-text);
     font-size: var(--ui-type-caption);
     transform: translateX(-50%);
-  }
-
-  .canvas.editing :global([role='toolbar'][aria-label='Selection actions']) {
-    display: none;
-  }
-
-  @media (max-width: 767px) {
-    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing']))) {
-      opacity: var(--neighbour-body);
-    }
-
-    .canvas.editing :global(.svelte-flow__edge) {
-      opacity: var(--neighbour-edges);
-    }
-
-    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing'])) .node-label) {
-      opacity: var(--neighbour-label);
-    }
-
-    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing'])) .svelte-flow__handle) {
-      opacity: var(--neighbour-ports);
-    }
   }
 
   .pending-frame {

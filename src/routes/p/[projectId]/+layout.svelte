@@ -7,7 +7,6 @@
   import CanvasTopBar from '$lib/components/canvas/CanvasTopBar.svelte';
   import FloatingRail from '$lib/components/canvas/FloatingRail.svelte';
   import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
-  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
   import RightBar from '$lib/components/brand-agent/RightBar.svelte';
   import { can, OrgAction } from '$lib/org-roles';
@@ -191,7 +190,7 @@
   }
 
   const viewSwitch = $derived(
-    onCanvasRoute && !inlineStage.editing ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView, properties: { target: $propertiesTarget?.name ?? null, onopen: openProperties }, layers: phoneSheets.shown === PhoneSheetKind.Layers, onlayers: () => phoneSheets.toggle(PhoneSheetKind.Layers), inserting: phoneSheets.shown === PhoneSheetKind.Insert, oninsert: () => phoneSheets.toggle(PhoneSheetKind.Insert) } : null
+    onCanvasRoute ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView, properties: { target: $propertiesTarget?.name ?? null, onopen: openProperties }, layers: phoneSheets.shown === PhoneSheetKind.Layers, onlayers: () => phoneSheets.toggle(PhoneSheetKind.Layers), inserting: phoneSheets.shown === PhoneSheetKind.Insert, oninsert: () => phoneSheets.toggle(PhoneSheetKind.Insert) } : null
   );
 
   const canEdit = $derived(can(data.org.role, OrgAction.Edit));
@@ -200,7 +199,7 @@
 <ChatLeaveGuard {projectId} />
 {#if browser}<RightBar {projectId} viewOnly={!canEdit} />{/if}
 
-<div class="project-shell safe-shell ui-app" class:is-editing={inlineStage.editing} class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-safe={isMobile ? 'sides' : undefined} data-mode={data.project.mode}>
+<div class="project-shell safe-shell ui-app" class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-safe={isMobile ? 'sides' : undefined} data-mode={data.project.mode}>
   {#if isMobile}
     <MobileTopBar
       {projectId}
@@ -288,7 +287,7 @@
         <CanvasSheet {projectId} />
       </div>
 
-      <CanvasChatPanel open={chatOpen || inlineStage.editing} />
+      <CanvasChatPanel open={chatOpen} />
     </div>
   {:else}
     <DesktopPageBar
@@ -308,9 +307,6 @@
 <style>
   .project-shell.is-uncensored {
     box-shadow: inset 0 3px 0 var(--color-destructive);
-  }
-  .project-shell.is-editing :global(.mobile-topbar) {
-    display: none;
   }
 
   .project-shell {
@@ -358,10 +354,6 @@
   .mobile-main.is-canvas {
     overflow: hidden;
     --mobile-stack-top: calc(var(--mobile-bar-clearance) + var(--mobile-stack-gap));
-  }
-  .project-shell.is-editing .mobile-main :global(.runs),
-  .project-shell.is-editing .mobile-main :global(.save-status) {
-    display: none;
   }
   .mobile-main.is-canvas .mobile-view {
     height: 100%;

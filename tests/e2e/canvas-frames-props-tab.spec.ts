@@ -39,7 +39,7 @@ test.describe('the frame inspector lives in the right bar Properties tab @real',
     const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
     expect(error).toBeNull();
 
-    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}?unifiedFrames=1`);
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await expect(page.locator('[data-canvas-surface]')).toHaveAttribute('data-renderer', 'core', { timeout: 30_000 });
     const tile = page.locator(`[data-testid="gpu-node"][data-id="${node.id}"]`);
     await expect(tile).toBeVisible({ timeout: 30_000 });

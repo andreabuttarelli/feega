@@ -2,13 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const layout = read('../../../routes/p/[projectId]/+layout.svelte');
 const editor = read('../motion/MotionEditorShell.svelte');
 const canvasPane = read('../canvas/CanvasChatPanel.svelte');
 
 describe('the right bar never goes back to the park between canvas and editor', () => {
-  it('the canvas pane stays open while a frame is edited, and the editor on the canvas seats the bar in place', () => {
-    expect(layout).toMatch(/<CanvasChatPanel open=\{chatOpen \|\| inlineStage\.editing\}/);
+  it('the editor on the canvas seats the bar in place', () => {
     expect(editor).toMatch(/seat=\{barSeat\}/);
     expect(editor).toMatch(/mount === Mount\.Canvas && viewportOf\(width\) === Viewport\.Desktop \? BarSeat\.InPlace/);
   });

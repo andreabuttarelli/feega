@@ -75,7 +75,7 @@ test.describe('free insertion from the bottom bar @real', () => {
 
     expect((await nodesOf(admin, session)).map((n) => n.kind)).toEqual(['element', 'element', 'element']);
     await gotoHydrated(page, url);
-    await expect(page.locator('[data-motion-node]')).toHaveCount(3, { timeout: 20_000 });
+    await expect(page.getByTestId('gpu-node')).toHaveCount(3, { timeout: 20_000 });
     await expect(page.locator('.node-label')).toHaveCount(0);
     await page.waitForTimeout(1500);
     await shoot(page, 'after-reload');

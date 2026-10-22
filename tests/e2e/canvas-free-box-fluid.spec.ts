@@ -27,7 +27,7 @@ async function drawBox(page: Page): Promise<string> {
   await page.mouse.up();
   const element = page.locator('[data-kind="element"][data-motion-node]');
   await expect(element).toHaveCount(1, { timeout: 15_000 });
-  await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+  await expect(page.getByTestId('frame-inspector')).toBeVisible({ timeout: 15_000 });
   return (await element.getAttribute('data-motion-node'))!;
 }
 
@@ -46,7 +46,7 @@ const emptyPoint = (page: Page) =>
 async function deselect(page: Page) {
   const empty = (await emptyPoint(page))!;
   await page.mouse.click(empty.x, empty.y);
-  await expect(page.getByTestId('motion-editor')).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByTestId('frame-inspector')).toHaveCount(0, { timeout: 10_000 });
 }
 
 async function watch(page: Page, nodeId: string) {
@@ -91,9 +91,9 @@ async function headDoc(admin: SupabaseClient, nodeId: string) {
 }
 
 async function expectFilled(page: Page, tile: Locator) {
-  await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 10_000 });
   const node = (await tile.boundingBox())!;
-  const shape = (await page.getByTestId('selection-box').boundingBox())!;
+  const shape = (await page.getByTestId('frame-selection').boundingBox())!;
   for (const [a, b, what] of [
     [shape.x, node.x, 'left'],
     [shape.y, node.y, 'top'],
@@ -154,7 +154,7 @@ test.describe('a free box stays fluid @real', () => {
     await expectFilled(page, tile);
     const start = await admin.from('nodes').select('x, y, width, height').eq('id', nodeId).single();
     const before = (await tile.boundingBox())!;
-    const corner = page.getByTestId('selection-overlay').locator('[data-handle="2"]');
+    const corner = page.getByTestId('frame-selection').locator('[data-handle="2"]');
     const grip = (await corner.boundingBox())!;
     await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
     await page.mouse.down();
@@ -182,7 +182,7 @@ test.describe('a free box stays fluid @real', () => {
       const r = el.getBoundingClientRect();
       return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     });
-    const grip = (await page.getByTestId('selection-overlay').getByRole('button', { name: 'Rotate' }).nth(2).boundingBox())!;
+    const grip = (await page.getByTestId('rotate-handle').boundingBox())!;
     const from = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 };
     const radius = Math.hypot(from.x - centre.x, from.y - centre.y);
     const start = Math.atan2(from.y - centre.y, from.x - centre.x);
@@ -232,7 +232,7 @@ test.describe('a free box stays fluid @real', () => {
     }, nodeId);
     const reloads: string[] = [];
     page.on('request', (req) => {
-      if (/fonts\.googleapis|__data\.json|\/(session|preview)(\?|$)/.test(req.url())) {
+      if (/__data\.json|\/(session|preview)(\?|$)/.test(req.url())) {
         reloads.push(req.url());
       }
     });
@@ -244,6 +244,6 @@ test.describe('a free box stays fluid @real', () => {
     expect(seen.filter((s) => !s.present).map((s) => s.frame), 'frames with the box gone').toEqual([]);
     expect(seen.filter((s) => !s.same).map((s) => s.frame), 'frames on a remounted box').toEqual([]);
     expect(await page.evaluate(() => (window as unknown as { __players: number }).__players), 'players mounted on the tile after the deselect').toBe(0);
-    expect(reloads, 'page data, session, preview or player fonts fetched after the deselect').toEqual([]);
+    expect(reloads, 'page data, session or preview fetched after the deselect').toEqual([]);
   });
 });
