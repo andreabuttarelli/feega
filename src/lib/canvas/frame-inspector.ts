@@ -10,7 +10,7 @@ import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
 import type { OpResult } from '$lib/motion/timeline';
 import { Command, commandFor } from '$lib/motion/shortcuts';
-import { matchingLayers } from '$lib/motion/select-matching';
+import { Same, matchingLayers, sameLayers } from '$lib/motion/select-matching';
 import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
 import type { SelectionActionId } from './selection-actions';
 import { siblingsOf } from './frame-select';
@@ -149,6 +149,10 @@ export async function barActionLater(id: ActionId, ctx: LaterCtx): Promise<Done 
 
 const PICKS: Partial<Record<ActionId, (doc: MotionDoc, picks: readonly string[]) => string[]>> = {
   [Command.SelectMatching]: matchingLayers,
+  [Command.SelectSameFill]: (doc, picks) => sameLayers(doc, picks, Same.Fill),
+  [Command.SelectSameStroke]: (doc, picks) => sameLayers(doc, picks, Same.Stroke),
+  [Command.SelectSameFont]: (doc, picks) => sameLayers(doc, picks, Same.Font),
+  [Command.SelectSameEffect]: (doc, picks) => sameLayers(doc, picks, Same.Effect),
   [Command.SelectAll]: siblingsOf
 };
 
