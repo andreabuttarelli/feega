@@ -28,6 +28,7 @@ export function leadingOf(p: Measured, sizePx: number): Leading {
 export const trackingOf = (p: Measured, sizePx: number): number => emOf(p.letterSpacing, sizePx) ?? Number(p.tracking ?? 0);
 
 export const CSS_NORMAL = 'normal';
+export const CSS_AUTO = 'auto';
 export const CAP_TRIM_CSS = 'trim-both cap alphabetic';
 
 export function measured<P extends Measured>(p: P, sizePx: number): P {

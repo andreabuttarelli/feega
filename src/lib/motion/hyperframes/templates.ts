@@ -237,7 +237,7 @@ const Text: Template<'Text'> = {
     const size = typeSize(ctx);
     const paint = glyphPaint(ctx, 'Text');
     const lines = clampLines(ctx, size);
-    const style = css({ ...typeStyle(ctx, measured(ctx.p, size), size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], textWrap: ctx.p.textWrap === 'wrap' ? undefined : ctx.p.textWrap, textBox: TEXT_BOX_TRIM[ctx.p.leadingTrim], ...clampCss(lines), ...ctx.text.vars });
+    const style = css({ ...typeStyle(ctx, measured(ctx.p, size), size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], textWrapStyle: ctx.p.textWrap === 'wrap' ? undefined : ctx.p.textWrap, textBox: TEXT_BOX_TRIM[ctx.p.leadingTrim], ...clampCss(lines), ...ctx.text.vars });
     const fit = FITS[ctx.p.sizing] && lines === null ? ` data-fit="${size}"` : ' data-text';
     return placed(ctx, ctx.p, `<div id="tx-${ctx.id}"${fit} style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${textBody(ctx)}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, { justifyContent: VERTICAL[ctx.p.verticalAlign], ...TEXT_BOX[ctx.p.sizing](ctx.p.truncate) });
   },

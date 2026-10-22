@@ -74,7 +74,7 @@ describe('text editing inside a core frame', () => {
 
 describe('the editing box follows the drawn text', () => {
   const caret = (over: Partial<TextCaret>): TextCaret => ({ lines: [], matrix: [1, 0, 0, 1, 100, 50], text: 'Hi', paragraphs: ['Hi'], flow: { spaces: 'keep', wraps: true } as TextCaret['flow'], width: 300, height: 80, size: 40, vertical: 0.5, ...over });
-  const look = { fontPx: 99, family: 'Inter', weight: 400, italic: false, trackingEm: 0, leading: 1.2, color: '#000', textTransform: 'none', align: 'left', wrap: 'wrap', trim: 'normal' };
+  const look = { fontPx: 99, family: 'Inter', weight: 400, italic: false, trackingEm: 0, leading: 1.2, color: '#000', textTransform: 'none', align: 'left', wrap: 'auto', trim: 'normal' };
 
   it('lays the box out in stage pixels and maps it to the screen in one transform', () => {
     const laid = editLayout(caret({}), [0.5, 0, 0, 0.5, 10, 20]);
@@ -112,7 +112,7 @@ describe('the editing box follows the drawn text', () => {
   it('balances and trims the way the canvas draws', () => {
     const css = editCss({ ...look, wrap: 'balance', trim: 'trim-both cap alphabetic' }, editLayout(caret({}), [1, 0, 0, 1, 0, 0]));
 
-    expect(css).toContain('text-wrap:balance');
+    expect(css).toContain('text-wrap-style:balance');
     expect(css).toContain('text-box:trim-both cap alphabetic');
   });
 

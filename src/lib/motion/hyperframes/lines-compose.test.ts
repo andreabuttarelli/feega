@@ -35,7 +35,7 @@ describe('line typography in the HTML export', () => {
   it('balances and trims', () => {
     const html = compose({ textWrap: 'balance', leadingTrim: 'cap' });
 
-    expect(html).toContain('text-wrap:balance');
+    expect(html).toContain('text-wrap-style:balance');
     expect(html).toContain('text-box:trim-both cap alphabetic');
   });
 });
