@@ -152,14 +152,14 @@
   import type { GenMedium } from '$lib/canvas/gen-node';
   import type { CanvasEdgeKind, FlowEdge, WireMode } from '$lib/canvas-edges';
   import { setTileRender } from '$lib/canvas/tile-render-context';
-  import { resizeCursor, type ResizeCursor } from '$lib/canvas/resize-cursor';
+  import { resizeCursor, rotateCursor } from '$lib/canvas/resize-cursor';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
-  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, type Hit } from '$lib/canvas/gpu/gesture';
+  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
@@ -184,7 +184,7 @@
   import { engineOf } from '$lib/motion/engine';
   import { track } from '$lib/analytics';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
-  import { followGroup } from '$lib/canvas/node-layout';
+  import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
   let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void } = $props();
 
@@ -263,7 +263,8 @@
   const tier = $derived(assetTier(view.zoom));
   const tierUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, tier);
 
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}) })));
+  let turning = $state<{ id: string; degrees: number } | null>(null);
+  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning?.id === t.id ? { rotation: turning.degrees } : {}) })));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
@@ -896,6 +897,7 @@
   );
 
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
+  const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && spec.flow.nodesDraggable ? selectedBoxes[0] : null);
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && spec.flow.nodesDraggable);
 
   $effect(() => {
@@ -1078,6 +1080,7 @@
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
     | { kind: GestureKind.Drag; id: string; start: Point; origins: Map<string, Point>; moved: boolean; toggle: boolean }
     | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number } }
+    | { kind: GestureKind.Rotate; id: string; centre: Point; start: Point; base: number; degrees: number }
     | { kind: GestureKind.Marquee; start: Point; base: string[]; additive: boolean; moved: boolean }
     | { kind: GestureKind.Connect; from: Port }
     | { kind: GestureKind.PickEdge; edgeId: string };
@@ -1109,6 +1112,10 @@
       if (unit) {
         return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
       }
+    }
+    const turnUnit = rotatable ? rotateZoneAt(rotatable, rotatable.rotation ?? 0, w, view.zoom) : null;
+    if (rotatable && turnUnit) {
+      return { kind: HitKind.Rotate, nodeId: rotatable.id, unit: turnUnit };
     }
     const node = topNodeAt(w);
     if (node) {
@@ -1292,12 +1299,17 @@
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
-  let cornerCursor = $state<ResizeCursor | null>(null);
+  let handleCursor = $state<string | null>(null);
 
-  function hoverCorner(w: Point) {
-    const box = resizable ? selectedBoxes[0] : null;
-    const unit = box ? resizeHandleAt(box, w, view.zoom) : null;
-    cornerCursor = box && unit ? resizeCursor([unit[0] * 2 - 1, unit[1] * 2 - 1], box.rotation ?? 0) : null;
+  function hoverHandle(w: Point) {
+    const hit = hitAt(w);
+    const box = hit.kind === HitKind.Corner || hit.kind === HitKind.Rotate ? byId.get(hit.nodeId) : null;
+    if (!box || (hit.kind !== HitKind.Corner && hit.kind !== HitKind.Rotate)) {
+      handleCursor = null;
+      return;
+    }
+    const outward: [number, number] = [hit.unit[0] * 2 - 1, hit.unit[1] * 2 - 1];
+    handleCursor = hit.kind === HitKind.Corner ? resizeCursor(outward, box.rotation ?? 0) : rotateCursor(outward, box.rotation ?? 0);
   }
 
   function dropHover() {
@@ -1333,6 +1345,7 @@
   onDestroy(() => canvasComponents.set([]));
 
   const PRIMARY_BUTTON = 0;
+  const ROTATE_SNAP_DEG = 15;
   let picks = $state<string[]>([]);
   let bandDrag = $state<{ nodeId: string; from: Point; to: Point } | null>(null);
 
@@ -1937,6 +1950,21 @@
     return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
   }
 
+  function rotateOf(nodeId: string, start: Point): Active {
+    const t = byId.get(nodeId)!;
+    return { kind: GestureKind.Rotate, id: t.id, centre: { x: t.x + t.w / 2, y: t.y + t.h / 2 }, start, base: t.rotation ?? 0, degrees: t.rotation ?? 0 };
+  }
+
+  function rotateHost(nodeId: string, e: PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    downAt = local(e);
+    captureId = e.pointerId;
+    holdSelection(true);
+    active = rotateOf(nodeId, toWorld(view, local(e)));
+    gesturing = true;
+  }
+
   function resizeHost(nodeId: string, handle: number, e: PointerEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -1950,6 +1978,10 @@
   function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
     if (grip === Grip.Scale && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.has(nodeId)) {
       resizeHost(nodeId, handle, e);
+      return;
+    }
+    if (grip === Grip.Rotate && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.get(nodeId)?.rotatable) {
+      rotateHost(nodeId, e);
       return;
     }
     if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && pickElement(e, toWorld(view, local(e)))) {
@@ -2094,7 +2126,7 @@
       goInside(hit.nodeId, Gesture.Click, null);
     }
     const inDom = target.closest('.gpu-dom-node');
-    if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && target.closest(INTERACTIVE)) {
+    if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && hit.kind !== HitKind.Rotate && target.closest(INTERACTIVE)) {
       return;
     }
     if (e.button === 2 && hit.kind !== HitKind.Empty) {
@@ -2134,6 +2166,12 @@
           return null;
         }
         return resizeOf(hit.nodeId, hit.unit, w);
+      },
+      [GestureKind.Rotate]: () => {
+        if (hit.kind !== HitKind.Rotate) {
+          return null;
+        }
+        return rotateOf(hit.nodeId, w);
       },
       [GestureKind.Marquee]: () => ({ kind: GestureKind.Marquee, start: w, base: selected, additive: e.shiftKey || e.metaKey || e.ctrlKey, moved: false }),
       [GestureKind.Connect]: () => {
@@ -2192,7 +2230,7 @@
       hoverChrome = e.pointerType === 'mouse' ? (hovered ?? portAt(ports, w, view.zoom)?.nodeId ?? null) : null;
       if (e.pointerType === 'mouse' && !e.buttons) {
         hoverElement(w);
-        hoverCorner(w);
+        hoverHandle(w);
       }
       return;
     }
@@ -2256,6 +2294,14 @@
         const box = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
         overrides = new Map([[a.id, box]]);
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
+      },
+      [GestureKind.Rotate]: (a) => {
+        if (a.kind !== GestureKind.Rotate) {
+          return;
+        }
+        const target = a.base + dragAngle(a.centre, a.start, w);
+        a.degrees = e.shiftKey ? Math.round(target / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG : target;
+        turning = byId.get(a.id)?.members?.length ? null : { id: a.id, degrees: a.degrees };
       },
       [GestureKind.Marquee]: (a) => {
         if (a.kind !== GestureKind.Marquee || (!far && !a.moved)) {
@@ -2338,6 +2384,12 @@
         }
         settleOverrides();
       },
+      [GestureKind.Rotate]: () => {
+        turning = null;
+        if (a.kind === GestureKind.Rotate && a.degrees !== a.base) {
+          props.onRotate?.(a.id, a.degrees - a.base);
+        }
+      },
       [GestureKind.Marquee]: () => {
         marquee = null;
         if (a.kind === GestureKind.Marquee && !a.moved) {
@@ -2376,6 +2428,7 @@
 
   function cancelGesture() {
     active = null;
+    turning = null;
     gesturing = false;
     resizing = new Set();
     marquee = null;
@@ -2469,7 +2522,6 @@
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
   const corePeers = $derived(coreOn && coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
-  const coreRotate = $derived(coreOn && props.onRotate ? selectedBoxes.filter((t) => t.rotatable && !t.rotation).map((t) => ({ id: t.id, box: { x: t.x, y: t.y, w: t.w, h: t.h } })) : []);
   const stackOrder = $derived(placed.map((t) => t.id));
   const viewZoom = $derived(view.zoom);
   const coreOverlay = $derived(
@@ -2485,7 +2537,6 @@
           glyphs: coreType.glyphs,
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
-          rotate: coreRotate,
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
           hovered: hovered && !selected.includes(hovered) && layersSource.hovered?.nodeId !== hovered ? (byId.get(hovered) ?? null) : null,
           running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})),
@@ -3159,7 +3210,7 @@
       pickHover = null;
     }}
     class:panning={space}
-    style:cursor={cornerCursor}
+    style:cursor={handleCursor}
     data-owns-pinch
   >
     {#if coreOn}
@@ -3241,7 +3292,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px;--bar-h:${holdsDoc(t.kind ?? '') && frameChrome(kindOfNode(t.id)).bar ? MOTION_NODE_BAR_H : 0}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} knobDrawn={coreRotate.some((r) => r.id === t.id)} />
+          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} />
           {#if !domIds.has(t.id) && holdsDoc(t.kind ?? '')}
             {@const kind = kindOfNode(t.id)}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>

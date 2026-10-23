@@ -9,8 +9,29 @@ const BY_EIGHTH = [ResizeCursor.Horizontal, ResizeCursor.Falling, ResizeCursor.V
 const EIGHTH_DEG = 45;
 const HALF_TURN_DEG = 180;
 
-export const ROTATE_CURSOR =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M6 15a7 7 0 0 1 9-9' fill='none' stroke='white' stroke-width='4'/%3E%3Cpath d='M6 15a7 7 0 0 1 9-9' fill='none' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M14 2l4 4-4 4zM2 14l4 4 4-4z' fill='black' stroke='white'/%3E%3C/svg%3E\") 12 12, grab";
+const FULL_TURN_DEG = 360;
+const ROTATE_CURSOR_BASE_DEG = 135;
+const ROTATE_CURSOR_HOTSPOT = 12;
+
+const rotateCursors = new Map<number, string>();
+
+const rotateIcon = (turn: number) => {
+  const arc = "d='M5 12A7 7 0 0 1 12 5' fill='none'";
+  const heads = "d='M2 12h6l-3 4zM12 2v6l4-3z'";
+  return `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><g transform='rotate(${turn} 12 12)'><path ${arc} stroke='white' stroke-width='4'/><path ${arc} stroke='black' stroke-width='1.5'/><path ${heads} fill='black' stroke='white'/></g></svg>`;
+};
+
+export function rotateCursor([x, y]: [number, number], turnDeg: number): string {
+  const outward = (Math.atan2(y, x) * HALF_TURN_DEG) / Math.PI + turnDeg;
+  const turn = (((Math.round(outward + ROTATE_CURSOR_BASE_DEG) % FULL_TURN_DEG) + FULL_TURN_DEG) % FULL_TURN_DEG);
+  const known = rotateCursors.get(turn);
+  if (known) {
+    return known;
+  }
+  const cursor = `url("data:image/svg+xml,${encodeURIComponent(rotateIcon(turn))}") ${ROTATE_CURSOR_HOTSPOT} ${ROTATE_CURSOR_HOTSPOT}, grab`;
+  rotateCursors.set(turn, cursor);
+  return cursor;
+}
 
 export function resizeCursor([x, y]: [number, number], turnDeg: number): ResizeCursor {
   const turn = (turnDeg * Math.PI) / HALF_TURN_DEG;
