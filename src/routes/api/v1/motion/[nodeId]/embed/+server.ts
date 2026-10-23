@@ -1,23 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { reachableCaller } from '$lib/server/org-data/reach';
 import { appOrigin } from '$lib/server/app-url';
-import { EmbedFailure, motionEmbedState, publishMotionEmbed, unpublishMotionEmbed, type EmbedAnswer } from '$lib/server/motion/agent-embed';
+import { embedStatus, motionEmbedState, publishMotionEmbed, unpublishMotionEmbed, type EmbedAnswer } from '$lib/server/motion/agent-embed';
 import type { RequestHandler } from './$types';
 
-const HTTP_OK = 200;
 const HTTP_FORBIDDEN = 403;
-const HTTP_NOT_FOUND = 404;
-const HTTP_CONFLICT = 409;
-const HTTP_BAD_GATEWAY = 502;
 
-const STATUS_OF: Record<EmbedFailure, number> = {
-  [EmbedFailure.NotFound]: HTTP_NOT_FOUND,
-  [EmbedFailure.Empty]: HTTP_CONFLICT,
-  [EmbedFailure.Refused]: HTTP_FORBIDDEN,
-  [EmbedFailure.Storage]: HTTP_BAD_GATEWAY
-};
-
-const answer = (result: EmbedAnswer) => json(result.body, { status: result.ok ? HTTP_OK : STATUS_OF[result.failure] });
+const answer = (result: EmbedAnswer) => json(result.body, { status: embedStatus(result) });
 
 enum Access {
   Read = 'read',

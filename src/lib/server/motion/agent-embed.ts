@@ -14,6 +14,7 @@ export enum EmbedFailure {
   NotFound = 'motion_node_not_found',
   Empty = 'nothing_to_publish',
   Refused = 'refused',
+  NotPublished = 'embed_not_published',
   Storage = 'storage_failed'
 }
 
@@ -22,6 +23,22 @@ export type EmbedAnswer = { ok: true; body: Record<string, unknown> } | { ok: fa
 type Saved = { record: CanvasNodeRecord; node: MotionNode; project: Project; version: number; doc: MotionDoc };
 type Scope = { orgId: string; nodeId: string };
 type PublishScope = Scope & { sign?: AssetSigner };
+
+const HTTP_OK = 200;
+const HTTP_FORBIDDEN = 403;
+const HTTP_NOT_FOUND = 404;
+const HTTP_CONFLICT = 409;
+const HTTP_BAD_GATEWAY = 502;
+
+const STATUS_OF: Record<EmbedFailure, number> = {
+  [EmbedFailure.NotFound]: HTTP_NOT_FOUND,
+  [EmbedFailure.Empty]: HTTP_CONFLICT,
+  [EmbedFailure.NotPublished]: HTTP_CONFLICT,
+  [EmbedFailure.Refused]: HTTP_FORBIDDEN,
+  [EmbedFailure.Storage]: HTTP_BAD_GATEWAY
+};
+
+export const embedStatus = (answer: EmbedAnswer): number => (answer.ok ? HTTP_OK : STATUS_OF[answer.failure]);
 
 const fetchBlob = (url: string) => fetch(url).then((r) => r.blob());
 

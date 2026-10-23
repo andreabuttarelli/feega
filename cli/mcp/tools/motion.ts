@@ -346,6 +346,20 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'share_motion_frame',
+    {
+      title: 'Share one frame as a link',
+      description:
+        'Create the public viewer link of ONE frame: a clean full-screen page that plays it on a loop, with tap to play and swipe between the canvas\'s shared frames on a phone. ' +
+        'Publishes the frame\'s web embed if needed and turns the canvas share link on; returns `url` (the viewer) and `embed_url`. ' +
+        'Turning the canvas share off kills every frame link. Videos from an uncensored project are refused (403, `refusal`). Free.',
+      inputSchema: z.object({ org, node_id: z.string() }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true }
+    },
+    async ({ org, node_id }) => withAuth((token) => motionApi.share(token, node_id, org))
+  );
+
+  server.registerTool(
     'get_motion_embed',
     {
       title: 'Read a frame web embed',
