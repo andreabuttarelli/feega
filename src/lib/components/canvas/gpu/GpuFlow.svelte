@@ -118,7 +118,7 @@
   import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { isTypingTarget } from '$lib/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
-  import { DropVerdict, pointOf } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, isOutside, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
   import { isAddable, type Addable } from '$lib/canvas/addable';
@@ -1898,8 +1898,26 @@
     const from = framePt(e);
     const reach = frameReach(at);
     let result: OpResult | null = null;
+    let carried = false;
+
+    const leaving = (ev: PointerEvent): ElementOut | null => {
+      const stage = wrap?.querySelector<HTMLElement>(`[data-motion-node="${nodeId}"] [data-frame-stage]`)?.getBoundingClientRect();
+      const [clipId] = inScope.ids;
+      const client = { x: ev.clientX, y: ev.clientY };
+      if (grip !== Grip.Move || inScope.ids.length !== 1 || !stage || !isOutside(stage, client)) {
+        return null;
+      }
+      const b = boxes[clipId];
+      const { width, height } = inScope.view;
+      return { clipId, client, box: b ? { left: b.left / width, top: b.top / height, width: b.width / width, height: b.height / height } : null };
+    };
 
     const move = (ev: PointerEvent) => {
+      const out = leaving(ev);
+      if (out || carried) {
+        props.onElementOut?.(nodeId, out ?? { clipId: '', client: { x: ev.clientX, y: ev.clientY }, box: null }, out ? DragPhase.Over : DragPhase.Back);
+        carried = !!out;
+      }
       const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey }, reach });
       result = dragged.result.ok ? { ok: true, doc: inScope.merge(dragged.result.doc) } : dragged.result;
       frameGuides = { nodeId, guides: dragged.guides, gaps: dragged.gaps };
@@ -1907,10 +1925,16 @@
         liveDocs.set(nodeId, { ...at.live, doc: result.doc });
       }
     };
-    const up = () => {
+    const up = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       frameGuides = null;
+      const out = leaving(ev);
+      if (out) {
+        liveDocs.clear(nodeId);
+        props.onElementOut?.(nodeId, out, DragPhase.Drop);
+        return;
+      }
       if (result?.ok) {
         commit(nodeId, result, GRIP_SUMMARY[grip]);
       }

@@ -117,6 +117,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import FrameHover from '$lib/components/canvas/FrameHover.svelte';
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
+  import { TileBody } from '$lib/canvas/motion-node';
+  import OutputDragHandle from '$lib/components/canvas/OutputDragHandle.svelte';
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -134,7 +136,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
-  import { DropVerdict, frameUnderPointer, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
@@ -368,6 +370,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       }
     });
     return DropVerdict.Taken;
+  }
+
+  async function elementOut(source: string, out: ElementOut, phase: DragPhase) {
+    markFrame(phase === DragPhase.Over ? out.client : null, source);
+    const drop = phase === DragPhase.Drop ? dropAt(out.client, source) : null;
+    if (!drop) {
+      return;
+    }
+    landed(await post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), ...(out.box ? { box: JSON.stringify(out.box) } : {}) }));
   }
 
   const regroups = inOrder();
@@ -3454,6 +3465,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onRestack={restack}
     onTileDragOver={tileDragOver}
     onTileDrop={tileDrop}
+    onElementOut={elementOut}
     onFlow={(fn) => (toFlow = fn)}
     onUpload={upload}
     onDuplicate={duplicate}
@@ -3502,6 +3514,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && !core}
         <FrameHover nodeId={id} revision={hoverMotion.docHeadRevision} previewUrl={motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} width={FORMATS[hoverMotion.format].width} height={FORMATS[hoverMotion.format].height} />
       {/if}
+      {@const hoverGen = hoverNode ? genOf(hoverNode) : null}
+      {#if body === TileBody.Standin && hoverGen?.refId && !hoverGen.running}<OutputDragHandle nodeId={id} />{/if}
       {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
     {/snippet}
     {#snippet tile({ id, selected })}

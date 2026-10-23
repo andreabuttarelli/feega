@@ -18,7 +18,7 @@ import type { CanvasNode } from '$lib/canvas/graph';
 import type { CanvasMode } from '$lib/canvas/canvas-mode';
 import type { RunQuote } from '$lib/canvas/run-quote';
 import type { GraphScope } from '$lib/canvas/run-graph';
-import type { DropVerdict, PointerPoint } from '$lib/canvas/canvas-drop';
+import type { DragPhase, DropVerdict, ElementOut, PointerPoint } from '$lib/canvas/canvas-drop';
 import type { Stack } from '$lib/canvas/stacking';
 
 export type Tile = {
@@ -55,6 +55,7 @@ export type FlowProps = {
   onMoveEnd?: (moves: { id: string; x: number; y: number }[]) => void;
   onTileDragOver?: (ids: string[], at: PointerPoint) => void;
   onTileDrop?: (ids: string[], at: PointerPoint) => DropVerdict;
+  onElementOut?: (frameId: string, out: ElementOut, phase: DragPhase) => void;
   onConnect?: (
     sourceItemId: string,
     targetItemId: string,

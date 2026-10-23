@@ -20,8 +20,7 @@
   import { scrollGuard } from '$lib/canvas/scroll-guard';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { untrack } from 'svelte';
-  import FrameIcon from '@lucide/svelte/icons/frame';
-  import { CANVAS_DRAG_OUTPUT } from '$lib/canvas/drag-payload';
+  import OutputDragHandle from './OutputDragHandle.svelte';
   import { EXAMPLE_LABEL, type DemoResult } from '$lib/onboarding/demo';
 
   let {
@@ -148,16 +147,6 @@
    * un corpo, il prompt riempie tutto il nodo invece di restare una striscia di due righe sopra
    * uno spazio vuoto.
    */
-  const TO_FRAME = 'Drag into a frame';
-
-  function dragOutput(e: DragEvent) {
-    e.stopPropagation();
-    e.dataTransfer?.setData(CANVAS_DRAG_OUTPUT, node.id);
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = 'copy';
-    }
-  }
-
   const shownExample = $derived(node.refId ? null : example);
   const hasBody = $derived(hasGenBody(node.medium, state, node.refId, !!shownExample));
 
@@ -232,7 +221,7 @@
         </div>
       {:else if node.refId && result}
         {@render result({ refId: node.refId, text: node.runs.find((r) => r.mediaId === node.refId)?.text ?? null })}
-        <button type="button" class="gen-to-frame nodrag nopan" draggable="true" title={TO_FRAME} aria-label={TO_FRAME} data-testid="drag-to-frame" ondragstart={dragOutput}><FrameIcon size={14} /></button>
+        <OutputDragHandle nodeId={node.id} />
       {:else if shownExample}
         <div class="gen-example" data-testid="example-result">
           <span class="gen-example-mark">{EXAMPLE_LABEL}</span>
@@ -506,31 +495,6 @@
     overflow-wrap: anywhere;
   }
 
-  .gen-to-frame {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    width: 28px;
-    height: 28px;
-    display: grid;
-    place-items: center;
-    border: 1px solid var(--line-2, #d2d2d7);
-    border-radius: 9999px;
-    background: var(--paper, #fff);
-    color: var(--ink, #1d1d1f);
-    cursor: grab;
-    opacity: 0;
-    transition: opacity 120ms ease;
-  }
-  .gen-body:hover .gen-to-frame,
-  .gen-to-frame:focus-visible {
-    opacity: 1;
-  }
-  @media (hover: none) {
-    .gen-to-frame {
-      opacity: 1;
-    }
-  }
   .gen-unlock {
     padding: 4px 12px;
     font: inherit;
