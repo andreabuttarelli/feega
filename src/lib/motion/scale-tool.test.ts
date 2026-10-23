@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ScaleMode, bakeScale, flipScale, scaleClips } from './scale-tool';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, setTransform, type OpResult } from './timeline';
+import { addEffect } from './effects/ops';
+import { EffectKind } from './effects/registry';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -16,6 +18,20 @@ const words = { component: 'Text' as const, from: 0, durationInFrames: 30, props
 const props = (doc: MotionDoc, id: string) => findClip(doc, id)!.clip.props as Record<string, unknown>;
 
 describe('the scale tool', () => {
+  it('scales the pixel sizes of effects with the layer', () => {
+    const shadowed = ok(addEffect(ok(addClip(newMotionDoc(MotionFormat.Landscape), words, 'words')), 'words', EffectKind.DropShadow, 'fx1', { blur: 10, distance: 8, x: 2, y: -2, spread: 3, opacity: 0.5 }));
+    const doc = ok(scaleClips(shadowed, ['words'], 2, [0, 0]));
+
+    expect(findClip(doc, 'words')!.clip.effects[0].params).toMatchObject({ blur: 20, distance: 16, x: 4, y: -4, spread: 6, opacity: 0.5 });
+  });
+
+  it('keeps a scaled effect inside its allowed range', () => {
+    const blurred = ok(addEffect(ok(addClip(newMotionDoc(MotionFormat.Landscape), words, 'words')), 'words', EffectKind.GaussianBlur, 'fx1', { radius: 150 }));
+    const doc = ok(scaleClips(blurred, ['words'], 2, [0, 0]));
+
+    expect(findClip(doc, 'words')!.clip.effects[0].params.radius).toBe(200);
+  });
+
   it('scales the box, the text size and the stroke weight together', () => {
     const doc = ok(scaleClips(ok(addClip(ok(addClip(newMotionDoc(MotionFormat.Landscape), stroked, 'box')), words, 'words')), ['box', 'words'], 2, [960, 540]));
 
