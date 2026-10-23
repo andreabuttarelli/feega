@@ -12,7 +12,8 @@ import { DrawTool } from '$lib/motion/draw-tool';
 import { gradientFillSchema } from '$lib/motion/fill/model';
 import { FILL_RULES } from '$lib/motion/shape/schema';
 import { frameShape } from './start';
-import { figmaFrameDoc } from '$lib/canvas/figma/figma-doc';
+import { figmaPlan, type PlanItem } from '$lib/canvas/figma/figma-doc';
+import { Destination } from '$lib/canvas/figma/scene';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
 import { saveMotionDoc } from './editor';
@@ -564,17 +565,28 @@ export async function drawFrameAt(store: FrameStore, place: Place & { id?: strin
   return { outcome: MoveOutcome.Done, frameId, clipId: '', created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
 }
 
-export type FigmaPasteOutcome = (Extract<Moved, { outcome: MoveOutcome.Done }> & { skipped: string[] }) | null;
+export type FigmaPasteOutcome = { outcome: MoveOutcome.Done; frameIds: string[]; undo: UndoItem[]; skipped: string[] } | null;
 
-export async function pasteFigmaAt(store: FrameStore, place: Place & { id?: string }, html: string, centre: Point, newId: NewId): Promise<FigmaPasteOutcome> {
-  const made = figmaFrameDoc(html, newId);
-  if (!made) {
+const ITEM_SHAPE: Record<Destination, (item: PlanItem) => { data: Record<string, unknown>; w: number; h: number }> = {
+  [Destination.Frame]: (item) => drawnFrameNodeOf(item.size),
+  [Destination.Free]: (item) => elementNodeOf(item.size, item.kind)
+};
+
+export async function pasteFigmaAt(store: FrameStore, place: Place, html: string, centre: Point, newId: NewId): Promise<FigmaPasteOutcome> {
+  const plan = figmaPlan(html, newId);
+  if (!plan) {
     return null;
   }
-  const shaped = drawnFrameNodeOf(made.box);
-  const at = { x: Math.round(centre.x - made.box.width / 2), y: Math.round(centre.y - made.box.height / 2) };
-  const frameId = await store.create({ ...place, ...at }, made.doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: made.name });
-  return { outcome: MoveOutcome.Done, frameId, clipId: '', created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)], skipped: made.skipped };
+  const frameIds: string[] = [];
+  const undo: UndoItem[] = [];
+  for (const item of plan.items) {
+    const shaped = ITEM_SHAPE[item.destination](item);
+    const at = { x: Math.round(centre.x + item.centre.x - item.size.width / 2), y: Math.round(centre.y + item.centre.y - item.size.height / 2) };
+    const frameId = await store.create({ ...place, ...at }, item.doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: item.name });
+    frameIds.push(frameId);
+    undo.push(created(frameId, at));
+  }
+  return { outcome: MoveOutcome.Done, frameIds, undo, skipped: plan.skipped };
 }
 
 export async function canvasFrameInputs<T extends FrameLine>(db: Db, scope: { orgId: string; actor: Actor; projectId: string }, nodes: Array<{ id: string; type: string }>, lines: T[]): Promise<T[]> {

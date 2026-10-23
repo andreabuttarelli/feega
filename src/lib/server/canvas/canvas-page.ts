@@ -1341,15 +1341,15 @@ export const actions: Actions<CanvasParams> = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
     const at = figmaAtSchema.safeParse(jsonField(fd, 'at'));
-    const id = String(fd.get('node_id') ?? '') || undefined;
-    if (!at.success || (id && !UUID.test(id))) {
+    if (!at.success) {
       return fail(400, { error: 'invalid paste' });
     }
-    const pasted = await pasteFigmaAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, String(fd.get('html') ?? ''), at.data, () => crypto.randomUUID().slice(0, 8));
+    const pasted = await pasteFigmaAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, String(fd.get('html') ?? ''), at.data, () => crypto.randomUUID().slice(0, 8));
     if (!pasted) {
       return fail(400, { error: 'no Figma layers in this paste' });
     }
-    return { ...pasted, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: pasted.frameId }) };
+    const nodes = await Promise.all(pasted.frameIds.map((nodeId) => findNode(scope.db, { orgId: scope.orgId, nodeId })));
+    return { outcome: pasted.outcome, nodes: nodes.filter((n) => n !== null), undo: pasted.undo, skipped: pasted.skipped };
   },
 
   placeOutput: async ({ request, params, locals, setHeaders }) => {
