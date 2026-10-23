@@ -123,6 +123,7 @@ const clipSchema = z.object({
   constraints: constraintsSchema.optional(),
   partStyles: partStylesSchema.optional(),
   styleRef: z.string().min(1).optional(),
+  effectStyleRef: z.string().min(1).optional(),
   bind: bindSchema
 });
 

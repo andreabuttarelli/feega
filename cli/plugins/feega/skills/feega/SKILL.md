@@ -258,10 +258,14 @@ Built-in line icons (arrow, check, close, menu, search, user, star, heart, play,
 path clip (x, y centre 0..1, size a share of the short side). Through `motion_tool`.
 
 Named styles keep a video consistent: `named_style` `{ action: "define", name, style: { kind:
-"text", font, size, weight, tracking, leading, color } }` (or `{ kind: "colour", color }`)
-creates or edits one; `action: "apply"` with `name` and `clip_ids` links clips (a colour style
-paints text colour or shape fill); `"detach"` unlinks, `"remove"` deletes, `"list"` lists them
-with their clips. Editing a style restyles every linked clip. Through `motion_tool`.
+"text", font, size, weight, tracking, leading, color } }` (or `{ kind: "colour", color }`,
+`{ kind: "paint", fills }` for a gradient or image fill, `{ kind: "effect", effects }` for
+shadows and blurs) creates or edits one; `action: "save"` with `name`, one `clip_ids` entry and
+`kind` makes a style from that clip's current look; `"apply"` with `name` and `clip_ids` links
+clips (a colour style paints text colour or shape fill; an effect style has its own slot, so a
+clip keeps one effect style next to one text, colour or paint style); `"detach"` unlinks (`slot`
+`styleRef` or `effectStyleRef`, both when omitted), `"remove"` deletes, `"list"` lists them with
+their clips. Editing a style restyles every linked clip. Through `motion_tool`.
 
 The frame editor page's own actions (read the head, save the whole doc, apply doc ops, render and
 batch status) run through `motion_editor_op` `{ node_id, op, input }` with the same answers as

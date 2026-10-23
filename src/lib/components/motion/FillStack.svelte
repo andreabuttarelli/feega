@@ -9,6 +9,7 @@
   import { Adder } from './stack-adder';
   import { FillField, fillKey } from '$lib/motion/fill/keys';
   import { KeyMark } from '$lib/motion/timeline-layers';
+  import { stopCss, swatchOf } from '$lib/motion/fill/swatch';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import MediaPicker from './MediaPicker.svelte';
   import type { MediaUploader } from './media-upload';
@@ -39,19 +40,7 @@
   const topFirst = $derived(fills.map((fill, index) => ({ fill, index })).reverse());
   const pct = (n: number) => Math.round(n * PERCENT);
   const color = (value: string) => resolveColor(value, tokens);
-  const stopCss = (stops: Stop[]) => [...stops].sort((a, b) => a.pos - b.pos).map((s) => `${color(s.color)} ${pct(s.pos)}%`).join(',');
-
-  const SWATCH: Record<FillType, (f: Fill) => string> = {
-    [FillType.Solid]: (f) => color((f as FillOf<FillType.Solid>).color),
-    [FillType.Linear]: (f) => `linear-gradient(${(f as FillOf<FillType.Linear>).angle + 90}deg,${stopCss((f as FillOf<FillType.Linear>).stops)})`,
-    [FillType.Radial]: (f) => `radial-gradient(circle,${stopCss((f as FillOf<FillType.Radial>).stops)})`,
-    [FillType.Angular]: (f) => `conic-gradient(from ${(f as FillOf<FillType.Angular>).angle}deg,${stopCss((f as FillOf<FillType.Angular>).stops)})`,
-    [FillType.Diamond]: (f) => `radial-gradient(closest-side,${stopCss((f as FillOf<FillType.Diamond>).stops)})`,
-    [FillType.Image]: (f) => {
-      const preview = assets.find((a) => a.id === (f as FillOf<FillType.Image>).assetId)?.previewUrl ?? (f as FillOf<FillType.Image>).src;
-      return preview ? `center / cover no-repeat url("${preview}")` : 'var(--ui-input)';
-    }
-  };
+  const swatch = (fill: Fill) => swatchOf(fill, { color, picture: (f) => assets.find((a) => a.id === f.assetId)?.previewUrl ?? f.src });
 
   const HEX_DIGITS = /^#/;
   const rowLabel = (f: Fill) => (f.type === FillType.Solid ? colourAlpha(f.color).base.replace(HEX_DIGITS, '').toUpperCase() : TYPE_LABEL[f.type]);
@@ -176,7 +165,7 @@
         data-testid="fill-swatch"
         aria-label={`Edit ${TYPE_LABEL[fill.type].toLowerCase()} fill`}
         aria-expanded={open === index}
-        style={`background:${SWATCH[fill.type](fill)}`}
+        style={`background:${swatch(fill)}`}
         onclick={(e) => {
           e.stopPropagation();
           toggle(index);
@@ -207,7 +196,7 @@
     </div>
 
     {#if open === index && rowEls[index]}
-      <SidePopover anchor={rowEls[index]} within={root} key={String(index)} title={TYPE_LABEL[fill.type]} label={`${TYPE_LABEL[fill.type]} fill`} swatch={SWATCH[fill.type](fill)} onclose={() => (open = null)}>
+      <SidePopover anchor={rowEls[index]} within={root} key={String(index)} title={TYPE_LABEL[fill.type]} label={`${TYPE_LABEL[fill.type]} fill`} swatch={swatch(fill)} onclose={() => (open = null)}>
       <div class="flex flex-col gap-1.5" data-testid="fill-editor">
         <label class={FIELD_ROW}
           ><span class={LABEL}>Type</span>
@@ -220,7 +209,7 @@
         {:else if fill.type !== FillType.Image}
           {@const at = Math.min(stopAt, fill.stops.length - 1)}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-          <div class="relative mx-2 my-1 h-4 cursor-copy rounded-xs border border-ui-divider" data-testid="fill-bar" title="Click to add a stop" style={`background:linear-gradient(90deg,${stopCss(fill.stops)})`} onclick={(e) => addStopAt(index, e)}>
+          <div class="relative mx-2 my-1 h-4 cursor-copy rounded-xs border border-ui-divider" data-testid="fill-bar" title="Click to add a stop" style={`background:linear-gradient(90deg,${stopCss(fill.stops, color)})`} onclick={(e) => addStopAt(index, e)}>
             {#each fill.stops as s, si (si)}
               <button
                 type="button"

@@ -1,9 +1,13 @@
 import { z } from 'zod';
 import { TYPE, TYPE_SIZE } from './components';
+import { fillsSchema } from './fill/model';
+import { effectSchema, MAX_EFFECTS } from './effects/model';
 
 export enum StyleKind {
   Text = 'text',
-  Colour = 'colour'
+  Colour = 'colour',
+  Effect = 'effect',
+  Paint = 'paint'
 }
 
 export const MAX_STYLES = 40;
@@ -25,7 +29,11 @@ export const textStyleSchema = z
 
 export const colourStyleSchema = z.object({ kind: z.literal(StyleKind.Colour), color: colour }).strict();
 
-export const styleSchema = z.discriminatedUnion('kind', [textStyleSchema, colourStyleSchema]);
+export const effectStyleSchema = z.object({ kind: z.literal(StyleKind.Effect), effects: z.array(effectSchema.omit({ lut: true })).min(1).max(MAX_EFFECTS) }).strict();
+
+export const paintStyleSchema = z.object({ kind: z.literal(StyleKind.Paint), fills: fillsSchema.min(1) }).strict();
+
+export const styleSchema = z.discriminatedUnion('kind', [textStyleSchema, colourStyleSchema, effectStyleSchema, paintStyleSchema]);
 export type Style = z.infer<typeof styleSchema>;
 
 export const stylesSchema = z

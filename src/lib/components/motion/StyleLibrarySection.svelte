@@ -1,6 +1,8 @@
 <script lang="ts">
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { StyleKind, styleSchema, type Style } from '$lib/motion/styles-model';
+  import { styleLabel } from '$lib/motion/style-library';
+  import { swatchOf } from '$lib/motion/fill/swatch';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
 
   let { tokens }: { tokens: BrandTokens } = $props();
@@ -14,7 +16,9 @@
   ];
 
   const entries = $derived(Object.entries(styleLibrary.styles));
-  const colourOf = (style: Style) => (style.color ? resolveColor(style.color, tokens) : '#000000');
+  const color = (value: string) => resolveColor(value, tokens);
+  const colourOf = (style: Style) => ('color' in style && style.color ? color(style.color) : '#000000');
+  const swatch = (style: Style) => (style.kind === StyleKind.Paint ? swatchOf(style.fills[0], { color, picture: (f) => f.src }) : null);
 
   function edit(name: string, style: Style, patch: Record<string, unknown>) {
     const next = styleSchema.safeParse({ ...style, ...patch });
@@ -32,11 +36,16 @@
   <section class="library" data-testid="style-library">
     <header>Styles · canvas</header>
     {#each entries as [name, style] (name)}
-      <div class="style" data-testid="style-library-row">
+      <div class="style" data-testid="style-library-row" data-kind={style.kind}>
         <div class="row">
-          <input type="color" data-testid={`style-library-colour-${name}`} value={colourOf(style)} onchange={(e) => edit(name, style, { color: e.currentTarget.value })} />
+          {#if style.kind === StyleKind.Text || style.kind === StyleKind.Colour}
+            <input type="color" data-testid={`style-library-colour-${name}`} value={colourOf(style)} onchange={(e) => edit(name, style, { color: e.currentTarget.value })} />
+          {:else}
+            <span class="swatch" data-testid={`style-library-swatch-${name}`} style={`background:${swatch(style) ?? 'var(--ui-input)'}`}></span>
+          {/if}
           <input class="name" type="text" value={name} aria-label="Style name" data-testid={`style-library-name-${name}`} onchange={(e) => styleLibrary.rename(name, e.currentTarget.value.trim())} />
         </div>
+        <span class="kind">{styleLabel(style)}</span>
         {#if style.kind === StyleKind.Text}
           <div class="fields">
             <label class="field">
@@ -93,6 +102,13 @@
     background: transparent;
   }
 
+  .swatch {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--ui-line);
+    border-radius: var(--ui-radius-xs);
+  }
+
   input[type='text'],
   input[type='number'] {
     min-width: 0;
@@ -104,6 +120,10 @@
     background: var(--ui-surface);
     color: var(--ui-text);
     font: inherit;
+  }
+
+  .kind {
+    color: var(--ui-text-tertiary);
   }
 
   .fields {
