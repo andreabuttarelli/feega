@@ -2,7 +2,7 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { FrameFit, framePicker } from '$lib/canvas/frame-pick';
+  import { FrameFit, framePicker, type WorldRect } from '$lib/canvas/frame-pick';
   import { onDestroy, onMount, untrack } from 'svelte';
   import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
@@ -985,7 +985,7 @@
     return surfaceRect ?? { width: innerWidth, height: innerHeight, left: 0, top: 0 };
   }
 
-  function boundsOf(boxes: Box[]): { x: number; y: number; width: number; height: number } | null {
+  function boundsOf(boxes: WorldRect[]): { x: number; y: number; width: number; height: number } | null {
     if (!boxes.length) {
       return null;
     }
@@ -994,7 +994,7 @@
     return { x, y, width: Math.max(...boxes.map((b) => b.x + b.w)) - x, height: Math.max(...boxes.map((b) => b.y + b.h)) - y };
   }
 
-  function fitTo(boxes: Box[], maxZoom = READABLE_ZOOM) {
+  function fitTo(boxes: WorldRect[], maxZoom = READABLE_ZOOM) {
     const b = boundsOf(boxes);
     if (!b) {
       return;
@@ -1002,6 +1002,22 @@
     const s = screenSize();
     const zoom = Math.max(MIN_ZOOM, Math.min(maxZoom, Math.min(s.width / (b.width * (1 + FIT_PADDING)), s.height / (b.height * (1 + FIT_PADDING)))));
     animateTo({ zoom, x: s.width / 2 - (b.x + b.width / 2) * zoom, y: s.height / 2 - (b.y + b.height / 2) * zoom });
+  }
+
+  function pickedRects(): WorldRect[] {
+    const at = inside?.level.clip && picks.length ? pickerOf(inside.nodeId) : null;
+    return at ? picks.flatMap((id) => at.picker.outline(id, at.space) ?? []) : [];
+  }
+
+  function zoomToSelection() {
+    const rects = pickedRects();
+    if (rects.length) {
+      fitTo(rects, MAX_ZOOM);
+      return;
+    }
+    if (selectedBoxes.length) {
+      fitTo(selectedBoxes);
+    }
   }
 
   let tween = 0;
@@ -2651,7 +2667,7 @@
       const s = screenSize();
       view = zoomAt(view, { x: s.width / 2, y: s.height / 2 }, 1 / view.zoom);
     },
-    'zoom-selection': () => selectedBoxes.length && fitTo(selectedBoxes),
+    'zoom-selection': zoomToSelection,
     'zoom-in': () => zoomStep(STEP_ZOOM),
     'zoom-out': () => zoomStep(1 / STEP_ZOOM),
     duplicate: () => selected.length && props.onDuplicate?.(selected),
