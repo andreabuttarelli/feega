@@ -1,4 +1,4 @@
-import { Command } from '$lib/motion/shortcuts';
+import { Command, OPACITY_KEYS } from '$lib/motion/shortcuts';
 import { Tool, type ActionId } from '$lib/motion/actions';
 import { LayerAction } from '$lib/canvas/layers';
 import { CanvasAction } from '$lib/canvas/canvas-list';
@@ -134,7 +134,10 @@ export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
   dropBranch: editor('drop_branch')
 };
 
+const OPACITY_PARITY = Object.fromEntries(OPACITY_KEYS.map((o) => [o.command, motion('set_transform')])) as Record<(typeof OPACITY_KEYS)[number]['command'], Parity>;
+
 export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
+  ...OPACITY_PARITY,
   [Command.TogglePlay]: VIEW,
   [Command.Play]: VIEW,
   [Command.Pause]: VIEW,

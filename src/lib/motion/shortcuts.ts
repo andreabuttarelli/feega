@@ -93,6 +93,16 @@ export enum Command {
   PasteReplace = 'paste-replace',
   ToggleHidden = 'toggle-hidden',
   ToggleLocked = 'toggle-locked',
+  Opacity10 = 'opacity-10',
+  Opacity20 = 'opacity-20',
+  Opacity30 = 'opacity-30',
+  Opacity40 = 'opacity-40',
+  Opacity50 = 'opacity-50',
+  Opacity60 = 'opacity-60',
+  Opacity70 = 'opacity-70',
+  Opacity80 = 'opacity-80',
+  Opacity90 = 'opacity-90',
+  Opacity100 = 'opacity-100',
   CreateComponent = 'create-component',
   DetachInstance = 'detach-instance',
   ResetInstance = 'reset-instance',
@@ -120,6 +130,19 @@ export enum Command {
   MoveDownMore = 'move-down-more'
 }
 
+export const OPACITY_KEYS = [
+  { key: '1', command: Command.Opacity10, opacity: 0.1 },
+  { key: '2', command: Command.Opacity20, opacity: 0.2 },
+  { key: '3', command: Command.Opacity30, opacity: 0.3 },
+  { key: '4', command: Command.Opacity40, opacity: 0.4 },
+  { key: '5', command: Command.Opacity50, opacity: 0.5 },
+  { key: '6', command: Command.Opacity60, opacity: 0.6 },
+  { key: '7', command: Command.Opacity70, opacity: 0.7 },
+  { key: '8', command: Command.Opacity80, opacity: 0.8 },
+  { key: '9', command: Command.Opacity90, opacity: 0.9 },
+  { key: '0', command: Command.Opacity100, opacity: 1 }
+] as const;
+
 export enum ShortcutGroup {
   Playback = 'Playback',
   Time = 'Time',
@@ -133,7 +156,10 @@ export type KeyPress = { key: string; code?: string; mod: boolean; shift: boolea
 
 type Binding = { key: string; mod?: boolean; shift?: boolean; alt?: boolean; ctrlCmd?: boolean; mode?: EditMode; command: Command; label: string; does: string; group: ShortcutGroup };
 
+const OPACITY_BINDINGS: readonly Binding[] = OPACITY_KEYS.map((o) => ({ key: o.key, mode: EditMode.Design, command: o.command, label: o.key, does: 'Opacity: 1 to 9 = 10 to 90%, 0 = 100%', group: ShortcutGroup.Layers }));
+
 export const SHORTCUTS: readonly Binding[] = [
+  ...OPACITY_BINDINGS,
   { key: 't', mode: EditMode.Design, command: Command.ToolText, label: 'T', does: 'Text tool: drag in the frame', group: ShortcutGroup.Draw },
   { key: 'r', mode: EditMode.Design, command: Command.ToolRectangle, label: 'R', does: 'Rectangle tool', group: ShortcutGroup.Draw },
   { key: 'o', mode: EditMode.Design, command: Command.ToolEllipse, label: 'O', does: 'Ellipse tool', group: ShortcutGroup.Draw },

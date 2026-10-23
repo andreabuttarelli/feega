@@ -13,8 +13,8 @@ import { BooleanOp, flattenShapes } from '$lib/motion/shape/boolean';
 import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
-import { setProps, type OpResult } from '$lib/motion/timeline';
-import { Command, commandFor } from '$lib/motion/shortcuts';
+import { setProps, setTransform, type OpResult } from '$lib/motion/timeline';
+import { Command, OPACITY_KEYS, commandFor } from '$lib/motion/shortcuts';
 import { Same, matchingLayers, sameLayers } from '$lib/motion/select-matching';
 import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
 import type { SelectionActionId } from './selection-actions';
@@ -159,7 +159,12 @@ function pasteReplace(ctx: BarCtx): Done | null {
   return replaced?.ok ? { ok: true, doc: replaced.doc, summary: 'Pasted to replace', selection: replaced.ids } : null;
 }
 
+const opacityOp = (opacity: number): BarOp => ({ shown: any, run: (ctx) => kept(ctx, ctx.selection.reduce<OpResult>((r, id) => (r.ok ? setTransform(r.doc, id, { opacity }) : r), { ok: true, doc: ctx.doc }), `Opacity ${Math.round(opacity * 100)}%`) });
+
+const OPACITY_OPS = Object.fromEntries(OPACITY_KEYS.map((o) => [o.command, opacityOp(o.opacity)]));
+
 const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
+  ...OPACITY_OPS,
   [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx.doc)), 'Created a component') },
   [Action.DetachInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, detachInstance(ctx.doc, ctx.selection[0], ctx.newId), 'Detached the instance') },
   [Action.PushInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, pushOverrides(ctx.doc, ctx.selection[0]), 'Pushed overrides to the main component') },
@@ -241,7 +246,7 @@ export const FRAME_ELEMENT_MENU: ReadonlySet<SelectionActionId> = new Set(
   })
 );
 
-const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
+const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
 
 export function frameKeyAction(e: KeyboardEvent): ActionId | null {
   const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, EditMode.Design);

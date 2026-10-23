@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { Action } from '$lib/motion/actions';
+import { Command } from '$lib/motion/shortcuts';
 import { PropertiesView } from '$lib/motion/properties-view';
 import { addClip, type OpResult } from '$lib/motion/timeline';
 import { FieldType, exposeField } from '$lib/motion/template/fields';
@@ -89,6 +90,13 @@ describe('barAction', () => {
 
     expect(scale(barAction(Action.FlipHorizontal, { doc: fixture(), selection: ['a'], frame: 0, newId: ids })?.doc, 'scaleX')).toBe(-1);
     expect(scale(barAction(Action.FlipVertical, { doc: fixture(), selection: ['a'], frame: 0, newId: ids })?.doc, 'scaleY')).toBe(-1);
+  });
+
+  it('sets the opacity of the selected clips from a digit command', () => {
+    const opacity = (doc: MotionDoc | undefined) => doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'a')?.transform.opacity;
+
+    expect(opacity(barAction(Command.Opacity30, { doc: fixture(), selection: ['a'], frame: 0, newId: ids })?.doc)).toBe(0.3);
+    expect(opacity(barAction(Command.Opacity100, { doc: fixture(), selection: ['a'], frame: 0, newId: ids })?.doc)).toBe(1);
   });
 
   it('deletes the selected clip', () => {
