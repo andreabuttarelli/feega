@@ -51,3 +51,17 @@ describe('morph', () => {
     expect(dot.every((p) => p[0] === dot[0][0] && p[1] === dot[0][1])).toBe(true);
   });
 });
+
+describe('contour pairing', () => {
+  const width = (c: Outline[number]) => {
+    const xs = flatten(c).map((p) => p[0]);
+    return Math.max(...xs) - Math.min(...xs);
+  };
+
+  it('pairs contours by size, so a hole listed first still follows the outline it belongs to', () => {
+    const [outer, hole] = ellipseOutline({ w: 1, h: 1 }, { start: 0, sweep: 1, ratio: 0.4 });
+    const middle = morphBetween([hole, outer], ellipseOutline(), 0.5, 0);
+
+    expect(Math.max(...middle.map(width))).toBeGreaterThan(0.95);
+  });
+});

@@ -192,7 +192,7 @@ import { setBlendMode } from '$lib/motion/blend-ops';
 import { setClipsBlur, setMotionBlur } from '$lib/motion/motion-blur-ops';
 import { DEGREES, MAX_SAMPLES } from '$lib/motion/motion-blur';
 import { MODIFIERS, MODIFIER_KINDS } from '$lib/motion/shape/modifiers';
-import { addModifier, morphTo, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
+import { addModifier, morphTo, morphToClip, removeModifier, setModifier, setPath } from '$lib/motion/shape/ops';
 import { SHAPE_KINDS, StrokeKind, modifierKey } from '$lib/motion/shape/schema';
 import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset } from '$lib/motion/shape/presets';
 import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
@@ -1866,6 +1866,15 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           morphTo(session.doc, input.clip_id, { ...input, from: input.start === undefined ? undefined : frames(input.start), to: input.end === undefined ? undefined : frames(input.end) }),
           `morph target on ${input.clip_id}`
         )
+    }),
+
+    morph_to_clip: tool({
+      description: 'Morph a Shape clip into the outline of another Shape clip on the canvas (a drawn path, a star, a ring with holes): the other clip is the next morph target and the morph is keyed over one second from at (seconds from the video start, default the clip start). The other clip is left as it is; hide or delete it if it was only a pattern. Contours are matched by size, so holes follow holes and extra contours grow out of a point.',
+      inputSchema: z.object({ clip_id: z.string(), to_clip_id: z.string(), at: z.number().min(0).optional() }),
+      execute: async (input) => {
+        const start = findClip(session.doc, input.clip_id)?.clip.from ?? 0;
+        return apply(morphToClip(session.doc, input.clip_id, input.to_clip_id, input.at === undefined ? start : frames(input.at)), `${input.clip_id} morphs into ${input.to_clip_id}`);
+      }
     }),
 
     add_modifier: tool({

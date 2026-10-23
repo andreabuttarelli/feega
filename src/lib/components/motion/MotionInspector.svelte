@@ -11,7 +11,7 @@
   import { setClipDepth } from '$lib/motion/camera-ops';
   import { ParentOpacity, parentChoices } from '$lib/motion/parent';
   import { setParent, setParentOpacity } from '$lib/motion/parent-ops';
-  import { findClip } from '$lib/motion/doc';
+  import { clipsOf, findClip } from '$lib/motion/doc';
   import { TRANSITION_KINDS, type Edge } from '$lib/motion/design';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
@@ -74,7 +74,7 @@
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
   import { effectKey } from '$lib/motion/effects/model';
   import { MODIFIERS, MODIFIER_KINDS, type ModifierKind } from '$lib/motion/shape/modifiers';
-  import { addModifier, morphHere, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
+  import { addModifier, morphHere, morphToClip, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
   import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset, type ShapePreset } from '$lib/motion/shape/presets';
   import { SHAPE_KINDS, ShapeKind, modifierKey, type Modifier } from '$lib/motion/shape/schema';
   import { cornerRadii, withCorner } from '$lib/motion/shape/geometry';
@@ -341,6 +341,16 @@
     select.value = '';
     if (kind) {
       commit(addModifier(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${MODIFIERS[kind].label.toLowerCase()}`);
+    }
+  }
+
+  const morphSources = $derived(clip.component === 'Shape' ? clipsOf(doc).filter((c) => c.component === 'Shape' && c.id !== clip.id) : []);
+
+  function morphIntoClip(select: HTMLSelectElement) {
+    const other = select.value;
+    select.value = '';
+    if (other) {
+      commit(morphToClip(doc, clip.id, other, frame), `Morphed into ${clipName(other)}`);
     }
   }
 
@@ -738,6 +748,12 @@
       <option value="">Morph to…</option>
       {#each SHAPE_KINDS.filter((k) => k !== ShapeKind.Path) as kind (kind)}<option value={kind}>{kind}</option>{/each}
     </select>
+    {#if morphSources.length}
+      <select class="add" aria-label="Morph into shape" data-testid="morph-into" title="Morphs into the outline of another shape on the canvas, from the playhead over one second" value="" onchange={(e) => morphIntoClip(e.currentTarget)}>
+        <option value="">Morph into shape…</option>
+        {#each morphSources as other (other.id)}<option value={other.id}>{clipName(other.id)}</option>{/each}
+      </select>
+    {/if}
     <select class="add" aria-label="Liquid preset" data-testid="shape-preset" value="" onchange={(e) => applyShapePresetOf(e.currentTarget)}>
       <option value="">Liquid preset…</option>
       {#each SHAPE_PRESETS as preset (preset)}<option value={preset} title={SHAPE_PRESET[preset].about}>{SHAPE_PRESET[preset].label}</option>{/each}
