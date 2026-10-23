@@ -4,7 +4,7 @@ import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type 
 import { DrawTool, type DragPoint, type DrawBox } from './draw-tool';
 import { corner, mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
 import { FillKind, ShapeKind, StrokeKind } from './shape/schema';
-import type { SvgGradient } from './shape/svg-import';
+import type { SvgFillRule, SvgGradient } from './shape/svg-import';
 import { DocMode, docMode, setStill, settledStill } from './still';
 import { TOP_LEFT_START, addClip, type OpResult } from './timeline';
 
@@ -121,7 +121,7 @@ export enum CanvasTheme {
   Dark = 'dark'
 }
 
-export type PenPaint = { fill?: string | null; stroke?: string | null; gradient?: SvgGradient };
+export type PenPaint = { fill?: string | null; stroke?: string | null; gradient?: SvgGradient; fillRule?: SvgFillRule };
 
 type BoxDrawn = { tool: BoxTool; box: CanvasBox; theme?: CanvasTheme; sizing?: TextSizing; text?: string; color?: string; weight?: number };
 
@@ -138,8 +138,9 @@ export function drawnOf(wire: DrawnWire): Drawn | string {
   return typeof outline === 'string' ? outline : { ...paint, outline };
 }
 
-export function penPaint({ fill, stroke, gradient }: PenPaint): Record<string, unknown> {
+export function penPaint({ fill, stroke, gradient, fillRule }: PenPaint): Record<string, unknown> {
   return {
+    ...(fillRule ? { fillRule } : {}),
     ...(gradient ? { fills: [gradient] } : {}),
     ...(fill === null ? { fillKind: FillKind.None } : {}),
     ...(fill ? { fillKind: FillKind.Solid, fill } : {}),

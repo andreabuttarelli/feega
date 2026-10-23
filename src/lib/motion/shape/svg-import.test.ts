@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parsePath } from './geometry';
 import { svgShapes } from './svg-import';
@@ -113,5 +114,58 @@ describe('svgShapes', () => {
     const svg = `<svg viewBox="0 0 100 100"><g transform="translate(10 10) scale(2)"><text x="5" y="10" font-size="10" text-anchor="middle"><tspan x="5" dy="0">one</tspan><tspan x="5" dy="12">two</tspan></text></g></svg>`;
     const [text] = svgShapes(svg).texts;
     expect(text).toMatchObject({ text: 'one\ntwo', x: 20, y: 30, size: 20, anchor: 'middle' });
+  });
+});
+
+const fixture = (name: string) => readFileSync(`tests/fixtures/svg/${name}.svg`, 'utf8');
+const outlineOf = (d: string) => {
+  const outline = parsePath(d);
+  if (typeof outline === 'string') {
+    throw new Error(outline);
+  }
+  return outline;
+};
+
+describe('svgShapes fill rule and real-world paths', () => {
+  it('keeps the two subpaths and the evenodd rule of the Designflow logo', () => {
+    const [shape] = svgShapes(fixture('designflow-logo')).shapes;
+    const outline = outlineOf(shape.path);
+    expect(shape.fillRule).toBe('evenodd');
+    expect(outline).toHaveLength(2);
+    expect(outline.every((c) => c.closed)).toBe(true);
+    expect(box(shape.path)).toEqual({ left: 0, top: 0, right: 40.134, bottom: 40.134 });
+  });
+
+  it('defaults to nonzero and inherits evenodd from a group', () => {
+    expect(svgShapes(fixture('nested-nonzero')).shapes[0].fillRule).toBe('nonzero');
+    expect(svgShapes(fixture('nested-evenodd')).shapes[0].fillRule).toBe('evenodd');
+  });
+
+  it('ignores clip-rule when reading the fill rule', () => {
+    const read = svgShapes(`<svg viewBox="0 0 10 10"><path d="M0 0H10V10Z" clip-rule="evenodd"/></svg>`);
+    expect(read.shapes[0].fillRule).toBe('nonzero');
+  });
+
+  it('reads relative commands, with a subpath that starts from the previous start point', () => {
+    const [shape] = svgShapes(fixture('relative-nonzero-hole')).shapes;
+    const outline = outlineOf(shape.path);
+    expect(outline.map((c) => c.vertices.map((v) => v.p))).toEqual([
+      [[5, 5], [35, 5], [35, 35], [5, 35]],
+      [[10, 10], [10, 30], [30, 30], [30, 10]]
+    ]);
+  });
+
+  it('turns arcs into curves that stay on the circle', () => {
+    const [shape] = svgShapes(fixture('arcs-evenodd-ring')).shapes;
+    expect(outlineOf(shape.path)).toHaveLength(2);
+    const b = box(shape.path);
+    expect(b.left).toBeCloseTo(5, 1);
+    expect(b.right).toBeCloseTo(35, 1);
+  });
+
+  it('expands S and T like the explicit C and Q they stand for', () => {
+    const [shorthand] = svgShapes(fixture('smooth-shorthands')).shapes;
+    const explicit = svgShapes(`<svg viewBox="0 0 40 40"><path d="M5 30C5 10 20 10 20 30C20 50 35 50 35 30ZM5 36Q12 30 20 36Q28 42 35 36Z"/></svg>`).shapes[0];
+    expect(shorthand.path).toBe(explicit.path);
   });
 });
