@@ -1,18 +1,32 @@
 <script lang="ts">
   import type { MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
-  import { GuideKind, newGuide, setLayoutGuides, type LayoutGuide } from '$lib/motion/layout-guides/guides';
-  import { MAX_LAYOUT_GUIDES } from '$lib/motion/layout-guides/model';
+  import { GuideAlign, GuideKind, newGuide, setLayoutGuides, type LayoutGuide } from '$lib/motion/layout-guides/guides';
+  import { AUTO_COUNT, DEFAULT_AUTO_SIZE, DEFAULT_GUIDE_SIZE, MAX_LAYOUT_GUIDES } from '$lib/motion/layout-guides/model';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
 
   const guides = $derived(doc.layoutGuides ?? []);
   const KINDS = Object.values(GuideKind);
+  const ALIGNS = Object.values(GuideAlign);
 
   const write = (next: LayoutGuide[], summary: string) => onchange(setLayoutGuides(doc, next), summary);
   const patch = (index: number, change: Partial<LayoutGuide>) => write(guides.map((g, i) => (i === index ? { ...g, ...change } : g)), 'Changed a layout guide');
 
-  function number(index: number, key: 'count' | 'gutter' | 'margin' | 'size', text: string) {
+  const countOf = (text: string) => (text.trim().toLowerCase() === AUTO_COUNT ? AUTO_COUNT : Number(text));
+
+  function count(index: number, text: string) {
+    const value = countOf(text);
+    if (value === AUTO_COUNT) {
+      patch(index, { count: value, size: guides[index].size === DEFAULT_GUIDE_SIZE ? DEFAULT_AUTO_SIZE : guides[index].size });
+      return;
+    }
+    if (Number.isFinite(value)) {
+      patch(index, { count: value });
+    }
+  }
+
+  function number(index: number, key: 'gutter' | 'margin' | 'size' | 'offset', text: string) {
     const value = Number(text);
     if (!Number.isFinite(value)) {
       return;
@@ -34,10 +48,22 @@
       {#if guide.kind === GuideKind.Grid}
         <input type="number" min="1" aria-label="Cell size" title="Cell size in px" value={guide.size} onchange={(e) => number(i, 'size', e.currentTarget.value)} />
       {:else}
-        <input type="number" min="1" aria-label="Count" title="Count" value={guide.count} onchange={(e) => number(i, 'count', e.currentTarget.value)} />
+        <input type="text" inputmode="numeric" aria-label="Count" title="Count, or auto" value={guide.count} onchange={(e) => count(i, e.currentTarget.value)} />
         <input type="number" min="0" aria-label="Gutter" title="Gutter in px" value={guide.gutter} onchange={(e) => number(i, 'gutter', e.currentTarget.value)} />
-        <input type="number" min="0" aria-label="Margin" title="Margin in px" value={guide.margin} onchange={(e) => number(i, 'margin', e.currentTarget.value)} />
+        <select aria-label="Alignment" value={guide.align} onchange={(e) => patch(i, { align: e.currentTarget.value as GuideAlign })}>
+          {#each ALIGNS as align (align)}<option value={align}>{align}</option>{/each}
+        </select>
+        {#if guide.align === GuideAlign.Stretch}
+          <input type="number" min="0" aria-label="Margin" title="Margin in px" value={guide.margin} onchange={(e) => number(i, 'margin', e.currentTarget.value)} />
+        {:else}
+          <input type="number" min="1" aria-label="Section size" title="Section size in px" value={guide.size} onchange={(e) => number(i, 'size', e.currentTarget.value)} />
+          {#if guide.align !== GuideAlign.Center}
+            <input type="number" min="0" aria-label="Offset" title="Offset in px" value={guide.offset} onchange={(e) => number(i, 'offset', e.currentTarget.value)} />
+          {/if}
+        {/if}
       {/if}
+      <input type="color" aria-label="Guide colour" title="Colour" value={guide.color} onchange={(e) => patch(i, { color: e.currentTarget.value })} />
+      <input type="number" min="0" max="100" step="5" aria-label="Guide opacity" title="Opacity %" value={Math.round(guide.opacity * 100)} onchange={(e) => patch(i, { opacity: Math.min(1, Math.max(0, Number(e.currentTarget.value) / 100)) })} />
       <label class="toggle" title="Show this guide"><input type="checkbox" checked={!guide.hidden} onchange={(e) => patch(i, { hidden: !e.currentTarget.checked })} /></label>
       <button type="button" class="remove" aria-label="Remove guide" onclick={() => write(guides.filter((_, j) => j !== i), 'Removed a layout guide')}>Remove</button>
     </div>
@@ -48,6 +74,7 @@
   .guides {
     display: grid;
     gap: 6px;
+    padding: 12px;
     font-size: var(--ui-text-xs);
     color: var(--ui-ink-2);
   }
@@ -59,15 +86,17 @@
   }
 
   .guide {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 4px;
     align-items: center;
   }
 
   select,
+  input[type='text'],
   input[type='number'] {
     min-width: 0;
-    flex: 1;
+    width: 100%;
     height: 28px;
     padding: 0 6px;
     border: 1px solid transparent;
@@ -93,6 +122,14 @@
   .add:hover,
   .remove:hover {
     background: var(--ui-hover);
+  }
+
+  input[type='color'] {
+    width: 100%;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    background: none;
   }
 
   .toggle input {

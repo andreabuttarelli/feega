@@ -2,19 +2,45 @@ import type { MotionDoc } from '../doc';
 import type { Box } from '../layout';
 import type { Bounds } from '../scene-select';
 import type { OpResult } from '../timeline';
-import { GuideKind, MAX_LAYOUT_GUIDES, layoutGuideSchema, type LayoutGuide } from './model';
+import { AUTO_COUNT, GuideAlign, GuideKind, MAX_LAYOUT_GUIDES, layoutGuideSchema, type LayoutGuide } from './model';
 
-export { GuideKind, type LayoutGuide };
+export { GuideAlign, GuideKind, type LayoutGuide };
 
 type Size = { width: number; height: number };
 export type GuideLine = { axis: 'x' | 'y'; at: number };
 
 export const newGuide = (kind: GuideKind): LayoutGuide => layoutGuideSchema.parse({ kind });
 
+const MAX_AUTO_BANDS = 256;
+
+const AVAILABLE: Record<GuideAlign, (guide: LayoutGuide, span: number) => number> = {
+  [GuideAlign.Stretch]: (guide, span) => span - 2 * guide.margin,
+  [GuideAlign.Min]: (guide, span) => span - guide.offset,
+  [GuideAlign.Max]: (guide, span) => span - guide.offset,
+  [GuideAlign.Center]: (_guide, span) => span
+};
+
+const STARTS_AT: Record<GuideAlign, (guide: LayoutGuide, span: number, total: number) => number> = {
+  [GuideAlign.Stretch]: (guide) => guide.margin,
+  [GuideAlign.Min]: (guide) => guide.offset,
+  [GuideAlign.Max]: (guide, span, total) => span - guide.offset - total,
+  [GuideAlign.Center]: (_guide, span, total) => (span - total) / 2
+};
+
+function countOf(guide: LayoutGuide, span: number): number {
+  if (guide.count !== AUTO_COUNT) {
+    return guide.count;
+  }
+  const fits = Math.floor((AVAILABLE[guide.align](guide, span) + guide.gutter) / (guide.size + guide.gutter));
+  return Math.max(1, Math.min(MAX_AUTO_BANDS, fits));
+}
+
 function bandsAlong(guide: LayoutGuide, span: number): [number, number][] {
-  const inner = span - 2 * guide.margin - guide.gutter * (guide.count - 1);
-  const band = Math.max(0, inner / guide.count);
-  return Array.from({ length: guide.count }, (_, i) => [guide.margin + i * (band + guide.gutter), band]);
+  const count = countOf(guide, span);
+  const gutters = guide.gutter * (count - 1);
+  const band = guide.align === GuideAlign.Stretch ? Math.max(0, (AVAILABLE[guide.align](guide, span) - gutters) / count) : guide.size;
+  const start = STARTS_AT[guide.align](guide, span, band * count + gutters);
+  return Array.from({ length: count }, (_, i) => [start + i * (band + guide.gutter), band]);
 }
 
 const BANDS: Record<GuideKind, (guide: LayoutGuide, frame: Size) => Box[]> = {
@@ -36,10 +62,8 @@ export function guideLines(guide: LayoutGuide, frame: Size): GuideLine[] {
   return [...every(guide.size, frame.width).map((at) => ({ axis: 'x' as const, at })), ...every(guide.size, frame.height).map((at) => ({ axis: 'y' as const, at }))];
 }
 
-const shownGuides = (doc: Pick<MotionDoc, 'layoutGuides'>) => (doc.layoutGuides ?? []).filter((g) => !g.hidden);
-
 export function guideSnapBounds(doc: Pick<MotionDoc, 'layoutGuides' | 'width' | 'height'>): Bounds[] {
-  return shownGuides(doc)
+  return (doc.layoutGuides ?? [])
     .flatMap((g) => guideBands(g, doc))
     .map((b) => ({ left: b.left, top: b.top, right: b.left + b.width, bottom: b.top + b.height }));
 }

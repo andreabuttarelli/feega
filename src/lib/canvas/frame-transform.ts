@@ -1,6 +1,7 @@
 import { findClip, type MotionDoc } from '$lib/motion/doc';
 import { EditMode } from '$lib/motion/edit-mode';
 import { groupDrag, lockedTo, type Keys } from '$lib/motion/element-gesture';
+import { guideSnapBounds } from '$lib/motion/layout-guides/guides';
 import { measureGaps } from '$lib/motion/measure-gaps';
 import { unionBounds } from '$lib/motion/multi-select';
 import { Grip, aabb, dragPatch, quadOf, spacing, writePatch, type Bounds, type Boxes, type Gap, type Guide, type Pt } from '$lib/motion/scene-select';
@@ -46,13 +47,13 @@ const asGroup = (d: Drag) => d.ids.length > 1 || (d.grip === Grip.Scale && !tilt
 
 function dragGroup(d: Drag, others: Bounds[]): Dragged {
   const box = unionBounds(d.ids.map((id) => boundsOf(d.doc, id, d.frame, d.boxes)));
-  return { ...groupDrag({ ...d, mode: MODE, box, others }), gaps: [] };
+  return { ...groupDrag({ ...d, mode: MODE, box, others: [...others, ...guideSnapBounds(d.doc)] }), gaps: [] };
 }
 
 function dragOne(d: Drag, others: Bounds[]): Dragged {
   const clipId = d.ids[0];
   const to = d.keys.shift && d.grip === Grip.Move ? lockedTo(d.from, d.to) : d.to;
-  const { patch, guides } = dragPatch({ doc: d.doc, clipId, frame: d.frame, box: d.boxes[clipId], grip: d.grip, handle: d.handle, from: d.from, to, shift: d.keys.shift, snapTargets: others, snapPx: d.reach });
+  const { patch, guides } = dragPatch({ doc: d.doc, clipId, frame: d.frame, box: d.boxes[clipId], grip: d.grip, handle: d.handle, from: d.from, to, shift: d.keys.shift, snapTargets: [...others, ...guideSnapBounds(d.doc)], snapPx: d.reach });
   const result = writePatch(d.doc, clipId, d.frame, patch);
   if (!result.ok || d.grip === Grip.Rotate) {
     return { result, guides, gaps: [] };
