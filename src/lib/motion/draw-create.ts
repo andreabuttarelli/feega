@@ -5,10 +5,14 @@ import { DrawTool, type DragPoint, type DrawBox } from './draw-tool';
 import { corner, mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
 import { FillKind, ShapeKind, StrokeKind } from './shape/schema';
 import type { SvgFillRule, SvgGradient } from './shape/svg-import';
+import { FillType } from './fill/model';
+import { setClipFlags } from './organize';
 import { DocMode, docMode, setStill, settledStill } from './still';
 import { TOP_LEFT_START, addClip, type OpResult } from './timeline';
 
-type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star;
+type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star | DrawTool.Frame;
+
+const FRAME_FILL = '#ffffff';
 
 export type LineTool = DrawTool.Line | DrawTool.Arrow;
 
@@ -19,7 +23,8 @@ const BOX_CLIP: Record<BoxTool, { component: ComponentId; props: Record<string, 
   [DrawTool.Rectangle]: { component: 'Shape', props: { shape: ShapeKind.Rect } },
   [DrawTool.Ellipse]: { component: 'Shape', props: { shape: ShapeKind.Ellipse } },
   [DrawTool.Polygon]: { component: 'Shape', props: { shape: ShapeKind.Polygon, sides: 3 } },
-  [DrawTool.Star]: { component: 'Shape', props: { shape: ShapeKind.Star, points: 5 } }
+  [DrawTool.Star]: { component: 'Shape', props: { shape: ShapeKind.Star, points: 5 } },
+  [DrawTool.Frame]: { component: 'Shape', props: { shape: ShapeKind.Rect, fills: [{ type: FillType.Solid, color: FRAME_FILL }] } }
 };
 
 const MIN_PEN_POINTS = 2;
@@ -52,7 +57,8 @@ const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox, sizing: TextSizi
   [DrawTool.Rectangle]: () => ({}),
   [DrawTool.Ellipse]: () => ({}),
   [DrawTool.Polygon]: () => ({}),
-  [DrawTool.Star]: () => ({})
+  [DrawTool.Star]: () => ({}),
+  [DrawTool.Frame]: () => ({})
 };
 
 export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = TextSizing.AutoHeight, extra: Record<string, unknown> = {}): OpResult {
@@ -60,7 +66,8 @@ export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: nu
   if (!made) {
     return fail(`${tool} does not draw a box`);
   }
-  return place(doc, made.component, { ...made.props, ...extra, ...BOX_SIZED[tool as BoxTool](doc, box, sizing), ...box }, frame, id);
+  const placed = place(doc, made.component, { ...made.props, ...extra, ...BOX_SIZED[tool as BoxTool](doc, box, sizing), ...box }, frame, id);
+  return placed.ok && tool === DrawTool.Frame ? setClipFlags(placed.doc, id, { clipContent: true }) : placed;
 }
 
 const ARROW_HEAD = { length: 0.2, minLength: 12, maxLength: 80, spread: Math.PI / 7 };

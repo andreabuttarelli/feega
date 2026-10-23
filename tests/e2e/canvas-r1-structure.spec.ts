@@ -69,4 +69,41 @@ test.describe('frame structure: presets, plus beside, layer menu @real', () => {
     await expect.poll(async () => { const b = (await added.boundingBox())!; return b.height / b.width; }, { timeout: SAVED_MS }).toBeCloseTo(PHONE.height / PHONE.width, 1);
     await page.screenshot({ path: `${SHOT_PREFIX}-st02-phone.png` });
   });
+
+  test('the frame tool inside a frame draws a nested frame that clips its content', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    await page.addInitScript(() => {
+      localStorage.setItem('feega.frame-edit-mode', 'design');
+      localStorage.setItem('feega:canvas-bar-mode', 'design');
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const node = await seedNode({ type: 'motion', x: 200, y: 150, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+
+    const nested = async () => {
+      const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1).single();
+      const clips = (data?.doc as { tracks: { clips: { id: string; component: string; clipContent?: boolean; props: Record<string, unknown> }[] }[] }).tracks.flatMap((t) => t.clips);
+      return clips.filter((c) => c.clipContent === true && c.component === 'Shape').length;
+    };
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const frame = page.locator(`[data-frame="${node.id}"]`);
+    await page.waitForTimeout(SETTLE_MS);
+    const r = (await frame.boundingBox())!;
+    const corner = { x: r.x + r.width * 0.05, y: r.y + r.height * 0.1 };
+    await page.mouse.click(corner.x, corner.y);
+    await page.waitForTimeout(SETTLE_MS);
+    await page.mouse.dblclick(corner.x, corner.y);
+    await page.getByTestId('draw-tools').locator('[data-tool="frame"]').click();
+    const from = { x: r.x + r.width * 0.1, y: r.y + r.height * 0.15 };
+    const to = { x: r.x + r.width * 0.4, y: r.y + r.height * 0.45 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2);
+    await page.mouse.move(to.x, to.y);
+    await page.mouse.up();
+    await expect.poll(nested, { timeout: SAVED_MS }).toBe(1);
+    await page.screenshot({ path: `${SHOT_PREFIX}-st01-nested.png` });
+  });
 });

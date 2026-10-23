@@ -3344,7 +3344,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && (frameBar.tool === DrawTool.Frame || !inside)}
+  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && !inside}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
