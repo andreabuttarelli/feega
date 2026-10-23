@@ -13,6 +13,7 @@ integrazioni esterne via API key — request, response, query params, body, erro
 | [08 — Prodotti e API key](08-products-api-keys.md) | `/products`, `/api-keys` |
 | [11 — Billing](11-billing.md) | `/billing/portal`, `/billing/checkout` — link Stripe che l'agente consegna all'umano |
 | [12 — Impostazioni: modelli media](12-settings-models.md) | `/settings/models` — quale modello disegna e quale gira, per brand |
+| [13 — Figma images](13-figma-images.md) | `POST /projects/:id/figma-images` — immagini di un paste Figma, col token personale dell'utente |
 
 ## Regole di manutenzione
 

@@ -55,6 +55,8 @@
   import { Reach, frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { chainTarget, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
+  import { ImagesOutcome, figmaImageAssets } from '$lib/canvas/figma/fetch-images';
+  import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
   import { quadBox, quadStyle } from '$lib/canvas/quad-box';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
@@ -179,7 +181,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -1770,6 +1772,11 @@
     return true;
   }
 
+  function leaveBuilder() {
+    picks = [];
+    frameBar.tool = DrawTool.Select;
+  }
+
   function drawnInside(id: string) {
     picks = [id];
     frameBar.tool = DrawTool.Select;
@@ -2749,8 +2756,51 @@
     commit(hit.nodeId, { ok: true, doc: done.doc }, PASTED_SUMMARY);
     pickMany(hit.nodeId, done.selection);
     refusal = done.skipped?.length ? `${FIGMA_SKIPPED} ${done.skipped.join('; ')}` : null;
+    if (done.images?.length && done.fileKey) {
+      void fillFigmaImages({ nodeId: hit.nodeId, fileKey: done.fileKey, images: done.images });
+    }
     return true;
   }
+
+  const FIGMA_SESSION_TRIES = 20;
+  const FIGMA_SESSION_WAIT_MS = 250;
+  const FIGMA_FILLED_SUMMARY = 'Filled Figma images';
+  const figmaStarted = new Set<FigmaJob>();
+
+  async function sessionOnceLoaded(nodeId: string) {
+    for (let tries = 0; tries < FIGMA_SESSION_TRIES; tries++) {
+      const session = saverOf(nodeId);
+      if (session) {
+        return session;
+      }
+      await new Promise((resolve) => setTimeout(resolve, FIGMA_SESSION_WAIT_MS));
+    }
+    return null;
+  }
+
+  async function fillFigmaImages(job: FigmaJob) {
+    const got = await figmaImageAssets({ projectId: page.params.projectId ?? '', fileKey: job.fileKey, hashes: job.images.map((i) => i.hash) });
+    props.onFigmaImages?.(got.outcome);
+    if (got.outcome !== ImagesOutcome.Filled || !Object.keys(got.assets).length) {
+      return;
+    }
+    const session = await sessionOnceLoaded(job.nodeId);
+    if (!session) {
+      return;
+    }
+    const shown = Object.fromEntries(Object.values(got.assets).map((id) => [id, assetUrl(id)]));
+    liveDocs.set(job.nodeId, { ...(liveOf(job.nodeId) as LiveDoc), assets: { ...liveOf(job.nodeId)?.assets, ...shown } });
+    commit(job.nodeId, { ok: true, doc: imagesFilled(session.history.present, job.images, got.assets) }, FIGMA_FILLED_SUMMARY);
+  }
+
+  $effect(() => {
+    for (const job of props.figmaJobs ?? []) {
+      if (!figmaStarted.has(job)) {
+        figmaStarted.add(job);
+        void fillFigmaImages(job);
+      }
+    }
+  });
 
   function pasteFrom(source: PasteSource<File> | null, at: Point) {
     const data = source ? readPaste(source) : null;
@@ -3103,7 +3153,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
+          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
@@ -3229,7 +3279,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && (frameBar.tool === DrawTool.Frame || !inside)}
+  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && (frameBar.tool === DrawTool.Frame || !inside)}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}

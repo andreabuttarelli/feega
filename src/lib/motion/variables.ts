@@ -9,6 +9,7 @@ export { VarType };
 export enum VariableAction {
   Define = 'define',
   Mode = 'mode',
+  AddMode = 'add_mode',
   Bind = 'bind',
   Unbind = 'unbind',
   Remove = 'remove',
@@ -220,4 +221,30 @@ export function removeVariable(doc: MotionDoc, collection: string, name: string)
   const { [name]: _gone, ...vars } = existing.vars;
   const freed = rebound(doc, (c) => Object.fromEntries(Object.entries(c.bind ?? {}).filter(([, k]) => k !== key)));
   return { ok: true, doc: { ...freed, variables: { ...doc.variables, [collection]: { ...existing, vars } } } };
+}
+
+export function addMode(doc: MotionDoc, collection: string, mode: string): OpResult {
+  const existing = doc.variables?.[collection];
+  if (!existing) {
+    return { ok: false, error: `no collection ${collection}` };
+  }
+  if (existing.modes.includes(mode)) {
+    return { ok: false, error: `${collection} already has the mode ${mode}` };
+  }
+  const first = existing.modes[0];
+  const vars = Object.fromEntries(Object.entries(existing.vars).map(([name, v]) => [name, { ...v, values: { ...v.values, [mode]: v.values[first] } }]));
+  return withVariables(doc, { ...doc.variables, [collection]: { ...existing, modes: [...existing.modes, mode], vars } });
+}
+
+export type VariableEntry = { key: string; type: VarType };
+
+export function variableEntries(doc: MotionDoc): VariableEntry[] {
+  return Object.entries(doc.variables ?? {}).flatMap(([collection, c]) => Object.entries(c.vars).map(([name, v]) => ({ key: keyOf(collection, name), type: v.type })));
+}
+
+export const typeOfVariable = (doc: MotionDoc, key: string) => typeOfKey(doc.variables, key);
+
+export function activeModeOf(doc: MotionDoc, collection: string): string {
+  const existing = doc.variables?.[collection];
+  return existing ? activeMode(existing) : '';
 }

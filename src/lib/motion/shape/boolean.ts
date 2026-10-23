@@ -36,7 +36,7 @@ function depth(doc: MotionDoc, clipId: string): [number, number] {
   return [track, -doc.tracks[track].clips.findIndex((c) => c.id === clipId)];
 }
 
-function bottomFirst(doc: MotionDoc) {
+export function bottomFirst(doc: MotionDoc) {
   return (a: MotionClip, b: MotionClip) => {
     const [ta, ca] = depth(doc, a.id);
     const [tb, cb] = depth(doc, b.id);
@@ -44,7 +44,7 @@ function bottomFirst(doc: MotionDoc) {
   };
 }
 
-function polygonsInFrame(doc: MotionDoc, clip: MotionClip, frame: number): Pt[][] {
+export function polygonsInFrame(doc: MotionDoc, clip: MotionClip, frame: number): Pt[][] {
   const space = pathSpace(doc, clip.id, frame);
   return baseOutline(clip.props as unknown as ShapeLook, UNIT).map((contour) => flatten(contour).map(space.toFrame));
 }
@@ -56,7 +56,7 @@ function spanOf(outline: Outline) {
   return { left: Math.min(...xs), top: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs) || 1, height: Math.max(...ys) - Math.min(...ys) || 1 };
 }
 
-function reshapedTo(doc: MotionDoc, clip: MotionClip, outline: Outline, frame: number): OpResult {
+export function reshapedTo(doc: MotionDoc, clip: MotionClip, outline: Outline, frame: number): OpResult {
   const span = spanOf(outline);
   const space = pathSpace(doc, clip.id, frame);
   const [fromX, fromY] = space.toFrame([0.5, 0.5]);
@@ -74,7 +74,7 @@ function reshapedTo(doc: MotionDoc, clip: MotionClip, outline: Outline, frame: n
   });
 }
 
-function shapesOf(doc: MotionDoc, ids: readonly string[], least: number): MotionClip[] | string {
+export function shapesOf(doc: MotionDoc, ids: readonly string[], least: number): MotionClip[] | string {
   const clips: MotionClip[] = [];
   for (const id of ids) {
     const clip = findClip(doc, id)?.clip;

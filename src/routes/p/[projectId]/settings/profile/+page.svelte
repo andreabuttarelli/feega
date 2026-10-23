@@ -22,6 +22,13 @@
     transfer: 'app.settings.profile.deleteTransfer'
   } as const;
 
+  const FIGMA_ERROR_KEY: Record<string, string> = {
+    invalid: 'app.settings.profile.figmaInvalid',
+    rejected: 'app.settings.profile.figmaRejected',
+    none: 'app.settings.profile.figmaNone',
+    unavailable: 'app.settings.profile.figmaUnavailable'
+  };
+
   const busy = new SvelteSet<string>();
   const isBusy = (key: string) => busy.has(key);
   const withBusy = (key: string) => () => {
@@ -48,6 +55,14 @@
   <Notice tone="success">{$_('app.settings.profile.avatarSaved')}</Notice>
 {:else if form?.avatarRemoved}
   <Notice tone="success">{$_('app.settings.profile.avatarRemoved')}</Notice>
+{:else if form?.figmaSaved}
+  <Notice tone="success">{$_('app.settings.profile.figmaSaved')}</Notice>
+{:else if form?.figmaTested !== undefined}
+  <Notice tone="success">{$_('app.settings.profile.figmaTested')}</Notice>
+{:else if form?.figmaRemoved}
+  <Notice tone="success">{$_('app.settings.profile.figmaRemoved')}</Notice>
+{:else if form?.figmaError}
+  <Notice tone="error">{$_(FIGMA_ERROR_KEY[form.figmaError as string] ?? 'app.settings.profile.figmaInvalid')}</Notice>
 {:else if form?.error === 'too_large'}
   <Notice tone="error">{$_('app.settings.profile.tooLarge')}</Notice>
 {:else if form?.error === 'not_image'}
@@ -126,6 +141,21 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p class="m-0 text-[0.8125rem] text-muted-foreground">{data.email ?? ''}</p>
       <Button type="submit" disabled={isBusy('profile')}>{$_('app.settings.save')}</Button>
+    </div>
+  </form>
+</Panel>
+
+<Panel title={$_('app.settings.profile.figmaTitle')} description={$_('app.settings.profile.figmaDesc')}>
+  <form method="POST" action="?/saveFigmaToken" use:enhance={withBusy('figma')} class="m-0 flex flex-col gap-3" data-testid="figma-token-form">
+    <Field label={$_('app.settings.profile.figmaToken')} hint={data.hasFigmaToken ? $_('app.settings.profile.figmaTokenSet') : $_('app.settings.profile.figmaTokenHint')}>
+      <Input name="token" type="password" autocomplete="off" maxlength={500} disabled={isBusy('figma')} class="h-9" />
+    </Field>
+    <div class="flex flex-wrap items-center gap-2">
+      <Button type="submit" disabled={isBusy('figma')}>{$_('app.settings.profile.figmaSave')}</Button>
+      {#if data.hasFigmaToken}
+        <Button variant="secondary" type="submit" formaction="?/testFigmaToken" disabled={isBusy('figma')}>{$_('app.settings.profile.figmaTest')}</Button>
+        <Button variant="ghost" type="submit" formaction="?/removeFigmaToken" disabled={isBusy('figma')}>{$_('app.settings.profile.figmaRemove')}</Button>
+      {/if}
     </div>
   </form>
 </Panel>

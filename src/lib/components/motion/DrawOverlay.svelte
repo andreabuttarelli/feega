@@ -41,6 +41,7 @@
     [DrawTool.Arrow]: 'Drew an arrow',
     [DrawTool.Pen]: 'Drew a path',
     [DrawTool.Pencil]: 'Drew a path',
+    [DrawTool.ShapeBuilder]: '',
     [DrawTool.Frame]: 'Drew a frame'
   };
 
