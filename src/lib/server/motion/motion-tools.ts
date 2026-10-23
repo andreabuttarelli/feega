@@ -2,7 +2,7 @@ import { ungroupClip } from '$lib/motion/group';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
 import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, stylesOf } from '$lib/motion/styles';
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
-import { VariableAction, bindVariable, defineVariable, removeVariable, setActiveMode, unbindVariable } from '$lib/motion/variables';
+import { VariableAction, addMode, bindVariable, defineVariable, removeVariable, setActiveMode, unbindVariable } from '$lib/motion/variables';
 import { VARIABLE_NAME, VarType, type VarInput } from '$lib/motion/variables-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
@@ -888,6 +888,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   const VARIABLE_ACTIONS: Record<VariableAction, (input: VariableInput) => unknown> = {
     [VariableAction.Define]: (input) => apply(defineVariable(session.doc, input.collection ?? '', input.name ?? '', { type: input.type, values: input.values } as VarInput, input.modes), `variable ${keyOfInput(input)}`),
     [VariableAction.Mode]: (input) => apply(setActiveMode(session.doc, input.collection ?? '', input.mode ?? ''), `${input.collection} mode ${input.mode}`),
+    [VariableAction.AddMode]: (input) => apply(addMode(session.doc, input.collection ?? '', input.mode ?? ''), `${input.collection} new mode ${input.mode}`),
     [VariableAction.Bind]: (input) => apply(bindVariable(session.doc, input.clip_id ?? '', input.target ?? '', keyOfInput(input)), `bound ${input.target} of ${input.clip_id} to ${keyOfInput(input)}`),
     [VariableAction.Unbind]: (input) => apply(unbindVariable(session.doc, input.clip_id ?? '', input.target ?? ''), `unbound ${input.target} of ${input.clip_id}`),
     [VariableAction.Remove]: (input) => apply(removeVariable(session.doc, input.collection ?? '', input.name ?? ''), `removed variable ${keyOfInput(input)}`),
@@ -2155,7 +2156,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     variable: tool({
-      description: `Variables with modes, bound to clip props. action define (collection, name, type ${Object.values(VarType).join('|')}, values {mode: value or {alias: "Collection/name"}}, modes optional list, first is the default) creates or edits a variable, creating its collection; every mode needs a value; an alias points to a variable of the same type, no loops. mode (collection, mode) switches this video to that mode: every bound clip takes that mode's value (light/dark, brand A/B). bind (collection, name, clip_id, target) links a prop to the variable: a colour variable to fill, stroke, color; a number to roundness, opacity, width, height, size, autoLayout.gap, autoLayout.crossGap, autoLayout.padding (all four sides); a string to a text prop; a boolean to a toggle. Number values are in the prop's own units (sizes and opacity are shares 0..1, gap and padding px). unbind (clip_id, target) keeps the current value. remove (collection, name) deletes one and unbinds its clips. list returns all (also in get_motion_doc). set_props on a bound prop is refused: unbind first.`,
+      description: `Variables with modes, bound to clip props. action define (collection, name, type ${Object.values(VarType).join('|')}, values {mode: value or {alias: "Collection/name"}}, modes optional list, first is the default) creates or edits a variable, creating its collection; every mode needs a value; an alias points to a variable of the same type, no loops. mode (collection, mode) switches this video to that mode: every bound clip takes that mode's value (light/dark, brand A/B). add_mode (collection, mode) adds a mode that starts from the default mode's values. bind (collection, name, clip_id, target) links a prop to the variable: a colour variable to fill, stroke, color; a number to roundness, opacity, width, height, size, autoLayout.gap, autoLayout.crossGap, autoLayout.padding (all four sides); a string to a text prop; a boolean to a toggle. Number values are in the prop's own units (sizes and opacity are shares 0..1, gap and padding px). unbind (clip_id, target) keeps the current value. remove (collection, name) deletes one and unbinds its clips. list returns all (also in get_motion_doc). set_props on a bound prop is refused: unbind first.`,
       inputSchema: z.object({
         action: z.enum(VariableAction),
         collection: z.string().regex(VARIABLE_NAME).optional(),

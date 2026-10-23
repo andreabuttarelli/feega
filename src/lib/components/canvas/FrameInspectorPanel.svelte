@@ -6,6 +6,7 @@
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import InstanceInspector from '$lib/components/motion/InstanceInspector.svelte';
   import RangeTextInspector from '$lib/components/motion/RangeTextInspector.svelte';
+  import VariablesLibrarySection from '$lib/components/motion/VariablesLibrarySection.svelte';
   import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import CameraInspector from '$lib/components/motion/CameraInspector.svelte';
@@ -76,6 +77,7 @@
     <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
     <LayoutGuidesSection {doc} onchange={editGuides} />
     <StyleLibrarySection {tokens} />
+    <VariablesLibrarySection {doc} onchange={editGuides} />
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">

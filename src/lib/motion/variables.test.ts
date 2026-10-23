@@ -3,7 +3,7 @@ import { MotionFormat, newMotionDoc, parseMotionDoc, findClip, type MotionDoc } 
 import { addClip, setProps, type OpResult } from './timeline';
 import { setAutoLayout } from './layout/ops';
 import { VarType } from './variables-model';
-import { bindVariable, bindableTargets, defineVariable, removeVariable, resolveVariables, setActiveMode, unbindVariable } from './variables';
+import { addMode, bindVariable, bindableTargets, defineVariable, removeVariable, resolveVariables, setActiveMode, unbindVariable } from './variables';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -123,6 +123,13 @@ describe('variables', () => {
     const bound = ok(bindVariable(themed(), 's1', 'fill', 'Theme/surface'));
     expect(setProps(bound, 's1', { fill: '#00ff00' })).toMatchObject({ ok: false, error: expect.stringContaining('Theme/surface') });
     expect(setProps(bound, 's1', { roundness: 0.1 })).toMatchObject({ ok: true });
+  });
+
+  it('a new mode starts from the values of the default mode', () => {
+    const doc = ok(addMode(themed(), 'Theme', 'Neon'));
+    expect(doc.variables!.Theme.modes).toEqual(['Light', 'Dark', 'Neon']);
+    expect(doc.variables!.Theme.vars.surface.values.Neon).toBe('#ffffff');
+    expect(addMode(doc, 'Theme', 'Neon')).toMatchObject({ ok: false });
   });
 
   it('resolving twice changes nothing', () => {
