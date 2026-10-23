@@ -53,6 +53,28 @@ describe('pastedInFrame', () => {
     expect(done.selection).toEqual([text.id]);
   });
 
+  it('keeps a gradient fill on the pasted shape', () => {
+    const svg = `<svg viewBox="0 0 10 10"><defs><linearGradient id="g" x2="0" y2="1"><stop offset="0" stop-color="#f00"/><stop offset="1" stop-color="#00f"/></linearGradient></defs><rect width="10" height="10" fill="url(#g)"/></svg>`;
+    const done = pastedInFrame(frame, { svg }, AT, 1, 0, ids())!;
+
+    expect(topClips(done.doc)[0].props.fills).toMatchObject([{ type: 'linear-gradient', angle: 90 }]);
+  });
+
+  it('turns SVG text into text clips next to the shapes', () => {
+    const svg = `<svg viewBox="0 0 100 50"><rect width="100" height="50" fill="#eee"/><text x="10" y="30" font-size="20" fill="#336699">Hi</text></svg>`;
+    const done = pastedInFrame(frame, { svg }, AT, 1, 0, ids())!;
+    const clips = done.doc.comps[compOf(topClips(done.doc)[0])!].tracks.flatMap((t) => t.clips);
+    const text = clips.find((c) => c.component === 'Text')!;
+
+    expect(text.props).toMatchObject({ text: 'Hi', color: '#336699' });
+  });
+
+  it('pastes an SVG made only of text', () => {
+    const done = pastedInFrame(frame, { svg: `<svg viewBox="0 0 100 50"><text x="10" y="30" font-size="20">Only</text></svg>` }, AT, 1, 0, ids())!;
+
+    expect(topClips(done.doc)[0].props.text).toBe('Only');
+  });
+
   it('pastes nothing from an SVG without shapes', () => {
     expect(pastedInFrame(frame, { svg: '<svg></svg>' }, AT, 2, 0, ids())).toBeNull();
   });

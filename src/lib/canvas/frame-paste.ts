@@ -3,7 +3,7 @@ import { CANVAS_INK, CanvasTheme, drawClip, penClip, penPaint } from '$lib/motio
 import { DrawTool } from '$lib/motion/draw-tool';
 import { groupClips } from '$lib/motion/group';
 import { mapOutline, parsePath, type Pt } from '$lib/motion/shape/geometry';
-import { svgShapes } from '$lib/motion/shape/svg-import';
+import { svgShapes, type SvgText } from '$lib/motion/shape/svg-import';
 import { TextSizing } from '$lib/motion/text-sizing';
 
 export type FramePaste = { svg: string } | { text: string };
@@ -13,6 +13,19 @@ type NewId = () => string;
 
 export const TEXT_BOX = { lineHeight: 32, charWidth: 0.55, maxChars: 48 };
 export const MAX_PASTED_SHAPES = 200;
+export const MAX_PASTED_TEXTS = 50;
+
+const MIN_TEXT_SIDE = 0.02;
+
+const SVG_TEXT = { charWidth: 0.55, lineHeight: 1.3, baselineFromTop: 0.95 };
+const ANCHOR_SHARE = { start: 0, middle: 0.5, end: 1 };
+
+export function svgTextBox(t: SvgText): { left: number; top: number; width: number; height: number } {
+  const longest = Math.max(...t.text.split('\n').map((line) => line.length));
+  const width = longest * t.size * SVG_TEXT.charWidth;
+  return { left: t.x - width * ANCHOR_SHARE[t.anchor], top: t.y - t.size * SVG_TEXT.baselineFromTop, width, height: t.size * SVG_TEXT.lineHeight };
+}
+
 
 const BRAND_TEXT = 'brand.text';
 const INK: Record<Background, string> = { [Background.Brand]: BRAND_TEXT, [Background.Transparent]: CANVAS_INK[CanvasTheme.Light] };
@@ -30,6 +43,16 @@ function pastedSvg(doc: MotionDoc, svg: string, at: Unit, scale: number, frame: 
     const id = newId();
     const made = typeof outline === 'string' ? null : penClip(next, mapOutline(outline, toUnit), frame, id, penPaint(shape));
     if (made?.ok) {
+      next = made.doc;
+      ids.push(id);
+    }
+  }
+  for (const text of read.texts.slice(0, MAX_PASTED_TEXTS)) {
+    const box = svgTextBox(text);
+    const [x, y] = toUnit([box.left + box.width / 2, box.top + box.height / 2]);
+    const id = newId();
+    const made = drawClip(next, DrawTool.Text, { x, y, width: Math.max(MIN_TEXT_SIDE, (box.width * scale) / doc.width), height: Math.max(MIN_TEXT_SIDE, (box.height * scale) / doc.height) }, frame, id, TextSizing.AutoWidth, { text: text.text, color: text.fill, weight: text.weight });
+    if (made.ok) {
       next = made.doc;
       ids.push(id);
     }

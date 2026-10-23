@@ -4,13 +4,12 @@
   import type { ExportRow } from '$lib/motion/export-rows';
   import { localStore } from '$lib/browser-storage';
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
-  import { Pasted, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
-  import { svgShapes } from '$lib/motion/shape/svg-import';
-  import { mapOutline, parsePath, pathData } from '$lib/motion/shape/geometry';
+  import { Pasted, isSvgFile, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
+  import { svgDrawings } from '$lib/canvas/svg-drawings';
   import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
   import { stackedLocally, type Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
-  import { MAX_PASTED_SHAPES, TEXT_BOX } from '$lib/canvas/frame-paste';
+  import { TEXT_BOX } from '$lib/canvas/frame-paste';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
@@ -1645,6 +1644,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       await uploadFontFile(file);
       return;
     }
+    if (isSvgFile(file)) {
+      await pasteSvg(await file.text(), at);
+      return;
+    }
     const verdict = verdictForUpload(file.type, file.name, file.size);
     if (!verdict.ok) {
       failed = verdict.why;
@@ -3085,33 +3088,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   const FIGMA_PASTE = 'Figma layers cannot be pasted directly. In Figma use Copy as → Copy as SVG, then paste here.';
 
-  function shiftedPath(path: string, dx: number, dy: number): string | null {
-    const outline = parsePath(path);
-    return typeof outline === 'string' ? null : pathData(mapOutline(outline, ([x, y]) => [x + dx, y + dy]));
-  }
-
-  function pathBox(path: string): CanvasBox | null {
-    const outline = parsePath(path);
-    if (typeof outline === 'string') { return null; }
-    const xs = outline.flatMap((c) => c.vertices.map((v) => v.p[0]));
-    const ys = outline.flatMap((c) => c.vertices.map((v) => v.p[1]));
-    return { left: Math.min(...xs), top: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
-  }
-
   async function pasteSvg(svg: string, at: { x: number; y: number }) {
-    const read = svgShapes(svg);
-    const shapes = read.shapes.slice(0, MAX_PASTED_SHAPES);
-    if (!shapes.length) {
+    const drawings = svgDrawings(svg, at);
+    if (!drawings.length) {
       failed = 'This SVG has no shapes to paste';
       return;
     }
-    const [dx, dy] = [at.x - read.size.width / 2, at.y - read.size.height / 2];
     const made = await Promise.all(
-      shapes.map(async (shape) => {
-        const path = shiftedPath(shape.path, dx, dy);
-        const res = path ? await post('drawElement', { drawn: JSON.stringify({ tool: DrawTool.Pen, path, fill: shape.fill, stroke: shape.stroke }), node_id: crypto.randomUUID() }) : null;
+      drawings.map(async ({ wire, box }) => {
+        const res = await post('drawElement', { drawn: JSON.stringify(wire), node_id: crypto.randomUUID() });
         const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
-        return node ? { node, undo: (res?.undo ?? []) as UndoItem[], box: path ? pathBox(path) : null } : null;
+        return node ? { node, undo: (res?.undo ?? []) as UndoItem[], box } : null;
       })
     );
     const landedShapes = made.filter((m) => m !== null);
@@ -3121,8 +3108,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const hold = frameHolding(nodes, { left: at.x, top: at.y, width: 0, height: 0 });
     if (hold) {
       for (const m of landedShapes) {
-        const own = m.box ? frameHolding(nodes, m.box) : null;
-        await intoFrame(m.node.id, own ?? hold);
+        await intoFrame(m.node.id, frameHolding(nodes, m.box) ?? hold);
       }
       return;
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Pasted, clipboardHtml, readPaste } from './system-clipboard';
+import { Pasted, clipboardHtml, isSvgFile, readPaste } from './system-clipboard';
 
 const tiles = { nodes: [{ type: 'text', data: { text: 'hi' }, dx: 0, dy: 0 }], edges: [], freeIds: [] };
 
@@ -32,5 +32,11 @@ describe('system clipboard', () => {
   it('falls back to plain text, and to nothing when empty', () => {
     expect(readPaste({ html: '<b>hi</b>', text: 'hi', files: [] })).toEqual({ kind: Pasted.Text, text: 'hi' });
     expect(readPaste({ html: '', text: '  ', files: [] })).toBeNull();
+  });
+
+  it('recognises an SVG file by its type or its extension', () => {
+    expect(isSvgFile({ type: 'image/svg+xml', name: 'a' })).toBe(true);
+    expect(isSvgFile({ type: '', name: 'Logo.SVG' })).toBe(true);
+    expect(isSvgFile({ type: 'image/png', name: 'a.png' })).toBe(false);
   });
 });
