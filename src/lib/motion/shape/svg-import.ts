@@ -4,7 +4,7 @@ type Matrix = [a: number, b: number, c: number, d: number, e: number, f: number]
 type Pt = [number, number];
 type Segment = { cmd: 'M' | 'L' | 'C' | 'Z'; pts: Pt[] };
 type Attrs = Record<string, string>;
-type Paint = { fill: string | null; stroke: string | null };
+type Paint = { fill: string | null; stroke: string | null; fillRule: SvgFillRule };
 
 type Box = { left: number; top: number; right: number; bottom: number };
 type Stop = { color: string; pos: number };
@@ -13,11 +13,16 @@ type GradientDef = { kind: FillType.Linear | FillType.Radial; attrs: Attrs; stop
 export type SvgGradient =
   | { type: FillType.Linear; stops: Stop[]; angle: number }
   | { type: FillType.Radial; stops: Stop[]; center: { x: number; y: number }; radius: number };
-export type SvgShape = { path: string; fill: string | null; stroke: string | null; gradient?: SvgGradient };
+export type SvgFillRule = 'nonzero' | 'evenodd';
+export type SvgShape = { path: string; fill: string | null; stroke: string | null; fillRule: SvgFillRule; gradient?: SvgGradient };
 export type SvgTextAnchor = 'start' | 'middle' | 'end';
 export type SvgText = { text: string; x: number; y: number; size: number; fill: string; weight: number; anchor: SvgTextAnchor };
 export type SvgRead = { size: { width: number; height: number }; shapes: SvgShape[]; texts: SvgText[] };
 
+const FILL_RULES = new Map<string, SvgFillRule>([
+  ['nonzero', 'nonzero'],
+  ['evenodd', 'evenodd']
+]);
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 const DEFAULT_SIDE = 100;
 const DIGITS = 1000;
@@ -378,7 +383,8 @@ function rootOf(a: Attrs): { size: SvgRead['size']; matrix: Matrix } {
 function paintOf(a: Attrs, inherited: Paint): Paint {
   const fill = colour(a.fill);
   const stroke = colour(a.stroke);
-  return { fill: fill === undefined ? inherited.fill : fill, stroke: stroke === undefined ? inherited.stroke : stroke };
+  const fillRule = FILL_RULES.get(a['fill-rule']?.trim().toLowerCase() ?? '') ?? inherited.fillRule;
+  return { fill: fill === undefined ? inherited.fill : fill, stroke: stroke === undefined ? inherited.stroke : stroke, fillRule };
 }
 
 const fraction = (raw: string | undefined, fallback: number) => (raw === undefined ? fallback : raw.includes('%') ? num(raw) / 100 : num(raw, fallback));
@@ -505,7 +511,7 @@ function textAt(svg: string, o: TextOrigin): SvgText | null {
 
 type Frame = { tag: string; matrix: Matrix; paint: Paint; clip: Box | null };
 
-const ROOT_FRAME: Frame = { tag: '', matrix: IDENTITY, paint: { fill: NAMED.black, stroke: null }, clip: null };
+const ROOT_FRAME: Frame = { tag: '', matrix: IDENTITY, paint: { fill: NAMED.black, stroke: null, fillRule: 'nonzero' }, clip: null };
 
 export function svgShapes(svg: string): SvgRead {
   const shapes: SvgShape[] = [];
@@ -573,6 +579,7 @@ export function svgShapes(svg: string): SvgRead {
           path: placed(kept, IDENTITY),
           fill: fill === null ? null : solid(fill),
           stroke: paint.stroke === null ? null : solid(paint.stroke),
+          fillRule: paint.fillRule,
           ...(def ? { gradient: gradientOf(def, boundsOfSegments(local)) } : {})
         });
       }

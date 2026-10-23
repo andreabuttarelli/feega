@@ -10,6 +10,7 @@ import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawn
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { gradientFillSchema } from '$lib/motion/fill/model';
+import { FILL_RULES } from '$lib/motion/shape/schema';
 import { frameShape } from './start';
 import { figmaFrameDoc } from '$lib/canvas/figma/figma-doc';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
@@ -535,7 +536,7 @@ export const drawnSchema = z.discriminatedUnion('tool', [drawnBox, drawnPen]);
 
 export const pastedSchema = z.discriminatedUnion('tool', [
   drawnBox.extend({ text: z.string().min(1).max(PASTED_TEXT_MAX).optional(), color: hexColour.optional(), weight: z.number().int().min(PASTED_WEIGHT.min).max(PASTED_WEIGHT.max).optional() }),
-  drawnPen.extend({ fill: hexColour.nullable().optional(), stroke: hexColour.nullable().optional(), gradient: gradientFillSchema.optional() })
+  drawnPen.extend({ fill: hexColour.nullable().optional(), stroke: hexColour.nullable().optional(), gradient: gradientFillSchema.optional(), fillRule: z.enum(FILL_RULES).optional() })
 ]);
 
 export async function drawElement(store: FrameStore, place: Place & { id?: string }, wire: z.infer<typeof pastedSchema>): Promise<Moved> {
