@@ -18,6 +18,9 @@ export type RunCase = (typeof RUN_CASES)[number];
 
 export type GradientFill = Exclude<Fill, { type: FillType.Solid | FillType.Image }>;
 
+const LINK_PROTOCOLS = /^(https?:|mailto:)/i;
+const MAX_LINK = 2048;
+
 const NOT_GRADIENT = new Set<FillType>([FillType.Solid, FillType.Image]);
 
 const gradientSchema = fillSchema.refine((f) => !NOT_GRADIENT.has(f.type), 'a range takes a gradient: use color for a solid') as unknown as z.ZodType<GradientFill>;
@@ -34,7 +37,8 @@ const runStyleShape = {
   underline: z.boolean().optional(),
   strike: z.boolean().optional(),
   textCase: z.enum(RUN_CASES).optional(),
-  opacity: z.number().min(0).max(1).optional()
+  opacity: z.number().min(0).max(1).optional(),
+  link: z.string().max(MAX_LINK).regex(LINK_PROTOCOLS, 'a link is http, https or mailto').optional()
 };
 
 export const runSchema = z.object({ start: z.number().int().min(0), end: z.number().int().min(1), ...runStyleShape }).strict();
@@ -43,7 +47,7 @@ export const runEditSchema = z.object(Object.fromEntries(Object.entries(runStyle
 
 export const runsSchema = z.array(runSchema).max(MAX_RUNS).optional();
 
-export type RunStyle = { fill?: GradientFill; color?: string; weight?: number; italic?: boolean; font?: string; size?: number; tracking?: number; leading?: number; underline?: boolean; strike?: boolean; textCase?: RunCase; opacity?: number };
+export type RunStyle = { fill?: GradientFill; color?: string; weight?: number; italic?: boolean; font?: string; size?: number; tracking?: number; leading?: number; underline?: boolean; strike?: boolean; textCase?: RunCase; opacity?: number; link?: string };
 export type TextRun = { start: number; end: number } & RunStyle;
 export type Range = { start: number; end: number };
 export type Segment = { text: string; run: TextRun | null };
@@ -59,7 +63,7 @@ type Toggled = { weight: RunToggle.Bold; italic: RunToggle.Italic; underline: Ru
 
 export type RunEdit = { [K in keyof RunStyle]?: RunStyle[K] | (K extends keyof Toggled ? Toggled[K] : never) | null };
 
-export const STYLE_KEYS = ['fill', 'color', 'weight', 'italic', 'font', 'size', 'tracking', 'leading', 'underline', 'strike', 'textCase', 'opacity'] as const;
+export const STYLE_KEYS = ['fill', 'color', 'weight', 'italic', 'font', 'size', 'tracking', 'leading', 'underline', 'strike', 'textCase', 'opacity', 'link'] as const;
 
 export type StyleKey = (typeof STYLE_KEYS)[number];
 
@@ -100,6 +104,19 @@ function runsOf(chars: Chars): TextRun[] {
   return runs;
 }
 
+const OTHER_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+export function linkOf(raw: string): string | null | undefined {
+  const typed = raw.trim();
+  if (!typed) {
+    return null;
+  }
+  if (LINK_PROTOCOLS.test(typed)) {
+    return typed;
+  }
+  return OTHER_SCHEME.test(typed) ? undefined : `https://${typed}`;
+}
+
 export const codePoints = (text: string) => [...text];
 
 export const codeIndex = (text: string, utf16: number) => [...text.slice(0, utf16)].length;
@@ -124,7 +141,8 @@ const TOGGLES: Record<StyleKey, (edit: unknown, chars: Chars, range: Range) => u
   tracking: plain,
   leading: plain,
   textCase: plain,
-  opacity: plain
+  opacity: plain,
+  link: plain
 };
 
 const REPLACES: Partial<Record<StyleKey, StyleKey>> = { fill: 'color', color: 'fill' };

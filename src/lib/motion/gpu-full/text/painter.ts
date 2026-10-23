@@ -514,7 +514,7 @@ const RULE_EM = 0.06;
 
 function decorations(run: TextRun | null, g: Glyph, x: number, baseline: number): number[][] {
   const bar = (at: number) => rect([x + g.pen, baseline + at * g.size, x + g.pen + g.advance, baseline + (at + RULE_EM) * g.size]);
-  return [...(run?.underline ? [bar(UNDERLINE_EM)] : []), ...(run?.strike ? [bar(STRIKE_EM)] : [])];
+  return [...(run?.underline || run?.link ? [bar(UNDERLINE_EM)] : []), ...(run?.strike ? [bar(STRIKE_EM)] : [])];
 }
 
 type Placed = { laid: Laid; type: Type; room: number };

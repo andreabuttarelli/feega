@@ -54,6 +54,13 @@ describe('rich text on the GPU path', () => {
     expect(count(inks(paintText(env({ text: 'ab', runs: [{ start: 0, end: 2, underline: true, strike: true }] }, book))))).toBe(plain + 4);
   });
 
+  it('a linked run is underlined on the canvas like in the export', () => {
+    const book = () => ({ face: boxFace, skew: 0 });
+    const count = (all: Ink[]) => all.reduce((n, i) => n + i.contours.length, 0);
+    const plain = count(inks(paintText(env({ text: 'ab' }, book))));
+    expect(count(inks(paintText(env({ text: 'ab', runs: [{ start: 0, end: 2, link: 'https://a.co' }] }, book))))).toBe(plain + 2);
+  });
+
   it('a run fades by its own opacity and changes its own case', () => {
     const asked: number[] = [];
     const book: FaceBook = (_r, code) => {
