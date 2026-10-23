@@ -2692,7 +2692,8 @@
 
   const IN_FRAME: { [K in Pasted]?: (data: Extract<PasteData<File>, { kind: K }>) => FramePaste } = {
     [Pasted.Svg]: ({ svg }) => ({ svg }),
-    [Pasted.Text]: ({ text }) => ({ text })
+    [Pasted.Text]: ({ text }) => ({ text }),
+    [Pasted.Figma]: ({ html }) => ({ figma: html })
   };
   const PASTED_SUMMARY = 'Pasted';
 

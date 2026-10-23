@@ -3097,7 +3097,24 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return { tiles: clipboard };
   }
 
-  const FIGMA_PASTE = 'Figma layers cannot be pasted directly. In Figma use Copy as → Copy as SVG, then paste here.';
+  const FIGMA_PASTE = 'These Figma layers could not be read. In Figma use Copy as → Copy as SVG, then paste here.';
+  const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
+
+  async function pasteFigma(html: string, at: { x: number; y: number }) {
+    const res = await post('pasteFigma', { html, at: JSON.stringify(at), node_id: crypto.randomUUID() });
+    const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    if (!node) {
+      failed = FIGMA_PASTE;
+      return;
+    }
+    nodes = [...nodes, toTile(node)];
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    focusOn([node.id], undefined, FocusMode.Select);
+    const skipped = (res?.skipped ?? []) as string[];
+    if (skipped.length) {
+      failed = `${FIGMA_SKIPPED} ${skipped.join('; ')}`;
+    }
+  }
 
   async function pasteSvg(svg: string, at: { x: number; y: number }) {
     const drawings = svgDrawings(svg, at);
@@ -3149,7 +3166,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     [Pasted.Svg]: ({ svg }, at) => void pasteSvg(svg, at),
     [Pasted.Image]: ({ file }, at) => void upload(file, at, frameHolding(nodes, { left: at.x, top: at.y, width: 0, height: 0 })),
     [Pasted.Text]: ({ text }, at) => pasteText(text, at),
-    [Pasted.Figma]: () => (failed = FIGMA_PASTE)
+    [Pasted.Figma]: ({ html }, at) => void pasteFigma(html, at)
   };
 
   function pasteData(data: PasteData<File>, at: { x: number; y: number }) {
