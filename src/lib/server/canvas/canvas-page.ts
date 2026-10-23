@@ -48,6 +48,7 @@ import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/c
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { CommentOutcome, addComment, listComments, resolveThread } from '$lib/server/canvas/canvas-comments';
 import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
@@ -1458,6 +1459,34 @@ export const actions: Actions<CanvasParams> = {
     });
 
     return out;
+  },
+
+  canvasComments: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    return { threads: await listComments(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
+  },
+
+  addComment: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const out = await addComment(scope.db, {
+      orgId: scope.orgId,
+      canvasId: scope.canvasId,
+      actor: userActor(scope),
+      body: String(fd.get('body') ?? ''),
+      nodeId: fd.get('node_id') ? String(fd.get('node_id')) : null,
+      parentId: fd.get('parent_id') ? String(fd.get('parent_id')) : null,
+      x: Number(fd.get('x') ?? 0),
+      y: Number(fd.get('y') ?? 0)
+    });
+    return out.outcome === CommentOutcome.Added ? out : fail(out.outcome === CommentOutcome.Missing ? 404 : 400, { error: out.outcome });
+  },
+
+  resolveComment: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const outcome = await resolveThread(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, commentId: String(fd.get('comment_id') ?? ''), resolved: fd.get('resolved') === '1' });
+    return outcome === CommentOutcome.Added ? { outcome } : fail(404, { error: outcome });
   },
 
   paste: async ({ request, params, locals }) => {
