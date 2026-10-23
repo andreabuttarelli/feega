@@ -103,6 +103,25 @@ describe('displayListAt', () => {
     expect(list(turning, 60).unsupported).toEqual([]);
   });
 
+  describe('an image fill on a shape', () => {
+    const fills = [{ type: FillType.Image, assetId: 'photo', fit: 'cover' }];
+    const pictured = patch(withCard, 'card', { props: { ...cardProps, fills } });
+    const drawnWith = (assets: Record<string, string>) => drawFrame(prepare(pictured, FEEGA_TOKENS, assets), 0);
+
+    it('draws the picture through the shape as a stencil', () => {
+      const drawn = drawnWith({ photo: 'https://cdn.test/photo.png' });
+      const image = drawn.items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(drawn.unsupported).toEqual([]);
+      expect(image).toMatchObject({ src: 'https://cdn.test/photo.png', fit: 'cover' });
+      expect(image?.matte?.items[0]).toMatchObject({ kind: ItemKind.Path });
+    });
+
+    it('stays a gap while the picture has no address', () => {
+      expect(drawnWith({}).unsupported).toContainEqual({ clip: 'card', component: 'Shape', reason: Unsupported.Fill });
+    });
+  });
+
   it('reads a gaussian blur effect as a CSS blur filter', () => {
     const blurred = patch(withCard, 'card', { effects: [{ id: 'e1', kind: 'gaussian-blur', enabled: true, params: { radius: 12 } }] } as never);
 

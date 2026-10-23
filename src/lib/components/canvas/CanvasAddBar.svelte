@@ -124,7 +124,8 @@
     [DrawTool.Line]: Command.ToolLine,
     [DrawTool.Arrow]: Command.ToolArrow,
     [DrawTool.Pen]: Command.ToolPen,
-    [DrawTool.Pencil]: Command.ToolPencil
+    [DrawTool.Pencil]: Command.ToolPencil,
+    [DrawTool.ShapeBuilder]: Command.ToolShapeBuilder
   };
 
   const SHAPE_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {

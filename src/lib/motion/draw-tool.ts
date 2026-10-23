@@ -11,6 +11,7 @@ export enum DrawTool {
   Arrow = 'arrow',
   Pen = 'pen',
   Pencil = 'pencil',
+  ShapeBuilder = 'shape-builder',
   Frame = 'frame'
 }
 
