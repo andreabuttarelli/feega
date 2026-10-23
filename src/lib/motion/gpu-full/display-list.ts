@@ -169,7 +169,9 @@ function strokeBands(s: Stroke, outline: Outline, unit: number): number[][] {
   return [...runs.flatMap((r) => strokePolygons(r.pts, r.closed, width, s.cap as Cap, s.join as Join, s.miter)), ...heads];
 }
 
-function shapePainter({ clip, props, size, unit, colour, time, fps }: Env): Painted {
+const pictureOf = (f: Fill, asset: Env['asset']): string | null => (f.type === FillType.Image ? (f.src || asset(f.assetId)) : null);
+
+function shapePainter({ clip, props, size, unit, colour, time, fps, asset }: Env): Painted {
   const look = { ...(props as unknown as ShapeLook), modifiers: lookAt(clip, time * fps).modifiers };
   const fills = fillsOf(props).filter((f) => f.visible);
   const stack = look.modifiers.filter((m) => m.enabled).map((m) => ({ kind: m.kind, values: modifierValues(m) }));
@@ -177,7 +179,7 @@ function shapePainter({ clip, props, size, unit, colour, time, fps }: Env): Pain
     [UNDRAWN_SHAPES.has(look.shape), Unsupported.ShapeKind],
     [strokesOf(props).some((s) => s.visible && s.sides), Unsupported.Stroke],
     [modifierFilter(stack, Math.min(size.width, size.height)) !== '', Unsupported.Modifier],
-    [fills.some((f) => !PAINTS[f.type] || f.blend !== BlendMode.Normal), Unsupported.Fill]
+    [fills.some((f) => !(PAINTS[f.type] || pictureOf(f, asset)) || f.blend !== BlendMode.Normal), Unsupported.Fill]
   ];
   const problem = problems.find(([hit]) => hit);
   if (problem) {
@@ -186,7 +188,17 @@ function shapePainter({ clip, props, size, unit, colour, time, fps }: Env): Pain
   const layers = shapeLayers(look, { w: size.width, h: size.height }, time).filter((l) => l.outline.length);
   const rule = look.fillRule === FillRule.EvenOdd ? FillRule.EvenOdd : FillRule.NonZero;
   const paintOf = (f: Fill) => (PAINTS[f.type] as (f: Fill, w: number, h: number, c: typeof colour) => Paint)(f, size.width, size.height, colour);
-  const filled = fills.flatMap((f: Fill) => layers.map((l): Content => ({ kind: ItemKind.Path, contours: flat(l.outline), rule, paint: paintOf(f), opacity: f.opacity * l.opacity, matrix: l.matrix as unknown as Affine })));
+  const filled = fills.flatMap((f: Fill) =>
+    layers.map((l): Content => {
+      const src = pictureOf(f, asset);
+      const matrix = l.matrix as unknown as Affine;
+      if (f.type !== FillType.Image || !src) {
+        return { kind: ItemKind.Path, contours: flat(l.outline), rule, paint: paintOf(f), opacity: f.opacity * l.opacity, matrix };
+      }
+      const stencil: PathContent = { kind: ItemKind.Path, contours: flat(l.outline), rule, paint: { kind: PaintKind.Solid, color: [1, 1, 1, 1] }, opacity: 1, matrix, blur: 0 };
+      return { ...(picture(src, size, { fit: f.fit, focus: [f.focus.x, f.focus.y], zoom: f.scale, clipped: false, opacity: f.opacity * l.opacity, matrix }) as ImageContent), stencil: [stencil] };
+    })
+  );
   const stroked = strokesOf(props)
     .filter((st) => st.visible)
     .flatMap((st) => layers.map((l): Content => ({ kind: ItemKind.Path, contours: strokeBands(st, l.outline, unit), rule: FillRule.Union, paint: paintOf(st.paint as Fill), opacity: st.paint.opacity * l.opacity, matrix: l.matrix as unknown as Affine, within: withinOf(st.align, flat(l.outline)) })));

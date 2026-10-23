@@ -1349,7 +1349,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'no Figma layers in this paste' });
     }
     const nodes = await Promise.all(pasted.frameIds.map((nodeId) => findNode(scope.db, { orgId: scope.orgId, nodeId })));
-    return { outcome: pasted.outcome, nodes: nodes.filter((n) => n !== null), undo: pasted.undo, skipped: pasted.skipped };
+    return { outcome: pasted.outcome, nodes: nodes.filter((n) => n !== null), undo: pasted.undo, skipped: pasted.skipped, fills: pasted.fills, fileKey: pasted.fileKey };
   },
 
   placeOutput: async ({ request, params, locals, setHeaders }) => {

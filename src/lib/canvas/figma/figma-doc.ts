@@ -22,11 +22,12 @@ type Unit = { x: number; y: number };
 type Size = { width: number; height: number };
 type Root = { id: string; layer: Layer };
 type Built = { doc: MotionDoc; ids: string[]; roots: Root[] };
-type Place = { centre: Unit; scale: number; frame: number; newId: NewId; report: (what: string) => void; rootSize: Size };
+export type FigmaImage = { clipId: string; hash: string; at: number };
+type Place = { centre: Unit; scale: number; frame: number; newId: NewId; report: (what: string) => void; rootSize: Size; images: FigmaImage[] };
 
-export type PlanItem = { destination: Destination; doc: MotionDoc; size: Size; centre: Unit; name: string; kind: FrameKind };
-export type FigmaPlan = { items: PlanItem[]; skipped: string[] };
-export type FigmaPasted = { doc: MotionDoc; selection: string[]; skipped: string[] };
+export type PlanItem = { destination: Destination; doc: MotionDoc; size: Size; centre: Unit; name: string; kind: FrameKind; images: FigmaImage[] };
+export type FigmaPlan = { items: PlanItem[]; skipped: string[]; fileKey: string | null };
+export type FigmaPasted = { doc: MotionDoc; selection: string[]; skipped: string[]; images: FigmaImage[]; fileKey: string | null };
 
 const IMAGE_PLACEHOLDER = '#d9d9d9';
 const DIGITS = 10000;
@@ -54,6 +55,11 @@ const MOTION_FILL: Record<FillKind, (f: Fill) => Painted | null> = {
 };
 
 const fillStack = (fills: Fill[]): Painted[] => fills.flatMap((f) => MOTION_FILL[f.kind](f) ?? []);
+
+function imageSlots(fills: Fill[]): { hash: string; at: number }[] {
+  const painted = fills.filter((f) => MOTION_FILL[f.kind](f));
+  return painted.flatMap((f, at) => (f.kind === FillKind.Image ? [{ hash: f.hash, at }] : []));
+}
 
 function strokeStack(strokes: Stroke[], doc: MotionDoc, p: Place): Painted[] {
   return strokes.flatMap((s) => {
@@ -109,6 +115,7 @@ function shapeClip(doc: MotionDoc, layer: Outlined, p: Place): Built {
     p.report(`${layer.name}: ${made.error}`);
     return { doc, ids: [], roots: [] };
   }
+  p.images.push(...imageSlots(layer.fills).map((slot) => ({ clipId: id, ...slot })));
   return { doc: made.doc, ids: [id], roots: [{ id, layer: layer as Layer }] };
 }
 
@@ -284,7 +291,8 @@ function nestedFrame(doc: MotionDoc, layer: FrameLayer, p: Place): Built {
 
 function sceneOf(html: string) {
   const message = figmaMessage(html);
-  return message ? figmaScene(message) : null;
+  const scene = message ? figmaScene(message) : null;
+  return scene && message ? { scene, fileKey: message.meta.fileKey ?? null } : null;
 }
 
 const wholeSize = (size: Size): Size => ({ width: Math.max(1, Math.round(size.width)), height: Math.max(1, Math.round(size.height)) });
@@ -292,9 +300,10 @@ const wholeSize = (size: Size): Size => ({ width: Math.max(1, Math.round(size.wi
 function frameItem(layer: FrameLayer, centre: Unit, newId: NewId, skipped: Set<string>): PlanItem {
   const size = wholeSize(layer.box);
   const blank = drawnFrame({ left: 0, top: 0, ...size });
-  const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box };
+  const images: FigmaImage[] = [];
+  const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images };
   const built = layersOf(blank, layer, place);
-  return { destination: Destination.Frame, doc: built.doc, size, centre, name: layer.name, kind: FrameKind.Frame };
+  return { destination: Destination.Frame, doc: built.doc, size, centre, name: layer.name, kind: FrameKind.Frame, images };
 }
 
 function freeItem(layer: Layer, size: Size, centre: Unit, newId: NewId, skipped: Set<string>): PlanItem | null {
@@ -304,7 +313,8 @@ function freeItem(layer: Layer, size: Size, centre: Unit, newId: NewId, skipped:
     skipped.add(`${layer.name}: ${blank.error}`);
     return null;
   }
-  const place: Place = { centre: CENTRE, scale: blank.doc.width / size.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: size };
+  const images: FigmaImage[] = [];
+  const place: Place = { centre: CENTRE, scale: blank.doc.width / size.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: size, images };
   const built = BUILD[layer.kind](blank.doc, layer, place);
   const one = layer.kind === LayerKind.Frame ? grouped(built, layer, place) : built;
   const first = one.doc.tracks.flatMap((t) => t.clips)[0];
@@ -312,7 +322,7 @@ function freeItem(layer: Layer, size: Size, centre: Unit, newId: NewId, skipped:
     return null;
   }
   const kind = compOf(first) ? FrameKind.Group : FrameKind.Element;
-  return { destination: Destination.Free, doc: canvasReady(one.doc), size: fit, centre, name: layer.name, kind };
+  return { destination: Destination.Free, doc: canvasReady(one.doc), size: fit, centre, name: layer.name, kind, images };
 }
 
 export function figmaPlan(html: string, newId: NewId): FigmaPlan | null {
@@ -330,16 +340,18 @@ export function planOf(message: FigmaMessage, newId: NewId): FigmaPlan | null {
     const made = pl.layer.kind === LayerKind.Frame && pl.destination === Destination.Frame ? frameItem(pl.layer, pl.centre, newId, skipped) : freeItem(pl.layer, pl.size, pl.centre, newId, skipped);
     return made ? [made] : [];
   });
-  return items.length ? { items, skipped: [...skipped] } : null;
+  return items.length ? { items, skipped: [...skipped], fileKey: message.meta.fileKey ?? null } : null;
 }
 
 export function figmaIntoFrame(doc: MotionDoc, html: string, at: Unit, scale: number, frame: number, newId: NewId): FigmaPasted | null {
-  const scene = sceneOf(html);
-  if (!scene) {
+  const found = sceneOf(html);
+  if (!found) {
     return null;
   }
+  const { scene, fileKey } = found;
   const skipped = new Set(scene.skipped);
-  const place: Place = { centre: at, scale, frame, newId, report: (w) => skipped.add(w), rootSize: scene.combined.box };
+  const images: FigmaImage[] = [];
+  const place: Place = { centre: at, scale, frame, newId, report: (w) => skipped.add(w), rootSize: scene.combined.box, images };
   const built = grouped(layersOf(doc, scene.combined, place), scene.combined, place);
-  return built.ids.length ? { doc: built.doc, selection: built.ids, skipped: [...skipped] } : null;
+  return built.ids.length ? { doc: built.doc, selection: built.ids, skipped: [...skipped], images, fileKey } : null;
 }

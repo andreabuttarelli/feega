@@ -986,6 +986,13 @@ battito in poi. Qui l'evento resta immutabile (`append_thread_event` solleva sul
 è giusto): l'aggiornamento entra come evento NUOVO con la sua `source_key`, di cui se ne tiene UNA
 sola, e il reducer sostituisce il messaggio con lo stesso id invece di accodarlo.
 
+### Un fill che la GPU non sa disegnare annerisce l'intero frame, e il modello dice «valido»
+Segnale: dopo aver scritto un'immagine come fill di una Shape (documento valido, `setProps` ok,
+suite verde) il frame sulla tela core diventa tutto nero, testo compreso. Causa: `shapePainter`
+risponde `Unsupported.Fill` a ogni fill che non sia solido o gradiente. Mossa: prima di produrre
+un tipo di fill nuovo da codice, guarda in `PAINTS` di `display-list.ts` se la GPU lo disegna;
+un giro Playwright con lo screenshot dopo l'edit lo prende, un test del documento no.
+
 ## Build e bundle
 
 ### Nel bundle esbuild un modulo che lancia in cima lancia UNA volta sola
