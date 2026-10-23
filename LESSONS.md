@@ -6,7 +6,7 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ### A PR that adds or changes a tool fails the tool surface pins
 
-**Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
+**Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. The src pin stores one fingerprint per tool/op, one entry each: PRs touching different tools do not conflict; a real conflict means the same tool changed twice. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
 
 ### An effect that publishes into a `$state` map loops once it runs per edit
 
