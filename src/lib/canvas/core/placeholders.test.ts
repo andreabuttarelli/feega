@@ -16,6 +16,13 @@ describe('placeholders', () => {
     expect(frame.list.items).toEqual([]);
   });
 
+  it('a stand-in for a box resized to a fractional size is whole pixels, which the core requires', () => {
+    for (const stand of [Stand.Card, Stand.Frame]) {
+      const { list } = placeholder(stand, { width: 131.25, height: 98.4375 }, LOOK);
+      expect([list.width, list.height]).toEqual([131, 98]);
+    }
+  });
+
   it('nodes of one kind and size share one group, so a thousand stand-ins cost one upload', () => {
     expect(placeholder(Stand.Card, { width: 200, height: 100 }, LOOK).group).toBe(placeholder(Stand.Card, { width: 200, height: 100 }, LOOK).group);
     expect(placeholder(Stand.Card, { width: 200, height: 100 }, LOOK).group).not.toBe(placeholder(Stand.Frame, { width: 200, height: 100 }, LOOK).group);

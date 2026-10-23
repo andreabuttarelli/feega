@@ -3243,3 +3243,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 
 **Signal:** CI `test` fails on `tool-surface-pin.test.ts` and `cli/mcp/tool-list-pin.test.ts` ("Snapshot ... mismatched", only a fingerprint differs) and the same two fail on `origin/dev` itself. **Move:** a tool description or schema change anywhere moves the hash; regenerate both pins in your PR (`vitest run src/lib/server/edit/tool-surface-pin.test.ts -u`; for the cli one `bun test` prints the new fingerprint, edit both entries by hand: `--update-snapshots` rewrites the file as Bun format and drops the vitest key CI reads).
 
+
+## The core canvas freezes a shape mid-gesture
+
+**Signal:** during a resize the selection follows the pointer but the shape stops at an intermediate size; `pageerror` shows `floating point \`131.25\`, expected u32`. **Move:** the wasm core rejects a display list whose `width`/`height` is fractional and the whole paint aborts. Round every size that becomes a `DisplayList` (placeholders, stand-ins) before it reaches `putGroup`.

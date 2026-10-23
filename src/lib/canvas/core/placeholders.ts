@@ -22,8 +22,11 @@ const LISTS: Record<Stand, (size: Size, look: Look) => DisplayList> = {
   [Stand.Frame]: (size) => ({ ...size, background: BLACK, items: [], unsupported: [] })
 };
 
+const wholePixels = (size: Size): Size => ({ width: Math.max(1, Math.round(size.width)), height: Math.max(1, Math.round(size.height)) });
+
 export function placeholder(stand: Stand, size: Size, look: Look): { group: string; list: DisplayList } {
-  return { group: `placeholder:${stand}:${Math.round(size.width)}x${Math.round(size.height)}`, list: LISTS[stand](size, look) };
+  const whole = wholePixels(size);
+  return { group: `placeholder:${stand}:${whole.width}x${whole.height}`, list: LISTS[stand](whole, look) };
 }
 
 export const standIn = <T>(layers: readonly (T | null | undefined)[]): T | null => layers.find((l) => l != null) ?? null;
