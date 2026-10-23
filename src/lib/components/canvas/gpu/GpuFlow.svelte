@@ -30,6 +30,10 @@
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { libraryOf, syncedDoc } from '$lib/motion/style-library';
   import { renameStyle } from '$lib/motion/styles';
+  import { variableLibrary } from '$lib/canvas/variable-library.svelte';
+  import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
+  import { removeVariable } from '$lib/motion/variables';
+  import type { Collection } from '$lib/motion/variables-model';
   import type { Style } from '$lib/motion/styles-model';
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
   import type { Fill } from '$lib/motion/fill/model';
@@ -1579,6 +1583,37 @@
   onMount(() => {
     styleLibrary.connect({ push: syncStyle, rename: syncRename });
     return () => styleLibrary.connect(null);
+  });
+
+  $effect(() => {
+    variableLibrary.collections = variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
+  });
+
+  const sharedShape = (c: Collection | undefined) => JSON.stringify(c && { modes: c.modes, vars: c.vars });
+
+  function syncCollection(name: string, collection: Collection) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.variables?.[name])) {
+      const present = saverOf(frame.id)?.history.present;
+      const synced = present && sharedShape(present.variables?.[name]) !== sharedShape(collection) ? syncedCollection(present, name, collection) : null;
+      if (synced) {
+        commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} variables`);
+      }
+    }
+  }
+
+  function syncRemoval(collection: string, variable: string) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.variables?.[collection]?.vars[variable])) {
+      const present = saverOf(frame.id)?.history.present;
+      const removed = present ? removeVariable(present, collection, variable) : null;
+      if (removed?.ok) {
+        commit(frame.id, removed, `Removed ${collection}/${variable}`);
+      }
+    }
+  }
+
+  onMount(() => {
+    variableLibrary.connect({ push: syncCollection, remove: syncRemoval });
+    return () => variableLibrary.connect(null);
   });
 
   $effect(() => {

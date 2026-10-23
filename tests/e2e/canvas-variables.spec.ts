@@ -74,4 +74,56 @@ test.describe('variables on the canvas @real', () => {
     expect(clips.find((c) => c.id === 'card')!.bind).toEqual({ fill: 'Collection/surface' });
     expect(clips.find((c) => c.id === 'chip')!.props.fill).toBe('#888888');
   });
+
+  test('a collection defined in one frame is offered to the others, edits sync, and each frame keeps its own mode', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(240_000);
+    await page.setViewportSize({ width: 1800, height: 1000 });
+    const seed = async (x: number) => {
+      const node = await seedNode({ type: 'motion', x, y: 150, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+      const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
+      expect(error).toBeNull();
+      return node;
+    };
+    const a = await seed(200);
+    const b = await seed(800);
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.waitForTimeout(SETTLE_MS);
+    const select = async (id: string) => {
+      const r = (await page.locator(`[data-frame="${id}"]`).boundingBox())!;
+      const point = { x: r.x + r.width * 0.5, y: r.y + r.height * 0.05 };
+      await page.mouse.click(point.x, point.y);
+      await page.waitForTimeout(SETTLE_MS);
+      await page.mouse.click(point.x, point.y);
+      await page.waitForTimeout(SETTLE_MS);
+    };
+    const heads = async () => {
+      const read = async (id: string) => (await admin.from('motion_revisions').select('doc, version').eq('node_id', id).order('version', { ascending: false }).limit(1).single()).data!.doc as { variables?: Record<string, { active?: string; vars: Record<string, { values: Record<string, string> }> }> };
+      return { a: await read(a.id), b: await read(b.id) };
+    };
+
+    await select(a.id);
+    await page.getByText('Properties', { exact: true }).first().click();
+    await page.getByTestId('variable-new-name').fill('surface');
+    await page.getByTestId('variable-add-button').click();
+    await page.getByTestId('variable-value-Collection-surface-Default').fill(LIGHT);
+
+    await page.waitForTimeout(SAVE_MS);
+    expect((await heads()).a.variables!.Collection).toBeDefined();
+    await select(b.id);
+    await expect(page.getByTestId('variable-shared')).toHaveAttribute('data-collection', 'Collection', { timeout: 15_000 });
+    await shot(page, 'shared-offered');
+    await page.getByTestId('variable-use-Collection').click();
+    await expect(page.getByTestId('variable-collection')).toHaveAttribute('data-collection', 'Collection');
+    await page.getByTestId('variable-new-mode-Collection').fill('Dark');
+    await page.getByTestId('variable-add-mode-Collection').click();
+    await page.getByTestId('variable-mode-Collection').selectOption('Dark');
+    await page.waitForTimeout(SAVE_MS);
+    await shot(page, 'shared-b-dark');
+
+    const saved = await heads();
+    expect(saved.b.variables!.Collection.active).toBe('Dark');
+    expect(saved.a.variables!.Collection.active).toBeUndefined();
+    expect(saved.a.variables!.Collection.vars.surface.values.Dark).toBe(LIGHT);
+  });
 });
