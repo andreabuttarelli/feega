@@ -57,6 +57,7 @@
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
   import TextCounterSection from './TextCounterSection.svelte';
+  import AnimateToSection from './AnimateToSection.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
@@ -760,6 +761,9 @@
 {/snippet}
 
 {#snippet animateBody()}
+  {#if visual && clip.component !== 'Null'}
+    <AnimateToSection {doc} {clip} {frame} {commit} />
+  {/if}
   {#if TEXT_COMPONENTS.has(clip.component)}
     <div class="stackable" data-testid="text-animators-section">
       {#each clip.animators as animator, i (animator.id)}
