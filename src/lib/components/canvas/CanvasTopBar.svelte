@@ -53,7 +53,8 @@
     profile,
     org,
     projectMode = ProjectMode.Standard,
-    brandName = null
+    brandName = null,
+    onComments = null
   }: {
     projectId: string;
     projectName: string;
@@ -70,6 +71,7 @@
     org: { name: string } | null;
     projectMode?: string;
     brandName?: string | null;
+    onComments?: (() => void) | null;
   } = $props();
 
   const ICON = 16;
@@ -281,6 +283,12 @@
           </div>
         {/each}
         <DropdownMenu.Separator />
+        {#if onComments}
+          <DropdownMenu.Item class="sw-row" data-testid="canvas-comments" onSelect={onComments}>
+            <span class="sw-lead"><MessageSquare size={ICON} /></span>
+            Comments
+          </DropdownMenu.Item>
+        {/if}
         <DropdownMenu.Item class="sw-row" data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>
           <span class="sw-lead"><Plus size={ICON} /></span>
           {$_('app.shell.canvasActions.new')}
