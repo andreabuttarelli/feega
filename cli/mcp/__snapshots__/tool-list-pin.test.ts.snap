@@ -1,0 +1,15 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the MCP tool list does not move while the server code is reorganised > tool names and descriptions are byte-identical 1`] = `
+{
+  "count": 51,
+  "fingerprint": "a99e13e2dc77519a996f206a6de1620b8f00a4c81ba243425036463008b5aaf1",
+}
+`;
+
+exports[`the MCP tool list does not move while the server code is reorganised tool names and descriptions are byte-identical 1`] = `
+{
+  "count": 51,
+  "fingerprint": "a99e13e2dc77519a996f206a6de1620b8f00a4c81ba243425036463008b5aaf1",
+}
+`;

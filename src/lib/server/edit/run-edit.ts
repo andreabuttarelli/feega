@@ -1,19 +1,14 @@
-import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
-import type { EditorOpName } from '$lib/server/frame-editor/editor-ops';
-import { Family, type EditOp } from './edit-catalogue';
-import type { Answer, CanvasAsk, EditorAsk, FrameToolAsk } from './runners';
+import { Family, type EditOp, type Runners } from './edit-catalogue';
+import type { Answer } from './runners';
 
 export type EditStep = { op: string; target?: string; element?: string; input?: Record<string, unknown>; version?: number };
 
 export type EditAsk = { projectId?: string; steps: EditStep[]; batch?: boolean };
 
-export type EditPorts = {
+export type EditPorts = Runners & {
   catalogue: Map<string, EditOp>;
   inputKeys: (op: EditOp) => Promise<string[]>;
   projectOf: (nodeId: string) => Promise<string | null>;
-  canvas: (ask: CanvasAsk) => Promise<Answer>;
-  frame: (ask: FrameToolAsk) => Promise<Answer>;
-  editor: (ask: EditorAsk) => Promise<Answer>;
 };
 
 const HTTP_OK = 200;
@@ -78,19 +73,8 @@ async function projectFor(ports: EditPorts, ask: EditAsk, r: Resolved): Promise<
   return ask.projectId ?? (r.step.target ? await ports.projectOf(r.step.target) : null);
 }
 
-async function runOne(ports: EditPorts, ask: EditAsk, r: Resolved): Promise<Answer> {
-  if (r.op.family === Family.Frame) {
-    return ports.frame({ nodeId: r.step.target ?? '', tool: r.op.source, input: r.input, version: r.step.version });
-  }
-  if (r.op.family === Family.Editor) {
-    return ports.editor({ nodeId: r.step.target ?? '', op: r.op.source as EditorOpName, input: r.input });
-  }
-  const projectId = await projectFor(ports, ask, r);
-  if (!projectId) {
-    return refusal('project_required', { op: r.step.op, fix: 'Pass `project_id`, or a `target` node id of that project.' });
-  }
-  return ports.canvas({ projectId, op: r.op.source as CanvasOpName, input: r.input });
-}
+const runOne = (ports: EditPorts, ask: EditAsk, r: Resolved): Promise<Answer> =>
+  r.op.run(ports, { nodeId: r.step.target ?? '', input: r.input, version: r.step.version, projectId: () => projectFor(ports, ask, r) });
 
 type Group = { items: Resolved[]; first: number };
 
