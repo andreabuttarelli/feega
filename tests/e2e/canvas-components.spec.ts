@@ -180,4 +180,48 @@ test.describe('components inside a canvas frame @real', () => {
     };
     await expect.poll(saved, { timeout: 20_000 }).toEqual({ overrides: undefined, text: 'Sold out' });
   });
+
+  test('the Assets panel lists a component and dragging it onto another frame inserts an instance', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(150_000);
+    const data = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
+    const source = await seedNode({ type: 'motion', x: 80, y: 80, data });
+    const target = await seedNode({ type: 'motion', x: 80, y: 520, data });
+    const empty = docWith({ id: 'note', component: 'Text', from: 0, durationInFrames: 150, props: { text: 'Note', size: 0.05, x: 0.2, y: 0.2, width: 0.2, height: 0.1 } });
+    for (const [node, content] of [[source, boxDoc], [target, empty]] as const) {
+      const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: content, actor_kind: 'user', actor_id: session.userId });
+      expect(error).toBeNull();
+    }
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const from = page.locator(`[data-testid="frame-overlays"] [data-frame="${source.id}"]`);
+    await expect(from).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(SETTLE_MS);
+    const box = (await from.boundingBox())!;
+    await page.mouse.click(box.x + 4, box.y + 4);
+    await page.waitForTimeout(SETTLE_MS);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press('Alt+Meta+k');
+    await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });
+    await page.mouse.click(box.x + box.width / 2, 100);
+
+    await page.getByRole('button', { name: 'Layers', exact: true }).click();
+    await page.getByText('Assets', { exact: true }).first().click();
+    const row = page.getByTestId('component-row').first();
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: `${SHOTS}/w2a-4-assets-components.png` });
+
+    const to = page.locator(`[data-testid="frame-overlays"] [data-frame="${target.id}"]`);
+    await expect(to).toBeVisible();
+    const drop = (await to.boundingBox())!;
+    await row.dragTo(page.locator('[data-canvas-surface]'), { targetPosition: { x: drop.x + drop.width / 2 - (await page.locator('[data-canvas-surface]').boundingBox())!.x, y: drop.y + drop.height / 2 - (await page.locator('[data-canvas-surface]').boundingBox())!.y } });
+    await page.waitForTimeout(SETTLE_MS);
+    await page.screenshot({ path: `${SHOTS}/w2a-4-dropped-instance.png` });
+
+    const saved = async () => {
+      const { data: rows } = await admin.from('motion_revisions').select('doc').eq('node_id', target.id).order('version', { ascending: false }).limit(1);
+      const head = rows?.[0]?.doc as Head;
+      return { instances: head.tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Precomp').length, mains: Object.values(head.comps).filter((c) => c.component).length };
+    };
+    await expect.poll(saved, { timeout: 20_000 }).toEqual({ instances: 1, mains: 1 });
+  });
 });
