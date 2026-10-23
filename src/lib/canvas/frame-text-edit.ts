@@ -12,7 +12,6 @@ import { css } from '$lib/motion/hyperframes/html';
 import { mul2d, type Affine } from '$lib/motion/affine';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
 import type { TextCase } from '$lib/motion/components';
-import { css } from '$lib/motion/hyperframes/html';
 import { decorationCss } from '$lib/motion/decoration';
 import { AUTO, CAP_TRIM_CSS, CSS_AUTO, CSS_NORMAL, leadingOf, trackingOf } from '$lib/motion/type-units';
 
