@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BLEND_MODES, BlendMode } from '../blend';
+import { adjustSchema } from './adjust';
 
 export enum FillType {
   Solid = 'solid',
@@ -131,6 +132,7 @@ export const fillSchema = z.discriminatedUnion('type', [
     scale: z.number().min(0.1).max(10).default(1),
     crop: cropWindow,
     rotation: z.number().min(-360).max(360).optional(),
+    adjust: adjustSchema.optional(),
     ...base
   })
 ]);

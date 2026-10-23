@@ -1,4 +1,5 @@
 import { BlendMode } from '../blend';
+import { toneOf, type Tone } from './adjust';
 import { FillType, ImageFit, PAINTED_AS, PaintedAs, colourAlpha, withAlpha, type Fill, type FillOf, type Stop } from './model';
 
 export type FillPaint = {
@@ -34,10 +35,12 @@ const RESOLVE: {
     ...f,
     stops: resolveStops(f.stops, color)
   }),
-  [FillType.Image]: (f, _color, asset) => ({
-    ...f,
-    src: f.src || asset(f.assetId || null) || (LINK.test(f.assetId) ? f.assetId : '')
-  })
+  [FillType.Image]: (f, _color, asset) =>
+    ({
+      ...f,
+      src: f.src || asset(f.assetId || null) || (LINK.test(f.assetId) ? f.assetId : ''),
+      tone: toneOf(f.adjust)
+    }) as FillOf<FillType.Image>
 };
 
 export const resolveFills = (fills: readonly Fill[], color: FillPaint['color'], asset: FillPaint['asset']): Fill[] => fills.map((f) => (RESOLVE[f.type] as (f: Fill, c: FillPaint['color'], a: FillPaint['asset']) => Fill)(f, color, asset));
@@ -59,6 +62,7 @@ type HtmlFill = {
   scale?: number;
   crop?: { x: number; y: number; w: number; h: number };
   rotation?: number;
+  tone?: Tone;
 };
 
 export function fillLayersHtml(fills: readonly HtmlFill[]): string {
@@ -74,8 +78,15 @@ export function fillLayersHtml(fills: readonly HtmlFill[]): string {
       .join(',');
   const at = (p: { x: number; y: number }) => r(p.x * PERCENT) + '% ' + r(p.y * PERCENT) + '%';
   const layer = (f: HtmlFill, kind: string, style: string, inner = '') => {
-    const look = (f.opacity < 1 ? ';opacity:' + r(f.opacity) : '') + (f.blend !== 'normal' ? ';mix-blend-mode:' + f.blend : '');
+    const look = (f.opacity < 1 ? ';opacity:' + r(f.opacity) : '') + (f.blend !== 'normal' ? ';mix-blend-mode:' + f.blend : '') + (f.tone ? ';filter:url(#' + f.tone.id + ')' : '');
     return '<div class="fl fl-' + kind + '" style="position:absolute;inset:0' + look + (style ? ';' + style : '') + '">' + inner + '</div>';
+  };
+  const tone = (f: HtmlFill) => {
+    if (!f.tone || !f.src) {
+      return '';
+    }
+    const curve = (tag: string) => '<' + tag + ' type="table" tableValues="' + f.tone!.curve + '"/>';
+    return '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="' + f.tone.id + '" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="' + f.tone.matrix + '"/><feComponentTransfer>' + curve('feFuncR') + curve('feFuncG') + curve('feFuncB') + '</feComponentTransfer></filter></svg>';
   };
   const image = (f: HtmlFill) => {
     if (!f.src) {
@@ -126,7 +137,7 @@ export function fillLayersHtml(fills: readonly HtmlFill[]): string {
       ];
       return layer(f, 'diamond', 'background:' + corners.map(([to, where]) => 'linear-gradient(' + to + ',' + half + ') ' + where + '/50% 50% no-repeat').join(','));
     }
-    return image(f);
+    return tone(f) + image(f);
   };
   return '<div class="fls" style="position:absolute;inset:0;overflow:hidden;container-type:size">' + fills.map(html).join('') + '</div>';
 }
