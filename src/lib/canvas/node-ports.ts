@@ -49,6 +49,7 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   audio: { inputs: InputRule.Audio, output: OutputRule.Audio },
   model3d: { inputs: ['images', 'text'], output: null },
   motion: { inputs: NONE, output: 'motions' },
+  element: { inputs: NONE, output: null },
   studio_batch: { inputs: NONE, output: 'images' }
 };
 

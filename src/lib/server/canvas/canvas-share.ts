@@ -258,6 +258,7 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   audio: audioView,
   model3d: model3dView,
   motion: () => EMPTY,
+  element: () => EMPTY,
   studio_batch: () => EMPTY
 };
 
