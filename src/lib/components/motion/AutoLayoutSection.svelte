@@ -17,6 +17,7 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
   import { Align, AlignContent, AutoFlow, Direction, Justify, Sizing } from '$lib/motion/layout/auto-layout';
+  import { formatPadding, parsePadding } from '$lib/motion/layout/padding-text';
   import { formatTracks, parseTracks } from '$lib/motion/layout/tracks-text';
   import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '$lib/motion/layout/model';
   import { hasBox, layoutParent, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
@@ -84,6 +85,13 @@
   const signedPx = (value: string) => Math.round(Number(value) || 0);
   const span = (value: string) => Math.max(1, Math.round(Number(value) || 1));
   const cellAlign = (value: string) => (value === '' ? undefined : (value as Align));
+
+  function setPadding(text: string) {
+    const padding = parsePadding(text);
+    if (padding) {
+      set({ padding }, 'Changed the padding');
+    }
+  }
 
   function setTracks(key: 'columnTracks' | 'rowTracks', text: string, summary: string) {
     const tracks = parseTracks(text);
@@ -167,7 +175,7 @@
             <input aria-label={`Padding ${side}`} title={SIDE_LABEL[side]} class={cn(FIELD_INPUT, 'w-full px-1')} type="number" min="0" value={layout.padding[side]} data-testid={`auto-layout-padding-${side}`} onchange={(e) => set({ padding: { ...layout.padding, [side]: px(e.currentTarget.value) } }, 'Changed the padding')} />
           {/each}
         {:else}
-          <input aria-label="Padding" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.padding.top} data-testid="auto-layout-padding" onchange={(e) => set({ padding: { top: px(e.currentTarget.value), right: px(e.currentTarget.value), bottom: px(e.currentTarget.value), left: px(e.currentTarget.value) } }, 'Changed the padding')} />
+          <input aria-label="Padding" placeholder="8 16" title="One to four values, like CSS: 8 · 8 16 · 8 16 24 · 8 16 24 32" class={cn(FIELD_INPUT, 'w-full')} value={formatPadding(layout.padding)} data-testid="auto-layout-padding" onchange={(e) => setPadding(e.currentTarget.value)} />
           <button type="button" class={cn('shrink-0 rounded-sm px-1.5 text-ui-label text-ui-text-2 hover:bg-ui-wash', FOCUS_RING)} data-testid="auto-layout-padding-sides" onclick={() => (splitPadding = true)}>Per side</button>
         {/if}
       </Field>

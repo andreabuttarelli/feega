@@ -138,7 +138,7 @@
   import { reportHref } from '$lib/reports/report-link';
   import { GraphScope } from '$lib/canvas/run-graph';
   import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
-  import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { STACK_GAP, alignTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
@@ -2682,6 +2682,7 @@
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
+    stack: () => placeTiles(stackTiles(placedBoxes(selected), STACK_GAP)),
     enter: () => enterSelected(selected, summaries),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
@@ -2958,6 +2959,7 @@
 
   const SELECTION_RUN: Record<CanvasActionId, (ids: string[]) => void> = {
     'tidy-up': (ids) => placeTiles(tidyTiles(placedBoxes(ids))),
+    stack: (ids) => placeTiles(stackTiles(placedBoxes(ids), STACK_GAP)),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => props.onDuplicate?.(ids),
     'connect-new': () => {

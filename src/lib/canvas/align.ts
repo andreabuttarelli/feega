@@ -32,3 +32,23 @@ export function tidyTiles(tiles: readonly TileBox[]): TileMove[] {
   const at = new Map(tiles.map((t) => [t.id, t]));
   return tidyMoves(tiles.map((t) => ({ id: t.id, left: t.x, top: t.y, width: t.width, height: t.height }))).map((m) => ({ id: m.id, x: at.get(m.id)!.x + m.dx, y: at.get(m.id)!.y + m.dy }));
 }
+
+export const STACK_GAP = 24;
+
+const span = (values: number[]) => Math.max(...values) - Math.min(...values);
+
+export function stackTiles(tiles: readonly TileBox[], gap: number): TileMove[] {
+  if (tiles.length < 2) {
+    return [];
+  }
+  const across = span(tiles.map((t) => t.x + t.width / 2)) >= span(tiles.map((t) => t.y + t.height / 2));
+  const left = Math.min(...tiles.map((t) => t.x));
+  const top = Math.min(...tiles.map((t) => t.y));
+  const ordered = [...tiles].sort((a, b) => (across ? a.x - b.x : a.y - b.y));
+  let at = across ? left : top;
+  return ordered.map((t) => {
+    const move = across ? { id: t.id, x: at, y: top } : { id: t.id, x: left, y: at };
+    at += (across ? t.width : t.height) + gap;
+    return move;
+  });
+}

@@ -319,6 +319,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'align-middle': canvas('move_node'),
   'align-bottom': canvas('move_node'),
   'tidy-up': canvas('move_node'),
+  stack: canvas('move_node'),
   'flip-horizontal': motion('set_transform'),
   'flip-vertical': motion('set_transform'),
   'use-as-mask': motion('use_as_mask'),
