@@ -8,7 +8,7 @@
   import { registerFont, withUploaded } from '$lib/motion/fonts/ops';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import { ListKind } from '$lib/motion/text-lists';
-  import { MIXED, RUN_CASES, type GradientFill, type RunEdit, type StyleKey } from '$lib/motion/text-runs';
+  import { MIXED, RUN_CASES, linkOf, type GradientFill, type RunEdit, type StyleKey } from '$lib/motion/text-runs';
   import { FILL_LABEL, FillType, addStop, removeStop } from '$lib/motion/fill/model';
   import { GRADIENT_TYPES, RunPaint, asGradient, gradientPatched, paintOf } from '$lib/motion/run-fill';
 
@@ -44,6 +44,13 @@
     const n = Number(raw);
     if (raw.trim() !== '' && Number.isFinite(n)) {
       set({ [field.key]: n / field.scale });
+    }
+  }
+
+  function setLink(raw: string) {
+    const link = linkOf(raw);
+    if (link !== undefined) {
+      set({ link });
     }
   }
 
@@ -137,6 +144,10 @@
         {#if values.textCase === MIXED}<option value="">{MIXED_LABEL}</option>{/if}
         {#each RUN_CASES as c (c)}<option value={c}>{c}</option>{/each}
       </select>
+    </label>
+    <label class="row">
+      <span>Link</span>
+      <input type="url" data-testid="range-link" placeholder={values.link === MIXED ? MIXED_LABEL : 'https://'} value={shown(values.link)} onchange={(e) => setLink(e.currentTarget.value)} />
     </label>
     <div class="flags" data-testid="range-lists">
       <button type="button" title="Bulleted list (⇧⌘8)" data-testid="range-list-bullet" class:on={textRange.listKind === ListKind.Bullet} onclick={() => (textRange.listKind === ListKind.Bullet ? textRange.unlist() : textRange.setList(ListKind.Bullet))}>•</button>

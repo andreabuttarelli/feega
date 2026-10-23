@@ -104,6 +104,7 @@ import CircleDashed from '@lucide/svelte/icons/circle-dashed';
 import Group from '@lucide/svelte/icons/group';
 import Ungroup from '@lucide/svelte/icons/ungroup';
 import Frame from '@lucide/svelte/icons/frame';
+import Shrink from '@lucide/svelte/icons/shrink';
 import Columns2 from '@lucide/svelte/icons/columns-2';
 import FolderOpen from '@lucide/svelte/icons/folder-open';
 import CopyCheck from '@lucide/svelte/icons/copy-check';
@@ -115,7 +116,7 @@ import Menu from '@lucide/svelte/icons/menu';
 import Paperclip from '@lucide/svelte/icons/paperclip';
 import Contrast from '@lucide/svelte/icons/contrast';
 import CircleOff from '@lucide/svelte/icons/circle-off';
-import { Command, SHORTCUTS } from './shortcuts';
+import { Command, OPACITY_KEYS, SHORTCUTS } from './shortcuts';
 
 export enum Tool {
   Back = 'back',
@@ -201,7 +202,10 @@ const DRAG_IN_FRAME = 'Drag it in the frame';
 const PINCH_PREVIEW = 'Pinch the preview';
 const DOUBLE_TAP_PREVIEW = 'Double-tap around the preview';
 
+const OPACITY_ACTIONS = Object.fromEntries(OPACITY_KEYS.map((o) => [o.command, { name: `Opacity ${Math.round(o.opacity * 100)}%`, icon: Blend, group: GuideGroup.Edit, menu: MenuSection.Layer } satisfies ActionSpec])) as Record<(typeof OPACITY_KEYS)[number]['command'], ActionSpec>;
+
 export const ACTIONS: Record<ActionId, ActionSpec> = {
+  ...OPACITY_ACTIONS,
   [Command.TogglePlay]: { name: 'Play / pause', icon: Play, group: GuideGroup.Playback, place: Place.Transport },
   [Command.Play]: { name: 'Play', icon: Play, group: GuideGroup.Playback, place: Place.Transport },
   [Command.Pause]: { name: 'Pause', icon: Pause, group: GuideGroup.Playback, place: Place.Transport },
@@ -237,6 +241,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Group]: { name: 'Group', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Ungroup]: { name: 'Ungroup', icon: Ungroup, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.FrameSelection]: { name: 'Frame selection', icon: Frame, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.ResizeToFit]: { name: 'Resize to fit', icon: Shrink, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },

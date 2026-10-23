@@ -618,7 +618,7 @@ export const COMPONENTS = {
     description: 'A nested composition (precompose clips to make one) played as one clip: trimStart starts it later, loop repeats it to the end of the clip.',
     track: TrackKind.Visual,
     durationInFrames: seconds(5),
-    schema: z.object({ comp: z.string().max(60).default('').meta({ control: Control.Comp, label: 'Composition', group: Group.Content }), loop: toggle(false, 'Loop', Group.Motion), hold: toggle(false, 'Hold last frame', Group.Motion), overrides: z.record(z.string(), z.record(z.string(), z.unknown())).optional().meta(managed('Overrides')), boolean: z.enum(BooleanOp).optional().meta(managed('Boolean operation')) }).strict()
+    schema: z.object({ comp: z.string().max(60).default('').meta({ control: Control.Comp, label: 'Composition', group: Group.Content }), loop: toggle(false, 'Loop', Group.Motion), hold: toggle(false, 'Hold last frame', Group.Motion), overrides: z.record(z.string(), z.record(z.string(), z.unknown())).optional().meta(managed('Overrides')), propValues: z.record(z.string(), z.union([z.string(), z.boolean()])).optional().meta(managed('Property values')), boolean: z.enum(BooleanOp).optional().meta(managed('Boolean operation')) }).strict()
   },
   Adjustment: {
     label: 'Adjustment layer',

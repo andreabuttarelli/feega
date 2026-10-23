@@ -224,4 +224,37 @@ test.describe('components inside a canvas frame @real', () => {
     };
     await expect.poll(saved, { timeout: 20_000 }).toEqual({ instances: 1, mains: 1 });
   });
+
+  test('a property exposed on the main is set from the instance and saved', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(150_000);
+    const frame = await seedNode({ type: 'motion', x: 80, y: 80, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frame.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const host = page.locator(`[data-testid="frame-overlays"] [data-frame="${frame.id}"]`);
+    await expect(host).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(SETTLE_MS);
+    const box = (await host.boundingBox())!;
+    await page.mouse.click(box.x + 4, box.y + 4);
+    await page.waitForTimeout(SETTLE_MS);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+
+    await page.keyboard.press('Alt+Meta+k');
+    await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('instance-expose').filter({ hasText: 'Visible' }).click();
+    const property = page.getByTestId('instance-property');
+    await expect(property).toBeVisible();
+    await property.getByTestId('instance-property-boolean').uncheck();
+    await expect(property.getByTestId('instance-property-reset')).toBeVisible();
+    await page.waitForTimeout(SETTLE_MS);
+    await page.screenshot({ path: `${SHOTS}/r4-1-property.png` });
+
+    const saved = async () => {
+      const { data: rows } = await admin.from('motion_revisions').select('doc').eq('node_id', frame.id).order('version', { ascending: false }).limit(1);
+      const head = rows?.[0]?.doc as { tracks: { clips: { component: string; props: { propValues?: Record<string, boolean> } }[] }[] };
+      return Object.values(head.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')?.props.propValues ?? {});
+    };
+    await expect.poll(saved, { timeout: 20_000 }).toEqual([false]);
+  });
 });

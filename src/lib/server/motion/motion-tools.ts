@@ -162,7 +162,7 @@ import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCamer
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
-import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
+import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '$lib/motion/layout/model';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
@@ -177,6 +177,9 @@ import { clearTextRuns, listTextRange, styleTextRange } from '$lib/motion/text-r
 import { ListChange } from '$lib/motion/text-lists';
 import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, pushOverrides, resetOverride, resetOverrides } from '$lib/motion/main-component';
 import { addVariant, pickVariant, swapInstance } from '$lib/motion/variants';
+import { defineProperty, removeProperty, resetProperty, setProperty } from '$lib/motion/component-properties';
+import { propertyDefSchema } from '$lib/motion/doc';
+import type { PropertyDef } from '$lib/motion/property-resolve';
 import { placeInstance } from '$lib/motion/canvas-components';
 import { runEditSchema, type RunEdit } from '$lib/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
@@ -999,7 +1002,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     text_style: tool({
-      description: 'Rich text: style characters start..end (end exclusive) of a Text clip only. style takes color (#rrggbb, brand.*) or fill (a gradient: type linear-gradient|radial-gradient|angular-gradient|diamond-gradient, stops [{color,pos 0..1}] of 2 to 8, angle in degrees for linear and angular, center {x,y} and radius for radial, center for angular; it spans the glyph bounds of the range itself; setting one of color and fill drops the other), weight, italic, font (register_font first), size (share of the frame like props.size), tracking (em), leading, underline, strike, textCase, opacity; null drops that field for the range. list sets the paragraphs the range touches (a paragraph is one line of text, split by newlines): bullet or number makes them that list (the same kind on a list that already is one removes it; none removes any list), nest and lift move an item one level in or out; a list item is indented one step with its marker hanging in the gutter. clear: true drops every range.',
+      description: 'Rich text: style characters start..end (end exclusive) of a Text clip only. style takes color (#rrggbb, brand.*) or fill (a gradient: type linear-gradient|radial-gradient|angular-gradient|diamond-gradient, stops [{color,pos 0..1}] of 2 to 8, angle in degrees for linear and angular, center {x,y} and radius for radial, center for angular; it spans the glyph bounds of the range itself; setting one of color and fill drops the other), weight, italic, font (register_font first), size (share of the frame like props.size), tracking (em), leading, underline, strike, textCase, opacity, link (http, https or mailto address; clickable in exports and embeds, underlined, not clickable on the canvas); null drops that field for the range. list sets the paragraphs the range touches (a paragraph is one line of text, split by newlines): bullet or number makes them that list (the same kind on a list that already is one removes it; none removes any list), nest and lift move an item one level in or out; a list item is indented one step with its marker hanging in the gutter. clear: true drops every range.',
       inputSchema: z.object({ clip_id: z.string(), start: z.number().int().min(0).optional(), end: z.number().int().min(1).optional(), style: runEditSchema.optional(), list: z.enum(ListChange).optional(), clear: z.boolean().optional() }),
       execute: async (input) => {
         if (input.clear) {
@@ -1709,6 +1712,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const out = apply(wrapInFrame(session.doc, clip_ids, id, deps.newId()), `framed ${clip_ids.length} clip(s)`);
         return out.ok ? { ...out, container_id: id } : out;
       }
+    }),
+
+    resize_to_fit: tool({
+      description: 'Resize a frame container to fit its children, like the editor Resize to fit (⌥⇧⌘R): a plain frame takes the bounding box of its children, an auto layout hugs them.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async ({ clip_id }) => apply(resizeToFit(session.doc, clip_id), `fitted ${clip_id} to its children`)
     }),
 
     set_auto_layout: tool({
@@ -2793,8 +2802,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     component: tool({
-      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value).',
-      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.string().optional() }),
+      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop).',
+      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.union([z.string(), z.boolean()]).optional(), property: propertyDefSchema.optional() }),
       execute: async (input) => {
         const ids: string[] = [];
         const newId = () => {
@@ -2812,7 +2821,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           [ComponentAction.Reset]: () => resetOverrides(session.doc, id),
           [ComponentAction.Detach]: () => detachInstance(session.doc, id, newId),
           [ComponentAction.AddVariant]: () => addVariant(session.doc, input.comp ?? '', input.variant ?? {}, newId),
-          [ComponentAction.Swap]: () => (input.comp ? swapInstance(session.doc, id, input.comp) : pickVariant(session.doc, id, input.prop ?? '', input.value ?? ''))
+          [ComponentAction.Swap]: () => (input.comp ? swapInstance(session.doc, id, input.comp) : pickVariant(session.doc, id, input.prop ?? '', String(input.value ?? ''))),
+          [ComponentAction.DefineProp]: () => (input.property ? defineProperty(session.doc, input.comp ?? '', input.prop ?? '', input.property as PropertyDef) : { ok: false, error: 'define-prop needs property' }),
+          [ComponentAction.RemoveProp]: () => removeProperty(session.doc, input.comp ?? '', input.prop ?? ''),
+          [ComponentAction.SetProp]: () => (input.value === undefined ? { ok: false, error: 'set-prop needs value' } : setProperty(session.doc, id, input.prop ?? '', input.value)),
+          [ComponentAction.ResetPropValue]: () => resetProperty(session.doc, id, input.prop ?? '')
         };
         const out = apply(run[input.action](), `component ${input.action}`);
         if (out.ok && input.action === ComponentAction.Place) {

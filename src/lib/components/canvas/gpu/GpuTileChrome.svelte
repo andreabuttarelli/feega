@@ -3,16 +3,14 @@
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { isNodeType } from '$lib/canvas/node-data';
-  import { dragAngle } from '$lib/canvas/node-layout';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { tileHovered } from '$lib/canvas/layers';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
 
-  let { tile, selected, full, painted = false, resizable = false, onrotate, knobDrawn = false }: { tile: Tile; selected: boolean; full: boolean; painted?: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void; knobDrawn?: boolean } = $props();
+  let { tile, selected, full, painted = false, resizable = false }: { tile: Tile; selected: boolean; full: boolean; painted?: boolean; resizable?: boolean } = $props();
 
   const CORNERS = ['top left', 'top right', 'bottom left', 'bottom right'] as const;
 
-  const SNAP_DEG = 15;
   const spaced = (i: number, n: number) => `${((i + 1) / (n + 1)) * 100}%`;
   const kind = $derived(tile.kind && isNodeType(tile.kind) ? tile.kind : null);
   const Icon = $derived(kind ? NODE_KIND_ICON[kind] : null);
@@ -21,22 +19,6 @@
   const chrome = $derived(nodeChrome(tile.id, selected, layersSource.video));
   const ringColor = $derived(tile.output ? CONNECTOR_STYLE[tile.output].color : 'var(--accent, #7c5cff)');
   const outputs = $derived(tile.connectable === false ? [] : (tile.outputs ?? []));
-
-  function startRotate(e: PointerEvent) {
-    e.stopPropagation();
-    const handle = e.currentTarget as HTMLElement;
-    const box = handle.closest('.svelte-flow__node')!.getBoundingClientRect();
-    const centre = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-    const from = { x: e.clientX, y: e.clientY };
-    handle.setPointerCapture(e.pointerId);
-    handle.onpointerup = (up) => {
-      handle.onpointerup = null;
-      const degrees = dragAngle(centre, from, { x: up.clientX, y: up.clientY }, up.shiftKey ? SNAP_DEG : 0);
-      if (degrees) {
-        onrotate?.(tile.id, degrees);
-      }
-    };
-  }
 </script>
 
 {#if full && label && Icon && !painted}
@@ -80,10 +62,6 @@
   {#each CORNERS as corner (corner)}
     <div class={`svelte-flow__resize-control handle ${corner}`} class:painted style={`border-color:${ringColor}`}></div>
   {/each}
-{/if}
-
-{#if selected && tile.rotatable && onrotate}
-  <button type="button" class="rotate-handle nodrag nopan" class:drawn={knobDrawn} aria-label="Rotate" data-testid="rotate-handle" onpointerdown={startRotate}></button>
 {/if}
 
 <style>
@@ -208,24 +186,5 @@
   }
   .handle.bottom {
     top: 100%;
-  }
-
-  .rotate-handle {
-    position: absolute;
-    left: 50%;
-    top: -28px;
-    width: 12px;
-    height: 12px;
-    margin-left: -6px;
-    padding: 0;
-    border: 2px solid var(--accent, #7c5cff);
-    border-radius: var(--ui-radius-full);
-    background: var(--ui-panel-raised, #fff);
-    cursor: grab;
-    z-index: 5;
-  }
-
-  .rotate-handle.drawn {
-    opacity: 0;
   }
 </style>

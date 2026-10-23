@@ -4,7 +4,7 @@
   import { textRange } from '$lib/canvas/text-range.svelte';
   import GradientHandles from './GradientHandles.svelte';
   import { ListKind, MARKER_GAP_EM, markersOf, type ListItem } from '$lib/motion/text-lists';
-  import { codeIndex, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '$lib/motion/text-runs';
+  import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '$lib/motion/text-runs';
 
   let { layout, look, text, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
 
@@ -15,6 +15,8 @@
   let value = $state('');
   let tint = $state('#000000');
   let mirrorStyle = $state('');
+  let linkOpen = $state(false);
+  let linkField = $state<HTMLInputElement>();
 
   const SHORTCUTS: Record<string, RunEdit> = { b: { weight: RunToggle.Bold }, i: { italic: RunToggle.Italic }, u: { underline: RunToggle.Underline } };
   const PANEL = '[data-text-range-panel]';
@@ -131,6 +133,38 @@
     textRange.restyle(edit);
   }
 
+  async function openLink() {
+    selected();
+    linkOpen = true;
+    await tick();
+    linkField?.focus();
+  }
+
+  function applyLink() {
+    if (!linkOpen) {
+      return;
+    }
+    linkOpen = false;
+    const link = linkOf(linkField?.value ?? '');
+    if (link !== undefined) {
+      restyle({ link });
+    }
+    refocus();
+  }
+
+  function onLinkKey(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyLink();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      linkOpen = false;
+      refocus();
+    }
+  }
+
   const LIST_SHORTCUTS: Record<string, ListKind> = { Digit7: ListKind.Number, Digit8: ListKind.Bullet };
 
   function atParagraphStart(): boolean {
@@ -161,6 +195,12 @@
   }
 
   function onKey(e: KeyboardEvent) {
+    if (styled && e.shiftKey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'u') {
+      e.preventDefault();
+      e.stopPropagation();
+      void openLink();
+      return;
+    }
     if (styled && !composing && onListKey(e)) {
       e.preventDefault();
       e.stopPropagation();
@@ -241,6 +281,10 @@
         restyle({ color: tint, fill: null });
         refocus();
       }} />
+    <button type="button" data-testid="text-range-link" title="Link (⇧⌘U)" onclick={openLink}>Link</button>
+    {#if linkOpen}
+      <input bind:this={linkField} type="url" class="url" data-testid="text-range-url" placeholder="https://" value={textRange.values?.link === MIXED ? '' : (textRange.values?.link ?? '')} onkeydown={onLinkKey} onblur={applyLink} />
+    {/if}
     <button type="button" data-testid="text-range-clear" title="Clear range style" onclick={() => restyle(CLEARED)}>×</button>
   </div>
 {/if}
@@ -260,6 +304,7 @@
 
   .range button,
   .range input {
+    min-width: 24px;
     width: 24px;
     height: 24px;
     padding: 0;
@@ -268,6 +313,17 @@
     background: transparent;
     color: var(--ui-text, #111);
     cursor: pointer;
+  }
+
+  .range [data-testid='text-range-link'] {
+    width: auto;
+    padding: 0 6px;
+  }
+
+  .range .url {
+    width: 160px;
+    padding: 0 6px;
+    border: 1px solid var(--ui-border, rgb(0 0 0 / 0.15));
   }
 
   .range button:hover {

@@ -1,9 +1,15 @@
 <script lang="ts">
   import type { CommentThread } from '$lib/canvas/comment-threads';
 
-  let { thread, active, onpick }: { thread: CommentThread; active: boolean; onpick: (id: string) => void } = $props();
+  type Props = { thread: CommentThread; active: boolean; onpick: (id: string) => void; ghost?: undefined } | { ghost: true; at: { x: number; y: number } };
+
+  let props: Props = $props();
 </script>
 
+{#if props.ghost}
+  <span class="pin active ghost" data-testid="comment-pin-pending" style={`left:${props.at.x}px;top:${props.at.y}px`}>+</span>
+{:else}
+  {@const { thread, active, onpick } = props}
 <button
   type="button"
   class="pin"
@@ -20,6 +26,7 @@
 >
   {thread.number}
 </button>
+{/if}
 
 <style>
   .pin {
@@ -41,6 +48,10 @@
     transform-origin: 0 100%;
     transform: translate(0, -100%) scale(calc(1 / var(--zoom, 1)));
     pointer-events: auto;
+  }
+
+  .ghost {
+    pointer-events: none;
   }
 
   .pin.active {

@@ -8,8 +8,8 @@ describe('one bottom bar, its tools by selection', () => {
   });
 
   it('on the canvas a switch picks one short set: Design draws, Generate adds generation nodes', () => {
-    expect(barSlots(BarContext.Canvas, BarMode.Design)).toEqual([BarSlot.Mode, BarSlot.Draw, BarSlot.Upload, BarSlot.FrameTemplates]);
-    expect(barSlots(BarContext.Canvas, BarMode.Generate)).toEqual([BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates]);
+    expect(barSlots(BarContext.Canvas, BarMode.Design)).toEqual([BarSlot.Mode, BarSlot.Draw, BarSlot.Upload, BarSlot.Comment, BarSlot.FrameTemplates]);
+    expect(barSlots(BarContext.Canvas, BarMode.Generate)).toEqual([BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.Comment, BarSlot.FrameTemplates]);
   });
 
   it('a selected frame adds Insert image and Templates for this frame and keeps every Generate tool', () => {

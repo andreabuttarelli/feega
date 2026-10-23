@@ -1,44 +1,3 @@
-/**
- * LE SCORCIATOIE DELLA TELA — quale tasto significa cosa, e soprattutto QUANDO non significa
- * niente. Il riconoscimento sta qui, l'esecuzione resta di chi ha la tela: la stessa divisione di
- * `$lib/shortcuts.ts`, che è il registro globale del prodotto.
- *
- * DUE REGISTRI E NON UNO, di proposito. Quello globale decide dove si va (`g` + lettera, ⌘K); qui
- * si decide cosa si fa a ciò che è selezionato, e la differenza è che questi tasti hanno senso
- * solo mentre si guarda una tela. Metterli lassù vorrebbe dire una scheda di aiuto che elenca
- * «sposta la selezione» su ogni pagina del prodotto, dove una selezione non esiste.
- *
- * LA SCELTA DEI TASTI, e cosa è stato scartato:
- *
- *   Nessuna LETTERA NUDA. Il registro globale usa `g` come prefisso: dopo `g`, QUALUNQUE lettera
- *   è la seconda di una sequenza (`matchShortcut` lo dice esplicitamente). Una `d` nuda qui
- *   sarebbe «duplica» e insieme la seconda lettera di una `g d`, e a decidere sarebbe l'ordine in
- *   cui due ascoltatori su `window` ricevono lo stesso evento. Un gesto, due padroni: scartata.
- *
- *   DUPLICA/COPIA/INCOLLA su ⌘D/⌘C/⌘V, non su ⌘⇧D o una lettera nuda: sono i tasti che ogni altro
- *   programma usa per lo stesso gesto, e ⌘D che il browser legge come segnalibro non è mai in un
- *   campo di testo — qui `isTypingTarget` li spegne comunque, come ogni altra combinazione. La
- *   scrittura che rendeva questi tasti prematuri (una riga nuova nel database, non solo un disegno
- *   che sparisce alla prossima apertura) esiste ora in `duplicateNodes`.
- *
- *   Backspace e Delete per cancellare, com'è su ogni tela che esista. Il ritorno alla pagina
- *   precedente su Backspace è stato tolto da Chrome nel 2016 e non è mai esistito su Safari.
- *
- *   I NUMERI per aggiungere, nell'ordine in cui la barra mostra le voci: `1` è la prima. Una
- *   lettera per tipo (`t`/`i`/`v`/`p`) sarebbe più mnemonica e cadrebbe nella collisione con `g`.
- *
- * ESC NON SI INTERCETTA. Il registro globale lo dice esplicitamente: Esc lo gestisce ogni overlay
- * per sé, e un `preventDefault` centrale lo ruberebbe a menu, dropdown e campi. Qui si riconosce
- * come «deseleziona» — perché è quello che significa su una tela — ma `preventable` lo esclude,
- * così il menù del doppio clic continua a chiudersi con lo stesso tasto.
- *
- * PERCHÉ CANCELLARE NON CHIEDE CONFERMA. La conferma protegge da ciò che non si può disfare, e su
- * una tela il pentimento ha già la sua strada: il nodo si riaggiunge con un tasto, ed è lo stesso
- * gesto che l'ha creato. Una finestra modale a ogni Backspace costa un'interruzione su ogni
- * cancellazione voluta — che sono quasi tutte — per salvare quella sbagliata, che si ripara in un
- * secondo. Quello che questa scelta ESIGE è che il tasto non scatti mentre si scrive: è l'unico
- * caso in cui la cancellazione arriva senza essere stata chiesta, ed è il primo test del file.
- */
 import { isTypingTarget } from '$lib/shortcuts';
 import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
@@ -46,7 +5,6 @@ import { Command, commandFor } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
 
-/** Di quante unità di tela sposta una freccia, e quanto con Shift. */
 export const NUDGE_STEP = 1;
 export const NUDGE_STEP_BIG = 10;
 
@@ -74,15 +32,12 @@ export type CanvasCommandId =
   | 'group'
   | 'ungroup'
   | 'tool'
+  | 'comment'
   | 'bring-front'
   | 'send-back'
   | 'help'
   | 'view';
 
-/**
- * Il comando riconosciuto. `add` e `nudge` portano con sé il loro argomento perché è il tasto a
- * deciderlo: `1` non è «aggiungi» più un parametro letto altrove, è «aggiungi un testo».
- */
 export type CanvasCommand =
   | { id: 'add'; what: Addable }
   | { id: 'nudge'; dx: number; dy: number }
@@ -173,12 +128,10 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
 
 const PASTE_MOD_KEYS:Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
 
-/** L'argomento di `add`, per chi ha in mano un comando e non sa ancora quale sia. */
 export function addableOf(c: CanvasCommand): Addable | null {
   return c.id === 'add' ? c.what : null;
 }
 
-/** Di quanto spostare, in unità di tela. null se il comando non è uno spostamento. */
 export function nudgeOf(c: CanvasCommand): { dx: number; dy: number } | null {
   return c.id === 'nudge' ? { dx: c.dx, dy: c.dy } : null;
 }
@@ -193,14 +146,11 @@ const ARROWS: Record<string, { dx: number; dy: number }> = {
 const ZOOM_IN_KEYS = ['+', '='];
 
 const HELP_KEY = '?';
+const COMMENT_KEY = 'c';
 const MOD_KEY = 'mod';
 
 const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'> = { Digit0: 'zoom-actual', Digit1: 'fit', Digit2: 'zoom-selection' };
 
-/**
- * Da un evento al comando, o null. `null` non è «non so»: è «questo evento non è mio», e chi
- * ascolta deve lasciarlo passare intatto — dentro un campo di testo è l'unica risposta giusta.
- */
 const ALT_ALIGN: Record<string, Edge> = { KeyA: Edge.Left, KeyH: Edge.Center, KeyD: Edge.Right, KeyW: Edge.Top, KeyV: Edge.Middle, KeyS: Edge.Bottom };
 
 function altCommand(e: KeyboardEvent): CanvasCommand | null {
@@ -214,8 +164,6 @@ function altCommand(e: KeyboardEvent): CanvasCommand | null {
 export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   if (e.altKey) return altCommand(e);
 
-  // Mentre si scrive nessun tasto è nostro, nemmeno quelli con modificatore: ⌘A dentro una
-  // textarea seleziona il testo, ed è quello che l'utente sta chiedendo.
   if (isTypingTarget(e.target)) return null;
 
   const mod = e.metaKey || e.ctrlKey;
@@ -225,20 +173,17 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   if (view) return { id: 'view', view };
 
   if (mod) {
-    // ⌘Z e ⇧⌘Z sono lo stesso tasto, e lo shift decide fra i due: va riconosciuto PRIMA del
-    // `return null` che lo shift porta per ogni altro comando con modificatore, o ⇧⌘Z non
-    // arriverebbe mai qui.
     if (key.toLowerCase() === 'z') return { id: e.shiftKey ? 'redo' : 'undo' };
     if (key.toLowerCase() === 'g') return { id: e.shiftKey ? 'ungroup' : 'group' };
     if (e.shiftKey) return null;
     if (key.toLowerCase() === 'a') return { id: 'select-all' };
     const command = PASTE_MOD_KEYS[key.toLowerCase()];
     if (command) return { id: command };
-    // Tutto il resto con modificatore è del browser o del registro globale (⌘K, ⌘,).
     return null;
   }
 
   if (key === HELP_KEY) return { id: 'help' };
+  if (key === COMMENT_KEY) return { id: 'comment' };
 
   const tool = toolFor(e);
   if (tool) return { id: 'tool', tool };
@@ -268,22 +213,12 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   return null;
 }
 
-/**
- * Questo comando può mangiarsi l'evento? Tutti sì tranne Esc, che appartiene agli overlay. Una
- * domanda e non un `if` dentro chi ascolta: chi esegue non deve ricordarsi l'eccezione.
- */
 export function preventable(c: CanvasCommand): boolean {
   return c.id !== 'deselect';
 }
 
 export type CanvasShortcutRow = { id: CanvasCommandId; keys: string[]; label: string };
 
-/**
- * La scheda che le elenca, DERIVATA dallo stesso elenco che i tasti usano: le voci di `add` sono
- * i tipi aggiungibili, nel loro ordine, quindi un quinto tipo compare qui da solo. Una lista
- * scritta a mano accanto al riconoscimento diverge al primo tasto cambiato, e a divergere è
- * sempre quella che l'utente legge.
- */
 export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   ...CANVAS_ADD_BAR.map((what, i) => ({
     id: 'add' as const,
@@ -315,6 +250,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'zoom-selection', keys: ['⇧2'], label: 'Zoom to selection' },
   { id: 'zoom-in', keys: ['+'], label: 'Zoom in' },
   { id: 'zoom-out', keys: ['-'], label: 'Zoom out' },
+  { id: 'comment', keys: ['C'], label: 'Comment mode' },
   { id: 'help', keys: [HELP_KEY], label: 'Keyboard shortcuts' }
 ];
 
@@ -336,6 +272,7 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   'select-next': GuideGroup.Select,
   'select-previous': GuideGroup.Select,
   tool: GuideGroup.Select,
+  comment: GuideGroup.Edit,
   undo: GuideGroup.Edit,
   redo: GuideGroup.Edit,
   duplicate: GuideGroup.Edit,

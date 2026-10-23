@@ -2,6 +2,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
 
 const SHOTS = process.env.CANVAS_MOTION_SHOTS;
+const OUTSIDE_PX = 10;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const blank = { version: 5, fps: 30, width: 1920, height: 1080, durationInFrames: 150, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [] }], comps: {}, assets: [] };
 const sheet = { ...blank, width: 200, height: 200, background: 'transparent', still: { frame: 0 }, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 's', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 } }] }] };
@@ -63,11 +64,8 @@ test.describe('groups behave like design-tool groups @real', () => {
     await page.mouse.up();
     await expect.poll(async () => (await rowOf(frame.id)).y, { timeout: 10_000 }).toBeGreaterThan(200);
 
-    const handle = page.getByTestId('rotate-handle');
-    await expect(handle).toBeVisible();
-    const h = (await handle.boundingBox())!;
     const tile = (await groupTile.boundingBox())!;
-    await page.mouse.move(h.x + 6, h.y + 6);
+    await page.mouse.move(tile.x + tile.width + OUTSIDE_PX, tile.y - OUTSIDE_PX);
     await page.mouse.down();
     await page.mouse.move(tile.x + tile.width + 80, tile.y + tile.height / 2, { steps: 10 });
     await page.mouse.up();

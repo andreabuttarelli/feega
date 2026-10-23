@@ -2,7 +2,7 @@ import { compOf, findClip, type MotionClip, type MotionDoc } from '$lib/motion/d
 import { Action, type ActionId } from '$lib/motion/actions';
 import { ClipOp, runClipOp, type ClipDone } from '$lib/motion/clip-ops';
 import { groupClips, ungroupClip } from '$lib/motion/group';
-import { addAutoLayout, removeAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
+import { addAutoLayout, removeAutoLayout, resizeToFit, wrapInFrame } from '$lib/motion/layout/ops';
 import { isText } from '$lib/motion/layout/text-extent';
 import { Flip, flipClips } from '$lib/motion/layer-props';
 import { copyStyle, pasteStyle } from '$lib/motion/style-copy';
@@ -13,8 +13,8 @@ import { BooleanOp, flattenShapes } from '$lib/motion/shape/boolean';
 import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
-import { setProps, type OpResult } from '$lib/motion/timeline';
-import { Command, commandFor } from '$lib/motion/shortcuts';
+import { setProps, setTransform, type OpResult } from '$lib/motion/timeline';
+import { Command, OPACITY_KEYS, commandFor } from '$lib/motion/shortcuts';
 import { Same, matchingLayers, sameLayers } from '$lib/motion/select-matching';
 import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
 import type { SelectionActionId } from './selection-actions';
@@ -159,7 +159,12 @@ function pasteReplace(ctx: BarCtx): Done | null {
   return replaced?.ok ? { ok: true, doc: replaced.doc, summary: 'Pasted to replace', selection: replaced.ids } : null;
 }
 
+const opacityOp = (opacity: number): BarOp => ({ shown: any, run: (ctx) => kept(ctx, ctx.selection.reduce<OpResult>((r, id) => (r.ok ? setTransform(r.doc, id, { opacity }) : r), { ok: true, doc: ctx.doc }), `Opacity ${Math.round(opacity * 100)}%`) });
+
+const OPACITY_OPS = Object.fromEntries(OPACITY_KEYS.map((o) => [o.command, opacityOp(o.opacity)]));
+
 const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
+  ...OPACITY_OPS,
   [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx.doc)), 'Created a component') },
   [Action.DetachInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, detachInstance(ctx.doc, ctx.selection[0], ctx.newId), 'Detached the instance') },
   [Action.PushInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, pushOverrides(ctx.doc, ctx.selection[0]), 'Pushed overrides to the main component') },
@@ -170,6 +175,7 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.Group]: { shown: several, run: (ctx) => (ctx.selection.length >= MIN_COMBINED ? regrouped(ctx, groupClips(ctx.doc, ctx.selection, ctx.newId), 'Grouped') : null) },
   [Action.Ungroup]: { shown: oneGroup, run: (ctx) => (ctx.selection.length === 1 ? regrouped(ctx, ungroupClip(ctx.doc, ctx.selection[0], ctx.newId), 'Ungrouped') : null) },
   [Action.FrameSelection]: { shown: any, run: framed },
+  [Action.ResizeToFit]: { shown: any, run: (ctx) => kept(ctx, resizeToFit(ctx.doc, ctx.selection[0]), 'Resized the frame to fit') },
   [Action.AutoLayout]: { shown: any, run: autoLayout },
   [Action.Union]: combine(BooleanOp.Union),
   [Action.Subtract]: combine(BooleanOp.Subtract),
@@ -194,7 +200,7 @@ const LATER_OPS: Partial<Record<ActionId, LaterOp>> = {
   [Action.TextToPath]: { shown: allText, run: async (ctx) => kept(ctx, await outlineTexts(ctx.doc, ctx.selection, ctx.load, ctx.assets), 'Outlined text') }
 };
 
-const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.AutoLayout, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Action.FlipHorizontal, Action.FlipVertical];
+const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.ResizeToFit, Action.AutoLayout, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Action.FlipHorizontal, Action.FlipVertical];
 
 export const FRAME_STRUCTURE_ACTIONS: ReadonlySet<ActionId> = new Set(STRUCTURE_ORDER);
 
@@ -241,7 +247,7 @@ export const FRAME_ELEMENT_MENU: ReadonlySet<SelectionActionId> = new Set(
   })
 );
 
-const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
+const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
 
 export function frameKeyAction(e: KeyboardEvent): ActionId | null {
   const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, EditMode.Design);

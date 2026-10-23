@@ -1,4 +1,4 @@
-import { Command } from '$lib/motion/shortcuts';
+import { Command, OPACITY_KEYS } from '$lib/motion/shortcuts';
 import { Tool, type ActionId } from '$lib/motion/actions';
 import { LayerAction } from '$lib/canvas/layers';
 import { CanvasAction } from '$lib/canvas/canvas-list';
@@ -134,7 +134,10 @@ export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
   dropBranch: editor('drop_branch')
 };
 
+const OPACITY_PARITY = Object.fromEntries(OPACITY_KEYS.map((o) => [o.command, motion('set_transform')])) as Record<(typeof OPACITY_KEYS)[number]['command'], Parity>;
+
 export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
+  ...OPACITY_PARITY,
   [Command.TogglePlay]: VIEW,
   [Command.Play]: VIEW,
   [Command.Pause]: VIEW,
@@ -200,6 +203,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Ungroup]: motion('ungroup'),
   [Command.AutoLayout]: motion('add_auto_layout'),
   [Command.FrameSelection]: motion('frame_clips'),
+  [Command.ResizeToFit]: motion('resize_to_fit'),
   [Command.UseAsMask]: motion('use_as_mask'),
   [Command.EditAsVector]: motion('to_vector'),
   [Command.BringForward]: motion('arrange_layers'),
@@ -325,6 +329,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'select-same-font': VIEW,
   'select-same-effect': VIEW,
   'frame-selection': motion('frame_clips'),
+  'resize-to-fit': motion('resize_to_fit'),
   'auto-layout': motion('add_auto_layout'),
   union: motion('combine_shapes'),
   subtract: motion('combine_shapes'),

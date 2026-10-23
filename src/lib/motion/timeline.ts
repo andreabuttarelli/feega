@@ -90,7 +90,9 @@ export type NewClip = {
 
 export const TOP_LEFT_ANCHOR: Transform = { anchorX: 0, anchorY: 0 };
 
-export const TOP_LEFT_START = { transform: TOP_LEFT_ANCHOR, constraints: { horizontal: Horizontal.Left, vertical: Vertical.Top } } satisfies Pick<NewClip, 'transform' | 'constraints'>;
+const NEW_CLIP_CONSTRAINTS: Constraints = { horizontal: Horizontal.Left, vertical: Vertical.Top };
+
+export const TOP_LEFT_START = { transform: TOP_LEFT_ANCHOR, constraints: NEW_CLIP_CONSTRAINTS } satisfies Pick<NewClip, 'transform' | 'constraints'>;
 
 type Span = { from: number; durationInFrames?: number };
 
@@ -125,7 +127,7 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     transitionIn: input.transitionIn ?? NO_EDGE,
     transitionOut: input.transitionOut ?? NO_EDGE,
     ...(input.transform ? { transform: { ...input.transform } } : {}),
-    ...(input.constraints ? { constraints: { ...input.constraints } } : {})
+    constraints: { ...(input.constraints ?? NEW_CLIP_CONSTRAINTS) }
   });
 
   return fitted({ ...doc, tracks: doc.tracks.map((t) => (t.id === track.id ? { ...t, clips: [...t.clips, clip] } : t)) });

@@ -18,6 +18,7 @@ const TURNED = 30;
 const FRAME_TURN = 20;
 const CORNER_BOTTOM_RIGHT = 2;
 const CORNER_TOP_LEFT = 0;
+const OUTSIDE_PX = 10;
 const DRAG: Point = { x: 90, y: 60 };
 const PULL = 60;
 
@@ -117,7 +118,8 @@ test.describe('resize is live and handle-true on the GPU canvas @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await drawBox(page);
     const middle = centre((await page.getByTestId('frame-selection').boundingBox())!);
-    const grip = centre((await page.getByTestId('rotate-handle').boundingBox())!);
+    const corner = centre((await page.getByTestId('frame-selection-handle').nth(CORNER_BOTTOM_RIGHT).boundingBox())!);
+    const grip = { x: corner.x + OUTSIDE_PX, y: corner.y + OUTSIDE_PX };
     const radius = Math.hypot(grip.x - middle.x, grip.y - middle.y);
     const start = Math.atan2(grip.y - middle.y, grip.x - middle.x);
     await page.mouse.move(grip.x, grip.y);
