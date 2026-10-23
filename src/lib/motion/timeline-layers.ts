@@ -82,10 +82,10 @@ export function rowWindow(rows: readonly Row[], scrolled: number, measured: numb
   return { from, to, before: rows[from]?.top ?? 0, after: last.top + ROW_PX[last.kind] - end };
 }
 
-export function layerName(clip: Pick<MotionClip, 'id' | 'component' | 'props'>, comps: Record<string, { name: string }>): string {
+export function layerName(clip: Pick<MotionClip, 'id' | 'component' | 'props'> & { name?: string }, comps: Record<string, { name: string }>): string {
   const comp = compOf(clip as MotionClip);
   const custom = clip.component === 'Custom' ? (clip.props as { name?: string }).name : undefined;
-  return `${custom ?? (comp ? comps[comp]?.name : undefined) ?? COMPONENTS[clip.component].label} · ${clip.id}`;
+  return `${clip.name || custom || (comp ? comps[comp]?.name : undefined) || COMPONENTS[clip.component].label} · ${clip.id}`;
 }
 
 export enum KeyMark {

@@ -2727,6 +2727,7 @@
     [Pasted.Figma]: ({ html }) => ({ figma: html })
   };
   const PASTED_SUMMARY = 'Pasted';
+  const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
 
   function pasteInFrame(data: PasteData<File>, at: Point): boolean {
     const paste = (IN_FRAME[data.kind] as ((d: PasteData<File>) => FramePaste) | undefined)?.(data);
@@ -2745,6 +2746,7 @@
     select([hit.nodeId]);
     commit(hit.nodeId, { ok: true, doc: done.doc }, PASTED_SUMMARY);
     pickMany(hit.nodeId, done.selection);
+    refusal = done.skipped?.length ? `${FIGMA_SKIPPED} ${done.skipped.join('; ')}` : null;
     return true;
   }
 

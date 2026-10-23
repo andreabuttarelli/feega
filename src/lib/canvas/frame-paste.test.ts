@@ -88,4 +88,10 @@ describe('a Figma paste into a frame', () => {
     expect(done.selection).toHaveLength(1);
     expect(topClips(done.doc).find((c) => c.id === done.selection[0])?.name).toBe('Cover');
   });
+
+  it('hands the Figma skipped list back when pasting into a frame', () => {
+    const html = readFileSync(new URL('../../../tests/fixtures/figma/clip-1.html', import.meta.url), 'utf8');
+    const done = pastedInFrame(frame, { figma: html }, AT, 1, 0, ids())!;
+    expect(Array.isArray(done.skipped)).toBe(true);
+  });
 });
