@@ -13,6 +13,8 @@ const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, las
 const BLANK = { version: 5, fps: 30, width: 1920, height: 1080, durationInFrames: 150, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [] }], comps: {}, assets: [] };
 const WITH_TEXT = { ...BLANK, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 'txt', from: 0, durationInFrames: 150, component: 'Text', props: { text: 'MOVE ME', size: 0.2, x: 0.5, y: 0.5, width: 0.8, height: 0.4 } }] }] };
 
+const WITH_BOX = { ...BLANK, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 'box', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.3, y: 0.5, width: 0.3, height: 0.3, fills: [{ type: 'solid', color: '#ff5a1f' }] } }] }] };
+
 type Row = { id: string; type: string };
 type Clip = { component: string };
 type Seed = (s: { type: string; x: number; y: number; data: Record<string, unknown> }) => Promise<{ id: string }>;
@@ -111,13 +113,15 @@ test.describe('free elements are element nodes @real', () => {
 
   test('an element dragged out of a frame is an element node', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(120_000);
-    const a = await seeded(admin, seedNode, session, { type: 'motion', x: 80, y: 80, data: LANDSCAPE }, WITH_TEXT);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const a = await seeded(admin, seedNode, session, { type: 'motion', x: 80, y: 80, data: LANDSCAPE }, WITH_BOX);
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const host = page.locator(`[data-testid="frame-overlays"] [data-frame="${a}"]`);
     await expect(host).toBeVisible({ timeout: 20_000 });
     const selection = page.getByTestId('frame-selection');
-    const at = await centre(host);
+    const frame = (await host.boundingBox())!;
+    const at = { x: frame.x + frame.width * 0.225, y: frame.y + frame.height * 0.5 };
     await expect(async () => {
       await page.mouse.click(at.x, at.y);
       await expect(selection).toBeVisible({ timeout: 1500 });
