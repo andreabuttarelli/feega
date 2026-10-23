@@ -4,9 +4,11 @@
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import TimeRemap from '$lib/components/motion/TimeRemap.svelte';
   import { advance } from '$lib/canvas/frame-playhead';
-  import { Action } from '$lib/motion/actions';
+  import { Action, type ActionId } from '$lib/motion/actions';
   import { findClip, type MotionDoc } from '$lib/motion/doc';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
+  import { frameBarActions } from '$lib/canvas/frame-inspector';
+  import { EditMode } from '$lib/motion/edit-mode';
   import { Snap } from '$lib/motion/timeline-view';
   import type { KeyRef } from '$lib/motion/timeline';
 
@@ -14,10 +16,17 @@
     doc,
     frame,
     selection,
+    mode = EditMode.Motion,
     onframe,
     onselect,
+    onmode = () => {},
+    onaction = () => {},
     onchange
-  }: { doc: MotionDoc; frame: number; selection: string[]; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+
+  const MODE_LABEL: Record<EditMode, string> = { [EditMode.Design]: 'Design: edits set the resting state', [EditMode.Motion]: 'Animate: edits key at the playhead' };
+
+  const GROUPING: readonly ActionId[] = [Action.Group, Action.Ungroup];
 
   let playing = $state(false);
   let graphOpen = $state(false);
@@ -28,6 +37,8 @@
   let raf = 0;
   let last = 0;
   let head = 0;
+
+  const grouping = $derived(frameBarActions(doc, selection).filter((id) => GROUPING.includes(id)));
 
   const remapped = $derived.by(() => {
     const found = selection.length === 1 ? findClip(doc, selection[0]) : null;
@@ -75,7 +86,9 @@
   <div class="bar">
     <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" data-testid="frame-timeline-play" onclick={toggle} />
     <span class="time" data-testid="frame-timeline-time">{(frame / doc.fps).toFixed(2)}s</span>
+    {#each grouping as id (id)}<IconButton action={id} size={14} data-testid={`frame-timeline-${id}`} onclick={() => onaction(id)} />{/each}
     <span class="spacer"></span>
+    <IconButton action={Action.ToggleEditMode} size={14} pressed={mode === EditMode.Motion} label={MODE_LABEL[mode]} data-testid="frame-timeline-mode" data-mode={mode} onclick={onmode} />
     <IconButton action={Action.GraphMode} size={14} pressed={graphOpen} onclick={() => (graphOpen = !graphOpen)} />
   </div>
   {#if remapped}<TimeRemap {doc} clip={remapped} {frame} {onchange} />{/if}

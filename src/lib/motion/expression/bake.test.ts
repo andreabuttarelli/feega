@@ -3,7 +3,7 @@ import { Ease } from '../design';
 import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { addClip, setKeyframes, setTransform } from '../timeline';
 import { sampleTrack } from '../keyframes';
-import { setCameraExpression, setExpression } from './ops';
+import { expressionToKeys, setCameraExpression, setExpression } from './ops';
 import { bakeExpressions, expressionErrors, expressionValue } from './bake';
 import { InputKey, fallbackPort } from './inputs';
 import { setCamera } from '../camera-ops';
@@ -145,5 +145,27 @@ describe('audio-reactive expressions', () => {
     expect(expressionValue(live, 'a', 'rotateY', frame)).toBeCloseTo((fallbackPort(frame / live.fps).read(InputKey.PointerX) - 0.5) * 30);
     expect(findClip(bakeExpressions(live), 'a')!.clip.keyframes.x).toEqual(findClip(bakeExpressions(literal), 'a')!.clip.keyframes.x);
     expect(bakeExpressions(live)).toEqual(bakeExpressions(live));
+  });
+});
+
+describe('converting an expression to keys', () => {
+  it('writes the baked keys into the clip and drops the expression', () => {
+    const doc = ok(setExpression(twoShapes(), 'a', 'rotateZ', 'time * 90'));
+
+    const next = findClip(ok(expressionToKeys(doc, 'a', 'rotateZ')), 'a')!.clip;
+
+    expect(next.expressions).toEqual({});
+    expect(next.keyframes.rotateZ).toHaveLength(2);
+    expect(sampleTrack(next.keyframes.rotateZ, 30)).toBeCloseTo(expressionValue(doc, 'a', 'rotateZ', 30), 3);
+  });
+
+  it('leaves the other expressions of the clip running', () => {
+    const doc = ok(setExpression(ok(setExpression(twoShapes(), 'a', 'rotateZ', 'time * 90')), 'a', 'x', 'wiggle(2, 0.05)'));
+
+    expect(findClip(ok(expressionToKeys(doc, 'a', 'rotateZ')), 'a')!.clip.expressions).toEqual({ x: 'wiggle(2, 0.05)' });
+  });
+
+  it('refuses a property without an expression', () => {
+    expect(expressionToKeys(twoShapes(), 'a', 'x')).toMatchObject({ ok: false, error: expect.stringContaining('no x expression') });
   });
 });

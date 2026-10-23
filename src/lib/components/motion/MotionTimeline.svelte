@@ -528,7 +528,10 @@
     [Drag.FadeIn]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.In, at),
     [Drag.FadeOut]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.Out, at),
     [Drag.Keys]: (g, at) => {
-      g.delta = snapTo(g.base, g.originFrom + (at - g.grabFrame), [], g.originFrom) - g.originFrom;
+      const raw = g.originFrom + (at - g.grabFrame);
+      const edge = snapTo(g.base, raw, [], g.originFrom);
+      markSnap(edge !== raw ? edge : null);
+      g.delta = edge - g.originFrom;
       return moveKeyframes(g.base, g.refs, g.delta);
     }
   };

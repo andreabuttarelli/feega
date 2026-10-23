@@ -310,6 +310,11 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('a'))).toBeNull();
   });
 
+  it('E switches between Design and Animate', () => {
+    expect(matchCanvasShortcut(ev('e'))).toEqual({ id: 'edit-mode' });
+    expect(matchCanvasShortcut(ev('e', { metaKey: true }))).toBeNull();
+  });
+
   it('zoom keys by physical digit: ⇧0 is 100%, ⇧1 fits everything, ⇧2 zooms to the selection', () => {
     expect(matchCanvasShortcut(ev(')', { shiftKey: true, code: 'Digit0' }))).toEqual({ id: 'zoom-actual' });
     expect(matchCanvasShortcut(ev('!', { shiftKey: true, code: 'Digit1' }))).toEqual({ id: 'fit' });

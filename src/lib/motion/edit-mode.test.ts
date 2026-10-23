@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Ease } from './design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, setKeyframes, type OpResult } from './timeline';
-import { EditMode, designWarning, editIn, nextMode, readMode } from './edit-mode';
+import { EDIT_MODE_KEY, EditMode, designWarning, editIn, nextMode, readMode, recalledMode, rememberMode } from './edit-mode';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -72,5 +72,29 @@ describe('Design and Motion modes', () => {
     expect(readMode('design')).toBe(EditMode.Design);
     expect(readMode('nonsense')).toBe(EditMode.Motion);
     expect(readMode(null)).toBe(EditMode.Motion);
+  });
+});
+
+describe('remembering the mode', () => {
+  const storage = () => {
+    const kept = new Map<string, string>();
+    return { kept, getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => void kept.set(k, v) };
+  };
+
+  it('writes the mode under its key and reads it back', () => {
+    const store = storage();
+
+    rememberMode(store, EditMode.Design);
+
+    expect(store.kept.get(EDIT_MODE_KEY)).toBe('design');
+    expect(recalledMode(store)).toBe('design');
+  });
+
+  it('survives storage that is missing or throws', () => {
+    const broken = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
+
+    expect(() => rememberMode(broken, EditMode.Design)).not.toThrow();
+    expect(recalledMode(broken)).toBeNull();
+    expect(recalledMode(null)).toBeNull();
   });
 });

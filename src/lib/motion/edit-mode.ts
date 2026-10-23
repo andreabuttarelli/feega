@@ -13,6 +13,23 @@ export enum EditMode {
 
 export const EDIT_MODE_KEY = 'feega.frame-edit-mode';
 
+type ModeStore = Pick<Storage, 'getItem' | 'setItem'>;
+
+export function recalledMode(store: Pick<ModeStore, 'getItem'> | null): string | null {
+  try {
+    return store?.getItem(EDIT_MODE_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function rememberMode(store: Pick<ModeStore, 'setItem'> | null, mode: EditMode): void {
+  try {
+    store?.setItem(EDIT_MODE_KEY, mode);
+  } catch {
+    return;
+  }
+}
 
 const animated = (clip: MotionClip, key: string) => Boolean(clip.keyframes[key]?.length);
 

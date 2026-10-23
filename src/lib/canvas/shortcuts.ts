@@ -22,6 +22,7 @@ export type CanvasCommandId =
   | 'align'
   | 'tidy'
   | 'stack'
+  | 'edit-mode'
   | 'enter'
   | 'select-next'
   | 'select-previous'
@@ -75,6 +76,8 @@ function viewFor(e: KeyboardEvent): FrameView | null {
 
 function stackFor(e: KeyboardEvent): boolean {
   return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.AutoLayout;
+function editModeFor(e: KeyboardEvent): boolean {
+  return commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey }) === Command.ToggleEditMode;
 }
 
 function toolFor(e: KeyboardEvent): DrawTool | null {
@@ -107,6 +110,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.Help]: { id: 'help' },
   [Command.TidyUp]: { id: 'tidy' },
   [Command.AutoLayout]: { id: 'stack' },
+  [Command.ToggleEditMode]: { id: 'edit-mode' },
   [Command.AlignLeft]: { id: 'align', edge: Edge.Left },
   [Command.AlignCenter]: { id: 'align', edge: Edge.Center },
   [Command.AlignRight]: { id: 'align', edge: Edge.Right },
@@ -195,6 +199,7 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   if (key === COMMENT_KEY) return { id: 'comment' };
 
   if (stackFor(e)) return { id: 'stack' };
+  if (editModeFor(e)) return { id: 'edit-mode' };
 
   const tool = toolFor(e);
   if (tool) return { id: 'tool', tool };
@@ -255,6 +260,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
   { id: 'stack', keys: ['⇧A'], label: 'Stack the selected tiles' },
+  { id: 'edit-mode', keys: ['E'], label: 'Design or Animate: edit the resting state or key at the playhead' },
   { id: 'view', keys: ["⇧'", '⇧G', 'mod Y'], label: 'Pixel grid, layout guides, outline view' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
   { id: 'fit', keys: ['0', '⇧1'], label: 'Zoom to fit' },
@@ -297,6 +303,7 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   align: GuideGroup.Edit,
   tidy: GuideGroup.Edit,
   stack: GuideGroup.Edit,
+  'edit-mode': GuideGroup.Edit,
   nudge: GuideGroup.Edit,
   fit: GuideGroup.View,
   'zoom-actual': GuideGroup.View,

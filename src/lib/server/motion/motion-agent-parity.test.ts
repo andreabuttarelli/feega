@@ -77,7 +77,7 @@ const CLIP: Record<string, Access> = {
   styleRef: { write: ['named_style'], read: 'styleRef' },
   bind: { write: ['variable'], read: 'bind' },
   effectStyleRef: { write: ['named_style'], read: 'effectStyleRef' },
-  expressions: { write: ['set_expression', 'pulse_with_music'], read: 'expressions' },
+  expressions: { write: ['set_expression', 'expression_to_keys', 'pulse_with_music'], read: 'expressions' },
   effects: { write: ['add_effect', 'set_effect', 'remove_effect', 'set_lut'], read: 'effects' },
   shaders: { write: ['add_custom_effect', 'set_custom_effect', 'remove_custom_effect'], read: 'shaders' },
   blend: { write: ['set_blend_mode'], read: 'blend' },

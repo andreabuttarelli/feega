@@ -75,6 +75,7 @@
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
+  import { EditMode, recalledMode, rememberMode, startMode } from '$lib/motion/edit-mode';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
@@ -1508,6 +1509,8 @@
     picks = [];
   });
 
+  const modeStore = () => (typeof localStorage === 'undefined' ? null : localStorage);
+
   function saverOf(nodeId: string) {
     const held = savers.get(nodeId);
     const live = liveOf(nodeId);
@@ -1517,9 +1520,11 @@
     }
     const url = `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${nodeId}`;
     const session: FrameEditSession = new FrameEditSession(
-      { head: { version: frame.revision, doc: live.doc }, selection: [] },
+      { head: { version: frame.revision, doc: live.doc }, selection: [], mode: startMode(live.doc, recalledMode(modeStore())) },
       {
         viewPath: () => [],
+        playhead: () => frameOfLive(liveOf(nodeId) ?? live),
+        moded: (mode) => rememberMode(modeStore(), mode),
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
         recorded: () => autosize(nodeId),
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
@@ -2053,7 +2058,7 @@
         props.onElementOut?.(nodeId, out ?? { clipId: '', client: { x: ev.clientX, y: ev.clientY }, box: null }, out ? DragPhase.Over : DragPhase.Back);
         carried = !!out;
       }
-      const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev) });
+      const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
       result = dragged.result.ok ? { ok: true, doc: inScope.merge(dragged.result.doc) } : dragged.result;
       frameGuides = { nodeId, guides: dragged.guides, gaps: dragged.gaps };
       if (result.ok) {
@@ -2685,7 +2690,7 @@
       return false;
     }
     const at = scoped(tools.doc, picks, tools.frame);
-    const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy]) : null;
+    const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy], savers.get(nodeId)?.mode ?? EditMode.Motion) : null;
     if (at && result?.ok) {
       commit(nodeId, { ok: true, doc: at.merge(result.doc) }, GRIP_SUMMARY[Grip.Move]);
     }
@@ -2710,6 +2715,7 @@
     align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
     stack: () => placeTiles(stackTiles(placedBoxes(selected), STACK_GAP)),
+    'edit-mode': () => inside && savers.get(inside.nodeId)?.toggleMode(),
     enter: () => enterSelected(selected, summaries),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
@@ -3215,9 +3221,12 @@
       <FrameTimeline
         doc={timeline.doc}
         frame={timeline.frame}
-        selection={inside?.level.clip ? [inside.level.clip] : []}
+        selection={picks.length > 1 ? picks : inside?.level.clip ? [inside.level.clip] : []}
+        mode={savers.get(nodeId)?.mode}
+        onmode={() => savers.get(nodeId)?.toggleMode()}
         onframe={(f) => scrubTo(nodeId, f)}
-        onselect={(ids) => goInside(nodeId, Gesture.Click, ids[0] ?? null)}
+        onselect={(ids) => (ids.length > 1 ? pickMany(nodeId, ids) : goInside(nodeId, Gesture.Click, ids[0] ?? null))}
+        onaction={(id) => void runFrameAction(id)}
         onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
       />
     </div>

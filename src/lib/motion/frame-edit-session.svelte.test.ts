@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
+import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
 import { FrameEditSession, type SessionPort, type SendResult } from './frame-edit-session.svelte';
 import { outgoing } from './frame-sync';
@@ -15,6 +16,8 @@ function open(send: SessionPort['send'] = accepted) {
     show: vi.fn(),
     recorded: vi.fn(),
     stepped: vi.fn(),
+    playhead: () => 12,
+    moded: vi.fn(),
     saved: vi.fn(),
     pull: vi.fn(async () => {}),
     send: vi.fn(send)
@@ -30,6 +33,30 @@ function held() {
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
+
+describe('the edit mode and the playhead', () => {
+  it('starts in Motion, flips to Design and back, and tells the host each time', () => {
+    const { session, port } = open();
+
+    expect(session.mode).toBe(EditMode.Motion);
+    session.toggleMode();
+    session.toggleMode();
+
+    expect(port.moded).toHaveBeenNthCalledWith(1, EditMode.Design);
+    expect(port.moded).toHaveBeenNthCalledWith(2, EditMode.Motion);
+    expect(session.mode).toBe(EditMode.Motion);
+  });
+
+  it('opens in the mode the host remembered', () => {
+    const { port } = open();
+
+    expect(new FrameEditSession({ head: { version: 1, doc: base }, selection: [], mode: EditMode.Design }, port).mode).toBe(EditMode.Design);
+  });
+
+  it('reads the playhead from the host', () => {
+    expect(open().session.playhead).toBe(12);
+  });
+});
 
 describe('telling the host about a new undo step', () => {
   it('a new edit is one step, the same edit typed on is not another', () => {

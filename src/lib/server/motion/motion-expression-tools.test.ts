@@ -29,6 +29,19 @@ describe('motion agent expression tool', () => {
     expect(findClip(session.doc, 'id1')!.clip.expressions).toEqual({});
   });
 
+  it('expression_to_keys turns the expression into keyframes and removes it', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
+    await run('set_expression', { clip_id: 'id1', prop: 'rotateZ', expression: 'time * 90' });
+
+    expect((await run('expression_to_keys', { clip_id: 'id1', prop: 'rotateZ' })).ok).toBe(true);
+
+    const clip = findClip(session.doc, 'id1')!.clip;
+    expect(clip.expressions).toEqual({});
+    expect(clip.keyframes.rotateZ.length).toBeGreaterThanOrEqual(2);
+    expect(String((await run('expression_to_keys', { clip_id: 'id1', prop: 'rotateZ' })).error)).toContain('no rotateZ expression');
+  });
+
   it('set_expression on the camera, and a broken expression comes back as an error', async () => {
     const { session, run } = setup();
     await run('set_camera', { enabled: true });

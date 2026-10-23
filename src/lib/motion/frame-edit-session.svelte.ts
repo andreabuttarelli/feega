@@ -1,5 +1,6 @@
 import { findClip, type MotionDoc } from './doc';
 import type { DocOp } from './doc-ops';
+import { EditMode, nextMode } from './edit-mode';
 import { SaveState } from './editor-bar';
 import { landed, outgoing, remote, type Revision, type Synced } from './frame-sync';
 import { adoptHead, amend, followHead, record, redo, startHistory, undo, type History } from './history';
@@ -17,17 +18,20 @@ export type SessionPort = {
   show: (doc: MotionDoc | null) => void;
   recorded: () => void;
   stepped: () => void;
+  playhead: () => number;
+  moded: (mode: EditMode) => void;
   saved: (head: Revision) => void;
   pull: () => Promise<void>;
   send: (ops: DocOp[], version: number, summary: string) => Promise<SendResult>;
 };
 
-export type SessionStart = { head: Revision; selection: string[] };
+export type SessionStart = { head: Revision; selection: string[]; mode?: EditMode };
 
 export class FrameEditSession {
   history = $state.raw<History>(startHistory({} as MotionDoc));
   version = $state(0);
   selection = $state<string[]>([]);
+  mode = $state<EditMode>(EditMode.Motion);
   saveState = $state<SaveState>(SaveState.Saved);
   notice = $state('');
   readonly live: LiveEdits<MotionDoc>;
@@ -47,11 +51,21 @@ export class FrameEditSession {
     this.history = startHistory(start.head.doc);
     this.version = start.head.version;
     this.selection = start.selection;
+    this.mode = start.mode ?? EditMode.Motion;
     this.baseDoc = start.head.doc;
     this.live = liveEdits<MotionDoc>({
       show: (next) => this.port.show(next),
       record: (next, summary) => this.recordEdit(next, summary)
     });
+  }
+
+  get playhead(): number {
+    return this.port.playhead();
+  }
+
+  toggleMode() {
+    this.mode = nextMode(this.mode);
+    this.port.moded(this.mode);
   }
 
   select(ids: string[]) {

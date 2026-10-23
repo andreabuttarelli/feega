@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { EditMode } from '$lib/motion/edit-mode';
+import { Ease } from '$lib/motion/design';
+import { setKeyframes } from '$lib/motion/timeline';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, setTransform, type OpResult } from '$lib/motion/timeline';
 import { setClipFlags } from '$lib/motion/organize';
@@ -22,7 +25,7 @@ const NO_KEYS = { shift: false, alt: false };
 const REACH = 8;
 const CORNER_BOTTOM_RIGHT = 2;
 
-const drag = (over: Partial<Drag>): Drag => ({ doc: DOC, ids: ['card'], frame: 0, boxes: BOXES, grip: Grip.Move, handle: 0, from: [900, 500], to: [900, 500], keys: NO_KEYS, reach: REACH, ...over });
+const drag = (over: Partial<Drag>): Drag => ({ doc: DOC, ids: ['card'], frame: 0, boxes: BOXES, grip: Grip.Move, handle: 0, from: [900, 500], to: [900, 500], keys: NO_KEYS, reach: REACH, mode: EditMode.Motion, ...over });
 const boundsOf = (doc: MotionDoc, id: string): Bounds => aabb(quadOf(doc, id, 0, BOXES[id]));
 const centre = (b: Bounds) => [(b.left + b.right) / 2, (b.top + b.bottom) / 2];
 
@@ -135,11 +138,40 @@ describe('dragClips', () => {
   });
 });
 
+describe('Design and Animate mode', () => {
+  const slide = must(
+    setKeyframes(DOC, 'card', 'x', [
+      { frame: 0, value: 0.3, ease: Ease.Linear },
+      { frame: 40, value: 0.6, ease: Ease.Linear }
+    ])
+  );
+  const keysOf = (doc: MotionDoc) => findClip(doc, 'card')!.clip.keyframes.x.map((k) => [k.frame, k.value]);
+  const moveRight = (mode: EditMode) => dragClips(drag({ doc: slide, frame: 20, mode, reach: 0, from: [0, 0], to: [192, 0] })).result;
+
+  it('Animate keys the moved prop at the playhead', () => {
+    expect(keysOf(must(moveRight(EditMode.Motion))).map(([frame]) => frame)).toEqual([0, 20, 40]);
+  });
+
+  it('Design adds no key: the whole animation shifts by the move', () => {
+    const next = keysOf(must(moveRight(EditMode.Design)));
+
+    expect(next.map(([frame]) => frame)).toEqual([0, 40]);
+    expect(next[0][1]).toBeCloseTo(0.4);
+    expect(next[1][1]).toBeCloseTo(0.7);
+  });
+
+  it('Design nudges an animated element without keying it', () => {
+    const next = must(nudgeClips(slide, ['card'], 20, [19.2, 0], EditMode.Design));
+
+    expect(keysOf(next).map(([frame]) => frame)).toEqual([0, 40]);
+  });
+});
+
 describe('nudgeClips', () => {
   it('moves the picked elements by whole frame pixels', () => {
     const before = boundsOf(DOC, 'card');
 
-    const after = boundsOf(must(nudgeClips(DOC, ['card'], 0, [10, -1])), 'card');
+    const after = boundsOf(must(nudgeClips(DOC, ['card'], 0, [10, -1], EditMode.Motion)), 'card');
 
     expect(after.left - before.left).toBeCloseTo(10);
     expect(after.top - before.top).toBeCloseTo(-1);
