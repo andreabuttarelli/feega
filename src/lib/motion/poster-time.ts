@@ -1,5 +1,3 @@
-export const POSTER_SHARE = 0.4;
+export const REST_SECOND = 0;
 
-export function posterSecond(doc: { durationInFrames: number; fps: number }): number {
-  return (doc.durationInFrames / doc.fps) * POSTER_SHARE;
-}
+export const posterSecond = (_doc: { durationInFrames: number; fps: number }): number => REST_SECOND;
