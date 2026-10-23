@@ -52,6 +52,20 @@ test.describe('a shared frame opens in a clean viewer @real', () => {
     await small.screenshot({ path: `${SHOTS}/share-frame-mobile-swiped.png` });
     await phone.close();
 
+    await page.goto(firstLink);
+    const into = page.getByLabel('Into project');
+    if (await into.count()) {
+      await into.selectOption(session.projectId);
+    }
+    await page.screenshot({ path: `${SHOTS}/share-frame-duplicate.png` });
+    await page.getByTestId('duplicate-frame').click();
+    await page.waitForURL(new RegExp(`/p/${session.projectId}/c/`));
+    const { data: nodes } = await admin.from('nodes').select('id').eq('project_id', session.projectId).eq('type', 'motion').not('id', 'in', `(${first.id},${second.id})`);
+    expect(nodes).toHaveLength(1);
+    const { data: copied } = await admin.from('motion_revisions').select('version').eq('node_id', nodes![0].id);
+    expect(copied?.length).toBeGreaterThan(0);
+    await page.screenshot({ path: `${SHOTS}/share-frame-duplicate-editor.png` });
+
     await admin.from('canvases').update({ share_token: null, shared_at: null }).eq('id', session.canvasId);
     for (const node of [first, second]) {
       await page.request.delete(`/api/v1/motion/${node.id}/embed`, { headers: bearer });

@@ -2,26 +2,17 @@ import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { galleryReader } from '$lib/server/gallery/reader';
 import { findGalleryItem } from '$lib/server/repos/gallery';
-import { listMemberships } from '$lib/server/repos/orgs';
-import { listProjects } from '$lib/server/repos/projects';
-import { chooseOrg, ORG_COOKIE } from '$lib/server/tenancy/context';
+import { standardTargets } from '$lib/server/projects/standard-targets';
+import { ORG_COOKIE } from '$lib/server/tenancy/context';
 import { toolScope } from '$lib/server/dashboard/tool-scope';
 import { remixInto } from '$lib/server/gallery/service';
 import { REMIX_STATUS } from '$lib/server/gallery/http';
 import { stashOAuthReturn } from '$lib/server/oauth';
 import { itemPath } from '$lib/gallery/model';
-import { ProjectMode } from '$lib/project-mode';
-import type { Db } from '$lib/server/db/client';
 
 const HTTP_SEE_OTHER = 303;
 const HTTP_NOT_FOUND = 404;
 const LOGIN_PATH = '/login';
-
-async function remixTargets(db: Db, userId: string, chosenOrg: string | null): Promise<{ id: string; name: string }[]> {
-  const membership = chooseOrg(await listMemberships(db, userId), chosenOrg);
-  const projects = membership ? await listProjects(db, membership.org.id) : [];
-  return projects.filter((p) => p.mode === ProjectMode.Standard).map((p) => ({ id: p.id, name: p.name }));
-}
 
 function toLogin(event: Pick<RequestEvent, 'cookies' | 'params'>): never {
   stashOAuthReturn(event.cookies, itemPath(event.params.id ?? ''));
@@ -35,7 +26,7 @@ export const load: PageServerLoad = async ({ locals, params, cookies, setHeaders
     throw error(HTTP_NOT_FOUND, 'This video is not in the gallery');
   }
   setHeaders({ 'cache-control': 'no-store' });
-  const projects = userId ? await remixTargets(db, userId, cookies.get(ORG_COOKIE) ?? null) : [];
+  const projects = userId ? await standardTargets(db, userId, cookies.get(ORG_COOKIE) ?? null) : [];
   return { item, signedIn: userId !== null, projects };
 };
 
