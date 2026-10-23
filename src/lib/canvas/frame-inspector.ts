@@ -20,25 +20,26 @@ import type { SelectionActionId } from './selection-actions';
 import { siblingsOf } from './frame-select';
 import { EditMode } from '$lib/motion/edit-mode';
 import { PropertiesView } from '$lib/motion/properties-view';
-import { viewOf, type CompPath } from '$lib/motion/precomp';
+import type { CompPath } from '$lib/motion/precomp';
+import { scopeView } from '$lib/motion/instance-view';
 import { scopeOf } from './frame-scope';
 import { isLockedComp } from '$lib/motion/template/library';
 import { createComponent, detachInstance, instanceOf, resetOverrides } from '$lib/motion/main-component';
 
-export type InspectorShown = { view: PropertiesView.Clip | PropertiesView.Template; clip: MotionClip; path: CompPath } | { view: PropertiesView.Multiple; clip: null; path: CompPath };
+export type InspectorShown = { view: PropertiesView.Clip | PropertiesView.Template; clip: MotionClip; path: CompPath; hosts: readonly string[] } | { view: PropertiesView.Multiple; clip: null; path: CompPath; hosts: readonly string[] };
 
 export function inspectorOf(doc: MotionDoc, selection: readonly string[]): InspectorShown | null {
   const present = selection.flatMap((id) => scopeOf(doc, id) ?? []);
   if (present.length > 1) {
-    return { view: PropertiesView.Multiple, clip: null, path: [] };
+    return { view: PropertiesView.Multiple, clip: null, path: [], hosts: [] };
   }
-  const path = present[0]?.scope.path ?? [];
-  const found = present.length === 1 ? findClip(viewOf(doc, path), present[0].id) : null;
+  const { path, hosts } = present[0]?.scope ?? { path: [], hosts: [] };
+  const found = present.length === 1 ? findClip(scopeView(doc, { path, hosts }), present[0].id) : null;
   if (!found) {
     return null;
   }
   const template = found.clip.component === 'Precomp' && isLockedComp(doc, String(found.clip.props.comp));
-  return { view: template ? PropertiesView.Template : PropertiesView.Clip, clip: found.clip, path };
+  return { view: template ? PropertiesView.Template : PropertiesView.Clip, clip: found.clip, path, hosts };
 }
 
 type BarCtx = { doc: MotionDoc; selection: readonly string[]; frame: number; newId: () => string };

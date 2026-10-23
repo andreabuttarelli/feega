@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, setTransform, type OpResult } from '$lib/motion/timeline';
+import { addClip, setProps, setTransform, type OpResult } from '$lib/motion/timeline';
 import { groupClips } from '$lib/motion/group';
+import { createComponent, innerClips, instanceOf } from '$lib/motion/main-component';
 import { Reach } from './frame-select';
 import { chainTarget, enteredFrom, parentPick, scopeOf, scoped } from './frame-scope';
 
@@ -65,6 +66,60 @@ describe('scoped', () => {
     const { doc, group, member } = grouped();
 
     expect(scoped(doc, [member('a'), group], 0)).toBeNull();
+  });
+});
+
+describe('scoped inside an instance', () => {
+  function instance() {
+    let n = 0;
+    const doc = must(createComponent(shape(shape(newMotionDoc(MotionFormat.Landscape), 'a', 0.2), 'b', 0.4), ['a', 'b'], () => `i${++n}`, 'Card'));
+    const host = doc.tracks.flatMap((t) => t.clips)[0].id;
+    return { doc, host, member: (id: string) => `${host}__0__${id}` };
+  }
+  const xOf = (doc: MotionDoc, id: string) => findClip(doc, id)!.clip.props.x;
+
+  it('an edit is recorded as an override of the instance and leaves the main alone', () => {
+    const { doc, host, member } = instance();
+    const s = scoped(doc, [member('a')], 0)!;
+    const merged = s.merge(must(setProps(s.view, 'a', { x: 0.9 })));
+
+    expect(instanceOf(merged, host)!.overrides).toEqual({ a: { x: 0.9 } });
+    expect(innerClips(instanceOf(merged, host)!.comp).find((c) => c.id === 'a')!.props.x).toBe(0.2);
+  });
+
+  it('a drag, which writes the transform, is recorded too', () => {
+    const { doc, host, member } = instance();
+    const s = scoped(doc, [member('a')], 0)!;
+    const merged = s.merge(must(setTransform(s.view, 'a', { x: 0.25 })));
+
+    expect(instanceOf(merged, host)!.overrides.a.transform).toMatchObject({ x: 0.25 });
+  });
+
+  it('shows the instance values, not the main ones, once overridden', () => {
+    const { doc, member } = instance();
+    const s = scoped(doc, [member('a')], 0)!;
+    const merged = s.merge(must(setProps(s.view, 'a', { x: 0.9 })));
+
+    expect(xOf(scoped(merged, [member('a')], 0)!.view, 'a')).toBe(0.9);
+  });
+
+  it('an element dragged back to the main value stops being an override', () => {
+    const { doc, host, member } = instance();
+    const s = scoped(doc, [member('a')], 0)!;
+    const moved = s.merge(must(setProps(s.view, 'a', { x: 0.9 })));
+    const again = scoped(moved, [member('a')], 0)!;
+    const back = again.merge(must(setProps(again.view, 'a', { x: 0.2 })));
+
+    expect(instanceOf(back, host)!.clip.props.overrides).toBeUndefined();
+  });
+
+  it('a plain group still edits its own comp', () => {
+    const { doc, group, member } = grouped();
+    const s = scoped(doc, [member('a')], 0)!;
+    const merged = s.merge(must(setProps(s.view, 'a', { x: 0.9 })));
+
+    expect(findClip(merged, group)!.clip.props.overrides).toBeUndefined();
+    expect(xOf(scoped(merged, [member('a')], 0)!.view, 'a')).toBe(0.9);
   });
 });
 
