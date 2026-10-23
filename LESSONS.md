@@ -3238,3 +3238,8 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## `npx prettier --write` rewrites whole files
 
 **Signal:** a small diff becomes thousands of lines, single quotes turn double. **Move:** the repo has no prettier config; never run prettier. Lost edits staged once survive as unreachable blobs: `git fsck --unreachable --no-reflogs`, match by identifier set.
+
+## A tool-surface pin goes red on dev without any of your files
+
+**Signal:** CI `test` fails on `tool-surface-pin.test.ts` and `cli/mcp/tool-list-pin.test.ts` ("Snapshot ... mismatched", only a fingerprint differs) and the same two fail on `origin/dev` itself. **Move:** a tool description or schema change anywhere moves the hash; regenerate both pins in your PR (`vitest run src/lib/server/edit/tool-surface-pin.test.ts -u`; for the cli one `bun test` prints the new fingerprint, edit both entries by hand: `--update-snapshots` rewrites the file as Bun format and drops the vitest key CI reads).
+
