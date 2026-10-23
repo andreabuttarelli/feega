@@ -23,8 +23,7 @@ import { elementFills } from '../fill/elements';
 import { textPaint } from '../fill/render';
 import { elementStrokes } from '../stroke/elements';
 import { textStroke } from '../stroke/render';
-import { LIST_STEP_EM, MARKER_GAP_EM, markersOf } from '../text-lists';
-import { segmentsOf, type RunCase, type TextRun } from '../text-runs';
+import { textBody } from './text-body';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
 
@@ -75,7 +74,6 @@ export const INK = { paper: '#ffffff', paper2: '#f5f5f3', line: '#e4e4e2', ink: 
 
 const JUSTIFY: Record<TextAlign, string> = { left: 'flex-start', center: 'center', right: 'flex-end', justify: 'stretch' };
 const VERTICAL: Record<VerticalAlign, string> = { top: 'flex-start', center: 'center', bottom: 'flex-end' };
-const EMPTY_LINE = '&#8203;';
 const REVEAL = 16;
 const LINE_STAGGER = 5;
 const FADE = 18;
@@ -143,78 +141,6 @@ const glyphPaint = (ctx: GlyphCtx, component: string) => textPaint(elementFills(
 const glyphStroke = (ctx: GlyphCtx & { unit: number }, component: string) => textStroke(elementStrokes(component, ctx.p), ctx.unit, ctx.color);
 const glyphStyle = (paint: Record<string, string>) => (paint.backgroundImage ? ` style="${css(paint)}"` : '');
 const glyphWrap = (paint: Record<string, string>, html: string) => (paint.backgroundImage ? `<span${glyphStyle(paint)}>${html}</span>` : html);
-
-const EM_PRECISION = 10000;
-const RUN_TRANSFORM: Record<RunCase, string> = { 'as-typed': 'none', upper: 'uppercase', lower: 'lowercase' };
-
-function runPaint(ctx: TemplateCtx<'Text'>, run: TextRun): Record<string, string | undefined> {
-  if (run.fill) {
-    return textPaint([run.fill], ctx.color, ctx.asset);
-  }
-  const colour = run.color ? ctx.color(run.color) : undefined;
-  return { color: colour, webkitTextFillColor: colour };
-}
-
-function runCss(ctx: TemplateCtx<'Text'>, run: TextRun): string {
-  const family = run.font ?? ctx.p.font;
-  return css({
-    ...runPaint(ctx, run),
-    fontFamily: run.font === undefined ? undefined : ctx.font(run.font),
-    fontSize: run.size === undefined ? undefined : `${Math.round((run.size / ctx.p.size) * EM_PRECISION) / EM_PRECISION}em`,
-    fontWeight: run.weight === undefined ? undefined : ctx.weight(family, run.weight),
-    fontStyle: run.italic === undefined ? undefined : run.italic ? 'italic' : 'normal',
-    letterSpacing: run.tracking === undefined ? undefined : `${run.tracking}em`,
-    lineHeight: run.leading,
-    textDecoration: run.underline || run.strike || run.link ? [run.underline || run.link ? 'underline' : '', run.strike ? 'line-through' : ''].filter(Boolean).join(' ') : undefined,
-    textTransform: run.textCase === undefined ? undefined : RUN_TRANSFORM[run.textCase],
-    opacity: run.opacity
-  });
-}
-
-function runHtml(ctx: TemplateCtx<'Text'>, run: TextRun, html: string): string {
-  const style = runCss(ctx, run);
-  return run.link ? `<a href="${esc(run.link)}" target="_blank" rel="noopener noreferrer" style="color:inherit;${style}">${html}</a>` : `<span style="${style}">${html}</span>`;
-}
-
-function runParagraphs(ctx: TemplateCtx<'Text'>): string[] {
-  const paragraphs: string[] = [''];
-  for (const segment of segmentsOf(ctx.p.text, ctx.p.runs)) {
-    segment.text.split('\n').forEach((piece, i) => {
-      if (i > 0) {
-        paragraphs.push('');
-      }
-      const html = esc(piece);
-      paragraphs[paragraphs.length - 1] += segment.run && piece ? runHtml(ctx, segment.run, html) : html;
-    });
-  }
-  return paragraphs;
-}
-
-const paragraphsOf = (ctx: TemplateCtx<'Text'>): string[] => (!ctx.p.runs?.length || ctx.text.id !== null ? ctx.text.lines(ctx.p.text) : runParagraphs(ctx));
-
-function listMarker(marker: string, level: number): string {
-  const style = css({ position: 'absolute', left: '0', width: `${emOf((level + 1) * LIST_STEP_EM - MARKER_GAP_EM)}em`, textAlign: 'right', textIndent: '0', whiteSpace: 'nowrap' });
-  return `<span style="${style}">${marker}</span>`;
-}
-
-const emOf = (n: number) => Math.round(n * EM_PRECISION) / EM_PRECISION;
-
-function textBody(ctx: TemplateCtx<'Text'>): string {
-  const paragraphs = paragraphsOf(ctx);
-  const { paragraphSpacing: spacing, paragraphIndent: indent, lists } = ctx.p;
-  const markers = markersOf(lists ?? []);
-  if (!spacing && !indent && !markers.some(Boolean)) {
-    return paragraphs.join('\n');
-  }
-  return paragraphs
-    .map((html, i) => {
-      const marker = markers[i];
-      const level = lists?.[i]?.level ?? 0;
-      const style = css({ position: marker ? 'relative' : undefined, paddingLeft: marker ? `${emOf((level + 1) * LIST_STEP_EM)}em` : undefined, textIndent: `${indent}em`, marginBottom: `${i < paragraphs.length - 1 ? spacing : 0}em` });
-      return `<div style="${style}">${marker ? listMarker(marker, level) : ''}${html || EMPTY_LINE}</div>`;
-    })
-    .join('');
-}
 
 const Title: Template<'Title'> = {
   timing: Timing.Wrapper,
