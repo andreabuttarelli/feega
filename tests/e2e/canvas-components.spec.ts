@@ -4,7 +4,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 const SHOTS = process.env.FIG_SHOTS ?? `${homedir()}/Documents/feega-videos/e2e`;
 const SETTLE_MS = 2500;
 
-const doc = {
+const docWith = (clip: unknown) => ({
   version: 5,
   fps: 30,
   width: 1920,
@@ -12,12 +12,16 @@ const doc = {
   durationInFrames: 150,
   background: 'brand',
   still: { frame: 0 },
-  tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 'label', component: 'Text', from: 0, durationInFrames: 150, props: { text: 'Buy now', size: 0.12, x: 0.5, y: 0.5, width: 0.6, height: 0.25 } }] }],
+  tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [clip] }],
   comps: {},
   assets: []
-};
+});
 
-type Clip = { component: string; props: { comp?: string; overrides?: Record<string, { text?: string }> } };
+const doc = docWith({ id: 'label', component: 'Text', from: 0, durationInFrames: 150, props: { text: 'Buy now', size: 0.12, x: 0.5, y: 0.5, width: 0.6, height: 0.25 } });
+const BLUE = '#2244ff';
+const boxDoc = docWith({ id: 'box', component: 'Shape', from: 0, durationInFrames: 150, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.5, height: 0.5, fills: [{ type: 'solid', color: BLUE, opacity: 1, visible: true, blend: 'normal' }] } });
+
+type Clip = { component: string; hidden?: boolean; props: { comp?: string; overrides?: Record<string, { text?: string; hidden?: boolean; fills?: { color: string }[] }> } };
 type Head = { tracks: { clips: Clip[] }[]; comps: Record<string, { component?: { name: string } }> };
 
 test.describe('components inside a canvas frame @real', () => {
@@ -51,5 +55,46 @@ test.describe('components inside a canvas frame @real', () => {
     const instance = head.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!;
     expect(head.comps[instance.props.comp!].component?.name).toBe('Component 1');
     expect(instance.props.overrides?.label?.text).toBe('Sold out');
+  });
+
+  test('an instance recolours and hides an element, each with its own reset', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(150_000);
+    const frame = await seedNode({ type: 'motion', x: 80, y: 80, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frame.id, version: 1, doc: boxDoc, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const host = page.locator(`[data-testid="frame-overlays"] [data-frame="${frame.id}"]`);
+    await expect(host).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(SETTLE_MS);
+    const box = (await host.boundingBox())!;
+    await page.mouse.click(box.x + 4, box.y + 4);
+    await page.waitForTimeout(SETTLE_MS);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+
+    await page.keyboard.press('Alt+Meta+k');
+    await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('instance-fill').fill('#ff0000');
+    await expect(page.getByTestId('instance-reset-fills')).toBeVisible();
+    await page.waitForTimeout(SETTLE_MS);
+    await page.screenshot({ path: `${SHOTS}/w2a-1-fill-override.png` });
+
+    await page.getByTestId('instance-visible').uncheck();
+    await expect(page.getByTestId('instance-reset-hidden')).toBeVisible();
+    await page.waitForTimeout(SETTLE_MS);
+    await page.screenshot({ path: `${SHOTS}/w2a-1-hidden-override.png` });
+
+    const saved = async () => {
+      const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', frame.id).order('version', { ascending: false }).limit(1);
+      const head = data?.[0]?.doc as Head;
+      return head.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!.props.overrides?.box;
+    };
+    await expect.poll(saved, { timeout: 20_000 }).toMatchObject({ hidden: true, fills: [{ color: '#ff0000' }] });
+
+    await page.getByTestId('instance-reset-hidden').click();
+    await expect(page.getByTestId('instance-reset-hidden')).toHaveCount(0);
+    await page.waitForTimeout(SETTLE_MS);
+    await page.screenshot({ path: `${SHOTS}/w2a-1-hidden-reset.png` });
+    await expect.poll(saved, { timeout: 20_000 }).toEqual({ fills: [expect.objectContaining({ color: '#ff0000' })] });
   });
 });

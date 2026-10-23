@@ -1,7 +1,7 @@
 <script lang="ts">
   import Diamond from '@lucide/svelte/icons/diamond';
   import type { MotionDoc } from '$lib/motion/doc';
-  import { instanceOf, instanceTexts, overrideInstance } from '$lib/motion/main-component';
+  import { Paint, instanceElements, instanceOf, instanceTexts, overrideInstance, recolorInstance, resetOverride } from '$lib/motion/main-component';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { addVariant, pickVariant, swapInstance, variantProps } from '$lib/motion/variants';
 
@@ -9,6 +9,8 @@
 
   const instance = $derived(instanceOf(doc, clipId));
   const texts = $derived(instanceTexts(doc, clipId));
+  const elements = $derived(instanceElements(doc, clipId));
+  const images = $derived(doc.assets.filter((a) => a.kind === 'image'));
   const props = $derived(instance ? variantProps(doc, instance.compId) : {});
   const mains = $derived(Object.entries(doc.comps).filter(([, c]) => c.component));
   const VARIANT_KEY = 'Variant';
@@ -28,6 +30,16 @@
     applied(addVariant(doc, instance.compId, { [key]: `${VARIANT_KEY} ${count}` }, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
   }
 
+  function change(result: ReturnType<typeof overrideInstance>, summary: string) {
+    if (result.ok) {
+      onchange(result.doc, summary);
+    }
+  }
+
+  const reset = (innerId: string, key: string) => change(resetOverride(doc, clipId, innerId, key), 'Reset an override');
+  const recolor = (innerId: string, paint: Paint, color: string) => change(recolorInstance(doc, clipId, innerId, paint, color), 'Overrode instance colour');
+  const override = (innerId: string, props: Record<string, unknown>) => change(overrideInstance(doc, clipId, innerId, props), 'Overrode instance property');
+
   function retext(innerId: string, text: string) {
     const result = overrideInstance(doc, clipId, innerId, { text });
     if (result.ok) {
@@ -46,7 +58,48 @@
       <label class="field">
         <span class:overridden={t.overridden}>{t.main}</span>
         <input type="text" value={t.value} data-testid="instance-text" onchange={(e) => retext(t.innerId, e.currentTarget.value)} />
+        {#if t.overridden}<button type="button" class="reset" data-testid="instance-reset-text" onclick={() => reset(t.innerId, 'text')}>Reset</button>{/if}
       </label>
+    {/each}
+    {#each elements as el, i (el.innerId)}
+      <div class="element" data-testid="instance-element" data-inner={el.innerId}>
+        <span class="label">{el.component} {i + 1}</span>
+        {#if el.fill}
+          <label class="field">
+            <span class:overridden={el.overridden.includes('fills')}>Fill</span>
+            <input type="color" value={el.fill} data-testid="instance-fill" onchange={(e) => recolor(el.innerId, Paint.Fill, e.currentTarget.value)} />
+            {#if el.overridden.includes('fills')}<button type="button" class="reset" data-testid="instance-reset-fills" onclick={() => reset(el.innerId, 'fills')}>Reset</button>{/if}
+          </label>
+        {/if}
+        {#if el.stroke}
+          <label class="field">
+            <span class:overridden={el.overridden.includes('strokes')}>Stroke</span>
+            <input type="color" value={el.stroke} data-testid="instance-stroke" onchange={(e) => recolor(el.innerId, Paint.Stroke, e.currentTarget.value)} />
+            {#if el.overridden.includes('strokes')}<button type="button" class="reset" data-testid="instance-reset-strokes" onclick={() => reset(el.innerId, 'strokes')}>Reset</button>{/if}
+          </label>
+        {/if}
+        {#if el.assetId !== null}
+          <label class="field">
+            <span class:overridden={el.overridden.includes('assetId')}>Image</span>
+            <select value={el.assetId} data-testid="instance-image" onchange={(e) => override(el.innerId, { assetId: e.currentTarget.value })}>
+              {#each images as a (a.id)}<option value={a.id}>{a.label ?? a.id}</option>{/each}
+            </select>
+            {#if el.overridden.includes('assetId')}<button type="button" class="reset" data-testid="instance-reset-assetId" onclick={() => reset(el.innerId, 'assetId')}>Reset</button>{/if}
+          </label>
+        {/if}
+        <label class="field">
+          <span class:overridden={el.overridden.includes('hidden')}>Visible</span>
+          <input type="checkbox" checked={!el.hidden} data-testid="instance-visible" onchange={(e) => override(el.innerId, { hidden: !e.currentTarget.checked })} />
+          {#if el.overridden.includes('hidden')}<button type="button" class="reset" data-testid="instance-reset-hidden" onclick={() => reset(el.innerId, 'hidden')}>Reset</button>{/if}
+        </label>
+        {#if el.effects > 0 || el.overridden.includes('effects')}
+          <label class="field">
+            <span class:overridden={el.overridden.includes('effects')}>Effects</span>
+            <input type="checkbox" checked={el.effects > 0} data-testid="instance-effects" onchange={(e) => (e.currentTarget.checked ? reset(el.innerId, 'effects') : override(el.innerId, { effects: [] }))} />
+            {#if el.overridden.includes('effects')}<button type="button" class="reset" data-testid="instance-reset-effects" onclick={() => reset(el.innerId, 'effects')}>Reset</button>{/if}
+          </label>
+        {/if}
+      </div>
     {/each}
     {#each Object.entries(props) as [key, values] (key)}
       <label class="field">
@@ -92,9 +145,30 @@
     color: var(--ui-text);
   }
 
+  .element {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-1);
+  }
+
+  .label {
+    font-size: var(--ui-type-caption);
+    font-weight: 600;
+    color: var(--ui-text);
+  }
+
+  .reset {
+    padding: 0 6px;
+    border: 0;
+    background: transparent;
+    color: #9747ff;
+    font-size: var(--ui-type-caption);
+    cursor: pointer;
+  }
+
   .field {
     display: grid;
-    grid-template-columns: 1fr 2fr;
+    grid-template-columns: 1fr 2fr auto;
     align-items: center;
     gap: var(--ui-space-2);
     font-size: var(--ui-type-caption);
