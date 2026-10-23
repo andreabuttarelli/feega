@@ -13,7 +13,11 @@ export enum ComponentAction {
   Place = 'place',
   Detach = 'detach',
   AddVariant = 'add-variant',
-  Swap = 'swap'
+  Swap = 'swap',
+  DefineProp = 'define-prop',
+  RemoveProp = 'remove-prop',
+  SetProp = 'set-prop',
+  ResetPropValue = 'reset-prop-value'
 }
 
 export const COMPONENT_ACTIONS = Object.values(ComponentAction) as [ComponentAction, ...ComponentAction[]];
