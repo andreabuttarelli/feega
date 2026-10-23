@@ -8,11 +8,12 @@
   import { tileHovered } from '$lib/canvas/layers';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
 
-  let { tile, selected, full, painted = false, resizable = false, onrotate, knobDrawn = false }: { tile: Tile; selected: boolean; full: boolean; painted?: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void; knobDrawn?: boolean } = $props();
+  let { tile, selected, full, painted = false, resizable = false, onrotate, knobDrawn = false, onaddbeside, showAdd = false }: { tile: Tile; selected: boolean; full: boolean; painted?: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void; knobDrawn?: boolean; onaddbeside?: (id: string) => void; showAdd?: boolean } = $props();
 
   const CORNERS = ['top left', 'top right', 'bottom left', 'bottom right'] as const;
 
   const SNAP_DEG = 15;
+  let overPlus = $state(false);
   const spaced = (i: number, n: number) => `${((i + 1) / (n + 1)) * 100}%`;
   const kind = $derived(tile.kind && isNodeType(tile.kind) ? tile.kind : null);
   const Icon = $derived(kind ? NODE_KIND_ICON[kind] : null);
@@ -82,11 +83,40 @@
   {/each}
 {/if}
 
+{#if onaddbeside && (showAdd || overPlus)}
+  <button type="button" class="add-beside nodrag nopan" onpointerenter={() => (overPlus = true)} onpointerleave={() => (overPlus = false)} aria-label="Add a frame beside" title="Add a frame of the same size" data-testid="add-frame-beside" onpointerdown={(e) => e.stopPropagation()} onclick={() => onaddbeside(tile.id)}>+</button>
+{/if}
+
 {#if selected && tile.rotatable && onrotate}
   <button type="button" class="rotate-handle nodrag nopan" class:drawn={knobDrawn} aria-label="Rotate" data-testid="rotate-handle" onpointerdown={startRotate}></button>
 {/if}
 
 <style>
+  .add-beside {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 8px);
+    z-index: 5;
+    width: 24px;
+    height: 24px;
+    translate: 0 -50%;
+    pointer-events: all;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--ui-line);
+    border-radius: var(--ui-radius-full, 9999px);
+    background: var(--ui-surface, #fff);
+    color: var(--ui-ink);
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .add-beside:hover {
+    background: var(--ui-hover);
+  }
+
   .port-layer {
     display: contents;
   }

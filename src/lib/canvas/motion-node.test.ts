@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath, holdsDoc } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, tileFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath, holdsDoc } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -185,6 +185,11 @@ describe('a custom frame takes the size the hand gives it', () => {
     expect(heightFollowsDoc(preset)).toBe(true);
     expect(heightFollowsDoc(custom)).toBe(false);
     expect(heightFollowsDoc(element)).toBe(false);
+  });
+
+  it('a custom frame also grows to the doc when the doc was set to a frame preset', () => {
+    expect(tileFollowsDoc(custom, { width: 393, height: 852 })).toBe(true);
+    expect(tileFollowsDoc(custom, { width: 500, height: 500 })).toBe(false);
   });
 
   it('a preset frame takes any ratio the hand gives it', () => {

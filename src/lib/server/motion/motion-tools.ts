@@ -162,6 +162,7 @@ import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCamer
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
+import { FRAME_PRESETS, PRESET_SIZE } from '$lib/motion/frame-presets';
 import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '$lib/motion/layout/model';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
@@ -2331,6 +2332,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to ${MAX_SHORT_SIDE}; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor. layout_guides replaces the frame's layout guides (columns/rows: count, gutter, margin px; grid: size px; [] removes them): drawn over the frame in the editor, never in the export, and layers snap to their edges.`,
       inputSchema: z.object({
         format: z.enum(MOTION_FORMATS).optional(),
+        preset: z.enum(FRAME_PRESETS).optional().describe('a device, paper or social size: phone, tablet, desktop, presentation, watch, paper, social; layers pinned with constraints keep their edge distance'),
         width: z.number().int().min(DESIGN_MIN_SIDE).max(DESIGN_MAX_SIDE).optional(),
         height: z.number().int().min(DESIGN_MIN_SIDE).max(DESIGN_MAX_SIDE).optional(),
         duration: z.number().positive().max(MAX_SECONDS).optional(),
@@ -2347,7 +2349,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const early = typeof input.still === 'number' ? designStill(session.doc, input.still) : ({ ok: true, doc: session.doc } as OpResult);
         const animated = !early.ok || input.still !== false ? early : animateStill(early.doc, input.duration);
         const paced = !animated.ok || input.fps === undefined ? animated : setFrameRate(animated.doc, input.fps);
-        const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
+        const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.preset ? PRESET_SIZE[input.preset] : input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         const guided = pinned.ok && input.layout_guides ? setLayoutGuides(pinned.doc, input.layout_guides) : pinned;
         return apply(guided, 'changed the canvas');

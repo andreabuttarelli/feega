@@ -404,6 +404,7 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'poster arrow shown, colour': motion('set_props'),
   'insert photo into a poster': motion('add_clip'),
   'still or video, format, duration, fps, background': motion('set_canvas'),
+  'frame size preset: phone, tablet, desktop, presentation, watch, paper, social': motion('set_canvas'),
   'custom format: width × height, frame resized on the canvas': motion('set_canvas'),
   'add or move a keyframe': motion('set_keyframes'),
   'keyframe ease': motion('set_ease_handles'),

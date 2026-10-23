@@ -114,7 +114,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
   import { frameHolding, type FrameHold } from '$lib/canvas/frame-holding';
-  import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
@@ -130,7 +130,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { TextSizing } from '$lib/motion/text-sizing';
-  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, heightFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
@@ -470,8 +470,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return id;
   }
 
+  let lastFrameSide: { width: number; height: number } | null = null;
+
+  async function addFrameBeside(id: string) {
+    const tile = nodes.find((n) => n.id === id);
+    if (tile) {
+      await drawFrame({ box: besideBox(tile) });
+    }
+  }
+
   async function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }) {
-    const box = 'box' in target ? target.box : defaultFrameBox(target.at);
+    const box = 'box' in target ? target.box : defaultFrameBox(target.at, lastFrameSide);
+    lastFrameSide = { width: box.width, height: box.height };
     const id = crypto.randomUUID();
     nodes = [...nodes, toTile(drawnFrameTile(id, box))];
     void saveFrame(id, box);
@@ -2346,7 +2356,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const open = layersSource.video;
     const row = open ? untrack(() => nodes.find((node) => node.id === open.nodeId)) : null;
     const motion = row ? motionOf(row) : null;
-    if (!open || !row || !motion || !heightFollowsDoc(motion)) {
+    if (!open || !row || !motion || !tileFollowsDoc(motion, open.doc)) {
       return;
     }
     const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motion.kind);
@@ -3578,6 +3588,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDraw={drawElement}
     onDrawFrame={drawFrame}
     onRotate={rotateGroupBy}
+    onAddBeside={addFrameBeside}
     onGroup={groupElements}
     onUngroup={ungroupElements}
     onRestack={restack}

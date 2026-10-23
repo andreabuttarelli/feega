@@ -18,7 +18,11 @@ const pickable = (d: Drawn) => (d.paint.kind !== PaintKind.Html || d.layer.bound
 
 const holds = (d: Drawn, p: Point) => inside(d.quad, p) && d.clips.every((c) => inside(c, p));
 
-const topAt = (scene: Scene, point: Point, time: number) => placedAt(scene, time).filter(pickable).findLast((d) => holds(d, point));
+const holding = (scene: Scene, point: Point, time: number) => placedAt(scene, time).filter(pickable).filter((d) => holds(d, point));
+
+const topAt = (scene: Scene, point: Point, time: number) => holding(scene, point, time).at(-1);
+
+export const pickStackAt = (scene: Scene, point: Point, time: number): string[] => holding(scene, point, time).map((d) => d.clip).reverse();
 
 export function pickAt(scene: Scene, point: Point, time: number): string | null {
   return topAt(scene, point, time)?.clip ?? null;

@@ -49,15 +49,7 @@
 <svelte:window onpointerdown={outside} onkeydown={(e) => e.key === 'Escape' && onclose()} />
 
 {#if items.length || pickable.length}
-  <div class={MENU_CONTENT} role="menu" data-testid="canvas-menu" style={`position: fixed; z-index: 30; min-width: 200px; left: ${at.x}px; top: ${at.y}px`}>
-    {#each items as item (item.id)}
-      {@const Icon = SELECTION_ACTION_ICON[item.id]}
-      <button type="button" role="menuitem" class={MENU_ITEM} data-action={item.id} onclick={() => pick(item.id)}>
-        <Icon aria-hidden="true" />
-        <span class="min-w-0 flex-1 truncate">{item.label}</span>
-        {#if item.shortcut}<Kbd shortcut={item.shortcut} class="text-ui-text-3" />{/if}
-      </button>
-    {/each}
+  <div class={MENU_CONTENT} role="menu" data-testid="canvas-menu" onclick={(e) => e.stopPropagation()} onpointerdown={(e) => e.stopPropagation()} style={`position: fixed; z-index: 30; min-width: 200px; left: ${at.x}px; top: ${at.y}px`}>
     {#if pickable.length}
       <div class="px-2 pt-2 pb-1 text-ui-caption text-ui-text-3" role="presentation">Select layer</div>
       {#each pickable as layer (layer.id)}
@@ -67,5 +59,13 @@
         </button>
       {/each}
     {/if}
+    {#each items as item (item.id)}
+      {@const Icon = SELECTION_ACTION_ICON[item.id]}
+      <button type="button" role="menuitem" class={MENU_ITEM} data-action={item.id} onclick={() => pick(item.id)}>
+        <Icon aria-hidden="true" />
+        <span class="min-w-0 flex-1 truncate">{item.label}</span>
+        {#if item.shortcut}<Kbd shortcut={item.shortcut} class="text-ui-text-3" />{/if}
+      </button>
+    {/each}
   </div>
 {/if}

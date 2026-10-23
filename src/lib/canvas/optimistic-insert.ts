@@ -1,6 +1,6 @@
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
-import { MOTION_NODE_BAR_H, atFirstRevision, motionNodeSize, drawnFrameNodeOf, elementNodeOf, frameNodeOf } from './motion-node';
-import { MotionFormat, type MotionDoc } from '$lib/motion/doc';
+import { MOTION_NODE_BAR_H, atFirstRevision, drawnFrameNodeOf, elementNodeOf, frameNodeOf } from './motion-node';
+import type { MotionDoc } from '$lib/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { drawnElement, drawnOf, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
 import { PENDING_FRAME_TYPE } from './pending-frame';
@@ -104,9 +104,14 @@ export function drawnFrameTile(id: string, box: CanvasBox): CanvasNodeRecord {
   };
 }
 
-export function defaultFrameBox(at: { x: number; y: number }): CanvasBox {
-  const node = motionNodeSize(MotionFormat.Landscape);
-  const width = node.w;
-  const height = node.h - MOTION_NODE_BAR_H;
+export const FIRST_FRAME_SIDE = 100;
+export const FRAME_GAP = 40;
+
+type Side = { width: number; height: number };
+
+export function defaultFrameBox(at: { x: number; y: number }, last: Side | null): CanvasBox {
+  const { width, height } = last ?? { width: FIRST_FRAME_SIDE, height: FIRST_FRAME_SIDE };
   return { left: at.x - width / 2, top: at.y - height / 2, width, height };
 }
+
+export const besideBox = (tile: { x: number; y: number; w: number; h: number }): CanvasBox => ({ left: tile.x + tile.w + FRAME_GAP, top: tile.y, width: tile.w, height: tile.h - MOTION_NODE_BAR_H });
