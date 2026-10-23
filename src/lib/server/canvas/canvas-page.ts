@@ -48,6 +48,7 @@ import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/c
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { RestoreOutcome, listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
 import { CommentOutcome, addComment, listComments, resolveThread } from '$lib/server/canvas/canvas-comments';
 import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
@@ -1459,6 +1460,24 @@ export const actions: Actions<CanvasParams> = {
     });
 
     return out;
+  },
+
+  saveCanvasVersion: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    return { version: await saveCanvasVersion(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, name: String(fd.get('name') ?? ''), actor: userActor(scope) }) };
+  },
+
+  canvasVersions: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    return { versions: await listCanvasVersions(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
+  },
+
+  restoreCanvasVersion: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const out = await restoreCanvasVersion(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, versionId: String(fd.get('version_id') ?? ''), actor: userActor(scope) });
+    return out.outcome === RestoreOutcome.Restored ? out : fail(404, { error: out.outcome });
   },
 
   canvasComments: async ({ params, locals }) => {
