@@ -40,6 +40,8 @@ export const hoverHostOf = (body: TileBody): HoverHost => HOVER_HOST[body];
 
 export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];
 
+export const leftEmpty = (kind: FrameKind, doc: { tracks: { clips: unknown[] }[] }): boolean => !CHROME[kind].takesDrops && doc.tracks.every((t) => t.clips.length === 0);
+
 export type MotionNode = {
   id: string;
   kind: FrameKind;
