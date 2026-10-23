@@ -336,7 +336,7 @@
         return [];
       }
       const on = selected.includes(t.id);
-      const chrome = nodeChrome(t.id, on, layersSource.video);
+      const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
       const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
@@ -1673,6 +1673,7 @@
     const node = summaries.get(id);
     return node && holdsDoc(node.type) ? docKindOf(node.type, node.data.kind) : FrameKind.Frame;
   };
+  const typedFreeText = () => (typing && kindOfNode(typing.nodeId) === FrameKind.Element ? typing.nodeId : null);
 
   const timeline = $derived.by(() => {
     const nodeId = inside?.nodeId;
@@ -1864,6 +1865,7 @@
       return;
     }
     if (fit.node) {
+      await saver.flushPending();
       props.onResize?.(nodeId, fit.node.w, fit.node.h);
       return;
     }
