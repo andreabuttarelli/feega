@@ -1,6 +1,6 @@
 import { ungroupClip } from '$lib/motion/group';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
-import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, stylesOf } from '$lib/motion/styles';
+import { StyleAction, StyleKind, StyleSlot, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, saveAsStyle, stylesOf } from '$lib/motion/styles';
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { VariableAction, addMode, bindVariable, defineVariable, removeVariable, setActiveMode, unbindVariable } from '$lib/motion/variables';
 import { VARIABLE_NAME, VarType, type VarInput } from '$lib/motion/variables-model';
@@ -426,6 +426,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
+        effectStyleRef: c.effectStyleRef ?? null,
         bind: c.bind ?? null,
         expressions: c.expressions,
         effects: c.effects,
@@ -872,12 +873,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return laid.ok ? `${cues.length} sound effects on the SFX track` : laid.error;
   };
 
-  type StyleInput = { name?: string; to?: string; style?: unknown; clip_ids?: string[] };
+  type StyleInput = { name?: string; to?: string; style?: unknown; clip_ids?: string[]; kind?: StyleKind; slot?: StyleSlot };
   const named = (input: StyleInput) => input.name ?? '';
   const STYLE_ACTIONS: Record<StyleAction, (input: StyleInput) => unknown> = {
     [StyleAction.Define]: (input) => apply(defineStyle(session.doc, named(input), input.style), `style ${named(input)}`),
     [StyleAction.Apply]: (input) => apply(applyStyle(session.doc, input.clip_ids ?? [], named(input)), `style ${named(input)} on ${(input.clip_ids ?? []).join(', ')}`),
-    [StyleAction.Detach]: (input) => apply(detachStyle(session.doc, input.clip_ids ?? []), `detached ${(input.clip_ids ?? []).join(', ')}`),
+    [StyleAction.Detach]: (input) => apply(detachStyle(session.doc, input.clip_ids ?? [], input.slot), `detached ${(input.clip_ids ?? []).join(', ')}`),
+    [StyleAction.Save]: (input) => apply(saveAsStyle(session.doc, input.clip_ids?.[0] ?? '', named(input), input.kind ?? StyleKind.Colour), `saved style ${named(input)}`),
     [StyleAction.Rename]: (input) => apply(renameStyle(session.doc, named(input), input.to ?? ''), `renamed style ${named(input)} to ${input.to}`),
     [StyleAction.Remove]: (input) => apply(removeStyle(session.doc, named(input)), `removed style ${named(input)}`),
     [StyleAction.List]: () => ({ styles: stylesOf(session.doc) })
@@ -2150,8 +2152,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     named_style: tool({
-      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color, or kind ${StyleKind.Colour} with color; editing restyles every clip using it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill. detach (clip_ids) unlinks them, keeping their look. remove (name) deletes a style. rename (name, to) renames it, elements stay linked. list returns the styles with their clips (also in get_motion_doc).`,
-      inputSchema: z.object({ action: z.enum(StyleAction), name: z.string().regex(STYLE_NAME).optional(), style: styleSchema.optional(), clip_ids: z.array(z.string()).optional(), to: z.string().regex(STYLE_NAME).optional() }),
+      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color; kind ${StyleKind.Colour} with color; kind ${StyleKind.Paint} with fills (gradient or image fill stack, as set_props fills); kind ${StyleKind.Effect} with effects (shadows, blurs: effect stack as add_effect, each {id, kind, enabled, params}); editing restyles every clip using it. save (name, clip_ids [one clip], kind) makes a style from that clip's current look and links it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill, a paint style to any clip with fills, an effect style to any visual clip (its own slot: a clip keeps one effect style next to one text, colour or paint style). detach (clip_ids, slot ${Object.values(StyleSlot).join('|')} optional: both when omitted) unlinks them, keeping their look. remove (name) deletes a style. rename (name, to) renames a style of any kind, elements stay linked. list returns the styles with their clips (also in get_motion_doc).`,
+      inputSchema: z.object({ action: z.enum(StyleAction), name: z.string().regex(STYLE_NAME).optional(), style: styleSchema.optional(), clip_ids: z.array(z.string()).optional(), to: z.string().regex(STYLE_NAME).optional(), kind: z.enum(StyleKind).optional(), slot: z.enum(StyleSlot).optional() }),
       execute: async (input) => STYLE_ACTIONS[input.action](input)
     }),
 

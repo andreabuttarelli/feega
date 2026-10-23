@@ -74,4 +74,23 @@ describe('the canvas styles library over MCP', () => {
     expect(await canvasStyle(store, { name: 'Brand', to: 'Primary' })).toMatchObject({ ok: false });
     expect(store.docs.a.styles).toEqual({ Brand: RED });
   });
+
+  it('an effect style of one frame lands on an element of another', async () => {
+    const lifted = { kind: StyleKind.Effect, effects: [{ id: 'sh', kind: 'drop-shadow', enabled: true, params: { blur: 20 } }] } as const;
+    const store = frames({ a: must(defineStyle(textDoc(), 'Lifted', lifted)), b: textDoc() });
+    const out = await canvasStyle(store, { name: 'Lifted', ids: ['b:t'] });
+    expect(out).toMatchObject({ ok: true });
+    expect(findClip(store.docs.b, 't')!.clip.effects).toMatchObject([{ kind: 'drop-shadow', params: { blur: 20 } }]);
+    expect(findClip(store.docs.b, 't')!.clip.effectStyleRef).toBe('Lifted');
+  });
+
+  it('renaming an effect style changes it in every frame, keeping the effect slot linked', async () => {
+    const lifted = { kind: StyleKind.Effect, effects: [{ id: 'sh', kind: 'drop-shadow', enabled: true, params: { blur: 20 } }] } as const;
+    const linked = (d: MotionDoc) => ({ ...d, tracks: d.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, effectStyleRef: 'Lifted' })) })) });
+    const store = frames({ a: linked(must(defineStyle(textDoc(), 'Lifted', lifted))), b: linked(must(defineStyle(textDoc(), 'Lifted', lifted))) });
+    const out = await canvasStyle(store, { name: 'Lifted', to: 'Raised' });
+
+    expect(out).toMatchObject({ ok: true, frames: ['a', 'b'] });
+    expect(findClip(store.docs.b, 't')!.clip.effectStyleRef).toBe('Raised');
+  });
 });
