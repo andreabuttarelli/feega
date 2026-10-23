@@ -25,8 +25,9 @@ export type ToolRow = {
   summary: string;
   input: z.ZodType;
   run: (input: never, options: { toolCallId: string }) => Promise<unknown>;
+  toModelOutput?: (result: { toolCallId: string; output: never }) => unknown;
 };
 
 export function toolsOf(rows: ToolRow[]): Record<string, Tool> {
-  return Object.fromEntries(rows.map((row) => [row.name, tool({ description: row.summary, inputSchema: row.input, execute: row.run as never })]));
+  return Object.fromEntries(rows.map((row) => [row.name, tool({ description: row.summary, inputSchema: row.input, execute: row.run as never, ...(row.toModelOutput ? { toModelOutput: row.toModelOutput as never } : {}) })]));
 }
