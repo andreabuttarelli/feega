@@ -125,6 +125,8 @@ pub struct Look {
     #[serde(default)]
     pub space: Option<[f64; 4]>,
     #[serde(default)]
+    pub origin: Option<[f64; 2]>,
+    #[serde(default)]
     pub backdrop: Option<f64>,
 }
 

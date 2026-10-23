@@ -76,7 +76,11 @@ vec4 run(ivec2 xy) {
 }";
 
 const FLOOD: &str = "
-vec4 run(ivec2 xy) { return vec4(p(0) * p(3), p(1) * p(3), p(2) * p(3), p(3)); }";
+vec4 run(ivec2 xy) {
+  vec2 c0 = centre(xy);
+  if (c0.x < p(4) || c0.y < p(5) || c0.x >= p(4) + p(6) || c0.y >= p(5) + p(7)) { return vec4(0.0); }
+  return vec4(p(0) * p(3), p(1) * p(3), p(2) * p(3), p(3));
+}";
 
 const COMPOSITE: &str = "
 vec4 run(ivec2 xy) {

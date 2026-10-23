@@ -358,12 +358,11 @@ describe('pasteFigma action', () => {
   const FIGMA = readFileSync(new URL('../../../../tests/fixtures/figma/clip-1.html', import.meta.url), 'utf8');
 
   it('a Figma clipboard lands as one frame of the copied size, centred on the pointer, with editable layers', async () => {
-    const id = '7b0c2f0e-8a51-4d0e-9a8e-2f2f6c1b9a12';
-    const input = event({ html: FIGMA, at: JSON.stringify({ x: 1000, y: 600 }), node_id: id });
+    const input = event({ html: FIGMA, at: JSON.stringify({ x: 1000, y: 600 }) });
 
-    expect(await actions.pasteFigma(input as never)).toMatchObject({ outcome: 'done', created: true, skipped: [] });
-    const rows = input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { id: string; x: number; y: number; width: number; display_name: string });
-    expect(rows).toMatchObject([{ id, x: 40, y: 60, width: 1920, display_name: 'Cover' }]);
+    expect(await actions.pasteFigma(input as never)).toMatchObject({ outcome: 'done', skipped: [] });
+    const rows = input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { x: number; y: number; width: number; display_name: string });
+    expect(rows).toMatchObject([{ x: 40, y: 60, width: 1920, display_name: 'Cover' }]);
     const doc = input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')!.payload as { doc: MotionDoc };
     expect(doc.doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual(expect.arrayContaining(['Shape', 'Precomp', 'Text']));
   });

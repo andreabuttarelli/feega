@@ -262,6 +262,7 @@ list. Returns how many combinations it actually stopped.
 | `get_render` | `feega motion render-status <runId>` |
 | `publish_motion_embed` | `feega motion embed <nodeId> [--unpublish]` |
 | `get_motion_embed` | `feega motion embed <nodeId> --status` |
+| `share_motion_frame` | `feega motion share <nodeId>` |
 | `motion_budget` | `feega motion budget <nodeId> [--raise]` |
 | `view_motion_frames` | `feega motion frames <nodeId> --at 1,2.5,4 [--width 640] [--out dir]` |
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |
@@ -298,6 +299,11 @@ once, expires in 30 minutes if nobody opens it, and is claimed by the first devi
 that device renders, saves the MP4 to the project and closes the run. `mode: "server"` is not
 available yet: it is refused with 403 `server_render_unavailable`. `get_render({ org, run_id })` returns
 `status`, `mode`, `asset_id` and a signed `file_url` (one hour) once `done`.
+
+`share_motion_frame({ org, node_id })` creates the public viewer link of one frame — a clean page that
+loops it, tap to play, swipe between the canvas's shared frames on a phone — and returns `{ url, embed_url }`.
+It publishes the embed and turns the canvas share on if needed; turning the canvas share off kills every
+frame link. Free; uncensored projects get 403 with `refusal`.
 
 `publish_motion_embed({ org, node_id, action? })` hosts the interactive web export of the saved
 revision and returns `{ published, url, snippet, react, flutter, revision }` — `react` and `flutter`

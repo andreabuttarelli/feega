@@ -10,6 +10,7 @@ export enum DrawTool {
   Line = 'line',
   Arrow = 'arrow',
   Pen = 'pen',
+  Pencil = 'pencil',
   Frame = 'frame'
 }
 

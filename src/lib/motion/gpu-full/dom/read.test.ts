@@ -337,6 +337,13 @@ describe('readTree', () => {
       expect(turbulence?.attrs).toMatchObject({ x: -40, y: -30, width: 480, height: 360 });
     });
 
+    it('carries where the filtered element starts, so primitive subregions land in the canvas', () => {
+      const moved = el({ parent: 0, tag: 'svg', svg: true, at: [50, 20], size: [400, 300] });
+      const [item] = readTree(withDefs(tree(root(), moved, rect(1, { filter: 'url("#soft")' })))).drawn;
+
+      expect(item.origin).toEqual([50, 20]);
+    });
+
     it('blurs each shape of a blurred group', () => {
       const read = readTree(withDefs(tree(root(), svg(), g({ filter: 'url("#soft")' }), rect(2), rect(2))));
 

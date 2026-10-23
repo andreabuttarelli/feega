@@ -2,7 +2,7 @@
 
 exports[`the MCP tool list does not move while the server code is reorganised > tool names and descriptions are byte-identical 1`] = `
 {
-  "count": 51,
-  "fingerprint": "fa6f319bae380b767114bda881bc954960dfa3019a0db4e48159c0740174ff06",
+  "count": 52,
+  "fingerprint": "2c17f7890cacaab62472b0e3829a999bc432ff1035b26455fce088fe26e42364",
 }
 `;

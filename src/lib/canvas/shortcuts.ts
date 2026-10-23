@@ -100,7 +100,8 @@ const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolStar]: DrawTool.Star,
   [Command.ToolLine]: DrawTool.Line,
   [Command.ToolArrow]: DrawTool.Arrow,
-  [Command.ToolPen]: DrawTool.Pen
+  [Command.ToolPen]: DrawTool.Pen,
+  [Command.ToolPencil]: DrawTool.Pencil
 };
 
 const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
@@ -154,6 +155,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.ToolRectangle]: { id: 'tool', tool: DrawTool.Rectangle },
   [Command.ToolEllipse]: { id: 'tool', tool: DrawTool.Ellipse },
   [Command.ToolPen]: { id: 'tool', tool: DrawTool.Pen },
+  [Command.ToolPencil]: { id: 'tool', tool: DrawTool.Pencil },
   [Command.TogglePixelGrid]: { id: 'view', view: FrameView.PixelGrid },
   [Command.ToggleLayoutGuides]: { id: 'view', view: FrameView.Guides },
   [Command.ToggleOutlines]: { id: 'view', view: FrameView.Outlines },

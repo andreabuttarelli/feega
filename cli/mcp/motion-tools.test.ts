@@ -74,6 +74,10 @@ const fake: Server = createServer((req, res) => {
       send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, react: `<FeegaMotion id="${NODE}" />`, flutter: `FeegaMotion(id: '${NODE}')`, revision: 3 } : { published });
       return;
     }
+    if (route === `/api/v1/motion/${NODE}/share`) {
+      send(200, { url: `https://feega.app/s/tok/${NODE}`, embed_url: `https://feega.app/e/${NODE}` });
+      return;
+    }
     if (route === `/api/v1/motion/${NODE}/budget`) {
       send(200, { ok: true, spent_usd: 2.04, cap_usd: req.method === 'POST' ? 3 : 2, raise_usd: 1 });
       return;
@@ -229,6 +233,12 @@ describe('the motion agent over MCP', () => {
     expect(result?.structuredContent).toMatchObject({ published: false });
   });
 
+  test('share_motion_frame returns the viewer link of one frame', async () => {
+    const result = await callTool('share_motion_frame', { node_id: NODE });
+    expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/share` });
+    expect(result?.structuredContent).toMatchObject({ url: `https://feega.app/s/tok/${NODE}` });
+  });
+
   test('motion_budget reads what a video spent across all its turns', async () => {
     const result = await callTool('motion_budget', { node_id: NODE });
     expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/budget` });
@@ -289,7 +299,7 @@ describe('the motion agent over MCP', () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'motion_editor_op', 'motion_tool', 'new_motion_from_template', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'motion_editor_op', 'motion_tool', 'new_motion_from_template', 'publish_motion_embed', 'restore_motion_revision', 'share_motion_frame', 'view_motion_frames']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');
