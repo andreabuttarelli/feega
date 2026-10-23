@@ -3266,3 +3266,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## An `$effect` that reads the `$state` it writes loops forever
 
 **Signal:** a debug `console.info` in the effect prints a thousand times a second and the page stalls. **Cause:** logging or reading `store.value` right after assigning it subscribes the effect to its own write. **Move:** compute into a local, assign once, read nothing from the target inside the effect.
+
+## A dev server on a fixed port may be another agent's
+
+**Signal:** your e2e runs against `localhost:5199` but your new code never shows; `vite dev --strictPort` for your own copy fails with `Port 5199 is already in use`. **Cause:** parallel agents pick the same popular ports, and `reuseExistingServer` happily drives whoever got there first. **Move:** `lsof -i :PORT` then `lsof -p PID | grep cwd` to see whose worktree it serves; pick an odd port and start your own.

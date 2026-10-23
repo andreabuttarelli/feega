@@ -6,6 +6,7 @@ import { fontStack } from '$lib/motion/fonts/model';
 import { CLIP_TEXT, editablePart, PartEdit } from '$lib/motion/poster-parts';
 import { setProps, type OpResult } from '$lib/motion/timeline';
 import { styledComponent } from '$lib/motion/text-run-ops';
+import { normalLists, type ListItem } from '$lib/motion/text-lists';
 import { segmentsOf, type RunCase, type RunStyle, type TextRun } from '$lib/motion/text-runs';
 import { textPaint } from '$lib/motion/fill/render';
 import { css } from '$lib/motion/hyperframes/html';
@@ -48,14 +49,16 @@ export const styledKind = (clip: Pick<MotionClip, 'component'>) => styledCompone
 
 export const runsOfClip = (clip: Pick<MotionClip, 'component' | 'props'>): TextRun[] => (styledKind(clip) ? ((clip.props.runs as TextRun[] | undefined) ?? []) : []);
 
+export const listsOfClip = (clip: Pick<MotionClip, 'component' | 'props'>): ListItem[] => (styledKind(clip) ? ((clip.props.lists as ListItem[] | undefined) ?? []) : []);
+
 export function baseStyle(clip: Pick<MotionClip, 'props'>): RunStyle {
   const p = clip.props;
   return { color: String(p.color), weight: Number(p.weight), italic: p.italic === true, font: String(p.font), size: Number(p.size), tracking: Number(p.tracking), leading: Number(p.leading), underline: false, strike: false, textCase: (p.textCase as RunCase | undefined) ?? 'as-typed', opacity: 1 };
 }
 
-export function commitText(doc: MotionDoc, clipId: string, text: string, runs: TextRun[] = []): OpResult {
+export function commitText(doc: MotionDoc, clipId: string, text: string, runs: TextRun[] = [], lists: ListItem[] = []): OpResult {
   const clip = findClip(doc, clipId)?.clip;
-  return setProps(doc, clipId, clip && styledKind(clip) ? { text, runs: runs.length ? runs : undefined } : { text });
+  return setProps(doc, clipId, clip && styledKind(clip) ? { text, runs: runs.length ? runs : undefined, lists: normalLists(lists, text.split('\n').length) } : { text });
 }
 
 export function textEditStyle(input: { clip: MotionClip; doc: MotionDoc; tokens: BrandTokens; frame: Size; scale: number }): TextEditStyle {

@@ -3,9 +3,10 @@
   import { editCss, gradientSpans, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import GradientHandles from './GradientHandles.svelte';
+  import { ListKind, MARKER_GAP_EM, markersOf, type ListItem } from '$lib/motion/text-lists';
   import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '$lib/motion/text-runs';
 
-  let { layout, look, text, clipId = '', base = {}, runs: initialRuns = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; clipId?: string; base?: RunStyle; runs?: TextRun[]; styled?: boolean; oncommit: (text: string, runs: TextRun[]) => void } = $props();
+  let { layout, look, text, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
 
   type Box = { left: number; top: number; width: number; height: number };
 
@@ -26,6 +27,8 @@
 
   const style = $derived(editCss(look, layout));
   const spans = $derived(gradientSpans(value, textRange.runs));
+  const markers = $derived(markersOf(textRange.lists));
+  const paragraphs = $derived(value.split('\n'));
   const fieldStyle = $derived(spans.length ? `${style};color:transparent` : style);
   let barAt = $state({ left: 0, top: 0 });
   let laid: number | null = null;
@@ -88,9 +91,9 @@
       return;
     }
     ended = true;
-    const runs = textRange.runs;
+    const { runs, lists } = textRange;
     textRange.close();
-    oncommit(value, runs);
+    oncommit(value, runs, lists);
   }
 
   let bar = $state<HTMLDivElement>();
@@ -162,11 +165,45 @@
     }
   }
 
+  const LIST_SHORTCUTS: Record<string, ListKind> = { Digit7: ListKind.Number, Digit8: ListKind.Bullet };
+
+  function atParagraphStart(): boolean {
+    return field !== null && field !== undefined && field.selectionStart === field.selectionEnd && (field.selectionStart === 0 || value[field.selectionStart - 1] === '\n');
+  }
+
+  function emptyParagraph(): boolean {
+    return atParagraphStart() && (value[field!.selectionStart] ?? '\n') === '\n';
+  }
+
+  function onListKey(e: KeyboardEvent): boolean {
+    const listKind = (e.metaKey || e.ctrlKey) && e.shiftKey ? LIST_SHORTCUTS[e.code] : undefined;
+    if (listKind) {
+      selected();
+      textRange.setList(listKind);
+      return true;
+    }
+    selected();
+    if (e.key === 'Tab' && textRange.listed) {
+      textRange.indent(e.shiftKey ? -1 : 1);
+      return true;
+    }
+    if ((e.key === 'Enter' && emptyParagraph() && textRange.listed) || (e.key === 'Backspace' && atParagraphStart() && textRange.listed)) {
+      textRange.unlist();
+      return true;
+    }
+    return false;
+  }
+
   function onKey(e: KeyboardEvent) {
     if (styled && e.shiftKey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'u') {
       e.preventDefault();
       e.stopPropagation();
       void openLink();
+      return;
+    }
+    if (styled && !composing && onListKey(e)) {
+      e.preventDefault();
+      e.stopPropagation();
       return;
     }
     const shortcut = styled && (e.metaKey || e.ctrlKey) ? SHORTCUTS[e.key.toLowerCase()] : undefined;
@@ -186,7 +223,7 @@
 
   onMount(() => {
     value = text;
-    textRange.open({ clipId: styled ? clipId : '', text, runs: initialRuns, base });
+    textRange.open({ clipId: styled ? clipId : '', text, runs: initialRuns, lists: initialLists, base });
     window.addEventListener('pointerdown', outside, true);
     const follow = () => document.activeElement === field && selected();
     document.addEventListener('selectionchange', follow);
@@ -201,6 +238,10 @@
     };
   });
 </script>
+
+{#if markers.some(Boolean)}
+  <div class="edit mirror gutter" data-testid="core-text-markers" style="{mirrorStyle};color:transparent" aria-hidden="true">{#each paragraphs as paragraph, i (i)}{#if markers[i]}<span class="marker" style="color:{look.color};--gap:{MARKER_GAP_EM}em">{markers[i]}</span>{/if}{paragraph}{i < paragraphs.length - 1 ? '\n' : ''}{/each}</div>
+{/if}
 
 {#if spans.length}
   <div class="edit mirror" data-testid="core-text-paint" style="{mirrorStyle};color:transparent" aria-hidden="true">{#each spans as span, i (i)}<span style={span.style || `color:${look.color}`}>{span.text}</span>{/each}</div>
@@ -292,6 +333,17 @@
   .mirror {
     outline: 0;
     pointer-events: none;
+  }
+
+  .edit.gutter {
+    overflow: visible;
+  }
+
+  .marker {
+    position: absolute;
+    text-indent: 0;
+    white-space: nowrap;
+    transform: translateX(calc(-100% - var(--gap)));
   }
 
   .edit {

@@ -22,11 +22,12 @@ import type { Face, FaceBook, Features, Request } from './face';
 import type { FaceRule } from './fonts';
 import type { FontFace } from '../../fonts/model';
 import { caretLines, type CaretLine } from './caret';
-import { Justify, layOut, NO_LIMIT, PLAIN_PARAGRAPH, Trim, Wrap, NO_EXTRA, Shaping, Spaces, type Paragraph, type Extra, type Flow, type Glyph, type Laid, type Line, type Look as RunLook, type RequestAt, type Type } from './layout';
+import { Justify, layOut, NO_LIMIT, NO_LISTS, PLAIN_PARAGRAPH, Trim, Wrap, NO_EXTRA, Shaping, Spaces, type ListMark, type Paragraph, type Extra, type Flow, type Glyph, type Laid, type Line, type Look as RunLook, type RequestAt, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
 import { clipped, contoursOf, dilated, type Rect } from './outline';
 import { blended } from '../blend-colour';
+import { LIST_STEP_EM, MARKER_GAP_EM, markersOf, type ListItem } from '../../text-lists';
 import { normalRuns, runAt, type RunCase, type TextRun } from '../../text-runs';
 
 export type TextComponent = 'Title' | 'Text' | 'Kicker' | 'Caption';
@@ -150,13 +151,19 @@ const ruleOf = (p: Props): Rule => ({
   skipInk: p.skipInk !== false
 });
 
+const listMarks = (lists: readonly ListItem[] | undefined): ListMark[] => {
+  const markers = markersOf(lists ?? []);
+  return (lists ?? []).map((item, i) => (item ? { inset: (item.level + 1) * LIST_STEP_EM, gap: MARKER_GAP_EM, marker: markers[i]! } : null));
+};
+
 const paragraphOf = (p: Props): Paragraph => ({
   indent: Number(p.paragraphIndent ?? 0),
   spacing: Number(p.paragraphSpacing ?? 0),
   justify: JUSTIFY_OF[p.align] ?? Justify.Off,
   wrap: WRAP_OF[p.textWrap ?? 'wrap'],
   limit: truncates(p) ? Number(p.maxLines ?? NO_LIMIT) : NO_LIMIT,
-  trim: TRIM_OF[p.leadingTrim ?? 'none']
+  trim: TRIM_OF[p.leadingTrim ?? 'none'],
+  lists: (p.lists as ListItem[] | undefined)?.length ? listMarks(p.lists as ListItem[]) : NO_LISTS
 });
 const PERCENT = 100;
 const rounded = (p: Props, unit: number) => Math.round(p.size * unit * PERCENT) / PERCENT;
@@ -524,7 +531,8 @@ const topOf = (plan: TextPlan, laid: Laid) => plan.frame.top + (plan.frame.ancho
 function place(plan: TextPlan, fonts: FaceBook): Placed {
   const typeAt = (size: number, limit = plan.typography.paragraph.limit): Type => {
     const requestAt = requestAtOf(plan, size);
-    const paragraph = { ...plan.typography.paragraph, limit, indent: plan.typography.paragraph.indent * size, spacing: plan.typography.paragraph.spacing * size };
+    const own = plan.typography.paragraph;
+    const paragraph = { ...own, limit, indent: own.indent * size, spacing: own.spacing * size, lists: own.lists.map((m) => (m ? { ...m, inset: m.inset * size, gap: m.gap * size } : null)) };
     return { request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping, paragraph, features: plan.typography.features, ...(requestAt ? { requestAt } : {}) };
   };
   const looks = plan.animation?.looks;
@@ -591,7 +599,7 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
     const ruleInk: number[][] = [];
     const units = new Map<string, Unit>();
     block.lines.forEach((line, l) => {
-      const x = (room - line.width) * plan.align;
+      const x = block.inset + (room - block.inset - line.width) * plan.align;
       const top = block.top + line.top + rise;
       const baseline = block.top + line.baseline + rise - smoothing.rise;
       const start = x + (line.glyphs[0]?.pen ?? 0);
@@ -604,21 +612,22 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
       if (plan.backdrop) {
         backdrop.push(rect([x, baseline - laid.ascent - CAPTION_PAD_EM * type.size, x + line.width, baseline + laid.descent + CAPTION_PAD_EM * type.size]));
       }
-      for (const g of line.glyphs) {
+      const drawn = [...(l === 0 ? block.marker.map((g) => ({ g, at: 0, marked: true })) : []), ...line.glyphs.map((g) => ({ g, at: x, marked: false }))];
+      for (const { g, at, marked } of drawn) {
         const slot = slots && g.word >= 0 ? slots(i, g) : null;
-        const style = runOf(plan, i, g.char);
+        const style = marked ? null : runOf(plan, i, g.char);
         const gradient = style?.fill ? style.start : null;
         const colour = gradient === null ? (style?.color ?? null) : null;
         const key = `${slot ? slot.key : -1}:${plan.area === Area.Line ? l : 0}:${colour}:${gradient}:${style?.opacity ?? 1}`;
         const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], glyphs: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area], colour, gradient, opacity: style?.opacity ?? 1 };
         units.set(key, unit);
-        const shape = moved(glyphContours(g.face, g.glyph, g.size, g.skew, smoothing.darken(g.size)), x + g.x, baseline - g.dy);
-        const rules = ruled(plan.typography.rule, g, x, baseline, shape);
-        unit.contours.push(...shape, ...decorations(style, g, x, baseline), ...(plan.typography.ruleColour ? [] : rules));
+        const shape = moved(glyphContours(g.face, g.glyph, g.size, g.skew, smoothing.darken(g.size)), at + g.x, baseline - g.dy);
+        const rules = ruled(plan.typography.rule, g, at, baseline, shape);
+        unit.contours.push(...shape, ...decorations(style, g, at, baseline), ...(plan.typography.ruleColour ? [] : rules));
         ruleInk.push(...(plan.typography.ruleColour ? rules : []));
-        unit.glyphs.push({ face: g.face, skew: g.skew, glyph: g.glyph, x: x + g.x, y: baseline - g.dy });
-        unit.outlines.push(...(plan.outline ? moved(glyphContours(g.face, g.glyph, g.size, g.skew, 0), x + g.x, baseline - g.dy + smoothing.rise) : []));
-        unit.box = [Math.min(unit.box[0], x + g.pen), Math.min(unit.box[1], top), Math.max(unit.box[2], x + g.pen + g.advance), Math.max(unit.box[3], top + line.height)];
+        unit.glyphs.push({ face: g.face, skew: g.skew, glyph: g.glyph, x: at + g.x, y: baseline - g.dy });
+        unit.outlines.push(...(plan.outline ? moved(glyphContours(g.face, g.glyph, g.size, g.skew, 0), at + g.x, baseline - g.dy + smoothing.rise) : []));
+        unit.box = [Math.min(unit.box[0], at + g.pen), Math.min(unit.box[1], top), Math.max(unit.box[2], at + g.pen + g.advance), Math.max(unit.box[3], top + line.height)];
       }
     });
     if (plan.typography.ruleColour && ruleInk.length) {
