@@ -123,7 +123,8 @@ fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
             let s = times(m, [a, b, c, d, 0.0, 0.0]);
             [s[0], s[1], s[2], s[3]]
         });
-        Look { matrix: times(m, look.matrix), blur: look.blur * scale, scissor: Some(scissor_of(clip)), masks, matte, space, ..look.clone() }
+        let origin = look.origin.map(|[x, y]| [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
+        Look { matrix: times(m, look.matrix), blur: look.blur * scale, scissor: Some(scissor_of(clip)), masks, matte, space, origin, ..look.clone() }
     };
     match item {
         Item::Path(p) => Item::Path(PathItem { look: look(&p.look), ..p.clone() }),
@@ -150,7 +151,7 @@ fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect, contou
         rule: FillRule::NonZero,
         paint: Paint::Solid { color: colour },
         within: None,
-        look: Look { opacity: 1.0, matrix: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0], blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, backdrop: None },
+        look: Look { opacity: 1.0, matrix: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0], blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None },
     })
 }
 
@@ -259,13 +260,13 @@ fn texture_image(u: &UseItem, group: &DisplayList, scale: f64, clip: String) -> 
     let (w, h) = texels(group, scale);
     let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
     let matrix = snapped(times(u.matrix, [1.0 / scale, 0.0, 0.0, 1.0 / scale, 0.0, 0.0]));
-    let look = Look { opacity: 1.0, matrix, blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, backdrop: None };
+    let look = Look { opacity: 1.0, matrix, blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None };
     let size = Size { width: w as f64, height: h as f64 };
     Item::Image(ImageItem { clip: clip.clone(), src: clip, video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, clipped: true, inner: IDENTITY, look })
 }
 
 fn partial(group: &str, (w, h): (u32, u32)) -> Item {
-    let look = Look { opacity: 1.0, matrix: IDENTITY, blur: 0.0, blend: "normal".into(), scissor: None, masks: None, matte: None, filters: None, space: None, backdrop: None };
+    let look = Look { opacity: 1.0, matrix: IDENTITY, blur: 0.0, blend: "normal".into(), scissor: None, masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None };
     let size = Size { width: w as f64, height: h as f64 };
     Item::Image(ImageItem { clip: building_clip(group), src: building_clip(group), video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, clipped: true, inner: IDENTITY, look })
 }

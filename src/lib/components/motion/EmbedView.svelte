@@ -25,6 +25,7 @@
     updated = false,
     onpublish,
     onunpublish,
+    onlink,
     onpresets
   }: {
     doc: MotionDoc;
@@ -40,10 +41,11 @@
     updated?: boolean;
     onpublish: () => void;
     onunpublish: () => void;
+    onlink?: () => Promise<string | null>;
     onpresets?: () => void;
   } = $props();
 
-  const Copied = { None: '', Hosted: 'hosted', File: 'file', React: 'react', Flutter: 'flutter' } as const;
+  const Copied = { None: '', Hosted: 'hosted', Link: 'link', File: 'file', React: 'react', Flutter: 'flutter' } as const;
   type Copied = (typeof Copied)[keyof typeof Copied];
 
   const COPIED_MS = 1600;
@@ -53,10 +55,20 @@
 
   let copied = $state<Copied>(Copied.None);
   let expanded = $state(false);
+  let linkFailed = $state(false);
   let copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
   const published = $derived(Boolean(hosted?.published));
   const weight = $derived(bundle ? (bundle.bytes >= BYTES_PER_MB ? `${(bundle.bytes / BYTES_PER_MB).toFixed(1)} MB` : `${Math.ceil(bundle.bytes / BYTES_PER_KB)} KB`) : '…');
+
+  async function copyLink() {
+    const link = await onlink?.();
+    if (link) {
+      await copy(link, Copied.Link);
+      return;
+    }
+    linkFailed = true;
+  }
 
   async function copy(text: string, which: Copied) {
     await navigator.clipboard.writeText(text);
@@ -114,6 +126,12 @@
       <button type="button" class="primary wide" onclick={() => copy(hostedSnippet, Copied.Hosted)} data-testid="interactive-copy">
         {#if copied === Copied.Hosted}<Check size={16} /> Copied{:else}<Copy size={16} /> Copy code{/if}
       </button>
+      {#if onlink}
+        <button type="button" class="secondary" onclick={copyLink} data-testid="interactive-copy-link">
+          {#if copied === Copied.Link}<Check size={16} /> Copied{:else}<Copy size={16} /> Copy viewer link{/if}
+        </button>
+        <p class="hint">{linkFailed ? 'The link could not be made.' : 'A clean page that plays this frame. Turning the canvas share off ends it.'}</p>
+      {/if}
       {#if appSnippets}
         <h3>Embed in your app</h3>
         <p class="hint">The same player, scroll and taps, inside a React or Flutter app.</p>

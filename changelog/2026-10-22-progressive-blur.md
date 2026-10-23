@@ -1,0 +1,3 @@
+# Progressive blur
+
+New effect `progressive-blur` (Figma PROGRESSIVE blur: startRadius, endRadius, start/end points 0..1). Built as 16 `feGaussianBlur` bands, each limited by a primitive subregion and merged: subregions are already honoured by both the TS and the Rust GPU filter graphs, so canvas and export run the same filter. Discarded: a gradient mask over one max blur (needs `feImage`, which the GPU graph does not run). Limits: bands follow the dominant axis of start→end, so a diagonal blur is approximated as vertical or horizontal; points are relative to the effect layer (the frame), not the object box. MCP: through the effect registry.

@@ -114,6 +114,14 @@ describe('the embed path discloses step by step', () => {
     expect(body).not.toContain('data-testid="interactive-publish"');
   });
 
+  it('once published: a link to a clean viewer of this frame, only when the host can make one', () => {
+    const published = { hosted: { published: true, url: 'https://feega.app/e/n' }, hostedSnippet: '<feega-motion src="n"></feega-motion>' };
+
+    expect(embed({ ...published, onlink: async () => null })).toContain('data-testid="interactive-copy-link"');
+    expect(embed(published)).not.toContain('data-testid="interactive-copy-link"');
+    expect(embed({ onlink: async () => null })).not.toContain('data-testid="interactive-copy-link"');
+  });
+
   it('once published: the same video in a React or Flutter app', () => {
     const appSnippets = { react: '<FeegaMotion id="n" origin="https://feega.app" />', flutter: "FeegaMotion(id: 'n', origin: 'https://feega.app')" };
     const body = embed({ hosted: { published: true, url: 'https://feega.app/e/n' }, hostedSnippet: '<feega-motion src="n"></feega-motion>', appSnippets });

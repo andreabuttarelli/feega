@@ -3128,15 +3128,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
 
   async function pasteFigma(html: string, at: { x: number; y: number }) {
-    const res = await post('pasteFigma', { html, at: JSON.stringify(at), node_id: crypto.randomUUID() });
-    const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
-    if (!node) {
+    const res = await post('pasteFigma', { html, at: JSON.stringify(at) });
+    const landedNodes = res?.outcome === 'done' ? ((res.nodes ?? []) as CanvasNodeRecord[]) : [];
+    if (!landedNodes.length) {
       failed = FIGMA_PASTE;
       return;
     }
-    nodes = [...nodes, toTile(node)];
+    nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
     pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
-    focusOn([node.id], undefined, FocusMode.Select);
+    focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
     const skipped = (res?.skipped ?? []) as string[];
     if (skipped.length) {
       failed = `${FIGMA_SKIPPED} ${skipped.join('; ')}`;
