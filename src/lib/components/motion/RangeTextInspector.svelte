@@ -7,6 +7,7 @@
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { registerFont, withUploaded } from '$lib/motion/fonts/ops';
   import { textRange } from '$lib/canvas/text-range.svelte';
+  import { ListKind } from '$lib/motion/text-lists';
   import { MIXED, RUN_CASES, type GradientFill, type RunEdit, type StyleKey } from '$lib/motion/text-runs';
   import { FILL_LABEL, FillType, addStop, removeStop } from '$lib/motion/fill/model';
   import { GRADIENT_TYPES, RunPaint, asGradient, gradientPatched, paintOf } from '$lib/motion/run-fill';
@@ -137,6 +138,12 @@
         {#each RUN_CASES as c (c)}<option value={c}>{c}</option>{/each}
       </select>
     </label>
+    <div class="flags" data-testid="range-lists">
+      <button type="button" title="Bulleted list (⇧⌘8)" data-testid="range-list-bullet" class:on={textRange.listKind === ListKind.Bullet} onclick={() => (textRange.listKind === ListKind.Bullet ? textRange.unlist() : textRange.setList(ListKind.Bullet))}>•</button>
+      <button type="button" title="Numbered list (⇧⌘7)" data-testid="range-list-number" class:on={textRange.listKind === ListKind.Number} onclick={() => (textRange.listKind === ListKind.Number ? textRange.unlist() : textRange.setList(ListKind.Number))}>1.</button>
+      <button type="button" title="Lift (⇧Tab)" data-testid="range-list-lift" disabled={!textRange.listed} onclick={() => textRange.indent(-1)}>←</button>
+      <button type="button" title="Nest (Tab)" data-testid="range-list-nest" disabled={!textRange.listed} onclick={() => textRange.indent(1)}>→</button>
+    </div>
     <div class="flags">
       {#each FLAGS as flag (flag.key)}
         <button type="button" data-testid={`range-${flag.key}`} class:on={values[flag.key] === true} class:mixed={values[flag.key] === MIXED} onclick={() => set({ [flag.key]: values[flag.key] !== true })}>{flag.label}</button>

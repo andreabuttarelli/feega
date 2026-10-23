@@ -25,7 +25,7 @@ export function caretLines(laid: Laid, paragraphs: string[], shape: Shape): Care
     return block.lines.map((line, j) => {
       const start = starts[j];
       const end = j + 1 < starts.length ? starts[j + 1] : length;
-      const origin = (shape.room - line.width) * shape.align;
+      const origin = block.inset + (shape.room - block.inset - line.width) * shape.align;
       const stops: Stop[] = [];
       line.glyphs.forEach((g, i) => {
         const next = line.glyphs[i + 1];

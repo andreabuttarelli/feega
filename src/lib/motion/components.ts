@@ -21,6 +21,7 @@ import { effectProblem } from './shader-effects/preset';
 import { fillsSchema } from './fill/model';
 import { strokesSchema } from './stroke/model';
 import { runsSchema } from './text-runs';
+import { listsSchema } from './text-lists';
 import { LETTER_SPACING, LINE_HEIGHT } from './type-units';
 import { DECORATION_STYLES, DECORATIONS, FEATURES, RULE } from './decoration';
 import { counterSchema } from './text-counter';
@@ -318,7 +319,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), lists: listsSchema.meta(managed('Lists')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
       .strict()
   },
   Kicker: {

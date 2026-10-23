@@ -173,7 +173,8 @@ import { liveLanes } from '$lib/motion/interactive/spec';
 import { fileSnippet } from '$lib/motion/interactive/bundle';
 import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, removeVar, unbindVar, type VarDecl } from '$lib/motion/interactive/vars';
 import { flattenComps } from '$lib/motion/precomp';
-import { clearTextRuns, styleTextRange } from '$lib/motion/text-run-ops';
+import { clearTextRuns, listTextRange, styleTextRange } from '$lib/motion/text-run-ops';
+import { ListChange } from '$lib/motion/text-lists';
 import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, pushOverrides, resetOverride, resetOverrides } from '$lib/motion/main-component';
 import { addVariant, pickVariant, swapInstance } from '$lib/motion/variants';
 import { placeInstance } from '$lib/motion/canvas-components';
@@ -998,14 +999,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     text_style: tool({
-      description: 'Rich text: style characters start..end (end exclusive) of a Text clip only. style takes color (#rrggbb, brand.*) or fill (a gradient: type linear-gradient|radial-gradient|angular-gradient|diamond-gradient, stops [{color,pos 0..1}] of 2 to 8, angle in degrees for linear and angular, center {x,y} and radius for radial, center for angular; it spans the glyph bounds of the range itself; setting one of color and fill drops the other), weight, italic, font (register_font first), size (share of the frame like props.size), tracking (em), leading, underline, strike, textCase, opacity; null drops that field for the range. clear: true drops every range.',
-      inputSchema: z.object({ clip_id: z.string(), start: z.number().int().min(0).optional(), end: z.number().int().min(1).optional(), style: runEditSchema.optional(), clear: z.boolean().optional() }),
+      description: 'Rich text: style characters start..end (end exclusive) of a Text clip only. style takes color (#rrggbb, brand.*) or fill (a gradient: type linear-gradient|radial-gradient|angular-gradient|diamond-gradient, stops [{color,pos 0..1}] of 2 to 8, angle in degrees for linear and angular, center {x,y} and radius for radial, center for angular; it spans the glyph bounds of the range itself; setting one of color and fill drops the other), weight, italic, font (register_font first), size (share of the frame like props.size), tracking (em), leading, underline, strike, textCase, opacity; null drops that field for the range. list sets the paragraphs the range touches (a paragraph is one line of text, split by newlines): bullet or number makes them that list (the same kind on a list that already is one removes it; none removes any list), nest and lift move an item one level in or out; a list item is indented one step with its marker hanging in the gutter. clear: true drops every range.',
+      inputSchema: z.object({ clip_id: z.string(), start: z.number().int().min(0).optional(), end: z.number().int().min(1).optional(), style: runEditSchema.optional(), list: z.enum(ListChange).optional(), clear: z.boolean().optional() }),
       execute: async (input) => {
         if (input.clear) {
           return apply(clearTextRuns(session.doc, input.clip_id), `cleared styled ranges of ${input.clip_id}`);
         }
+        if (input.list && input.start !== undefined && input.end !== undefined) {
+          return apply(listTextRange(session.doc, input.clip_id, { start: input.start, end: input.end }, input.list), `${input.list} on ${input.clip_id} ${input.start}..${input.end}`);
+        }
         if (input.start === undefined || input.end === undefined || !input.style) {
-          return { ok: false, error: 'start, end and style are required unless clear is true' };
+          return { ok: false, error: 'start, end and style (or list) are required unless clear is true' };
         }
         return apply(styleTextRange(session.doc, input.clip_id, { start: input.start, end: input.end }, input.style as RunEdit), `styled ${input.clip_id} ${input.start}..${input.end}`);
       }

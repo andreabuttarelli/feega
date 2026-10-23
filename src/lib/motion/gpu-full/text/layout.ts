@@ -35,9 +35,13 @@ export enum Trim {
 
 export const NO_LIMIT = 0;
 
-export type Paragraph = { indent: number; spacing: number; justify: Justify; wrap: Wrap; limit: number; trim: Trim };
+export type ListMark = { inset: number; gap: number; marker: string } | null;
 
-export const PLAIN_PARAGRAPH: Paragraph = { indent: 0, spacing: 0, justify: Justify.Off, wrap: Wrap.Greedy, limit: NO_LIMIT, trim: Trim.None };
+export const NO_LISTS: readonly ListMark[] = [];
+
+export type Paragraph = { indent: number; spacing: number; justify: Justify; wrap: Wrap; limit: number; trim: Trim; lists: readonly ListMark[] };
+
+export const PLAIN_PARAGRAPH: Paragraph = { indent: 0, spacing: 0, justify: Justify.Off, wrap: Wrap.Greedy, limit: NO_LIMIT, trim: Trim.None, lists: NO_LISTS };
 
 export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: Leading; inset: number; shaping: Shaping; requestAt?: RequestAt; paragraph?: Paragraph; features?: Features };
 
@@ -45,7 +49,7 @@ export type Glyph = { face: Face; glyph: number; skew: number; x: number; dy: nu
 
 export type Line = { glyphs: Glyph[]; width: number; baseline: number; top: number; height: number };
 
-export type Block = { lines: Line[]; top: number; height: number };
+export type Block = { lines: Line[]; top: number; height: number; inset: number; marker: Glyph[] };
 
 export type Extra = (paragraph: number, word: number, letter: number) => number;
 
@@ -321,7 +325,7 @@ function limited(blocks: Block[], limit: number, room: number, ellipsis: () => T
   }
   const last = kept.at(-1)!;
   const closing = last.lines.at(-1)!;
-  last.lines[last.lines.length - 1] = { ...closing, ...ellipsised(closing, room, ellipsis()) };
+  last.lines[last.lines.length - 1] = { ...closing, ...ellipsised(closing, room - last.inset, ellipsis()) };
   return kept;
 }
 
@@ -364,11 +368,17 @@ export function layOut(paragraphs: string[], type: Type, flow: Flow, room: numbe
       missing ||= token.missing;
       return token;
     });
+    const mark = paragraph.lists[at] ?? null;
+    const inset = mark ? mark.inset : 0;
+    const available = room - inset;
+    const shapedMarker = mark ? shapedOf(mark.marker, 0, type, askedOf({ ...type, requestAt: undefined }, at), book, () => 0) : null;
+    missing ||= shapedMarker?.missing ?? false;
+    const marker = mark && shapedMarker ? shift(shapedMarker.glyphs, mark.inset - mark.gap - shapedMarker.width).map((g) => ({ ...g, char: 0, word: -1 })) : [];
     const lay = (width: number) => wrapped(tokens, flow, width, type.inset, paragraph.indent);
-    const fitted = flow.wraps ? WRAP_ROOM[paragraph.wrap](lay, room) : room;
-    const laid = JUSTIFIED[flow.wraps ? paragraph.justify : Justify.Off](lay(fitted), room);
+    const fitted = flow.wraps ? WRAP_ROOM[paragraph.wrap](lay, available) : available;
+    const laid = JUSTIFIED[flow.wraps ? paragraph.justify : Justify.Off](lay(fitted), available);
     const lines = type.requestAt ? mixedLines(laid, { above: baseline, below: lineHeight - baseline }) : laid.map((l, i) => ({ ...l, top: i * lineHeight, height: lineHeight, baseline: i * lineHeight + baseline }));
-    const block = { lines, top, height: lines.reduce((n, l) => n + l.height, 0) };
+    const block = { lines, top, height: lines.reduce((n, l) => n + l.height, 0), inset, marker };
     top += block.height + paragraph.spacing;
     return block;
   });
@@ -379,6 +389,6 @@ export function layOut(paragraphs: string[], type: Type, flow: Flow, room: numbe
   const trimTop = paragraph.trim === Trim.Cap ? baseline - capHeightOf(type, book) : 0;
   const trimBottom = paragraph.trim === Trim.Cap ? lineHeight - baseline : 0;
   const trimmed = kept.map((b) => ({ ...b, top: b.top - trimTop }));
-  const width = Math.max(0, ...trimmed.flatMap((b) => b.lines.map((l) => l.width)));
+  const width = Math.max(0, ...trimmed.flatMap((b) => b.lines.map((l) => b.inset + l.width)));
   return { blocks: trimmed, width, height: Math.max(0, height - trimTop - trimBottom), ascent, descent, lineHeight, missing };
 }
