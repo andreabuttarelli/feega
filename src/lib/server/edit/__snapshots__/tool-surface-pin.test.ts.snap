@@ -2,7 +2,7 @@
 
 exports[`the tool surfaces do not move while their code is reorganised > the chat tool definitions are byte-identical 1`] = `
 {
-  "fingerprint": "6bb7528334c9bce2b8770eb52392cd8fa841b94c36db3eb0e498a1b502b18269",
+  "fingerprint": "146d14dd82f57dbf8ecf12fab43b499882e4f8a70a1f4fff5cd6f78b3a9aad8a",
   "names": [
     "apply_effects",
     "ask_motion_agent",
@@ -52,6 +52,6 @@ exports[`the tool surfaces do not move while their code is reorganised > the cha
 }
 `;
 
-exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 1`] = `"2ea4afc4ae7b94778cc1758a99d11a1285bfac81a1c5a72298865df15bf114e4"`;
+exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 1`] = `"52db20a988401aa5ef0ac1c9398a12a06afb5104aff89d6e8cbe53332e59a652"`;
 
-exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 2`] = `"91788667c21ddcf70fa94a31d4eefdd30ef956b5f7869acd80957cc872ac935b"`;
+exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 2`] = `"8c92ce4c382536fc47b80fe97e9615159a20332de75743dab118de1169e5ca44"`;
