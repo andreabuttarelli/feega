@@ -6,7 +6,7 @@ import { TransitionKind } from '../design';
 import { addClip, setTransform, setTransition, Side, type OpResult } from '../timeline';
 import { composeHtml } from '../hyperframes/compose';
 import { compileScene } from './scene';
-import { pickAt, pickOwnersAt, quadOf, rectOf } from './pick';
+import { leafRectsAt, pickAt, pickOwnersAt, quadOf, rectOf } from './pick';
 import { groupClips } from '../group';
 import { drawClip } from '../draw-create';
 import { DrawTool } from '../draw-tool';
@@ -181,5 +181,15 @@ describe('a group', () => {
     const r = rectOf(sceneOf(doc), group, 0)!;
 
     expect(pickOwnersAt(sceneOf(doc), [r.left + 5, r.top + r.height / 2], 0)[0]).toBe(group);
+  });
+
+  it('lists its members, not itself, as the drawn leaves', () => {
+    const doc = grouped();
+    const group = doc.tracks.flatMap((t) => t.clips).map((c) => c.id)[0];
+    const leaves = leafRectsAt(sceneOf(doc), 0);
+
+    expect(Object.keys(leaves)).toHaveLength(2);
+    expect(Object.keys(leaves)).not.toContain(group);
+    expect(Object.values(leaves).every((r) => r.width > 0)).toBe(true);
   });
 });

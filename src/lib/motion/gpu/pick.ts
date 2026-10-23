@@ -24,6 +24,15 @@ export function pickAt(scene: Scene, point: Point, time: number): string | null 
   return topAt(scene, point, time)?.clip ?? null;
 }
 
+export function leafRectsAt(scene: Scene, time: number): Record<string, FrameRect> {
+  const corners = new Map<string, Point[]>();
+  for (const d of placedAt(scene, time).filter(pickable)) {
+    const leaf = d.layer.owners.at(-1) ?? d.clip;
+    corners.set(leaf, [...(corners.get(leaf) ?? []), ...d.quad]);
+  }
+  return Object.fromEntries([...corners].map(([leaf, points]) => [leaf, spanOf(points)]));
+}
+
 export function pickOwnersAt(scene: Scene, point: Point, time: number): string[] {
   return topAt(scene, point, time)?.layer.owners ?? [];
 }

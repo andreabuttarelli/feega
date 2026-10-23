@@ -1349,8 +1349,12 @@
   }
 
   function extendPick(e: PointerEvent, w: Point): boolean {
-    const hit = e.shiftKey && e.button === 0 && e.pointerType === 'mouse' ? framePickAt(w) : null;
+    const deep = (e.metaKey || e.ctrlKey) && !e.shiftKey;
+    const hit = (e.shiftKey || deep) && e.button === 0 && e.pointerType === 'mouse' ? framePickAt(w) : null;
     if (!hit || inside?.nodeId !== hit.nodeId) {
+      return false;
+    }
+    if (hit.clip && deep) {
       return false;
     }
     if (hit.clip) {
@@ -1368,10 +1372,12 @@
       bandDrag = null;
       const a = hit.picker.framePoint(from, hit.space);
       const b = hit.picker.framePoint(toWorld(view, local(ev)), hit.space);
-      const rects = Object.fromEntries(clips.flatMap((id) => {
-        const r = hit.picker.frameRect(id);
-        return r ? [[id, r]] : [];
-      }));
+      const rects = deep
+        ? hit.picker.leafRects()
+        : Object.fromEntries(clips.flatMap((id) => {
+            const r = hit.picker.frameRect(id);
+            return r ? [[id, r]] : [];
+          }));
       pickMany(hit.nodeId, marqueeIds(rects, spanOf(a, b)));
     };
     window.addEventListener('pointermove', move);
