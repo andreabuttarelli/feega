@@ -8,7 +8,7 @@ import { TextSizing } from '$lib/motion/text-sizing';
 import { figmaIntoFrame } from './figma/figma-doc';
 
 export type FramePaste = { svg: string } | { text: string } | { figma: string };
-export type Pasted = { doc: MotionDoc; selection: string[] };
+export type Pasted = { doc: MotionDoc; selection: string[]; skipped?: string[] };
 type Unit = { x: number; y: number };
 type NewId = () => string;
 

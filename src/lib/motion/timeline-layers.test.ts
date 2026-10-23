@@ -33,6 +33,10 @@ describe('timeline layers', () => {
     expect(rows.at(-1)!.top).toBe(ROW_PX[RowKind.Group] + ROW_PX[RowKind.Layer] + ROW_PX[RowKind.Property]);
   });
 
+  it('shows the name a layer was given, such as a Figma layer name', () => {
+    expect(layerName({ ...clip('t1'), name: 'Headline' } as Partial<MotionClip> as MotionClip, {})).toBe('Headline · t1');
+  });
+
   it('names a layer by component and id, so eighteen shapes stop being called "Shape"', () => {
     expect(layerName(clip('hook'), {})).toBe('Title · hook');
     expect(layerName(clip('p1', { component: 'Precomp', props: { comp: 'c1' } } as Partial<MotionClip>), { c1: { name: 'Intro' } })).toBe('Intro · p1');
