@@ -24,6 +24,7 @@ import { runsSchema } from './text-runs';
 import { LETTER_SPACING, LINE_HEIGHT } from './type-units';
 import { DECORATION_STYLES, DECORATIONS, FEATURES, RULE } from './decoration';
 import { counterSchema } from './text-counter';
+import { BooleanOp } from './shape/boolean-op';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -616,7 +617,7 @@ export const COMPONENTS = {
     description: 'A nested composition (precompose clips to make one) played as one clip: trimStart starts it later, loop repeats it to the end of the clip.',
     track: TrackKind.Visual,
     durationInFrames: seconds(5),
-    schema: z.object({ comp: z.string().max(60).default('').meta({ control: Control.Comp, label: 'Composition', group: Group.Content }), loop: toggle(false, 'Loop', Group.Motion), hold: toggle(false, 'Hold last frame', Group.Motion), overrides: z.record(z.string(), z.record(z.string(), z.unknown())).optional().meta(managed('Overrides')) }).strict()
+    schema: z.object({ comp: z.string().max(60).default('').meta({ control: Control.Comp, label: 'Composition', group: Group.Content }), loop: toggle(false, 'Loop', Group.Motion), hold: toggle(false, 'Hold last frame', Group.Motion), overrides: z.record(z.string(), z.record(z.string(), z.unknown())).optional().meta(managed('Overrides')), boolean: z.enum(BooleanOp).optional().meta(managed('Boolean operation')) }).strict()
   },
   Adjustment: {
     label: 'Adjustment layer',
