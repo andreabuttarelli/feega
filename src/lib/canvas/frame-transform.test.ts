@@ -5,7 +5,7 @@ import { Grip, aabb, handlesOf, quadOf, type Bounds } from '$lib/motion/scene-se
 import { guessedBoxes } from '$lib/motion/move-element';
 import { transformAt } from '$lib/motion/parent';
 import { GuideAlign, GuideKind, newGuide, setLayoutGuides } from '$lib/motion/layout-guides/guides';
-import { dragClips, measuredGaps, nudgeClips, type Drag } from './frame-transform';
+import { SnapMode, dragClips, measuredGaps, nudgeClips, type Drag } from './frame-transform';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -43,6 +43,24 @@ describe('dragClips', () => {
     const { result } = dragClips(drag({ doc: guided, to: [900 + near, 500] }));
 
     expect(boundsOf(must(result), 'card').right).toBeCloseTo(1000);
+  });
+
+  it('suspends snapping and shows no guide when snapping is off', () => {
+    const before = boundsOf(DOC, 'card');
+    const near = boundsOf(DOC, 'side').left - before.right - 3;
+
+    const { result, guides } = dragClips(drag({ to: [900 + near, 500], snap: SnapMode.Off }));
+
+    expect(guides).toEqual([]);
+    expect(boundsOf(must(result), 'card').right).toBeCloseTo(boundsOf(DOC, 'side').left - 3);
+  });
+
+  it('lands a moved element on whole pixels in pixel mode', () => {
+    const { result } = dragClips(drag({ to: [900.4, 500.3], snap: SnapMode.Pixels, reach: 0 }));
+    const after = boundsOf(must(result), 'card');
+
+    expect(after.left).toBeCloseTo(Math.round(after.left));
+    expect(after.top).toBeCloseTo(Math.round(after.top));
   });
 
   it('locks a Shift move to the dominant axis', () => {
