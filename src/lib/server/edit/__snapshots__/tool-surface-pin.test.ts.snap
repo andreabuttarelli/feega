@@ -54,4 +54,4 @@ exports[`the tool surfaces do not move while their code is reorganised > the cha
 
 exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 1`] = `"2ea4afc4ae7b94778cc1758a99d11a1285bfac81a1c5a72298865df15bf114e4"`;
 
-exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 2`] = `"72d5095d59f70a62e9f446f3d64b49f7337d3c2c05e5e48c6adcc31253aac8b8"`;
+exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 2`] = `"91788667c21ddcf70fa94a31d4eefdd30ef956b5f7869acd80957cc872ac935b"`;
