@@ -75,6 +75,7 @@ import ChevronsDown from '@lucide/svelte/icons/chevrons-down';
 import Maximize2 from '@lucide/svelte/icons/maximize-2';
 import RotateCw from '@lucide/svelte/icons/rotate-cw';
 import Blend from '@lucide/svelte/icons/blend';
+import Crosshair from '@lucide/svelte/icons/crosshair';
 import Diamond from '@lucide/svelte/icons/diamond';
 import ZoomIn from '@lucide/svelte/icons/zoom-in';
 import ZoomOut from '@lucide/svelte/icons/zoom-out';
@@ -341,6 +342,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.PreviewActual]: { name: 'Preview at 100%', icon: SquareDashed, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.TogglePixelGrid]: { name: 'Pixel grid', icon: Grid3x3, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleLayoutGuides]: { name: 'Layout guides', icon: LayoutGrid, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.TogglePivot]: { name: 'Rotation origin', icon: Crosshair, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleOutlines]: { name: 'Outline view', icon: VectorSquare, group: GuideGroup.View, menu: MenuSection.View },
   [Command.PreviewSelection]: { name: 'Zoom to selection', icon: Scan, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleInspector]: { name: 'Properties panel', icon: PanelRight, group: GuideGroup.View, place: Place.Bar },

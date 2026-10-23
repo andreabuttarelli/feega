@@ -23,6 +23,12 @@ describe('frame view shortcuts', () => {
     expect(matchCanvasShortcut({ key: 'G', shiftKey: true, metaKey: false, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Guides });
     expect(matchCanvasShortcut({ key: 'y', shiftKey: false, metaKey: true, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Outlines });
   });
+
+  it('Alt R shows the rotation origin', () => {
+    const at = { tagName: 'DIV', isContentEditable: false };
+
+    expect(matchCanvasShortcut({ key: '®', code: 'KeyR', shiftKey: false, metaKey: false, ctrlKey: false, altKey: true, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Pivot });
+  });
 });
 
 /** Un evento tastiera finto: bastano i campi che il registro guarda. */

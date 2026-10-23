@@ -25,6 +25,7 @@
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '$lib/motion/doc';
   import { findClip, type MotionClip } from '$lib/motion/doc';
+  import { TRANSFORM } from '$lib/motion/keyframes';
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import GradientHandles from '../GradientHandles.svelte';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
@@ -1765,7 +1766,9 @@
     const onScreen = (p: Point): [number, number] => [(p.x - at.frame.box.x) * view.zoom, (p.y - at.frame.box.y) * view.zoom];
     return picks.flatMap((clip) => {
       const quad = at.picker.outlineQuad(clip, at.space);
-      return quad ? [{ clip, kind, quad: quad.map(onScreen) }] : [];
+      const own = findClip(at.live.doc, clip)?.clip;
+      const pivot: [number, number] = [own?.transform.anchorX ?? TRANSFORM.anchorX.fallback, own?.transform.anchorY ?? TRANSFORM.anchorY.fallback];
+      return quad ? [{ clip, kind, pivot, quad: quad.map(onScreen) }] : [];
     });
   }
 
@@ -3249,7 +3252,7 @@
           <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={shows(frameViews, FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}

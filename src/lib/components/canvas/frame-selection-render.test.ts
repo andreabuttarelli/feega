@@ -30,6 +30,21 @@ let unpublish = () => {};
 
 afterEach(() => unpublish());
 
+describe('the pivot of the selection', () => {
+  const pivot = (props: Record<string, unknown>) => render(FrameSelection, { props: { clip: 'card', quad: QUAD, ongrab: () => {}, ...props } }).body;
+
+  it('is drawn at its share of the box when asked for', () => {
+    const body = pivot({ pivot: [0.25, 0.5] });
+
+    expect(body).toContain('data-testid="frame-selection-pivot"');
+    expect(body).toContain('left:25px;top:25px');
+  });
+
+  it('is not drawn by default', () => {
+    expect(pivot({})).not.toContain('frame-selection-pivot');
+  });
+});
+
 describe('the selection drawn over a core frame', () => {
   it('outlines the element with a body to move and eight handles to resize', () => {
     const body = render(FrameSelection, { props: { clip: 'card', quad: QUAD, ongrab: () => {} } }).body;

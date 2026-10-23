@@ -63,7 +63,8 @@ const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
 const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
   [Command.TogglePixelGrid]: FrameView.PixelGrid,
   [Command.ToggleLayoutGuides]: FrameView.Guides,
-  [Command.ToggleOutlines]: FrameView.Outlines
+  [Command.ToggleOutlines]: FrameView.Outlines,
+  [Command.TogglePivot]: FrameView.Pivot
 };
 
 function viewFor(e: KeyboardEvent): FrameView | null {
@@ -116,6 +117,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.TogglePixelGrid]: { id: 'view', view: FrameView.PixelGrid },
   [Command.ToggleLayoutGuides]: { id: 'view', view: FrameView.Guides },
   [Command.ToggleOutlines]: { id: 'view', view: FrameView.Outlines },
+  [Command.TogglePivot]: { id: 'view', view: FrameView.Pivot },
   [Command.MoveLeft]: nudgeBy(-1, 0, NUDGE_STEP),
   [Command.MoveRight]: nudgeBy(1, 0, NUDGE_STEP),
   [Command.MoveUp]: nudgeBy(0, -1, NUDGE_STEP),
@@ -157,6 +159,7 @@ function altCommand(e: KeyboardEvent): CanvasCommand | null {
   if (isTypingTarget(e.target) || e.shiftKey) return null;
   const mod = e.metaKey || e.ctrlKey;
   if (mod) return e.code === 'KeyT' ? { id: 'tidy' } : null;
+  if (e.code === 'KeyR') return { id: 'view', view: FrameView.Pivot };
   const edge = ALT_ALIGN[e.code];
   return edge ? { id: 'align', edge } : null;
 }
