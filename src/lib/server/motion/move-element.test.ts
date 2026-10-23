@@ -4,7 +4,7 @@ import { addClip } from '$lib/motion/timeline';
 import { setStill } from '$lib/motion/still';
 import { OutputKind, type Output } from '$lib/motion/move-element';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
-import { DropOn, MoveOutcome, copyElement, moveElement, placeMedia, placeOutput, retireFrameInputs, type FrameStore, type StoredFrame } from './move-element';
+import { DropOn, MoveOutcome, copyElement, moveElement, pastedSchema, placeMedia, placeOutput, retireFrameInputs, type FrameStore, type StoredFrame } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const VIDEO_ID = '33333333-2222-4333-8444-555555555555';
@@ -296,5 +296,28 @@ describe('copying an element out of a frame', () => {
     expect(copied).toMatchObject({ outcome: MoveOutcome.Done, frameId: 'b' });
     expect(findClip(headOf(m, 'a').doc, 'txt')).not.toBeNull();
     expect(clipsOf(headOf(m, 'b').doc)).toHaveLength(1);
+  });
+});
+
+describe('pastedSchema', () => {
+  const gradient = { type: 'linear-gradient', stops: [{ color: '#ff0000', pos: 0 }, { color: '#0000ff', pos: 1 }], angle: 90 };
+
+  it('lets a pasted path carry a gradient fill', () => {
+    const parsed = pastedSchema.safeParse({ tool: 'pen', path: 'M0 0L10 0L10 10Z', fill: '#ff0000', stroke: null, gradient });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it('refuses a gradient with one stop', () => {
+    const parsed = pastedSchema.safeParse({ tool: 'pen', path: 'M0 0L10 0L10 10Z', gradient: { ...gradient, stops: [gradient.stops[0]] } });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('lets a pasted text carry its colour and weight', () => {
+    const box = { left: 0, top: 0, width: 100, height: 30 };
+
+    expect(pastedSchema.safeParse({ tool: 'text', box, text: 'hi', color: '#336699', weight: 700 }).success).toBe(true);
+    expect(pastedSchema.safeParse({ tool: 'text', box, text: 'hi', color: 'red' }).success).toBe(false);
   });
 });

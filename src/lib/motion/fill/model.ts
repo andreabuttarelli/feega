@@ -59,25 +59,31 @@ const base = {
   blend: z.enum(BLEND_MODES).default(BlendMode.Normal)
 };
 
+const linearFill = z.object({
+  type: z.literal(FillType.Linear),
+  stops,
+  angle: z.number().min(-360).max(360).default(DEFAULT_ANGLE),
+  ...base
+});
+
+const radialFill = z.object({
+  type: z.literal(FillType.Radial),
+  stops,
+  center: point.default({ x: CENTRE, y: CENTRE }),
+  radius: z.number().min(0.01).max(4).default(1),
+  ...base
+});
+
+export const gradientFillSchema = z.discriminatedUnion('type', [linearFill, radialFill]);
+
 export const fillSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(FillType.Solid),
     color: z.string().min(1).max(64),
     ...base
   }),
-  z.object({
-    type: z.literal(FillType.Linear),
-    stops,
-    angle: z.number().min(-360).max(360).default(DEFAULT_ANGLE),
-    ...base
-  }),
-  z.object({
-    type: z.literal(FillType.Radial),
-    stops,
-    center: point.default({ x: CENTRE, y: CENTRE }),
-    radius: z.number().min(0.01).max(4).default(1),
-    ...base
-  }),
+  linearFill,
+  radialFill,
   z.object({
     type: z.literal(FillType.Angular),
     stops,

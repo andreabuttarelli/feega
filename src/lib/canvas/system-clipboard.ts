@@ -31,6 +31,8 @@ export const HTML_MIME = 'text/html';
 export const TEXT_MIME = 'text/plain';
 export const SVG_MIME = 'image/svg+xml';
 
+export const isSvgFile = (file: PasteFile) => file.type === SVG_MIME || /\.svg$/i.test(file.name);
+
 const PAYLOAD_ATTR = 'data-feega-clipboard';
 const PAYLOAD = new RegExp(`${PAYLOAD_ATTR}="([A-Za-z0-9+/=]*)"`);
 const FIGMA = /\(figma\)|\(figmeta\)/;

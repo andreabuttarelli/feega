@@ -9,6 +9,7 @@ import { FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, frameChrom
 import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
+import { gradientFillSchema } from '$lib/motion/fill/model';
 import { frameShape } from './start';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
@@ -525,6 +526,7 @@ export function frameRequest(store: FrameStore, ask: z.infer<typeof frameRequest
 export const canvasBoxSchema = z.object({ left: z.number().finite(), top: z.number().finite(), width: z.number().positive(), height: z.number().positive() }).strict();
 
 const PASTED_TEXT_MAX = 5000;
+const PASTED_WEIGHT = { min: 100, max: 1000 };
 const hexColour = z.string().regex(/^#[0-9a-f]{6}$/i);
 
 const drawnBox = z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse, DrawTool.Polygon, DrawTool.Star]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional(), sizing: z.enum(TEXT_SIZINGS).optional() }).strict();
@@ -533,8 +535,8 @@ const drawnPen = z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(
 export const drawnSchema = z.discriminatedUnion('tool', [drawnBox, drawnPen]);
 
 export const pastedSchema = z.discriminatedUnion('tool', [
-  drawnBox.extend({ text: z.string().min(1).max(PASTED_TEXT_MAX).optional() }),
-  drawnPen.extend({ fill: hexColour.nullable().optional(), stroke: hexColour.nullable().optional() })
+  drawnBox.extend({ text: z.string().min(1).max(PASTED_TEXT_MAX).optional(), color: hexColour.optional(), weight: z.number().int().min(PASTED_WEIGHT.min).max(PASTED_WEIGHT.max).optional() }),
+  drawnPen.extend({ fill: hexColour.nullable().optional(), stroke: hexColour.nullable().optional(), gradient: gradientFillSchema.optional() })
 ]);
 
 export async function drawElement(store: FrameStore, place: Place & { id?: string }, wire: z.infer<typeof pastedSchema>): Promise<Moved> {

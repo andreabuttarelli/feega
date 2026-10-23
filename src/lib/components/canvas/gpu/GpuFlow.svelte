@@ -99,6 +99,7 @@
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
+  import { isSvgFile } from '$lib/canvas/system-clipboard';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import { FrameKind, MOTION_NODE_BAR_H, TileBody, frameChrome } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
@@ -2779,7 +2780,7 @@
     const files = [...(e.dataTransfer?.files ?? [])];
     if (files.length && props.onUpload) {
       e.preventDefault();
-      files.forEach((file) => props.onUpload?.(file));
+      files.forEach((file) => props.onUpload?.(file, isSvgFile(file) ? toFlow(at) : undefined));
       return;
     }
     const output = e.dataTransfer?.getData(CANVAS_DRAG_OUTPUT);
@@ -3107,7 +3108,7 @@
   {#if spec.chrome && props.onCreate}
     <CanvasAddBar
       onpick={addAtCentre}
-      onupload={props.onUpload}
+      onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) ? viewCentre() : undefined) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}

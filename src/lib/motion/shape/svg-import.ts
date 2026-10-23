@@ -1,11 +1,22 @@
+import { FillType } from '../fill/model';
+
 type Matrix = [a: number, b: number, c: number, d: number, e: number, f: number];
 type Pt = [number, number];
 type Segment = { cmd: 'M' | 'L' | 'C' | 'Z'; pts: Pt[] };
 type Attrs = Record<string, string>;
 type Paint = { fill: string | null; stroke: string | null };
 
-export type SvgShape = { path: string; fill: string | null; stroke: string | null };
-export type SvgRead = { size: { width: number; height: number }; shapes: SvgShape[] };
+type Box = { left: number; top: number; right: number; bottom: number };
+type Stop = { color: string; pos: number };
+type GradientDef = { kind: FillType.Linear | FillType.Radial; attrs: Attrs; stops: Stop[] };
+
+export type SvgGradient =
+  | { type: FillType.Linear; stops: Stop[]; angle: number }
+  | { type: FillType.Radial; stops: Stop[]; center: { x: number; y: number }; radius: number };
+export type SvgShape = { path: string; fill: string | null; stroke: string | null; gradient?: SvgGradient };
+export type SvgTextAnchor = 'start' | 'middle' | 'end';
+export type SvgText = { text: string; x: number; y: number; size: number; fill: string; weight: number; anchor: SvgTextAnchor };
+export type SvgRead = { size: { width: number; height: number }; shapes: SvgShape[]; texts: SvgText[] };
 
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 const DEFAULT_SIDE = 100;
@@ -19,6 +30,23 @@ const PATH_TOKEN = /[MmLlHhVvCcSsQqTtAaZz]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g
 const COMMAND = /^[MmLlHhVvCcSsQqTtAaZz]$/;
 const ARITY: Record<string, number> = { m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4, t: 2, a: 7, z: 0 };
 const ARC_FLAGS = new Set([3, 4]);
+const MAX_STOPS = 8;
+const DEFAULT_TEXT_SIZE = 16;
+const REGULAR_WEIGHT = 400;
+const BOLD_WEIGHT = 700;
+const LINE_BREAK = '\u0000';
+const RADIAL_FULL = 2;
+const MIN_RADIUS = 0.01;
+const MAX_RADIUS = 4;
+const ANGLE_DIGITS = 100;
+const CSS_ANGLE_OFFSET = 90;
+const USER_SPACE = 'userspaceonuse';
+const GRADIENT = /<(linearGradient|radialGradient)\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/\1\s*>/gi;
+const STOP = /<stop\b((?:[^>"']|"[^"]*"|'[^']*')*?)\/?>/gi;
+const CLIP = /<clipPath\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/clipPath\s*>/gi;
+const URL_REF = /^url\(\s*['"]?#([^'")\s]+)/;
+const LINE_TSPAN = /<tspan\b(?=[^>]*\s(?:y|dy)\s*=)[^>]*>/gi;
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 
 const NAMED: Record<string, string> = {
   black: '#000000',
@@ -38,6 +66,9 @@ const NAMED: Record<string, string> = {
 const hex2 = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
 
 function colour(raw: string | undefined): string | null | undefined {
+  if (raw?.trim().startsWith('url(')) {
+    return raw.trim();
+  }
   const v = raw?.trim().toLowerCase();
   if (!v) {
     return undefined;
@@ -293,11 +324,31 @@ function ellipsePath(cx: number, cy: number, rx: number, ry: number): string {
   ].join(' ');
 }
 
+function roundedRect(x: number, y: number, w: number, h: number, rx: number, ry: number): string {
+  return [
+    `M${x + rx} ${y}`,
+    `H${x + w - rx}`,
+    `A${rx} ${ry} 0 0 1 ${x + w} ${y + ry}`,
+    `V${y + h - ry}`,
+    `A${rx} ${ry} 0 0 1 ${x + w - rx} ${y + h}`,
+    `H${x + rx}`,
+    `A${rx} ${ry} 0 0 1 ${x} ${y + h - ry}`,
+    `V${y + ry}`,
+    `A${rx} ${ry} 0 0 1 ${x + rx} ${y}`,
+    'Z'
+  ].join(' ');
+}
+
 const SHAPE_PATH: Record<string, (a: Attrs) => string> = {
   path: (a) => a.d ?? '',
   rect: (a) => {
     const [x, y, w, h] = [num(a.x), num(a.y), num(a.width), num(a.height)];
-    return w > 0 && h > 0 ? `M${x} ${y} H${x + w} V${y + h} H${x} Z` : '';
+    if (!(w > 0 && h > 0)) {
+      return '';
+    }
+    const rx = Math.min(num(a.rx, num(a.ry)), w / 2);
+    const ry = Math.min(num(a.ry, num(a.rx)), h / 2);
+    return rx > 0 && ry > 0 ? roundedRect(x, y, w, h, rx, ry) : `M${x} ${y} H${x + w} V${y + h} H${x} Z`;
   },
   circle: (a) => (num(a.r) > 0 ? ellipsePath(num(a.cx), num(a.cy), num(a.r), num(a.r)) : ''),
   ellipse: (a) => (num(a.rx) > 0 && num(a.ry) > 0 ? ellipsePath(num(a.cx), num(a.cy), num(a.rx), num(a.ry)) : ''),
@@ -330,15 +381,149 @@ function paintOf(a: Attrs, inherited: Paint): Paint {
   return { fill: fill === undefined ? inherited.fill : fill, stroke: stroke === undefined ? inherited.stroke : stroke };
 }
 
+const fraction = (raw: string | undefined, fallback: number) => (raw === undefined ? fallback : raw.includes('%') ? num(raw) / 100 : num(raw, fallback));
+
+function gradientsOf(svg: string): Map<string, GradientDef> {
+  const found = new Map<string, GradientDef>();
+  for (const g of svg.matchAll(GRADIENT)) {
+    const attrs = attrsOf(g[2]);
+    const stops = [...g[3].matchAll(STOP)].slice(0, MAX_STOPS).map((m) => {
+      const stop = attrsOf(m[1]);
+      return { color: colour(stop['stop-color']) ?? NAMED.black, pos: Math.max(0, Math.min(1, fraction(stop.offset, 0))) };
+    });
+    if (attrs.id && stops.length) {
+      found.set(attrs.id, { kind: g[1].toLowerCase() === 'lineargradient' ? FillType.Linear : FillType.Radial, attrs, stops });
+    }
+  }
+  return found;
+}
+
+const boundsOfSegments = (segments: Segment[]): Box => {
+  const pts = segments.flatMap((s) => s.pts);
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+};
+
+const unit = (n: number, side: number) => (side > 0 ? n / side : 0);
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+
+function gradientOf(def: GradientDef, bounds: Box): SvgGradient {
+  const [w, h] = [bounds.right - bounds.left, bounds.bottom - bounds.top];
+  const absolute = def.attrs.gradientunits?.toLowerCase() === USER_SPACE;
+  const stops = def.stops.length > 1 ? def.stops : [...def.stops, ...def.stops];
+  if (def.kind === FillType.Linear) {
+    const [x1, y1, x2, y2] = [fraction(def.attrs.x1, 0), fraction(def.attrs.y1, 0), fraction(def.attrs.x2, 1), fraction(def.attrs.y2, 0)];
+    const [dx, dy] = absolute ? [x2 - x1, y2 - y1] : [(x2 - x1) * w, (y2 - y1) * h];
+    const css = (Math.atan2(dx, -dy) * 180) / Math.PI;
+    return { type: FillType.Linear, stops, angle: Math.round((css - CSS_ANGLE_OFFSET) * ANGLE_DIGITS) / ANGLE_DIGITS };
+  }
+  const [cx, cy, r] = [fraction(def.attrs.cx, 0.5), fraction(def.attrs.cy, 0.5), fraction(def.attrs.r, 0.5)];
+  const center = absolute ? { x: unit(cx - bounds.left, w), y: unit(cy - bounds.top, h) } : { x: cx, y: cy };
+  const radius = absolute ? unit(r, Math.max(w, h) / 2) : r * RADIAL_FULL;
+  return { type: FillType.Radial, stops, center: { x: clamp(center.x, 0, 1), y: clamp(center.y, 0, 1) }, radius: clamp(radius, MIN_RADIUS, MAX_RADIUS) };
+}
+
+const refOf = (paint: string | null | undefined) => paint?.match(URL_REF)?.[1];
+
+function clipsOf(svg: string): Map<string, Box> {
+  const found = new Map<string, Box>();
+  for (const c of svg.matchAll(CLIP)) {
+    const id = attrsOf(c[1]).id;
+    const segments = svgShapes(`<svg>${c[2]}</svg>`).shapes.flatMap((sh) => pathSegments(sh.path));
+    if (id && segments.some((s) => s.pts.length)) {
+      found.set(id, boundsOfSegments(segments));
+    }
+  }
+  return found;
+}
+
+function movedBox(box: Box, m: Matrix): Box {
+  const corners: Pt[] = [[box.left, box.top], [box.right, box.top], [box.right, box.bottom], [box.left, box.bottom]];
+  return boundsOfSegments([{ cmd: 'L', pts: corners.map((p) => apply(m, p)) }]);
+}
+
+const overlap = (a: Box, b: Box): Box => ({ left: Math.max(a.left, b.left), top: Math.max(a.top, b.top), right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom) });
+
+const isEmpty = (b: Box) => b.right <= b.left || b.bottom <= b.top;
+
+const inside = (inner: Box, outer: Box) => inner.left >= outer.left && inner.top >= outer.top && inner.right <= outer.right && inner.bottom <= outer.bottom;
+
+function isRect(segments: Segment[]): boolean {
+  const pts = segments.flatMap((s) => s.pts);
+  return segments.every((s) => s.cmd !== 'C') && new Set(pts.map((p) => p[0])).size <= 2 && new Set(pts.map((p) => p[1])).size <= 2;
+}
+
+function clippedTo(segments: Segment[], clip: Box): Segment[] | null {
+  const bounds = boundsOfSegments(segments);
+  if (isEmpty(overlap(bounds, clip))) {
+    return null;
+  }
+  if (inside(bounds, clip) || !isRect(segments)) {
+    return segments;
+  }
+  return segments.map((s) => ({ cmd: s.cmd, pts: s.pts.map(([x, y]): Pt => [clamp(x, clip.left, clip.right), clamp(y, clip.top, clip.bottom)]) }));
+}
+
+const decoded = (s: string) =>
+  s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (whole, name: string) => {
+    if (name.startsWith('#')) {
+      return String.fromCodePoint(name[1].toLowerCase() === 'x' ? parseInt(name.slice(2), 16) : Number(name.slice(1)));
+    }
+    return ENTITIES[name.toLowerCase()] ?? whole;
+  });
+
+function textOf(inner: string): string {
+  return inner
+    .replace(LINE_TSPAN, LINE_BREAK)
+    .replace(/<[^>]*>/g, '')
+    .split(LINE_BREAK)
+    .map((line) => decoded(line).replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+const WEIGHTS: Record<string, number> = { normal: REGULAR_WEIGHT, bold: BOLD_WEIGHT };
+
+const weightOf = (raw: string | undefined) => WEIGHTS[raw?.trim().toLowerCase() ?? ''] ?? (num(raw, REGULAR_WEIGHT) || REGULAR_WEIGHT);
+
+const ANCHORS: Record<string, SvgTextAnchor> = { start: 'start', middle: 'middle', end: 'end' };
+
+type TextOrigin = { from: number; attrs: Attrs; matrix: Matrix; fill: string };
+
+function textAt(svg: string, o: TextOrigin): SvgText | null {
+  const a = o.attrs;
+  const close = svg.toLowerCase().indexOf('</text', o.from);
+  const text = close < 0 ? '' : textOf(svg.slice(o.from, close));
+  if (!text || a.display === 'none' || a.visibility === 'hidden') {
+    return null;
+  }
+  const [x, y] = apply(o.matrix, [num(a.x), num(a.y)]);
+  const scale = Math.sqrt(Math.abs(o.matrix[0] * o.matrix[3] - o.matrix[1] * o.matrix[2]));
+  return { text, x: round(x), y: round(y), size: round(num(a['font-size'], DEFAULT_TEXT_SIZE) * scale), fill: o.fill, weight: weightOf(a['font-weight']), anchor: ANCHORS[a['text-anchor']] ?? 'start' };
+}
+
+type Frame = { tag: string; matrix: Matrix; paint: Paint; clip: Box | null };
+
+const ROOT_FRAME: Frame = { tag: '', matrix: IDENTITY, paint: { fill: NAMED.black, stroke: null }, clip: null };
+
 export function svgShapes(svg: string): SvgRead {
   const shapes: SvgShape[] = [];
-  const empty: SvgRead = { size: { width: DEFAULT_SIDE, height: DEFAULT_SIDE }, shapes };
-  const stack: { tag: string; matrix: Matrix; paint: Paint }[] = [];
+  const texts: SvgText[] = [];
+  const empty: SvgRead = { size: { width: DEFAULT_SIDE, height: DEFAULT_SIDE }, shapes, texts };
+  const gradients = gradientsOf(svg);
+  const clips = clipsOf(svg);
+  const stack: Frame[] = [];
   let size = empty.size;
   let hidden = 0;
 
+  const solid = (paint: string): string => {
+    const ref = refOf(paint);
+    return ref ? (gradients.get(ref)?.stops[0].color ?? NAMED.black) : paint;
+  };
+
   for (const m of svg.matchAll(TAG)) {
-    const [, closing, rawTag, rawAttrs, selfClosing] = m;
+    const [whole, closing, rawTag, rawAttrs, selfClosing] = m;
     const tag = rawTag.toLowerCase().replace(/^svg:/, '');
     if (closing) {
       const at = stack.map((s) => s.tag).lastIndexOf(tag);
@@ -348,6 +533,15 @@ export function svgShapes(svg: string): SvgRead {
       hidden = Math.max(0, hidden - (HIDDEN_TAGS.has(tag) ? 1 : 0));
       continue;
     }
+    const parent = stack[stack.length - 1] ?? ROOT_FRAME;
+    const a = attrsOf(rawAttrs);
+    if (tag === 'text' && !hidden && !selfClosing) {
+      const paint = paintOf(a, parent.paint);
+      const read = textAt(svg, { from: (m.index ?? 0) + whole.length, attrs: a, matrix: multiply(parent.matrix, transformOf(a.transform)), fill: solid(paint.fill ?? NAMED.black) });
+      if (read) {
+        texts.push(read);
+      }
+    }
     if (HIDDEN_TAGS.has(tag)) {
       hidden += selfClosing ? 0 : 1;
       continue;
@@ -356,24 +550,36 @@ export function svgShapes(svg: string): SvgRead {
       continue;
     }
 
-    const a = attrsOf(rawAttrs);
-    const parent = stack[stack.length - 1] ?? { matrix: IDENTITY, paint: { fill: NAMED.black, stroke: null } };
     const root = tag === 'svg' && !stack.length ? rootOf(a) : null;
     if (root) {
       size = root.size;
     }
     const matrix = multiply(multiply(parent.matrix, root?.matrix ?? IDENTITY), transformOf(a.transform));
     const paint = paintOf(a, parent.paint);
+    const clipBox = clips.get(refOf(a['clip-path']) ?? '');
+    const own = clipBox ? movedBox(clipBox, matrix) : null;
+    const clip = own && parent.clip ? overlap(own, parent.clip) : (own ?? parent.clip);
 
     const make = SHAPE_PATH[tag];
-    const segments = make ? pathSegments(make(a)) : [];
+    const local = make ? pathSegments(make(a)) : [];
     const fill = OPEN_SHAPES.has(tag) ? null : paint.fill;
-    if (segments.length > 1 && (fill || paint.stroke) && a.display !== 'none' && a.visibility !== 'hidden') {
-      shapes.push({ path: placed(segments, matrix), fill, stroke: paint.stroke });
+    if (local.length > 1 && (fill || paint.stroke) && a.display !== 'none' && a.visibility !== 'hidden') {
+      const world = local.map((s) => ({ cmd: s.cmd, pts: s.pts.map((p) => apply(matrix, p)) }));
+      const kept = clip ? clippedTo(world, clip) : world;
+      const ref = refOf(fill);
+      const def = ref ? gradients.get(ref) : undefined;
+      if (kept) {
+        shapes.push({
+          path: placed(kept, IDENTITY),
+          fill: fill === null ? null : solid(fill),
+          stroke: paint.stroke === null ? null : solid(paint.stroke),
+          ...(def ? { gradient: gradientOf(def, boundsOfSegments(local)) } : {})
+        });
+      }
     }
     if (!selfClosing && !make) {
-      stack.push({ tag, matrix, paint });
+      stack.push({ tag, matrix, paint, clip });
     }
   }
-  return stack.length || shapes.length ? { size, shapes } : empty;
+  return stack.length || shapes.length || texts.length ? { size, shapes, texts } : empty;
 }

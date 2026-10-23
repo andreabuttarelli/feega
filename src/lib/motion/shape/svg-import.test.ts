@@ -51,4 +51,67 @@ describe('svgShapes', () => {
   it('refuses text that is not svg', () => {
     expect(svgShapes('hello').shapes).toEqual([]);
   });
+
+  it('reads a linear gradient fill as a gradient layer with its stops and angle', () => {
+    const svg = `<svg viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff0000"/><stop offset="1" stop-color="#0000ff"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/></svg>`;
+    const [shape] = svgShapes(svg).shapes;
+    expect(shape.fill).toBe('#ff0000');
+    expect(shape.gradient).toEqual({
+      type: 'linear-gradient',
+      stops: [
+        { color: '#ff0000', pos: 0 },
+        { color: '#0000ff', pos: 1 }
+      ],
+      angle: 90
+    });
+  });
+
+  it('reads a radial gradient with its centre and radius in box units', () => {
+    const svg = `<svg viewBox="0 0 100 100"><defs><radialGradient id="r" cx="0.25" cy="0.75" r="0.5"><stop offset="0" style="stop-color:#ffffff"/><stop offset="100%" stop-color="#000000"/></radialGradient></defs><circle cx="50" cy="50" r="40" fill="url(#r)"/></svg>`;
+    const [shape] = svgShapes(svg).shapes;
+    expect(shape.gradient).toMatchObject({ type: 'radial-gradient', center: { x: 0.25, y: 0.75 }, radius: 1 });
+  });
+
+  it('measures a user-space gradient against the shape it paints', () => {
+    const svg = `<svg viewBox="0 0 100 100"><defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="0"><stop offset="0" stop-color="#000"/><stop offset="1" stop-color="#fff"/></linearGradient></defs><rect x="50" width="50" height="100" fill="url(#g)"/></svg>`;
+    const [shape] = svgShapes(svg).shapes;
+    expect(shape.gradient).toMatchObject({ type: 'linear-gradient', angle: 0 });
+  });
+
+  it('falls back to the first stop when a gradient is missing', () => {
+    const [shape] = svgShapes(`<svg viewBox="0 0 10 10"><rect width="5" height="5" fill="url(#nope)"/></svg>`).shapes;
+    expect(shape.gradient).toBeUndefined();
+    expect(shape.fill).toBe('#000000');
+  });
+
+  it('rounds the corners of a rect with rx and ry', () => {
+    const [shape] = svgShapes(`<svg viewBox="0 0 100 50"><rect width="100" height="50" rx="10" fill="#000"/></svg>`).shapes;
+    expect(shape.path).toContain('C');
+    expect(box(shape.path)).toEqual({ left: 0, top: 0, right: 100, bottom: 50 });
+  });
+
+  it('caps a corner radius at half the short side', () => {
+    const [shape] = svgShapes(`<svg viewBox="0 0 100 50"><rect width="100" height="50" rx="90" fill="#000"/></svg>`).shapes;
+    expect(box(shape.path)).toEqual({ left: 0, top: 0, right: 100, bottom: 50 });
+  });
+
+  it('clamps a rect to its clip path and drops shapes outside it', () => {
+    const svg = `<svg viewBox="0 0 100 100"><defs><clipPath id="c"><rect x="0" y="0" width="50" height="100"/></clipPath></defs><g clip-path="url(#c)"><rect x="25" width="50" height="100" fill="#f00"/><rect x="60" width="30" height="100" fill="#0f0"/></g></svg>`;
+    const read = svgShapes(svg);
+    expect(read.shapes).toHaveLength(1);
+    expect(box(read.shapes[0].path)).toEqual({ left: 25, top: 0, right: 50, bottom: 100 });
+  });
+
+  it('reads text as positioned text with size, colour and weight', () => {
+    const svg = `<svg viewBox="0 0 200 100"><text x="20" y="50" font-size="24" font-weight="700" fill="#336699" font-family="Inter, sans-serif">Hello &amp; bye</text></svg>`;
+    const read = svgShapes(svg);
+    expect(read.shapes).toEqual([]);
+    expect(read.texts).toEqual([{ text: 'Hello & bye', x: 20, y: 50, size: 24, fill: '#336699', weight: 700, anchor: 'start' }]);
+  });
+
+  it('scales and offsets text with the transforms above it and splits tspans into lines', () => {
+    const svg = `<svg viewBox="0 0 100 100"><g transform="translate(10 10) scale(2)"><text x="5" y="10" font-size="10" text-anchor="middle"><tspan x="5" dy="0">one</tspan><tspan x="5" dy="12">two</tspan></text></g></svg>`;
+    const [text] = svgShapes(svg).texts;
+    expect(text).toMatchObject({ text: 'one\ntwo', x: 20, y: 30, size: 20, anchor: 'middle' });
+  });
 });

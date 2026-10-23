@@ -78,7 +78,7 @@ export type FlowProps = {
   onFlow?: (
     toFlow: (p: { x: number; y: number }) => { x: number; y: number },
   ) => void;
-  onUpload?: (file: File) => void;
+  onUpload?: (file: File, at?: { x: number; y: number }) => void;
   onDuplicate?: (ids: string[], offset?: Offset) => void;
   onCopy?: (ids: string[]) => void;
   onPaste?: (at: { x: number; y: number }) => void;

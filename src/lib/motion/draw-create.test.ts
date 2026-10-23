@@ -7,6 +7,7 @@ import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, lineOutlin
 import { parsePath, type Outline } from './shape/geometry';
 import type { OpResult } from './timeline';
 import { TextSizing } from './text-sizing';
+import { FillType } from './fill/model';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -115,6 +116,20 @@ describe('drawing an element on the canvas, outside any frame', () => {
 
     expect(findClip(filled.doc, 'f1')!.clip.props).toMatchObject({ fill: '#ff0000', fillKind: 'solid' });
     expect(findClip(stroked.doc, 's1')!.clip.props).toMatchObject({ fillKind: 'none', strokeKind: 'solid', stroke: '#00ff00' });
+  });
+
+  it('a pasted path keeps its gradient as a fill layer', () => {
+    const outline = parsePath('M 0 0 L 10 0 L 10 10 Z') as Outline;
+    const gradient = { type: FillType.Linear, stops: [{ color: '#ff0000', pos: 0 }, { color: '#0000ff', pos: 1 }], angle: 90 };
+    const drawn = made(drawnElement({ tool: DrawTool.Pen, outline, fill: '#ff0000', gradient }, 'g1'));
+
+    expect(findClip(drawn.doc, 'g1')!.clip.props.fills).toMatchObject([gradient]);
+  });
+
+  it('a pasted text keeps its colour', () => {
+    const drawn = made(drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 60 }, text: 'hi', color: '#336699' }, 't3'));
+
+    expect(findClip(drawn.doc, 't3')!.clip.props.color).toBe('#336699');
   });
 
   it('a pasted text carries its words', () => {
