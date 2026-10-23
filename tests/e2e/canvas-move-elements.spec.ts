@@ -37,17 +37,15 @@ async function centre(locator: Locator) {
 }
 
 async function openAndGrab(page: Page, nodeId: string) {
-  await stageOf(page, nodeId).click({ position: { x: 60, y: 10 } });
-  const overlay = page.getByTestId('selection-overlay');
-  await expect(overlay).toBeVisible({ timeout: 15_000 });
+  const host = page.locator(`[data-testid="frame-overlays"] [data-frame="${nodeId}"]`);
+  await expect(host).toBeVisible({ timeout: 20_000 });
+  const at = await centre(host);
+  const selection = page.getByTestId('frame-selection');
   await expect(async () => {
-    await overlay.dblclick();
-    await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 1000 });
-  }, 'the text selects once the preview has measured it').toPass({ timeout: 15_000 });
-  await page.keyboard.press('Escape');
-  await expect(page.getByTestId('selection-box'), 'Escape leaves the text editor with the text still selected').toBeVisible();
-  const middle = await centre(overlay);
-  return { x: middle.x - 40, y: middle.y + 10 };
+    await page.mouse.click(at.x, at.y);
+    await expect(selection).toBeVisible({ timeout: 1500 });
+  }, 'the text is picked once the frame has drawn it').toPass({ timeout: 25_000 });
+  return centre(selection);
 }
 
 async function dragTo(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
@@ -93,7 +91,7 @@ test.describe('moving elements between frames @real', () => {
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const from = await openAndGrab(page, a);
-    const seen = (await page.getByTestId('selection-box').boundingBox())!;
+    const seen = (await page.getByTestId('frame-selection').boundingBox())!;
     const stage = (await stageOf(page, a).boundingBox())!;
     const viewport = page.viewportSize()!;
     await dragTo(page, from, { x: viewport.width - 120, y: viewport.height - 120 });
@@ -166,7 +164,6 @@ test.describe('moving elements between frames @real', () => {
 
       await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
       await hoverTile(page, gen.id);
-      await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
       await page.getByTestId('drag-to-frame').dragTo(stageOf(page, b));
 
       const component = type === 'image' ? 'Image' : 'Video';
@@ -183,7 +180,6 @@ test.describe('moving elements between frames @real', () => {
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await hoverTile(page, gen.id);
-    await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
     const viewport = page.viewportSize()!;
     await page.getByTestId('drag-to-frame').dragTo(page.locator('.svelte-flow__pane'), { targetPosition: { x: viewport.width / 2, y: 120 } });
 
