@@ -221,6 +221,25 @@ describe('displayListAt', () => {
     expect(new Set(kinds(fill([{ type: 'angular-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
   });
 
+  it('draws angular and diamond fills on every shape kind instead of dropping the shape', () => {
+    const stops = [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }];
+    const shapes = [{ shape: 'rect' }, { shape: 'ellipse' }, { shape: 'path', path: 'M0 0 L1 0 L1 1 Z' }];
+    const fills = [
+      { fill: { type: 'angular-gradient', angle: 90, center: { x: 0.25, y: 0.5 }, stops }, paint: { kind: PaintKind.Sweep, center: [48, 54], start: 0 } },
+      { fill: { type: 'diamond-gradient', stops }, paint: { kind: PaintKind.Diamond, center: [96, 54], half: [96, 54] } }
+    ];
+
+    for (const kind of shapes) {
+      for (const { fill, paint } of fills) {
+        const shaped = must(addClip(withBg, { component: 'Shape', from: 0, durationInFrames: 90, props: { ...square, ...kind, fills: [fill] } }, 's'));
+        const drawn = displayListAt(shaped, 0, FEEGA_TOKENS);
+
+        expect(drawn.unsupported).toEqual([]);
+        expect(pathOf(shaped, 's')?.paint).toMatchObject({ ...paint, stops: [{ at: 0 }, { at: 1 }] });
+      }
+    }
+  });
+
   it('carries text as glyph runs when asked to, for the native core to outline', () => {
     const keyed = { ...boxFace, key: { font: 'box.woff2', coords: [] as [string, number][] } };
     const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab' } }, 'text'));

@@ -25,7 +25,7 @@ import { caretLines, type CaretLine } from './caret';
 import { Justify, layOut, NO_LIMIT, PLAIN_PARAGRAPH, Trim, Wrap, NO_EXTRA, Shaping, Spaces, type Paragraph, type Extra, type Flow, type Glyph, type Laid, type Line, type Look as RunLook, type RequestAt, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
-import { clipped, contoursOf, dilated, within, type Rect } from './outline';
+import { clipped, contoursOf, dilated, type Rect } from './outline';
 import { blended } from '../blend-colour';
 import { normalRuns, runAt, type RunCase, type TextRun } from '../../text-runs';
 
@@ -269,7 +269,7 @@ function mixed(base: Rgba, tint: Rgba, amount: number): Rgba {
   return [channel(0), channel(1), channel(2), alpha];
 }
 
-type Shade = { paint: Paint; squash: number; clip: number[] | null; picture?: Picture };
+type Shade = { paint: Paint; squash: number; picture?: Picture };
 
 export type Colour = (v: string) => Rgba;
 
@@ -280,13 +280,9 @@ const stopsOf = (f: { stops: { color: string; pos: number }[]; opacity: number }
 const DEG = Math.PI / 180;
 const CSS_TURN = 90;
 const HALF = 0.5;
-const WEDGES = 120;
-const FULL_TURN = 360;
 const WHITE: Rgba = [1, 1, 1, 1];
 
 export enum ClippedFill {
-  Diamond = 'diamond',
-  Angular = 'angular',
   Image = 'image'
 }
 
@@ -294,8 +290,8 @@ export type FillPlan =
   | { kind: PaintKind.Solid; color: Rgba }
   | { kind: PaintKind.Linear; angle: number; stops: Stop[] }
   | { kind: PaintKind.Radial; center: [number, number]; radius: number; stops: Stop[] }
-  | { kind: ClippedFill.Diamond; stops: Stop[] }
-  | { kind: ClippedFill.Angular; angle: number; center: [number, number]; stops: Stop[] }
+  | { kind: PaintKind.Diamond; stops: Stop[] }
+  | { kind: PaintKind.Sweep; angle: number; center: [number, number]; stops: Stop[] }
   | { kind: ClippedFill.Image; src: string; fit: string; focus: [number, number]; opacity: number };
 
 type FillKind = FillPlan['kind'];
@@ -304,43 +300,15 @@ const PLANS: Partial<{ [T in FillType]: (f: FillOf<T>, colour: Colour, asset: (i
   [FillType.Solid]: (f, colour) => ({ kind: PaintKind.Solid, color: faded(colour(f.color), f.opacity) }),
   [FillType.Linear]: (f, colour) => ({ kind: PaintKind.Linear, angle: f.angle, stops: stopsOf(f, colour) }),
   [FillType.Radial]: (f, colour) => ({ kind: PaintKind.Radial, center: [f.center.x, f.center.y], radius: f.radius, stops: stopsOf(f, colour) }),
-  [FillType.Diamond]: (f, colour) => ({ kind: ClippedFill.Diamond, stops: stopsOf(f, colour) }),
-  [FillType.Angular]: (f, colour) => ({ kind: ClippedFill.Angular, angle: f.angle, center: [f.center.x, f.center.y], stops: stopsOf(f, colour) }),
+  [FillType.Diamond]: (f, colour) => ({ kind: PaintKind.Diamond, stops: stopsOf(f, colour) }),
+  [FillType.Angular]: (f, colour) => ({ kind: PaintKind.Sweep, angle: f.angle, center: [f.center.x, f.center.y], stops: stopsOf(f, colour) }),
   [FillType.Image]: (f, _colour, asset) => {
     const src = f.src ?? asset(f.assetId);
     return src && f.fit !== ImageFit.Tile ? { kind: ClippedFill.Image, src, fit: f.fit, focus: [f.focus.x, f.focus.y], opacity: f.opacity } : null;
   }
 };
 
-function colourAt(stops: Stop[], t: number): Rgba {
-  const after = stops.findIndex((s) => s.at >= t);
-  if (after <= 0) {
-    return (after === 0 ? stops[0] : stops[stops.length - 1]).color;
-  }
-  const [a, b] = [stops[after - 1], stops[after]];
-  const k = b.at === a.at ? 0 : (t - a.at) / (b.at - a.at);
-  return a.color.map((v, i) => v + (b.color[i] - v) * k) as Rgba;
-}
-
-const rectPolygon = ([l, t, r, b]: Rect) => [l, t, r, t, r, b, l, b];
-
-function towardCorner([l, t, r, b]: Rect, sx: number, sy: number, stops: Stop[]): Paint {
-  const [w, h] = [r - l, b - t];
-  const length = Math.hypot(w, h) || 1;
-  const [dx, dy] = [(sx * h) / length, (sy * w) / length];
-  const reach = (Math.abs(w * dx) + Math.abs(h * dy)) * HALF;
-  const [cx, cy] = [(l + r) * HALF, (t + b) * HALF];
-  return { kind: PaintKind.Linear, from: [cx - dx * reach, cy - dy * reach], to: [cx + dx * reach, cy + dy * reach], stops };
-}
-
-const QUADRANTS: [number, number][] = [
-  [1, 1],
-  [-1, 1],
-  [1, -1],
-  [-1, -1]
-];
-
-const unclipped = (paint: Paint, squash = 1): Shade[] => [{ paint, squash, clip: null }];
+const unclipped = (paint: Paint, squash = 1): Shade[] => [{ paint, squash }];
 
 const SHADES: { [K in FillKind]: (f: Extract<FillPlan, { kind: K }>, area: Rect) => Shade[] } = {
   [PaintKind.Solid]: (f) => unclipped({ kind: PaintKind.Solid, color: f.color }),
@@ -356,28 +324,9 @@ const SHADES: { [K in FillKind]: (f: Extract<FillPlan, { kind: K }>, area: Rect)
     const squash = ry > 0 ? rx / ry : 1;
     return unclipped({ kind: PaintKind.Radial, center: [l + f.center[0] * (r - l), (t + f.center[1] * (b - t)) * squash], radius: rx, stops: f.stops }, squash);
   },
-  [ClippedFill.Diamond]: (f, [l, t, r, b]) => {
-    const [cx, cy] = [(l + r) * HALF, (t + b) * HALF];
-    const stops = f.stops.map((s) => ({ ...s, at: s.at * HALF }));
-    return QUADRANTS.map(([sx, sy]) => {
-      const quadrant: Rect = [sx > 0 ? cx : l, sy > 0 ? cy : t, sx > 0 ? r : cx, sy > 0 ? b : cy];
-      return { paint: towardCorner(quadrant, sx, sy, stops), squash: 1, clip: rectPolygon(quadrant) };
-    });
-  },
-  [ClippedFill.Angular]: (f, [l, t, r, b]) => {
-    const [cx, cy] = [l + f.center[0] * (r - l), t + f.center[1] * (b - t)];
-    const far = 2 * Math.hypot(r - l, b - t);
-    const ray = (k: number): [number, number] => {
-      const angle = (f.angle + (k * FULL_TURN) / WEDGES) * DEG;
-      return [cx + Math.sin(angle) * far, cy - Math.cos(angle) * far];
-    };
-    const mid = (p: [number, number]): [number, number] => [(cx + p[0]) * HALF, (cy + p[1]) * HALF];
-    return Array.from({ length: WEDGES }, (_, k) => {
-      const [a, z] = [ray(k), ray(k + 1)];
-      return { paint: { kind: PaintKind.Linear, from: mid(a), to: mid(z), stops: [{ at: 0, color: colourAt(f.stops, k / WEDGES) }, { at: 1, color: colourAt(f.stops, (k + 1) / WEDGES) }] }, squash: 1, clip: [cx, cy, ...a, ...z] };
-    });
-  },
-  [ClippedFill.Image]: (f, area) => [{ paint: { kind: PaintKind.Solid, color: faded(WHITE, f.opacity) }, squash: 1, clip: null, picture: { src: f.src, fit: f.fit, focus: f.focus, area } }]
+  [PaintKind.Diamond]: (f, [l, t, r, b]) => unclipped({ kind: PaintKind.Diamond, center: [(l + r) * HALF, (t + b) * HALF], half: [(r - l) * HALF, (b - t) * HALF], stops: f.stops }),
+  [PaintKind.Sweep]: (f, [l, t, r, b]) => unclipped({ kind: PaintKind.Sweep, center: [l + f.center[0] * (r - l), t + f.center[1] * (b - t)], start: (f.angle - CSS_TURN) * DEG, stops: f.stops }),
+  [ClippedFill.Image]: (f, area) => [{ paint: { kind: PaintKind.Solid, color: faded(WHITE, f.opacity) }, squash: 1, picture: { src: f.src, fit: f.fit, focus: f.focus, area } }]
 };
 
 const shadesOf = (f: FillPlan, area: Rect): Shade[] => (SHADES[f.kind] as (f: FillPlan, area: Rect) => Shade[])(f, area);
@@ -691,7 +640,7 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
       const asRuns = (paint: Paint) => runs!.map((run): Ink => ({ contours: [], paint, rule: FillRule.NonZero, opacity: plan.fade * look.opacity * unit.opacity, matrix: look === UNTINTED ? matrix : mul2d(matrix, turn), blur: look.blur * scaleOf(look.turn), run }));
       const fills: FillPlan[] = unit.gradient !== null ? plan.gradients[unit.gradient] : unit.colour ? [{ kind: PaintKind.Solid, color: plan.tints[unit.colour] }] : plan.fills;
       const area: Rect = unit.gradient !== null ? unit.box : unit.area;
-      const filled = fills.flatMap((f) => shadesOf(f, area)).flatMap((shade) => (runs && !shade.clip && shade.squash === 1 && !shade.picture ? asRuns(tinted(shade.paint, look)) : [ink(shade.clip ? within(shown, shade.clip) : shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash, shade.picture)]));
+      const filled = fills.flatMap((f) => shadesOf(f, area)).flatMap((shade) => (runs && shade.squash === 1 && !shade.picture ? asRuns(tinted(shade.paint, look)) : [ink(shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash, shade.picture)]));
       const outline = plan.outline;
       const stroked = outline ? [ink(placed(unit.outlines.flatMap((c) => strokePolygons(c, true, outline.width, Cap.Butt, Join.Miter))), tinted({ kind: PaintKind.Solid, color: outline.colour }, look), FillRule.Union)] : [];
       inks.push(...(outline?.under ? [...stroked, ...filled] : [...filled, ...stroked]).filter((i) => (i.contours.length || i.run) && visible(i.paint)));

@@ -23,7 +23,7 @@ impl Canvas for Recorder {
         Size { width: 1.0, height: 1.0 }
     }
 
-    fn fill(&mut self, _: Fill, _: Affine, paint: &Paint, _: &BezPath) {
+    fn fill_plain(&mut self, _: Fill, _: Affine, paint: &Paint, _: &BezPath) {
         self.fills.push(paint.clone());
     }
 

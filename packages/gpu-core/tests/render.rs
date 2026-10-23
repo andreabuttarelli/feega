@@ -64,3 +64,44 @@ fn thousands_of_dashes_in_one_frame_still_draw() {
     assert_eq!(at(1, 1), &[255, 0, 0, 255]);
     assert_eq!(at(side as usize - 1, side as usize - 1), &[0, 0, 255, 255]);
 }
+
+#[cfg(feature = "gpu")]
+fn shaded(paint: &str) -> Vec<u8> {
+    let list = parse(&format!(
+        r#"{{ "width": 64, "height": 64, "background": [0, 0, 1, 1], "items": [
+          {{ "kind": "path", "clip": "card", "contours": [[0, 0, 64, 0, 64, 64, 0, 64]], "rule": "nonzero",
+            "paint": {paint}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blur": 0, "blend": "normal" }} ] }}"#
+    ))
+    .unwrap();
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
+    renderer.render(&list, &Pictures::new()).unwrap().pixels
+}
+
+#[cfg(feature = "gpu")]
+fn red_at(pixels: &[u8], x: usize, y: usize) -> i32 {
+    pixels[(y * 64 + x) * 4] as i32
+}
+
+#[cfg(feature = "gpu")]
+const BLACK_TO_WHITE: &str = r#"[{ "at": 0, "color": [0, 0, 0, 1] }, { "at": 1, "color": [1, 1, 1, 1] }]"#;
+
+#[cfg(feature = "gpu")]
+#[test]
+fn sweeps_an_angular_gradient_clockwise_from_its_start() {
+    let pixels = shaded(&format!(r#"{{ "kind": "sweep", "center": [32, 32], "start": -1.5707963, "stops": {BLACK_TO_WHITE} }}"#));
+
+    assert!((red_at(&pixels, 56, 32) - 64).abs() < 16, "a quarter turn: {}", red_at(&pixels, 56, 32));
+    assert!((red_at(&pixels, 32, 56) - 128).abs() < 16, "half a turn: {}", red_at(&pixels, 32, 56));
+    assert!((red_at(&pixels, 8, 32) - 191).abs() < 16, "three quarters: {}", red_at(&pixels, 8, 32));
+}
+
+#[cfg(feature = "gpu")]
+#[test]
+fn spreads_a_diamond_gradient_by_distance_along_both_axes() {
+    let pixels = shaded(&format!(r#"{{ "kind": "diamond", "center": [32, 32], "half": [32, 32], "stops": {BLACK_TO_WHITE} }}"#));
+
+    assert!(red_at(&pixels, 32, 32) < 16, "the centre: {}", red_at(&pixels, 32, 32));
+    assert!((red_at(&pixels, 48, 32) - 128).abs() < 16, "half way on an axis: {}", red_at(&pixels, 48, 32));
+    assert!((red_at(&pixels, 24, 40) - 128).abs() < 16, "half way on a diagonal: {}", red_at(&pixels, 24, 40));
+    assert!(red_at(&pixels, 62, 62) > 240, "past the tip: {}", red_at(&pixels, 62, 62));
+}

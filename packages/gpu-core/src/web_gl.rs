@@ -35,7 +35,7 @@ impl Canvas for GlCanvas {
         picture.size
     }
 
-    fn fill(&mut self, rule: Fill, transform: Affine, paint: &Paint, shape: &BezPath) {
+    fn fill_plain(&mut self, rule: Fill, transform: Affine, paint: &Paint, shape: &BezPath) {
         self.scene.set_transform(self.by * transform);
         self.scene.set_fill_rule(rule);
         self.scene.reset_paint_transform();

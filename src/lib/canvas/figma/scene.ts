@@ -12,6 +12,8 @@ export enum FillKind {
   Solid = 'solid',
   Linear = 'linear',
   Radial = 'radial',
+  Angular = 'angular',
+  Diamond = 'diamond',
   Image = 'image'
 }
 
@@ -58,6 +60,8 @@ export type Fill =
   | { kind: FillKind.Solid; color: string; opacity: number }
   | { kind: FillKind.Linear; stops: Stop[]; angle: number; opacity: number }
   | { kind: FillKind.Radial; stops: Stop[]; opacity: number }
+  | { kind: FillKind.Angular; stops: Stop[]; angle: number; center: { x: number; y: number }; opacity: number }
+  | { kind: FillKind.Diamond; stops: Stop[]; opacity: number }
   | { kind: FillKind.Image; hash: string; opacity: number };
 
 export type Stroke = { fill: Fill; weight: number; align: string };
@@ -248,14 +252,24 @@ function gradientAngle(t: Matrix | undefined): number {
   return Math.round(((Math.atan2(dy, dx) * 180) / Math.PI + 90 + 360) % 360);
 }
 
+const GRADIENT_MIDDLE = 0.5;
+const unitClamp = (n: number) => round(Math.max(0, Math.min(1, n)));
+
+function gradientCentre(t: Matrix | undefined): { x: number; y: number } {
+  const m = t ?? IDENTITY;
+  const det = m.m00 * m.m11 - m.m01 * m.m10 || 1;
+  const [gx, gy] = [GRADIENT_MIDDLE - m.m02, GRADIENT_MIDDLE - m.m12];
+  return { x: unitClamp((m.m11 * gx - m.m01 * gy) / det), y: unitClamp((m.m00 * gy - m.m10 * gx) / det) };
+}
+
 type Report = (what: string) => void;
 
 const FILLS: Record<string, (p: Paint, report: Report) => Fill | null> = {
   SOLID: (p) => ({ kind: FillKind.Solid, color: hexOf(p.color!), opacity: round((p.opacity ?? 1) * (p.color?.a ?? 1)) }),
   GRADIENT_LINEAR: (p) => ({ kind: FillKind.Linear, stops: stopsOf(p.stops), angle: gradientAngle(p.transform), opacity: round(p.opacity ?? 1) }),
   GRADIENT_RADIAL: (p) => ({ kind: FillKind.Radial, stops: stopsOf(p.stops), opacity: round(p.opacity ?? 1) }),
-  GRADIENT_DIAMOND: (p, report) => (report('diamond gradient drawn as radial'), { kind: FillKind.Radial, stops: stopsOf(p.stops), opacity: round(p.opacity ?? 1) }),
-  GRADIENT_ANGULAR: (p, report) => (report('angular gradient drawn as linear'), { kind: FillKind.Linear, stops: stopsOf(p.stops), angle: gradientAngle(p.transform), opacity: round(p.opacity ?? 1) }),
+  GRADIENT_DIAMOND: (p) => ({ kind: FillKind.Diamond, stops: stopsOf(p.stops), opacity: round(p.opacity ?? 1) }),
+  GRADIENT_ANGULAR: (p) => ({ kind: FillKind.Angular, stops: stopsOf(p.stops), angle: gradientAngle(p.transform), center: gradientCentre(p.transform), opacity: round(p.opacity ?? 1) }),
   IMAGE: (p, report) => {
     const hash = hashHex(p.image?.hash);
     report(`image ${hash.slice(0, 12)} placed as a placeholder`);
@@ -275,7 +289,7 @@ function fillsOf(paints: Paint[] | undefined, report: Report): Fill[] {
     });
 }
 
-const STROKE_KINDS = new Set([FillKind.Solid, FillKind.Linear, FillKind.Radial]);
+const STROKE_KINDS = new Set([FillKind.Solid, FillKind.Linear, FillKind.Radial, FillKind.Angular, FillKind.Diamond]);
 
 function strokesOf(n: FigmaRawNode, report: Report): Stroke[] {
   return fillsOf(n.strokePaints, report).flatMap((fill) => {
