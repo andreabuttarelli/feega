@@ -105,7 +105,7 @@
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { isSvgFile } from '$lib/canvas/system-clipboard';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { FrameKind, MOTION_NODE_BAR_H, TileBody, frameChrome } from '$lib/canvas/motion-node';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, frameChrome, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -1756,8 +1756,13 @@
     if (!nodeId || !at || !done) {
       return false;
     }
-    commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
+    const doc = at.merge(done.doc);
     picks = [];
+    if (leftEmpty(kindOfNode(nodeId), doc)) {
+      dropSelection([nodeId], []);
+      return true;
+    }
+    commit(nodeId, { ok: true, doc }, done.summary);
     return true;
   }
 
