@@ -59,11 +59,18 @@ describe('group and ungroup', () => {
   });
 
   it('offers Export for any picked frames, one or many, and nothing else', () => {
-    const frame = { data: { format: '4:5' } };
+    const frame = { type: 'motion', data: { format: '4:5' } };
     expect(shownFor('export', [frame])).toBe(true);
     expect(shownFor('export', [frame, frame])).toBe(true);
-    expect(shownFor('export', [frame, { data: {} }])).toBe(false);
-    expect(shownFor('export', [{ data: { format: '1:1', kind: 'element' } }]), 'a free element exports on its own').toBe(true);
+    expect(shownFor('export', [frame, { type: 'image', data: {} }])).toBe(false);
+    expect(shownFor('export', [{ type: 'motion', data: { format: '1:1', kind: 'element' } }]), 'a free element exports on its own').toBe(true);
+  });
+
+  it('reads an element node as a free element whatever its data holds', () => {
+    const element = { type: 'element', data: { docHeadRevision: 1 } };
+    expect(shownFor('export', [element])).toBe(true);
+    expect(shownFor('create-formats', [element])).toBe(false);
+    expect(shownFor('ungroup', [{ type: 'element', data: { docHeadRevision: 1, kind: 'group' } }])).toBe(true);
   });
 
   it('each surface shows the shared menu, in its order, limited to what it can run', () => {
@@ -127,7 +134,7 @@ describe('enabledFor', () => {
 });
 
 describe('create formats', () => {
-  const frame = { data: { format: '16:9' } };
+  const frame = { type: 'motion', data: { format: '16:9' } };
 
   it('shows for one frame', () => {
     expect(shownFor('create-formats', [frame])).toBe(true);
@@ -136,7 +143,7 @@ describe('create formats', () => {
 
   it('hides for anything else', () => {
     expect(shownFor('create-formats', [frame, frame])).toBe(false);
-    expect(shownFor('create-formats', [{ data: { format: '16:9', kind: 'element' } }])).toBe(false);
-    expect(shownFor('create-formats', [{ data: { prompt: 'x' } }])).toBe(false);
+    expect(shownFor('create-formats', [{ type: 'motion', data: { format: '16:9', kind: 'element' } }])).toBe(false);
+    expect(shownFor('create-formats', [{ type: 'text', data: { prompt: 'x' } }])).toBe(false);
   });
 });

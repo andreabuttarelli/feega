@@ -35,4 +35,18 @@ describe('pasteNodes', () => {
 
     expect('refused' in out).toBe(true);
   });
+
+  it('a copied free element lands as an element node with its size and its drawing', async () => {
+    const doc = { version: 5, fps: 30, width: 400, height: 200, durationInFrames: 150, background: 'transparent', tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 'box', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 } }] }], comps: {}, assets: [] };
+    const fake = fakeDb({ nodes: [], nodes_connections: [], canvas_events: [], motion_revisions: [{ id: 'r', org_id: ORG, node_id: 'src', version: 2, doc, summary: null, actor_kind: 'user' }] }, { store: true });
+
+    const out = await pasteNodes(fake.db, { ...SCOPE, nodes: [{ type: 'motion', data: { format: '16:9', docHeadRevision: 2, kind: 'element' }, x: 0, y: 0, source: 'src', width: 200, height: 100 }], edges: [] });
+
+    if ('refused' in out) {
+      throw new Error(out.refused);
+    }
+    expect(out.nodes[0]).toMatchObject({ type: 'element', size: { width: 200, height: 100 }, data: { docHeadRevision: 1 } });
+    const revision = fake.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert');
+    expect(revision?.payload).toMatchObject({ node_id: out.nodes[0]!.id, version: 1, doc: { tracks: [{ clips: [{ id: 'box' }] }] } });
+  });
 });

@@ -73,7 +73,7 @@ describe('moveElement action', () => {
     const result = await actions.moveElement(input as never);
 
     expect(result).toMatchObject({ outcome: 'done', created: true });
-    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'insert' && (c.payload as { type: string }).type === 'motion')).toBe(true);
+    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'insert' && (c.payload as { type: string }).type === 'element')).toBe(true);
     const revisions = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => c.payload as { version: number; doc: MotionDoc });
     expect(revisions.map((r) => [r.version, clipIds(r.doc)])).toEqual([
       [1, ['txt']],
@@ -123,7 +123,7 @@ describe('upload action over a frame', () => {
 describe('a generated output placed on the empty canvas', () => {
   const asset = (type: string, width: number, height: number) => ({ id: ASSET, org_id: 'org', project_id: 'project', type, url: 'x', content: type === 'text' ? 'Hello' : null, mime_type: 'image/png', bytes: 1, width, height, duration_s: type === 'video' ? 3 : null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' });
   const placed = (input: ReturnType<typeof event>) => ({
-    node: input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload as { width: number; height: number; data: Record<string, unknown> },
+    node: input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload as { type: string; width: number; height: number; data: Record<string, unknown> },
     doc: (input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')?.payload as { doc: MotionDoc }).doc
   });
 
@@ -139,7 +139,7 @@ describe('a generated output placed on the empty canvas', () => {
 
     expect(await actions.placeOutput(input as never)).toMatchObject({ outcome: 'done', created: true });
     const { node, doc } = placed(input);
-    expect(node.data.kind).toBe('element');
+    expect(node.type).toBe('element');
     expect(doc.background).toBe('transparent');
     expect(doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual([component]);
     if (width) {
@@ -233,7 +233,7 @@ describe('elements in and out of frames', () => {
     );
 
     expect(await actions.moveElement(input as never)).toMatchObject({ outcome: 'done', created: true });
-    expect(inserted(input)).toMatchObject([{ x: 800, y: 17.5, width: 200, height: 45, data: { kind: 'element' } }]);
+    expect(inserted(input)).toMatchObject([{ type: 'element', x: 800, y: 17.5, width: 200, height: 45 }]);
     const made = input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')?.payload as { doc: MotionDoc };
     expect(made.doc.background).toBe('transparent');
   });
@@ -280,8 +280,8 @@ describe('drawElement action', () => {
 
     const result = await actions.drawElement(input as never);
 
-    expect(result).toMatchObject({ outcome: 'done', created: true, node: { type: 'motion' } });
-    expect(inserted(input)).toMatchObject([{ type: 'motion', x: 120, y: 40, width: 300, height: 100, data: { kind: 'element' } }]);
+    expect(result).toMatchObject({ outcome: 'done', created: true });
+    expect(inserted(input)).toMatchObject([{ type: 'element', x: 120, y: 40, width: 300, height: 100 }]);
     const revisions = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => c.payload as { version: number; doc: MotionDoc });
     expect(revisions.map((r) => [r.version, r.doc.background, r.doc.tracks.flatMap((t) => t.clips).map((c) => c.component)])).toEqual([[1, 'transparent', ['Shape']]]);
   });

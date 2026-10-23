@@ -1,7 +1,9 @@
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { createConnection, createNode, listConnections, listNodes, type CanvasNodeRecord, type Connection } from '$lib/server/repos/canvas';
-import { planDuplicate, DUPLICATE_OFFSET, type DuplicatePlan } from '$lib/canvas/duplicate-plan';
+import { planDuplicate, DUPLICATE_OFFSET, type DuplicatePlan, type DuplicatedNode } from '$lib/canvas/duplicate-plan';
+import { docNodeCopy, holdsDoc } from '$lib/canvas/motion-node';
+import { copyHead } from '$lib/server/repos/motion-revisions';
 
 /**
  * DUPLICARE UNA SELEZIONE: N nodi nuovi, e le linee che stavano interamente dentro di lei.
@@ -45,7 +47,11 @@ export async function duplicateNodes(
     offset: input.offset ?? DUPLICATE_OFFSET
   });
 
-  return writePlan(db, input, plan);
+  const chosen = existingNodes.filter((n) => chosenIds.includes(n.id));
+  const sized = { ...plan, nodes: plan.nodes.map((planned) => docCopy(planned, chosen[planned.sourceIndex])) };
+  const written = await writePlan(db, input, sized);
+  await Promise.all(written.nodes.map((node, i) => copiedHead(db, input, chosen[sized.nodes[i].sourceIndex], node)));
+  return written;
 }
 
 export async function writePlan(
@@ -63,6 +69,8 @@ export async function writePlan(
       x: planned.x,
       y: planned.y,
       data: planned.data,
+      width: planned.width,
+      height: planned.height,
       actor: input.actor
     });
     nodes.push(node);
@@ -83,4 +91,17 @@ export async function writePlan(
   }
 
   return { nodes, connections };
+}
+
+function docCopy(planned: DuplicatedNode, source: CanvasNodeRecord): DuplicatedNode {
+  if (!holdsDoc(source.type)) {
+    return planned;
+  }
+  return { ...docNodeCopy(planned), width: source.size.width ?? undefined, height: source.size.height ?? undefined };
+}
+
+async function copiedHead(db: Db, input: { orgId: string; actor?: Actor }, source: CanvasNodeRecord, copy: CanvasNodeRecord): Promise<void> {
+  if (holdsDoc(source.type)) {
+    await copyHead(db, { orgId: input.orgId, from: source.id, to: copy.id, actor: input.actor ?? { kind: 'system', id: null } });
+  }
 }

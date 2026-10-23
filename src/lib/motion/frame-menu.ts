@@ -1,5 +1,5 @@
 import { ALIGN_ACTIONS, ALIGN_EDGE, type SelectionActionId } from '$lib/canvas/selection-actions';
-import { FrameKind } from '$lib/canvas/motion-node';
+import { DocNodeType, FrameKind } from '$lib/canvas/motion-node';
 import { compOf, findClip, type MotionDoc } from './doc';
 import { elementName } from './element-name';
 import { Command } from './shortcuts';
@@ -78,6 +78,6 @@ export function frameLayers(doc: MotionDoc, ids: readonly string[]): FrameLayer[
 export function frameSummaries(doc: MotionDoc, ids: readonly string[]) {
   return ids.map((id) => {
     const clip = findClip(doc, id)?.clip;
-    return { id, type: 'clip', data: clip && compOf(clip) ? { kind: FrameKind.Group } : {} };
+    return clip && compOf(clip) ? { id, type: DocNodeType.Element, data: { kind: FrameKind.Group } } : { id, type: 'clip', data: {} };
   });
 }

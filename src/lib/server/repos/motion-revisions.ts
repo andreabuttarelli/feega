@@ -241,3 +241,10 @@ export async function appendRevision(
 export async function sealRevision(db: Db, input: { orgId: string; nodeId: string; version: number }): Promise<void> {
   await db.from('motion_revisions').update({ sealed: true } as never).eq('org_id', input.orgId).eq('node_id', input.nodeId).eq('version', input.version);
 }
+
+export async function copyHead(db: Db, input: { orgId: string; from: string; to: string; actor: Actor }): Promise<void> {
+  const head = await readFullHead(db, { orgId: input.orgId, nodeId: input.from });
+  if (head) {
+    await appendRevision(db, { orgId: input.orgId, nodeId: input.to, expectedVersion: 0, doc: head.doc, actor: input.actor });
+  }
+}
