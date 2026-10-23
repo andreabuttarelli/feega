@@ -17,7 +17,7 @@ function setup() {
 describe('constraints through set_layout_item', () => {
   it('a layer pinned right keeps its distance to the right edge when set_canvas resizes the frame', async () => {
     const { run, session } = setup();
-    await run('add_shape', { kind: 'rect', start: 0 });
+    await run('add_shape', { kind: 'rect', start: 0, props: { width: 576 } });
     const id = clipsOf(session.doc)[0].id;
     const before = pivotBox(clipsOf(session.doc)[0].props, session.doc);
 
