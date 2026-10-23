@@ -39,3 +39,13 @@ export function sizingAfterResize(sizing: TextSizing, changed: { width: boolean;
   }
   return changed.width && sizing === TextSizing.AutoWidth ? TextSizing.AutoHeight : sizing;
 }
+
+export function fittedShare(sizing: TextSizing, placed: Pick<Placement, 'width' | 'height'>, measured: PxBox, stage: Stage): Pick<Placement, 'width' | 'height'> | null {
+  const follows = FOLLOWS[sizing];
+  const width = follows.width ? measured.width : placed.width * stage.width;
+  const height = follows.height ? measured.height : placed.height * stage.height;
+  if (Math.abs(width - placed.width * stage.width) <= SLACK_PX && Math.abs(height - placed.height * stage.height) <= SLACK_PX) {
+    return null;
+  }
+  return { width: width / stage.width, height: height / stage.height };
+}
