@@ -1,5 +1,5 @@
 import { IDENTITY, apply2d, type Affine } from './affine';
-import { BlendMode } from './blend';
+import { commonGap } from './export-gaps';
 import { MaskMode } from './mask';
 import { CoverKind } from './gpu-full/mask-layers';
 import { ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type MaskLayer, type Paint, type PathItem } from './gpu-full/display-list';
@@ -173,14 +173,9 @@ function body(w: Writer, item: Item): string {
 
 function itemMarkup(w: Writer, item: Item): string {
   try {
-    if (item.blend !== BlendMode.Normal) {
-      return reason(`blend mode ${item.blend}`);
-    }
-    if (item.filters?.length || item.space || item.backdrop) {
-      return reason('effects');
-    }
-    if (item.matte) {
-      return reason('matte');
+    const gap = commonGap(item);
+    if (gap) {
+      return reason(gap);
     }
     return dressed(w, item, body(w, item), item.opacity);
   } catch (error) {

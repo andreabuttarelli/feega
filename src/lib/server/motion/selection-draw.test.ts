@@ -8,6 +8,8 @@ import { displayListAt } from '$lib/motion/gpu-full/display-list';
 import type { ExportPage, ExportPort, PageBox, Viewport } from './server-frames';
 import { drawTargets } from './selection-draw';
 import type { DrawTarget } from './selection-export';
+import { Span } from './vector-list';
+import { unzipSync } from 'fflate';
 
 const doc = newMotionDoc(MotionFormat.Square);
 const ELEMENT_BOX: PageBox = { left: 100, top: 200, width: 300, height: 120 };
@@ -44,7 +46,7 @@ const row = (raw: object) => exportRowsSchema.parse([raw])[0];
 const card = { shape: 'rect', x: 0.5, y: 0.5, width: 0.25, height: 0.25, fill: '#ff0000' };
 const drawn = addClip(doc, { component: 'Shape', from: 0, durationInFrames: 90, props: card }, 'card');
 const withCard = drawn.ok ? drawn.doc : doc;
-const vector = async (target: DrawTarget) => ({ list: displayListAt(target.doc, 0, FEEGA_TOKENS), images: new Map<string, string>() });
+const vector = async (target: DrawTarget, span: Span) => ({ lists: Array.from({ length: span === Span.Whole ? target.doc.durationInFrames : 1 }, (_, f) => displayListAt(target.doc, f, FEEGA_TOKENS)), images: new Map<string, string>() });
 const ports = (port: ExportPort) => ({ port, compose, vector });
 
 describe('drawing an export', () => {
@@ -77,6 +79,35 @@ describe('drawing an export', () => {
     const { skipped } = await drawTargets(ports(port), [{ nodeId: 'a', doc: blended }], row({ format: 'svg', by: 'scale', value: 1 }));
 
     expect(skipped).toEqual(['card: blend mode multiply']);
+  });
+
+  it('a Lottie row is the animation of the frame as JSON, one frame per doc frame', async () => {
+    const { port, log } = fakePort();
+    const short = { ...withCard, durationInFrames: 12 };
+    const { bytes, skipped } = await drawTargets(ports(port), [{ nodeId: 'a', doc: short }], row({ format: 'lottie', by: 'scale', value: 1 }));
+    const json = JSON.parse(bytes.toString());
+
+    expect(json).toMatchObject({ w: doc.width, h: doc.height, fr: doc.fps, op: 12 });
+    expect(json.layers.some((l: { nm: string }) => l.nm === 'card:0')).toBe(true);
+    expect(skipped).toEqual([]);
+    expect(log).toEqual([]);
+  });
+
+  it('a dotLottie row is a zip holding that animation', async () => {
+    const { port } = fakePort();
+    const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', doc: { ...withCard, durationInFrames: 3 } }], row({ format: 'dotlottie', by: 'scale', value: 1 }));
+
+    expect(Object.keys(unzipSync(new Uint8Array(bytes))).sort()).toEqual(['animations/animation.json', 'manifest.json']);
+  });
+
+  it('a Lottie of one element holds only that element, and says what it left out', async () => {
+    const { port } = fakePort();
+    const blended = { ...withCard, tracks: withCard.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'card' ? { ...c, blend: 'multiply' } : c)) })) } as typeof withCard;
+    const element = await drawTargets(ports(port), [{ nodeId: 'a', doc: { ...withCard, durationInFrames: 2 }, elementId: 'card' }], row({ format: 'lottie', by: 'scale', value: 1 }));
+    const skipped = await drawTargets(ports(port), [{ nodeId: 'a', doc: { ...blended, durationInFrames: 2 }, elementId: 'card' }], row({ format: 'lottie', by: 'scale', value: 1 }));
+
+    expect(JSON.parse(element.bytes.toString()).layers.map((l: { nm: string }) => l.nm)).toEqual(['card:0']);
+    expect(skipped.skipped).toEqual(['card: blend mode multiply']);
   });
 
   it('a PDF row prints every target as one page of one file', async () => {

@@ -7,7 +7,7 @@ import { SIGNED_URL_TTL_S, signAssetFile, storeAssetFile } from '$lib/server/rep
 import { frameStore } from './move-element';
 import { chromiumExport } from './chromium-frames';
 import { drawTargets } from './selection-draw';
-import { vectorOf } from './vector-list';
+import { vectorOf, type Span } from './vector-list';
 import { libsOrigin } from './libs-origin';
 import { composeHtml } from '$lib/motion/hyperframes/compose';
 import { assetUrls, motionAssets, motionTokens } from './editor';
@@ -27,7 +27,7 @@ export function selectionPorts(scope: SelectionScope): SelectionPorts {
 
   const compose = async (target: DrawTarget) => composeHtml({ doc: target.doc, tokens: await tokens, assets: await urlsOf(target), origin: libsOrigin() });
 
-  const vector = async (target: DrawTarget) => vectorOf({ doc: target.doc, tokens: await tokens, assets: await urlsOf(target) });
+  const vector = async (target: DrawTarget, span: Span) => vectorOf({ doc: target.doc, tokens: await tokens, assets: await urlsOf(target) }, span);
 
   return {
     read: async (nodeId) => {
