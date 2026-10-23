@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GuideKind, guideBands, guideLines, guideSnapBounds, newGuide, setLayoutGuides } from './guides';
+import { GuideAlign, GuideKind, guideBands, guideLines, guideSnapBounds, newGuide, setLayoutGuides } from './guides';
 import { MotionFormat, newMotionDoc, parseMotionDoc } from '../doc';
 
 const FRAME = { width: 1000, height: 500 };
@@ -48,5 +48,60 @@ describe('layout guides', () => {
 
   it('refuses more guides than the frame holds', () => {
     expect(setLayoutGuides(newMotionDoc(MotionFormat.Landscape), Array.from({ length: 20 }, () => newGuide(GuideKind.Rows))).ok).toBe(false);
+  });
+});
+
+describe('layout guide count and alignment', () => {
+  const columns = (change: object) => ({ ...newGuide(GuideKind.Columns), ...change });
+
+  it('an auto count fits as many sections of the size as the frame holds', () => {
+    const bands = guideBands(columns({ count: 'auto', size: 100, gutter: 0, margin: 0, align: GuideAlign.Min }), FRAME);
+
+    expect(bands).toHaveLength(10);
+    expect(bands.every((b) => b.width === 100)).toBe(true);
+  });
+
+  it('an auto count leaves out a section that would not fit between the margins', () => {
+    expect(guideBands(columns({ count: 'auto', size: 100, gutter: 20, margin: 50 }), FRAME)).toHaveLength(7);
+  });
+
+  it('an auto stretch count shares the width between the margins', () => {
+    const bands = guideBands(columns({ count: 'auto', size: 100, gutter: 0, margin: 0 }), FRAME);
+
+    expect(bands.map((b) => b.width)).toEqual(Array.from({ length: 10 }, () => 100));
+  });
+
+  it('center puts the columns in the middle of the frame', () => {
+    const bands = guideBands(columns({ align: GuideAlign.Center, count: 3, size: 100, gutter: 50 }), FRAME);
+
+    expect(bands.map((b) => b.left)).toEqual([300, 450, 600]);
+  });
+
+  it('min starts the columns at the offset', () => {
+    const bands = guideBands(columns({ align: GuideAlign.Min, count: 2, size: 100, gutter: 0, offset: 30 }), FRAME);
+
+    expect(bands.map((b) => b.left)).toEqual([30, 130]);
+  });
+
+  it('max ends the columns at the offset from the far edge', () => {
+    const bands = guideBands(columns({ align: GuideAlign.Max, count: 2, size: 100, gutter: 0, offset: 30 }), FRAME);
+
+    expect(bands.map((b) => b.left)).toEqual([770, 870]);
+  });
+
+  it('rows align down the height', () => {
+    const bands = guideBands({ ...newGuide(GuideKind.Rows), align: GuideAlign.Max, count: 1, size: 50, offset: 10 }, FRAME);
+
+    expect(bands.map((b) => [b.top, b.height])).toEqual([[440, 50]]);
+  });
+
+  it('a new guide is red at ten percent', () => {
+    expect(newGuide(GuideKind.Columns)).toMatchObject({ color: '#ff0000', opacity: 0.1, align: GuideAlign.Stretch });
+  });
+
+  it('a hidden guide still snaps', () => {
+    const doc = setLayoutGuides({ ...newMotionDoc(MotionFormat.Landscape), width: 1000, height: 500 }, [{ ...newGuide(GuideKind.Columns), count: 2, gutter: 0, margin: 0, hidden: true }]);
+
+    expect(doc.ok && guideSnapBounds(doc.doc)).toHaveLength(2);
   });
 });

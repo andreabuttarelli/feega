@@ -4,6 +4,7 @@ import { addClip, setTransform, type OpResult } from '$lib/motion/timeline';
 import { Grip, aabb, handlesOf, quadOf, type Bounds } from '$lib/motion/scene-select';
 import { guessedBoxes } from '$lib/motion/move-element';
 import { transformAt } from '$lib/motion/parent';
+import { GuideAlign, GuideKind, newGuide, setLayoutGuides } from '$lib/motion/layout-guides/guides';
 import { dragClips, measuredGaps, nudgeClips, type Drag } from './frame-transform';
 
 const must = (r: OpResult): MotionDoc => {
@@ -33,6 +34,15 @@ describe('dragClips', () => {
 
     expect(boundsOf(must(result), 'card').right).toBeCloseTo(boundsOf(DOC, 'side').left);
     expect(guides).toContainEqual({ axis: 'x', at: boundsOf(DOC, 'side').left });
+  });
+
+  it('snaps a moved element to the edge of a layout guide, shown or hidden', () => {
+    const guided = must(setLayoutGuides(DOC, [{ ...newGuide(GuideKind.Columns), align: GuideAlign.Min, count: 1, size: 100, offset: 1000, hidden: true }]));
+    const near = 1003 - boundsOf(guided, 'card').right;
+
+    const { result } = dragClips(drag({ doc: guided, to: [900 + near, 500] }));
+
+    expect(boundsOf(must(result), 'card').right).toBeCloseTo(1000);
   });
 
   it('locks a Shift move to the dominant axis', () => {
