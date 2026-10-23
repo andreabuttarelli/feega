@@ -25,6 +25,7 @@ const FRAME_COMMAND: Partial<Record<SelectionActionId, Command>> = {
   'select-same-font': Command.SelectSameFont,
   'select-same-effect': Command.SelectSameEffect,
   'frame-selection': Command.FrameSelection,
+  'resize-to-fit': Command.ResizeToFit,
   'auto-layout': Command.AutoLayout,
   'union': Command.Union,
   'subtract': Command.Subtract,

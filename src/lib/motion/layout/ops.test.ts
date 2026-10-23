@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, type OpResult } from '../timeline';
 import { Align, Direction, Sizing, TrackType } from './auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from './model';
-import { addAutoLayout, leaveAutoLayout, reorderChild, removeAutoLayout, setAutoLayout, setLayoutItem, wrapInAutoLayout, wrapInFrame } from './ops';
+import { addAutoLayout, leaveAutoLayout, reorderChild, removeAutoLayout, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from './ops';
 import { withAutoLayout } from './resolve';
 import { layerOrder } from '../siblings';
 
@@ -185,6 +185,36 @@ describe('wrapInFrame', () => {
   it('leaves the children where they were', () => {
     expect(clip(framed, 'a').props.x).toBe(0.2);
     expect(clip(framed, 'b').layoutItem).toBeFalsy();
+  });
+});
+
+describe('resizeToFit', () => {
+  const framed = must(wrapInFrame(row, ['a', 'b'], 'box', 'lane'));
+  const moved = { ...framed, tracks: framed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'b' ? { ...c, props: { ...c.props, x: 0.9 } } : c)) })) };
+
+  it('grows the frame to the bounding box of its children', () => {
+    const box = clip(must(resizeToFit(moved, 'box')), 'box').props;
+
+    expect(box.x).toBeCloseTo(0.55, 5);
+    expect(box.width).toBeCloseTo(0.8, 5);
+  });
+
+  it('shrinks the frame to its children', () => {
+    const roomy = { ...framed, tracks: framed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'box' ? { ...c, props: { ...c.props, width: 1, height: 1 } } : c)) })) };
+    const box = clip(must(resizeToFit(roomy, 'box')), 'box').props;
+
+    expect(box.width).toBeCloseTo(0.4, 5);
+    expect(box.height).toBeCloseTo(0.1, 5);
+  });
+
+  it('makes an auto layout hug its children', () => {
+    const laid = must(wrapInAutoLayout(row, ['a', 'b'], 'box', 'lane'));
+
+    expect(clip(must(resizeToFit(laid, 'box')), 'box').layoutItem).toMatchObject({ width: Sizing.Hug, height: Sizing.Hug });
+  });
+
+  it('refuses a clip with no children', () => {
+    expect(resizeToFit(row, 'a').ok).toBe(false);
   });
 });
 
