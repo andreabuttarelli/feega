@@ -4,6 +4,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 const SHOTS = process.env.CANVAS_MOTION_SHOTS ?? `${homedir()}/Documents/feega-videos/e2e`;
 const SETTLE_MS = 2500;
 const NEW_ANGLE = 10;
+const RENAMED = 'Dusk';
 
 const SUNSET = { kind: 'paint', fills: [{ type: 'linear-gradient', angle: 45, stops: [{ color: '#ff7a00', pos: 0 }, { color: '#7a00ff', pos: 1 }] }] };
 const LIFTED = { kind: 'effect', effects: [{ id: 'sh', kind: 'drop-shadow', enabled: true, params: { distance: 30, angle: 90, blur: 40, opacity: 0.8 } }] };
@@ -79,7 +80,7 @@ test.describe('effect and paint styles shared across frames @real', () => {
     await look.selectOption('Sunset');
     await page.getByTestId('clip-effect-style').selectOption('Lifted');
     await page.waitForTimeout(SETTLE_MS);
-    await page.screenshot({ path: `${SHOTS}/p1b-styles-1-applied.png` });
+    await page.screenshot({ path: `${SHOTS}/styles2-1-applied.png` });
     await expect.poll(async () => (await head(b.id)).styleRef, { timeout: 20_000 }).toBe('Sunset');
     expect((await head(b.id)).effectStyleRef).toBe('Lifted');
     expect((await head(b.id)).props.fills[0].type).toBe('linear-gradient');
@@ -92,10 +93,21 @@ test.describe('effect and paint styles shared across frames @real', () => {
     await angle.press('Enter');
     await inspector.locator('[data-testid="style-update"][data-style="Sunset"]').click();
     await page.waitForTimeout(SETTLE_MS * 2);
-    await page.screenshot({ path: `${SHOTS}/p1b-styles-2-updated.png` });
+    await page.screenshot({ path: `${SHOTS}/styles2-2-updated.png` });
 
     for (const node of [a, b]) {
       await expect.poll(async () => (await head(node.id)).props.fills[0].angle, { timeout: 20_000 }).toBe(NEW_ANGLE);
+    }
+
+    await page.keyboard.press('Escape');
+    const name = page.getByTestId('style-library-name-Sunset');
+    await name.fill(RENAMED);
+    await name.press('Enter');
+    await page.waitForTimeout(SETTLE_MS * 2);
+    await page.screenshot({ path: `${SHOTS}/styles2-3-renamed.png` });
+
+    for (const node of [a, b]) {
+      await expect.poll(async () => (await head(node.id)).styleRef, { timeout: 20_000 }).toBe(RENAMED);
     }
   });
 });
