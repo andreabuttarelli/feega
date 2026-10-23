@@ -20,6 +20,7 @@ import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
 import type { SelectionActionId } from './selection-actions';
 import { siblingsOf } from './frame-select';
 import { EditMode } from '$lib/motion/edit-mode';
+import { propBoxes, tidySpace } from '$lib/motion/space';
 import { PropertiesView } from '$lib/motion/properties-view';
 import type { CompPath } from '$lib/motion/precomp';
 import { scopeView } from '$lib/motion/instance-view';
@@ -165,6 +166,7 @@ const OPACITY_OPS = Object.fromEntries(OPACITY_KEYS.map((o) => [o.command, opaci
 
 const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   ...OPACITY_OPS,
+  [Action.TidyUp]: { shown: several, run: (ctx) => kept(ctx, tidySpace(ctx.doc, ctx.selection, ctx.frame, propBoxes(ctx.doc), EditMode.Design), 'Tidied up') },
   [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx.doc)), 'Created a component') },
   [Action.DetachInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, detachInstance(ctx.doc, ctx.selection[0], ctx.newId), 'Detached the instance') },
   [Action.PushInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, pushOverrides(ctx.doc, ctx.selection[0]), 'Pushed overrides to the main component') },
@@ -247,7 +249,7 @@ export const FRAME_ELEMENT_MENU: ReadonlySet<SelectionActionId> = new Set(
   })
 );
 
-const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
+const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.TidyUp, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
 
 export function frameKeyAction(e: KeyboardEvent): ActionId | null {
   const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, EditMode.Design);

@@ -133,8 +133,10 @@ const SPAN: Record<Axis, { start: (b: Bounds) => number; size: (b: Bounds) => nu
   [Axis.Y]: { start: (b) => b.top, size: (b) => b.bottom - b.top }
 };
 
-export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, axis: Axis, mode: EditMode): OpResult {
-  if (ids.length < MIN_DISTRIBUTED) {
+const MIN_SPACED = 2;
+
+export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, axis: Axis, mode: EditMode, spacing?: number): OpResult {
+  if (ids.length < (spacing === undefined ? MIN_DISTRIBUTED : MIN_SPACED)) {
     return fail(`distribute needs at least ${MIN_DISTRIBUTED} clips`);
   }
   const bounds = boundsOf(doc, ids, frame, boxes);
@@ -146,7 +148,7 @@ export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: n
   const first = bounds.get(ordered[0])!;
   const last = bounds.get(ordered[ordered.length - 1])!;
   const sizes = ordered.map((id) => size(bounds.get(id)!));
-  const gap = (start(last) + size(last) - start(first) - sizes.reduce((a, b) => a + b, 0)) / (ordered.length - 1);
+  const gap = spacing ?? (start(last) + size(last) - start(first) - sizes.reduce((a, b) => a + b, 0)) / (ordered.length - 1);
   const moves = ordered.map((id, i): [string, Pt] => {
     const wanted = start(first) + sizes.slice(0, i).reduce((a, b) => a + b, 0) + gap * i;
     return [id, along(axis, wanted - start(bounds.get(id)!))];
