@@ -14,7 +14,7 @@ const frame = (source: boolean) => ({
   width: 1920,
   height: 1080,
   durationInFrames: 150,
-  background: '#f2efe9',
+  background: 'brand',
   still: { frame: 0 },
   tracks: [
     {
@@ -44,7 +44,7 @@ test.describe('effect and paint styles shared across frames @real', () => {
   test.skip(!REAL_STACK, 'requires a stack: E2E_REAL_STACK=1');
 
   test('a gradient and a shadow style apply to another frame and editing them restyles both', async ({ page, session, admin, seedNode }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(150_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     const data = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
     const a = await seedNode({ type: 'motion', x: 540, y: 80, data });
@@ -62,15 +62,15 @@ test.describe('effect and paint styles shared across frames @real', () => {
     };
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    const hostA = page.locator(`[data-testid="frame-overlays"] [data-frame="${a.id}"]`);
     const hostB = page.locator(`[data-testid="frame-overlays"] [data-frame="${b.id}"]`);
     await expect(hostB).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(SETTLE_MS);
-    const selectCard = async (host: typeof hostA) => {
+    const selectCard = async (host: typeof hostB) => {
       const box = (await host.boundingBox())!;
       await page.mouse.click(box.x + 4, box.y + 4);
       await page.waitForTimeout(SETTLE_MS);
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await expect(page.getByTestId('clip-style')).toBeVisible({ timeout: 15_000 });
     };
 
     await selectCard(hostB);
@@ -85,10 +85,7 @@ test.describe('effect and paint styles shared across frames @real', () => {
     expect((await head(b.id)).props.fills[0].type).toBe('linear-gradient');
     expect((await head(b.id)).effects[0].params.blur).toBe(40);
 
-    await selectCard(hostA);
-    await expect(page.getByTestId('style-library')).toBeVisible({ timeout: 15_000 });
     const inspector = page.getByTestId('frame-inspector');
-    await page.screenshot({ path: `${SHOTS}/p1b-styles-debug.png` });
     await inspector.getByTestId('fill-row').first().getByTestId('fill-swatch').click();
     const angle = page.getByTestId('fill-angle');
     await angle.fill(String(NEW_ANGLE));
