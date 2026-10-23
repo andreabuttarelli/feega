@@ -161,6 +161,10 @@ pub struct ImageItem {
     pub fit: String,
     pub focus: [f64; 2],
     pub zoom: f64,
+    #[serde(default)]
+    pub crop: Option<[f64; 4]>,
+    #[serde(default)]
+    pub tile_turn: f64,
     pub clipped: bool,
     pub inner: Affine,
     #[serde(flatten)]
