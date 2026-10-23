@@ -6,12 +6,9 @@ import { ShapeKind } from './schema';
 import { pathSpace } from './space';
 import { ClipOp, clipPolygons } from './polygon-clip';
 
-export enum BooleanOp {
-  Union = 'union',
-  Subtract = 'subtract',
-  Intersect = 'intersect',
-  Exclude = 'exclude'
-}
+import { BooleanOp } from './boolean-op';
+
+export { BooleanOp };
 
 const CLIP_OP: Record<BooleanOp, ClipOp> = {
   [BooleanOp.Union]: ClipOp.Union,
