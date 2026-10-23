@@ -167,8 +167,8 @@ const UNSAFE_NAME = /[^\w.-]+/g;
 
 const linkName = (url: string) => decodeURIComponent(new URL(url).pathname.split('/').pop() || 'link').replace(UNSAFE_NAME, '_');
 
-export async function importCanvasLink(db: Db, input: { orgId: string; projectId: string; url: string }) {
-  const fetched = await safeFetchBytes(input.url, { maxBytes: UPLOAD_MAX_BYTES.video, timeoutMs: LINK_TIMEOUT_MS, maxRedirects: LINK_REDIRECTS, scheme: 'https-only' }).catch((cause: unknown) => {
+export async function importCanvasLink(db: Db, input: { orgId: string; projectId: string; url: string; maxBytes?: number }) {
+  const fetched = await safeFetchBytes(input.url, { maxBytes: input.maxBytes ?? UPLOAD_MAX_BYTES.video, timeoutMs: LINK_TIMEOUT_MS, maxRedirects: LINK_REDIRECTS, scheme: 'https-only' }).catch((cause: unknown) => {
     throw new UploadError(400, cause instanceof SafeFetchError ? cause.message : 'That link could not be fetched');
   });
   if (!fetched.ok) {
