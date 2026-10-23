@@ -56,4 +56,22 @@ describe('the canvas styles library over MCP', () => {
     expect(out).toMatchObject({ ok: true });
     expect(findClip(store.docs.b, 't')!.clip.styleRef).toBe('Brand');
   });
+
+  it('renaming changes the name in every frame that has it, keeping elements linked', async () => {
+    const linked = (d: MotionDoc) => ({ ...d, tracks: d.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, styleRef: 'Brand' })) })) });
+    const store = frames({ a: linked(must(defineStyle(textDoc(), 'Brand', RED))), b: linked(must(defineStyle(textDoc(), 'Brand', RED))), c: textDoc() });
+    const out = await canvasStyle(store, { name: 'Brand', to: 'Primary' });
+
+    expect(out).toMatchObject({ ok: true, frames: ['a', 'b'] });
+    expect(store.docs.a.styles).toEqual({ Primary: RED });
+    expect(findClip(store.docs.b, 't')!.clip.styleRef).toBe('Primary');
+    expect(store.docs.c.styles).toBeUndefined();
+  });
+
+  it('refuses a new name another frame already uses', async () => {
+    const store = frames({ a: must(defineStyle(textDoc(), 'Brand', RED)), b: must(defineStyle(textDoc(), 'Primary', BLUE)) });
+
+    expect(await canvasStyle(store, { name: 'Brand', to: 'Primary' })).toMatchObject({ ok: false });
+    expect(store.docs.a.styles).toEqual({ Brand: RED });
+  });
 });

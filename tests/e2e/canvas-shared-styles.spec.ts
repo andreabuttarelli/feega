@@ -68,4 +68,47 @@ test.describe('styles shared by the frames of a canvas @real', () => {
       expect((await head(node.id)).styleRef).toBe('Brand');
     }
   });
+
+  test('editing a text style and renaming it changes every frame that uses it', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(180_000);
+    const data = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
+    const headline = { kind: 'text', size: 0.12, weight: 600 };
+    const withHeadline = (text: string) => {
+      const base = frame(text, false);
+      return { ...base, styles: { Headline: headline }, tracks: [{ ...base.tracks[0], clips: [{ ...base.tracks[0].clips[0], styleRef: 'Headline' }] }] };
+    };
+    const a = await seedNode({ type: 'motion', x: 540, y: 80, data });
+    const b = await seedNode({ type: 'motion', x: 80, y: 80, data });
+    for (const [node, doc] of [[a, withHeadline('One')], [b, withHeadline('Two')]] as const) {
+      const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
+      expect(error).toBeNull();
+    }
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const hostA = page.locator(`[data-testid="frame-overlays"] [data-frame="${a.id}"]`);
+    await expect(hostA).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(SETTLE_MS);
+    const boxA = (await hostA.boundingBox())!;
+    await page.mouse.click(boxA.x + 4, boxA.y + 4);
+    await page.getByText('Properties', { exact: true }).first().click();
+    await expect(page.getByTestId('style-library')).toBeVisible({ timeout: 15_000 });
+
+    await page.getByTestId('style-library-size-Headline').fill('0.2');
+    await page.getByTestId('style-library-size-Headline').press('Enter');
+    await page.waitForTimeout(SETTLE_MS);
+    await page.screenshot({ path: `${SHOTS}/w2a-5-style-edited.png` });
+    await page.getByTestId('style-library-name-Headline').fill('Display');
+    await page.getByTestId('style-library-name-Headline').press('Enter');
+    await page.waitForTimeout(SETTLE_MS * 2);
+    await page.screenshot({ path: `${SHOTS}/w2a-5-style-renamed.png` });
+
+    type Doc = { styles: Record<string, { size?: number }>; tracks: { clips: { styleRef?: string; props: { size?: number } }[] }[] };
+    const head = async (nodeId: string) => {
+      const { data: rows } = await admin.from('motion_revisions').select('doc').eq('node_id', nodeId).order('version', { ascending: false }).limit(1);
+      const doc = rows?.[0]?.doc as Doc;
+      return { names: Object.keys(doc.styles), size: doc.styles.Display?.size, ref: doc.tracks[0].clips[0].styleRef, clipSize: doc.tracks[0].clips[0].props.size };
+    };
+    for (const node of [a, b]) {
+      await expect.poll(() => head(node.id), { timeout: 20_000 }).toEqual({ names: ['Display'], size: 0.2, ref: 'Display', clipSize: 0.2 });
+    }
+  });
 });

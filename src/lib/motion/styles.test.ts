@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, parseMotionDoc, findClip, type MotionDoc } from './doc';
 import { addClip } from './timeline';
-import { StyleKind, applyStyle, defineStyle, detachStyle, removeStyle, saveAsStyle, stylesFor, stylesOf } from './styles';
+import { StyleKind, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, saveAsStyle, stylesFor, stylesOf } from './styles';
 
 function docWith(): MotionDoc {
   const base = newMotionDoc(MotionFormat.Square);
@@ -100,3 +100,22 @@ describe('named styles', () => {
     expect(stylesFor(doc, 'Title').map((s) => s.name)).toEqual(['Headline', 'Brand']);
   });
 });
+
+describe('renaming a style', () => {
+  it('moves the definition and keeps the linked elements linked', () => {
+    const linked = ok(applyStyle(ok(defineStyle(docWith(), 'Headline', HEADLINE)), ['t1'], 'Headline'));
+    const renamed = ok(renameStyle(linked, 'Headline', 'Display'));
+
+    expect(renamed.styles).toEqual({ Display: HEADLINE });
+    expect(findClip(renamed, 't1')!.clip.styleRef).toBe('Display');
+  });
+
+  it('refuses a missing style, a taken name and an invalid one', () => {
+    const doc = ok(defineStyle(ok(defineStyle(docWith(), 'A', HEADLINE)), 'B', HEADLINE));
+
+    expect(renameStyle(doc, 'Z', 'C').ok).toBe(false);
+    expect(renameStyle(doc, 'A', 'B').ok).toBe(false);
+    expect(renameStyle(doc, 'A', '!!').ok).toBe(false);
+  });
+});
+

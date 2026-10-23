@@ -4,7 +4,7 @@ import { fieldsOf } from './inspector';
 import { FillType } from './fill/model';
 import { setProps, type OpResult } from './timeline';
 import type { ComponentId } from './components';
-import { StyleKind, styleSchema, stylesSchema, type Style, type textStyleSchema, type colourStyleSchema } from './styles-model';
+import { STYLE_NAME, StyleKind, styleSchema, stylesSchema, type Style, type textStyleSchema, type colourStyleSchema } from './styles-model';
 
 export { StyleKind };
 
@@ -13,6 +13,7 @@ export enum StyleAction {
   Apply = 'apply',
   Detach = 'detach',
   Remove = 'remove',
+  Rename = 'rename',
   List = 'list'
 }
 
@@ -116,6 +117,22 @@ export function removeStyle(doc: MotionDoc, name: string): OpResult {
   }
   const { [name]: _gone, ...styles } = doc.styles;
   return { ok: true, doc: { ...withRef(doc, linked(doc, name), undefined), styles } };
+}
+
+export function renameStyle(doc: MotionDoc, from: string, to: string): OpResult {
+  const style = doc.styles?.[from];
+  if (!style) {
+    return { ok: false, error: `no style ${from}` };
+  }
+  if (!STYLE_NAME.test(to)) {
+    return { ok: false, error: 'style names are letters, digits, spaces, - or _' };
+  }
+  if (doc.styles?.[to]) {
+    return { ok: false, error: `a style ${to} already exists` };
+  }
+  const { [from]: _old, ...others } = doc.styles;
+  const tracks = doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.styleRef === from ? { ...c, styleRef: to } : c)) }));
+  return { ok: true, doc: { ...doc, tracks, styles: { ...others, [to]: style } } };
 }
 
 const TEXT_PROPS = ['font', 'size', 'weight', 'tracking', 'leading', 'color'] as const;

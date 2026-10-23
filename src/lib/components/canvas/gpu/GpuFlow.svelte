@@ -29,6 +29,7 @@
   import GradientHandles from '../GradientHandles.svelte';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import { renameStyle } from '$lib/motion/styles';
   import type { Style } from '$lib/motion/styles-model';
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
   import type { Fill } from '$lib/motion/fill/model';
@@ -1563,8 +1564,18 @@
     }
   }
 
+  function syncRename(from: string, to: string) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[from])) {
+      const present = saverOf(frame.id)?.history.present;
+      const renamed = present ? renameStyle(present, from, to) : null;
+      if (renamed?.ok) {
+        commit(frame.id, renamed, `Renamed the ${from} style to ${to}`);
+      }
+    }
+  }
+
   onMount(() => {
-    styleLibrary.connect(syncStyle);
+    styleLibrary.connect({ push: syncStyle, rename: syncRename });
     return () => styleLibrary.connect(null);
   });
 
