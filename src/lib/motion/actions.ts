@@ -11,6 +11,7 @@ import PenLine from '@lucide/svelte/icons/pen-line';
 import Combine from '@lucide/svelte/icons/combine';
 import ComponentIcon from '@lucide/svelte/icons/component';
 import Unlink from '@lucide/svelte/icons/unlink';
+import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
 import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 import Scaling from '@lucide/svelte/icons/scaling';
 import Grid3x3 from '@lucide/svelte/icons/grid-3x3';
@@ -264,6 +265,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.PasteProperties]: { name: 'Paste properties', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.CreateComponent]: { name: 'Create component', icon: ComponentIcon, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.DetachInstance]: { name: 'Detach instance', icon: Unlink, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.PushInstance]: { name: 'Push overrides to main', icon: ArrowUpToLine, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ResetInstance]: { name: 'Reset all overrides', icon: RotateCcw, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.FlipVertical]: { name: 'Flip vertical', icon: FlipVertical2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Tool.NullFromSelection]: { name: 'Null parent', icon: CircleDashed, group: GuideGroup.Edit, menu: MenuSection.Layer },

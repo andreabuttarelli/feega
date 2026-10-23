@@ -143,4 +143,41 @@ test.describe('components inside a canvas frame @real', () => {
     await expect.poll(async () => (await saved()).overrides, { timeout: 20_000 }).toBeTruthy();
     expect((await saved()).mainX).toBe(0.5);
   });
+
+  test('push to main turns an instance override into the main value', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(150_000);
+    const frame = await seedNode({ type: 'motion', x: 80, y: 80, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frame.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const host = page.locator(`[data-testid="frame-overlays"] [data-frame="${frame.id}"]`);
+    await expect(host).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(SETTLE_MS);
+    const box = (await host.boundingBox())!;
+    await page.mouse.click(box.x + 4, box.y + 4);
+    await page.waitForTimeout(SETTLE_MS);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(page.getByTestId('frame-selection').first()).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press('Alt+Meta+k');
+    await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('instance-push')).toBeDisabled();
+
+    await page.getByTestId('instance-text').fill('Sold out');
+    await page.getByTestId('instance-text').press('Enter');
+    await expect(page.getByTestId('instance-push')).toBeEnabled();
+    await page.screenshot({ path: `${SHOTS}/w2a-3-before-push.png` });
+    await page.getByTestId('instance-push').click();
+    await expect(page.getByTestId('instance-push')).toBeDisabled();
+    await page.waitForTimeout(SETTLE_MS);
+    await page.screenshot({ path: `${SHOTS}/w2a-3-after-push.png` });
+
+    const saved = async () => {
+      const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', frame.id).order('version', { ascending: false }).limit(1);
+      const head = data?.[0]?.doc as Head;
+      const instance = head.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!;
+      const main = head.comps[instance.props.comp!].tracks.flatMap((t) => t.clips).find((c) => c.id === 'label')!;
+      return { overrides: instance.props.overrides, text: main.props.text };
+    };
+    await expect.poll(saved, { timeout: 20_000 }).toEqual({ overrides: undefined, text: 'Sold out' });
+  });
 });

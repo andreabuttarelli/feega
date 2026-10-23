@@ -118,6 +118,7 @@
     <div class="actions">
       <button type="button" data-testid="instance-add-variant" onclick={newVariant}>Add variant</button>
       <button type="button" data-testid="instance-reset" disabled={!Object.keys(instance.overrides).length} onclick={() => onrun(Action.ResetInstance)}>Reset overrides</button>
+      <button type="button" data-testid="instance-push" disabled={!Object.keys(instance.overrides).length} onclick={() => onrun(Action.PushInstance)}>Push to main</button>
       <button type="button" data-testid="instance-detach" onclick={() => onrun(Action.DetachInstance)}>Detach</button>
     </div>
   </section>

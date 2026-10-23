@@ -24,7 +24,7 @@ import type { CompPath } from '$lib/motion/precomp';
 import { scopeView } from '$lib/motion/instance-view';
 import { scopeOf } from './frame-scope';
 import { isLockedComp } from '$lib/motion/template/library';
-import { createComponent, detachInstance, instanceOf, resetOverrides } from '$lib/motion/main-component';
+import { createComponent, detachInstance, instanceOf, pushOverrides, resetOverrides } from '$lib/motion/main-component';
 
 export type InspectorShown = { view: PropertiesView.Clip | PropertiesView.Template; clip: MotionClip; path: CompPath; hosts: readonly string[] } | { view: PropertiesView.Multiple; clip: null; path: CompPath; hosts: readonly string[] };
 
@@ -136,6 +136,7 @@ function pasteReplace(ctx: BarCtx): Done | null {
 const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx.doc)), 'Created a component') },
   [Action.DetachInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, detachInstance(ctx.doc, ctx.selection[0], ctx.newId), 'Detached the instance') },
+  [Action.PushInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, pushOverrides(ctx.doc, ctx.selection[0]), 'Pushed overrides to the main component') },
   [Action.ResetInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, resetOverrides(ctx.doc, ctx.selection[0]), 'Reset all overrides') },
   [Action.Split]: clipOp(ClipOp.Split),
   [Action.Duplicate]: clipOp(ClipOp.Duplicate),
@@ -167,7 +168,7 @@ const LATER_OPS: Partial<Record<ActionId, LaterOp>> = {
   [Action.TextToPath]: { shown: allText, run: async (ctx) => kept(ctx, await outlineTexts(ctx.doc, ctx.selection, ctx.load, ctx.assets), 'Outlined text') }
 };
 
-const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.AutoLayout, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Action.FlipHorizontal, Action.FlipVertical];
+const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.AutoLayout, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Action.FlipHorizontal, Action.FlipVertical];
 
 export const FRAME_STRUCTURE_ACTIONS: ReadonlySet<ActionId> = new Set(STRUCTURE_ORDER);
 
