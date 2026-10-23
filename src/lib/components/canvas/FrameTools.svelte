@@ -69,7 +69,7 @@
 
   const edit = (next: MotionDoc, summary: string) => apply({ ok: true, doc: next }, summary);
   const alignTo = (edge: Edge) => apply(alignSpace(doc, picks, frame, propBoxes(doc), edge, EditMode.Design), `Aligned ${edge}`);
-  const distribute = (axis: Axis) => apply(distributeSpace(doc, picks, frame, propBoxes(doc), axis, EditMode.Design), `Distributed along ${axis}`);
+  const distribute = (axis: Axis, spacing?: number) => apply(distributeSpace(doc, picks, frame, propBoxes(doc), axis, EditMode.Design, spacing), `Distributed along ${axis}`);
 
   function created(id: string) {
     const made = findClip(doc, id)?.clip;

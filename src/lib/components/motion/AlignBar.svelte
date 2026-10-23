@@ -10,10 +10,14 @@
   import AlignVerticalDistributeCenter from '@lucide/svelte/icons/align-vertical-distribute-center';
   import { Axis, Edge } from '$lib/motion/space';
 
-  let { count, onalign, ondistribute }: { count: number; onalign: (edge: Edge) => void; ondistribute: (axis: Axis) => void } = $props();
+  let { count, onalign, ondistribute }: { count: number; onalign: (edge: Edge) => void; ondistribute: (axis: Axis, spacing?: number) => void } = $props();
+
+  let spacing = $state('');
+  const exactGap = $derived(spacing.trim() === '' || !Number.isFinite(Number(spacing)) ? undefined : Number(spacing));
 
   const ICON = 15;
   const MIN_DISTRIBUTED = 3;
+  const MIN_SPACED = 2;
 
   const ALIGNS: { edge: Edge; label: string; icon: Component }[] = [
     { edge: Edge.Left, label: 'Align left', icon: AlignStartVertical },
@@ -35,8 +39,9 @@
     <button type="button" aria-label={a.label} title={a.label} data-align={a.edge} onclick={() => onalign(a.edge)}><a.icon size={ICON} /></button>
   {/each}
   {#each DISTRIBUTES as d (d.axis)}
-    <button type="button" aria-label={d.label} title={d.label} data-distribute={d.axis} disabled={count < MIN_DISTRIBUTED} onclick={() => ondistribute(d.axis)}><d.icon size={ICON} /></button>
+    <button type="button" aria-label={d.label} title={d.label} data-distribute={d.axis} disabled={count < (exactGap === undefined ? MIN_DISTRIBUTED : MIN_SPACED)} onclick={() => ondistribute(d.axis, exactGap)}><d.icon size={ICON} /></button>
   {/each}
+  <input class="gap" type="text" inputmode="decimal" placeholder="gap" aria-label="Exact spacing in pixels" title="Exact spacing in px; empty spreads evenly" data-testid="distribute-spacing" bind:value={spacing} />
 </div>
 
 <style>
@@ -62,6 +67,18 @@
 
   button:hover:not(:disabled) {
     border-color: var(--ui-line-strong);
+  }
+
+  .gap {
+    width: 44px;
+    height: 26px;
+    padding: 0 var(--ui-space-1);
+    border: 1px solid var(--ui-line);
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: 12px;
   }
 
   button:disabled {
