@@ -40,3 +40,23 @@ describe('paragraph typography in the HTML export', () => {
     expect(compose({ text: 'a b', textCase: 'title' })).toContain('text-transform:capitalize');
   });
 });
+
+describe('links in the HTML export', () => {
+  it('wraps a linked range in an anchor that opens a new tab safely', () => {
+    const html = compose({ text: 'see docs', runs: [{ start: 4, end: 8, link: 'https://feega.app/docs?a=1&b=2' }] });
+
+    expect(html).toMatch(/see <a href="https:\/\/feega\.app\/docs\?a=1&amp;b=2" target="_blank" rel="noopener noreferrer" style="[^"]*">docs<\/a>/);
+  });
+
+  it('keeps the text colour instead of the browser link blue', () => {
+    const html = compose({ text: 'abc', runs: [{ start: 0, end: 3, link: 'https://a.co' }] });
+
+    expect(html).toMatch(/<a [^>]*style="color:inherit;/);
+  });
+
+  it('underlines a link', () => {
+    const html = compose({ text: 'abc', runs: [{ start: 0, end: 3, link: 'https://a.co' }] });
+
+    expect(html).toMatch(/<a [^>]*style="[^"]*text-decoration:underline/);
+  });
+});

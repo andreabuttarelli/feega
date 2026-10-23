@@ -164,10 +164,15 @@ function runCss(ctx: TemplateCtx<'Text'>, run: TextRun): string {
     fontStyle: run.italic === undefined ? undefined : run.italic ? 'italic' : 'normal',
     letterSpacing: run.tracking === undefined ? undefined : `${run.tracking}em`,
     lineHeight: run.leading,
-    textDecoration: run.underline || run.strike ? [run.underline ? 'underline' : '', run.strike ? 'line-through' : ''].filter(Boolean).join(' ') : undefined,
+    textDecoration: run.underline || run.strike || run.link ? [run.underline || run.link ? 'underline' : '', run.strike ? 'line-through' : ''].filter(Boolean).join(' ') : undefined,
     textTransform: run.textCase === undefined ? undefined : RUN_TRANSFORM[run.textCase],
     opacity: run.opacity
   });
+}
+
+function runHtml(ctx: TemplateCtx<'Text'>, run: TextRun, html: string): string {
+  const style = runCss(ctx, run);
+  return run.link ? `<a href="${esc(run.link)}" target="_blank" rel="noopener noreferrer" style="color:inherit;${style}">${html}</a>` : `<span style="${style}">${html}</span>`;
 }
 
 function runParagraphs(ctx: TemplateCtx<'Text'>): string[] {
@@ -178,7 +183,7 @@ function runParagraphs(ctx: TemplateCtx<'Text'>): string[] {
         paragraphs.push('');
       }
       const html = esc(piece);
-      paragraphs[paragraphs.length - 1] += segment.run && piece ? `<span style="${runCss(ctx, segment.run)}">${html}</span>` : html;
+      paragraphs[paragraphs.length - 1] += segment.run && piece ? runHtml(ctx, segment.run, html) : html;
     });
   }
   return paragraphs;

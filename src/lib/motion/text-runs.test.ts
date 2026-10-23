@@ -1,7 +1,50 @@
 import { describe, expect, it } from 'vitest';
 import { BlendMode } from './blend';
 import { FillType } from './fill/model';
-import { MIXED, type GradientFill, RunToggle, codeIndex, normalRuns, rangeValues, runEditSchema, runAt, runsSchema, segmentsOf, shiftRuns, styledRange } from './text-runs';
+import { MIXED, type GradientFill, RunToggle, codeIndex, linkOf, normalRuns, rangeValues, runEditSchema, runAt, runsSchema, segmentsOf, shiftRuns, styledRange } from './text-runs';
+
+describe('text run links', () => {
+  it('takes http, https and mailto addresses', () => {
+    for (const link of ['https://feega.app', 'http://a.co/x', 'mailto:hi@feega.app']) {
+      expect(runsSchema.parse([{ start: 0, end: 1, link }])).toHaveLength(1);
+    }
+  });
+
+  it('refuses an address that runs script', () => {
+    expect(() => runsSchema.parse([{ start: 0, end: 1, link: 'javascript:alert(1)' }])).toThrow();
+  });
+
+  it('sets on a range, merges with a neighbour of the same address, and null removes it', () => {
+    const linked = styledRange([], { start: 0, end: 2 }, { link: 'https://a.co' }, 6);
+    const more = styledRange(linked, { start: 2, end: 4 }, { link: 'https://a.co' }, 6);
+
+    expect(more).toEqual([{ start: 0, end: 4, link: 'https://a.co' }]);
+    expect(styledRange(more, { start: 0, end: 4 }, { link: null }, 6)).toEqual([]);
+  });
+
+  it('reads as mixed when a range holds two addresses', () => {
+    const runs = [
+      { start: 0, end: 1, link: 'https://a.co' },
+      { start: 1, end: 2, link: 'https://b.co' }
+    ];
+
+    expect(rangeValues(runs, { start: 0, end: 2 }, {}, 2).link).toBe(MIXED);
+  });
+});
+
+describe('linkOf', () => {
+  it('keeps a full address, adds https to a bare one, and empties to null', () => {
+    expect(linkOf(' https://a.co/x ')).toBe('https://a.co/x');
+    expect(linkOf('feega.app')).toBe('https://feega.app');
+    expect(linkOf('mailto:hi@feega.app')).toBe('mailto:hi@feega.app');
+    expect(linkOf('  ')).toBeNull();
+  });
+
+  it('refuses script and other schemes', () => {
+    expect(linkOf('javascript:alert(1)')).toBeUndefined();
+    expect(linkOf('data:text/html,x')).toBeUndefined();
+  });
+});
 
 describe('text runs', () => {
   it('an old text clip without runs still parses', () => {
