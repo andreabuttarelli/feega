@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath, holdsDoc } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -110,19 +110,20 @@ describe('a free element is a frame without chrome', () => {
   it('is the drawn box exactly: no bar, in preview or edit', () => {
     const made = elementNodeOf({ width: 240, height: 80 });
 
-    expect(made.data.kind).toBe(FrameKind.Element);
+    expect(made.type).toBe('element');
+    expect(motionOf({ id: 'e', type: made.type, data: made.data })?.kind).toBe(FrameKind.Element);
     expect({ w: made.w, h: made.h }).toEqual({ w: 240, h: 80 });
     expect(frameNodeSize(120, { width: 480, height: 160 }, NodeMode.Preview, FrameKind.Element)).toEqual({ w: 120, h: 40 });
   });
 
   it('has no ports, no name tag and a small minimum size: it is a shape, not a node', () => {
-    const element = { id: 'e', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }).data };
+    const element = { id: 'e', type: 'element', data: elementNodeOf({ width: 10, height: 10 }).data };
 
     expect(tileChromeOf(element)).toMatchObject({ ports: false, label: false, bar: false, takesDrops: false });
     expect(tileChromeOf(element)).toMatchObject({ timeline: false });
     expect(tileChromeOf({ id: 'f', type: 'motion', data: newMotionData() })).toMatchObject({ ports: true, label: true, bar: true, timeline: true });
     expect(tileChromeOf({ id: 't', type: 'text', data: {} })).toMatchObject({ ports: true, label: true });
-    expect(nodeSize('motion', element.data).w).toBeLessThan(40);
+    expect(nodeSize('element', element.data).w).toBeLessThan(40);
   });
 
   it('opens with its own shapes selected, so the properties show at once; a frame opens on nothing', () => {
@@ -165,7 +166,7 @@ describe('a free element is a frame without chrome', () => {
   });
 
   it('reads back as an element; an old frame without the field stays a frame', () => {
-    expect(motionOf({ id: 'e', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }).data })?.kind).toBe(FrameKind.Element);
+    expect(motionOf({ id: 'e', type: 'element', data: elementNodeOf({ width: 10, height: 10 }).data })?.kind).toBe(FrameKind.Element);
     expect(motionOf({ id: 'f', type: 'motion', data: { format: '9:16', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } })?.kind).toBe(FrameKind.Frame);
   });
 });
@@ -179,7 +180,7 @@ describe('a custom frame takes the size the hand gives it', () => {
   });
 
   it('only a preset grows its node to the open doc; a custom frame or a free element is sized by the node, never by a stale doc', () => {
-    const element = motionOf({ id: 'e', type: 'motion', data: elementNodeOf({ width: 300, height: 100 }).data })!;
+    const element = motionOf({ id: 'e', type: 'element', data: elementNodeOf({ width: 300, height: 100 }).data })!;
 
     expect(heightFollowsDoc(preset)).toBe(true);
     expect(heightFollowsDoc(custom)).toBe(false);
@@ -204,5 +205,23 @@ describe('who hears a pointer over a frame\'s children', () => {
 
   it('a tile with a DOM node keeps its own hover', () => {
     expect(hoverHostOf(TileBody.Dom)).toBe(HoverHost.Node);
+  });
+});
+
+describe('an element node is its own type, not a frame', () => {
+  it('reads as an element, with no frame format in its data', () => {
+    expect(motionOf({ id: 'e', type: 'element', data: { docHeadRevision: 2 } })?.kind).toBe(FrameKind.Element);
+  });
+
+  it('a group of elements keeps its group behaviour', () => {
+    expect(motionOf({ id: 'g', type: 'element', data: { docHeadRevision: 1, kind: 'group' } })?.kind).toBe(FrameKind.Group);
+  });
+
+  it('never reads as a frame, whatever its data says', () => {
+    expect(motionOf({ id: 'e', type: 'element', data: { docHeadRevision: 1, kind: 'frame' } })?.kind).toBe(FrameKind.Element);
+  });
+
+  it('holds a doc like a frame does; other types do not', () => {
+    expect(['motion', 'element', 'image'].map(holdsDoc)).toEqual([true, true, false]);
   });
 });

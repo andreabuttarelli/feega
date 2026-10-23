@@ -15,7 +15,7 @@
  */
 
 import type { PostCompositionNode } from './post-composition';
-import { FrameKind } from './motion-node';
+import { FrameKind, docKindOf, holdsDoc } from './motion-node';
 import { Edge } from '$lib/motion/space';
 import { FRAME_DIALOG_ACTIONS, isFrameDialogAction, type FrameDialogActionId } from './frame-dialogs';
 import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-plan';
@@ -155,13 +155,15 @@ const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
-type Summary = { data: Record<string, unknown> };
+type Summary = { type: string; data: Record<string, unknown> };
 
-const isGroup = (n: Summary) => n.data.kind === FrameKind.Group;
+const kindOf = (n: Summary): FrameKind | null => (holdsDoc(n.type) ? docKindOf(n.type, n.data.kind) : null);
 
-const isDrawn = (n: Summary) => typeof n.data.format === 'string' && n.data.kind !== FrameKind.Group;
+const isGroup = (n: Summary) => kindOf(n) === FrameKind.Group;
 
-const isFrame = (n: Summary) => typeof n.data.format === 'string' && (n.data.kind ?? FrameKind.Frame) === FrameKind.Frame;
+const isDrawn = (n: Summary) => kindOf(n) !== null && kindOf(n) !== FrameKind.Group;
+
+const isFrame = (n: Summary) => kindOf(n) === FrameKind.Frame;
 
 const isOneFrame = (summaries: readonly Summary[]) => summaries.length === 1 && isFrame(summaries[0]);
 

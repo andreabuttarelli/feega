@@ -240,19 +240,18 @@ describe('paintText', () => {
     const inksOf = (props: Record<string, unknown>, change: Partial<TextEnv> = {}) => drawn(paintText(env('Text', { text: 'aa', align: 'left', ...props }, change)));
     const solid = (color: string, blend = 'normal') => ({ type: FillType.Solid, color, blend });
 
-    it('draws a diamond as four linear quadrants meeting at the centre', () => {
+    it('draws a diamond as one diamond paint over the glyphs', () => {
       const inks = inksOf({ fills: [{ type: FillType.Diamond, stops }] });
 
-      expect(inks).toHaveLength(4);
-      expect(inks.every((i) => i.paint.kind === PaintKind.Linear)).toBe(true);
+      expect(inks.map((i) => i.paint.kind)).toEqual([PaintKind.Diamond]);
     });
 
-    it('draws an angular gradient as thin wedges, black just after where it starts', () => {
+    it('draws an angular gradient as one sweep starting at the top, as CSS conic does', () => {
       const inks = inksOf({ fills: [{ type: FillType.Angular, angle: 0, center: { x: 0.5, y: 0.5 }, stops }] });
-      const first = inks[0].paint as Extract<Paint, { kind: PaintKind.Linear }>;
+      const [sweep] = inks.map((i) => i.paint as Extract<Paint, { kind: PaintKind.Sweep }>);
 
-      expect(inks.length).toBeGreaterThan(8);
-      expect(first.stops[0].color[0]).toBeLessThan(0.05);
+      expect(inks).toHaveLength(1);
+      expect(sweep.start).toBeCloseTo(-Math.PI / 2);
     });
 
     it('blends solid layers into one colour like background-blend-mode', () => {

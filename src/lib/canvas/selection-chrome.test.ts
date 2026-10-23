@@ -22,6 +22,11 @@ describe('one selection level at a time', () => {
     });
   });
 
+  it('a free text being typed drops its ring: the editor outlines the text as it grows', () => {
+    expect(nodeChrome('m1', true, open(['tx']), 'm1')).toEqual({ ring: NodeChrome.None, handles: false });
+    expect(nodeChrome('m1', true, open(['tx']), 'other')).toEqual({ ring: NodeChrome.Editing, handles: false });
+  });
+
   it('with something picked inside its open frame, the node only shows it is open', () => {
     expect(nodeChrome('m1', true, open(['poster']))).toEqual({
       ring: NodeChrome.Editing,

@@ -60,6 +60,8 @@ fn colours(p: &Paint) -> Vec<f32> {
         Paint::Solid { color } => color.to_vec(),
         Paint::Linear { from, to, stops } => from.iter().chain(to).map(|v| *v as f32 / 100.0).chain(stops.iter().flat_map(|s| s.color)).collect(),
         Paint::Radial { center, radius, stops } => center.iter().chain([radius]).map(|v| *v as f32 / 100.0).chain(stops.iter().flat_map(|s| s.color)).collect(),
+        Paint::Sweep { center, start, stops } => center.iter().chain([start]).map(|v| *v as f32 / 100.0).chain(stops.iter().flat_map(|s| s.color)).collect(),
+        Paint::Diamond { center, half, stops } => center.iter().chain(half).map(|v| *v as f32 / 100.0).chain(stops.iter().flat_map(|s| s.color)).collect(),
     }
 }
 

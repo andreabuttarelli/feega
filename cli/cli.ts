@@ -152,6 +152,15 @@ motion
   });
 
 motion
+  .command('share <nodeId>')
+  .description('Create the public viewer link of one frame (plays on a loop, swipes between frames on a phone; free)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionShare } = await import('./commands/motion.ts');
+    await cmdMotionShare(nodeId, opts);
+  });
+
+motion
   .command('move <frameId> <elementId>')
   .description('Move an element out of a frame into another frame (--to), or into a new frame on the canvas')
   .option('--to <frameId>', 'The frame to move it into; omit for a new frame')

@@ -90,6 +90,38 @@ describe('displayListAt', () => {
     expect(pathOf(graded, 'card')?.paint).toMatchObject({ kind: PaintKind.Linear, from: [0, 54], to: [192, 54] });
   });
 
+  it('samples a keyed gradient stop colour and angle at the frame drawn', () => {
+    const fills = [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
+    const graded = patch(withCard, 'card', { props: { ...cardProps, fills } });
+    const keyed = must(setKeyframes(graded, 'card', 'fill.0.stop.1.color', [{ frame: 0, value: '#ffffff', ease: Ease.Linear }, { frame: 60, value: '#ff0000', ease: Ease.Linear }]));
+    const turning = must(setKeyframes(keyed, 'card', 'fill.0.angle', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 60, value: 90, ease: Ease.Linear }]));
+    const end = pathOf(turning, 'card', 60)?.paint as { from: number[]; to: number[]; stops: { color: number[] }[] };
+
+    expect(pathOf(turning, 'card', 0)?.paint).toMatchObject({ kind: PaintKind.Linear, from: [0, 54], to: [192, 54] });
+    expect(end.from[0]).toBeCloseTo(96);
+    expect(end.stops[1].color.slice(0, 3)).toEqual([1, 0, 0]);
+    expect(list(turning, 60).unsupported).toEqual([]);
+  });
+
+  describe('an image fill on a shape', () => {
+    const fills = [{ type: FillType.Image, assetId: 'photo', fit: 'cover' }];
+    const pictured = patch(withCard, 'card', { props: { ...cardProps, fills } });
+    const drawnWith = (assets: Record<string, string>) => drawFrame(prepare(pictured, FEEGA_TOKENS, assets), 0);
+
+    it('draws the picture through the shape as a stencil', () => {
+      const drawn = drawnWith({ photo: 'https://cdn.test/photo.png' });
+      const image = drawn.items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(drawn.unsupported).toEqual([]);
+      expect(image).toMatchObject({ src: 'https://cdn.test/photo.png', fit: 'cover' });
+      expect(image?.matte?.items[0]).toMatchObject({ kind: ItemKind.Path });
+    });
+
+    it('stays a gap while the picture has no address', () => {
+      expect(drawnWith({}).unsupported).toContainEqual({ clip: 'card', component: 'Shape', reason: Unsupported.Fill });
+    });
+  });
+
   it('reads a gaussian blur effect as a CSS blur filter', () => {
     const blurred = patch(withCard, 'card', { effects: [{ id: 'e1', kind: 'gaussian-blur', enabled: true, params: { radius: 12 } }] } as never);
 
@@ -187,6 +219,25 @@ describe('displayListAt', () => {
     expect(kinds(fill([{ type: 'linear-gradient', angle: 0, stops }]))).toEqual([ItemKind.Text]);
     expect(new Set(kinds(fill([{ type: 'diamond-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
     expect(new Set(kinds(fill([{ type: 'angular-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
+  });
+
+  it('draws angular and diamond fills on every shape kind instead of dropping the shape', () => {
+    const stops = [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }];
+    const shapes = [{ shape: 'rect' }, { shape: 'ellipse' }, { shape: 'path', path: 'M0 0 L1 0 L1 1 Z' }];
+    const fills = [
+      { fill: { type: 'angular-gradient', angle: 90, center: { x: 0.25, y: 0.5 }, stops }, paint: { kind: PaintKind.Sweep, center: [48, 54], start: 0 } },
+      { fill: { type: 'diamond-gradient', stops }, paint: { kind: PaintKind.Diamond, center: [96, 54], half: [96, 54] } }
+    ];
+
+    for (const kind of shapes) {
+      for (const { fill, paint } of fills) {
+        const shaped = must(addClip(withBg, { component: 'Shape', from: 0, durationInFrames: 90, props: { ...square, ...kind, fills: [fill] } }, 's'));
+        const drawn = displayListAt(shaped, 0, FEEGA_TOKENS);
+
+        expect(drawn.unsupported).toEqual([]);
+        expect(pathOf(shaped, 's')?.paint).toMatchObject({ ...paint, stops: [{ at: 0 }, { at: 1 }] });
+      }
+    }
   });
 
   it('carries text as glyph runs when asked to, for the native core to outline', () => {

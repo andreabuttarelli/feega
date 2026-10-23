@@ -61,6 +61,7 @@ export const NODE_TYPES = [
   'audio',
   'model3d',
   'motion',
+  'element',
   'studio_batch'
 ] as const;
 

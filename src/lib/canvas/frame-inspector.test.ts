@@ -136,11 +136,30 @@ describe('barAction', () => {
     expect(findClip(barAction(Action.AutoLayout, { doc: added.doc, selection: [container], frame: 0, newId: fresh() })!.doc, container)?.clip.autoLayout).toBeFalsy();
   });
 
-  it('unites two shapes into the bottom one', () => {
+  it('unites two shapes into a live group that keeps both editable', () => {
     const done = barAction(Action.Union, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() });
+    const group = findClip(done!.doc, done!.selection[0])!.clip;
 
-    expect(done?.selection).toEqual(['bottom']);
-    expect(findClip(done!.doc, 'top')).toBeNull();
+    expect(group.props.boolean).toBe('union');
+    expect(done?.selection).toHaveLength(1);
+    const inside = Object.values(done!.doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((k) => k.id)));
+    expect(inside.sort()).toEqual(['bottom', 'top']);
+  });
+
+  it('switches a live group to another operation', () => {
+    const made = barAction(Action.Union, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
+    const done = barAction(Action.Subtract, { doc: made.doc, selection: made.selection, frame: 0, newId: fresh() });
+
+    expect(findClip(done!.doc, made.selection[0])!.clip.props.boolean).toBe('subtract');
+  });
+
+  it('flatten bakes a live group into one shape', () => {
+    const made = barAction(Action.Union, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
+    const done = barAction(Action.Flatten, { doc: made.doc, selection: made.selection, frame: 0, newId: fresh() })!;
+
+    expect(done.selection).toHaveLength(1);
+    expect(findClip(done.doc, done.selection[0])!.clip.props.shape).toBe('path');
+    expect(findClip(done.doc, made.selection[0])).toBeNull();
   });
 
   it('flips the selection', () => {

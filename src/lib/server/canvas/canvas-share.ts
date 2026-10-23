@@ -258,6 +258,7 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   audio: audioView,
   model3d: model3dView,
   motion: () => EMPTY,
+  element: () => EMPTY,
   studio_batch: () => EMPTY
 };
 
@@ -274,7 +275,7 @@ async function projectShareable(db: Db, canvas: { org_id: string; project_id: st
   return modeAllows(modeOf(data?.mode), Capability.Share);
 }
 
-export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): Promise<SharedCanvas | null> {
+export async function findSharedCanvas(db: Db, token: string) {
   if (!token) {
     return null;
   }
@@ -290,6 +291,14 @@ export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): 
     throw error;
   }
   if (!canvas || !(await projectShareable(db, canvas))) {
+    return null;
+  }
+  return canvas;
+}
+
+export async function readSharedCanvas(db: Db, token: string, sign: SignPaths): Promise<SharedCanvas | null> {
+  const canvas = await findSharedCanvas(db, token);
+  if (!canvas) {
     return null;
   }
 

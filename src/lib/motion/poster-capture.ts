@@ -1,7 +1,7 @@
 import { postPageAction } from '$lib/api/page-action';
 import { Background } from './doc';
 import { FrameFormat } from './hyperframes/capture';
-import { POSTER_SHARE, posterSecond } from './poster-time';
+import { posterSecond } from './poster-time';
 
 export { posterSecond };
 export const POSTER_WIDTH = 480;
@@ -44,6 +44,8 @@ export async function sendPoster(pageUrl: string, jpeg: string, fields: Record<s
   await postPageAction(pageUrl, 'poster', form);
 }
 
+const VIDEO_POSTER_SHARE = 0.4;
+
 export function videoPoster(src: string, width: number): Promise<{ jpeg: string; height: number }> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
@@ -52,7 +54,7 @@ export function videoPoster(src: string, width: number): Promise<{ jpeg: string;
     video.preload = 'auto';
     video.onerror = () => reject(new Error('video not readable'));
     video.onloadedmetadata = () => {
-      video.currentTime = video.duration * POSTER_SHARE;
+      video.currentTime = video.duration * VIDEO_POSTER_SHARE;
     };
     video.onseeked = () => {
       const canvas = document.createElement('canvas');

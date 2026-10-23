@@ -106,6 +106,8 @@ export enum Command {
   ToolLine = 'tool-line',
   ToolArrow = 'tool-arrow',
   ToolPen = 'tool-pen',
+  ToolPencil = 'tool-pencil',
+  ToolShapeBuilder = 'tool-shape-builder',
   ToolScale = 'tool-scale',
   ToggleEditMode = 'toggle-edit-mode',
   MoveLeft = 'move-left',
@@ -138,6 +140,8 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'l', mode: EditMode.Design, command: Command.ToolLine, label: 'L', does: 'Line tool: drag from end to end', group: ShortcutGroup.Draw },
   { key: 'l', shift: true, mode: EditMode.Design, command: Command.ToolArrow, label: '⇧L', does: 'Arrow tool: drag from tail to head', group: ShortcutGroup.Draw },
   { key: 'p', mode: EditMode.Design, command: Command.ToolPen, label: 'P', does: 'Pen tool: click points, drag for curves', group: ShortcutGroup.Draw },
+  { key: 'b', shift: true, mode: EditMode.Design, command: Command.ToolPencil, label: '⇧B', does: 'Pencil tool: draw freehand, hold Shift for straight segments', group: ShortcutGroup.Draw },
+  { key: 'x', mode: EditMode.Design, command: Command.ToolShapeBuilder, label: 'X', does: 'Shape builder: merge regions of selected shapes, hold Alt to subtract', group: ShortcutGroup.Draw },
   { key: 'k', mode: EditMode.Design, command: Command.ToolScale, label: 'K', does: 'Scale tool: handles scale size, text and strokes together', group: ShortcutGroup.Draw },
   { key: ' ', command: Command.TogglePlay, label: 'Space', does: 'Play / pause', group: ShortcutGroup.Playback },
   { key: 'l', command: Command.Play, label: 'L', does: 'Play', group: ShortcutGroup.Playback },
@@ -252,6 +256,8 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'o', shift: true, command: Command.ToolEllipse, label: '⇧O', does: 'Ellipse tool', group: ShortcutGroup.Draw },
   { key: 'l', shift: true, command: Command.ToolLine, label: '⇧L', does: 'Line tool: drag from end to end', group: ShortcutGroup.Draw },
   { key: 'p', shift: true, command: Command.ToolPen, label: '⇧P', does: 'Pen tool: click points, drag for curves', group: ShortcutGroup.Draw },
+  { key: 'b', shift: true, command: Command.ToolPencil, label: '⇧B', does: 'Pencil tool: draw freehand, hold Shift for straight segments', group: ShortcutGroup.Draw },
+  { key: 'x', shift: true, command: Command.ToolShapeBuilder, label: '⇧X', does: 'Shape builder: merge regions of selected shapes, hold Alt to subtract', group: ShortcutGroup.Draw },
   { key: 'e', command: Command.ToggleEditMode, label: 'E', does: 'Design / Motion: edit the base or key at the playhead', group: ShortcutGroup.View },
   { key: '?', shift: true, command: Command.Help, label: '?', does: 'Keyboard & gestures', group: ShortcutGroup.View }
 ];

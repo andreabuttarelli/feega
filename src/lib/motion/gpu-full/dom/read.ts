@@ -41,7 +41,7 @@ export enum DrawnKind {
   Group = 'group'
 }
 
-export type Look = { masks?: MaskLayer[]; filters?: Filter[]; space?: Linear; blend?: BlendMode };
+export type Look = { masks?: MaskLayer[]; filters?: Filter[]; space?: Linear; origin?: [number, number]; blend?: BlendMode };
 export type DrawnPath = { kind: DrawnKind.Path; contours: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine } & Look;
 export type DrawnLayer = { kind: DrawnKind.Layer; layer: number; width: number; height: number; opacity: number; matrix: Affine } & Look;
 export type DrawnGroup = { kind: DrawnKind.Group; items: Drawn[]; opacity: number; matrix: Affine } & Look;
@@ -258,7 +258,7 @@ function shadowsOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Own {
       continue;
     }
     const filters: Filter[] = blur > 0 ? [{ kind: FilterKind.Css, fns: [{ name: 'blur', args: [`${blur * SHADOW_SIGMA}px`] }] }] : [];
-    drawn.push({ ...path(flat(outlineOf(grownShape, grown), dx - spread, dy - spread), solid(color), matrix), ...(filters.length ? { filters, space: linearOf(matrix) } : {}) });
+    drawn.push({ ...path(flat(outlineOf(grownShape, grown), dx - spread, dy - spread), solid(color), matrix), ...(filters.length ? { filters, space: linearOf(matrix), origin: [matrix[4], matrix[5]] as [number, number] } : {}) });
   }
   return { drawn, gaps: [] };
 }
@@ -478,7 +478,7 @@ const filterEffect: GroupEffect = ({ node, items, matrix, defs }) => {
     return DomGap.Filter;
   }
   const filter = regioned(found.filter, items);
-  return items.map((d) => ({ ...d, filters: [...(d.filters ?? []), filter], space: linearOf(matrix) }));
+  return items.map((d) => ({ ...d, filters: [...(d.filters ?? []), filter], space: linearOf(matrix), origin: [matrix[4], matrix[5]] as [number, number] }));
 };
 
 const REGION_DEFAULTS = { x: '-10%', y: '-10%', width: '120%', height: '120%' };

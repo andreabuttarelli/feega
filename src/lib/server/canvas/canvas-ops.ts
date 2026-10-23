@@ -25,6 +25,7 @@ import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
 import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles';
+import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-variables';
 import { drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
@@ -32,10 +33,12 @@ import { NODE_NAME_MAX } from '$lib/canvas/node-name';
 import { removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { addComment, listComments, resolveThread } from '$lib/server/canvas/canvas-comments';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
+import { listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
 import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
@@ -210,7 +213,7 @@ const createdSize = (type: string, data: Record<string, unknown>) => {
   return { width: size.w, height: size.h };
 };
 
-const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (frame nodes with data.kind element)') }).strict();
+const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (element nodes)') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
 const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
@@ -659,6 +662,23 @@ export const CANVAS_OPS = {
     }
   }),
 
+  variables: op({
+    access: Access.Write,
+    audience: Audience.Mcp,
+    input: canvasVariableInput,
+    run: async (ctx, input) => {
+      const frames = framesOf(ctx);
+      return canvasVariable(
+        {
+          ids: async () => (await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })).filter((n) => n.type === MOTION_TYPE).map((n) => n.id),
+          read: frames.read,
+          write: frames.write
+        },
+        input
+      );
+    }
+  }),
+
   move_frame_element: op({
     access: Access.Write,
     input: moveFrameElementInput,
@@ -947,6 +967,51 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: duplicateInput,
     run: async (ctx, input) => duplicateNodes(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, ...input, actor: ctx.actor })
+  }),
+
+  save_canvas_version: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), name: z.string().max(60).describe('e.g. "Client review"') }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? saveCanvasVersion(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, name: input.name, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  list_canvas_versions: op({
+    access: Access.Read,
+    input: z.object({ canvasId: z.string() }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { versions: await listCanvasVersions(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) } : NOT_IN_PROJECT)
+  }),
+
+  restore_canvas_version: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), versionId: z.string().describe('from list_canvas_versions') }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? restoreCanvasVersion(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, versionId: input.versionId, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  list_canvas_comments: op({
+    access: Access.Read,
+    input: z.object({ canvasId: z.string() }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { threads: await listComments(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) } : NOT_IN_PROJECT)
+  }),
+
+  add_canvas_comment: op({
+    access: Access.Write,
+    input: z
+      .object({
+        canvasId: z.string(),
+        body: z.string().max(2000),
+        nodeId: z.string().optional().describe('pin to this node; x/y are then relative to its top-left'),
+        parentId: z.string().optional().describe('reply to this thread (a comment id from list_canvas_comments)'),
+        x: z.number().optional(),
+        y: z.number().optional()
+      })
+      .strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? addComment(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, ...input }) : NOT_IN_PROJECT)
+  }),
+
+  resolve_canvas_comment: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), commentId: z.string().describe('the first comment of the thread'), resolved: z.boolean() }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { outcome: await resolveThread(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, commentId: input.commentId, resolved: input.resolved }) } : NOT_IN_PROJECT)
   }),
 
   share_canvas: op({

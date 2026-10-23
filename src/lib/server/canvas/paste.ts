@@ -2,8 +2,12 @@ import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { createConnection, createNode } from '$lib/server/repos/canvas';
 import { validateNodeData } from '$lib/canvas/node-data';
+import { docNodeCopy, holdsDoc } from '$lib/canvas/motion-node';
+import { copyHead } from '$lib/server/repos/motion-revisions';
 
-export type PastedNode = { type: string; data: Record<string, unknown>; x: number; y: number };
+export type PastedNode = { type: string; data: Record<string, unknown>; x: number; y: number; source?: string; width?: number; height?: number };
+
+const landed = (p: PastedNode): PastedNode => (holdsDoc(p.type) ? docNodeCopy(p) : { ...p, width: undefined, height: undefined });
 
 export type PastedEdge = { sourceIndex: number; targetIndex: number; sourceHandle: string | null; targetHandle: string | null };
 
@@ -16,7 +20,7 @@ export async function pasteNodes(
   input: { orgId: string; projectId: string; canvasId: string; nodes: PastedNode[]; edges: PastedEdge[]; actor: Actor }
 ): Promise<Pasted> {
   const nodes: Awaited<ReturnType<typeof createNode>>[] = [];
-  for (const p of input.nodes) {
+  for (const p of input.nodes.map(landed)) {
     const verdict = validateNodeData(p.type, p.data);
     if (!verdict.ok) {
       return { refused: verdict.error };
@@ -31,9 +35,14 @@ export async function pasteNodes(
         x: p.x,
         y: p.y,
         data: verdict.data,
+        width: p.width,
+        height: p.height,
         actor: input.actor
       })
     );
+    if (holdsDoc(p.type) && p.source) {
+      await copyHead(db, { orgId: input.orgId, from: p.source, to: nodes[nodes.length - 1]!.id, actor: input.actor });
+    }
   }
 
   const connections: Awaited<ReturnType<typeof createConnection>>[] = [];

@@ -4,6 +4,10 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### A PR that adds or changes a tool fails the tool surface pins
+
+**Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. The src pin stores one fingerprint per tool/op, one entry each: PRs touching different tools do not conflict; a real conflict means the same tool changed twice. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
+
 ### An effect that publishes into a `$state` map loops once it runs per edit
 
 **Signal:** `effect_update_depth_exceeded` in the console, the UI stops updating after the first keystroke, the stack points at an `$effect` calling `liveDocs.set`. **Move:** the setter read `this.map` to copy it, so the effect depended on what it wrote; read it with `untrack` inside the setter. Vitest runs the server build of Svelte, where effects do not run: only a real browser shows it.
@@ -985,6 +989,13 @@ aggiorna quella riga.** Se sì, o il trigger copre anche l'UPDATE, o il log è u
 battito in poi. Qui l'evento resta immutabile (`append_thread_event` solleva sul payload diverso, ed
 è giusto): l'aggiornamento entra come evento NUOVO con la sua `source_key`, di cui se ne tiene UNA
 sola, e il reducer sostituisce il messaggio con lo stesso id invece di accodarlo.
+
+### Un fill che la GPU non sa disegnare annerisce l'intero frame, e il modello dice «valido»
+Segnale: dopo aver scritto un'immagine come fill di una Shape (documento valido, `setProps` ok,
+suite verde) il frame sulla tela core diventa tutto nero, testo compreso. Causa: `shapePainter`
+risponde `Unsupported.Fill` a ogni fill che non sia solido o gradiente. Mossa: prima di produrre
+un tipo di fill nuovo da codice, guarda in `PAINTS` di `display-list.ts` se la GPU lo disegna;
+un giro Playwright con lo screenshot dopo l'edit lo prende, un test del documento no.
 
 ## Build e bundle
 
@@ -3247,3 +3258,11 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## The core canvas freezes a shape mid-gesture
 
 **Signal:** during a resize the selection follows the pointer but the shape stops at an intermediate size; `pageerror` shows `floating point \`131.25\`, expected u32`. **Move:** the wasm core rejects a display list whose `width`/`height` is fractional and the whole paint aborts. Round every size that becomes a `DisplayList` (placeholders, stand-ins) before it reaches `putGroup`.
+
+## An agent worktree's dev server serves old code for files it already loaded
+
+**Signal:** a new file shows up in the browser but your edit to an existing module (a `.svelte` the page already imported) does nothing, no error. **Cause:** `server.watch.ignored` skips `**/.claude/worktrees/**`, so Vite never invalidates anything inside a worktree. **Move:** restart the dev server after editing an existing module; new files are fine.
+
+## An `$effect` that reads the `$state` it writes loops forever
+
+**Signal:** a debug `console.info` in the effect prints a thousand times a second and the page stalls. **Cause:** logging or reading `store.value` right after assigning it subscribes the effect to its own write. **Move:** compute into a local, assign once, read nothing from the target inside the effect.

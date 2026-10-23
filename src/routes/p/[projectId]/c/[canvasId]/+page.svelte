@@ -1,7 +1,14 @@
 <script lang="ts">
+  import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
+  import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
+  import CommentPin from '$lib/components/canvas/CommentPin.svelte';
+  import type { CommentThread } from '$lib/canvas/comment-threads';
   import { keepTextSize } from '$lib/motion/text-fit';
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
+  import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
+  import CanvasVersionsDialog from '$lib/components/canvas/CanvasVersionsDialog.svelte';
+  import type { CanvasVersion } from '$lib/server/canvas/canvas-versions';
   import { localStore } from '$lib/browser-storage';
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import { Pasted, isSvgFile, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
@@ -230,6 +237,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { Product } from '$lib/server/repos/products';
   import type { SocialPost } from '$lib/server/repos/social-posts';
   import { BILLING_PATH } from '$lib/billing-path';
+  import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
+  import type { FigmaJob } from '$lib/canvas/figma/images';
+  import { ImagesOutcome } from '$lib/canvas/figma/fetch-images';
 
   let { data } = $props();
 
@@ -1387,6 +1397,67 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       failed = DROPPED_EDIT_NOTICE;
     }
   }
+
+  let canvasVersions = $state<CanvasVersion[] | null>(null);
+
+  $effect(() => {
+    if (versionsPanel.open) {
+      void loadVersions();
+    }
+  });
+
+  async function loadVersions() {
+    const res = await post('canvasVersions', {});
+    canvasVersions = (res?.versions as CanvasVersion[] | undefined) ?? [];
+  }
+
+  async function saveVersion(name: string) {
+    await post('saveCanvasVersion', { name });
+    await loadVersions();
+  }
+
+  async function restoreVersion(version: CanvasVersion) {
+    await post('restoreCanvasVersion', { version_id: version.id });
+    versionsPanel.hide();
+    await refresh();
+  }
+
+  let commentThreads = $state<CommentThread[] | null>(null);
+  let viewCentre = $state({ cx: 0, cy: 0 });
+
+  $effect(() => {
+    if (commentsPanel.open) {
+      void loadComments();
+    }
+  });
+
+  async function loadComments() {
+    const res = await post('canvasComments', {});
+    commentThreads = (res?.threads as CommentThread[] | undefined) ?? [];
+  }
+
+  const pinTarget = $derived.by(() => {
+    const picked = tiles.find((t) => t.id === selectedIds[0]);
+    return picked ? { nodeId: picked.id, x: picked.w, y: 0, label: 'the selected node' } : { nodeId: null, x: viewCentre.cx, y: viewCentre.cy, label: 'the middle of the view' };
+  });
+
+  async function addThread(body: string) {
+    const at = pinTarget;
+    await post('addComment', { body, x: at.x, y: at.y, ...(at.nodeId ? { node_id: at.nodeId } : {}) });
+    await loadComments();
+  }
+
+  async function replyTo(threadId: string, body: string) {
+    await post('addComment', { body, parent_id: threadId });
+    await loadComments();
+  }
+
+  async function resolveThread(thread: CommentThread) {
+    await post('resolveComment', { comment_id: thread.id, resolved: thread.resolved ? '0' : '1' });
+    await loadComments();
+  }
+
+  const livePins = (nodeId: string | null) => (commentThreads ?? []).filter((t) => t.nodeId === nodeId && !t.resolved);
 
   async function refresh(): Promise<boolean> {
     const version = ++snapshotVersion;
@@ -3082,7 +3153,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
     clipboard = {
       freeIds: chosen.flatMap((n) => freeElement([n.id]) ?? []),
-      nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy })),
+      nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy, source: n.id, width: n.w, height: n.h })),
       edges: edges
         .filter((e) => indexOf.has(e.source) && indexOf.has(e.target))
         .map((e) => ({
@@ -3101,19 +3172,31 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
 
   async function pasteFigma(html: string, at: { x: number; y: number }) {
-    const res = await post('pasteFigma', { html, at: JSON.stringify(at), node_id: crypto.randomUUID() });
-    const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
-    if (!node) {
+    const res = await post('pasteFigma', { html, at: JSON.stringify(at) });
+    const landedNodes = res?.outcome === 'done' ? ((res.nodes ?? []) as CanvasNodeRecord[]) : [];
+    if (!landedNodes.length) {
       failed = FIGMA_PASTE;
       return;
     }
-    nodes = [...nodes, toTile(node)];
+    nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
     pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
-    focusOn([node.id], undefined, FocusMode.Select);
+    focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
     const skipped = (res?.skipped ?? []) as string[];
     if (skipped.length) {
       failed = `${FIGMA_SKIPPED} ${skipped.join('; ')}`;
     }
+    const fileKey = (res?.fileKey ?? null) as string | null;
+    const fills = (res?.fills ?? []) as { nodeId: string; images: FigmaImage[] }[];
+    if (fileKey && fills.length) {
+      figmaJobs = [...figmaJobs, ...fills.map((f) => ({ ...f, fileKey }))];
+    }
+  }
+
+  let figmaJobs = $state<FigmaJob[]>([]);
+  let figmaTokenMissing = $state(false);
+
+  function figmaImagesAnswered(outcome: ImagesOutcome) {
+    figmaTokenMissing = outcome === ImagesOutcome.NoToken;
   }
 
   async function pasteSvg(svg: string, at: { x: number; y: number }) {
@@ -3209,7 +3292,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
 
     const result = await post('paste', {
-      nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy }))),
+      nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy, source: n.source, width: n.width, height: n.height }))),
       edges: JSON.stringify(clipboard.edges)
     });
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
@@ -3407,6 +3490,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {/if}
     </p>
   {/if}
+  {#if figmaTokenMissing}
+    <p class="warning" role="status" data-testid="figma-token-hint">
+      Add a Figma token in Settings to import images
+      <a href="/p/{data.projectId}/settings/profile">Open settings</a>
+    </p>
+  {/if}
   {#if fontAdded}
     <p class="warning" role="status" data-testid="font-added">{fontAdded}</p>
   {/if}
@@ -3423,6 +3512,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     </div>
   {/if}
 
+  {#if commentsPanel.open}
+    <CanvasCommentsPanel threads={commentThreads} me={data.session?.user?.id ?? ''} pinsTo={pinTarget.label} onadd={addThread} onreply={replyTo} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
+  {/if}
+
   <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
 
   {#if exportFor}
@@ -3430,6 +3523,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
   {#if exportElements}
     <ExportDialog count={exportElements.elementIds.length} onexport={(rows) => exportPicked(exportElements!, rows)} onclose={() => (exportElements = null)} />
+  {/if}
+  {#if versionsPanel.open}
+    <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
   {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
@@ -3490,6 +3586,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onPaste={paste}
     onClip={copy}
     onPasteData={pasteData}
+    {figmaJobs}
+    onFigmaImages={figmaImagesAnswered}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
@@ -3519,11 +3617,22 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       cursors.port.update({ live });
       liveResized(live);
     }}
-    onView={(view) => cursors.port.update({ view })}
+    onView={(view) => {
+      viewCentre = { cx: view.cx, cy: view.cy };
+      cursors.port.update({ view });
+    }}
     onUserPan={() => (following = null)}
     follow={followView}
   >
+    {#snippet canvasOver()}
+      {#each livePins(null) as thread (thread.id)}
+        <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(id) => commentsPanel.focus(id)} />
+      {/each}
+    {/snippet}
     {#snippet tileOver({ id, body })}
+      {#each livePins(id) as thread (thread.id)}
+        <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(picked) => commentsPanel.focus(picked)} />
+      {/each}
       {@const over = liveHost === LiveHost.Canvas ? nodes.find((n) => n.id === id) : null}
       {@const overMotion = over ? motionOf(over) : null}
       {@const hoverNode = nodes.find((n) => n.id === id)}

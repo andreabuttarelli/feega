@@ -64,6 +64,7 @@ const HANDLE_FILL = '#ffffff';
 const LABEL_COLOR = '#6e6e73';
 const ICON_SIZE = 12;
 const ICON_GAP = 5;
+const ELLIPSIS = '…';
 const NAME_SIZE = 11;
 const NAME_GAP = 16;
 const PORT_RING = 1;
@@ -133,6 +134,22 @@ function handles(t: StateTile): PathItem[] {
 
 const shift = (contours: number[][], dx: number, dy: number) => contours.map((c) => c.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)));
 
+const LABEL_SET: TextSet = { leading: LABEL_LEADING, tracking: 0 };
+
+function fitted(text: string, room: number, glyphs: Glyphs) {
+  const whole = glyphs(text, LABEL_SIZE, LABEL_SET);
+  if (whole.width <= room) {
+    return whole;
+  }
+  let kept = text.length;
+  let cut = whole;
+  while (kept > 0 && cut.width > room) {
+    kept -= 1;
+    cut = glyphs(text.slice(0, kept).trimEnd() + ELLIPSIS, LABEL_SIZE, LABEL_SET);
+  }
+  return cut;
+}
+
 function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   if (!t.label) {
     return [];
@@ -141,8 +158,8 @@ function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   const top = t.y - LABEL_GAP - LABEL_PAD - line;
   const icon = t.icon ? [{ ...item(t, ChromePart.Icon, shift(t.icon, t.x, top + (line - ICON_SIZE) / 2), LABEL_COLOR), rule: FillRule.Union }] : [];
   const left = t.icon ? t.x + ICON_SIZE + ICON_GAP : t.x;
-  const label = item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE, { leading: LABEL_LEADING, tracking: 0 }).contours, left, top), LABEL_COLOR);
-  return [...icon, { ...label, scissor: [t.x, top, t.x + t.width, top + line] }];
+  const text = fitted(t.label, t.x + t.width - left, glyphs);
+  return [...icon, item(t, ChromePart.Label, shift(text.contours, left, top), LABEL_COLOR)];
 }
 
 function name(t: ChromeTile, glyphs: Glyphs, m: PortMark, centre: number, side: ChromePart): PathItem {

@@ -173,6 +173,11 @@ export async function cmdMotionEmbed(nodeId: string, opts: EmbedOpts) {
   await embedAndReport(await token(), nodeId, opts);
 }
 
+export async function cmdMotionShare(nodeId: string, opts: { org?: string }) {
+  const shared = await motionApi.share(await token(), nodeId, opts.org);
+  console.log(shared.url);
+}
+
 export async function embedAndReport(bearer: string, nodeId: string, opts: EmbedOpts) {
   if (opts.download) {
     await writeFile(opts.download, await motionApi.bundle(bearer, nodeId, opts.org));

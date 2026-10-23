@@ -6,6 +6,7 @@ import { listConnections, listNodes } from '$lib/server/repos/canvas';
 import { canvasFrameInputs } from './move-element';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
+import { FIGMA_FILE_KEY, figmaClipWithImage } from '../../../../tests/fixtures/figma/image-clip';
 
 const SOURCE = '44444444-4444-4444-4444-444444444444';
 const TARGET = '66666666-6666-6666-6666-666666666666';
@@ -72,7 +73,7 @@ describe('moveElement action', () => {
     const result = await actions.moveElement(input as never);
 
     expect(result).toMatchObject({ outcome: 'done', created: true });
-    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'insert' && (c.payload as { type: string }).type === 'motion')).toBe(true);
+    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'insert' && (c.payload as { type: string }).type === 'element')).toBe(true);
     const revisions = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => c.payload as { version: number; doc: MotionDoc });
     expect(revisions.map((r) => [r.version, clipIds(r.doc)])).toEqual([
       [1, ['txt']],
@@ -122,7 +123,7 @@ describe('upload action over a frame', () => {
 describe('a generated output placed on the empty canvas', () => {
   const asset = (type: string, width: number, height: number) => ({ id: ASSET, org_id: 'org', project_id: 'project', type, url: 'x', content: type === 'text' ? 'Hello' : null, mime_type: 'image/png', bytes: 1, width, height, duration_s: type === 'video' ? 3 : null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' });
   const placed = (input: ReturnType<typeof event>) => ({
-    node: input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload as { width: number; height: number; data: Record<string, unknown> },
+    node: input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload as { type: string; width: number; height: number; data: Record<string, unknown> },
     doc: (input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')?.payload as { doc: MotionDoc }).doc
   });
 
@@ -138,7 +139,7 @@ describe('a generated output placed on the empty canvas', () => {
 
     expect(await actions.placeOutput(input as never)).toMatchObject({ outcome: 'done', created: true });
     const { node, doc } = placed(input);
-    expect(node.data.kind).toBe('element');
+    expect(node.type).toBe('element');
     expect(doc.background).toBe('transparent');
     expect(doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual([component]);
     if (width) {
@@ -232,7 +233,7 @@ describe('elements in and out of frames', () => {
     );
 
     expect(await actions.moveElement(input as never)).toMatchObject({ outcome: 'done', created: true });
-    expect(inserted(input)).toMatchObject([{ x: 800, y: 17.5, width: 200, height: 45, data: { kind: 'element' } }]);
+    expect(inserted(input)).toMatchObject([{ type: 'element', x: 800, y: 17.5, width: 200, height: 45 }]);
     const made = input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')?.payload as { doc: MotionDoc };
     expect(made.doc.background).toBe('transparent');
   });
@@ -279,8 +280,8 @@ describe('drawElement action', () => {
 
     const result = await actions.drawElement(input as never);
 
-    expect(result).toMatchObject({ outcome: 'done', created: true, node: { type: 'motion' } });
-    expect(inserted(input)).toMatchObject([{ type: 'motion', x: 120, y: 40, width: 300, height: 100, data: { kind: 'element' } }]);
+    expect(result).toMatchObject({ outcome: 'done', created: true });
+    expect(inserted(input)).toMatchObject([{ type: 'element', x: 120, y: 40, width: 300, height: 100 }]);
     const revisions = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => c.payload as { version: number; doc: MotionDoc });
     expect(revisions.map((r) => [r.version, r.doc.background, r.doc.tracks.flatMap((t) => t.clips).map((c) => c.component)])).toEqual([[1, 'transparent', ['Shape']]]);
   });
@@ -358,14 +359,24 @@ describe('pasteFigma action', () => {
   const FIGMA = readFileSync(new URL('../../../../tests/fixtures/figma/clip-1.html', import.meta.url), 'utf8');
 
   it('a Figma clipboard lands as one frame of the copied size, centred on the pointer, with editable layers', async () => {
-    const id = '7b0c2f0e-8a51-4d0e-9a8e-2f2f6c1b9a12';
-    const input = event({ html: FIGMA, at: JSON.stringify({ x: 1000, y: 600 }), node_id: id });
+    const input = event({ html: FIGMA, at: JSON.stringify({ x: 1000, y: 600 }) });
 
-    expect(await actions.pasteFigma(input as never)).toMatchObject({ outcome: 'done', created: true, skipped: [] });
-    const rows = input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { id: string; x: number; y: number; width: number; display_name: string });
-    expect(rows).toMatchObject([{ id, x: 40, y: 60, width: 1920, display_name: 'Cover' }]);
+    expect(await actions.pasteFigma(input as never)).toMatchObject({ outcome: 'done', skipped: [] });
+    const rows = input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { x: number; y: number; width: number; display_name: string });
+    expect(rows).toMatchObject([{ x: 40, y: 60, width: 1920, display_name: 'Cover' }]);
     const doc = input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')!.payload as { doc: MotionDoc };
     expect(doc.doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual(expect.arrayContaining(['Shape', 'Precomp', 'Text']));
+  });
+
+  it('answers which clips wait for which image, and the file they come from', async () => {
+    const hash = 'ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12';
+    const input = event({ html: figmaClipWithImage(hash), at: JSON.stringify({ x: 1000, y: 600 }) });
+
+    const answer = (await actions.pasteFigma(input as never)) as { fills: { nodeId: string; images: { hash: string }[] }[]; fileKey: string };
+
+    expect(answer.fileKey).toBe(FIGMA_FILE_KEY);
+    expect(answer.fills).toHaveLength(1);
+    expect(answer.fills[0].images.map((i) => i.hash)).toEqual([hash]);
   });
 
   it('html without Figma data is a 400, nothing written', async () => {

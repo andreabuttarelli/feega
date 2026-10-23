@@ -5,6 +5,7 @@
   import { DrawTool, clickBox, closesOnFirst, dragRect, type DragPoint, type DrawBox } from '$lib/motion/draw-tool';
   import { LINE_PAINT, drawClip, lineOutline, penClip, penPaint, type LineTool } from '$lib/motion/draw-create';
   import { mapOutline, pathData, type Outline, type Pt } from '$lib/motion/shape/geometry';
+  import { smoothStroke, straightStroke } from '$lib/motion/shape/pencil';
   import { Handle, Mirror, addPoint, dragHandle, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
   import type { OpResult } from '$lib/motion/timeline';
 
@@ -27,6 +28,7 @@
   const LINE_INK = 'brand.text';
   const LINE_TOOLS: ReadonlySet<DrawTool> = new Set([DrawTool.Line, DrawTool.Arrow]);
   const MIN_LINE_PX = 2;
+  const PENCIL_SMOOTHING_PX = 2;
 
   const SUMMARY: Record<DrawTool, string> = {
     [DrawTool.Select]: '',
@@ -38,6 +40,8 @@
     [DrawTool.Line]: 'Drew a line',
     [DrawTool.Arrow]: 'Drew an arrow',
     [DrawTool.Pen]: 'Drew a path',
+    [DrawTool.Pencil]: 'Drew a path',
+    [DrawTool.ShapeBuilder]: '',
     [DrawTool.Frame]: 'Drew a frame'
   };
 
@@ -45,6 +49,8 @@
   let drag = $state<{ from: DragPoint; to: DragPoint; square: boolean } | null>(null);
   let outline = $state.raw<Outline>([]);
   let grab = $state<PointRef | null>(null);
+  let stroke = $state.raw<Pt[]>([]);
+  let straight = $state(false);
 
   let held = $state.raw<DrawBox | null>(null);
   const lining = $derived(LINE_TOOLS.has(tool));
@@ -68,7 +74,8 @@
     return { x: at.x * doc.width, y: at.y * doc.height };
   }
 
-  const reach = () => (host ? (CLOSE_REACH_PX * doc.width) / hostWidth(host) : CLOSE_REACH_PX);
+  const docPx = (screenPx: number) => (host ? (screenPx * doc.width) / hostWidth(host) : screenPx);
+  const reach = () => docPx(CLOSE_REACH_PX);
   const unit = (box: DrawBox): DrawBox => ({ x: box.x / doc.width, y: box.y / doc.height, width: box.width / doc.width, height: box.height / doc.height });
 
   function create(result: OpResult, id: string) {
@@ -83,6 +90,11 @@
     host?.setPointerCapture(e.pointerId);
     const at = local(e);
     held = null;
+    if (tool === DrawTool.Pencil) {
+      stroke = [[at.x, at.y]];
+      straight = e.shiftKey;
+      return;
+    }
     if (tool !== DrawTool.Pen) {
       drag = { from: at, to: at, square: e.shiftKey };
       return;
@@ -99,6 +111,11 @@
 
   function move(e: PointerEvent) {
     const at = local(e);
+    if (stroke.length) {
+      straight = e.shiftKey;
+      stroke = [...stroke, [at.x, at.y]];
+      return;
+    }
     if (drag) {
       drag = { ...drag, to: at, square: e.shiftKey };
       return;
@@ -110,6 +127,10 @@
 
   function release() {
     grab = null;
+    if (stroke.length) {
+      finishStroke();
+      return;
+    }
     if (!drag) {
       return;
     }
@@ -138,11 +159,23 @@
     create(penClip(doc, outline, frame, id, penPaint(LINE_PAINT[tool as LineTool](LINE_INK))), id);
   }
 
-  function finish(done: Outline) {
+  const asPoint = ({ x, y }: DragPoint): Pt => [x, y];
+  const asDrag = ([x, y]: Pt): DragPoint => ({ x, y });
+  const strokeOutline = $derived(straight && stroke.length > 1 ? straightStroke(stroke[0], asPoint(snapped(asDrag(stroke[0]), asDrag(stroke[stroke.length - 1]), true))) : smoothStroke(stroke, docPx(PENCIL_SMOOTHING_PX)));
+
+  function finishStroke() {
+    const done = strokeOutline;
+    stroke = [];
+    if (done.length) {
+      finish(done, penPaint(LINE_PAINT[DrawTool.Line](LINE_INK)));
+    }
+  }
+
+  function finish(done: Outline, paint: Record<string, unknown> = {}) {
     outline = [];
     grab = null;
     const id = newId();
-    create(penClip(doc, mapOutline(done, ([x, y]) => [x / doc.width, y / doc.height]), frame, id), id);
+    create(penClip(doc, mapOutline(done, ([x, y]) => [x / doc.width, y / doc.height]), frame, id, paint), id);
   }
 
   function key(e: KeyboardEvent) {
@@ -166,6 +199,9 @@
     {/if}
     {#if liveLine}
       <path class="ghost" d={pathData(liveLine)} />
+    {/if}
+    {#if stroke.length}
+      <path class="ghost" d={pathData(strokeOutline)} />
     {/if}
     {#if outline.length}
       <path class="ghost" d={pathData(outline)} />

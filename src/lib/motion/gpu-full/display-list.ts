@@ -4,6 +4,7 @@ import { TrackKind, type ComponentId } from '../components';
 import { animProp, sampleColor, Source, TRANSFORM, ValueKind, type TransformKey } from '../keyframes';
 import { sampleTrack } from '../sample-track';
 import { IDENTITY, ParentOpacity, ancestorsOf, mul2d, transformAt, worldAt, type Affine } from '../parent';
+import { apply2d } from '../affine';
 import { boxOf } from '../layout';
 import { preparedDoc } from '../hyperframes/compose';
 import { renderAt } from '../effects/render';
@@ -13,6 +14,7 @@ import { BlendMode } from '../blend';
 import { MASK_KEYS } from '../mask';
 import { mattePairs, MATTE_READ } from '../matte';
 import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, fillsOf, type Fill, type FillOf } from '../fill/model';
+import { applyFillKeys, fillOfKey } from '../fill/keys';
 import { StrokeAlign, dashOf, strokesOf, type Stroke } from '../stroke/model';
 import { Cap, Join, dashes, strokePolygons } from './stroke';
 import { arrowHeads } from '../stroke/arrows';
@@ -78,21 +80,23 @@ export type Scissor = [number, number, number, number];
 
 export type Within = { contours: number[][]; outside: boolean };
 
-export type PathItem = { kind: ItemKind.Path; clip: string; contours: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; within?: Within; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+export type Origin = [number, number];
 
-export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video: boolean; mediaTime: number; size: Size; fit: string; focus: [number, number]; zoom: number; clipped: boolean; inner: Affine; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+export type PathItem = { kind: ItemKind.Path; clip: string; contours: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; within?: Within; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
-export type LayerItem = { kind: ItemKind.Layer; clip: string; source: string; size: Size; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video: boolean; mediaTime: number; size: Size; fit: string; focus: [number, number]; zoom: number; clipped: boolean; inner: Affine; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
+
+export type LayerItem = { kind: ItemKind.Layer; clip: string; source: string; size: Size; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
 export type Turn = { scale: number; rotation: number };
 
-export type TextItem = { kind: ItemKind.Text; clip: string; plan: UniformPlan; turn: Turn; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+export type TextItem = { kind: ItemKind.Text; clip: string; plan: UniformPlan; turn: Turn; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
-export type LensItem = { kind: ItemKind.Lens; clip: string; lens: Lens; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+export type LensItem = { kind: ItemKind.Lens; clip: string; lens: Lens; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
-export type GlyphsItem = { kind: ItemKind.Glyphs; clip: string; font: string; coords: [string, number][]; size: number; glyphs: [number, number, number][]; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+export type GlyphsItem = { kind: ItemKind.Glyphs; clip: string; font: string; coords: [string, number][]; size: number; glyphs: [number, number, number][]; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
-export type GroupItem = { kind: ItemKind.Group; clip: string; items: Item[]; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+export type GroupItem = { kind: ItemKind.Group; clip: string; items: Item[]; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
 export type Item = GlyphsItem | PathItem | ImageItem | LayerItem | TextItem | LensItem | GroupItem;
 
@@ -125,6 +129,7 @@ const SOLID_PATTERN = 'solid';
 const CENTRE = 0.5;
 const REMAPPED: ReadonlySet<ComponentId> = new Set(['Video']);
 const DEG = Math.PI / 180;
+const CSS_TURN = 90;
 
 const flat = (outline: Outline): number[][] => outline.map((c) => flatten(c).flatMap(([x, y]) => [x, y]));
 
@@ -145,7 +150,9 @@ const PAINTS: Partial<Record<FillType, (f: never, w: number, h: number, colour: 
     const dy = (Math.sin(f.angle * DEG) * h) / 2;
     return { kind: PaintKind.Linear, from: [w / 2 - dx, h / 2 - dy], to: [w / 2 + dx, h / 2 + dy], stops: stopsOf(f.stops, colour) };
   },
-  [FillType.Radial]: (f: FillOf<FillType.Radial>, w, h, colour) => ({ kind: PaintKind.Radial, center: [f.center.x * w, f.center.y * h], radius: (f.radius * Math.max(w, h)) / 2, stops: stopsOf(f.stops, colour) })
+  [FillType.Radial]: (f: FillOf<FillType.Radial>, w, h, colour) => ({ kind: PaintKind.Radial, center: [f.center.x * w, f.center.y * h], radius: (f.radius * Math.max(w, h)) / 2, stops: stopsOf(f.stops, colour) }),
+  [FillType.Angular]: (f: FillOf<FillType.Angular>, w, h, colour) => ({ kind: PaintKind.Sweep, center: [f.center.x * w, f.center.y * h], start: (f.angle - CSS_TURN) * DEG, stops: stopsOf(f.stops, colour) }),
+  [FillType.Diamond]: (f: FillOf<FillType.Diamond>, w, h, colour) => ({ kind: PaintKind.Diamond, center: [w / 2, h / 2], half: [w / 2, h / 2], stops: stopsOf(f.stops, colour) })
 };
 
 const UNDRAWN_SHAPES: ReadonlySet<ShapeKind> = new Set([ShapeKind.Line, ShapeKind.Vector]);
@@ -165,7 +172,9 @@ function strokeBands(s: Stroke, outline: Outline, unit: number): number[][] {
   return [...runs.flatMap((r) => strokePolygons(r.pts, r.closed, width, s.cap as Cap, s.join as Join, s.miter)), ...heads];
 }
 
-function shapePainter({ clip, props, size, unit, colour, time, fps }: Env): Painted {
+const pictureOf = (f: Fill, asset: Env['asset']): string | null => (f.type === FillType.Image ? (f.src || asset(f.assetId)) : null);
+
+function shapePainter({ clip, props, size, unit, colour, time, fps, asset }: Env): Painted {
   const look = { ...(props as unknown as ShapeLook), modifiers: lookAt(clip, time * fps).modifiers };
   const fills = fillsOf(props).filter((f) => f.visible);
   const stack = look.modifiers.filter((m) => m.enabled).map((m) => ({ kind: m.kind, values: modifierValues(m) }));
@@ -173,7 +182,7 @@ function shapePainter({ clip, props, size, unit, colour, time, fps }: Env): Pain
     [UNDRAWN_SHAPES.has(look.shape), Unsupported.ShapeKind],
     [strokesOf(props).some((s) => s.visible && s.sides), Unsupported.Stroke],
     [modifierFilter(stack, Math.min(size.width, size.height)) !== '', Unsupported.Modifier],
-    [fills.some((f) => !PAINTS[f.type] || f.blend !== BlendMode.Normal), Unsupported.Fill]
+    [fills.some((f) => !(PAINTS[f.type] || pictureOf(f, asset)) || f.blend !== BlendMode.Normal), Unsupported.Fill]
   ];
   const problem = problems.find(([hit]) => hit);
   if (problem) {
@@ -182,7 +191,17 @@ function shapePainter({ clip, props, size, unit, colour, time, fps }: Env): Pain
   const layers = shapeLayers(look, { w: size.width, h: size.height }, time).filter((l) => l.outline.length);
   const rule = look.fillRule === FillRule.EvenOdd ? FillRule.EvenOdd : FillRule.NonZero;
   const paintOf = (f: Fill) => (PAINTS[f.type] as (f: Fill, w: number, h: number, c: typeof colour) => Paint)(f, size.width, size.height, colour);
-  const filled = fills.flatMap((f: Fill) => layers.map((l): Content => ({ kind: ItemKind.Path, contours: flat(l.outline), rule, paint: paintOf(f), opacity: f.opacity * l.opacity, matrix: l.matrix as unknown as Affine })));
+  const filled = fills.flatMap((f: Fill) =>
+    layers.map((l): Content => {
+      const src = pictureOf(f, asset);
+      const matrix = l.matrix as unknown as Affine;
+      if (f.type !== FillType.Image || !src) {
+        return { kind: ItemKind.Path, contours: flat(l.outline), rule, paint: paintOf(f), opacity: f.opacity * l.opacity, matrix };
+      }
+      const stencil: PathContent = { kind: ItemKind.Path, contours: flat(l.outline), rule, paint: { kind: PaintKind.Solid, color: [1, 1, 1, 1] }, opacity: 1, matrix, blur: 0 };
+      return { ...(picture(src, size, { fit: f.fit, focus: [f.focus.x, f.focus.y], zoom: f.scale, clipped: false, opacity: f.opacity * l.opacity, matrix }) as ImageContent), stencil: [stencil] };
+    })
+  );
   const stroked = strokesOf(props)
     .filter((st) => st.visible)
     .flatMap((st) => layers.map((l): Content => ({ kind: ItemKind.Path, contours: strokeBands(st, l.outline, unit), rule: FillRule.Union, paint: paintOf(st.paint as Fill), opacity: st.paint.opacity * l.opacity, matrix: l.matrix as unknown as Affine, within: withinOf(st.align, flat(l.outline)) })));
@@ -283,15 +302,16 @@ const CONTENT_OF: Record<DrawnKind, (d: never, clip: string) => Content> = {
 
 const contentOf = (d: Drawn, clip: string): Content => (CONTENT_OF[d.kind] as (d: Drawn, clip: string) => Content)(d, clip);
 
-type Looked = { masks?: MaskLayer[]; filters?: Filter[]; space?: Linear; blend?: BlendMode };
+type Looked = { masks?: MaskLayer[]; filters?: Filter[]; space?: Linear; origin?: Origin; blend?: BlendMode };
 
 function ownLook(content: object, placed: Affine, clip: Looked): Looked {
   const own = content as Looked;
   const masks = own.masks?.map((m) => ({ ...m, cover: { ...m.cover, matrix: mul2d(placed, m.cover.matrix) } }));
   const space = own.space ? (mul2d([placed[0], placed[1], placed[2], placed[3], 0, 0], [...own.space, 0, 0]).slice(0, 4) as Linear) : undefined;
+  const origin = own.origin ? (apply2d(placed, own.origin) as Origin) : undefined;
   return {
     ...(masks ? { masks: [...(clip.masks ?? []), ...masks] } : {}),
-    ...(own.filters ? { filters: [...own.filters, ...(clip.filters ?? [])], space } : {}),
+    ...(own.filters ? { filters: [...own.filters, ...(clip.filters ?? [])], space, ...(origin ? { origin } : {}) } : {}),
     ...(own.blend ? { blend: own.blend } : {})
   };
 }
@@ -335,7 +355,7 @@ const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (c
 
 const MASKED: ReadonlySet<string> = new Set(MASK_KEYS);
 
-const drawnKey = (clip: MotionClip, key: string) => MASKED.has(key) || effectOfKey(key) !== null || animatorOfKey(key) !== null || modifierOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
+const drawnKey = (clip: MotionClip, key: string) => MASKED.has(key) || effectOfKey(key) !== null || animatorOfKey(key) !== null || modifierOfKey(key) !== null || fillOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
 
 const drawnSource = (clip: MotionClip, source: Source | undefined) => (source !== undefined && (DRAWN_SOURCES.has(source) || SAMPLED_IN_PLACE.has(source))) || (source === Source.Remap && REMAPPED.has(clip.component));
 
@@ -357,7 +377,12 @@ function propsAt(clip: MotionClip, frame: number, colour: (v: string) => string)
     }
     return [[key, prop.kind === ValueKind.Color ? sampleColor(track, local, colour) : sampleTrack(track, local)]];
   });
-  return counted(clip.component, { ...clip.props, ...Object.fromEntries(sampled) }, local);
+  return counted(clip.component, { ...clip.props, ...Object.fromEntries(sampled), ...fillsAt(clip, local, colour) }, local);
+}
+
+function fillsAt(clip: MotionClip, local: number, colour: (v: string) => string): { fills?: Fill[] } {
+  const values = Object.entries(clip.keyframes).flatMap(([key, track]) => (fillOfKey(key) && track.length ? [[key, typeof track[0].value === 'string' ? sampleColor(track, local, colour) : sampleTrack(track, local)] as const] : []));
+  return values.length ? { fills: applyFillKeys(fillsOf(clip.props), Object.fromEntries(values)) } : {};
 }
 
 const SELECTOR_FIELDS: ReadonlySet<string> = new Set(SELECTOR_KEYS);
@@ -471,7 +496,7 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     const blur = blurOf(clip, frame) * scaleOf(placed) + edge.blur;
     const scissor = scissorOf(edge, size.width, size.height);
     const read = pair ? MATTE_READ[pair.matte] : null;
-    const extras = { ...(scissor ? { scissor } : {}), ...(filtered.filters.length ? { filters: filtered.filters, space: [world[0], world[1], world[2], world[3]] as Linear } : {}), ...(filtered.backdrop ? { backdrop: filtered.backdrop } : {}), ...(masks.length ? { masks } : {}), ...(read ? { matte: { items: matteItems, luma: read.weights !== null, invert: read.invert } } : {}) };
+    const extras = { ...(scissor ? { scissor } : {}), ...(filtered.filters.length ? { filters: filtered.filters, space: [world[0], world[1], world[2], world[3]] as Linear, origin: [world[4], world[5]] as Origin } : {}), ...(filtered.backdrop ? { backdrop: filtered.backdrop } : {}), ...(masks.length ? { masks } : {}), ...(read ? { matte: { items: matteItems, luma: read.weights !== null, invert: read.invert } } : {}) };
     const framed = (c: Content) => (c.kind === ItemKind.Image && c.clipped ? { matrix: mul2d(base, c.matrix), inner: moved } : c.kind === ItemKind.Group ? { matrix: IDENTITY } : { matrix: mul2d(placed, c.matrix) });
     const inner = (c: Content): Item => ({ ...bare(c), clip: clip.id, ...framed(c), blur: ownBlur(c), blend: BlendMode.Normal, ...(c.kind === ItemKind.Group ? { items: c.items.map(inner) } : {}), ...ownLook(c, placed, {}), ...stenciled(c) }) as Item;
     const ownBlur = (c: Content) => ('blur' in c ? (c.blur ?? 0) * scaleOf(placed) : 0);

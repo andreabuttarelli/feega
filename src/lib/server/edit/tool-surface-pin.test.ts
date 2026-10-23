@@ -16,7 +16,7 @@ async function definitions(tools: Record<string, Tool>) {
   return Promise.all(names.map(async (name) => ({ name, description: tools[name].description ?? '', schema: await asSchema(tools[name].inputSchema).jsonSchema })));
 }
 
-describe('the tool surfaces do not move while their code is reorganised', () => {
+describe('the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot)', () => {
   it('the chat tool definitions are byte-identical', async () => {
     const { db } = fakeDb({});
     const tools = {
@@ -26,14 +26,20 @@ describe('the tool surfaces do not move while their code is reorganised', () => 
     };
     const defined = await definitions(tools);
 
-    expect({ names: defined.map((d) => d.name), fingerprint: fingerprint(defined) }).toMatchSnapshot();
+    for (const definition of defined) {
+      expect(fingerprint(definition)).toMatchSnapshot(`chat tool ${definition.name}`);
+    }
   });
 
   it('the edit catalogue lists the same ops, summaries and schemas', async () => {
-    const listing = await describeEdit({});
-    const schemas = await describeEdit({ schemas: true });
+    const listing = (await describeEdit({})) as { ops: { name: string }[] };
+    const schemas = (await describeEdit({ schemas: true })) as { schemas: { op: string }[] };
 
-    expect(fingerprint(listing)).toMatchSnapshot();
-    expect(fingerprint(schemas)).toMatchSnapshot();
+    for (const entry of listing.ops) {
+      expect(fingerprint(entry)).toMatchSnapshot(`edit op ${entry.name}`);
+    }
+    for (const detail of schemas.schemas) {
+      expect(fingerprint(detail)).toMatchSnapshot(`edit op schema ${detail.op}`);
+    }
   });
 });

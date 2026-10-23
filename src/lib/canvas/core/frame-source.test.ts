@@ -42,16 +42,23 @@ describe('handing a frame to the core', () => {
 });
 
 describe('still frame', () => {
-  it('draws a resting frame at the same instant its poster was taken', () => {
-    expect(stillFrame({ fps: 30, durationInFrames: 90, tracks: [], comps: {} })).toBe(36);
+  it('a frame rests at time 0', () => {
+    expect(stillFrame({ fps: 30, durationInFrames: 90, tracks: [], comps: {} })).toBe(0);
   });
 
   it('a still doc rests on its own still frame', () => {
     expect(stillFrame({ fps: 30, durationInFrames: 60, still: { frame: 0 }, tracks: [], comps: {} })).toBe(0);
   });
 
-  it('a doc longer than its content rests inside the content, not on an empty black frame', () => {
-    expect(stillFrame(instance as unknown as MotionDoc)).toBe(60);
+  it('a doc longer than its content still rests at time 0', () => {
+    expect(stillFrame(instance as unknown as MotionDoc)).toBe(0);
+  });
+
+  it('a clip from 0 to 1s in a 5s frame is drawn on the canvas', () => {
+    const doc = { fps: 30, durationInFrames: 150, tracks: [], comps: {} } as unknown as MotionDoc;
+    const clip = { from: 0, durationInFrames: 30 };
+    const at = stillFrame(doc);
+    expect(at >= clip.from && at < clip.from + clip.durationInFrames).toBe(true);
   });
 });
 

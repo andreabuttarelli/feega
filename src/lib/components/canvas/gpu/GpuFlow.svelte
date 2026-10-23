@@ -30,6 +30,10 @@
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { libraryOf, syncedDoc } from '$lib/motion/style-library';
   import { renameStyle } from '$lib/motion/styles';
+  import { variableLibrary } from '$lib/canvas/variable-library.svelte';
+  import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
+  import { removeVariable } from '$lib/motion/variables';
+  import type { Collection } from '$lib/motion/variables-model';
   import type { Style } from '$lib/motion/styles-model';
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
   import type { Fill } from '$lib/motion/fill/model';
@@ -55,6 +59,8 @@
   import { Reach, frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { chainTarget, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
+  import { ImagesOutcome, figmaImageAssets } from '$lib/canvas/figma/fetch-images';
+  import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
   import { quadBox, quadStyle } from '$lib/canvas/quad-box';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
@@ -105,7 +111,7 @@
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { isSvgFile } from '$lib/canvas/system-clipboard';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { FrameKind, MOTION_NODE_BAR_H, TileBody, frameChrome, leftEmpty } from '$lib/canvas/motion-node';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -138,7 +144,7 @@
   import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
 
   import { dragOffset } from '$lib/canvas/duplicate-plan';
-  import { enterFrame } from '$lib/canvas/enter-frame';
+  import { enterSelected } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
   import type { Edge } from '$lib/motion/space';
   import MeasureLayer from '../MeasureLayer.svelte';
@@ -179,7 +185,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -284,8 +290,8 @@
   const LIVE_POSTER_CAP = 3;
   let settledView = $state<Viewport | null>(null);
   const domIds = $derived.by(() => {
-    const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => t.kind === 'motion' && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
-    const posters = placed.filter((t) => t.kind === 'motion' && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
+    const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => holdsDoc(t.kind ?? '') && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
+    const posters = placed.filter((t) => holdsDoc(t.kind ?? '') && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
     const sharp = !coreOn && BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
     const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
@@ -320,7 +326,7 @@
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null
       };
-      const poster = t.kind === 'motion';
+      const poster = holdsDoc(t.kind ?? '');
       return [{ key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
     });
   });
@@ -336,9 +342,9 @@
         return [];
       }
       const on = selected.includes(t.id);
-      const chrome = nodeChrome(t.id, on, layersSource.video);
+      const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
-      const layers = t.kind === 'motion' ? ChromeLayers.Whole : ChromeLayers.State;
+      const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
       }
@@ -351,7 +357,7 @@
   const nodeCards = $derived(coreCards.filter((c) => !c.poster));
   const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
   let domShows = $state(new Set<string>());
-  const handedOver = (t: Tile) => domIds.has(t.id) && (t.kind !== 'motion' || domShows.has(t.id));
+  const handedOver = (t: Tile) => domIds.has(t.id) && (!holdsDoc(t.kind ?? '') || domShows.has(t.id));
   $effect(() => {
     const kept = [...untrack(() => domShows)].filter((id) => domIds.has(id));
     if (kept.length !== untrack(() => domShows.size)) {
@@ -437,7 +443,7 @@
   let shelfHost = $state<HTMLDivElement | null>(null);
   let fontCss: string | null = null;
 
-  const snapshotKind = (t: Tile) => !!t.kind && t.kind !== 'motion' && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
+  const snapshotKind = (t: Tile) => !!t.kind && !holdsDoc(t.kind) && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
   const shotKeyOf = (id: string) => {
     const t = byId.get(id);
     return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.viewOf?.(id) ?? null) : '';
@@ -528,7 +534,7 @@
   const domDrawn = (id: string) => !!wrap?.querySelector(`.gpu-dom-node[data-id="${id}"] [data-drawn="true"], .gpu-dom-node[data-id="${id}"] img.poster`);
   const previewed = (t: Tile) => {
     if (domIds.has(t.id)) {
-      return t.kind !== 'motion' || domDrawn(t.id);
+      return !holdsDoc(t.kind ?? '') || domDrawn(t.id);
     }
     if (coreOn) {
       return coreDrawn.has(t.id);
@@ -1580,6 +1586,37 @@
   });
 
   $effect(() => {
+    variableLibrary.collections = variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
+  });
+
+  const sharedShape = (c: Collection | undefined) => JSON.stringify(c && { modes: c.modes, vars: c.vars });
+
+  function syncCollection(name: string, collection: Collection) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.variables?.[name])) {
+      const present = saverOf(frame.id)?.history.present;
+      const synced = present && sharedShape(present.variables?.[name]) !== sharedShape(collection) ? syncedCollection(present, name, collection) : null;
+      if (synced) {
+        commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} variables`);
+      }
+    }
+  }
+
+  function syncRemoval(collection: string, variable: string) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.variables?.[collection]?.vars[variable])) {
+      const present = saverOf(frame.id)?.history.present;
+      const removed = present ? removeVariable(present, collection, variable) : null;
+      if (removed?.ok) {
+        commit(frame.id, removed, `Removed ${collection}/${variable}`);
+      }
+    }
+  }
+
+  onMount(() => {
+    variableLibrary.connect({ push: syncCollection, remove: syncRemoval });
+    return () => variableLibrary.connect(null);
+  });
+
+  $effect(() => {
     peering?.select(pointedFrame, picks);
   });
 
@@ -1669,7 +1706,11 @@
     }
   });
 
-  const kindOfNode = (id: string) => (summaries.get(id)?.data.kind as FrameKind | undefined) ?? FrameKind.Frame;
+  const kindOfNode = (id: string): FrameKind => {
+    const node = summaries.get(id);
+    return node && holdsDoc(node.type) ? docKindOf(node.type, node.data.kind) : FrameKind.Frame;
+  };
+  const typedFreeText = () => (typing && kindOfNode(typing.nodeId) === FrameKind.Element ? typing.nodeId : null);
 
   const timeline = $derived.by(() => {
     const nodeId = inside?.nodeId;
@@ -1764,6 +1805,11 @@
     }
     commit(nodeId, { ok: true, doc }, done.summary);
     return true;
+  }
+
+  function leaveBuilder() {
+    picks = [];
+    frameBar.tool = DrawTool.Select;
   }
 
   function drawnInside(id: string) {
@@ -1861,6 +1907,7 @@
       return;
     }
     if (fit.node) {
+      await saver.flushPending();
       props.onResize?.(nodeId, fit.node.w, fit.node.h);
       return;
     }
@@ -2572,12 +2619,7 @@
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
-    enter: () => {
-      const only = selected.length === 1 ? selected[0] : null;
-      if (only) {
-        enterFrame(only, String(summaries.get(only)?.data.kind ?? '') || undefined);
-      }
-    },
+    enter: () => enterSelected(selected, summaries),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
     tool: (c) => {
@@ -2724,6 +2766,7 @@
     [Pasted.Figma]: ({ html }) => ({ figma: html })
   };
   const PASTED_SUMMARY = 'Pasted';
+  const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
 
   function pasteInFrame(data: PasteData<File>, at: Point): boolean {
     const paste = (IN_FRAME[data.kind] as ((d: PasteData<File>) => FramePaste) | undefined)?.(data);
@@ -2742,8 +2785,52 @@
     select([hit.nodeId]);
     commit(hit.nodeId, { ok: true, doc: done.doc }, PASTED_SUMMARY);
     pickMany(hit.nodeId, done.selection);
+    refusal = done.skipped?.length ? `${FIGMA_SKIPPED} ${done.skipped.join('; ')}` : null;
+    if (done.images?.length && done.fileKey) {
+      void fillFigmaImages({ nodeId: hit.nodeId, fileKey: done.fileKey, images: done.images });
+    }
     return true;
   }
+
+  const FIGMA_SESSION_TRIES = 20;
+  const FIGMA_SESSION_WAIT_MS = 250;
+  const FIGMA_FILLED_SUMMARY = 'Filled Figma images';
+  const figmaStarted = new Set<FigmaJob>();
+
+  async function sessionOnceLoaded(nodeId: string) {
+    for (let tries = 0; tries < FIGMA_SESSION_TRIES; tries++) {
+      const session = saverOf(nodeId);
+      if (session) {
+        return session;
+      }
+      await new Promise((resolve) => setTimeout(resolve, FIGMA_SESSION_WAIT_MS));
+    }
+    return null;
+  }
+
+  async function fillFigmaImages(job: FigmaJob) {
+    const got = await figmaImageAssets({ projectId: page.params.projectId ?? '', fileKey: job.fileKey, hashes: job.images.map((i) => i.hash) });
+    props.onFigmaImages?.(got.outcome);
+    if (got.outcome !== ImagesOutcome.Filled || !Object.keys(got.assets).length) {
+      return;
+    }
+    const session = await sessionOnceLoaded(job.nodeId);
+    if (!session) {
+      return;
+    }
+    const shown = Object.fromEntries(Object.values(got.assets).map((id) => [id, assetUrl(id)]));
+    liveDocs.set(job.nodeId, { ...(liveOf(job.nodeId) as LiveDoc), assets: { ...liveOf(job.nodeId)?.assets, ...shown } });
+    commit(job.nodeId, { ok: true, doc: imagesFilled(session.history.present, job.images, got.assets) }, FIGMA_FILLED_SUMMARY);
+  }
+
+  $effect(() => {
+    for (const job of props.figmaJobs ?? []) {
+      if (!figmaStarted.has(job)) {
+        figmaStarted.add(job);
+        void fillFigmaImages(job);
+      }
+    }
+  });
 
   function pasteFrom(source: PasteSource<File> | null, at: Point) {
     const data = source ? readPaste(source) : null;
@@ -3096,7 +3183,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
+          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
@@ -3104,7 +3191,7 @@
         {/if}
       {/snippet}
     </FrameOverlays>
-    <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
+    <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom});--zoom:${view.zoom}`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
         {#each curves as c (c.edge.id)}
           <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} class:iterate={(c.edge.mode ?? 'fixed') === 'iterate'} class:linked={selected.includes(c.edge.source) || selected.includes(c.edge.target)} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
@@ -3136,11 +3223,11 @@
           data-kind={t.kind}
           data-core={coreDrawn.has(t.id) || undefined}
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
-          style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px;--bar-h:${t.kind === 'motion' && String(summaries.get(t.id)?.data.kind ?? 'frame') === 'frame' ? MOTION_NODE_BAR_H : 0}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
+          style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px;--bar-h:${holdsDoc(t.kind ?? '') && frameChrome(kindOfNode(t.id)).bar ? MOTION_NODE_BAR_H : 0}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
           <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} knobDrawn={coreRotate.some((r) => r.id === t.id)} />
-          {#if !domIds.has(t.id) && t.kind === 'motion'}
-            {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
+          {#if !domIds.has(t.id) && holdsDoc(t.kind ?? '')}
+            {@const kind = kindOfNode(t.id)}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
               <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage data-drawn={drawn.has(t.id) || coreDrawn.has(t.id)}>
                 {#if t.poster}
@@ -3159,6 +3246,7 @@
           {/if}
         </div>
       {/each}
+      {@render props.canvasOver?.()}
       <PeerLayer peers={corePeers.length ? (props.peers ?? []).filter((p) => p.chat) : (props.peers ?? [])} outlined={!corePeers.length} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
       {#if measured.length || snapGuides.length || snapSpacing.length}
         <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={coreOn ? [] : snapGuides} zoom={view.zoom} />
@@ -3221,7 +3309,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && (frameBar.tool === DrawTool.Frame || !inside)}
+  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && (frameBar.tool === DrawTool.Frame || !inside)}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}

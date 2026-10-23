@@ -1,7 +1,9 @@
 import { ungroupClip } from '$lib/motion/group';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
-import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, stylesOf } from '$lib/motion/styles';
+import { StyleAction, StyleKind, StyleSlot, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, saveAsStyle, stylesOf } from '$lib/motion/styles';
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
+import { VariableAction, addMode, bindVariable, defineVariable, removeVariable, setActiveMode, unbindVariable } from '$lib/motion/variables';
+import { VARIABLE_NAME, VarType, type VarInput } from '$lib/motion/variables-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
 import { setNetwork, toVector } from '$lib/motion/vector/ops';
@@ -9,6 +11,7 @@ import { PointOp, editPathPoints } from '$lib/motion/shape/point-ops';
 import { Handle } from '$lib/motion/shape/pen';
 import { networkSchema } from '$lib/motion/vector/model';
 import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
+import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { scaleClips } from '$lib/motion/scale-tool';
 import { setLayoutGuides } from '$lib/motion/layout-guides/guides';
@@ -57,6 +60,7 @@ const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) =
 
 const OUTLINE_STROKE = 'outline_stroke';
 const FLATTEN = 'flatten';
+const isBooleanOp = (op: string): op is BooleanOp => (Object.values(BooleanOp) as string[]).includes(op);
 const SHAPE_OPS = [BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude, OUTLINE_STROKE, FLATTEN] as const;
 
 type ShapeOp = (doc: MotionDoc, ids: string[], frame: number) => OpResult;
@@ -424,6 +428,8 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
+        effectStyleRef: c.effectStyleRef ?? null,
+        bind: c.bind ?? null,
         expressions: c.expressions,
         effects: c.effects,
         shaders: c.shaders,
@@ -447,6 +453,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     layoutGuides: doc.layoutGuides ?? [],
     fonts: doc.fonts,
     styles: stylesOf(doc),
+    variables: doc.variables ?? {},
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     interactive: interactiveOf(doc),
@@ -607,7 +614,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   const SHAPE_OP: Record<(typeof SHAPE_OPS)[number], ShapeOp> = {
     ...(Object.fromEntries(Object.values(BooleanOp).map((op) => [op, (doc: MotionDoc, ids: string[], frame: number) => combineShapes(doc, ids, op, frame)])) as Record<BooleanOp, ShapeOp>),
     [OUTLINE_STROKE]: (doc, ids, frame) => outlineStrokes(doc, ids, frame, deps.newId),
-    [FLATTEN]: flattenShapes
+    [FLATTEN]: (doc, ids, frame) => {
+      const [only] = ids.length === 1 ? [findClip(doc, ids[0])?.clip] : [];
+      return only && isBooleanGroup(only) ? bakeBooleanGroup(doc, only.id, deps.newId) : flattenShapes(doc, ids, frame);
+    }
   };
 
   const layoutWritten = (written: LayoutWritten | null) => {
@@ -868,15 +878,28 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return laid.ok ? `${cues.length} sound effects on the SFX track` : laid.error;
   };
 
-  type StyleInput = { name?: string; to?: string; style?: unknown; clip_ids?: string[] };
+  type StyleInput = { name?: string; to?: string; style?: unknown; clip_ids?: string[]; kind?: StyleKind; slot?: StyleSlot };
   const named = (input: StyleInput) => input.name ?? '';
   const STYLE_ACTIONS: Record<StyleAction, (input: StyleInput) => unknown> = {
     [StyleAction.Define]: (input) => apply(defineStyle(session.doc, named(input), input.style), `style ${named(input)}`),
     [StyleAction.Apply]: (input) => apply(applyStyle(session.doc, input.clip_ids ?? [], named(input)), `style ${named(input)} on ${(input.clip_ids ?? []).join(', ')}`),
-    [StyleAction.Detach]: (input) => apply(detachStyle(session.doc, input.clip_ids ?? []), `detached ${(input.clip_ids ?? []).join(', ')}`),
+    [StyleAction.Detach]: (input) => apply(detachStyle(session.doc, input.clip_ids ?? [], input.slot), `detached ${(input.clip_ids ?? []).join(', ')}`),
+    [StyleAction.Save]: (input) => apply(saveAsStyle(session.doc, input.clip_ids?.[0] ?? '', named(input), input.kind ?? StyleKind.Colour), `saved style ${named(input)}`),
     [StyleAction.Rename]: (input) => apply(renameStyle(session.doc, named(input), input.to ?? ''), `renamed style ${named(input)} to ${input.to}`),
     [StyleAction.Remove]: (input) => apply(removeStyle(session.doc, named(input)), `removed style ${named(input)}`),
     [StyleAction.List]: () => ({ styles: stylesOf(session.doc) })
+  };
+
+  type VariableInput = { action: VariableAction; collection?: string; name?: string; type?: VarType; values?: Record<string, unknown>; modes?: string[]; mode?: string; clip_id?: string; target?: string };
+  const keyOfInput = (input: VariableInput) => `${input.collection ?? ''}/${input.name ?? ''}`;
+  const VARIABLE_ACTIONS: Record<VariableAction, (input: VariableInput) => unknown> = {
+    [VariableAction.Define]: (input) => apply(defineVariable(session.doc, input.collection ?? '', input.name ?? '', { type: input.type, values: input.values } as VarInput, input.modes), `variable ${keyOfInput(input)}`),
+    [VariableAction.Mode]: (input) => apply(setActiveMode(session.doc, input.collection ?? '', input.mode ?? ''), `${input.collection} mode ${input.mode}`),
+    [VariableAction.AddMode]: (input) => apply(addMode(session.doc, input.collection ?? '', input.mode ?? ''), `${input.collection} new mode ${input.mode}`),
+    [VariableAction.Bind]: (input) => apply(bindVariable(session.doc, input.clip_id ?? '', input.target ?? '', keyOfInput(input)), `bound ${input.target} of ${input.clip_id} to ${keyOfInput(input)}`),
+    [VariableAction.Unbind]: (input) => apply(unbindVariable(session.doc, input.clip_id ?? '', input.target ?? ''), `unbound ${input.target} of ${input.clip_id}`),
+    [VariableAction.Remove]: (input) => apply(removeVariable(session.doc, input.collection ?? '', input.name ?? ''), `removed variable ${keyOfInput(input)}`),
+    [VariableAction.List]: () => ({ variables: session.doc.variables ?? {} })
   };
 
   const tools: Record<string, Tool> = {
@@ -1107,7 +1130,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     set_keyframes: tool({
       description:
-        `Animate one prop of a clip: replaces its keyframes. time is seconds from the clip start; ease is the curve leaving that keyframe: standard (default, feega.inOut: expo in-out with a soft settle, for moves), enter (feega.out, for entrances), exit (feega.in, for exits), linear (only a drift or a loop), overshoot (a visible bounce: off-style), elastic or bounce (springy: only when asked, with intensity 0..1, default 0.5), or a cubic-bezier [x1,y1,x2,y2]. ${INTERP_HELP} Colour props take #rrggbb or brand colours. list_components says what each component animates.`,
+        `Animate one prop of a clip: replaces its keyframes. time is seconds from the clip start; ease is the curve leaving that keyframe: standard (default, feega.inOut: expo in-out with a soft settle, for moves), enter (feega.out, for entrances), exit (feega.in, for exits), linear (only a drift or a loop), overshoot (a visible bounce: off-style), elastic or bounce (springy: only when asked, with intensity 0..1, default 0.5), or a cubic-bezier [x1,y1,x2,y2]. ${INTERP_HELP} Colour props take #rrggbb or brand colours. Shape gradients: fill.<i>.stop.<n>.color|pos, fill.<i>.angle|cx|cy|radius. list_components says what each component animates.`,
       inputSchema: z.object({
         clip_id: z.string(),
         prop: z.string(),
@@ -1810,9 +1833,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     combine_shapes: tool({
-      description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed. flatten (one or more shapes) merges their outlines into one editable path as they are, curves kept, with no boolean. outline_stroke (one or more shapes) turns the first visible stroke into a filled path of the same look; a shape that also has a fill keeps it and gets the outlined stroke as a new layer above.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum([...SHAPE_OPS]), at: z.number().min(0).optional().describe('seconds; default 0') }),
-      execute: async (input) => apply(SHAPE_OP[input.op](session.doc, input.clip_ids, frames(input.at ?? 0)), `${input.op} ${input.clip_ids.join(', ')}`)
+      description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed. live (union, subtract, intersect or exclude only) instead groups the shapes into a live boolean group: they stay separate and editable inside it, the group draws the result and redraws it when a child changes; set_props boolean on the group changes the operation. flatten (one or more shapes, or one live boolean group) merges their outlines into one editable path as they are, curves kept, with no boolean; a live boolean group is baked into one plain shape. outline_stroke (one or more shapes) turns the first visible stroke into a filled path of the same look; a shape that also has a fill keeps it and gets the outlined stroke as a new layer above.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum([...SHAPE_OPS]), live: z.boolean().optional().describe('boolean ops only: keep the shapes editable in a live boolean group'), at: z.number().min(0).optional().describe('seconds; default 0') }),
+      execute: async (input) => {
+        const result = input.live && isBooleanOp(input.op) ? liveCombine(session.doc, input.clip_ids, input.op, deps.newId) : SHAPE_OP[input.op](session.doc, input.clip_ids, frames(input.at ?? 0));
+        return apply(result, `${input.op} ${input.clip_ids.join(', ')}`);
+      }
     }),
 
     to_vector: tool({
@@ -2134,9 +2160,25 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     named_style: tool({
-      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color, or kind ${StyleKind.Colour} with color; editing restyles every clip using it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill. detach (clip_ids) unlinks them, keeping their look. remove (name) deletes a style. rename (name, to) renames it, elements stay linked. list returns the styles with their clips (also in get_motion_doc).`,
-      inputSchema: z.object({ action: z.enum(StyleAction), name: z.string().regex(STYLE_NAME).optional(), style: styleSchema.optional(), clip_ids: z.array(z.string()).optional(), to: z.string().regex(STYLE_NAME).optional() }),
+      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color; kind ${StyleKind.Colour} with color; kind ${StyleKind.Paint} with fills (gradient or image fill stack, as set_props fills); kind ${StyleKind.Effect} with effects (shadows, blurs: effect stack as add_effect, each {id, kind, enabled, params}); editing restyles every clip using it. save (name, clip_ids [one clip], kind) makes a style from that clip's current look and links it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill, a paint style to any clip with fills, an effect style to any visual clip (its own slot: a clip keeps one effect style next to one text, colour or paint style). detach (clip_ids, slot ${Object.values(StyleSlot).join('|')} optional: both when omitted) unlinks them, keeping their look. remove (name) deletes a style. rename (name, to) renames a style of any kind, elements stay linked. list returns the styles with their clips (also in get_motion_doc).`,
+      inputSchema: z.object({ action: z.enum(StyleAction), name: z.string().regex(STYLE_NAME).optional(), style: styleSchema.optional(), clip_ids: z.array(z.string()).optional(), to: z.string().regex(STYLE_NAME).optional(), kind: z.enum(StyleKind).optional(), slot: z.enum(StyleSlot).optional() }),
       execute: async (input) => STYLE_ACTIONS[input.action](input)
+    }),
+
+    variable: tool({
+      description: `Variables with modes, bound to clip props. action define (collection, name, type ${Object.values(VarType).join('|')}, values {mode: value or {alias: "Collection/name"}}, modes optional list, first is the default) creates or edits a variable, creating its collection; every mode needs a value; an alias points to a variable of the same type, no loops. mode (collection, mode) switches this video to that mode: every bound clip takes that mode's value (light/dark, brand A/B). add_mode (collection, mode) adds a mode that starts from the default mode's values. bind (collection, name, clip_id, target) links a prop to the variable: a colour variable to fill, stroke, color; a number to roundness, opacity, width, height, size, autoLayout.gap, autoLayout.crossGap, autoLayout.padding (all four sides); a string to a text prop; a boolean to a toggle. Number values are in the prop's own units (sizes and opacity are shares 0..1, gap and padding px). unbind (clip_id, target) keeps the current value. remove (collection, name) deletes one and unbinds its clips. list returns all (also in get_motion_doc). set_props on a bound prop is refused: unbind first.`,
+      inputSchema: z.object({
+        action: z.enum(VariableAction),
+        collection: z.string().regex(VARIABLE_NAME).optional(),
+        name: z.string().regex(VARIABLE_NAME).optional(),
+        type: z.enum(VarType).optional(),
+        values: z.record(z.string(), z.unknown()).optional(),
+        modes: z.array(z.string().regex(VARIABLE_NAME)).optional(),
+        mode: z.string().regex(VARIABLE_NAME).optional(),
+        clip_id: z.string().optional(),
+        target: z.string().optional()
+      }),
+      execute: async (input) => VARIABLE_ACTIONS[input.action](input)
     }),
 
     register_font: tool({

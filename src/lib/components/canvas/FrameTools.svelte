@@ -1,5 +1,6 @@
 <script lang="ts">
   import DrawOverlay from '$lib/components/motion/DrawOverlay.svelte';
+  import ShapeBuilderOverlay from '$lib/components/motion/ShapeBuilderOverlay.svelte';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
@@ -37,7 +38,8 @@
     views = FRAME_VIEW_DEFAULT,
     boxes = {},
     apply,
-    ondrawn
+    ondrawn,
+    onleave
   }: {
     doc: MotionDoc;
     frame: number;
@@ -49,6 +51,7 @@
     boxes?: Boxes;
     apply: (result: OpResult, summary: string) => void;
     ondrawn: (id: string) => void;
+    onleave: () => void;
   } = $props();
 
   let pointEdit = $state<string | null>(null);
@@ -104,6 +107,7 @@
   {#if only && shown.has(FrameOverlay.TextPath)}<TextPathOverlay {doc} clip={only} {frame} />{/if}
   {#if laidOut}<CornerOverlay {doc} {frame} clip={laidOut} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.MotionPath)}<MotionPathOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
+  {#if shown.has(FrameOverlay.ShapeBuilder)}<ShapeBuilderOverlay {doc} {frame} {picks} onchange={apply} onexit={onleave} />{/if}
   {#if shown.has(FrameOverlay.Draw)}
     <div class="draw">
       <DrawOverlay {doc} {frame} {tool} onchange={apply} oncreated={created} />

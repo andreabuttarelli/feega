@@ -185,7 +185,26 @@ impl<R: Runner> Fx<'_, R> {
     }
 
     fn flood(&self, like: &Img<R::Tex>, c: Rgba) -> Img<R::Tex> {
-        self.op(Op::Flood, &like.tex, &like.tex, &c)
+        let (w, h) = Self::size(&like.tex);
+        self.flood_in(like, c, [0.0, 0.0, w as f32, h as f32])
+    }
+
+    fn flood_in(&self, like: &Img<R::Tex>, c: Rgba, region: [f32; 4]) -> Img<R::Tex> {
+        self.op(Op::Flood, &like.tex, &like.tex, &[c[0], c[1], c[2], c[3], region[0], region[1], region[2], region[3]])
+    }
+
+    fn cropped(&self, out: Img<R::Tex>, node: &SvgNode, space: Linear, origin: [f64; 2]) -> Img<R::Tex> {
+        if node.tag == "feTurbulence" || !SUBREGION.iter().any(|k| node.attrs.contains_key(*k)) {
+            return out;
+        }
+        let (x, y) = (num(node.attrs.get("x"), 0.0), num(node.attrs.get("y"), 0.0));
+        let (w, h) = (num(node.attrs.get("width"), 0.0), num(node.attrs.get("height"), 0.0));
+        let corners = [(x, y), (x + w, y), (x, y + h), (x + w, y + h)].map(|(px, py)| (space[0] * px + space[2] * py + origin[0], space[1] * px + space[3] * py + origin[1]));
+        let (x0, y0) = corners.iter().fold((f64::MAX, f64::MAX), |(a, b), &(cx, cy)| (a.min(cx), b.min(cy)));
+        let (x1, y1) = corners.iter().fold((f64::MIN, f64::MIN), |(a, b), &(cx, cy)| (a.max(cx), b.max(cy)));
+        let region = [x0 as f32, y0 as f32, (x1 - x0) as f32, (y1 - y0) as f32];
+        let window = self.flood_in(&out, WHITE, region);
+        self.composite(&out, &window, "in", [0.0; 4])
     }
 
     fn composite(&self, a: &Img<R::Tex>, b: &Img<R::Tex>, op: &str, k: [f32; 4]) -> Img<R::Tex> {
@@ -290,7 +309,7 @@ impl<R: Runner> Fx<'_, R> {
         self.op(Op::Displace, &src.tex, &map.tex, &[(num(n.attrs.get("scale"), 0.0) * s) as f32, channel("xChannelSelector"), channel("yChannelSelector")])
     }
 
-    fn svg_graph(&self, source: Img<R::Tex>, filter: &SvgNode, space: Linear) -> Img<R::Tex> {
+    fn svg_graph(&self, source: Img<R::Tex>, filter: &SvgNode, space: Linear, origin: [f64; 2]) -> Img<R::Tex> {
         let mut results: HashMap<String, Img<R::Tex>> = HashMap::new();
         let mut last = source.clone();
         let s = scale(space);
@@ -343,6 +362,7 @@ impl<R: Runner> Fx<'_, R> {
                 "feDisplacementMap" => self.displace(&input(a("in")), &input(a("in2")), node, s),
                 _ => continue,
             };
+            let out = self.cropped(out, node, space, origin);
             if let Some(name) = a("result") {
                 results.insert(text(Some(name)), out.clone());
             }
@@ -373,11 +393,11 @@ impl<R: Runner> Fx<'_, R> {
         })
     }
 
-    pub fn apply(&self, src: R::Tex, filters: &[Filter], space: Linear) -> R::Tex {
+    pub fn apply(&self, src: R::Tex, filters: &[Filter], space: Linear, origin: [f64; 2]) -> R::Tex {
         let start = Self::plain(src);
         let out = filters.iter().fold(start, |img, f| match f {
             Filter::Css { fns } => self.css_graph(img, fns, space),
-            Filter::Svg { nodes } => nodes.iter().fold(img, |i, node| self.svg_graph(i, node, space)),
+            Filter::Svg { nodes } => nodes.iter().fold(img, |i, node| self.svg_graph(i, node, space, origin)),
         });
         out.tex
     }
@@ -393,6 +413,7 @@ fn vector(space: Linear, dx: f64, dy: f64) -> (f64, f64) {
 
 const SIGMAS: f64 = 3.0;
 const SVG_REGION_SHARE: f64 = 0.1;
+const SUBREGION: [&str; 4] = ["x", "y", "width", "height"];
 const SVG_OWN_REGION: [&str; 5] = ["x", "y", "width", "height", "filterUnits"];
 const FRAME_SPACE_PRIMITIVES: [&str; 5] = ["feTurbulence", "feTile", "feImage", "feDiffuseLighting", "feSpecularLighting"];
 

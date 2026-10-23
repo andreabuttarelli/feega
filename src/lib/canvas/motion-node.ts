@@ -82,6 +82,13 @@ export const motionNodeSchema = z.object({
   interactive: z.boolean().default(false)
 });
 
+export const elementNodeSchema = z.object({
+  docHeadRevision: z.number().int().min(0),
+  posterRevision: z.number().int().min(0).optional(),
+  kind: z.literal(FrameKind.Group).optional(),
+  interactive: z.boolean().default(false)
+});
+
 export function storyboardOf(data: Record<string, unknown>): StoryboardLink | null {
   const parsed = linkSchema.safeParse(data.storyboard);
   return parsed.success ? parsed.data : null;
@@ -154,17 +161,21 @@ export function frameResize(node: MotionNode, asked: { w: number; h: number }, p
   return RESIZE[sizingOf(node)](node, asked, picture, mode);
 }
 
-export function elementNodeOf(box: { width: number; height: number }, kind: FrameKind = FrameKind.Element): { data: Record<string, unknown>; w: number; h: number } {
-  return { data: { ...newMotionData(docFormat(box)), kind }, w: Math.round(box.width), h: Math.round(box.height) };
+export type DocNodeShape = { type: DocNodeType; data: Record<string, unknown>; w: number; h: number };
+
+const elementData = (kind: FrameKind): Record<string, unknown> => (kind === FrameKind.Group ? { docHeadRevision: 0, kind } : { docHeadRevision: 0 });
+
+export function elementNodeOf(box: { width: number; height: number }, kind: FrameKind = FrameKind.Element): DocNodeShape {
+  return { type: DocNodeType.Element, data: elementData(kind), w: Math.round(box.width), h: Math.round(box.height) };
 }
 
-export function drawnFrameNodeOf(box: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
-  return { data: newMotionData(docFormat(box)), w: Math.round(box.width), h: Math.round(box.height) + MOTION_NODE_BAR_H };
+export function drawnFrameNodeOf(box: { width: number; height: number }): DocNodeShape {
+  return { type: DocNodeType.Motion, data: newMotionData(docFormat(box)), w: Math.round(box.width), h: Math.round(box.height) + MOTION_NODE_BAR_H };
 }
 
-export function frameNodeOf(picture: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
+export function frameNodeOf(picture: { width: number; height: number }): DocNodeShape {
   const format = docFormat(picture);
-  return { data: newMotionData(format), ...frameNodeSize(MOTION_STAGE_WIDTH[format], picture) };
+  return { type: DocNodeType.Motion, data: newMotionData(format), ...frameNodeSize(MOTION_STAGE_WIDTH[format], picture) };
 }
 
 export const FIRST_REVISION = 1;
@@ -175,14 +186,48 @@ export function newMotionData(format: MotionFormat = MotionFormat.Vertical): Rec
   return { format, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null };
 }
 
+export enum DocNodeType {
+  Motion = 'motion',
+  Element = 'element'
+}
+
+export const DOC_NODE_TYPES: readonly string[] = Object.values(DocNodeType);
+
+export const holdsDoc = (type: string): type is DocNodeType => DOC_NODE_TYPES.includes(type);
+
+const KIND_OF_TYPE: Record<DocNodeType, (stored: FrameKind | undefined) => FrameKind> = {
+  [DocNodeType.Motion]: (stored) => stored ?? FrameKind.Frame,
+  [DocNodeType.Element]: (stored) => (stored === FrameKind.Group ? FrameKind.Group : FrameKind.Element)
+};
+
+const storedKind = (raw: unknown): FrameKind | undefined => (Object.values(FrameKind).includes(raw as FrameKind) ? (raw as FrameKind) : undefined);
+
+export const docKindOf = (type: DocNodeType, raw: unknown): FrameKind => KIND_OF_TYPE[type](storedKind(raw));
+
 export function motionOf(row: { id: string; type: string; data: Record<string, unknown> }): MotionNode | null {
-  if (row.type !== 'motion') {
+  if (!holdsDoc(row.type)) {
     return null;
   }
 
   const parsed = motionNodeSchema.safeParse({ ...newMotionData(), ...row.data });
   const data = parsed.success ? parsed.data : motionNodeSchema.parse(newMotionData());
-  return { id: row.id, ...data, kind: data.kind ?? FrameKind.Frame };
+  return { id: row.id, ...data, kind: docKindOf(row.type, data.kind) };
+}
+
+const LEGACY_FREE: ReadonlySet<unknown> = new Set([FrameKind.Element, FrameKind.Group]);
+
+export function currentDocNode<T extends { type: string; data: Record<string, unknown> }>(row: T): T {
+  if (row.type !== DocNodeType.Motion || !LEGACY_FREE.has(row.data.kind)) {
+    return row;
+  }
+  const { kind, ...rest } = row.data;
+  return { ...row, type: DocNodeType.Element, data: { ...rest, ...elementData(kind as FrameKind) } };
+}
+
+export function docNodeCopy<T extends { type: string; data: Record<string, unknown> }>(row: T): T {
+  const current = currentDocNode(row);
+  const { posterRevision: _poster, ...data } = atFirstRevision(current.data);
+  return { ...current, data };
 }
 
 export const FRAME_PARAM = 'frame';
@@ -222,8 +267,8 @@ const DEFAULT_SIZE: Record<FrameKind, (node: MotionNode) => { w: number; h: numb
   [FrameKind.Group]: () => ELEMENT_MIN_SIZE
 };
 
-export function frameDefaultSize(data: Record<string, unknown>): { w: number; h: number } {
-  const node = motionOf({ id: '', type: 'motion', data })!;
+export function frameDefaultSize(data: Record<string, unknown>, type: DocNodeType = DocNodeType.Motion): { w: number; h: number } {
+  const node = motionOf({ id: '', type, data })!;
   return DEFAULT_SIZE[node.kind](node);
 }
 

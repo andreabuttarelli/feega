@@ -18,7 +18,7 @@ async function shoot(page: Page, name: string) {
 }
 
 async function elements(admin: SupabaseClient, canvasId: string) {
-  const { data } = await admin.from('nodes').select('id, data').eq('canvas_id', canvasId).is('deleted_at', null);
+  const { data } = await admin.from('nodes').select('id, type, data').eq('canvas_id', canvasId).is('deleted_at', null);
   return data ?? [];
 }
 
@@ -58,7 +58,7 @@ test.describe('system clipboard on the canvas @real', () => {
     await pasteOverCanvas(page);
 
     await expect.poll(async () => (await allClips(admin, session.canvasId)).map((c) => c.props.fill).sort(), { timeout: 20_000 }).toEqual(['#0a84ff', '#ff3b30']);
-    await expect.poll(async () => (await elements(admin, session.canvasId)).map((n) => (n.data as { kind?: string }).kind), { timeout: 20_000 }).toEqual(['group']);
+    await expect.poll(async () => (await elements(admin, session.canvasId)).map((n) => [n.type, (n.data as { kind?: string }).kind]), { timeout: 20_000 }).toEqual([['element', 'group']]);
     await page.waitForTimeout(3000);
     await shoot(page, '1-svg-pasted');
   });
@@ -79,7 +79,7 @@ test.describe('system clipboard on the canvas @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await putOnClipboard(page, { 'text/plain': ICON });
     await pasteOverCanvas(page);
-    await expect.poll(async () => (await elements(admin, session.canvasId)).map((n) => (n.data as { kind?: string }).kind), { timeout: 20_000 }).toEqual(['group']);
+    await expect.poll(async () => (await elements(admin, session.canvasId)).map((n) => [n.type, (n.data as { kind?: string }).kind]), { timeout: 20_000 }).toEqual([['element', 'group']]);
     await page.waitForTimeout(3000);
     const pane = (await page.locator('.svelte-flow').boundingBox())!;
     await page.mouse.click(pane.x + 40, pane.y + pane.height - 160);

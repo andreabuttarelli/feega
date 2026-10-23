@@ -5,10 +5,10 @@ import { groupClips } from '$lib/motion/group';
 import { mapOutline, parsePath, type Pt } from '$lib/motion/shape/geometry';
 import { svgShapes, type SvgText } from '$lib/motion/shape/svg-import';
 import { TextSizing } from '$lib/motion/text-sizing';
-import { figmaIntoFrame } from './figma/figma-doc';
+import { figmaIntoFrame, type FigmaImage } from './figma/figma-doc';
 
 export type FramePaste = { svg: string } | { text: string } | { figma: string };
-export type Pasted = { doc: MotionDoc; selection: string[] };
+export type Pasted = { doc: MotionDoc; selection: string[]; skipped?: string[]; images?: FigmaImage[]; fileKey?: string | null };
 type Unit = { x: number; y: number };
 type NewId = () => string;
 

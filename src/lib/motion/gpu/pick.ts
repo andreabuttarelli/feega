@@ -1,5 +1,5 @@
 import { PaintKind } from './paint-of';
-import { frameAt, type Drawn, type Point, type Quad, type Scene } from './scene';
+import { placedAt, type Drawn, type Point, type Quad, type Scene } from './scene';
 
 export type FrameRect = { left: number; top: number; width: number; height: number };
 
@@ -14,11 +14,11 @@ function inside(quad: Quad, [x, y]: Point): boolean {
   return !turns.some((s) => s > 0) || !turns.some((s) => s < 0);
 }
 
-const pickable = (d: Drawn) => d.paint.kind !== PaintKind.Html && d.opacity > 0;
+const pickable = (d: Drawn) => (d.paint.kind !== PaintKind.Html || d.layer.bounds !== undefined) && d.opacity > 0;
 
 const holds = (d: Drawn, p: Point) => inside(d.quad, p) && d.clips.every((c) => inside(c, p));
 
-const topAt = (scene: Scene, point: Point, time: number) => frameAt(scene, time).filter(pickable).findLast((d) => holds(d, point));
+const topAt = (scene: Scene, point: Point, time: number) => placedAt(scene, time).filter(pickable).findLast((d) => holds(d, point));
 
 export function pickAt(scene: Scene, point: Point, time: number): string | null {
   return topAt(scene, point, time)?.clip ?? null;
@@ -28,7 +28,7 @@ export function pickOwnersAt(scene: Scene, point: Point, time: number): string[]
   return topAt(scene, point, time)?.layer.owners ?? [];
 }
 
-const drawnOf = (scene: Scene, clip: string, time: number) => frameAt(scene, time).filter((d) => d.layer.covers.includes(clip) || d.layer.owners.includes(clip));
+const drawnOf = (scene: Scene, clip: string, time: number) => placedAt(scene, time).filter((d) => d.layer.covers.includes(clip) || d.layer.owners.includes(clip));
 
 function spanOf(corners: Point[]): FrameRect {
   const xs = corners.map(([x]) => x);

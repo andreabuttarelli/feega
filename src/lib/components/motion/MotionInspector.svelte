@@ -17,7 +17,7 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { EditMode, designWarning, editIn } from '$lib/motion/edit-mode';
   import { InspectorTab, clipFieldGroups, keyAt, keyedField, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
-  import { setMask, setProps, setTiming, setTrackMatte, setTransition, Side, type OpResult } from '$lib/motion/timeline';
+  import { setKeyframe, setMask, setProps, setTiming, setTrackMatte, setTransition, Side, type OpResult } from '$lib/motion/timeline';
   import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
   import { ANIMATABLE, Source, isAnimatable, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
   import NumberField from './NumberField.svelte';
@@ -47,7 +47,8 @@
   import MarkedLines from './MarkedLines.svelte';
   import FillStack from './FillStack.svelte';
   import { FILLED, elementFills } from '$lib/motion/fill/elements';
-  import { FILL_LABEL, FILL_TYPES, addFill } from '$lib/motion/fill/model';
+  import { FILL_LABEL, FILL_TYPES, addFill, type Fill } from '$lib/motion/fill/model';
+  import { applyFillKeys, fillOfKey, splitFillEdit } from '$lib/motion/fill/keys';
   import { Adder } from './stack-adder';
   import StrokeStack from './StrokeStack.svelte';
   import { STROKED, elementStrokes } from '$lib/motion/stroke/elements';
@@ -62,6 +63,7 @@
   import TextPresetGallery from './TextPresetGallery.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
+  import VariablesSection from './VariablesSection.svelte';
   import { registerFont, replaceFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
   import { isBuiltin } from '$lib/motion/fonts/model';
   import type { FontLibrary } from '$lib/motion/fonts/library';
@@ -407,6 +409,19 @@
   }
 
   const shown = (key: string) => valueAt(animated, key, frame, resolve);
+
+  const fillKeyed = $derived(new Set(Object.keys(clip.keyframes).filter((key) => fillOfKey(key) && clip.keyframes[key].length)));
+  const fillsShown = $derived(applyFillKeys(elementFills(clip.component, clip.props), Object.fromEntries([...fillKeyed].map((key) => [key, shown(key) as KeyValue]))));
+  const fillKeys = $derived(clip.component === 'Shape' ? { mark: (key: string) => MARK[keyState(key)], toggle } : null);
+
+  function commitFills(next: Fill[], summary: string) {
+    const { fills, keyedValues } = splitFillEdit(elementFills(clip.component, clip.props), fillsShown, next, fillKeyed);
+    let result: OpResult = setProps(doc, clip.id, { fills });
+    for (const [key, value] of Object.entries(keyedValues)) {
+      result = result.ok ? setKeyframe(result.doc, clip.id, key, frame - clip.from, value) : result;
+    }
+    commit(result, summary);
+  }
   const numberShown = (prop: AnimProp) => toShown(clip.component, prop.key, Math.round(Number(shown(prop.key)) * 1000) / 1000, doc);
   const stored = (key: string, v: number) => toStored(clip.component, key, v, doc);
   const slider = (p: Ranged) => sliderOf(clip.component, p, doc);
@@ -486,6 +501,7 @@
       </details>
     {/if}
     {#if visual}<StyleSection {doc} {clip} {commit} />{/if}
+    {#if visual}<VariablesSection {doc} {clip} {commit} />{/if}
     {#if visual}<AutoLayoutSection {doc} {clip} {commit} />{/if}
   {/if}
 
@@ -568,7 +584,7 @@
     <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
-    <div class="stack" data-prop={field.key}><FillStack {gesture} fills={elementFills(clip.component, clip.props)} adder={Adder.Section} {assets} {tokens} {upload} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><FillStack {gesture} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} onchange={commitFills} /></div>
   {:else if field.control === Control.Strokes}
     <div class="stack" data-prop={field.key}><StrokeStack {gesture} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}

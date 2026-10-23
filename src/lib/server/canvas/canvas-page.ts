@@ -48,6 +48,8 @@ import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/c
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { RestoreOutcome, listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { CommentOutcome, addComment, listComments, resolveThread } from '$lib/server/canvas/canvas-comments';
 import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
@@ -1341,15 +1343,15 @@ export const actions: Actions<CanvasParams> = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
     const at = figmaAtSchema.safeParse(jsonField(fd, 'at'));
-    const id = String(fd.get('node_id') ?? '') || undefined;
-    if (!at.success || (id && !UUID.test(id))) {
+    if (!at.success) {
       return fail(400, { error: 'invalid paste' });
     }
-    const pasted = await pasteFigmaAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, String(fd.get('html') ?? ''), at.data, () => crypto.randomUUID().slice(0, 8));
+    const pasted = await pasteFigmaAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, String(fd.get('html') ?? ''), at.data, () => crypto.randomUUID().slice(0, 8));
     if (!pasted) {
       return fail(400, { error: 'no Figma layers in this paste' });
     }
-    return { ...pasted, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: pasted.frameId }) };
+    const nodes = await Promise.all(pasted.frameIds.map((nodeId) => findNode(scope.db, { orgId: scope.orgId, nodeId })));
+    return { outcome: pasted.outcome, nodes: nodes.filter((n) => n !== null), undo: pasted.undo, skipped: pasted.skipped, fills: pasted.fills, fileKey: pasted.fileKey };
   },
 
   placeOutput: async ({ request, params, locals, setHeaders }) => {
@@ -1458,6 +1460,52 @@ export const actions: Actions<CanvasParams> = {
     });
 
     return out;
+  },
+
+  saveCanvasVersion: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    return { version: await saveCanvasVersion(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, name: String(fd.get('name') ?? ''), actor: userActor(scope) }) };
+  },
+
+  canvasVersions: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    return { versions: await listCanvasVersions(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
+  },
+
+  restoreCanvasVersion: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const out = await restoreCanvasVersion(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, versionId: String(fd.get('version_id') ?? ''), actor: userActor(scope) });
+    return out.outcome === RestoreOutcome.Restored ? out : fail(404, { error: out.outcome });
+  },
+
+  canvasComments: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    return { threads: await listComments(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
+  },
+
+  addComment: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const out = await addComment(scope.db, {
+      orgId: scope.orgId,
+      canvasId: scope.canvasId,
+      actor: userActor(scope),
+      body: String(fd.get('body') ?? ''),
+      nodeId: fd.get('node_id') ? String(fd.get('node_id')) : null,
+      parentId: fd.get('parent_id') ? String(fd.get('parent_id')) : null,
+      x: Number(fd.get('x') ?? 0),
+      y: Number(fd.get('y') ?? 0)
+    });
+    return out.outcome === CommentOutcome.Added ? out : fail(out.outcome === CommentOutcome.Missing ? 404 : 400, { error: out.outcome });
+  },
+
+  resolveComment: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const outcome = await resolveThread(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, commentId: String(fd.get('comment_id') ?? ''), resolved: fd.get('resolved') === '1' });
+    return outcome === CommentOutcome.Added ? { outcome } : fail(404, { error: outcome });
   },
 
   paste: async ({ request, params, locals }) => {

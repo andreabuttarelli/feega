@@ -4,6 +4,8 @@ import { TransitionKind } from './design';
 import type { Keyframes } from './keyframes';
 import { withoutHidden } from './organize';
 import { addClip, type OpResult } from './timeline';
+import { BooleanOp } from './shape/boolean-op';
+import { combineShapes } from './shape/boolean';
 import { RING_LAYOUT, ringCards, ringRadiusPx, ringSliceId, slicesFor } from './ring/model';
 import { BENTO_LAYOUT, bentoCellId, heldCell, type BentoCard } from './bento/model';
 import { facesOf, screenCompOf, screenHostId } from './device-screen';
@@ -159,9 +161,21 @@ export function overridden(tracks: MotionTrack[], host: MotionClip): MotionTrack
 
 type Expander = (doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number) => MotionTrack[];
 
+const BOOLEAN_FRAME = 0;
+const BOOLEAN_OPS: ReadonlySet<string> = new Set(Object.values(BooleanOp));
+
+function combinedInside(doc: MotionDoc, tracks: MotionTrack[], op: unknown): MotionTrack[] {
+  if (typeof op !== 'string' || !BOOLEAN_OPS.has(op)) {
+    return tracks;
+  }
+  const shapes = tracks.flatMap((t) => (t.clips as MotionClip[]).filter((c) => c.component === 'Shape').map((c) => c.id));
+  const done = combineShapes({ ...doc, tracks }, shapes, op as BooleanOp, BOOLEAN_FRAME);
+  return done.ok ? done.doc.tracks : tracks;
+}
+
 function precompTracks(doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number): MotionTrack[] {
   const comp = doc.comps[compOf(host)!];
-  const inner = expand(doc, withoutHidden({ ...doc, tracks: overridden(comp.tracks, host) }).tracks, depth + 1);
+  const inner = combinedInside(doc, expand(doc, withoutHidden({ ...doc, tracks: overridden(comp.tracks, host) }).tracks, depth + 1), host.props.boolean);
   const laid = placed(host, comp, inner);
   const group: MotionClip = { ...host, props: { ...host.props, span: laid.length } };
   return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...laid];

@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { cardOverElements, elementsOnly } from '../../../../tests/fixtures/figma/elements';
+import { FrameKind } from '$lib/canvas/motion-node';
 import { parseMotionDoc, type MotionClip } from '$lib/motion/doc';
-import { figmaFrameDoc } from './figma-doc';
+import { figmaPlan, planOf } from './figma-doc';
+import { Destination } from './scene';
 
 const clip = readFileSync(new URL('../../../../tests/fixtures/figma/clip-1.html', import.meta.url), 'utf8');
 
@@ -11,32 +14,95 @@ const newId = () => `id${++n}`;
 const clipsOf = (doc: { tracks: { clips: unknown[] }[]; comps: Record<string, { tracks: { clips: unknown[] }[] }> }): MotionClip[] =>
   [...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips as MotionClip[]);
 
-describe('a Figma paste as a frame', () => {
+describe('a Figma paste of one frame', () => {
   it('builds a valid frame doc the size of the copied frame', () => {
-    const made = figmaFrameDoc(clip, newId);
-    expect(made).not.toBeNull();
-    expect(parseMotionDoc(made!.doc).ok).toBe(true);
-    expect(made!.box).toEqual({ width: 1920, height: 1080 });
-    expect(made!.name).toBe('Cover');
+    const plan = figmaPlan(clip, newId)!;
+    const [item] = plan.items;
+    expect(plan.items).toHaveLength(1);
+    expect(item.destination).toBe(Destination.Frame);
+    expect(parseMotionDoc(item.doc).ok).toBe(true);
+    expect(item.size).toEqual({ width: 1920, height: 1080 });
+    expect(item.name).toBe('Cover');
   });
 
   it('lands the text as an editable Text clip in Archivo bold', () => {
-    const doc = figmaFrameDoc(clip, newId)!.doc;
+    const doc = figmaPlan(clip, newId)!.items[0].doc;
     const text = clipsOf(doc).find((c) => c.component === 'Text');
     expect(text?.props).toMatchObject({ text: 'dal \nnulla', font: 'Archivo', weight: 700, color: '#ffffff', letterSpacing: '-7%', lineHeight: '83%' });
     expect(doc.fonts.map((f) => f.family)).toContain('Archivo');
   });
 
   it('lands the ghost as three even-odd vector shapes grouped, over a black background', () => {
-    const clips = clipsOf(figmaFrameDoc(clip, newId)!.doc);
+    const clips = clipsOf(figmaPlan(clip, newId)!.items[0].doc);
     const shapes = clips.filter((c) => c.component === 'Shape');
-    expect(shapes.filter((s) => s.props.fill === '#fd5e29' && s.props.fillRule === 'evenodd')).toHaveLength(3);
-    expect(shapes.some((s) => s.props.fill === '#000000')).toBe(true);
+    const fill = (c: MotionClip) => (c.props.fills as { color?: string }[])[0]?.color;
+    expect(shapes.filter((s) => fill(s) === '#fd5e29' && s.props.fillRule === 'evenodd')).toHaveLength(3);
+    expect(shapes.some((s) => fill(s) === '#000000')).toBe(true);
     expect(clips.some((c) => c.component === 'Precomp')).toBe(true);
   });
 
   it('returns null for html without Figma data', () => {
-    expect(figmaFrameDoc('<p>x</p>', newId)).toBeNull();
+    expect(figmaPlan('<p>x</p>', newId)).toBeNull();
   });
 });
 
+describe('a Figma paste of elements only', () => {
+  const plan = planOf(elementsOnly(), newId)!;
+
+  it('makes one free element per top-level node and no frame', () => {
+    expect(plan.items.map((i) => [i.destination, i.kind])).toEqual([
+      [Destination.Free, FrameKind.Element],
+      [Destination.Free, FrameKind.Element],
+      [Destination.Free, FrameKind.Element],
+      [Destination.Free, FrameKind.Group]
+    ]);
+    expect(plan.items.every((i) => parseMotionDoc(i.doc).ok)).toBe(true);
+  });
+
+  it('every free element is one clip on a transparent doc', () => {
+    for (const item of plan.items) {
+      expect(item.doc.tracks.flatMap((t) => t.clips)).toHaveLength(1);
+      expect(item.doc.background).toBe('transparent');
+    }
+  });
+
+  it('keeps both fills and both strokes of the rectangle', () => {
+    const shape = plan.items[0].doc.tracks.flatMap((t) => t.clips)[0] as MotionClip;
+    expect((shape.props.fills as unknown[]).length).toBe(2);
+    expect((shape.props.strokes as unknown[]).length).toBe(2);
+  });
+
+  it('applies the rotation of the text', () => {
+    const text = plan.items[2].doc.tracks.flatMap((t) => t.clips)[0] as MotionClip;
+    expect(text.props.rotation).toBe(-90);
+  });
+
+  it('keeps the group as one group clip with its two rectangles inside', () => {
+    const doc = plan.items[3].doc;
+    expect(clipsOf(doc).filter((c) => c.component === 'Shape')).toHaveLength(2);
+  });
+});
+
+describe('a Figma frame with auto layout', () => {
+  const plan = planOf(cardOverElements(), newId)!;
+  const card = plan.items.find((i) => i.destination === Destination.Frame)!;
+  const clips = clipsOf(card.doc);
+
+  it('becomes an auto layout container holding its children', () => {
+    const container = clips.find((c) => c.autoLayout);
+    expect(container?.autoLayout).toMatchObject({ direction: 'horizontal', justify: 'space-between', align: 'center' });
+    expect(clips.filter((c) => c.parent === container?.id)).toHaveLength(2);
+  });
+
+  it('carries the padding and the gap in doc pixels', () => {
+    const layout = clips.find((c) => c.autoLayout)!.autoLayout!;
+    const scale = card.doc.width / card.size.width;
+    expect(layout.gap).toBeCloseTo(16 * scale, 1);
+    expect(layout.padding.left).toBeCloseTo(20 * scale, 1);
+  });
+
+  it('lets the growing child fill the main axis and hugs the text', () => {
+    const text = clips.find((c) => c.component === 'Text')!;
+    expect(text.layoutItem).toMatchObject({ width: 'fill', height: 'hug' });
+  });
+});

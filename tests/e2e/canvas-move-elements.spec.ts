@@ -97,13 +97,12 @@ test.describe('moving elements between frames @real', () => {
     await dragTo(page, from, { x: viewport.width - 120, y: viewport.height - 120 });
 
     await expect.poll(async () => clipIds(await head(admin, a)), { timeout: 10_000 }).toEqual([]);
-    const { data: frames } = await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null).neq('id', a);
+    const { data: frames } = await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).eq('type', 'element').is('deleted_at', null).neq('id', a);
     expect(frames).toHaveLength(1);
     expect(clipIds(await head(admin, frames![0].id))).toEqual(['Text:txt']);
 
     const made = (await head(admin, frames![0].id)) as Doc & { width: number; height: number; background: string };
     const { data: node } = await admin.from('nodes').select('width, height, data').eq('id', frames![0].id).single();
-    expect((node!.data as { kind?: string }).kind).toBe('element');
     expect(made.background).toBe('transparent');
     expect(Math.abs(Number(node!.width) - (STAGE_W * seen.width) / stage.width), 'as wide as it was in its frame').toBeLessThanOrEqual(8);
     expect(Math.abs(Number(node!.height) - (Number(node!.width) * made.height) / made.width), 'the node is the shape of the element, no bar').toBeLessThanOrEqual(1);
@@ -183,8 +182,8 @@ test.describe('moving elements between frames @real', () => {
     const viewport = page.viewportSize()!;
     await page.getByTestId('drag-to-frame').dragTo(page.locator('.svelte-flow__pane'), { targetPosition: { x: viewport.width / 2, y: 120 } });
 
-    const made = async () => (await admin.from('nodes').select('id, data').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null)).data ?? [];
-    await expect.poll(async () => (await made()).map((n) => (n.data as { kind?: string }).kind), { timeout: 10_000 }).toEqual(['element']);
+    const made = async () => (await admin.from('nodes').select('id, data').eq('canvas_id', session.canvasId).eq('type', 'element').is('deleted_at', null)).data ?? [];
+    await expect.poll(async () => (await made()).length, { timeout: 10_000 }).toBe(1);
     await expect.poll(async () => clipIds(await head(admin, (await made())[0].id)), { timeout: 10_000 }).toEqual([expect.stringMatching(/^Image:/)]);
   });
 });

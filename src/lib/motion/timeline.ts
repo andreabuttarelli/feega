@@ -217,6 +217,10 @@ export function removeClips(doc: MotionDoc, ids: readonly string[]): OpResult {
 }
 
 export function setProps(doc: MotionDoc, clipId: string, patch: Record<string, unknown>): OpResult {
+  const bound = Object.keys(patch).find((key) => findClip(doc, clipId)?.clip.bind?.[key]);
+  if (bound) {
+    return fail(`${bound} is bound to ${findClip(doc, clipId)?.clip.bind?.[bound]}: unbind it first`);
+  }
   const edited = propsEdited(doc, clipId, patch);
   const clip = edited.ok ? findClip(edited.doc, clipId)?.clip : undefined;
   return edited.ok && clip ? { ok: true, doc: drivenVars(edited.doc, [clip]) } : edited;

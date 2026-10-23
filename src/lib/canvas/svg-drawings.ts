@@ -31,7 +31,7 @@ export function svgDrawings(svg: string, at: Point): SvgDrawing[] {
     if (!moved) {
       return [];
     }
-    const wire: DrawnWire = { tool: DrawTool.Pen, path: moved.path, fill: shape.fill, stroke: shape.stroke, ...(shape.gradient ? { gradient: shape.gradient } : {}) };
+    const wire: DrawnWire = { tool: DrawTool.Pen, path: moved.path, fill: shape.fill, stroke: shape.stroke, fillRule: shape.fillRule, ...(shape.gradient ? { gradient: shape.gradient } : {}) };
     return [{ wire, box: moved.box }];
   });
   const texts = read.texts.slice(0, MAX_PASTED_TEXTS).map((text): SvgDrawing => {

@@ -110,9 +110,9 @@ describe('rich text on the GPU path', () => {
     expect(painted.some((i) => i.paint.kind === PaintKind.Radial)).toBe(true);
   });
 
-  it('an angular gradient run paints wedges clipped to the range', () => {
+  it('an angular gradient run paints one sweep over the range', () => {
     const painted = inks(paintText(env({ text: 'abcd', runs: [{ start: 0, end: 2, fill: fillOf('angular-gradient', { angle: 0, center: { x: 0.5, y: 0.5 } }) }] }, book)));
-    expect(painted.filter((i) => i.paint.kind === PaintKind.Linear).length).toBeGreaterThan(1);
+    expect(painted.filter((i) => i.paint.kind === PaintKind.Sweep)).toHaveLength(1);
   });
 
   it('two ranges with the same gradient each get their own span', () => {

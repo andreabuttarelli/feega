@@ -9,6 +9,7 @@ export enum FrameOverlay {
   Align = 'align',
   Mask = 'mask',
   Pen = 'pen',
+  ShapeBuilder = 'shape-builder',
   Vector = 'vector',
   AutoLayout = 'auto-layout',
   TextPath = 'text-path',
@@ -44,7 +45,8 @@ export function alignSide(frame: Screen, clear: Clear): AlignSide {
 const POINT_OVERLAY: Record<string, FrameOverlay> = { path: FrameOverlay.Pen, vector: FrameOverlay.Vector };
 
 const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
-  [FrameOverlay.Draw]: (c) => c.tool !== DrawTool.Select,
+  [FrameOverlay.Draw]: (c) => c.tool !== DrawTool.Select && c.tool !== DrawTool.ShapeBuilder,
+  [FrameOverlay.ShapeBuilder]: (c) => c.tool === DrawTool.ShapeBuilder && c.picks >= MIN_ALIGNED,
   [FrameOverlay.Guides]: (c) => Boolean(c.doc.layoutGuides?.length) && shows(c.views, FrameView.Guides),
   [FrameOverlay.Align]: (c) => c.picks >= MIN_ALIGNED,
   [FrameOverlay.Mask]: (c) => Boolean(c.clip?.mask) && c.active,

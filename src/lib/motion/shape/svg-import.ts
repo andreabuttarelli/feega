@@ -4,7 +4,7 @@ type Matrix = [a: number, b: number, c: number, d: number, e: number, f: number]
 type Pt = [number, number];
 type Segment = { cmd: 'M' | 'L' | 'C' | 'Z'; pts: Pt[] };
 type Attrs = Record<string, string>;
-type Paint = { fill: string | null; stroke: string | null };
+type Paint = { fill: string | null; stroke: string | null; fillRule: SvgFillRule };
 
 type Box = { left: number; top: number; right: number; bottom: number };
 type Stop = { color: string; pos: number };
@@ -12,12 +12,19 @@ type GradientDef = { kind: FillType.Linear | FillType.Radial; attrs: Attrs; stop
 
 export type SvgGradient =
   | { type: FillType.Linear; stops: Stop[]; angle: number }
-  | { type: FillType.Radial; stops: Stop[]; center: { x: number; y: number }; radius: number };
-export type SvgShape = { path: string; fill: string | null; stroke: string | null; gradient?: SvgGradient };
+  | { type: FillType.Radial; stops: Stop[]; center: { x: number; y: number }; radius: number }
+  | { type: FillType.Angular; stops: Stop[]; angle: number; center: { x: number; y: number } }
+  | { type: FillType.Diamond; stops: Stop[] };
+export type SvgFillRule = 'nonzero' | 'evenodd';
+export type SvgShape = { path: string; fill: string | null; stroke: string | null; fillRule: SvgFillRule; gradient?: SvgGradient };
 export type SvgTextAnchor = 'start' | 'middle' | 'end';
 export type SvgText = { text: string; x: number; y: number; size: number; fill: string; weight: number; anchor: SvgTextAnchor };
 export type SvgRead = { size: { width: number; height: number }; shapes: SvgShape[]; texts: SvgText[] };
 
+const FILL_RULES = new Map<string, SvgFillRule>([
+  ['nonzero', 'nonzero'],
+  ['evenodd', 'evenodd']
+]);
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 const DEFAULT_SIDE = 100;
 const DIGITS = 1000;
@@ -41,6 +48,11 @@ const MAX_RADIUS = 4;
 const ANGLE_DIGITS = 100;
 const CSS_ANGLE_OFFSET = 90;
 const USER_SPACE = 'userspaceonuse';
+const FIGMA_GRADIENT = 'data-figma-gradient-fill';
+const CONIC_FROM = /conic-gradient\(\s*from\s+(-?[\d.]+)deg/i;
+const CHANNEL = 255;
+const FULL_TURN = 360;
+const MIDDLE = 0.5;
 const GRADIENT = /<(linearGradient|radialGradient)\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/\1\s*>/gi;
 const STOP = /<stop\b((?:[^>"']|"[^"]*"|'[^']*')*?)\/?>/gi;
 const CLIP = /<clipPath\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/clipPath\s*>/gi;
@@ -378,7 +390,8 @@ function rootOf(a: Attrs): { size: SvgRead['size']; matrix: Matrix } {
 function paintOf(a: Attrs, inherited: Paint): Paint {
   const fill = colour(a.fill);
   const stroke = colour(a.stroke);
-  return { fill: fill === undefined ? inherited.fill : fill, stroke: stroke === undefined ? inherited.stroke : stroke };
+  const fillRule = FILL_RULES.get(a['fill-rule']?.trim().toLowerCase() ?? '') ?? inherited.fillRule;
+  return { fill: fill === undefined ? inherited.fill : fill, stroke: stroke === undefined ? inherited.stroke : stroke, fillRule };
 }
 
 const fraction = (raw: string | undefined, fallback: number) => (raw === undefined ? fallback : raw.includes('%') ? num(raw) / 100 : num(raw, fallback));
@@ -425,6 +438,43 @@ function gradientOf(def: GradientDef, bounds: Box): SvgGradient {
 }
 
 const refOf = (paint: string | null | undefined) => paint?.match(URL_REF)?.[1];
+
+type Conic = { from: number; matrix: Matrix };
+type FigmaPaint = { type?: string; stops?: { color: { r: number; g: number; b: number }; position: number }[] };
+
+const turned = (degrees: number) => Math.round((((degrees % FULL_TURN) + FULL_TURN) % FULL_TURN) * ANGLE_DIGITS) / ANGLE_DIGITS;
+
+function angularOf(stops: Stop[], conic: Conic | null, bounds: Box): SvgGradient {
+  if (!conic) {
+    return { type: FillType.Angular, stops, angle: 0, center: { x: MIDDLE, y: MIDDLE } };
+  }
+  const [cx, cy] = apply(conic.matrix, [0, 0]);
+  const centre = { x: clamp(unit(cx - bounds.left, bounds.right - bounds.left), 0, 1), y: clamp(unit(cy - bounds.top, bounds.bottom - bounds.top), 0, 1) };
+  const spin = (Math.atan2(conic.matrix[1], conic.matrix[0]) * 180) / Math.PI;
+  return { type: FillType.Angular, stops, angle: turned(conic.from + spin), center: centre };
+}
+
+const FIGMA_GRADIENTS: Record<string, (stops: Stop[], conic: Conic | null, bounds: Box) => SvgGradient> = {
+  GRADIENT_ANGULAR: angularOf,
+  GRADIENT_DIAMOND: (stops) => ({ type: FillType.Diamond, stops })
+};
+
+function figmaGradient(raw: string, conic: Conic | null, bounds: Box): SvgGradient | null {
+  let paint: FigmaPaint;
+  try {
+    paint = JSON.parse(decoded(raw));
+  } catch {
+    return null;
+  }
+  const make = FIGMA_GRADIENTS[paint.type ?? ''];
+  const stops = (paint.stops ?? []).slice(0, MAX_STOPS).map((st) => ({ color: `#${hex2(st.color.r * CHANNEL)}${hex2(st.color.g * CHANNEL)}${hex2(st.color.b * CHANNEL)}`, pos: clamp(st.position, 0, 1) }));
+  return make && stops.length > 1 ? make(stops, conic, bounds) : null;
+}
+
+const conicOf = (background: string | undefined, matrix: Matrix): Conic | null => {
+  const from = background?.match(CONIC_FROM)?.[1];
+  return from === undefined ? null : { from: Number(from), matrix };
+};
 
 function clipsOf(svg: string): Map<string, Box> {
   const found = new Map<string, Box>();
@@ -505,7 +555,7 @@ function textAt(svg: string, o: TextOrigin): SvgText | null {
 
 type Frame = { tag: string; matrix: Matrix; paint: Paint; clip: Box | null };
 
-const ROOT_FRAME: Frame = { tag: '', matrix: IDENTITY, paint: { fill: NAMED.black, stroke: null }, clip: null };
+const ROOT_FRAME: Frame = { tag: '', matrix: IDENTITY, paint: { fill: NAMED.black, stroke: null, fillRule: 'nonzero' }, clip: null };
 
 export function svgShapes(svg: string): SvgRead {
   const shapes: SvgShape[] = [];
@@ -516,6 +566,7 @@ export function svgShapes(svg: string): SvgRead {
   const stack: Frame[] = [];
   let size = empty.size;
   let hidden = 0;
+  let conic: Conic | null = null;
 
   const solid = (paint: string): string => {
     const ref = refOf(paint);
@@ -555,6 +606,7 @@ export function svgShapes(svg: string): SvgRead {
       size = root.size;
     }
     const matrix = multiply(multiply(parent.matrix, root?.matrix ?? IDENTITY), transformOf(a.transform));
+    conic = conicOf(a.background, matrix) ?? conic;
     const paint = paintOf(a, parent.paint);
     const clipBox = clips.get(refOf(a['clip-path']) ?? '');
     const own = clipBox ? movedBox(clipBox, matrix) : null;
@@ -568,12 +620,16 @@ export function svgShapes(svg: string): SvgRead {
       const kept = clip ? clippedTo(world, clip) : world;
       const ref = refOf(fill);
       const def = ref ? gradients.get(ref) : undefined;
+      const figma = a[FIGMA_GRADIENT] ? figmaGradient(a[FIGMA_GRADIENT], conic, boundsOfSegments(world)) : null;
+      const gradient = figma ?? (def ? gradientOf(def, boundsOfSegments(local)) : null);
+      conic = null;
       if (kept) {
         shapes.push({
           path: placed(kept, IDENTITY),
-          fill: fill === null ? null : solid(fill),
+          fill: figma ? figma.stops[0].color : fill === null ? null : solid(fill),
           stroke: paint.stroke === null ? null : solid(paint.stroke),
-          ...(def ? { gradient: gradientOf(def, boundsOfSegments(local)) } : {})
+          fillRule: paint.fillRule,
+          ...(gradient ? { gradient } : {})
         });
       }
     }

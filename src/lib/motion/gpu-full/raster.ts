@@ -68,6 +68,12 @@ void main() {
     c = ramp(dot(local - u_a, d) / max(dot(d, d), 1e-6));
   } else if (u_kind == 2) {
     c = ramp(length(local - u_a) / max(u_radius, 1e-6));
+  } else if (u_kind == 3) {
+    vec2 d = local - u_a;
+    c = ramp(fract((atan(d.y, d.x) - u_radius) / 6.283185307));
+  } else if (u_kind == 4) {
+    vec2 d = abs(local - u_a) / max(u_b, vec2(1e-6));
+    c = ramp(d.x + d.y);
   }
   float a = c.a * u_opacity * covered();
   outColor = vec4(c.rgb * a, a);
@@ -147,7 +153,7 @@ const RAMP_PAINT: Record<RampKind, Paint> = {
   [RampKind.Radial]: { kind: PaintKind.Radial, center: [0.5, 0.5], radius: 0.5, stops: [{ at: 0, color: WHITE }, { at: 1, color: CLEAR }] }
 };
 
-const PAINT_KIND: Record<PaintKind, number> = { [PaintKind.Solid]: 0, [PaintKind.Linear]: 1, [PaintKind.Radial]: 2 };
+const PAINT_KIND: Record<PaintKind, number> = { [PaintKind.Solid]: 0, [PaintKind.Linear]: 1, [PaintKind.Radial]: 2, [PaintKind.Sweep]: 3, [PaintKind.Diamond]: 4 };
 
 type Target = { fbo: WebGLFramebuffer; resolve: WebGLFramebuffer; texture: WebGLTexture; buffers: WebGLRenderbuffer[] };
 
@@ -252,8 +258,14 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
       return;
     }
     gl.uniform2fv(u(pathProgram, 'u_a'), paint.center);
-    gl.uniform1f(u(pathProgram, 'u_radius'), paint.radius);
+    GEOMETRY[paint.kind](paint as never);
   }
+
+  const GEOMETRY: { [K in Exclude<PaintKind, PaintKind.Solid | PaintKind.Linear>]: (paint: Extract<Paint, { kind: K }>) => void } = {
+    [PaintKind.Radial]: (paint) => gl.uniform1f(u(pathProgram, 'u_radius'), paint.radius),
+    [PaintKind.Sweep]: (paint) => gl.uniform1f(u(pathProgram, 'u_radius'), paint.start),
+    [PaintKind.Diamond]: (paint) => gl.uniform2fv(u(pathProgram, 'u_b'), paint.half)
+  };
 
   function fan(contours: number[][]) {
     for (const contour of contours) {
@@ -561,7 +573,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
       scissored(item, () => behind(item, item.backdrop!, pictures));
     }
     intoLayer(() => drawItem(item, 1, pictures));
-    const filtered = item.filters ? filters.apply(layer.texture, item.filters, item.space ?? [1, 0, 0, 1]) : layer.texture;
+    const filtered = item.filters ? filters.apply(layer.texture, item.filters, item.space ?? [1, 0, 0, 1], item.origin ?? [0, 0]) : layer.texture;
     const src = blurredFrom(item, filtered);
     scissored(item, () => composite(item, src, mask));
   }
@@ -628,7 +640,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     depth--;
     dest = outer;
     const mask = item.masks || item.matte ? maskOf(item, pictures) : null;
-    const filtered = item.filters ? filters.apply(group.texture, item.filters, item.space ?? [1, 0, 0, 1]) : group.texture;
+    const filtered = item.filters ? filters.apply(group.texture, item.filters, item.space ?? [1, 0, 0, 1], item.origin ?? [0, 0]) : group.texture;
     const src = blurredFrom(item, filtered);
     scissored(item, () => composite(item, src, mask));
   }

@@ -47,7 +47,7 @@ describe('creating an element by drawing inside a frame', () => {
   it('in a video it starts at the playhead; in a still it spans the whole frame', () => {
     const atPlayhead = findClip(ok(drawClip(video(), DrawTool.Rectangle, BOX, 120, 'r1')), 'r1')!.clip;
     expect(atPlayhead.from).toBe(120);
-    expect(atPlayhead.from + atPlayhead.durationInFrames).toBeLessThanOrEqual(300);
+    expect(atPlayhead.from + atPlayhead.durationInFrames).toBe(300);
 
     const doc = still();
     const onStill = findClip(ok(drawClip(doc, DrawTool.Rectangle, BOX, 40, 'r1')), 'r1')!.clip;

@@ -3,8 +3,8 @@ import { FRAME_DIALOG_ACTIONS, FrameDialog, type FrameDialogActionId } from './f
 import { SELECTION_ACTIONS, isCanvasAction, shownFor } from './selection-actions';
 import { SELECTION_ACTION_ICON } from './selection-action-icons';
 
-const frame = { data: { format: '16:9' } };
-const image = { data: {} };
+const frame = { type: 'motion', data: { format: '16:9' } };
+const image = { type: 'image', data: {} };
 const ids = Object.keys(FRAME_DIALOG_ACTIONS) as FrameDialogActionId[];
 
 describe('frame dialog entry points', () => {
