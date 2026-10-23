@@ -1,10 +1,11 @@
 import { CanvasMode } from '../canvas-mode';
 import type { Point } from './camera';
-import { Corner, type Box } from './geometry';
+import { Corner, ROTATE_REACH_PX, type Box } from './geometry';
 
 export enum HitKind {
   Port = 'port',
   Corner = 'corner',
+  Rotate = 'rotate',
   Node = 'node',
   Edge = 'edge',
   Empty = 'empty'
@@ -13,6 +14,7 @@ export enum HitKind {
 export type Hit =
   | { kind: HitKind.Port; nodeId: string; handle: string | null }
   | { kind: HitKind.Corner; nodeId: string; unit: [number, number] }
+  | { kind: HitKind.Rotate; nodeId: string; unit: [number, number] }
   | { kind: HitKind.Node; nodeId: string }
   | { kind: HitKind.Edge; edgeId: string }
   | { kind: HitKind.Empty };
@@ -21,6 +23,7 @@ export enum GestureKind {
   Pan = 'pan',
   Drag = 'drag',
   Resize = 'resize',
+  Rotate = 'rotate',
   Marquee = 'marquee',
   Connect = 'connect',
   PickEdge = 'pick-edge'
@@ -39,6 +42,7 @@ const PAN_BUTTONS = new Set([1, 2]);
 const ON_HIT: Record<HitKind, (p: Press) => GestureKind> = {
   [HitKind.Port]: () => GestureKind.Connect,
   [HitKind.Corner]: () => GestureKind.Resize,
+  [HitKind.Rotate]: () => GestureKind.Rotate,
   [HitKind.Node]: () => GestureKind.Drag,
   [HitKind.Edge]: () => GestureKind.PickEdge,
   [HitKind.Empty]: (p) => (p.pointer === Pointer.Touch ? GestureKind.Pan : GestureKind.Marquee)
@@ -104,6 +108,16 @@ export function resizedAt(b: Box, unit: Unit, d: Point, min: { w: number; h: num
   const cx = b.x + b.w / 2 + anchor.x - moved.x;
   const cy = b.y + b.h / 2 + anchor.y - moved.y;
   return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
+export function rotateZoneAt(b: Box, rotation: number, p: Point, zoom: number): Unit | null {
+  const local = turned({ x: p.x - (b.x + b.w / 2), y: p.y - (b.y + b.h / 2) }, -rotation);
+  const beyondX = Math.abs(local.x) - b.w / 2;
+  const beyondY = Math.abs(local.y) - b.h / 2;
+  if (beyondX < 0 || beyondY < 0 || Math.hypot(beyondX, beyondY) > ROTATE_REACH_PX / zoom) {
+    return null;
+  }
+  return [Math.sign(local.x), Math.sign(local.y)];
 }
 
 export const resized = (b: Box, corner: Corner, d: Point, min: { w: number; h: number }): Box => resizedAt(b, CORNER_UNIT[corner], d, min, STILL, 0);

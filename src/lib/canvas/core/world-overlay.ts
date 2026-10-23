@@ -2,7 +2,7 @@ import { mul2d } from '$lib/motion/affine';
 import type { PathItem } from '$lib/motion/gpu-full/display-list';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
-import { EdgeLook, edgeItems, ghostItems, guideItems, hoverItems, marqueeItems, runningItems, peerItems, rotateItems, type CorePeer, type CoreTheme } from './overlay';
+import { EdgeLook, edgeItems, ghostItems, guideItems, hoverItems, marqueeItems, runningItems, peerItems, type CorePeer, type CoreTheme } from './overlay';
 import { stateChrome, tileChrome, type Glyphs, type StateTile } from './chrome';
 import { turned, type Turn } from './screen-uses';
 import { line, rect, solid } from './shapes';
@@ -15,7 +15,7 @@ export type PeerOutline = { key: string; box: Box; color: string };
 
 export type Wire = { id: string; source: string; target: string; mode?: string };
 
-export type WorldOverlay = { curves: readonly { edge: Wire; curve: Curve }[]; selected: readonly string[]; selectedEdge: string | null; marquee: Box | null; guides: readonly SnapGuide[]; zoom: number; theme: CoreTheme; glyphs: Glyphs; peers: readonly CorePeer[]; outlines: readonly PeerOutline[]; rotate: readonly { id: string; box: Box }[]; ghost: { curve: Curve; ok: boolean } | null; hovered: Box | null; running: readonly (Box & { id: string })[]; chrome: readonly ChromeOnCanvas[] };
+export type WorldOverlay = { curves: readonly { edge: Wire; curve: Curve }[]; selected: readonly string[]; selectedEdge: string | null; marquee: Box | null; guides: readonly SnapGuide[]; zoom: number; theme: CoreTheme; glyphs: Glyphs; peers: readonly CorePeer[]; outlines: readonly PeerOutline[]; ghost: { curve: Curve; ok: boolean } | null; hovered: Box | null; running: readonly (Box & { id: string })[]; chrome: readonly ChromeOnCanvas[] };
 
 export enum ChromeLayers {
   State = 'state',
@@ -46,7 +46,6 @@ export function overlayOf(o: WorldOverlay): PathItem[] {
     ...guideItems(o.guides, o.zoom, o.theme),
     ...o.outlines.map((p) => solid(`${p.key}:${PEER_OUTLINE}`, line(rect(p.box.x, p.box.y, p.box.w, p.box.h), PEER_OUTLINE_PX / o.zoom, true), p.color)),
     ...o.peers.flatMap((p) => peerItems(p, o.zoom, o.glyphs)),
-    ...o.rotate.flatMap((r) => rotateItems(r.id, r.box, o.theme)),
     ...(o.ghost ? ghostItems(o.ghost.curve, o.ghost.ok, o.zoom, o.theme) : [])
   ];
 }

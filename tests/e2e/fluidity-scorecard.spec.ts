@@ -11,6 +11,7 @@ import { recordsVideo, scorecard, verdictOf, type SessionRun, type StepResult } 
 
 const PROFILE = process.env.FLUID_PROFILE;
 const VIDEO = process.env.FLUID_VIDEO !== 'off';
+const ROTATE_OUTSIDE_PX = 10;
 const ONLY = process.env.FLUID_STEPS ? new RegExp(process.env.FLUID_STEPS) : null;
 const OUT = process.env.FLUID_OUT ?? join(homedir(), 'Documents', 'feega-videos', 'fluidity');
 const SLUG = process.env.FLUID_PROJECT_SLUG ?? 'gpu-fixture-0aef6d1a';
@@ -485,10 +486,7 @@ const STEPS: Step[] = [
       await selectOnly(page, group);
       const g = await boxOf(page, group);
       await watch([boxWatch(group, 'group')]);
-      const handle = page.getByTestId('rotate-handle').first();
-      await expect(handle).toBeVisible({ timeout: 5000 });
-      const h = (await handle.boundingBox())!;
-      await drag(page, centre(h), { x: g.x + g.width + 80, y: g.y + g.height / 2 }, 10);
+      await drag(page, { x: g.x + g.width + ROTATE_OUTSIDE_PX, y: g.y + g.height + ROTATE_OUTSIDE_PX }, { x: g.x + g.width + 80, y: g.y + g.height / 2 }, 10);
       return { touched: [ids.get('box')!, ids.get('copy')!, group], watches: [boxWatch(group, 'group')] };
     }
   },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Corner } from './geometry';
-import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, resizedAt } from './gesture';
+import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, resizedAt, rotateZoneAt } from './gesture';
 import { CanvasMode } from '../canvas-mode';
 
 const mouse = { pointer: Pointer.Mouse, button: 0, shift: false, space: false, mode: CanvasMode.Edit };
@@ -95,5 +95,39 @@ describe('drag, resize, marquee', () => {
     expect(box).toEqual({ x: 5, y: 5, w: 10, h: 10 });
     expect(marqueePick(tiles, box, [], false)).toEqual(['a']);
     expect(marqueePick(tiles, box, ['b'], true)).toEqual(['b', 'a']);
+  });
+});
+
+describe('rotateZoneAt — the invisible zone just outside a corner', () => {
+  const box = { x: 0, y: 0, w: 100, h: 50 };
+
+  it('finds the corner a point lies beyond', () => {
+    expect(rotateZoneAt(box, 0, { x: 110, y: 60 }, 1)).toEqual([1, 1]);
+    expect(rotateZoneAt(box, 0, { x: -10, y: -10 }, 1)).toEqual([-1, -1]);
+    expect(rotateZoneAt(box, 0, { x: 110, y: -10 }, 1)).toEqual([1, -1]);
+    expect(rotateZoneAt(box, 0, { x: -10, y: 60 }, 1)).toEqual([-1, 1]);
+  });
+
+  it('leaves the inside, the sides and the far field alone', () => {
+    expect(rotateZoneAt(box, 0, { x: 50, y: 25 }, 1)).toBeNull();
+    expect(rotateZoneAt(box, 0, { x: 110, y: 25 }, 1)).toBeNull();
+    expect(rotateZoneAt(box, 0, { x: 150, y: 100 }, 1)).toBeNull();
+  });
+
+  it('keeps its size on screen at any zoom', () => {
+    expect(rotateZoneAt(box, 0, { x: 110, y: 60 }, 2)).toBeNull();
+    expect(rotateZoneAt(box, 0, { x: 105, y: 55 }, 2)).toEqual([1, 1]);
+    expect(rotateZoneAt(box, 0, { x: 130, y: 80 }, 0.5)).toEqual([1, 1]);
+  });
+
+  it('turns with the object about its centre', () => {
+    expect(rotateZoneAt(box, 90, { x: 85, y: -35 }, 1)).toEqual([-1, -1]);
+    expect(rotateZoneAt(box, 90, { x: 110, y: 60 }, 1)).toBeNull();
+  });
+});
+
+describe('gestureFor — rotate', () => {
+  it('a press in a rotate zone starts a rotation', () => {
+    expect(gestureFor({ kind: HitKind.Rotate, nodeId: 'a', unit: [1, 1] }, mouse)).toBe(GestureKind.Rotate);
   });
 });

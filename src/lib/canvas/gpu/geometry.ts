@@ -35,6 +35,7 @@ const PORT_HIT_PX = 10;
 export const PORT_SIZE = 10;
 export const PORT_OFFSET = PORT_SIZE / 2;
 const CORNER_HIT_PX = 8;
+export const ROTATE_REACH_PX = 22;
 const EDGE_HIT_PX = 6;
 const CURVATURE = 0.25;
 const CURVE_SAMPLES = 24;
