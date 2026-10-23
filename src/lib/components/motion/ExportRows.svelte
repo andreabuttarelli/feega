@@ -2,7 +2,7 @@
   import { attachmentUrl } from '$lib/motion/still-model';
   import { EXPORT_PRESETS, FILE, FILE_FORMATS, FileFormat, LOSSY, MAX_SCALE, MIN_SCALE, SizeBy, type ExportRow } from '$lib/motion/export-rows';
 
-  type Made = { url: string; name: string; files: string[] };
+  type Made = { url: string; name: string; files: string[]; skipped?: string[] };
 
   let { count, onexport, onclose = null }: { count: number; onexport: (rows: ExportRow[]) => Promise<Made | string>; onclose?: (() => void) | null } = $props();
 
@@ -66,6 +66,7 @@
   {/each}
   <button type="button" class="fx-btn" onclick={() => (rows = [...rows, fresh()])} data-testid="export-add">Add setting</button>
   {#if error}<p class="fx-warn" role="alert">{error}</p>{/if}
+  {#if made?.skipped?.length}<p class="fx-warn" role="status" data-testid="export-skipped">Left out of the vector file: {made.skipped.join('; ')}.</p>{/if}
   {#if made}<a class="fx-btn primary" href={attachmentUrl(made.url, made.name)} download={made.name} data-testid="export-file">Download {made.name}</a>{/if}
   <div class="fx-actions">
     {#if onclose}<button class="fx-btn" type="button" disabled={working} onclick={onclose}>Close</button>{/if}

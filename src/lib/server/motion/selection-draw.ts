@@ -1,8 +1,12 @@
 import { Drawing, FILE, rowSize, type ExportRow } from '$lib/motion/export-rows';
-import { printDocument, svgDocument, type Crop } from '$lib/motion/export-vector';
+import { printDocument, type Crop } from '$lib/motion/export-vector';
+import { boundsOfClips, svgOf } from '$lib/motion/export-svg';
+import type { DisplayList } from '$lib/motion/gpu-full/display-list';
+import { ancestorsOf } from '$lib/motion/parent';
+import type { MotionDoc } from '$lib/motion/doc';
 import { stillSeconds } from '$lib/motion/still';
 import type { ExportPage, ExportPort } from './server-frames';
-import type { DrawTarget } from './selection-export';
+import type { DrawTarget, Drawn } from './selection-export';
 
 type Opened = { page: ExportPage; crop: Crop | null; scale: number };
 
@@ -20,22 +24,41 @@ async function opened<T>(port: ExportPort, compose: (target: DrawTarget) => Prom
   }
 }
 
-const vectorOf = (target: DrawTarget, o: Opened) => o.page.freeze().then((html) => svgDocument(html, target.doc, { scale: o.scale, crop: o.crop ?? undefined }));
+export type VectorPort = (target: DrawTarget) => Promise<{ list: DisplayList; images: ReadonlyMap<string, string> }>;
 
-const sizeOf = (target: DrawTarget, o: Opened) => ({ width: Math.round((o.crop?.width ?? target.doc.width) * o.scale), height: Math.round((o.crop?.height ?? target.doc.height) * o.scale) });
+export type DrawPorts = { port: ExportPort; compose: (target: DrawTarget) => Promise<string>; vector: VectorPort };
 
-const DRAW: Record<Drawing, (port: ExportPort, compose: (t: DrawTarget) => Promise<string>, targets: DrawTarget[], row: ExportRow) => Promise<Buffer>> = {
-  [Drawing.Raster]: (port, compose, [target], row) => opened(port, compose, target, row, (o) => o.page.shot(FILE[row.format].mime, row.quality ?? FILE[row.format].quality, o.crop)),
-  [Drawing.Vector]: async (port, compose, [target], row) => Buffer.from(await opened(port, compose, target, row, (o) => vectorOf(target, o))),
-  [Drawing.Pages]: async (port, compose, targets, row) => {
+type Vectored = { svg: string; skipped: string[]; width: number; height: number };
+
+const clipsUnder = (doc: MotionDoc, elementId: string) => new Set([elementId, ...doc.tracks.flatMap((t) => t.clips.map((c) => c.id)).filter((id) => ancestorsOf(doc, id).includes(elementId))]);
+
+async function vectored(vector: VectorPort, target: DrawTarget, row: ExportRow): Promise<Vectored> {
+  const { list, images } = await vector(target);
+  const { scale } = rowSize(row, target.doc);
+  const crop = target.elementId ? boundsOfClips(list, clipsUnder(target.doc, target.elementId)) : null;
+  const box = crop ?? { left: 0, top: 0, width: target.doc.width, height: target.doc.height };
+  const { svg, skipped } = svgOf(list, { scale, crop: crop ?? undefined, images });
+  return { svg, skipped, width: Math.round(box.width * scale), height: Math.round(box.height * scale) };
+}
+
+const DRAW: Record<Drawing, (ports: DrawPorts, targets: DrawTarget[], row: ExportRow) => Promise<Drawn>> = {
+  [Drawing.Raster]: async ({ port, compose }, [target], row) => ({ bytes: await opened(port, compose, target, row, (o) => o.page.shot(FILE[row.format].mime, row.quality ?? FILE[row.format].quality, o.crop)), skipped: [] }),
+  [Drawing.Vector]: async ({ vector }, [target], row) => {
+    const { svg, skipped } = await vectored(vector, target, row);
+    return { bytes: Buffer.from(svg), skipped };
+  },
+  [Drawing.Pages]: async ({ port, vector }, targets, row) => {
     const pages = [];
+    const skipped = new Set<string>();
     for (const target of targets) {
-      pages.push(await opened(port, compose, target, row, async (o) => ({ html: `<!doctype html><html><body style="margin:0">${await vectorOf(target, o)}</body></html>`, ...sizeOf(target, o) })));
+      const page = await vectored(vector, target, row);
+      page.skipped.forEach((s) => skipped.add(s));
+      pages.push({ html: `<!doctype html><html><body style="margin:0">${page.svg}</body></html>`, width: page.width, height: page.height });
     }
-    return port.print(printDocument(pages));
+    return { bytes: await port.print(printDocument(pages)), skipped: [...skipped] };
   }
 };
 
-export function drawTargets(port: ExportPort, compose: (target: DrawTarget) => Promise<string>, targets: DrawTarget[], row: ExportRow): Promise<Buffer> {
-  return DRAW[FILE[row.format].drawing](port, compose, targets, row);
+export function drawTargets(ports: DrawPorts, targets: DrawTarget[], row: ExportRow): Promise<Drawn> {
+  return DRAW[FILE[row.format].drawing](ports, targets, row);
 }
