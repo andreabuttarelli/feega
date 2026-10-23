@@ -54,4 +54,4 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas 1`] = `"11d8f8bac4a823c4ab13e0225626db1070b3c567338a1d1b5f7a5d8f3f18ee62"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas 2`] = `"346ab677eb2c41217453d63421cc08d7418394aeffabee42032178ac8dcb188d"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas 2`] = `"7051ba07c4372dd95bf61094a6b029ca921915f4b3f54070776df8ca198b4ef2"`;
