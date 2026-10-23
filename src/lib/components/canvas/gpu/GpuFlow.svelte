@@ -156,6 +156,7 @@
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
+  import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, type Hit } from '$lib/canvas/gpu/gesture';
@@ -185,7 +186,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -2057,6 +2058,12 @@
     );
   });
 
+  function placeComment(w: Point) {
+    const id = topNodeAt(w);
+    const tile = id ? byId.get(id) : null;
+    props.onComment?.(commentPlacement(w, tile ? { id: tile.id, x: tile.x, y: tile.y } : null));
+  }
+
   function onDown(e: PointerEvent) {
     glide = null;
     dropHover();
@@ -2072,6 +2079,11 @@
       }
     }
     const w = toWorld(view, p);
+    if (props.commenting && e.button === 0 && e.pointerType !== 'touch') {
+      e.preventDefault();
+      placeComment(w);
+      return;
+    }
     const target = e.target as HTMLElement;
     const hit = boxHit(hitAt(w), target);
     if (hit.kind === HitKind.Node && (extendPick(e, w) || pickElement(e, w))) {
@@ -2628,7 +2640,11 @@
       }
     },
     delete: () => deletePicks() || ((selected.length || selectedEdge) && dropSelection(selected, selectedEdge ? [selectedEdge] : [])),
-    deselect: () => clearSelection(),
+    comment: () => props.onCommenting?.(!props.commenting),
+    deselect: () => {
+      props.onCommenting?.(false);
+      clearSelection();
+    },
     'select-all': () => select(placed.map((t) => t.id)),
     fit: () => fitTo(placed),
     'zoom-actual': () => {
@@ -3112,7 +3128,7 @@
 }} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} onpointermove={(e) => (pointer = { x: e.clientX, y: e.clientY })} oncopy={(e) => onCopy(e, false)} oncut={(e) => onCopy(e, true)} onpaste={onPasteEvent} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? (coreOn ? CORE : 'pending')} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? (coreOn ? CORE : 'pending')} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
   {#if timeline}
     {@const nodeId = timeline.nodeId}
     <div style="display: contents" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
@@ -3333,6 +3349,8 @@
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
       onimage={insertImageInFrame}
+      oncomment={props.onCommenting ? () => props.onCommenting?.(!props.commenting) : undefined}
+      commenting={props.commenting}
       onframelibrary={soleFrame ? () => (frameDialog = { nodeId: soleFrame, dialog: FrameDialog.Templates }) : undefined}
       context={barContextFor(soleFrame)}
       zoom={view.zoom}
@@ -3424,6 +3442,10 @@
 </div>
 
 <style>
+  .wrap.commenting .surface {
+    cursor: crosshair;
+  }
+
   .frame-marquee {
     position: absolute;
     border: 1px solid var(--ui-accent, #3b82f6);

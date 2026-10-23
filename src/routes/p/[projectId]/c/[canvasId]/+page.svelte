@@ -1437,6 +1437,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   const pinTarget = $derived.by(() => {
+    const dropped = commentsPanel.pending;
+    if (dropped) {
+      return { ...dropped, label: 'the spot you clicked' };
+    }
     const picked = tiles.find((t) => t.id === selectedIds[0]);
     return picked ? { nodeId: picked.id, x: picked.w, y: 0, label: 'the selected node' } : { nodeId: null, x: viewCentre.cx, y: viewCentre.cy, label: 'the middle of the view' };
   });
@@ -1444,6 +1448,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   async function addThread(body: string) {
     const at = pinTarget;
     await post('addComment', { body, x: at.x, y: at.y, ...(at.nodeId ? { node_id: at.nodeId } : {}) });
+    commentsPanel.settle();
     await loadComments();
   }
 
@@ -3622,14 +3627,23 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       cursors.port.update({ view });
     }}
     onUserPan={() => (following = null)}
+    commenting={commentsPanel.placing}
+    onCommenting={(on) => commentsPanel.place(on)}
+    onComment={(at) => commentsPanel.drop(at)}
     follow={followView}
   >
     {#snippet canvasOver()}
+      {#if commentsPanel.pending && !commentsPanel.pending.nodeId}
+        <CommentPin ghost at={commentsPanel.pending} />
+      {/if}
       {#each livePins(null) as thread (thread.id)}
         <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(id) => commentsPanel.focus(id)} />
       {/each}
     {/snippet}
     {#snippet tileOver({ id, body })}
+      {#if commentsPanel.pending?.nodeId === id}
+        <CommentPin ghost at={commentsPanel.pending} />
+      {/if}
       {#each livePins(id) as thread (thread.id)}
         <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(picked) => commentsPanel.focus(picked)} />
       {/each}
