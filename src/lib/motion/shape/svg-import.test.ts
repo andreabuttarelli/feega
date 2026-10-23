@@ -79,6 +79,27 @@ describe('svgShapes', () => {
     expect(shape.gradient).toMatchObject({ type: 'linear-gradient', angle: 0 });
   });
 
+  describe('a Figma export of a gradient SVG cannot draw', () => {
+    const stopsJson = '[{&#34;color&#34;:{&#34;r&#34;:1.0,&#34;g&#34;:0.0,&#34;b&#34;:0.0,&#34;a&#34;:1.0},&#34;position&#34;:0.0},{&#34;color&#34;:{&#34;r&#34;:0.0,&#34;g&#34;:0.0,&#34;b&#34;:1.0,&#34;a&#34;:1.0},&#34;position&#34;:1.0}]';
+    const figma = (type: string, background: string) =>
+      `<svg width="100" height="100" viewBox="0 0 100 100"><g clip-path="url(#c)" data-figma-skip-parse="true"><g transform="matrix(0 0.1 -0.1 0 25 50)"><foreignObject x="-1000" y="-1000" width="2000" height="2000"><div xmlns="http://www.w3.org/1999/xhtml" style="background:${background};height:100%;width:100%;opacity:1"></div></foreignObject></g></g><path d="M0 0H100V100H0V0Z" data-figma-gradient-fill="{&#34;type&#34;:&#34;${type}&#34;,&#34;stops&#34;:${stopsJson}}"/><defs><clipPath id="c"><path d="M0 0H100V100H0V0Z"/></clipPath></defs></svg>`;
+    const stops = [
+      { color: '#ff0000', pos: 0 },
+      { color: '#0000ff', pos: 1 }
+    ];
+
+    it('keeps an angular gradient, turned and centred where the export put it', () => {
+      const [shape] = svgShapes(figma('GRADIENT_ANGULAR', 'conic-gradient(from 90deg,rgba(255, 0, 0, 1) 0deg,rgba(0, 0, 255, 1) 360deg)')).shapes;
+      expect(shape.gradient).toEqual({ type: 'angular-gradient', stops, angle: 180, center: { x: 0.25, y: 0.5 } });
+      expect(shape.fill).toBe('#ff0000');
+    });
+
+    it('keeps a diamond gradient', () => {
+      const [shape] = svgShapes(figma('GRADIENT_DIAMOND', 'linear-gradient(to bottom right, red 0%, blue 50%) bottom right / 50% 50% no-repeat')).shapes;
+      expect(shape.gradient).toEqual({ type: 'diamond-gradient', stops });
+    });
+  });
+
   it('falls back to the first stop when a gradient is missing', () => {
     const [shape] = svgShapes(`<svg viewBox="0 0 10 10"><rect width="5" height="5" fill="url(#nope)"/></svg>`).shapes;
     expect(shape.gradient).toBeUndefined();

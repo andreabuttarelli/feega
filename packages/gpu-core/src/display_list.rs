@@ -25,6 +25,8 @@ pub enum Paint {
     Solid { color: Rgba },
     Linear { from: [f64; 2], to: [f64; 2], stops: Vec<Stop> },
     Radial { center: [f64; 2], radius: f64, stops: Vec<Stop> },
+    Sweep { center: [f64; 2], start: f64, stops: Vec<Stop> },
+    Diamond { center: [f64; 2], half: [f64; 2], stops: Vec<Stop> },
 }
 
 #[derive(Debug, Clone, Deserialize)]
