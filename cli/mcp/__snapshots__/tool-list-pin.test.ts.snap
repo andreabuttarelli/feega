@@ -6,3 +6,10 @@ exports[`the MCP tool list does not move while the server code is reorganised > 
   "fingerprint": "fa6f319bae380b767114bda881bc954960dfa3019a0db4e48159c0740174ff06",
 }
 `;
+
+exports[`the MCP tool list does not move while the server code is reorganised tool names and descriptions are byte-identical 1`] = `
+{
+  "count": 51,
+  "fingerprint": "fa6f319bae380b767114bda881bc954960dfa3019a0db4e48159c0740174ff06",
+}
+`;
