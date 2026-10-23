@@ -6,6 +6,7 @@ import { listConnections, listNodes } from '$lib/server/repos/canvas';
 import { canvasFrameInputs } from './move-element';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
+import { FIGMA_FILE_KEY, figmaClipWithImage } from '../../../../tests/fixtures/figma/image-clip';
 
 const SOURCE = '44444444-4444-4444-4444-444444444444';
 const TARGET = '66666666-6666-6666-6666-666666666666';
@@ -365,6 +366,17 @@ describe('pasteFigma action', () => {
     expect(rows).toMatchObject([{ x: 40, y: 60, width: 1920, display_name: 'Cover' }]);
     const doc = input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')!.payload as { doc: MotionDoc };
     expect(doc.doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual(expect.arrayContaining(['Shape', 'Precomp', 'Text']));
+  });
+
+  it('answers which clips wait for which image, and the file they come from', async () => {
+    const hash = 'ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12';
+    const input = event({ html: figmaClipWithImage(hash), at: JSON.stringify({ x: 1000, y: 600 }) });
+
+    const answer = (await actions.pasteFigma(input as never)) as { fills: { nodeId: string; images: { hash: string }[] }[]; fileKey: string };
+
+    expect(answer.fileKey).toBe(FIGMA_FILE_KEY);
+    expect(answer.fills).toHaveLength(1);
+    expect(answer.fills[0].images.map((i) => i.hash)).toEqual([hash]);
   });
 
   it('html without Figma data is a 400, nothing written', async () => {
