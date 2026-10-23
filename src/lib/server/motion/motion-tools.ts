@@ -162,7 +162,7 @@ import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCamer
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
-import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
+import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '$lib/motion/layout/model';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
@@ -1705,6 +1705,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const out = apply(wrapInFrame(session.doc, clip_ids, id, deps.newId()), `framed ${clip_ids.length} clip(s)`);
         return out.ok ? { ...out, container_id: id } : out;
       }
+    }),
+
+    resize_to_fit: tool({
+      description: 'Resize a frame container to fit its children, like the editor Resize to fit (⌥⇧⌘R): a plain frame takes the bounding box of its children, an auto layout hugs them.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async ({ clip_id }) => apply(resizeToFit(session.doc, clip_id), `fitted ${clip_id} to its children`)
     }),
 
     set_auto_layout: tool({

@@ -104,6 +104,7 @@ import CircleDashed from '@lucide/svelte/icons/circle-dashed';
 import Group from '@lucide/svelte/icons/group';
 import Ungroup from '@lucide/svelte/icons/ungroup';
 import Frame from '@lucide/svelte/icons/frame';
+import Shrink from '@lucide/svelte/icons/shrink';
 import Columns2 from '@lucide/svelte/icons/columns-2';
 import FolderOpen from '@lucide/svelte/icons/folder-open';
 import CopyCheck from '@lucide/svelte/icons/copy-check';
@@ -240,6 +241,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Group]: { name: 'Group', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Ungroup]: { name: 'Ungroup', icon: Ungroup, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.FrameSelection]: { name: 'Frame selection', icon: Frame, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.ResizeToFit]: { name: 'Resize to fit', icon: Shrink, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },

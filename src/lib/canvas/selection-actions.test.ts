@@ -46,6 +46,7 @@ describe('group and ungroup', () => {
       ['select-same-font', null],
       ['select-same-effect', null],
       ['frame-selection', 'Mod+Alt+G'],
+      ['resize-to-fit', 'Mod+Alt+Shift+R'],
       ['auto-layout', 'Shift+A'],
       ['union', 'Alt+Shift+U'],
       ['subtract', 'Alt+Shift+S'],

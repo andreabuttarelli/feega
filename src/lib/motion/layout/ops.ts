@@ -133,6 +133,26 @@ export const wrapInAutoLayout = (source: MotionDoc, clipIds: readonly string[], 
 
 export const wrapInFrame = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Frame);
 
+export function resizeToFit(doc: MotionDoc, containerId: string): OpResult {
+  const container = findClip(doc, containerId)?.clip;
+  const children = doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.parent === containerId && hasBox(c));
+  if (!container || !children.length) {
+    return fail(`${containerId} has no children to fit`);
+  }
+  if (container.autoLayout) {
+    return setLayoutItem(doc, containerId, HUG);
+  }
+
+  const size = { width: doc.width, height: doc.height };
+  const boxes = children.map((c) => pivotBox(c.props, size));
+  const left = Math.min(...boxes.map((b) => b.left));
+  const top = Math.min(...boxes.map((b) => b.top));
+  const right = Math.max(...boxes.map((b) => b.left + b.width));
+  const bottom = Math.max(...boxes.map((b) => b.top + b.height));
+  const fitted = { x: (left + right) / 2 / size.width, y: (top + bottom) / 2 / size.height, width: (right - left) / size.width, height: (bottom - top) / size.height };
+  return { ok: true, doc: withClip(doc, containerId, (c) => ({ ...c, props: { ...c.props, ...fitted } })) };
+}
+
 export function removeAutoLayout(doc: MotionDoc, containerId: string): OpResult {
   const container = findClip(doc, containerId)?.clip;
   if (!container?.autoLayout) {

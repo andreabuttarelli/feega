@@ -22,7 +22,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool draw_element 1`] = `"02646d8ffcaceb96116b1e11083cd117a7536dd8c62a32b72305f16879a71a3c"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool frame_tool 1`] = `"f55acccbdf4319736361deb72c6d21373cec330586d47d51dddc4f39a7c02d77"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool frame_tool 1`] = `"c558a6c449aecf84f241552501f66aeeda5b481ea98d791fa7a33264fbcaf156"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool get_motion_embed 1`] = `"740c3cd4c2636b163beb4d3251aaa976ceed02e94b8a0e1f7f27368c0e9dacff"`;
 
@@ -468,6 +468,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op resize_node 1`] = `"29114b1e4d80560e9cbf6c24b0a811af8a96cbdd5eea02736a199fa7e473c824"`;
 
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op resize_to_fit 1`] = `"cfaa67f1985735d7453233bdf02d252fcd532be411b332a6f8b1099f5836106d"`;
+
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op resolve_canvas_comment 1`] = `"82b071aac485f694ff785e3e516af1fa4eb887433734a384145d453cea90ace9"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op restore_canvas_version 1`] = `"2fd83c14712801910b8186ce5a4d1dea7978be10173390bdc99e9c864539d070"`;
@@ -879,6 +881,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema request_upload 1`] = `"10c283a5bbabc61d18b708db2b7486598ed6ffba370d935d370d1a3688f79d20"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema resize_node 1`] = `"2e9bcfb2f764562bada7f5df3b5545392d7dd759edf92fafb6903ade839dc86d"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema resize_to_fit 1`] = `"6e6304f7e73326db78cf3cfc5aa01f958a369fc6dd03df57cf3fdbf57aebb1d4"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema resolve_canvas_comment 1`] = `"696fdb06479c959b2b88eb7550bf3e12c260b8791170a5a0079d89188e178257"`;
 
