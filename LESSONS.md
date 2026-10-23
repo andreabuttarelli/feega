@@ -4,6 +4,10 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### A PR that adds or changes a tool fails the tool surface pins
+
+**Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
+
 ### An effect that publishes into a `$state` map loops once it runs per edit
 
 **Signal:** `effect_update_depth_exceeded` in the console, the UI stops updating after the first keystroke, the stack points at an `$effect` calling `liveDocs.set`. **Move:** the setter read `this.map` to copy it, so the effect depended on what it wrote; read it with `untrack` inside the setter. Vitest runs the server build of Svelte, where effects do not run: only a real browser shows it.

@@ -1,8 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`the tool surfaces do not move while their code is reorganised > the chat tool definitions are byte-identical 1`] = `
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical 1`] = `
 {
-  "fingerprint": "d65a664cc7b7143216e06866d24ccfaf367505f98addaadcb153588aeb801d45",
+  "fingerprint": "848a6dfc7312213e8f41c8cc3c8d4d707895c4e4fffdf4f31f22f631b8000be2",
   "names": [
     "apply_effects",
     "ask_motion_agent",
@@ -52,6 +52,6 @@ exports[`the tool surfaces do not move while their code is reorganised > the cha
 }
 `;
 
-exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 1`] = `"2e73007939f6267efe2a73417d9ea31694beda1181affacbc36f9789434587b7"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas 1`] = `"39917c22aa6d5a22e8ee7598cc73c121b3883414499cf663109dbff33e536964"`;
 
-exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 2`] = `"d00a7a93a998940ba97a1a25605e000fba565a46660c8071dbcf4bcf45e905eb"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas 2`] = `"fae456478da82820cc6dc32cd7c0b98fb8c389b401fc6a26ef3219b19fd82393"`;

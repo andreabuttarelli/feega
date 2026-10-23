@@ -11,6 +11,8 @@ import { groupClips } from '../group';
 import { drawClip } from '../draw-create';
 import { DrawTool } from '../draw-tool';
 import { TextSizing } from '../text-sizing';
+import { addEffect } from '../effects/ops';
+import { EffectKind } from '../effects/registry';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -26,6 +28,29 @@ const centre = (doc: MotionDoc, id: string) => {
   const r = rectOf(sceneOf(doc), id, 0)!;
   return [r.left + r.width / 2, r.top + r.height / 2] as [number, number];
 };
+
+describe('pickAt on a clip with an effect', () => {
+  const shadowed = (id: string, x: number, y: number) => must(addEffect(shape(empty, id, x, y, 0.1), id, EffectKind.DropShadow, 'fx', { distance: 10, blur: 8 }));
+
+  it('picks the shadowed shape where it is', () => {
+    const doc = shadowed('a', 0.2, 0.5);
+
+    expect(pickAt(sceneOf(doc), centre(doc, 'a'), 0)).toBe('a');
+  });
+
+  it('does not pick the shadowed shape away from it', () => {
+    const doc = shadowed('a', 0.2, 0.5);
+
+    expect(pickAt(sceneOf(doc), [1800, 1000], 0)).toBeNull();
+  });
+
+  it('picks the plain shape under a shadowed one where only the lower one is', () => {
+    const doc = must(addEffect(shape(shape(empty, 'under', 0.5, 0.5, 0.5), 'over', 0.2, 0.5, 0.05), 'over', EffectKind.DropShadow, 'fx', { distance: 10, blur: 8 }));
+    const [x, y] = centre(doc, 'under');
+
+    expect(pickAt(sceneOf(doc), [x + 300, y], 0)).toBe('under');
+  });
+});
 
 describe('pickAt', () => {
   it('returns null over empty canvas', () => {

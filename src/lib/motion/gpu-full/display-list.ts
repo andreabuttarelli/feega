@@ -129,6 +129,7 @@ const SOLID_PATTERN = 'solid';
 const CENTRE = 0.5;
 const REMAPPED: ReadonlySet<ComponentId> = new Set(['Video']);
 const DEG = Math.PI / 180;
+const CSS_TURN = 90;
 
 const flat = (outline: Outline): number[][] => outline.map((c) => flatten(c).flatMap(([x, y]) => [x, y]));
 
@@ -149,7 +150,9 @@ const PAINTS: Partial<Record<FillType, (f: never, w: number, h: number, colour: 
     const dy = (Math.sin(f.angle * DEG) * h) / 2;
     return { kind: PaintKind.Linear, from: [w / 2 - dx, h / 2 - dy], to: [w / 2 + dx, h / 2 + dy], stops: stopsOf(f.stops, colour) };
   },
-  [FillType.Radial]: (f: FillOf<FillType.Radial>, w, h, colour) => ({ kind: PaintKind.Radial, center: [f.center.x * w, f.center.y * h], radius: (f.radius * Math.max(w, h)) / 2, stops: stopsOf(f.stops, colour) })
+  [FillType.Radial]: (f: FillOf<FillType.Radial>, w, h, colour) => ({ kind: PaintKind.Radial, center: [f.center.x * w, f.center.y * h], radius: (f.radius * Math.max(w, h)) / 2, stops: stopsOf(f.stops, colour) }),
+  [FillType.Angular]: (f: FillOf<FillType.Angular>, w, h, colour) => ({ kind: PaintKind.Sweep, center: [f.center.x * w, f.center.y * h], start: (f.angle - CSS_TURN) * DEG, stops: stopsOf(f.stops, colour) }),
+  [FillType.Diamond]: (f: FillOf<FillType.Diamond>, w, h, colour) => ({ kind: PaintKind.Diamond, center: [w / 2, h / 2], half: [w / 2, h / 2], stops: stopsOf(f.stops, colour) })
 };
 
 const UNDRAWN_SHAPES: ReadonlySet<ShapeKind> = new Set([ShapeKind.Line, ShapeKind.Vector]);

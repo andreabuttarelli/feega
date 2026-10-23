@@ -32,6 +32,7 @@ import { NODE_NAME_MAX } from '$lib/canvas/node-name';
 import { removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { addComment, listComments, resolveThread } from '$lib/server/canvas/canvas-comments';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
@@ -966,6 +967,33 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ canvasId: z.string(), versionId: z.string().describe('from list_canvas_versions') }).strict(),
     run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? restoreCanvasVersion(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, versionId: input.versionId, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  list_canvas_comments: op({
+    access: Access.Read,
+    input: z.object({ canvasId: z.string() }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { threads: await listComments(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) } : NOT_IN_PROJECT)
+  }),
+
+  add_canvas_comment: op({
+    access: Access.Write,
+    input: z
+      .object({
+        canvasId: z.string(),
+        body: z.string().max(2000),
+        nodeId: z.string().optional().describe('pin to this node; x/y are then relative to its top-left'),
+        parentId: z.string().optional().describe('reply to this thread (a comment id from list_canvas_comments)'),
+        x: z.number().optional(),
+        y: z.number().optional()
+      })
+      .strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? addComment(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, ...input }) : NOT_IN_PROJECT)
+  }),
+
+  resolve_canvas_comment: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), commentId: z.string().describe('the first comment of the thread'), resolved: z.boolean() }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { outcome: await resolveThread(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, commentId: input.commentId, resolved: input.resolved }) } : NOT_IN_PROJECT)
   }),
 
   share_canvas: op({

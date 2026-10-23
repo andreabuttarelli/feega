@@ -55,7 +55,8 @@
     org,
     projectMode = ProjectMode.Standard,
     brandName = null,
-    onVersions = null
+    onVersions = null,
+    onComments = null
   }: {
     projectId: string;
     projectName: string;
@@ -73,6 +74,7 @@
     projectMode?: string;
     brandName?: string | null;
     onVersions?: (() => void) | null;
+    onComments?: (() => void) | null;
   } = $props();
 
   const ICON = 16;
@@ -288,6 +290,12 @@
           <DropdownMenu.Item class="sw-row" data-testid="canvas-versions" onSelect={onVersions}>
             <span class="sw-lead"><History size={ICON} /></span>
             Versions…
+          </DropdownMenu.Item>
+        {/if}
+        {#if onComments}
+          <DropdownMenu.Item class="sw-row" data-testid="canvas-comments" onSelect={onComments}>
+            <span class="sw-lead"><MessageSquare size={ICON} /></span>
+            Comments
           </DropdownMenu.Item>
         {/if}
         <DropdownMenu.Item class="sw-row" data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>

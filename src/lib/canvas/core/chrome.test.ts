@@ -143,7 +143,7 @@ describe('tileChrome', () => {
     const asked: (number | undefined)[] = [];
     tileChrome(tile({ label: 'Image' }), (text, size, set) => (asked.push(set?.tracking), glyphs(text, size, set)));
 
-    expect(asked).toEqual([0]);
+    expect(new Set(asked)).toEqual(new Set([0]));
   });
 
   it('dims ports a drag cannot reach and half-dims flagged ones', () => {
@@ -161,10 +161,19 @@ describe('tileChrome', () => {
     expect(ofPart(t, ChromePart.PortName)).toHaveLength(1);
   });
 
-  it('clips the label to the tile width, as the canvas masks it', () => {
-    const [label] = ofPart(tile({ label: 'A very long name for a node' }), ChromePart.Label);
+  it('truncates a long label with an ellipsis inside the tile width, with no scissor in world space', () => {
+    const [label] = ofPart(tile({ label: 'A very long name for a node that never ends' }), ChromePart.Label);
+    const [, , right] = box(label.contours);
 
-    expect(label.scissor?.[0]).toBe(100);
-    expect(label.scissor?.[2]).toBe(400);
+    expect(label.scissor).toBeUndefined();
+    expect(right).toBeLessThanOrEqual(400);
+    expect(right).toBeGreaterThan(300);
+  });
+
+  it('truncates the label after the icon, not under it', () => {
+    const t = tile({ label: 'A very long name for a node that never ends', icon: [[0, 0, 12, 0, 12, 12, 0, 12]] });
+    const [, , right] = box(ofPart(t, ChromePart.Label)[0].contours);
+
+    expect(right).toBeLessThanOrEqual(400);
   });
 });

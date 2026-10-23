@@ -3,7 +3,9 @@ import type { Rgba } from './rgba';
 export enum PaintKind {
   Solid = 'solid',
   Linear = 'linear',
-  Radial = 'radial'
+  Radial = 'radial',
+  Sweep = 'sweep',
+  Diamond = 'diamond'
 }
 
 export enum FillRule {
@@ -19,4 +21,6 @@ export type Stop = { at: number; color: Rgba };
 export type Paint =
   | { kind: PaintKind.Solid; color: Rgba }
   | { kind: PaintKind.Linear; from: [number, number]; to: [number, number]; stops: Stop[] }
-  | { kind: PaintKind.Radial; center: [number, number]; radius: number; stops: Stop[] };
+  | { kind: PaintKind.Radial; center: [number, number]; radius: number; stops: Stop[] }
+  | { kind: PaintKind.Sweep; center: [number, number]; start: number; stops: Stop[] }
+  | { kind: PaintKind.Diamond; center: [number, number]; half: [number, number]; stops: Stop[] };

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
+  import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import { modeOf, ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
   import { page } from '$app/state';
@@ -253,6 +254,7 @@
       }))}
       projectMode={data.project.mode}
       brandName={data.brand?.name ?? null}
+      onComments={() => commentsPanel.show()}
       canvasName={currentCanvas?.name ?? ''}
       canvasHref={currentCanvas?.href ?? ''}
       canvases={data.canvases}

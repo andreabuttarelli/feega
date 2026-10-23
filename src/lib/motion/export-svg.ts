@@ -51,6 +51,9 @@ function paintAttr(w: Writer, paint: Paint): string {
   if (paint.kind === PaintKind.Solid) {
     return `fill="${hex(paint.color)}"${paint.color[3] < 1 ? ` fill-opacity="${num(paint.color[3])}"` : ''}`;
   }
+  if (paint.kind === PaintKind.Sweep || paint.kind === PaintKind.Diamond) {
+    return reason(`${paint.kind} gradient`);
+  }
   const id = w.nextId('g');
   if (paint.kind === PaintKind.Linear) {
     w.defs.push(`<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${num(paint.from[0])}" y1="${num(paint.from[1])}" x2="${num(paint.to[0])}" y2="${num(paint.to[1])}">${stops(paint.stops)}</linearGradient>`);

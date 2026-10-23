@@ -51,7 +51,12 @@ const MOTION_FILL: Record<FillKind, (f: Fill) => Painted | null> = {
   [FillKind.Solid]: (f) => ({ type: FillType.Solid, color: (f as Extract<Fill, { kind: FillKind.Solid }>).color, opacity: f.opacity }),
   [FillKind.Image]: (f) => ({ type: FillType.Solid, color: IMAGE_PLACEHOLDER, opacity: f.opacity }),
   [FillKind.Linear]: (f) => withStops(f as Extract<Fill, { kind: FillKind.Linear }>, (stops) => ({ type: FillType.Linear, stops, angle: (f as Extract<Fill, { kind: FillKind.Linear }>).angle, opacity: f.opacity })),
-  [FillKind.Radial]: (f) => withStops(f as Extract<Fill, { kind: FillKind.Radial }>, (stops) => ({ type: FillType.Radial, stops, center: CENTRE, radius: 1, opacity: f.opacity }))
+  [FillKind.Radial]: (f) => withStops(f as Extract<Fill, { kind: FillKind.Radial }>, (stops) => ({ type: FillType.Radial, stops, center: CENTRE, radius: 1, opacity: f.opacity })),
+  [FillKind.Angular]: (f) => {
+    const angular = f as Extract<Fill, { kind: FillKind.Angular }>;
+    return withStops(angular, (stops) => ({ type: FillType.Angular, stops, angle: angular.angle, center: angular.center, opacity: f.opacity }));
+  },
+  [FillKind.Diamond]: (f) => withStops(f as Extract<Fill, { kind: FillKind.Diamond }>, (stops) => ({ type: FillType.Diamond, stops, opacity: f.opacity }))
 };
 
 const fillStack = (fills: Fill[]): Painted[] => fills.flatMap((f) => MOTION_FILL[f.kind](f) ?? []);

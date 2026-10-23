@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { cardOverElements, elementsOnly } from '../../../../tests/fixtures/figma/elements';
+import { cardOverElements, elementsOnly, gradient } from '../../../../tests/fixtures/figma/elements';
 import { figmaMessage } from './archive';
 import { Cross, Destination, Fit, Flow, Justify, LayerKind, figmaScene, type FrameLayer } from './scene';
 
@@ -81,7 +81,24 @@ describe('what the Figma layer looks like', () => {
     expect(text).toMatchObject({ rotation: -90 });
     expect(rect.kind === LayerKind.Shape && rect.fills).toHaveLength(2);
     expect(rect.kind === LayerKind.Shape && rect.strokes).toHaveLength(2);
-    expect(rect.kind === LayerKind.Shape && rect.fills.map((f) => f.kind)).toEqual(['solid', 'linear']);
+    expect(rect.kind === LayerKind.Shape && rect.fills.map((f) => f.kind)).toEqual(['solid', 'angular']);
+  });
+
+  it('keeps angular and diamond gradients as themselves, not approximated', () => {
+    const painted = (type: string) => {
+      const message = elementsOnly();
+      message.nodes[2].fillPaints = [gradient(type)];
+      return figmaScene(message)!;
+    };
+    const fillOf = (type: string) => {
+      const ellipse = painted(type).placements[1].layer;
+      return ellipse.kind === LayerKind.Shape ? ellipse.fills[0] : null;
+    };
+    const notes = (type: string) => painted(type).skipped.join(' ');
+
+    expect(fillOf('GRADIENT_ANGULAR')).toMatchObject({ kind: 'angular', angle: 90, center: { x: 0.5, y: 0.5 }, stops: [{ pos: 0 }, { pos: 1 }] });
+    expect(fillOf('GRADIENT_DIAMOND')).toMatchObject({ kind: 'diamond', stops: [{ pos: 0 }, { pos: 1 }] });
+    expect(notes('GRADIENT_ANGULAR') + notes('GRADIENT_DIAMOND')).not.toMatch(/drawn as/);
   });
 
   it('measures a rotated element by what it covers, and keeps rotated text inside its box', () => {

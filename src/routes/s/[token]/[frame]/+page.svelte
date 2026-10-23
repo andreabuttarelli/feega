@@ -1,5 +1,6 @@
 
 <script lang="ts">
+  import { enhance } from '$app/forms';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { HOST_MESSAGE } from '$lib/motion/interactive/host';
@@ -8,13 +9,14 @@
   import LegalFooter from '$lib/components/LegalFooter.svelte';
   import { reportHref } from '$lib/reports/report-link';
 
-  let { data } = $props();
+  let { data, form } = $props();
 
   const PLAYING_GRACE_MS = 600;
 
   let frameEl = $state<HTMLIFrameElement | null>(null);
   let playing = $state(true);
   let silence: ReturnType<typeof setTimeout> | undefined;
+  let copying = $state(false);
   let touchFrom: { x: number; y: number } | null = null;
 
   const position = $derived(data.frame.frames.findIndex((f) => f.id === data.frame.frameId) + 1);
@@ -116,6 +118,29 @@
     {/if}
   </header>
 
+  <form
+    class="copy"
+    method="POST"
+    action={data.signedIn ? '?/duplicate' : '?/signin'}
+    use:enhance={() => {
+      copying = true;
+      return async ({ update }) => {
+        await update();
+        copying = false;
+      };
+    }}
+  >
+    {#if data.signedIn && data.projects.length > 1}
+      <select name="project" aria-label="Into project">
+        {#each data.projects as project (project.id)}<option value={project.id}>{project.name}</option>{/each}
+      </select>
+    {:else if data.signedIn && data.projects.length === 1}
+      <input type="hidden" name="project" value={data.projects[0].id} />
+    {/if}
+    <button type="submit" disabled={copying || (data.signedIn && !data.projects.length)} data-testid="duplicate-frame">{copying ? 'Copying…' : 'Duplicate to my workspace'}</button>
+    {#if form?.error}<span class="warn" role="alert">{form.error}</span>{/if}
+  </form>
+
   <a class="mark" href="/">feega</a>
   <div class="legal-mark">
     <a class="report" href={reportHref({ share: page.params.token })} rel="nofollow">Report</a>
@@ -200,6 +225,33 @@
   .pager a[aria-disabled='true'] {
     opacity: 0.3;
     pointer-events: none;
+  }
+  .copy {
+    position: absolute;
+    left: 50%;
+    bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100vw - 28px);
+  }
+  .copy button,
+  .copy select {
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    background: rgb(0 0 0 / 0.6);
+    border: 1px solid rgb(255 255 255 / 0.3);
+    border-radius: var(--ui-radius-sm);
+  }
+  .copy button:disabled {
+    opacity: 0.5;
+  }
+  .warn {
+    font-size: 12px;
+    color: #ffb4b4;
   }
   .mark {
     position: absolute;
