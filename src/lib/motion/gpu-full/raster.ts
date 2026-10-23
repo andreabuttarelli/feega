@@ -561,7 +561,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
       scissored(item, () => behind(item, item.backdrop!, pictures));
     }
     intoLayer(() => drawItem(item, 1, pictures));
-    const filtered = item.filters ? filters.apply(layer.texture, item.filters, item.space ?? [1, 0, 0, 1]) : layer.texture;
+    const filtered = item.filters ? filters.apply(layer.texture, item.filters, item.space ?? [1, 0, 0, 1], item.origin ?? [0, 0]) : layer.texture;
     const src = blurredFrom(item, filtered);
     scissored(item, () => composite(item, src, mask));
   }
@@ -628,7 +628,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     depth--;
     dest = outer;
     const mask = item.masks || item.matte ? maskOf(item, pictures) : null;
-    const filtered = item.filters ? filters.apply(group.texture, item.filters, item.space ?? [1, 0, 0, 1]) : group.texture;
+    const filtered = item.filters ? filters.apply(group.texture, item.filters, item.space ?? [1, 0, 0, 1], item.origin ?? [0, 0]) : group.texture;
     const src = blurredFrom(item, filtered);
     scissored(item, () => composite(item, src, mask));
   }

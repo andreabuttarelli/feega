@@ -9,6 +9,7 @@ export enum EffectKind {
   BlackWhite = 'black-white',
   GaussianBlur = 'gaussian-blur',
   DirectionalBlur = 'directional-blur',
+  ProgressiveBlur = 'progressive-blur',
   DropShadow = 'drop-shadow',
   InnerShadow = 'inner-shadow',
   BackgroundBlur = 'background-blur',
@@ -110,6 +111,26 @@ function tintMatrix(black: string, white: string, amount: number): string {
     return [...mixed, 0, amount * lo[c]];
   });
   return [...rows, [0, 0, 0, 1, 0]].flat().map(r).join(' ');
+}
+
+const PROGRESSIVE_BANDS = 16;
+
+function progressiveBands(v: Values, f: Pick<EffectFrame, 'width' | 'height'>): SvgNode[] {
+  const [sx, sy, ex, ey] = [n(v, 'startX') * f.width, n(v, 'startY') * f.height, n(v, 'endX') * f.width, n(v, 'endY') * f.height];
+  const vertical = Math.abs(ey - sy) >= Math.abs(ex - sx);
+  const length = vertical ? f.height : f.width;
+  const [from, to] = vertical ? [sy, ey] : [sx, ex];
+  const span = to - from || 1;
+  const band = length / PROGRESSIVE_BANDS;
+  const radiusAt = (at: number) => {
+    const t = Math.min(1, Math.max(0, (at - from) / span));
+    return n(v, 'startRadius') + (n(v, 'endRadius') - n(v, 'startRadius')) * t;
+  };
+  const bands = Array.from({ length: PROGRESSIVE_BANDS }, (_, i) => {
+    const region = vertical ? { x: 0, y: r(i * band), width: f.width, height: r(band) } : { x: r(i * band), y: 0, width: r(band), height: f.height };
+    return node('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: r(radiusAt((i + 0.5) * band) / 2), ...region, result: `band${i}` });
+  });
+  return [...bands, node('feMerge', {}, bands.map((_, i) => node('feMergeNode', { in: `band${i}` })))];
 }
 
 const DIRECTIONAL_TAPS = 9;
@@ -224,6 +245,20 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     params: [num('length', 'Length', 0, 400, 1, 40), num('angle', 'Angle', -180, 180, 1, 0)],
     reach: (v) => n(v, 'length') / 2,
     render: (v, _f, id) => svg(id, directionalTaps(n(v, 'length'), n(v, 'angle')))
+  },
+  [EffectKind.ProgressiveBlur]: {
+    label: 'Progressive blur',
+    about: 'blur that grows from startRadius px at (startX, startY) to endRadius px at (endX, endY), points as 0..1 of the layer',
+    params: [
+      num('startRadius', 'Start radius', 0, 200, 0.5, 0),
+      num('endRadius', 'End radius', 0, 200, 0.5, 24),
+      num('startX', 'Start X', 0, 1, 0.01, 0.5),
+      num('startY', 'Start Y', 0, 1, 0.01, 0),
+      num('endX', 'End X', 0, 1, 0.01, 0.5),
+      num('endY', 'End Y', 0, 1, 0.01, 1)
+    ],
+    reach: (v) => (Math.max(n(v, 'startRadius'), n(v, 'endRadius')) / 2) * GAUSS_TAIL,
+    render: (v, f, id) => svg(id, progressiveBands(v, f))
   },
   [EffectKind.DropShadow]: {
     label: 'Drop shadow',

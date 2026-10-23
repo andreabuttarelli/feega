@@ -148,6 +148,7 @@ impl<'a> Surface for Gpu<'a> {
         let tick = self.cache.tick;
         let cached = self.cache.entries.get_mut(&self.key(item))?;
         cached.used = tick;
+        self.vello.mark_override_image_dirty(&cached.image);
         Some(Placed { image: cached.image.clone(), origin: cached.origin })
     }
 
