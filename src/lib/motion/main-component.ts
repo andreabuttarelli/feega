@@ -10,6 +10,7 @@ export enum ComponentAction {
   Reset = 'reset',
   ResetProp = 'reset-prop',
   Push = 'push',
+  Place = 'place',
   Detach = 'detach',
   AddVariant = 'add-variant',
   Swap = 'swap'
