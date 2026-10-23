@@ -41,7 +41,7 @@ import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
-import { ClipEdge, Side, TOP_LEFT_START, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, TOP_LEFT_START, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, duplicateKeyframes, setKeyEase, setLaneMuted, type OpResult } from '$lib/motion/timeline';
 import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
@@ -431,6 +431,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         textPath: c.textPath,
         motionBlur: c.motionBlur,
         hidden: c.hidden ?? false,
+        mutedLanes: c.mutedLanes ?? [],
         locked: c.locked ?? false,
         bleed: c.bleed ?? false,
         clipContent: c.clipContent ?? false,
@@ -1126,6 +1127,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const owner = ownerOf(input.clip_id);
         const targets = Object.fromEntries(Object.entries(input.to).map(([prop, value]) => [prop, typeof value === 'number' ? toStored(owner, prop, value, session.doc) : value]));
         return apply(animateTo(session.doc, input.clip_id, targets, { start: frames(input.start), duration: Math.max(1, frames(input.duration)), ease: input.ease }, (c) => c), `animated ${input.clip_id} to ${Object.keys(input.to).join(', ')}`);
+      }
+    }),
+
+    edit_lane: tool({
+      description: 'Edit one keyframe lane (prop) of a clip. mute/unmute: leave the lane out of playback and render, keys kept (mutedLanes in get_motion_doc). duplicate: copy the keys at times (s from the clip start; all if omitted) after the last of them, spacing kept.',
+      inputSchema: z.object({ clip_id: z.string(), prop: z.string(), action: z.enum(['mute', 'unmute', 'duplicate']), times: z.array(z.number().min(0)).optional() }),
+      execute: async (input) => {
+        if (input.action !== 'duplicate') {
+          return apply(setLaneMuted(session.doc, input.clip_id, input.prop, input.action === 'mute'), `${input.action} ${input.prop} of ${input.clip_id}`);
+        }
+        const track = findClip(session.doc, input.clip_id)?.clip.keyframes[input.prop] ?? [];
+        const picked = input.times ? input.times.map(frames) : track.map((k) => k.frame);
+        return apply(duplicateKeyframes(session.doc, picked.map((frame) => ({ clipId: input.clip_id, prop: input.prop, frame }))), `duplicated keyframes of ${input.prop} on ${input.clip_id}`);
       }
     }),
 

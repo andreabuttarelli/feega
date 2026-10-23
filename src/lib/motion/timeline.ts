@@ -388,7 +388,7 @@ export function snapTargets(doc: MotionDoc, input: { playhead: number; exclude: 
 }
 
 export type KeyRef = { clipId: string; prop: string; frame: number };
-export type KeyBoard = ({ prop: string; offset: number; value: KeyValue; ease: EaseSpec } & KeyShape)[];
+export type KeyBoard = ({ prop: string; offset: number; value: KeyValue; ease: EaseSpec; intensity?: number } & KeyShape)[];
 
 export enum Direction {
   Back = 'back',
@@ -535,7 +535,7 @@ export function copyKeyframes(doc: MotionDoc, refs: readonly KeyRef[]): KeyBoard
     return key ? [{ prop: ref.prop, key }] : [];
   });
   const earliest = Math.min(...picked.map((p) => p.key.frame));
-  return picked.map(({ prop, key }) => ({ prop, offset: key.frame - earliest, value: key.value, ease: key.ease, in: key.in, out: key.out, roving: key.roving }));
+  return picked.map(({ prop, key }) => ({ prop, offset: key.frame - earliest, value: key.value, ease: key.ease, intensity: key.intensity, in: key.in, out: key.out, roving: key.roving }));
 }
 
 export function pasteKeyframes(doc: MotionDoc, clipId: string, board: KeyBoard, at: number): OpResult {
@@ -543,9 +543,39 @@ export function pasteKeyframes(doc: MotionDoc, clipId: string, board: KeyBoard, 
     const next: Keyframes = { ...clip.keyframes };
     for (const item of board) {
       const frame = Math.max(0, Math.round(at + item.offset));
-      next[item.prop] = [...(next[item.prop] ?? []).filter((k) => k.frame !== frame), shaped({ frame, value: item.value, ease: item.ease }, { in: item.in, out: item.out, roving: item.roving })];
+      next[item.prop] = [...(next[item.prop] ?? []).filter((k) => k.frame !== frame), shaped({ frame, value: item.value, ease: item.ease, ...(item.intensity === undefined ? {} : { intensity: item.intensity }) }, { in: item.in, out: item.out, roving: item.roving })];
     }
     return withKeyframes(doc, clip, next);
+  });
+}
+
+const DUPLICATE_GAP_FRAMES = 15;
+
+export function duplicateKeyframes(doc: MotionDoc, refs: readonly KeyRef[]): OpResult {
+  const byClip = new Map<string, KeyRef[]>();
+  for (const ref of refs) {
+    byClip.set(ref.clipId, [...(byClip.get(ref.clipId) ?? []), ref]);
+  }
+  let result: OpResult = { ok: true, doc };
+  for (const [clipId, picked] of byClip) {
+    if (!result.ok) {
+      return result;
+    }
+    const board = copyKeyframes(result.doc, picked);
+    const at = Math.max(...picked.map((r) => r.frame)) + DUPLICATE_GAP_FRAMES;
+    result = board.length ? pasteKeyframes(result.doc, clipId, board, at) : result;
+  }
+  return result;
+}
+
+export function setLaneMuted(doc: MotionDoc, clipId: string, prop: string, muted: boolean): OpResult {
+  return editClip(doc, clipId, (clip) => {
+    if (!clip.keyframes[prop]?.length) {
+      return `${clipId} has no keyframes on ${prop} to mute`;
+    }
+    const others = (clip.mutedLanes ?? []).filter((p) => p !== prop);
+    const mutedLanes = muted ? [...others, prop] : others;
+    return { ...clip, mutedLanes: mutedLanes.length ? mutedLanes : undefined };
   });
 }
 
