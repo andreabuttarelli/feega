@@ -8,7 +8,7 @@ const CANVAS_ACTION_CALLERS = [
   'src/routes/p/[projectId]/+layout.svelte',
   'src/lib/canvas/canvas-list.ts',
   'src/lib/canvas/media-uploader.ts',
-  'src/lib/components/canvas/CanvasFlow.svelte',
+  'src/lib/components/canvas/gpu/GpuFlow.svelte',
   'src/lib/components/canvas/NextStepChips.svelte'
 ];
 
@@ -23,9 +23,7 @@ describe('canvas actions go to the API, whatever the URL says', () => {
     expect(posting).toEqual([]);
   });
 
-  it('both renderers hand the next-step chips the API poster', () => {
-    for (const flow of ['src/lib/components/canvas/CanvasFlow.svelte', 'src/lib/components/canvas/gpu/GpuFlow.svelte']) {
-      expect(readFileSync(flow, 'utf8'), flow).toMatch(/<NextStepChips\s+\{?postAction/);
-    }
+  it('the canvas hands the next-step chips the API poster', () => {
+    expect(readFileSync('src/lib/components/canvas/gpu/GpuFlow.svelte', 'utf8')).toMatch(/<NextStepChips\s+\{?postAction/);
   });
 });

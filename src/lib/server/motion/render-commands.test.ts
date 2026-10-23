@@ -141,6 +141,15 @@ describe('finishing each format', () => {
     expect(boomerang).toContain('-loop 0');
   });
 
+  it('an APNG is decoded with its alpha, silent and looping forever', () => {
+    const apng = args(ExportFormat.Apng);
+
+    expect(apng).toContain('-c:v libvpx-vp9 -f concat');
+    expect(apng).toContain('-f apng -plays 0');
+    expect(apng).not.toContain('mix.m4a');
+    expect(apng.endsWith('o')).toBe(true);
+  });
+
   it('a PNG sequence writes numbered frames, silent', () => {
     const png = args(ExportFormat.PngSequence);
 

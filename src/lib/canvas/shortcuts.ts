@@ -96,6 +96,10 @@ const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolText]: DrawTool.Text,
   [Command.ToolRectangle]: DrawTool.Rectangle,
   [Command.ToolEllipse]: DrawTool.Ellipse,
+  [Command.ToolPolygon]: DrawTool.Polygon,
+  [Command.ToolStar]: DrawTool.Star,
+  [Command.ToolLine]: DrawTool.Line,
+  [Command.ToolArrow]: DrawTool.Arrow,
   [Command.ToolPen]: DrawTool.Pen
 };
 
@@ -115,7 +119,55 @@ function toolFor(e: KeyboardEvent): DrawTool | null {
   return command ? (TOOL_OF_COMMAND[command] ?? null) : null;
 }
 
-const PASTE_MOD_KEYS: Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
+const nudgeBy = (dx: number, dy: number, step: number): CanvasCommand => ({ id: 'nudge', dx: dx * step, dy: dy * step });
+
+export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
+  [Command.Delete]: { id: 'delete' },
+  [Command.Duplicate]: { id: 'duplicate' },
+  [Command.Undo]: { id: 'undo' },
+  [Command.Redo]: { id: 'redo' },
+  [Command.Copy]: { id: 'copy' },
+  [Command.Group]: { id: 'group' },
+  [Command.Ungroup]: { id: 'ungroup' },
+  [Command.SelectAll]: { id: 'select-all' },
+  [Command.Deselect]: { id: 'deselect' },
+  [Command.SelectChild]: { id: 'enter' },
+  [Command.SelectNext]: { id: 'select-next' },
+  [Command.SelectPrevious]: { id: 'select-previous' },
+  [Command.BringToFront]: { id: 'bring-front' },
+  [Command.SendToBack]: { id: 'send-back' },
+  [Command.PreviewZoomIn]: { id: 'zoom-in' },
+  [Command.PreviewZoomOut]: { id: 'zoom-out' },
+  [Command.PreviewFit]: { id: 'fit' },
+  [Command.PreviewActual]: { id: 'zoom-actual' },
+  [Command.PreviewSelection]: { id: 'zoom-selection' },
+  [Command.Help]: { id: 'help' },
+  [Command.TidyUp]: { id: 'tidy' },
+  [Command.AlignLeft]: { id: 'align', edge: Edge.Left },
+  [Command.AlignCenter]: { id: 'align', edge: Edge.Center },
+  [Command.AlignRight]: { id: 'align', edge: Edge.Right },
+  [Command.AlignTop]: { id: 'align', edge: Edge.Top },
+  [Command.AlignMiddle]: { id: 'align', edge: Edge.Middle },
+  [Command.AlignBottom]: { id: 'align', edge: Edge.Bottom },
+  [Command.ToolSelect]: { id: 'tool', tool: DrawTool.Select },
+  [Command.ToolText]: { id: 'tool', tool: DrawTool.Text },
+  [Command.ToolRectangle]: { id: 'tool', tool: DrawTool.Rectangle },
+  [Command.ToolEllipse]: { id: 'tool', tool: DrawTool.Ellipse },
+  [Command.ToolPen]: { id: 'tool', tool: DrawTool.Pen },
+  [Command.TogglePixelGrid]: { id: 'view', view: FrameView.PixelGrid },
+  [Command.ToggleLayoutGuides]: { id: 'view', view: FrameView.Guides },
+  [Command.ToggleOutlines]: { id: 'view', view: FrameView.Outlines },
+  [Command.MoveLeft]: nudgeBy(-1, 0, NUDGE_STEP),
+  [Command.MoveRight]: nudgeBy(1, 0, NUDGE_STEP),
+  [Command.MoveUp]: nudgeBy(0, -1, NUDGE_STEP),
+  [Command.MoveDown]: nudgeBy(0, 1, NUDGE_STEP),
+  [Command.MoveLeftMore]: nudgeBy(-1, 0, NUDGE_STEP_BIG),
+  [Command.MoveRightMore]: nudgeBy(1, 0, NUDGE_STEP_BIG),
+  [Command.MoveUpMore]: nudgeBy(0, -1, NUDGE_STEP_BIG),
+  [Command.MoveDownMore]: nudgeBy(0, 1, NUDGE_STEP_BIG)
+};
+
+const PASTE_MOD_KEYS:Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
 
 /** L'argomento di `add`, per chi ha in mano un comando e non sa ancora quale sia. */
 export function addableOf(c: CanvasCommand): Addable | null {

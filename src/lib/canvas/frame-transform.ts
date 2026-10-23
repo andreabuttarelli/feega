@@ -42,7 +42,7 @@ function tilted(d: Drag): boolean {
   return Math.abs(b[1] - a[1]) > TILT_EPSILON;
 }
 
-const asGroup = (d: Drag) => d.ids.length > 1 || (d.keys.alt && d.grip === Grip.Scale && !tilted(d));
+const asGroup = (d: Drag) => d.ids.length > 1 || (d.grip === Grip.Scale && !tilted(d));
 
 function dragGroup(d: Drag, others: Bounds[]): Dragged {
   const box = unionBounds(d.ids.map((id) => boundsOf(d.doc, id, d.frame, d.boxes)));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ExportFormat, EXPORT_FORMATS, FORMAT, GIF_LIMITS, GifLoop, Preset, PRESETS, estimateBytes, exportProblem, gifOf, parseSettings, settingsOf } from './export-formats';
+import { APNG_MAX_SECONDS, ExportFormat, EXPORT_FORMATS, FORMAT, GIF_LIMITS, GifLoop, Preset, PRESETS, estimateBytes, exportProblem, gifOf, parseSettings, settingsOf } from './export-formats';
 import { MotionFormat, newMotionDoc } from './doc';
 import { Resolution } from './render-quote';
 
@@ -11,7 +11,7 @@ describe('export formats', () => {
       expect(FORMAT[format].ext).toMatch(/^[a-z0-9]+$/);
       expect(FORMAT[format].mime).toMatch(/^[a-z]+\/[a-z0-9.+-]+$/);
     }
-    expect(EXPORT_FORMATS.filter((f) => FORMAT[f].alpha).sort()).toEqual([ExportFormat.Gif, ExportFormat.PngSequence, ExportFormat.ProRes4444, ExportFormat.WebmAlpha].sort());
+    expect(EXPORT_FORMATS.filter((f) => FORMAT[f].alpha).sort()).toEqual([ExportFormat.Apng, ExportFormat.Gif, ExportFormat.PngSequence, ExportFormat.ProRes4444, ExportFormat.WebmAlpha].sort());
   });
 
   it('presets cover social, web, gif and a master', () => {
@@ -27,6 +27,10 @@ describe('export formats', () => {
     expect(parseSettings(JSON.stringify(settingsOf(Preset.Web)))).toEqual({ ok: true, settings: settingsOf(Preset.Web) });
     expect(parseSettings(JSON.stringify({ format: 'avi' })).ok).toBe(false);
     expect(parseSettings(JSON.stringify({ ...PRESETS[Preset.Social], fps: 29 })).ok).toBe(false);
+  });
+
+  it('120 fps is an export frame rate', () => {
+    expect(parseSettings(JSON.stringify({ ...PRESETS[Preset.Social], fps: 120 })).ok).toBe(true);
   });
 
   it('a heavier codec makes a bigger file', () => {
@@ -49,6 +53,13 @@ describe('export formats', () => {
   it('a GIF longer than its cap is refused', () => {
     expect(exportProblem(doc(GIF_LIMITS.maxSeconds + 1), PRESETS[Preset.Gif])).toMatch(/GIF/);
     expect(exportProblem(doc(GIF_LIMITS.maxSeconds), PRESETS[Preset.Gif])).toBeNull();
+  });
+
+  it('an APNG longer than its cap is refused, up to it is fine', () => {
+    const apng = { ...PRESETS[Preset.Social], format: ExportFormat.Apng };
+
+    expect(exportProblem(doc(APNG_MAX_SECONDS + 1), apng)).toMatch(/APNG/);
+    expect(exportProblem(doc(APNG_MAX_SECONDS), apng)).toBeNull();
   });
 
   it('a GIF loops forever at 15 fps and 640 px unless told otherwise', () => {

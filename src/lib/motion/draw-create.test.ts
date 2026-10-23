@@ -3,7 +3,7 @@ import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from
 import { setStill } from './still';
 import { COMPONENTS } from './components';
 import { DrawTool } from './draw-tool';
-import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, penClip } from './draw-create';
+import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, lineOutline, penClip } from './draw-create';
 import { parsePath, type Outline } from './shape/geometry';
 import type { OpResult } from './timeline';
 import { TextSizing } from './text-sizing';
@@ -207,3 +207,53 @@ describe('drawing a frame in a chosen format', () => {
     expect(drawnFrame(box, MotionFormat.Square, 1).still).toEqual({ frame: 30 });
   });
 });
+
+describe('shape tools', () => {
+  it.each([
+    [DrawTool.Polygon, { shape: 'polygon', sides: 3 }],
+    [DrawTool.Star, { shape: 'star', points: 5 }]
+  ])('%s draws its shape on the box', (tool, props) => {
+    const clip = findClip(ok(drawClip(video(), tool, BOX, 0, 's1')), 's1')!.clip;
+    expect(clip.props).toMatchObject({ ...props, ...BOX });
+  });
+
+  it('a line is an open two-point path from where the drag started', () => {
+    const outline = lineOutline({ x: 10, y: 50 }, { x: 110, y: 0 }, DrawTool.Line);
+    expect(outline).toHaveLength(1);
+    expect(outline[0].closed).toBe(false);
+    expect(outline[0].vertices.map((v) => v.p)).toEqual([
+      [10, 50],
+      [110, 0]
+    ]);
+  });
+
+  it('an arrow strokes a head back from the tip, in one open stroke', () => {
+    const outline = lineOutline({ x: 0, y: 0 }, { x: 100, y: 0 }, DrawTool.Arrow);
+    expect(outline).toHaveLength(1);
+    expect(outline[0].closed).toBe(false);
+    const points = outline[0].vertices.map((v) => v.p);
+    expect(points).toHaveLength(5);
+    expect(points[3]).toEqual([100, 0]);
+    expect(points[2][0]).toBeLessThan(100);
+    expect(points[4][0]).toBeLessThan(100);
+  });
+
+  it('a drawn line keeps a stroke and no fill', () => {
+    const made = drawnElement({ tool: DrawTool.Pen, outline: lineOutline({ x: 0, y: 0 }, { x: 100, y: 40 }, DrawTool.Line), fill: null, stroke: '#111111' }, 'l1');
+    expect(made.ok).toBe(true);
+    const clip = made.ok ? findClip(made.doc, 'l1')!.clip : null;
+    expect(clip?.props).toMatchObject({ shape: 'path', fillKind: 'none', strokeKind: 'solid', stroke: '#111111' });
+  });
+
+  it('a flat line on the canvas gets room around it and a stroke two canvas units wide', () => {
+    const made = drawnElement({ tool: DrawTool.Pen, outline: lineOutline({ x: 0, y: 10 }, { x: 200, y: 10 }, DrawTool.Line), fill: null, stroke: '#111111' }, 'l2');
+    expect(made.ok).toBe(true);
+    if (!made.ok) {
+      return;
+    }
+    expect(made.box.height).toBeGreaterThanOrEqual(24);
+    const clip = findClip(made.doc, 'l2')!.clip;
+    expect((clip.props.strokeWidth as number) * Math.min(made.box.width, made.box.height)).toBeCloseTo(2, 5);
+  });
+});
+

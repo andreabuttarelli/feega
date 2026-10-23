@@ -30,6 +30,10 @@ import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
 import TypeIcon from '@lucide/svelte/icons/type';
 import SquareIcon from '@lucide/svelte/icons/square';
 import CircleIcon from '@lucide/svelte/icons/circle';
+import TriangleIcon from '@lucide/svelte/icons/triangle';
+import StarIcon from '@lucide/svelte/icons/star';
+import SlashIcon from '@lucide/svelte/icons/slash';
+import MoveUpRight from '@lucide/svelte/icons/move-up-right';
 import PenTool from '@lucide/svelte/icons/pen-tool';
 import PencilRuler from '@lucide/svelte/icons/pencil-ruler';
 import Pause from '@lucide/svelte/icons/pause';
@@ -312,6 +316,10 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToolText]: { name: 'Text tool', icon: TypeIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
   [Command.ToolRectangle]: { name: 'Rectangle tool', icon: SquareIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
   [Command.ToolEllipse]: { name: 'Ellipse tool', icon: CircleIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolPolygon]: { name: 'Polygon tool', icon: TriangleIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolStar]: { name: 'Star tool', icon: StarIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolLine]: { name: 'Line tool', icon: SlashIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag from end to end' },
+  [Command.ToolArrow]: { name: 'Arrow tool', icon: MoveUpRight, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag from tail to head' },
   [Command.ToolScale]: { name: 'Scale tool', icon: Scaling, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToolPen]: { name: 'Pen tool', icon: PenTool, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Tap points, tap the first to close' },
   [Tool.FitGraph]: { name: 'Fit curves to view', icon: Maximize, group: GuideGroup.Timeline, place: Place.Graph },

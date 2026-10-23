@@ -89,12 +89,38 @@ export function removeAnimator(doc: MotionDoc, clipId: string, id: string): OpRe
 export enum TextPreset {
   BlurUp = 'blur-up',
   WordStagger = 'word-stagger',
-  LineMaskUp = 'line-mask-up'
+  LineMaskUp = 'line-mask-up',
+  FadeChars = 'fade-chars',
+  FadeWords = 'fade-words',
+  FadeLines = 'fade-lines',
+  SlideWords = 'slide-words',
+  SlideLines = 'slide-lines',
+  ScaleChars = 'scale-chars',
+  BlurWords = 'blur-words',
+  DropChars = 'drop-chars',
+  SpinChars = 'spin-chars',
+  Typewriter = 'typewriter'
 }
 
 export const TEXT_PRESETS = Object.values(TextPreset) as [TextPreset, ...TextPreset[]];
 
 type Preset = { about: string; animator: Required<Pick<AnimatorInput, 'unit' | 'softness' | 'start'>> & AnimatorInput };
+
+export const PRESET_LABEL: Record<TextPreset, string> = {
+  [TextPreset.BlurUp]: 'Blur up',
+  [TextPreset.WordStagger]: 'Word stagger',
+  [TextPreset.LineMaskUp]: 'Line mask up',
+  [TextPreset.FadeChars]: 'Fade letters',
+  [TextPreset.FadeWords]: 'Fade words',
+  [TextPreset.FadeLines]: 'Fade lines',
+  [TextPreset.SlideWords]: 'Slide words',
+  [TextPreset.SlideLines]: 'Slide lines',
+  [TextPreset.ScaleChars]: 'Scale letters',
+  [TextPreset.BlurWords]: 'Blur words',
+  [TextPreset.DropChars]: 'Drop letters',
+  [TextPreset.SpinChars]: 'Spin letters',
+  [TextPreset.Typewriter]: 'Typewriter'
+};
 
 export const PRESETS: Record<TextPreset, Preset> = {
   [TextPreset.BlurUp]: {
@@ -108,16 +134,57 @@ export const PRESETS: Record<TextPreset, Preset> = {
   [TextPreset.LineMaskUp]: {
     about: 'each line slides up from below its own baseline, like a mask reveal',
     animator: { unit: AnimatorUnit.Line, shape: SelectorShape.Smooth, softness: 0.4, start: 0, end: 200, values: { y: 1.2 } }
+  },
+  [TextPreset.FadeChars]: {
+    about: 'each character fades in, left to right',
+    animator: { unit: AnimatorUnit.Char, shape: SelectorShape.Ramp, softness: 0.5, start: 0, end: 200, values: { opacity: 0 } }
+  },
+  [TextPreset.FadeWords]: {
+    about: 'words fade in one after another',
+    animator: { unit: AnimatorUnit.Word, shape: SelectorShape.Ramp, softness: 0.5, start: 0, end: 200, values: { opacity: 0 } }
+  },
+  [TextPreset.FadeLines]: {
+    about: 'lines fade in one after another',
+    animator: { unit: AnimatorUnit.Line, shape: SelectorShape.Ramp, softness: 0.5, start: 0, end: 200, values: { opacity: 0 } }
+  },
+  [TextPreset.SlideWords]: {
+    about: 'words slide in from the left while they fade',
+    animator: { unit: AnimatorUnit.Word, shape: SelectorShape.Smooth, softness: 0.4, start: 0, end: 200, values: { opacity: 0, x: -0.5 } }
+  },
+  [TextPreset.SlideLines]: {
+    about: 'lines slide in from the right while they fade',
+    animator: { unit: AnimatorUnit.Line, shape: SelectorShape.Smooth, softness: 0.4, start: 0, end: 200, values: { opacity: 0, x: 0.8 } }
+  },
+  [TextPreset.ScaleChars]: {
+    about: 'each character grows from small while it fades in',
+    animator: { unit: AnimatorUnit.Char, shape: SelectorShape.Smooth, softness: 0.4, start: 0, end: 200, values: { opacity: 0, scale: 0.2 } }
+  },
+  [TextPreset.BlurWords]: {
+    about: 'words come out of a blur one after another',
+    animator: { unit: AnimatorUnit.Word, shape: SelectorShape.Smooth, softness: 0.5, start: 0, end: 200, values: { opacity: 0, blur: 12 } }
+  },
+  [TextPreset.DropChars]: {
+    about: 'each character drops in from above',
+    animator: { unit: AnimatorUnit.Char, shape: SelectorShape.Smooth, softness: 0.35, start: 0, end: 200, values: { opacity: 0, y: -0.7 } }
+  },
+  [TextPreset.SpinChars]: {
+    about: 'each character turns upright as it fades in',
+    animator: { unit: AnimatorUnit.Char, shape: SelectorShape.Smooth, softness: 0.35, start: 0, end: 200, values: { opacity: 0, rotation: -90, y: 0.3 } }
+  },
+  [TextPreset.Typewriter]: {
+    about: 'characters appear one at a time, no fade',
+    animator: { unit: AnimatorUnit.Char, shape: SelectorShape.Square, softness: 0, start: 0, end: 200, values: { opacity: 0 } }
   }
 };
 
 const LONE_UNIT = [0.5];
+const MIN_SWEEP_MARGIN = 0.01;
 
 function sweepOf(spec: Preset, text: string): { from: number; to: number } {
   const found = unitPositions(text, spec.animator.unit);
   const at = found.length ? found : LONE_UNIT;
   const { softness, start } = spec.animator;
-  return { from: (Math.min(...at) - softness) * 100 - start, to: Math.max(...at) * 100 - start };
+  return { from: (Math.min(...at) - Math.max(softness, MIN_SWEEP_MARGIN)) * 100 - start, to: Math.max(...at) * 100 - start };
 }
 
 export function applyPreset(doc: MotionDoc, clipId: string, preset: TextPreset, span: { start: number; duration: number }, id: string): OpResult {

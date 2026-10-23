@@ -59,6 +59,20 @@ describe('frame rate', () => {
     expect(parseMotionDoc({ ...at60, fps: 30 }).ok).toBe(false);
   });
 
+  it('a doc can run at 120 fps and keeps the same longest length in seconds', () => {
+    const at120 = { ...newMotionDoc(MotionFormat.Square), fps: 120, durationInFrames: maxFrames(120) };
+
+    expect(parseMotionDoc(at120).ok).toBe(true);
+    expect(parseMotionDoc({ ...at120, durationInFrames: maxFrames(120) + 1 }).ok).toBe(false);
+  });
+
+  it('moving a doc to 120 fps keeps every time in seconds', () => {
+    const result = setFrameRate(edited(), 120);
+
+    expect(result.ok && [result.doc.fps, result.doc.durationInFrames, result.doc.tracks[0].clips[0].from]).toEqual([120, 15 * 120, 15 * 4]);
+    expect(result.ok && parseMotionDoc(result.doc).ok).toBe(true);
+  });
+
   it('changing the rate keeps every time in seconds: clips, transitions, keyframes, camera', () => {
     const result = setFrameRate(edited(), 60);
     if (!result.ok) {

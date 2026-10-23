@@ -33,6 +33,7 @@ import { frameTapScript } from './frame-tap';
 import { exactSeekScript } from './exact-seek';
 import { Library, Play, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
 import { ComponentMode, PropFormat, modeOf, type CustomComponents } from '../custom/component';
+import { counted } from '../text-counter';
 import { drawnTexts } from '../poster-parts';
 import { mattePairs, type MattePair } from '../matte';
 import { matteScript, matteWrapper } from './mattes';
@@ -44,6 +45,7 @@ import { photoFills } from '../fill/model';
 import { resolveFills } from '../fill/render';
 import { partStyleTag } from './part-styles';
 import type { Extent } from '../shape/render';
+import { counterBake, counterScript, type CounterBake } from './counter';
 import { TEXT_PATH_CSS, textPathBake, textPathScript, textPathTemplate, type TextPathBake } from './text-path';
 import { particleBake, particleScript } from './particles';
 import { shaderEffectBake, shaderEffectScript, type ShaderEffectBake } from './shader-effects';
@@ -203,7 +205,7 @@ function ctxOf(clip: MotionClip, input: ComposeInput): TemplateCtx<ComponentId> 
   const { width, height } = frameOf(clip, doc);
   return {
     id: clip.id,
-    p: { ...clip.props, ...keyedOverrides(clip) } as never,
+    p: counted(clip.component, { ...clip.props, ...keyedOverrides(clip) }, 0) as never,
     width,
     height,
     unit: Math.min(width, height),
@@ -669,6 +671,7 @@ export function composeHtml(raw: ComposeInput): string {
   const compositions: TimedBake[] = [];
   const shapes: ShapeBake[] = [];
   const textPaths: TextPathBake[] = [];
+  const counters: CounterBake[] = [];
   const particles: ParticleBake[] = [];
   const blobs: BlobBake[] = [];
   const shaderEffects: ShaderEffectBake[] = [];
@@ -718,6 +721,10 @@ export function composeHtml(raw: ComposeInput): string {
       }
       if (clip.textPath) {
         textPaths.push(textPathBake(clip, doc));
+      }
+      const counter = counterBake(clip);
+      if (counter) {
+        counters.push(counter);
       }
       if (clip.component === 'Particles') {
         particles.push(particleBake(clip, ctx));
@@ -795,6 +802,7 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(compositionScript(compositions, Number(duration))),
     hotScript(shapeScript(shapes, doc.fps, Number(duration))),
     hotScript(textPathScript(textPaths, doc.fps, Number(duration))),
+    hotScript(counterScript(counters, doc.fps, Number(duration))),
     particles.length && delivery.runtime === RuntimeDelivery.Hosted ? chunkTag(Chunk.Particles, delivery) : '',
     hotScript(particleScript(particles, doc.fps, Number(duration), delivery.runtime)),
     hotScript(blobScript(blobs, Number(duration))),

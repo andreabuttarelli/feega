@@ -12,7 +12,7 @@ export enum HitKind {
 
 export type Hit =
   | { kind: HitKind.Port; nodeId: string; handle: string | null }
-  | { kind: HitKind.Corner; nodeId: string; corner: Corner }
+  | { kind: HitKind.Corner; nodeId: string; unit: [number, number] }
   | { kind: HitKind.Node; nodeId: string }
   | { kind: HitKind.Edge; edgeId: string }
   | { kind: HitKind.Empty };
@@ -62,19 +62,51 @@ export function movedBy(origins: Map<string, Point>, d: Point): { id: string; x:
   return [...origins].map(([id, o]) => ({ id, x: o.x + d.x, y: o.y + d.y }));
 }
 
-const GROWS: Record<Corner, { left: boolean; top: boolean }> = {
-  [Corner.TopLeft]: { left: true, top: true },
-  [Corner.TopRight]: { left: false, top: true },
-  [Corner.BottomLeft]: { left: true, top: false },
-  [Corner.BottomRight]: { left: false, top: false }
+type Unit = [number, number];
+type ResizeKeys = { shift: boolean; alt: boolean };
+
+const CORNER_UNIT: Record<Corner, Unit> = {
+  [Corner.TopLeft]: [0, 0],
+  [Corner.TopRight]: [1, 0],
+  [Corner.BottomLeft]: [0, 1],
+  [Corner.BottomRight]: [1, 1]
 };
 
-export function resized(b: Box, corner: Corner, d: Point, min: { w: number; h: number }): Box {
-  const grows = GROWS[corner];
-  const w = Math.max(min.w, b.w + (grows.left ? -d.x : d.x));
-  const h = Math.max(min.h, b.h + (grows.top ? -d.y : d.y));
-  return { x: grows.left ? b.x + b.w - w : b.x, y: grows.top ? b.y + b.h - h : b.y, w, h };
+const SIDE = 0.5;
+const STILL: ResizeKeys = { shift: false, alt: false };
+
+const turned = (p: Point, degrees: number): Point => {
+  const r = (degrees * Math.PI) / 180;
+  return { x: p.x * Math.cos(r) - p.y * Math.sin(r), y: p.x * Math.sin(r) + p.y * Math.cos(r) };
+};
+
+function grown(size: number, unit: number, by: number, alt: boolean): number {
+  if (unit === SIDE) {
+    return size;
+  }
+  return size + (unit === 1 ? by : -by) * (alt ? 2 : 1);
 }
+
+function keptRatio(b: Box, unit: Unit, w: number, h: number): { w: number; h: number } {
+  const factor = unit[0] === SIDE ? h / b.h : unit[1] === SIDE ? w / b.w : Math.max(w / b.w, h / b.h);
+  return { w: b.w * factor, h: b.h * factor };
+}
+
+export function resizedAt(b: Box, unit: Unit, d: Point, min: { w: number; h: number }, keys: ResizeKeys, rotation: number): Box {
+  const local = turned(d, -rotation);
+  const free = { w: grown(b.w, unit[0], local.x, keys.alt), h: grown(b.h, unit[1], local.y, keys.alt) };
+  const sized = keys.shift ? keptRatio(b, unit, free.w, free.h) : free;
+  const w = Math.max(min.w, sized.w);
+  const h = Math.max(min.h, sized.h);
+  const pin = (size: number, u: number) => (keys.alt ? 0 : (SIDE - u) * size);
+  const anchor = turned({ x: pin(b.w, unit[0]), y: pin(b.h, unit[1]) }, rotation);
+  const moved = turned({ x: pin(w, unit[0]), y: pin(h, unit[1]) }, rotation);
+  const cx = b.x + b.w / 2 + anchor.x - moved.x;
+  const cy = b.y + b.h / 2 + anchor.y - moved.y;
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
+export const resized = (b: Box, corner: Corner, d: Point, min: { w: number; h: number }): Box => resizedAt(b, CORNER_UNIT[corner], d, min, STILL, 0);
 
 export function marqueeBox(a: Point, b: Point): Box {
   return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) };

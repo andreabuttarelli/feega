@@ -27,6 +27,7 @@ import { DrawnKind, type DomRead, type Drawn } from './dom/read';
 import { sourceSeconds } from '../time-remap';
 import { edgeAt, moveAt, type Pose } from './edges';
 import { stillSeconds } from '../still';
+import { counted } from '../text-counter';
 import { animatorOfKey, COLOR_VALUE, SELECTOR_KEYS, type TextAnimator } from '../text-animators/model';
 import { textPathAt, type OnPath } from '../hyperframes/text-path';
 import { paintOnPath } from './text/on-path';
@@ -356,7 +357,7 @@ function propsAt(clip: MotionClip, frame: number, colour: (v: string) => string)
     }
     return [[key, prop.kind === ValueKind.Color ? sampleColor(track, local, colour) : sampleTrack(track, local)]];
   });
-  return { ...clip.props, ...Object.fromEntries(sampled) };
+  return counted(clip.component, { ...clip.props, ...Object.fromEntries(sampled) }, local);
 }
 
 const SELECTOR_FIELDS: ReadonlySet<string> = new Set(SELECTOR_KEYS);

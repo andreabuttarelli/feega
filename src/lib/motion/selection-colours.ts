@@ -1,10 +1,17 @@
 import { findClip, type MotionDoc } from './doc';
+import { BRAND_COLORS } from './components';
 import { setProps, type OpResult } from './timeline';
 
 const HEX = /^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
+const TOKENS: ReadonlySet<string> = new Set(BRAND_COLORS);
+
+export const isBrandToken = (colour: string) => TOKENS.has(colour);
+
+const isColour = (value: string) => HEX.test(value) || TOKENS.has(value);
+
 function coloursIn(value: unknown, into: string[]): string[] {
-  if (typeof value === 'string' && HEX.test(value)) {
+  if (typeof value === 'string' && isColour(value)) {
     into.push(value.toLowerCase());
     return into;
   }

@@ -23,6 +23,7 @@ import { strokesSchema } from './stroke/model';
 import { runsSchema } from './text-runs';
 import { LETTER_SPACING, LINE_HEIGHT } from './type-units';
 import { DECORATION_STYLES, DECORATIONS, FEATURES, RULE } from './decoration';
+import { counterSchema } from './text-counter';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -316,7 +317,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
       .strict()
   },
   Kicker: {
@@ -385,6 +386,9 @@ export const COMPONENTS = {
         sides: range(3, 64, 1, 6, 'Sides', Group.Content),
         points: range(3, 64, 1, 5, 'Points', Group.Content),
         innerRadius: range(0.05, 1, 0.01, 0.5, 'Inner radius', Group.Content),
+        arcStart: range(-360, 360, 1, 0, 'Arc start (°)', Group.Content),
+        arcSweep: range(-1, 1, 0.01, 1, 'Arc sweep', Group.Content),
+        arcRatio: range(0, 1, 0.01, 0, 'Arc ratio', Group.Content),
         morphs: z.array(pathString).max(MAX_MORPHS).default([]).meta(managed('Morph targets')),
         morph: range(0, MAX_MORPHS, 0.01, 0, 'Morph', Group.Content),
         morphStart: range(0, 1, 0.01, 0, 'Morph start point', Group.Content),

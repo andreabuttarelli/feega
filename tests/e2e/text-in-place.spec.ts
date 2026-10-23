@@ -62,7 +62,6 @@ async function headText(
 
 for (const [renderer, query] of [
   ["gpu", ""],
-  ["dom", "?renderer=dom"],
 ]) {
   test.describe(`text edited where it is drawn on the ${renderer} canvas @real`, () => {
     test.skip(!REAL_STACK, "richiede uno stack disposable: E2E_REAL_STACK=1");

@@ -36,6 +36,7 @@ export class FrameEditSession {
   private saving = false;
   private resave = false;
   private missedRemote = false;
+  private held: Promise<unknown> | null = null;
   private lastEdit = { summary: '', at: 0 };
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private unsavedSummary = '';
@@ -81,6 +82,10 @@ export class FrameEditSession {
     }
     this.lastEdit = { summary, at: now };
     this.scheduleSave(summary);
+  }
+
+  settleHeld(root: MotionDoc) {
+    this.history = amend(this.history, root);
   }
 
   amendRoot(root: MotionDoc, summary: string) {
@@ -158,7 +163,22 @@ export class FrameEditSession {
     return next !== null;
   }
 
+  holdSave(until: Promise<unknown>) {
+    const hold = until.catch(() => undefined).finally(() => {
+      if (this.held === hold) {
+        this.held = null;
+      }
+    });
+    this.held = hold;
+  }
+
   async save() {
+    if (this.held) {
+      await this.held;
+      if (this.saving || this.saveState !== SaveState.Pending) {
+        return;
+      }
+    }
     if (this.saving) {
       this.resave = true;
       return;

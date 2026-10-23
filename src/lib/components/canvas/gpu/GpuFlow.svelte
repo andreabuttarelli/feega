@@ -2,8 +2,8 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { framePicker } from '$lib/canvas/frame-pick';
-  import { onMount, untrack, type ComponentProps } from 'svelte';
+  import { FrameFit, framePicker } from '$lib/canvas/frame-pick';
+  import { onMount, untrack } from 'svelte';
   import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
   import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
@@ -12,7 +12,7 @@
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
   import { alignSide } from '$lib/canvas/frame-tools';
-  import { FRAME_ELEMENT_MENU, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
+  import { FRAME_ELEMENT_MENU, canRunInFrame, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { loadOutliner } from '$lib/motion/fonts/outliner';
   import { frameSummaries } from '$lib/motion/frame-menu';
@@ -61,14 +61,15 @@
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
-  import { Grip, type Gap, type Guide, type Pt } from '$lib/motion/scene-select';
+  import { Grip, handlesOf, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
+  import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
   import FrameTimeline from '../FrameTimeline.svelte';
-  import type CanvasFlow from '../CanvasFlow.svelte';
-  import type { Tile } from '../CanvasFlow.svelte';
+  import type { FlowProps, Tile } from '../flow-types';
+  import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
   import SelectionToolbar from '../SelectionToolbar.svelte';
@@ -109,7 +110,8 @@
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
-  import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
+  import { CANVAS_COMMAND_OF, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
+  import type { Command } from '$lib/motion/shortcuts';
   import { HTML_MIME, Pasted, TEXT_MIME, clipboardHtml, readPaste, type ClipboardPayload, type PasteData, type PasteSource } from '$lib/canvas/system-clipboard';
   import { eventSource, systemSource, writeSystem } from '$lib/canvas/system-clipboard-browser';
   import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
@@ -144,8 +146,8 @@
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
-  import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, Corner, type Box, type Port } from '$lib/canvas/gpu/geometry';
-  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
+  import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
+  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
@@ -172,7 +174,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -1063,7 +1065,7 @@
   type Active =
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
     | { kind: GestureKind.Drag; id: string; start: Point; origins: Map<string, Point>; moved: boolean; toggle: boolean }
-    | { kind: GestureKind.Resize; id: string; corner: Corner; start: Point; box: Box; min: { w: number; h: number } }
+    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number } }
     | { kind: GestureKind.Marquee; start: Point; base: string[]; additive: boolean; moved: boolean }
     | { kind: GestureKind.Connect; from: Port }
     | { kind: GestureKind.PickEdge; edgeId: string };
@@ -1091,9 +1093,9 @@
       return { kind: HitKind.Port, nodeId: port.nodeId, handle: port.handle };
     }
     if (resizable) {
-      const corner = resizeCornerAt(selectedBoxes[0], w, view.zoom);
-      if (corner) {
-        return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, corner };
+      const unit = resizeHandleAt(selectedBoxes[0], w, view.zoom);
+      if (unit) {
+        return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
       }
     }
     const node = topNodeAt(w);
@@ -1230,13 +1232,12 @@
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
-  const CORNER_OUTWARD: Record<Corner, [number, number]> = { [Corner.TopLeft]: [-1, -1], [Corner.TopRight]: [1, -1], [Corner.BottomLeft]: [-1, 1], [Corner.BottomRight]: [1, 1] };
   let cornerCursor = $state<ResizeCursor | null>(null);
 
   function hoverCorner(w: Point) {
     const box = resizable ? selectedBoxes[0] : null;
-    const corner = box ? resizeCornerAt(box, w, view.zoom) : null;
-    cornerCursor = box && corner ? resizeCursor(CORNER_OUTWARD[corner], box.rotation ?? 0) : null;
+    const unit = box ? resizeHandleAt(box, w, view.zoom) : null;
+    cornerCursor = box && unit ? resizeCursor([unit[0] * 2 - 1, unit[1] * 2 - 1], box.rotation ?? 0) : null;
   }
 
   function dropHover() {
@@ -1574,7 +1575,7 @@
     const held = pickers.get(nodeId);
     const picker = held?.live === live.doc ? held.picker : framePicker(live, () => liveOf(nodeId)?.playhead);
     pickers.set(nodeId, { live: live.doc, picker });
-    return { picker, space: picker.spaceOf(frame.box, byId.get(nodeId)?.rotation ?? 0), frame, live };
+    return { picker, space: picker.spaceOf(frame.box, byId.get(nodeId)?.rotation ?? 0, resizing.has(nodeId) ? FrameFit.Stretch : FrameFit.Contain), frame, live };
   }
 
   let timed: string | null = null;
@@ -1799,7 +1800,33 @@
     return Math.hypot(b[0] - a[0], b[1] - a[1]);
   }
 
+  const UNIT_SQUARE: Quad = [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 1]
+  ];
+
+  function resizeOf(nodeId: string, unit: [number, number], start: Point): Active {
+    const t = byId.get(nodeId)!;
+    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
+  }
+
+  function resizeHost(nodeId: string, handle: number, e: PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    downAt = local(e);
+    captureId = e.pointerId;
+    holdSelection(true);
+    active = resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e)));
+    gesturing = true;
+  }
+
   function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
+    if (grip === Grip.Scale && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.has(nodeId)) {
+      resizeHost(nodeId, handle, e);
+      return;
+    }
     if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && pickElement(e, toWorld(view, local(e)))) {
       e.stopPropagation();
       return;
@@ -1946,8 +1973,7 @@
         if (hit.kind !== HitKind.Corner) {
           return null;
         }
-        const t = byId.get(hit.nodeId)!;
-        return { kind: GestureKind.Resize, id: t.id, corner: hit.corner, start: w, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
+        return resizeOf(hit.nodeId, hit.unit, w);
       },
       [GestureKind.Marquee]: () => ({ kind: GestureKind.Marquee, start: w, base: selected, additive: e.shiftKey || e.metaKey || e.ctrlKey, moved: false }),
       [GestureKind.Connect]: () => {
@@ -2067,7 +2093,7 @@
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
-        const box = resized(a.box, a.corner, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min);
+        const box = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
         overrides = new Map([[a.id, box]]);
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
       },
@@ -2486,6 +2512,17 @@
     }
   };
 
+  function runPaletteCommand(command: Command) {
+    if (inside?.level.clip && picks.length && canRunInFrame(command)) {
+      void runFrameAction(command);
+      return;
+    }
+    const canvasCommand = CANVAS_COMMAND_OF[command];
+    if (canvasCommand) {
+      KEY_RUN[canvasCommand.id](canvasCommand);
+    }
+  }
+
   function onKeydown(e: KeyboardEvent) {
     if (frameDialog) {
       return;
@@ -2618,12 +2655,36 @@
     props.onPaste?.(at);
   }
 
-  function insertImageInFrame(file: File) {
-    const frame = coreFrames.find((f) => f.id === soleFrame);
-    if (!frame) {
+  async function insertImageInFrame(file: File) {
+    const nodeId = soleFrame;
+    const session = nodeId ? saverOf(nodeId) : null;
+    const extras = nodeId ? extrasOf(nodeId) : null;
+    if (!nodeId || !session || !extras || !frameChrome(kindOfNode(nodeId)).takesDrops) {
       return;
     }
-    props.onPasteData?.({ kind: Pasted.Image, file }, { x: frame.box.x + frame.box.w / HALF, y: frame.box.y + frame.box.h / HALF });
+    const size = await sizeOfImage(file);
+    const pendingId = `${PENDING_ASSET}${crypto.randomUUID()}`;
+    const pending = imageInFrame(session.history.present, { assetId: pendingId, name: file.name, ...size });
+    if (!pending.ok) {
+      return;
+    }
+    const local = URL.createObjectURL(file);
+    const uploading = extras.uploadMedia(file, () => undefined);
+    session.holdSave(uploading);
+    commit(nodeId, pending, 'Inserted image');
+    const shown = (assetId: string) => liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), assets: { ...liveOf(nodeId)?.assets, [assetId]: local } });
+    shown(pendingId);
+
+    const uploaded = await uploading;
+    if (!uploaded.ok) {
+      session.undo();
+      liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), doc: session.history.present });
+      props.onfail?.(uploaded.error);
+      return;
+    }
+    session.settleHeld(withAssetSwapped(session.history.present, pendingId, uploaded.asset.id));
+    liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), doc: session.history.present });
+    shown(uploaded.asset.id);
   }
 
   async function onPasteEvent(e: ClipboardEvent) {
@@ -2786,11 +2847,10 @@
         })
         .catch((err: unknown) => {
           failed = err instanceof Error ? err.message : String(err);
-          props.onfail?.(failed);
         });
     const recover = (lost: GpuScene) => {
       const next = nextBackend(lost.backend);
-      console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'dom'}`);
+      console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'none'}`);
       lossNote = `${lost.backend} lost`;
       scene = null;
       built = null;
@@ -2800,7 +2860,7 @@
         lost.canvas.remove();
       }
       if (!next) {
-        props.onfail?.('GPU context lost');
+        failed = 'GPU context lost';
         return;
       }
       void start(next);
@@ -3111,7 +3171,7 @@
   {/if}
 
   {#if spec.chrome}
-    <CommandPalette />
+    <CommandPalette onrun={runPaletteCommand} />
   {/if}
 
   {#if menuAt && spec.chrome}

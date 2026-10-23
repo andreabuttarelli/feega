@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { editCss, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { editCss, gradientSpans, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import GradientHandles from './GradientHandles.svelte';
   import { codeIndex, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '$lib/motion/text-runs';
@@ -13,6 +13,7 @@
   let rangeBox = $state<Box | null>(null);
   let value = $state('');
   let tint = $state('#000000');
+  let mirrorStyle = $state('');
 
   const SHORTCUTS: Record<string, RunEdit> = { b: { weight: RunToggle.Bold }, i: { italic: RunToggle.Italic }, u: { underline: RunToggle.Underline } };
   const PANEL = '[data-text-range-panel]';
@@ -22,6 +23,8 @@
   let ended = false;
 
   const style = $derived(editCss(look, layout));
+  const spans = $derived(gradientSpans(value, textRange.runs));
+  const fieldStyle = $derived(spans.length ? `${style};color:transparent` : style);
   let barAt = $state({ left: 0, top: 0 });
   let laid: number | null = null;
 
@@ -44,6 +47,7 @@
     const own = field.getBoundingClientRect();
     const host = field.offsetParent?.getBoundingClientRect() ?? own;
     barAt = { left: own.left - host.left, top: own.top - host.top - BAR_GAP_PX };
+    mirrorStyle = field.style.cssText;
   }
 
   $effect(() => {
@@ -158,12 +162,16 @@
   });
 </script>
 
+{#if spans.length}
+  <div class="edit mirror" data-testid="core-text-paint" style="{mirrorStyle};color:transparent" aria-hidden="true">{#each spans as span, i (i)}<span style={span.style || `color:${look.color}`}>{span.text}</span>{/each}</div>
+{/if}
+
 <textarea
   bind:this={field}
   bind:value
   class="edit"
   data-testid="core-text-edit"
-  {style}
+  style={fieldStyle}
   rows="1"
   spellcheck="false"
   oninput={retyped}
@@ -223,6 +231,11 @@
 
   .range button:hover {
     background: var(--ui-hover, rgb(0 0 0 / 0.06));
+  }
+
+  .mirror {
+    outline: 0;
+    pointer-events: none;
   }
 
   .edit {

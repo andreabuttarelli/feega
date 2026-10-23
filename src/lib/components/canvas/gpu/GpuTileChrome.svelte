@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Tile } from '../CanvasFlow.svelte';
+  import type { Tile } from '../flow-types';
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { isNodeType } from '$lib/canvas/node-data';

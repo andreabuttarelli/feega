@@ -15,7 +15,8 @@ export enum FarmReason {
   Format = 'format',
   NoEncoder = 'no_encoder',
   Device = 'device',
-  NoAudio = 'no_audio'
+  NoAudio = 'no_audio',
+  FrameRate = 'frame_rate'
 }
 
 export enum Device {
@@ -35,6 +36,7 @@ export const DEVICE_LIMITS: Record<Device, DeviceLimit> = {
 const WEAK_MEMORY_GB = 3;
 const RESOLUTION_ORDER: readonly Resolution[] = [Resolution.P720, Resolution.P1080, Resolution.P1440, Resolution.P2160];
 
+const BROWSER_MAX_FPS = 60;
 const BROWSER_FORMATS: ReadonlySet<ExportFormat> = new Set([ExportFormat.Mp4H264]);
 
 export type DeviceInfo = { mobile: boolean; memoryGb: number | null; cores: number | null };
@@ -65,6 +67,11 @@ const RULES: readonly Rule[] = [
     reason: FarmReason.Format,
     applies: (i) => !BROWSER_FORMATS.has(i.settings.format),
     message: (i) => `${FORMAT[i.settings.format].label} cannot be encoded in a browser: it renders on our servers.`
+  },
+  {
+    reason: FarmReason.FrameRate,
+    applies: (i) => i.settings.fps > BROWSER_MAX_FPS,
+    message: (i) => `${i.settings.fps} fps is more than a browser encodes: it renders on our servers.`
   },
   {
     reason: FarmReason.NoEncoder,

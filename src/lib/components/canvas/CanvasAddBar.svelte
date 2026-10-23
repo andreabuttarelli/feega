@@ -119,6 +119,10 @@
     [DrawTool.Text]: Command.ToolText,
     [DrawTool.Rectangle]: Command.ToolRectangle,
     [DrawTool.Ellipse]: Command.ToolEllipse,
+    [DrawTool.Polygon]: Command.ToolPolygon,
+    [DrawTool.Star]: Command.ToolStar,
+    [DrawTool.Line]: Command.ToolLine,
+    [DrawTool.Arrow]: Command.ToolArrow,
     [DrawTool.Pen]: Command.ToolPen
   };
 
@@ -183,7 +187,7 @@
   const trailerTiles = $derived<Tile[]>(ontrailer ? [{ id: 'feega-trailer', label: TRAILER_LABEL, icon: Film, run: ontrailer }] : []);
 
   const IMAGE_TILE: Tile = { id: 'image', label: 'Insert image', icon: ImagePlus, run: pickImage };
-  const frameLibraryTile = (): Tile[] => (onframelibrary ? [{ id: 'frame-library', label: 'Frame templates', icon: LayoutTemplate, run: onframelibrary }] : []);
+  const frameLibraryTile = (): Tile[] => (onframelibrary ? [{ id: 'frame-library', label: 'Templates for this frame', icon: LayoutTemplate, run: onframelibrary }] : []);
 
   const canvasSections = (): Section[] => [
     { title: 'Design', tiles: drawTiles },
@@ -359,10 +363,10 @@
 {#snippet frameLibrarySlot()}
   {#if onframelibrary}
     <span class="tool">
-      <button type="button" class="keys-toggle" title="Frame templates" aria-label="Frame templates" data-testid="frame-library" onclick={onframelibrary}>
+      <button type="button" class="keys-toggle" title="Templates for this frame" aria-label="Templates for this frame" data-testid="frame-library" onclick={onframelibrary}>
         <LayoutTemplate size={17} strokeWidth={1.7} />
       </button>
-      <span class="add-tip" role="tooltip">Frame templates</span>
+      <span class="add-tip" role="tooltip">Templates for this frame</span>
     </span>
   {/if}
 {/snippet}

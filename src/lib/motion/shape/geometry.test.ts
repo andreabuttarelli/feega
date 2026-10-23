@@ -131,3 +131,28 @@ describe('flatten', () => {
     expect(flatten(ellipseOutline()[0]).length).toBeGreaterThan(30);
   });
 });
+
+describe('ellipse arcs', () => {
+  const box = { w: 100, h: 100 };
+  const xs = (o: ReturnType<typeof ellipseOutline>) => o.flatMap((c) => c.vertices.map((v) => v.p));
+
+  it('a full sweep without a hole is the plain ellipse', () => {
+    expect(ellipseOutline(box, { start: 0, sweep: 1, ratio: 0 })).toEqual(ellipseOutline(box));
+  });
+
+  it('a half sweep is a pie through the centre', () => {
+    const points = xs(ellipseOutline(box, { start: 0, sweep: 0.5, ratio: 0 }));
+    expect(points[0][0]).toBeCloseTo(100, 5);
+    expect(points[0][1]).toBeCloseTo(50, 5);
+    expect(points.some(([x, y]) => Math.abs(x - 50) < 1e-6 && Math.abs(y - 50) < 1e-6)).toBe(true);
+    expect(Math.max(...points.map((p) => p[1]))).toBeCloseTo(100, 5);
+    expect(Math.min(...points.map((p) => p[1]))).toBeCloseTo(50, 5);
+  });
+
+  it('a ratio cuts a ring: two contours when the sweep is full', () => {
+    const ring = ellipseOutline(box, { start: 0, sweep: 1, ratio: 0.5 });
+    expect(ring).toHaveLength(2);
+    expect(Math.min(...ring[1].vertices.map((v) => v.p[0]))).toBeCloseTo(25, 5);
+  });
+});
+

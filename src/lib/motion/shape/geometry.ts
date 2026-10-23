@@ -190,11 +190,56 @@ function merged(vertices: Vertex[]): Vertex[] {
   return out;
 }
 
-export function ellipseOutline(size: Size = UNIT): Outline {
+export type Arc = { start: number; sweep: number; ratio: number };
+
+export const FULL_ARC: Arc = { start: 0, sweep: 1, ratio: 0 };
+
+const QUARTER_TURN = Math.PI / 2;
+const DEGREES = Math.PI / 180;
+
+function fullEllipse(size: Size): Contour {
   const c: Pt = [size.w / 2, size.h / 2];
   const r: Pt = [size.w / 2, size.h / 2];
   const starts = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
-  return [{ vertices: merged(starts.flatMap((a) => arcCorner(c, r, a))), closed: true }];
+  return { vertices: merged(starts.flatMap((a) => arcCorner(c, r, a))), closed: true };
+}
+
+function arcVertices(c: Pt, r: Pt, from: number, to: number): Vertex[] {
+  const count = Math.max(1, Math.ceil(Math.abs(to - from) / QUARTER_TURN));
+  const step = (to - from) / count;
+  const handle = (4 / 3) * Math.tan(step / 4);
+  const at = (a: number): Pt => [c[0] + r[0] * Math.cos(a), c[1] + r[1] * Math.sin(a)];
+  const tangent = (a: number): Pt => [-r[0] * Math.sin(a) * handle, r[1] * Math.cos(a) * handle];
+  return Array.from({ length: count + 1 }, (_, i) => {
+    const a = from + i * step;
+    const p = at(a);
+    return { p, in: i === 0 ? p : sub(p, tangent(a)), out: i === count ? p : add(p, tangent(a)) };
+  });
+}
+
+const reversed = (contour: Contour): Contour => ({ closed: contour.closed, vertices: [...contour.vertices].reverse().map((v) => ({ p: v.p, in: v.out, out: v.in })) });
+
+const clampUnit = (n: number) => Math.max(-1, Math.min(1, n));
+
+export function ellipseOutline(size: Size = UNIT, arc: Arc = FULL_ARC): Outline {
+  const sweep = clampUnit(arc.sweep);
+  const ratio = Math.max(0, Math.min(1, arc.ratio));
+  const full = Math.abs(sweep) >= 1;
+  if (full && ratio <= 0) {
+    return [fullEllipse(size)];
+  }
+  const c: Pt = [size.w / 2, size.h / 2];
+  const r: Pt = [size.w / 2, size.h / 2];
+  const inner: Pt = [r[0] * ratio, r[1] * ratio];
+  if (full) {
+    const hole = mapOutline([fullEllipse(size)], ([x, y]) => [c[0] + (x - c[0]) * ratio, c[1] + (y - c[1]) * ratio])[0];
+    return [fullEllipse(size), reversed(hole)];
+  }
+  const from = arc.start * DEGREES;
+  const to = from + sweep * Math.PI * 2;
+  const outer = arcVertices(c, r, from, to);
+  const back = ratio > 0 ? arcVertices(c, inner, to, from) : [corner(c)];
+  return [{ vertices: [...outer, ...back], closed: true }];
 }
 
 function radial(count: number, radius: (i: number) => number, roundness: (i: number) => number, size: Size): Outline {

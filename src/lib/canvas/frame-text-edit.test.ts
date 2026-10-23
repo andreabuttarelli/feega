@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { findClip, MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { commitText, editCss, editLayout, editsText, hideText, runsOfClip, textEditStyle } from './frame-text-edit';
+import { commitText, editCss, editLayout, editsText, gradientSpans, hideText, runsOfClip, textEditStyle } from './frame-text-edit';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
 
 function withText() {
@@ -131,5 +131,22 @@ describe('the editing box follows the drawn text', () => {
 
     expect(css).toContain('text-transform:capitalize');
     expect(css).toContain('text-align:justify');
+  });
+});
+
+describe('gradientSpans', () => {
+  const fill = { type: 'linear-gradient', angle: 90, opacity: 1, visible: true, blend: 'normal', stops: [{ pos: 0, color: '#ff0000', opacity: 1 }, { pos: 1, color: '#0000ff', opacity: 1 }] } as never;
+
+  it('is empty while no range carries a gradient', () => {
+    expect(gradientSpans('Hello world', [{ start: 6, end: 11, color: '#fff' }])).toEqual([]);
+  });
+
+  it('splits the text at the gradient range and paints only that range', () => {
+    const spans = gradientSpans('Hello world', [{ start: 6, end: 11, fill }]);
+
+    expect(spans.map((s) => s.text)).toEqual(['Hello ', 'world']);
+    expect(spans[0].style).toBe('');
+    expect(spans[1].style).toContain('linear-gradient');
+    expect(spans[1].style).toContain('background-clip:text');
   });
 });
