@@ -5,7 +5,7 @@ import type { Db } from '$lib/server/db/client';
 import { createNode, deleteConnection, deleteNode, findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, frameChrome, motionNodeSize } from '$lib/canvas/motion-node';
+import { FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, leftEmpty, motionNodeSize } from '$lib/canvas/motion-node';
 import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
@@ -210,8 +210,6 @@ export async function landElement(store: FrameStore, from: StoredFrame & { right
   return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
 }
 
-const emptied = (source: StoredFrame, doc: MotionDoc) => !frameChrome(source.kind ?? FrameKind.Frame).takesDrops && doc.tracks.every((t) => t.clips.length === 0);
-
 function landOut(store: FrameStore, source: StoredFrame, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, box: Box | null): Promise<Landing> {
   const mode = docMode(source.doc);
   return source.stage ? landFree(store, source, element, drop, mode, box, source.stage) : landOnCanvas(store, source, element, drop, mode, box);
@@ -245,7 +243,7 @@ export async function moveElement(store: FrameStore, ask: MoveAsk): Promise<Move
     return landing;
   }
 
-  if (emptied(source, lifted.doc)) {
+  if (leftEmpty(source.kind ?? FrameKind.Frame, lifted.doc)) {
     await store.remove(source.nodeId);
     return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: [...landing.undo, deleted(source)] };
   }
