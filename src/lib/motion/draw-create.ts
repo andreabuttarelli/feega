@@ -27,9 +27,9 @@ const MIN_SIDE = 0.001;
 
 const SPAN: Record<DocMode, (doc: MotionDoc, frame: number, component: ComponentId) => { from: number; durationInFrames: number }> = {
   [DocMode.Still]: (doc) => ({ from: 0, durationInFrames: doc.durationInFrames }),
-  [DocMode.Video]: (doc, frame, component) => {
+  [DocMode.Video]: (doc, frame) => {
     const from = Math.min(Math.max(0, Math.round(frame)), doc.durationInFrames - 1);
-    return { from, durationInFrames: Math.max(1, Math.min(COMPONENTS[component].durationInFrames, doc.durationInFrames - from)) };
+    return { from, durationInFrames: Math.max(1, doc.durationInFrames - from) };
   }
 };
 

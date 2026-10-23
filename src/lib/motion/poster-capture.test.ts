@@ -7,8 +7,8 @@ describe('the poster of a composition', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('is taken at 40% of the video, where the content is on screen', () => {
-    expect(posterSecond({ durationInFrames: 300, fps: 30 })).toBe(4);
+  it('is taken at time 0, where every clip of a frame is on screen', () => {
+    expect(posterSecond({ durationInFrames: 300, fps: 30 })).toBe(0);
   });
 
   it('a burst of saves uploads one poster, after the edits settle', async () => {

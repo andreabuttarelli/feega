@@ -187,6 +187,16 @@ describe('a new frame made of one element', () => {
   });
 });
 
+describe('a picture inserted into a frame', () => {
+  it('spans the whole frame from time 0', () => {
+    const element = mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'gen' });
+    const doc = must(placeElement(target(), element, { at: { x: 0.5, y: 0.5 }, frame: 0 }, ids()));
+    const clip = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Image')!;
+
+    expect({ from: clip.from, end: clip.from + clip.durationInFrames }).toEqual({ from: 0, end: doc.durationInFrames });
+  });
+});
+
 describe('an output linked to a frame', () => {
   it('lands once, and a new output updates the same element', () => {
     const first = must(linkOutput(target(), 'gen-node', mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'a' }), ids()));

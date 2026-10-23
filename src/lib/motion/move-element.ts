@@ -13,7 +13,7 @@ export type Box = { left: number; top: number; width: number; height: number };
 
 type Carried = Pick<MotionDoc, 'assets' | 'fonts' | 'components' | 'comps'>;
 
-export type Element = { clip: MotionClip; fps: number; size: Size; stillAt: number; carried: Carried };
+export type Element = { clip: MotionClip; fps: number; size: Size; stillAt: number; carried: Carried; fillsFrame?: boolean };
 
 export type Placement = { at: Point; frame?: number };
 
@@ -192,6 +192,10 @@ function timed(clip: MotionClip, target: MotionDoc, element: Element, frame?: nu
     return { ...moved, durationInFrames, from: Math.max(0, target.still.frame - retime.frame(element.stillAt)) };
   }
   const wanted = Math.max(0, Math.round(frame ?? moved.from));
+  if (element.fillsFrame) {
+    const from = Math.min(wanted, target.durationInFrames - 1);
+    return { ...moved, from, durationInFrames: Math.max(1, target.durationInFrames - from) };
+  }
   return { ...moved, durationInFrames, from: Math.min(wanted, limit - durationInFrames) };
 }
 
@@ -350,7 +354,7 @@ export function mediaElement(output: Output, fps: number = FPS): Element {
   const durationInFrames = media.frames(output, fps) ?? Math.round((COMPONENTS[media.component].durationInFrames * fps) / FPS);
   const clip = newClip({ id: `${media.component.toLowerCase()}-${crypto.randomUUID().slice(0, 8)}`, from: 0, durationInFrames, component: media.component, props: { ...MEDIA_FIT[output.kind], [media.prop]: media.value(output) } });
   const asset = media.asset(output);
-  return { clip, fps, size: media.size(output), stillAt: 0, carried: { assets: asset ? [asset] : [], fonts: [], components: {}, comps: {} } };
+  return { clip, fps, size: media.size(output), stillAt: 0, fillsFrame: output.kind === OutputKind.Image, carried: { assets: asset ? [asset] : [], fonts: [], components: {}, comps: {} } };
 }
 
 function refreshed(doc: MotionDoc, clipId: string, element: Element): OpResult {
