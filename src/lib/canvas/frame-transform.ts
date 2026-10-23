@@ -79,12 +79,19 @@ function onWholePixels(d: Drag, dragged: Dragged): Dragged {
   return aligned.ok ? { ...dragged, result: aligned } : dragged;
 }
 
+const lockedRatio = (d: Drag): boolean => d.ids.every((id) => findClip(d.doc, id)?.clip.lockRatio);
+
+function withLock(d: Drag): Drag {
+  const keep = d.grip === Grip.Scale && (d.keys.shift || lockedRatio(d)) && !d.keys.ctrl;
+  return { ...d, keys: { ...d.keys, shift: d.grip === Grip.Scale ? keep : d.keys.shift } };
+}
+
 export function dragClips(d: Drag): Dragged {
   const missing = d.ids.find((id) => !present(d.doc, d.boxes)(id));
   if (missing || !d.ids.length) {
     return { result: { ok: false, error: `no clip ${missing ?? ''}` }, guides: [], gaps: [] };
   }
-  const at = d.snap === SnapMode.Off ? { ...d, reach: 0 } : d;
+  const at = d.snap === SnapMode.Off ? { ...withLock(d), reach: 0 } : withLock(d);
   const others = othersOf(at);
   return onWholePixels(at, asGroup(at) ? dragGroup(at, others) : dragOne(at, others));
 }

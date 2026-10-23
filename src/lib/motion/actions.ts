@@ -157,7 +157,9 @@ export enum Tool {
   ParentTo = 'parent-to',
   SelectSeveral = 'select-several',
   ClipProperties = 'clip-properties',
-  SampleColour = 'sample-colour'
+  SampleColour = 'sample-colour',
+  LockRatio = 'lock-ratio',
+  UnlockRatio = 'unlock-ratio'
 }
 
 export const Action = { ...Command, ...Tool } as const;
@@ -323,6 +325,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Tool.ShowLayer]: { name: 'Show layer', icon: EyeOff, place: Place.Layer },
   [Tool.LockLayer]: { name: 'Lock layer', icon: LockOpen, group: GuideGroup.Timeline, place: Place.Layer },
   [Tool.UnlockLayer]: { name: 'Unlock layer', icon: Lock, place: Place.Layer },
+  [Tool.LockRatio]: { name: 'Lock aspect ratio', icon: LockOpen, group: GuideGroup.Edit },
+  [Tool.UnlockRatio]: { name: 'Unlock aspect ratio', icon: Lock },
   [Command.ToolSelect]: { name: 'Select tool', icon: MousePointer2, group: GuideGroup.Edit, place: Place.Draw },
   [Command.ToolText]: { name: 'Text tool', icon: TypeIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
   [Command.ToolRectangle]: { name: 'Rectangle tool', icon: SquareIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
