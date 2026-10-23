@@ -1,5 +1,8 @@
 import { apply2d, mul2d, type Affine } from '../../affine';
-import { TYPE, type TextCase } from '../../components';
+import { NO_RULE, ruled, type Rule } from './rules';
+import { featuresFor, type Decoration, type DecorationStyle } from '../../decoration';
+import { TYPE, type LeadingTrim, type TextAlign, type TextCase, type TextWrap, type VerticalAlign } from '../../components';
+import { AUTO, leadingOf, trackingOf, type Leading } from '../../type-units';
 import { Ease } from '../../design';
 import { safeBox } from '../../fit';
 import { elementFills } from '../../fill/elements';
@@ -15,11 +18,11 @@ import { easeCurve } from '../../sample-track';
 import { elementStrokes } from '../../stroke/elements';
 import { TextSizing } from '../../text-sizing';
 import { rgbaOf, type Rgba } from '../rgba';
-import type { Face, FaceBook, Request } from './face';
+import type { Face, FaceBook, Features, Request } from './face';
 import type { FaceRule } from './fonts';
 import type { FontFace } from '../../fonts/model';
 import { caretLines, type CaretLine } from './caret';
-import { layOut, NO_EXTRA, Shaping, Spaces, type Extra, type Flow, type Glyph, type Laid, type Line, type Look, type RequestAt, type Type } from './layout';
+import { Justify, layOut, NO_LIMIT, PLAIN_PARAGRAPH, Trim, Wrap, NO_EXTRA, Shaping, Spaces, type Paragraph, type Extra, type Flow, type Glyph, type Laid, type Line, type Look as RunLook, type RequestAt, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
 import { clipped, contoursOf, dilated, within, type Rect } from './outline';
@@ -123,9 +126,38 @@ type Kind = {
   area: Area;
 };
 
-type Props = Record<string, unknown> & { text: string; size: number; align: keyof typeof ALIGN_SHARE; sizing?: TextSizing; easing: Ease };
+type Props = Record<string, unknown> & { text: string; size: number; align: TextAlign; sizing?: TextSizing; easing: Ease; verticalAlign?: VerticalAlign; paragraphSpacing?: number; paragraphIndent?: number; textWrap?: TextWrap; leadingTrim?: LeadingTrim; maxLines?: number };
 
-const ALIGN_SHARE = { left: 0, center: 0.5, right: 1 } as const;
+const ALIGN_SHARE: Record<TextAlign, number> = { left: 0, center: 0.5, right: 1, justify: 0 };
+const JUSTIFY_OF: Record<TextAlign, Justify> = { left: Justify.Off, center: Justify.Off, right: Justify.Off, justify: Justify.On };
+const VERTICAL_SHARE: Record<VerticalAlign, number> = { top: 0, center: 0.5, bottom: 1 };
+
+export type Typography = { vertical: number; paragraph: Paragraph; clips: boolean; rule: Rule; ruleColour: Rgba | null; features: Features };
+
+export const coreTypography = ({ leading, typography: { vertical, paragraph, clips, rule, features } }: Pick<TextPlan, 'leading' | 'typography'>) =>
+  leading !== AUTO && !clips && rule.line === NO_RULE.line && !Object.keys(features).length && vertical === VERTICAL_SHARE.center && (Object.keys(PLAIN_PARAGRAPH) as (keyof Paragraph)[]).every((key) => paragraph[key] === PLAIN_PARAGRAPH[key]);
+
+const WRAP_OF: Record<TextWrap, Wrap> = { wrap: Wrap.Greedy, balance: Wrap.Balance, pretty: Wrap.Pretty };
+const TRIM_OF: Record<LeadingTrim, Trim> = { none: Trim.None, cap: Trim.Cap };
+
+const truncates = (p: Props) => p.truncate === true;
+
+const ruleOf = (p: Props): Rule => ({
+  line: (p.decoration as Decoration | undefined) ?? NO_RULE.line,
+  style: (p.decorationStyle as DecorationStyle | undefined) ?? NO_RULE.style,
+  thickness: Number(p.decorationThickness ?? NO_RULE.thickness),
+  offset: Number(p.decorationOffset ?? NO_RULE.offset),
+  skipInk: p.skipInk !== false
+});
+
+const paragraphOf = (p: Props): Paragraph => ({
+  indent: Number(p.paragraphIndent ?? 0),
+  spacing: Number(p.paragraphSpacing ?? 0),
+  justify: JUSTIFY_OF[p.align] ?? Justify.Off,
+  wrap: WRAP_OF[p.textWrap ?? 'wrap'],
+  limit: truncates(p) ? Number(p.maxLines ?? NO_LIMIT) : NO_LIMIT,
+  trim: TRIM_OF[p.leadingTrim ?? 'none']
+});
 const PERCENT = 100;
 const rounded = (p: Props, unit: number) => Math.round(p.size * unit * PERCENT) / PERCENT;
 const lines = (text: string) => text.split('\n');
@@ -149,12 +181,14 @@ const sizingOf = (p: Props) => p.sizing ?? TextSizing.Fixed;
 
 const KINDS: Record<TextComponent, Kind> = {
   Title: { size: rounded, paragraphs: lines, flow: () => NORMAL, fits: () => true, upper: false, inset: 0, frame: (_p, box, stage) => ({ box: safeBox(box, stage), anchor: Anchor.Centre, hugs: false }), motion: Motion.LinesRise, area: Area.Block },
-  Text: { size: rounded, paragraphs: lines, flow: (p) => TEXT_FLOW[sizingOf(p)], fits: (p) => sizingOf(p) === TextSizing.Fixed, upper: false, inset: 0, frame: (p, box) => ({ box, ...TEXT_FRAME[sizingOf(p)] }), motion: Motion.FadeUp, area: Area.Line },
+  Text: { size: rounded, paragraphs: lines, flow: (p) => TEXT_FLOW[sizingOf(p)], fits: (p) => sizingOf(p) === TextSizing.Fixed && !truncates(p), upper: false, inset: 0, frame: (p, box) => ({ box, ...TEXT_FRAME[sizingOf(p)] }), motion: Motion.FadeUp, area: Area.Line },
   Kicker: { size: rounded, paragraphs: whole, flow: () => NORMAL, fits: () => true, upper: true, inset: 0, frame: centred, motion: Motion.None, area: Area.Whole },
   Caption: { size: (p, unit) => p.size * unit, paragraphs: whole, flow: () => NORMAL, fits: () => true, upper: false, inset: 0.5, frame: centred, motion: Motion.None, area: Area.Line }
 };
 
-const CASE: Record<TextCase, (s: string) => string> = { 'as-typed': (s) => s, upper: (s) => s.toUpperCase(), lower: (s) => s.toLowerCase() };
+const WORD_START = /(^|\s)(\S)/gu;
+
+const CASE: Record<TextCase, (s: string) => string> = { 'as-typed': (s) => s, upper: (s) => s.toUpperCase(), lower: (s) => s.toLowerCase(), title: (s) => s.replace(WORD_START, (_, gap: string, first: string) => gap + first.toUpperCase()), 'small-caps': (s) => s };
 
 export const casedOf = (component: TextComponent, p: Record<string, unknown>) => CASE[KINDS[component].upper ? 'upper' : ((p.textCase as TextCase) ?? 'as-typed')](String(p.text));
 
@@ -399,12 +433,13 @@ export type TextPlan = {
   size: number;
   fits: boolean;
   tracking: number;
-  leading: number;
+  leading: Leading;
   inset: number;
   shaping: Shaping;
   flow: Flow;
   frame: PlanFrame;
   align: number;
+  typography: Typography;
   fade: number;
   rises: number[] | null;
   area: Area;
@@ -420,7 +455,7 @@ export type TextPlan = {
   share: number;
 };
 
-export type UniformPlan = Omit<TextPlan, 'runs' | 'starts' | 'tints' | 'gradients' | 'share'>;
+export type UniformPlan = Omit<TextPlan, 'runs' | 'starts' | 'tints' | 'gradients' | 'share' | 'typography'>;
 
 type Word = { line: number; chars: number };
 
@@ -460,26 +495,28 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
   const run = animation(cased, env.animators);
   const paragraphs = kind.paragraphs(cased);
   const frame = kind.frame(p, env.box, env.stage);
+  const size = kind.size(p, Math.min(env.stage.width, env.stage.height));
   return {
     text: cased,
     paragraphs,
     request: { family: String(p.font), weight: Number(p.weight), italic: p.italic === true, axes: axesOf(p) },
-    size: kind.size(p, Math.min(env.stage.width, env.stage.height)),
+    size,
     fits: kind.fits(p),
-    tracking: Number(p.tracking),
-    leading: Number(p.leading),
+    tracking: trackingOf(p, size),
+    leading: leadingOf(p, size),
     inset: kind.inset,
     shaping: run?.finest === AnimatorUnit.Char ? Shaping.Chars : Shaping.Runs,
     flow: kind.flow(p),
     frame: { left: frame.box.left - env.box.left, top: frame.box.top - env.box.top, width: frame.box.width, height: frame.box.height, anchor: frame.anchor, hugs: frame.hugs },
     align: ALIGN_SHARE[p.align] ?? 0,
+    typography: { vertical: VERTICAL_SHARE[p.verticalAlign ?? 'center'], paragraph: paragraphOf(p), clips: truncates(p) && sizingOf(p) === TextSizing.Fixed, rule: ruleOf(p), ruleColour: p.decorationColor ? colour(String(p.decorationColor)) : null, features: featuresFor(p) },
     fade: kind.motion === Motion.FadeUp ? progress(env, { at: 0, duration: FADE_FRAMES / env.fps }, p.easing) : 1,
     rises: kind.motion === Motion.LinesRise ? paragraphs.map((_, i) => progress(env, { at: (i * LINE_STAGGER) / env.fps, duration: REVEAL_FRAMES / env.fps }, p.easing)) : null,
     area: kind.area,
     backdrop: kind.inset > 0 ? colour(String(p.background)) : null,
     fills,
     outline: outlineOf(env, colour),
-    animation: run ? { finest: run.finest, looks: looksOf(cased, run, colour, throughText(visibleFills), Number(p.tracking)) } : null,
+    animation: run ? { finest: run.finest, looks: looksOf(cased, run, colour, throughText(visibleFills), trackingOf(p, size)) } : null,
     smoothing: env.smoothing,
     runs,
     starts: startsOf(paragraphs),
@@ -511,7 +548,7 @@ function requestAtOf(plan: TextPlan, size: number): RequestAt | undefined {
   if (!plan.runs.length) {
     return undefined;
   }
-  const plain: Look = { request: plan.request, size, tracking: plan.tracking, leading: plan.leading };
+  const plain: RunLook = { request: plan.request, size, tracking: plan.tracking, leading: plan.leading };
   return (paragraph, char) => {
     const run = runOf(plan, paragraph, char);
     if (!run) {
@@ -533,19 +570,24 @@ function decorations(run: TextRun | null, g: Glyph, x: number, baseline: number)
 
 type Placed = { laid: Laid; type: Type; room: number };
 
+const topOf = (plan: TextPlan, laid: Laid) => plan.frame.top + (plan.frame.anchor === Anchor.Centre ? (plan.frame.height - laid.height) * plan.typography.vertical : 0);
+
 function place(plan: TextPlan, fonts: FaceBook): Placed {
-  const typeAt = (size: number): Type => {
+  const typeAt = (size: number, limit = plan.typography.paragraph.limit): Type => {
     const requestAt = requestAtOf(plan, size);
-    return { request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping, ...(requestAt ? { requestAt } : {}) };
+    const paragraph = { ...plan.typography.paragraph, limit, indent: plan.typography.paragraph.indent * size, spacing: plan.typography.paragraph.spacing * size };
+    return { request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping, paragraph, features: plan.typography.features, ...(requestAt ? { requestAt } : {}) };
   };
   const looks = plan.animation?.looks;
   const words = wordsOf(plan.text);
   const before = charsBeforeOf(words);
   const wordsBefore = plan.paragraphs.map((_, i) => plan.paragraphs.slice(0, i).reduce((n, para) => n + (para.match(WORD)?.length ?? 0), 0));
   const extra: Extra = looks ? (paragraph, word, letter) => looks[(before[wordsBefore[paragraph] + word] ?? 0) + letter]?.spacing ?? 0 : NO_EXTRA;
-  const lay = (size: number) => layOut(plan.paragraphs, typeAt(size), plan.flow, plan.frame.width, fonts, extra);
+  const lay = (size: number, limit?: number) => layOut(plan.paragraphs, typeAt(size, limit), plan.flow, plan.frame.width, fonts, extra);
   const size = plan.fits ? fitSize(plan.size, (s) => lay(s), plan.frame) : plan.size;
-  const laid = lay(size);
+  const whole = lay(size);
+  const overflows = plan.typography.clips && plan.typography.paragraph.limit === NO_LIMIT && whole.height > plan.frame.height;
+  const laid = overflows ? lay(size, Math.max(1, Math.floor(plan.frame.height / whole.lineHeight))) : whole;
   return { laid, type: typeAt(size), room: plan.frame.hugs ? laid.width : plan.frame.width };
 }
 
@@ -588,7 +630,7 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
   }
   const smoothing = SMOOTHING[plan.smoothing];
   const { left } = plan.frame;
-  const top = plan.frame.top + (plan.frame.anchor === Anchor.Centre ? (plan.frame.height - laid.height) / 2 : 0);
+  const top = topOf(plan, laid);
   const matrix: Affine = [1, 0, 0, 1, left, top + FADE_RISE_PX * (1 - plan.fade)];
   const inks: Ink[] = [];
   const stripWidth = laid.blocks.reduce((n, b) => n + b.lines.reduce((m, line) => m + inkedWidth(line), 0), 0);
@@ -597,6 +639,7 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
     const rise = plan.rises ? (RISE_PERCENT / PERCENT) * block.height * (1 - plan.rises[i]) : 0;
     const mask: Rect | null = plan.rises ? [0, block.top, room, block.top + block.height + DESCENDER_EM * type.size] : null;
     const backdrop: number[][] = [];
+    const ruleInk: number[][] = [];
     const units = new Map<string, Unit>();
     block.lines.forEach((line, l) => {
       const x = (room - line.width) * plan.align;
@@ -620,12 +663,18 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
         const key = `${slot ? slot.key : -1}:${plan.area === Area.Line ? l : 0}:${colour}:${gradient}:${style?.opacity ?? 1}`;
         const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], glyphs: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area], colour, gradient, opacity: style?.opacity ?? 1 };
         units.set(key, unit);
-        unit.contours.push(...moved(glyphContours(g.face, g.glyph, g.size, g.skew, smoothing.darken(g.size)), x + g.x, baseline - g.dy), ...decorations(style, g, x, baseline));
+        const shape = moved(glyphContours(g.face, g.glyph, g.size, g.skew, smoothing.darken(g.size)), x + g.x, baseline - g.dy);
+        const rules = ruled(plan.typography.rule, g, x, baseline, shape);
+        unit.contours.push(...shape, ...decorations(style, g, x, baseline), ...(plan.typography.ruleColour ? [] : rules));
+        ruleInk.push(...(plan.typography.ruleColour ? rules : []));
         unit.glyphs.push({ face: g.face, skew: g.skew, glyph: g.glyph, x: x + g.x, y: baseline - g.dy });
         unit.outlines.push(...(plan.outline ? moved(glyphContours(g.face, g.glyph, g.size, g.skew, 0), x + g.x, baseline - g.dy + smoothing.rise) : []));
         unit.box = [Math.min(unit.box[0], x + g.pen), Math.min(unit.box[1], top), Math.max(unit.box[2], x + g.pen + g.advance), Math.max(unit.box[3], top + line.height)];
       }
     });
+    if (plan.typography.ruleColour && ruleInk.length) {
+      inks.push({ contours: ruleInk, paint: { kind: PaintKind.Solid, color: plan.typography.ruleColour }, rule: FillRule.NonZero, opacity: plan.fade, matrix, blur: 0 });
+    }
     if (plan.backdrop) {
       inks.push({ contours: backdrop, paint: { kind: PaintKind.Solid, color: plan.backdrop }, rule: FillRule.NonZero, opacity: plan.fade, matrix, blur: 0 });
     }
@@ -664,7 +713,7 @@ function spaceOf(laid: Laid, paragraphs: string[], size: number): number {
   return glyphs[0]?.advance ?? size * SPACE_EM;
 }
 
-export type Caret = { lines: CaretLine[]; left: number; top: number; width: number; height: number; size: number; centred: boolean };
+export type Caret = { lines: CaretLine[]; left: number; top: number; width: number; height: number; size: number; vertical: number };
 
 export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
   const { laid, room, type } = place(plan, fonts);
@@ -674,7 +723,7 @@ export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
   if (laid.missing) {
     return TextGap.Glyph;
   }
-  const top = plan.frame.top + (plan.frame.anchor === Anchor.Centre ? (plan.frame.height - laid.height) / 2 : 0);
+  const top = topOf(plan, laid);
   return {
     lines: caretLines(laid, plan.paragraphs, { room, align: plan.align, top: 0, space: spaceOf(laid, plan.paragraphs, type.size) }),
     left: plan.frame.left,
@@ -682,6 +731,6 @@ export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
     width: plan.frame.hugs ? laid.width : plan.frame.width,
     height: plan.frame.anchor === Anchor.Top ? laid.height : plan.frame.height,
     size: type.size,
-    centred: plan.frame.anchor === Anchor.Centre
+    vertical: plan.frame.anchor === Anchor.Centre ? plan.typography.vertical : 0
   };
 }

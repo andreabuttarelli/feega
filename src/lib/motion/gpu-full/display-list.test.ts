@@ -312,10 +312,13 @@ describe('textBoxesAt', () => {
     const fixed = textCaretAt(prepare(texted({ sizing: 'fixed' }), FEEGA_TOKENS, {}, boxType), 0, 'text')!;
     const auto = textCaretAt(prepare(texted({ sizing: 'auto' }), FEEGA_TOKENS, {}, boxType), 0, 'text')!;
 
-    expect(fixed.centred).toBe(true);
+    const bottom = textCaretAt(prepare(texted({ sizing: 'fixed', verticalAlign: 'bottom' }), FEEGA_TOKENS, {}, boxType), 0, 'text')!;
+
+    expect(fixed.vertical).toBe(0.5);
+    expect(bottom.vertical).toBe(1);
     expect(fixed.flow.wraps).toBe(true);
     expect(fixed.size).toBeLessThanOrEqual(0.05 * Math.min(withBg.width, withBg.height));
-    expect(auto.centred).toBe(false);
+    expect(auto.vertical).toBe(0);
     expect(auto.flow.wraps).toBe(false);
   });
 });

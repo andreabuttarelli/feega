@@ -3234,3 +3234,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## A worktree dev server ignores your edits
 
 **Signal:** a `console.log` you just added never shows; `curl` of the module from vite lacks it. **Move:** vite does not watch files under `.claude/worktrees/`; restart the dev server after every edit.
+
+## `npx prettier --write` rewrites whole files
+
+**Signal:** a small diff becomes thousands of lines, single quotes turn double. **Move:** the repo has no prettier config; never run prettier. Lost edits staged once survive as unreachable blobs: `git fsck --unreachable --no-reflogs`, match by identifier set.

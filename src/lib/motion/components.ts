@@ -21,6 +21,8 @@ import { effectProblem } from './shader-effects/preset';
 import { fillsSchema } from './fill/model';
 import { strokesSchema } from './stroke/model';
 import { runsSchema } from './text-runs';
+import { LETTER_SPACING, LINE_HEIGHT } from './type-units';
+import { DECORATION_STYLES, DECORATIONS, FEATURES, RULE } from './decoration';
 import { counterSchema } from './text-counter';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
@@ -101,7 +103,15 @@ const BLEED_REACH = 2;
 export const TITLE_LOOK = { weight: SEMIBOLD, tracking: -0.05 } as const;
 export const TITLE_RANGE = { weight: [MEDIUM, SEMIBOLD], tracking: [-0.07, -0.04] } as const;
 export const ALIGNS = ['left', 'center', 'right'] as const;
-export const TEXT_CASES = ['as-typed', 'upper', 'lower'] as const;
+export const TEXT_CASES = ['as-typed', 'upper', 'lower', 'title', 'small-caps'] as const;
+export const TEXT_ALIGNS = [...ALIGNS, 'justify'] as const;
+export type TextAlign = (typeof TEXT_ALIGNS)[number];
+export const VERTICAL_ALIGNS = ['top', 'center', 'bottom'] as const;
+export const TEXT_WRAPS = ['wrap', 'balance', 'pretty'] as const;
+export type TextWrap = (typeof TEXT_WRAPS)[number];
+export const LEADING_TRIMS = ['none', 'cap'] as const;
+export type LeadingTrim = (typeof LEADING_TRIMS)[number];
+export type VerticalAlign = (typeof VERTICAL_ALIGNS)[number];
 export { TEXT_SIZINGS, TextSizing } from './text-sizing';
 export type TextCase = (typeof TEXT_CASES)[number];
 export const MOVES = ['none', 'drift-up', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'] as const;
@@ -149,6 +159,31 @@ const typography = (size: number, fallbackColor: string, look: Look) => ({
   stretch: range(TYPE.stretch.min, TYPE.stretch.max, TYPE.stretch.step, TYPE.stretch.fallback, 'Width axis', Group.Style),
   slant: range(TYPE.slant.min, TYPE.slant.max, TYPE.slant.step, TYPE.slant.fallback, 'Slant axis', Group.Style),
   axes: z.string().max(200).regex(AXES, "axes look like 'GRAD' 50, 'CASL' 1").default('').meta({ control: Control.Text, label: 'Other axes', group: Group.Style })
+});
+
+export const PARAGRAPH = {
+  spacing: { min: 0, max: 4, step: 0.05 },
+  indent: { min: 0, max: 10, step: 0.1 },
+  maxLines: { min: 0, max: 100, step: 1 }
+} as const;
+
+const paragraph = () => ({
+  align: choice(TEXT_ALIGNS, 'center', 'Align', Group.Layout),
+  verticalAlign: choice(VERTICAL_ALIGNS, 'center', 'Vertical align', Group.Layout),
+  paragraphSpacing: range(PARAGRAPH.spacing.min, PARAGRAPH.spacing.max, PARAGRAPH.spacing.step, 0, 'Paragraph spacing', Group.Style),
+  paragraphIndent: range(PARAGRAPH.indent.min, PARAGRAPH.indent.max, PARAGRAPH.indent.step, 0, 'Indent', Group.Style),
+  lineHeight: z.string().regex(LINE_HEIGHT, 'line height is auto, 24px or 120%').default('').meta({ control: Control.Text, label: 'Line height', group: Group.Style }),
+  letterSpacing: z.string().regex(LETTER_SPACING, 'letter spacing is 2px or 5%').default('').meta({ control: Control.Text, label: 'Letter spacing', group: Group.Style }),
+  maxLines: range(PARAGRAPH.maxLines.min, PARAGRAPH.maxLines.max, PARAGRAPH.maxLines.step, 0, 'Max lines', Group.Style),
+  textWrap: choice(TEXT_WRAPS, 'wrap', 'Wrap', Group.Style),
+  leadingTrim: choice(LEADING_TRIMS, 'none', 'Vertical trim', Group.Style),
+  decoration: choice(DECORATIONS, 'none', 'Decoration', Group.Style),
+  decorationStyle: choice(DECORATION_STYLES, 'solid', 'Decoration style', Group.Style),
+  decorationThickness: range(RULE.thickness.min, RULE.thickness.max, RULE.thickness.step, RULE.thickness.fallback, 'Decoration thickness', Group.Style),
+  decorationOffset: range(RULE.offset.min, RULE.offset.max, RULE.offset.step, RULE.offset.fallback, 'Underline offset', Group.Style),
+  decorationColor: z.union([z.literal(''), z.string().regex(COLOR)]).default('').meta({ control: Control.Color, label: 'Decoration colour', group: Group.Style }),
+  skipInk: toggle(true, 'Skip ink', Group.Style),
+  features: z.string().max(200).regex(FEATURES, "features look like 'tnum' 1, 'liga' 0").default('').meta({ control: Control.Text, label: 'OpenType features', group: Group.Style })
 });
 
 export const LIGHTINGS = ['studio', 'soft', 'dramatic'] as const;
@@ -282,7 +317,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }) })
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
       .strict()
   },
   Kicker: {

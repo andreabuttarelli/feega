@@ -120,7 +120,7 @@ const GROUP_SECTION: Record<Group, Section> = {
   [Group.Camera]: Section.ThreeD
 };
 
-const TEXT_KEYS: ReadonlySet<string> = new Set(['font', 'weight', 'fontWeight', 'italic', 'size', 'tracking', 'leading', 'textCase', 'stretch', 'slant', 'axes', 'align', 'sizing']);
+const TEXT_KEYS: ReadonlySet<string> = new Set(['font', 'weight', 'fontWeight', 'italic', 'size', 'tracking', 'leading', 'textCase', 'stretch', 'slant', 'axes', 'align', 'sizing', 'verticalAlign', 'paragraphSpacing', 'paragraphIndent', 'lineHeight', 'letterSpacing', 'maxLines', 'textWrap', 'leadingTrim', 'decoration', 'decorationStyle', 'decorationThickness', 'decorationOffset', 'decorationColor', 'skipInk', 'features']);
 
 const KEY_SECTION: Record<string, Section> = {
   opacity: Section.Layer,
@@ -192,6 +192,8 @@ const LOOKS: Record<string, Partial<FieldLook>> = {
   size: { short: 'Size' },
   tracking: { short: 'Spacing', unit: EM },
   leading: { short: 'Line', unit: TIMES },
+  paragraphSpacing: { short: 'Paragraph', unit: EM },
+  paragraphIndent: { short: 'Indent', unit: EM },
   rotateX: { short: 'Tilt X', unit: DEGREES },
   rotateY: { short: 'Tilt Y', unit: DEGREES },
   rotateZ: { short: 'Rotate', unit: DEGREES },
