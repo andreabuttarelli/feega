@@ -20,6 +20,8 @@ type PictureItem = ImageItem | LayerItem;
 
 const NO_PICTURES: Pictures = () => null;
 
+const wired = (list: DisplayList) => JSON.stringify({ ...list, width: Math.ceil(list.width), height: Math.ceil(list.height) });
+
 const coverPicture = (src: string) => ({ kind: ItemKind.Image, clip: src, src, video: false }) as ImageItem;
 
 export const pictureKey = (item: PictureItem): string => (item.kind === ItemKind.Layer ? item.source : item.clip);
@@ -103,15 +105,15 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
   return {
     draw: (list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
-      return attached.draw(JSON.stringify(list)).split('\n').filter(Boolean);
+      return attached.draw(wired(list)).split('\n').filter(Boolean);
     },
     putGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
-      attached.put_group(key, JSON.stringify(list));
+      attached.put_group(key, wired(list));
     },
     appendGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
-      attached.append_group(key, JSON.stringify(list));
+      attached.append_group(key, wired(list));
     },
     patchGroup: (from: string, to: string, splice: Splice, pictures = NO_PICTURES) => {
       wantedPictures(splice.items).forEach((item) => upload(item, pictures));
