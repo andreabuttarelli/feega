@@ -49,7 +49,7 @@ import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } 
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { offsetFrom } from '$lib/canvas/duplicate-plan';
-import { ShowRun, removeNodes, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
+import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { templateLibrary } from '$lib/server/motion/templates';
@@ -953,6 +953,21 @@ export const actions: Actions<CanvasParams> = {
       return fail(404, { error: 'node not found' });
     }
     return { resized: true };
+  },
+
+  rename: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+
+    const nodeId = String(fd.get('node_id') ?? '');
+    if (!nodeId) {
+      return fail(HTTP_BAD_REQUEST, { error: 'invalid rename' });
+    }
+
+    if (!(await renameOnCanvas(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId, name: String(fd.get('name') ?? '') }))) {
+      return fail(404, { error: 'node not found' });
+    }
+    return { renamed: true };
   },
 
   /**

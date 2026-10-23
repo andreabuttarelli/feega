@@ -23,7 +23,7 @@ const DOC: Record<string, Access> = {
   assets: { write: ['add_asset', 'remove_asset'], read: 'assets' },
   camera: { write: ['set_camera'], read: 'camera' },
   look: { write: ['set_look', 'set_light', 'remove_light', 'set_light_keyframes'], read: 'look' },
-  fonts: { write: ['set_font', 'register_font', 'remove_font'], read: 'fonts' },
+  fonts: { write: ['set_font', 'register_font', 'remove_font', 'replace_font'], read: 'fonts' },
   components: { write: ['write_component', 'update_components', 'remove_component'], read: 'components' },
   shaders: { write: ['add_custom_effect'], read: 'shaders' },
   markers: { write: ['set_marker', 'remove_marker', 'mark_beats'], read: 'markers' },

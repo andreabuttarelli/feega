@@ -42,7 +42,7 @@
     }
     const content = field.scrollHeight;
     laid ??= content;
-    field.style.marginTop = layout.centred ? `${(laid - content) / 2}px` : '0';
+    field.style.marginTop = `${(laid - content) * layout.vertical}px`;
     field.style.height = `${content}px`;
     const own = field.getBoundingClientRect();
     const host = field.offsetParent?.getBoundingClientRect() ?? own;

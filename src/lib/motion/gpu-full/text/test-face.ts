@@ -1,4 +1,4 @@
-import { Ligatures, Op, type Face, type FaceBook, type Resolved } from './face';
+import { Ligatures, Op, type Face, type Features, type FaceBook, type Resolved } from './face';
 
 export const UPM = 1000;
 export const WIDE = 500;
@@ -6,13 +6,15 @@ export const SPACE = 250;
 const SPACE_CODE = 32;
 
 export const seenLigatures: Ligatures[] = [];
+export const seenFeatures: Features[] = [];
 
 export const boxFace: Face = {
   unitsPerEm: UPM,
   ascent: 800,
   descent: 200,
-  shape: (text, ligatures) => {
+  shape: (text, ligatures, features = {}) => {
     seenLigatures.push(ligatures);
+    seenFeatures.push(features);
     return [...text].map((c) => ({ glyph: c.codePointAt(0)!, advance: c.codePointAt(0) === SPACE_CODE ? SPACE : WIDE, dx: 0, dy: 0, chars: 1 }));
   },
   outline: (glyph) =>

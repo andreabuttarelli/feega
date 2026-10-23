@@ -7,6 +7,7 @@ import { SIGNED_URL_TTL_S, signAssetFile, storeAssetFile } from '$lib/server/rep
 import { frameStore } from './move-element';
 import { chromiumExport } from './chromium-frames';
 import { drawTargets } from './selection-draw';
+import { vectorOf } from './vector-list';
 import { libsOrigin } from './libs-origin';
 import { composeHtml } from '$lib/motion/hyperframes/compose';
 import { assetUrls, motionAssets, motionTokens } from './editor';
@@ -22,10 +23,11 @@ export function selectionPorts(scope: SelectionScope): SelectionPorts {
   const tokens = motionTokens(db, { orgId, brandId: scope.brandId });
   const canvasOf = new Map<string, string>();
 
-  const compose = async (target: DrawTarget) => {
-    const assets = await motionAssets({ db, orgId, projectId, canvasId: canvasOf.get(target.nodeId)! }, SIGNED_URL_TTL_S.render);
-    return composeHtml({ doc: target.doc, tokens: await tokens, assets: assetUrls(assets), origin: libsOrigin() });
-  };
+  const urlsOf = async (target: DrawTarget) => assetUrls(await motionAssets({ db, orgId, projectId, canvasId: canvasOf.get(target.nodeId)! }, SIGNED_URL_TTL_S.render));
+
+  const compose = async (target: DrawTarget) => composeHtml({ doc: target.doc, tokens: await tokens, assets: await urlsOf(target), origin: libsOrigin() });
+
+  const vector = async (target: DrawTarget) => vectorOf({ doc: target.doc, tokens: await tokens, assets: await urlsOf(target) });
 
   return {
     read: async (nodeId) => {
@@ -36,7 +38,7 @@ export function selectionPorts(scope: SelectionScope): SelectionPorts {
       canvasOf.set(nodeId, frame.canvasId);
       return { name: node?.displayName || FRAME_NAME, doc: frame.doc };
     },
-    draw: (targets, row) => drawTargets(chromiumExport, compose, targets, row),
+    draw: (targets, row) => drawTargets({ port: chromiumExport, compose, vector }, targets, row),
     store: async (packed) => {
       const path = `${canvasUploadPrefix(orgId, projectId)}exports/${crypto.randomUUID()}/${packed.name}`;
       await storeAssetFile(db, path, new File([new Uint8Array(packed.bytes)], packed.name, { type: packed.mime }));

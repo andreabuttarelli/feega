@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs';
 import type { Browser, Page } from 'puppeteer-core';
 import shaderRuntime from 'virtual:motion-shader-fx';
 import type { ExportPage, ExportPort, PageBox, StillPage, StillPort, Viewport } from './server-frames';
-import { freezePage } from '$lib/motion/export-vector';
 import { Pose, kindsOf, measureClips } from '$lib/motion/hyperframes/measure';
 import type { GlPage } from '$lib/server/effects/check';
 
@@ -117,7 +116,6 @@ async function exportPageOf(viewport: Viewport): Promise<ExportPage> {
   const page = await openPage(viewport);
   return {
     ...stillOf(page),
-    freeze: async () => (await page.evaluate(`(${freezePage.toString()})(document)`)) as string,
     boxOf: (clipId) => boxOf(page, clipId),
     shot: async (mime, quality, clip) => Buffer.from(await page.screenshot({ type: SCREENSHOT_TYPE[mime], quality, omitBackground: true, ...(clip ? { clip: { x: clip.left, y: clip.top, width: clip.width, height: clip.height } } : {}) }))
   };

@@ -40,6 +40,16 @@ describe('motion agent font tools', () => {
     expect(session.doc.fonts).toEqual([]);
   });
 
+  it('replace_font swaps a family for another across the whole video', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 2 });
+    await run('set_font', { clip_id: 'id1', family: 'Playfair Display' });
+
+    expect((await run('replace_font', { from: 'Playfair Display', to: 'Space Grotesk' })).ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.props.font).toBe('Space Grotesk');
+    expect(session.doc.fonts.map((f) => f.family)).toEqual(['Space Grotesk']);
+  });
+
   it('register_font makes a family available to custom component font params', async () => {
     const { session, run } = setup();
     expect((await run('register_font', { family: 'Space Grotesk' })).ok).toBe(true);

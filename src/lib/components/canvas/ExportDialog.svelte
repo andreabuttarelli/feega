@@ -2,7 +2,7 @@
   import ExportRows from '$lib/components/motion/ExportRows.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
 
-  type Made = { url: string; name: string; files: string[] };
+  type Made = { url: string; name: string; files: string[]; skipped?: string[] };
 
   let { count, onexport, onclose }: { count: number; onexport: (rows: ExportRow[]) => Promise<Made | string>; onclose: () => void } = $props();
 </script>

@@ -419,6 +419,18 @@ export async function moveNode(
   return data ? toNode(data) : null;
 }
 
+export async function renameNode(db: Db, input: { orgId: string; nodeId: string; name: string | null }): Promise<void> {
+  const { error } = await db
+    .from('nodes')
+    .update({ display_name: input.name, updated_at: new Date().toISOString() })
+    .eq('id', input.nodeId)
+    .eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function resizeNode(
   db: Db,
   input: { orgId: string; nodeId: string; width: number; height: number }

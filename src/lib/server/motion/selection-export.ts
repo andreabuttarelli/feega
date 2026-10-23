@@ -29,9 +29,11 @@ export type SelectionFrame = { name: string; doc: MotionDoc };
 
 export type DrawTarget = { nodeId: string; doc: MotionDoc; elementId?: string };
 
+export type Drawn = { bytes: Buffer; skipped: string[] };
+
 export type SelectionPorts = {
   read: (nodeId: string) => Promise<SelectionFrame | null>;
-  draw: (targets: DrawTarget[], row: ExportRow) => Promise<Buffer>;
+  draw: (targets: DrawTarget[], row: ExportRow) => Promise<Drawn>;
   store: (packed: Packed) => Promise<{ asset_id: string; url: string }>;
 };
 
@@ -40,7 +42,7 @@ export type ExportTarget = { nodeId: string; elementId?: string };
 export type SelectionAsk = { targets: ExportTarget[]; rows: ExportRow[]; name: string };
 
 export type SelectionExported =
-  | { outcome: ExportOutcome.Done; asset_id: string; url: string; name: string; files: string[] }
+  | { outcome: ExportOutcome.Done; asset_id: string; url: string; name: string; files: string[]; skipped: string[] }
   | { outcome: ExportOutcome.NotFound | ExportOutcome.NoElement; nodeId: string; elementId?: string };
 
 const asDrawn = (doc: MotionDoc, row: ExportRow): MotionDoc => (row.transparent ? { ...doc, background: Background.Transparent } : doc);
@@ -67,18 +69,22 @@ export async function exportSelection(ports: SelectionPorts, ask: SelectionAsk):
     return { id: keyOf(t), name: frame.name, ...(clip ? { elementId: clip.id, elementName: elementName(clip) } : {}) };
   });
   const files = exportFiles(listed, ask.rows, ask.name);
+  const skipped = new Set<string>();
   const packed = await packExport(
     files,
-    (file) =>
-      ports.draw(
+    async (file) => {
+      const drawn = await ports.draw(
         file.targets.map((listedTarget) => {
           const target = byKey.get(listedTarget.id)!;
           return { nodeId: target.nodeId, doc: asDrawn(frames.get(target.nodeId)!.doc, file.row), ...(target.elementId ? { elementId: target.elementId } : {}) };
         }),
         file.row
-      ),
+      );
+      drawn.skipped.forEach((s) => skipped.add(s));
+      return drawn.bytes;
+    },
     ask.name
   );
   const stored = await ports.store(packed);
-  return { outcome: ExportOutcome.Done, ...stored, name: packed.name, files: files.map((f) => f.name) };
+  return { outcome: ExportOutcome.Done, ...stored, name: packed.name, files: files.map((f) => f.name), skipped: [...skipped] };
 }
