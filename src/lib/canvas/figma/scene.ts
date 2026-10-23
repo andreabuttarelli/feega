@@ -15,6 +15,37 @@ export enum FillKind {
   Image = 'image'
 }
 
+export enum Destination {
+  Frame = 'frame',
+  Free = 'free'
+}
+
+export enum Flow {
+  Row = 'row',
+  Column = 'column'
+}
+
+export enum Justify {
+  Start = 'start',
+  Center = 'center',
+  End = 'end',
+  SpaceBetween = 'space-between',
+  SpaceAround = 'space-around',
+  SpaceEvenly = 'space-evenly'
+}
+
+export enum Cross {
+  Start = 'start',
+  Center = 'center',
+  End = 'end',
+  Baseline = 'baseline'
+}
+
+export enum Fit {
+  Fixed = 'fixed',
+  Hug = 'hug'
+}
+
 export enum Clip {
   Content = 'clip',
   None = 'none'
@@ -29,19 +60,21 @@ export type Fill =
   | { kind: FillKind.Radial; stops: Stop[]; opacity: number }
   | { kind: FillKind.Image; hash: string; opacity: number };
 
-export type Stroke = { color: string; weight: number; align: string };
+export type Stroke = { fill: Fill; weight: number; align: string };
 
 export type Shadow = { kind: 'drop-shadow' | 'inner-shadow'; x: number; y: number; blur: number; spread: number; color: string; opacity: number };
 export type Blur = { kind: 'layer-blur' | 'background-blur'; radius: number };
 export type LayerEffect = Shadow | Blur;
 
-export type AutoLayout = { direction: 'row' | 'column'; gap: number; padding: [number, number, number, number] };
+export type Padding = { top: number; right: number; bottom: number; left: number };
+export type AutoLayout = { flow: Flow; wrap: boolean; gap: number; crossGap: number; padding: Padding; justify: Justify; align: Cross; width: Fit; height: Fit };
+export type ChildItem = { grow: boolean; stretch: boolean; absolute: boolean };
 
 export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean };
 
-type Common = { name: string; box: Box; opacity: number; effects: LayerEffect[] };
+type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem };
 
-export type FrameLayer = Common & { kind: LayerKind.Frame; fills: Fill[]; strokes: Stroke[]; radii: [number, number, number, number]; clip: Clip; autoLayout: AutoLayout | null; children: Layer[] };
+export type FrameLayer = Common & { kind: LayerKind.Frame; fills: Fill[]; strokes: Stroke[]; radii: [number, number, number, number]; outline: string; clip: Clip; autoLayout: AutoLayout | null; children: Layer[] };
 export type ShapeLayer = Common & { kind: LayerKind.Shape; path: string; fillRule: FillRule; fills: Fill[]; strokes: Stroke[] };
 export type TextLayer = Common & {
   kind: LayerKind.Text;
@@ -55,10 +88,13 @@ export type TextLayer = Common & {
   align: 'left' | 'center' | 'right' | 'justify';
   color: string;
   runs: TextRun[];
+  fills: Fill[];
+  strokes: Stroke[];
 };
 export type Layer = FrameLayer | ShapeLayer | TextLayer;
 
-export type FigmaScene = { root: FrameLayer; skipped: string[] };
+export type Placement = { destination: Destination; layer: Layer; size: { width: number; height: number }; centre: Vec };
+export type FigmaScene = { placements: Placement[]; combined: FrameLayer; skipped: string[] };
 
 const IDENTITY: Matrix = { m00: 1, m01: 0, m02: 0, m10: 0, m11: 1, m12: 0 };
 const DIGITS = 100;
@@ -68,6 +104,33 @@ const PERCENT = 100;
 const CONTAINERS = new Set(['FRAME', 'GROUP', 'SECTION', 'INSTANCE', 'SYMBOL', 'COMPONENT', 'COMPONENT_SET']);
 const VECTORS = new Set(['VECTOR', 'STAR', 'REGULAR_POLYGON', 'LINE', 'BOOLEAN_OPERATION']);
 const PAGES = new Set(['DOCUMENT', 'CANVAS']);
+
+const DESTINATION: Record<string, Destination> = {
+  FRAME: Destination.Frame,
+  SECTION: Destination.Frame,
+  COMPONENT: Destination.Frame,
+  COMPONENT_SET: Destination.Frame,
+  SYMBOL: Destination.Frame
+};
+
+const JUSTIFY: Record<string, Justify> = {
+  MIN: Justify.Start,
+  CENTER: Justify.Center,
+  MAX: Justify.End,
+  SPACE_EVENLY: Justify.SpaceBetween,
+  SPACE_BETWEEN: Justify.SpaceBetween,
+  SPACE_AROUND: Justify.SpaceAround,
+  SPACE_EVENLY_CSS: Justify.SpaceEvenly
+};
+
+const CROSS: Record<string, Cross> = { MIN: Cross.Start, CENTER: Cross.Center, MAX: Cross.End, BASELINE: Cross.Baseline };
+
+const HUGGING = new Set(['RESIZE_TO_FIT', 'RESIZE_TO_FIT_WITH_IMPLICIT_SIZE']);
+const FLOWS: Record<string, Flow> = { HORIZONTAL: Flow.Row, VERTICAL: Flow.Column };
+const HALF_TURN = 180;
+const NO_ROTATION = 1e-3;
+
+export const destinationOf = (type: string | undefined): Destination => DESTINATION[type ?? ''] ?? Destination.Free;
 
 const WEIGHTS: [RegExp, number][] = [
   [/thin|hairline/i, 100],
@@ -104,9 +167,22 @@ const multiply = (a: Matrix, b: Matrix): Matrix => ({
 
 const applied = (m: Matrix, p: Vec): Vec => ({ x: m.m00 * p.x + m.m01 * p.y + m.m02, y: m.m10 * p.x + m.m11 * p.y + m.m12 });
 
-const rotated = (m: Matrix) => Math.abs(m.m01) > 1e-6 || Math.abs(m.m10) > 1e-6;
+const rotationOf = (m: Matrix) => round((Math.atan2(m.m10, m.m00) * HALF_TURN) / Math.PI);
 
-const boxOf = (m: Matrix, size: Vec): Box => ({ x: round(m.m02), y: round(m.m12), width: round(size.x), height: round(size.y) });
+const isRotated = (m: Matrix) => Math.abs(rotationOf(m)) > NO_ROTATION;
+
+function boxOf(m: Matrix, size: Vec): Box {
+  const middle = applied(m, { x: size.x / 2, y: size.y / 2 });
+  return { x: round(middle.x - size.x / 2), y: round(middle.y - size.y / 2), width: round(size.x), height: round(size.y) };
+}
+
+function pathBox(path: string): Box {
+  const numbers = (path.match(/-?\d*\.?\d+(?:e-?\d+)?/gi) ?? []).map(Number);
+  const xs = numbers.filter((_, i) => i % 2 === 0);
+  const ys = numbers.filter((_, i) => i % 2 === 1);
+  const [x, y] = [Math.min(...xs), Math.min(...ys)];
+  return { x: round(x), y: round(y), width: round(Math.max(...xs) - x), height: round(Math.max(...ys) - y) };
+}
 
 function transformedPath(path: string, m: Matrix): string {
   const numbers = path.match(/-?\d*\.?\d+(?:e-?\d+)?/gi) ?? [];
@@ -199,8 +275,16 @@ function fillsOf(paints: Paint[] | undefined, report: Report): Fill[] {
     });
 }
 
+const STROKE_KINDS = new Set([FillKind.Solid, FillKind.Linear, FillKind.Radial]);
+
 function strokesOf(n: FigmaRawNode, report: Report): Stroke[] {
-  return fillsOf(n.strokePaints, report).flatMap((f) => (f.kind === FillKind.Solid ? [{ color: f.color, weight: round(n.strokeWeight ?? 1), align: (n.strokeAlign ?? 'CENTER').toLowerCase() }] : (report('gradient stroke drawn solid'), [])));
+  return fillsOf(n.strokePaints, report).flatMap((fill) => {
+    if (!STROKE_KINDS.has(fill.kind)) {
+      report(`${fill.kind} stroke`);
+      return [];
+    }
+    return [{ fill, weight: round(n.strokeWeight ?? 1), align: (n.strokeAlign ?? 'CENTER').toLowerCase() }];
+  });
 }
 
 const EFFECTS: Record<string, (e: Effect) => LayerEffect> = {
@@ -222,13 +306,34 @@ function effectsOf(n: FigmaRawNode, report: Report): LayerEffect[] {
     });
 }
 
-function autoLayoutOf(n: FigmaRawNode): AutoLayout | null {
-  if (!n.stackMode || n.stackMode === 'NONE') {
+const hugs = (sizing: string | undefined) => HUGGING.has(sizing ?? '');
+
+function autoLayoutOf(n: FigmaRawNode, report: Report): AutoLayout | null {
+  const flow = FLOWS[n.stackMode ?? ''];
+  if (!flow) {
+    if (n.stackMode === 'GRID') {
+      report(`grid layout of ${n.name ?? ''} kept as fixed positions`);
+    }
     return null;
   }
-  const [h, v] = [n.stackHorizontalPadding ?? 0, n.stackVerticalPadding ?? 0];
-  return { direction: n.stackMode === 'HORIZONTAL' ? 'row' : 'column', gap: n.stackSpacing ?? 0, padding: [v, n.stackPaddingRight ?? h, n.stackPaddingBottom ?? v, h] };
+  const left = n.stackHorizontalPadding ?? n.stackPadding ?? 0;
+  const top = n.stackVerticalPadding ?? n.stackPadding ?? 0;
+  const [primaryHugs, counterHugs] = [hugs(n.stackPrimarySizing), hugs(n.stackCounterSizing)];
+  const row = flow === Flow.Row;
+  return {
+    flow,
+    wrap: n.stackWrap === 'WRAP',
+    gap: round(n.stackSpacing ?? 0),
+    crossGap: round(n.stackCounterSpacing ?? n.stackSpacing ?? 0),
+    padding: { top, right: n.stackPaddingRight ?? left, bottom: n.stackPaddingBottom ?? top, left },
+    justify: JUSTIFY[n.stackPrimaryAlignItems ?? n.stackJustify ?? ''] ?? Justify.Start,
+    align: CROSS[n.stackCounterAlignItems ?? n.stackCounterAlign ?? ''] ?? Cross.Start,
+    width: (row ? primaryHugs : counterHugs) ? Fit.Hug : Fit.Fixed,
+    height: (row ? counterHugs : primaryHugs) ? Fit.Hug : Fit.Fixed
+  };
 }
+
+const itemOf = (n: FigmaRawNode): ChildItem => ({ grow: (n.stackChildPrimaryGrow ?? 0) > 0, stretch: n.stackChildAlignSelf === 'STRETCH', absolute: n.stackPositioning === 'ABSOLUTE' });
 
 function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: number; color: string }, report: Report): TextRun[] {
   const ids = n.textData?.characterStyleIDs ?? [];
@@ -291,14 +396,15 @@ function shapePath(n: FigmaRawNode, ctx: Ctx): { path: string; rule: FillRule } 
 }
 
 function common(n: FigmaRawNode, m: Matrix, ctx: Ctx): Common {
-  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report) };
+  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n) };
 }
 
 function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
   const font = n.fontName?.family ?? 'Inter';
   const weight = weightOf(n.fontName?.style ?? '');
   const size = n.fontSize ?? 12;
-  const color = fillsOf(n.fillPaints, ctx.report).find((f) => f.kind === FillKind.Solid);
+  const fills = fillsOf(n.fillPaints, ctx.report);
+  const color = fills.find((f) => f.kind === FillKind.Solid);
   const base = { font, weight, size, color: color?.kind === FillKind.Solid ? color.color : '#000000' };
   return {
     kind: LayerKind.Text,
@@ -309,7 +415,9 @@ function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
     lineHeight: unitOf(n.lineHeight, 'auto'),
     letterSpacing: unitOf(n.letterSpacing, '0%'),
     align: ALIGN[n.textAlignHorizontal ?? 'LEFT'] ?? 'left',
-    runs: runsOf(n, base, ctx.report)
+    runs: runsOf(n, base, ctx.report),
+    fills,
+    strokes: strokesOf(n, ctx.report)
   };
 }
 
@@ -336,9 +444,6 @@ function layerOf(n: FigmaRawNode, parent: Matrix, ctx: Ctx): Layer | null {
   if (CONTAINERS.has(type)) {
     return frameLayer(n, m, ctx);
   }
-  if (rotated(m) && type === 'TEXT') {
-    ctx.report(`rotation of text ${n.name ?? ''}`);
-  }
   if (type === 'TEXT') {
     return textLayer(n, m, ctx);
   }
@@ -348,19 +453,20 @@ function layerOf(n: FigmaRawNode, parent: Matrix, ctx: Ctx): Layer | null {
       ctx.report(`${type.toLowerCase()} ${n.name ?? ''} without geometry`);
       return null;
     }
-    return { kind: LayerKind.Shape, ...common(n, m, ctx), path: transformedPath(local.path, m), fillRule: local.rule, fills: fillsOf(n.fillPaints, ctx.report), strokes: strokesOf(n, ctx.report) };
+    const path = transformedPath(local.path, m);
+    const shaped = common(n, m, ctx);
+    const box = isRotated(m) ? pathBox(path) : shaped.box;
+    return { kind: LayerKind.Shape, ...shaped, box, rotation: 0, path, fillRule: local.rule, fills: fillsOf(n.fillPaints, ctx.report), strokes: strokesOf(n, ctx.report) };
   }
   ctx.report(`${type.toLowerCase()} ${n.name ?? ''}`);
   return null;
 }
 
 function frameLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): FrameLayer {
-  if (rotated(m)) {
-    ctx.report(`rotation of frame ${n.name ?? ''}`);
-  }
-  const autoLayout = autoLayoutOf(n);
-  if (autoLayout) {
-    ctx.report(`auto layout of ${n.name ?? ''} kept as fixed positions`);
+  const stacked = autoLayoutOf(n, ctx.report);
+  const upright = !isRotated(m);
+  if (stacked && !upright) {
+    ctx.report(`auto layout of rotated frame ${n.name ?? ''} kept as fixed positions`);
   }
   const clips = n.type !== 'GROUP' && !n.resizeToFit && n.frameMaskDisabled === false;
   return {
@@ -369,22 +475,61 @@ function frameLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): FrameLayer {
     fills: fillsOf(n.fillPaints, ctx.report),
     strokes: strokesOf(n, ctx.report),
     radii: radiiOf(n),
+    outline: transformedPath(roundedRect(n.size ?? { x: 0, y: 0 }, radiiOf(n)), m),
     clip: clips ? Clip.Content : Clip.None,
-    autoLayout,
+    autoLayout: upright ? stacked : null,
     children: childrenOf(n, ctx).flatMap((c) => layerOf(c, m, ctx) ?? [])
   };
 }
 
-const byPosition = (a: FigmaRawNode, b: FigmaRawNode) => ((a.parentIndex?.position ?? '') < (b.parentIndex?.position ?? '') ? -1 : 1);
+type Extent = { left: number; top: number; right: number; bottom: number };
 
-function boundsOf(layers: Layer[]): Box {
-  const xs = layers.flatMap((l) => [l.box.x, l.box.x + l.box.width]);
-  const ys = layers.flatMap((l) => [l.box.y, l.box.y + l.box.height]);
-  const [x, y] = [Math.min(...xs), Math.min(...ys)];
-  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+const CORNERS: [number, number][] = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1]
+];
+
+function corners(box: Box, degrees: number): Vec[] {
+  const [cx, cy] = [box.x + box.width / 2, box.y + box.height / 2];
+  const [cos, sin] = [Math.cos((degrees * Math.PI) / HALF_TURN), Math.sin((degrees * Math.PI) / HALF_TURN)];
+  return CORNERS.map(([sx, sy]) => {
+    const [dx, dy] = [(sx * box.width) / 2, (sy * box.height) / 2];
+    return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+  });
 }
 
-const shifted = (m: Matrix, by: Vec): Matrix => ({ ...m, m02: m.m02 - by.x, m12: m.m12 - by.y });
+function extentOf(layer: Layer): Extent {
+  const upright = layer.kind === LayerKind.Text && layer.rotation ? corners(layer.box, 0) : [];
+  const own = [...corners(layer.box, layer.rotation), ...upright];
+  const inside = layer.kind === LayerKind.Frame && layer.clip === Clip.None ? layer.children.map(extentOf) : [];
+  const xs = [...own.map((p) => p.x), ...inside.flatMap((e) => [e.left, e.right])];
+  const ys = [...own.map((p) => p.y), ...inside.flatMap((e) => [e.top, e.bottom])];
+  return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+}
+
+function union(extents: Extent[]): Extent {
+  return { left: Math.min(...extents.map((e) => e.left)), top: Math.min(...extents.map((e) => e.top)), right: Math.max(...extents.map((e) => e.right)), bottom: Math.max(...extents.map((e) => e.bottom)) };
+}
+
+const byPosition = (a: FigmaRawNode, b: FigmaRawNode) => ((a.parentIndex?.position ?? '') < (b.parentIndex?.position ?? '') ? -1 : 1);
+
+const shifted = (to: Vec): Matrix => ({ ...IDENTITY, m02: -to.x, m12: -to.y });
+
+const middleOf = (e: Extent): Vec => ({ x: (e.left + e.right) / 2, y: (e.top + e.bottom) / 2 });
+
+type Top = { node: FigmaRawNode; extent: Extent };
+
+const BUILD_TOP: Record<Destination, (top: Top, ctx: Ctx) => Layer | null> = {
+  [Destination.Frame]: (top, ctx) => ({ ...frameLayer(top.node, IDENTITY, ctx), clip: Clip.Content }),
+  [Destination.Free]: (top, ctx) => layerOf(top.node, shifted({ x: top.extent.left, y: top.extent.top }), ctx)
+};
+
+const SIZE_OF: Record<Destination, (layer: Layer, extent: Extent) => { width: number; height: number }> = {
+  [Destination.Frame]: (layer) => ({ width: layer.box.width, height: layer.box.height }),
+  [Destination.Free]: (_, extent) => ({ width: round(extent.right - extent.left), height: round(extent.bottom - extent.top) })
+};
 
 export function figmaScene(message: FigmaMessage): FigmaScene | null {
   const skipped = new Set<string>();
@@ -401,22 +546,39 @@ export function figmaScene(message: FigmaMessage): FigmaScene | null {
   }
   const ctx: Ctx = { byKey, children, blobs: message.blobs, report: (what) => skipped.add(what.trim()) };
   const internal = new Set(message.nodes.filter((n) => n.type === 'CANVAS' && n.internalOnly).map((n) => keyOf(n.guid)));
-  const tops = message.nodes.filter((n) => !PAGES.has(n.type ?? '') && n.parentIndex && PAGES.has(byKey.get(keyOf(n.parentIndex.guid))?.type ?? '') && !internal.has(keyOf(n.parentIndex.guid))).sort(byPosition);
+  const nodes = message.nodes.filter((n) => !PAGES.has(n.type ?? '') && n.parentIndex && PAGES.has(byKey.get(keyOf(n.parentIndex.guid))?.type ?? '') && !internal.has(keyOf(n.parentIndex.guid))).sort(byPosition);
+  const tops: Top[] = nodes.flatMap((node) => {
+    const layer = layerOf(node, IDENTITY, ctx);
+    return layer ? [{ node, extent: extentOf(layer) }] : [];
+  });
   if (!tops.length) {
     return null;
   }
-  const single = tops.length === 1 && CONTAINERS.has(tops[0].type ?? '') ? tops[0] : null;
-  if (single) {
-    const at = single.transform ?? IDENTITY;
-    const root = frameLayer(single, shifted(at, { x: at.m02, y: at.m12 }), ctx);
-    return { root: { ...root, clip: Clip.Content }, skipped: [...skipped] };
-  }
-  const placed = tops.flatMap((n) => layerOf(n, IDENTITY, ctx) ?? []);
-  if (!placed.length) {
-    return null;
-  }
-  const box = boundsOf(placed);
-  const again = tops.flatMap((n) => layerOf(n, shifted(IDENTITY, box), ctx) ?? []);
-  const root: FrameLayer = { kind: LayerKind.Frame, name: 'Figma paste', box: { ...box, x: 0, y: 0 }, opacity: 1, effects: [], fills: [], strokes: [], radii: [0, 0, 0, 0], clip: Clip.None, autoLayout: null, children: again };
-  return { root, skipped: [...skipped] };
+  const all = union(tops.map((t) => t.extent));
+  const centre = middleOf(all);
+  const placements = tops.flatMap((top): Placement[] => {
+    const destination = destinationOf(top.node.type);
+    const layer = BUILD_TOP[destination](top, ctx);
+    const at = middleOf(top.extent);
+    return layer ? [{ destination, layer, size: SIZE_OF[destination](layer, top.extent), centre: { x: round(at.x - centre.x), y: round(at.y - centre.y) } }] : [];
+  });
+  const [only] = placements;
+  const wrapper: FrameLayer = {
+    kind: LayerKind.Frame,
+    name: 'Figma paste',
+    box: { x: 0, y: 0, width: round(all.right - all.left), height: round(all.bottom - all.top) },
+    rotation: 0,
+    opacity: 1,
+    effects: [],
+    item: { grow: false, stretch: false, absolute: false },
+    fills: [],
+    strokes: [],
+    radii: [0, 0, 0, 0],
+    outline: '',
+    clip: Clip.None,
+    autoLayout: null,
+    children: tops.flatMap((t) => layerOf(t.node, shifted({ x: all.left, y: all.top }), ctx) ?? [])
+  };
+  const loneFrame = placements.length === 1 && only.destination === Destination.Frame && only.layer.kind === LayerKind.Frame;
+  return { placements, combined: loneFrame ? (only.layer as FrameLayer) : wrapper, skipped: [...skipped] };
 }
