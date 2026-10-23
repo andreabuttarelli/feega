@@ -141,12 +141,20 @@ function placed(host: MotionClip, comp: MotionComp, tracks: MotionTrack[]): Moti
 
 type Overrides = Record<string, Record<string, unknown>>;
 
+export const CLIP_LEVEL_OVERRIDES = ['hidden', 'effects'] as const;
+
+export function withOverride(clip: MotionClip, override: Record<string, unknown>): MotionClip {
+  const level = Object.fromEntries(CLIP_LEVEL_OVERRIDES.filter((k) => k in override).map((k) => [k, override[k]]));
+  const props = Object.fromEntries(Object.entries(override).filter(([k]) => !(CLIP_LEVEL_OVERRIDES as readonly string[]).includes(k)));
+  return { ...clip, ...level, props: { ...clip.props, ...props } };
+}
+
 function overridden(tracks: MotionTrack[], host: MotionClip): MotionTrack[] {
   const overrides = host.props.overrides as Overrides | undefined;
   if (!overrides) {
     return tracks;
   }
-  return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (overrides[c.id] ? { ...c, props: { ...c.props, ...overrides[c.id] } } : c)) }));
+  return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (overrides[c.id] ? withOverride(c, overrides[c.id]) : c)) }));
 }
 
 type Expander = (doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number) => MotionTrack[];

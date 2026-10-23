@@ -2,10 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from './brand';
 import { findClip, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
+import { addClip, setProps, type OpResult } from './timeline';
 import { flattenComps } from './precomp';
 import { composeHtml } from './hyperframes/compose';
-import { componentOf, createComponent, detachInstance, instanceOf, instanceTexts, overrideInstance, resetOverrides } from './main-component';
+import { componentOf, createComponent, detachInstance, instanceOf, instanceElements, instanceTexts, Paint, recolorInstance, overrideInstance, resetOverride, resetOverrides } from './main-component';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -78,5 +78,68 @@ describe('the instance properties a person can override', () => {
     const overridden = must(overrideInstance(doc, id, 'label', { text: 'Sold out' }));
 
     expect(instanceTexts(overridden, id)).toEqual([{ innerId: 'label', value: 'Sold out', main: 'Buy now', overridden: true }]);
+  });
+});
+
+describe('overrides beyond text', () => {
+  const made = () => {
+    const doc = must(createComponent(button(), ['bg', 'label'], newId, 'Button'));
+    return { doc, id: doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!.id };
+  };
+  const flat = (doc: MotionDoc) => flattenComps(doc).tracks.flatMap((t) => t.clips as MotionClip[]);
+
+  it('hiding an element in one instance removes it from both renderers', () => {
+    const { doc, id } = made();
+    const hidden = must(overrideInstance(doc, id, 'bg', { hidden: true }));
+
+    expect(flat(hidden).some((c) => c.id.endsWith('bg'))).toBe(false);
+    expect(flat(doc).some((c) => c.id.endsWith('bg'))).toBe(true);
+  });
+
+  it('an effects override replaces the effects of the element, not its props', () => {
+    const { doc, id } = made();
+    const plain = must(overrideInstance(doc, id, 'bg', { effects: [] }));
+
+    expect(flat(plain).find((c) => c.id.endsWith('bg'))!.effects).toEqual([]);
+    expect(flat(plain).find((c) => c.id.endsWith('bg'))!.props.effects).toBeUndefined();
+  });
+
+  it('a fill override recolours the instance and detach bakes it in', () => {
+    const { doc, id } = made();
+    const fills = [{ type: 'solid', color: '#ff0000', opacity: 1, visible: true, blend: 'normal' }];
+    const red = must(overrideInstance(doc, id, 'bg', { fills }));
+
+    expect(flat(red).find((c) => c.id.endsWith('bg'))!.props.fills).toEqual(fills);
+    expect(flat(must(detachInstance(red, id, newId))).find((c) => c.id.endsWith('bg'))!.props.fills).toEqual(fills);
+  });
+
+  it('resets one property and keeps the others', () => {
+    const { doc, id } = made();
+    const both = must(overrideInstance(must(overrideInstance(doc, id, 'bg', { hidden: true })), id, 'label', { text: 'Sold out' }));
+    const back = must(resetOverride(both, id, 'bg', 'hidden'));
+
+    expect(instanceOf(back, id)!.overrides).toEqual({ label: { text: 'Sold out' } });
+    expect(instanceOf(must(resetOverride(back, id, 'label', 'text')), id)!.clip.props.overrides).toBeUndefined();
+  });
+
+  it('lists each element with the properties it overrides', () => {
+    const { doc, id } = made();
+    const hidden = must(overrideInstance(doc, id, 'bg', { hidden: true }));
+    const bg = instanceElements(hidden, id).find((e) => e.innerId === 'bg')!;
+
+    expect(bg.hidden).toBe(true);
+    expect(bg.overridden).toEqual(['hidden']);
+    expect(instanceElements(hidden, id).find((e) => e.innerId === 'label')!.overridden).toEqual([]);
+  });
+
+  it('recolours the first fill and keeps its other settings', () => {
+    const fills = [{ type: 'solid', color: '#111111', opacity: 0.5, visible: true, blend: 'normal' }];
+    const base = must(setProps(button(), 'bg', { fills }));
+    const doc = must(createComponent(base, ['bg', 'label'], newId, 'Button'));
+    const id = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!.id;
+    const red = must(recolorInstance(doc, id, 'bg', Paint.Fill, '#ff0000'));
+
+    expect(instanceOf(red, id)!.overrides.bg.fills).toEqual([{ ...fills[0], color: '#ff0000' }]);
+    expect(recolorInstance(doc, id, 'label', Paint.Stroke, '#fff').ok).toBe(false);
   });
 });
