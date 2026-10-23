@@ -81,7 +81,7 @@ import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNod
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
-import { exportElementsSchema, exportRowsSchema } from '$lib/motion/export-rows';
+import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
@@ -1157,7 +1157,7 @@ export const actions: Actions<CanvasParams> = {
     if (!rows.success || !elements.success || !Array.isArray(frameIds) || frameIds.length + elements.data.length === 0) {
       return fail(400, { error: 'invalid export' });
     }
-    if (!serverFramesOpen()) {
+    if (needsBrowser(rows.data) && !serverFramesOpen()) {
       return fail(503, { error: 'image export needs the server renderer, which is not available here' });
     }
     const ports = selectionPorts({ db: scope.db, orgId: scope.orgId, projectId: scope.canvas.projectId, brandId: scope.projectBrandId, actor: userActor(scope) });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Bundle, EXPORT_PRESETS, FileFormat, SizeBy, bundleOf, exportFiles, exportRowsSchema, rowSize } from './export-rows';
+import { Bundle, EXPORT_PRESETS, FILE, FileFormat, SizeBy, bundleOf, exportFiles, exportRowsSchema, needsBrowser, rowSize } from './export-rows';
 
 const frame = { width: 1080, height: 1350 };
 
@@ -44,6 +44,22 @@ describe('export rows', () => {
     const files = exportFiles([{ id: 'a', name: 'Poster', elementId: 'title', elementName: 'Title' }], rows, 'Deck');
 
     expect(files.map((f) => f.name)).toEqual(['Poster - Title.pdf', 'Poster - Title.png']);
+  });
+
+  it('Lottie is a .json file and dotLottie a .lottie file, one per frame', () => {
+    const rows = exportRowsSchema.parse([{ format: 'lottie', by: 'scale', value: 1 }, { format: 'dotlottie', by: 'scale', value: 1 }]);
+    const files = exportFiles([{ id: 'a', name: 'Intro' }], rows, 'Deck');
+
+    expect(files.map((f) => f.name)).toEqual(['Intro.json', 'Intro.lottie']);
+    expect([FILE[FileFormat.Lottie].mime, FILE[FileFormat.DotLottie].mime]).toEqual(['application/json', 'application/zip']);
+  });
+
+  it('only raster and PDF rows need the browser; SVG, Lottie and dotLottie do not', () => {
+    const rows = (...formats: string[]) => exportRowsSchema.parse(formats.map((format) => ({ format, by: 'scale', value: 1 })));
+
+    expect(needsBrowser(rows('svg', 'lottie', 'dotlottie'))).toBe(false);
+    expect(needsBrowser(rows('svg', 'png'))).toBe(true);
+    expect(needsBrowser(rows('pdf'))).toBe(true);
   });
 
   it('one file downloads as itself, several as one zip', () => {

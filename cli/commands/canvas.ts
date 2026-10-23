@@ -62,6 +62,6 @@ export async function cmdCanvasExport(project: string, frames: string[], opts: E
   await writeFile(out, new Uint8Array(await (await fetch(result.url)).arrayBuffer()));
   console.log(out);
   if (result.skipped?.length) {
-    console.error(`Left out of the vector file: ${result.skipped.join('; ')}`);
+    console.error(`Left out of the file: ${result.skipped.join('; ')}`);
   }
 }

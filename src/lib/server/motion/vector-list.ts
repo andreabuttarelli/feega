@@ -10,7 +10,14 @@ export type VectorInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<
 
 export type Fetcher = (url: string) => Promise<{ ok: boolean; headers: { get: (name: string) => string | null }; arrayBuffer: () => Promise<ArrayBuffer> }>;
 
-export type Vector = { list: DisplayList; images: ReadonlyMap<string, string> };
+export enum Span {
+  Still = 'still',
+  Whole = 'whole'
+}
+
+export const LOTTIE_MAX_SECONDS = 30;
+
+export type Vector = { lists: DisplayList[]; images: ReadonlyMap<string, string> };
 
 const DEFAULT_MIME = 'application/octet-stream';
 
@@ -31,10 +38,22 @@ export async function inlineImages(sources: string[], fetcher: Fetcher): Promise
 
 export type VectorIo = { fetcher?: Fetcher; fonts?: ReturnType<typeof fontLoader> };
 
-export async function vectorOf({ doc, tokens, assets }: VectorInput, io: VectorIo = {}): Promise<Vector> {
+function framesOf(doc: MotionDoc, span: Span): number[] {
+  const rest = stillSeconds(doc);
+  if (rest !== null || span === Span.Still) {
+    return [Math.round((rest ?? 0) * doc.fps)];
+  }
+  if (doc.durationInFrames > LOTTIE_MAX_SECONDS * doc.fps) {
+    throw new Error(`an animation can be at most ${LOTTIE_MAX_SECONDS} s: shorten the video`);
+  }
+  return Array.from({ length: doc.durationInFrames }, (_, f) => f);
+}
+
+export async function vectorOf({ doc, tokens, assets }: VectorInput, span: Span, io: VectorIo = {}): Promise<Vector> {
   const { fetcher = fetch, fonts: loadFonts = fontLoader() } = io;
+  const frames = framesOf(doc, span);
   const fonts = await loadFonts(doc, assets, tokens);
-  const frame = Math.round((stillSeconds(doc) ?? 0) * doc.fps);
-  const list = drawFrame(prepare(doc, tokens, assets, { fonts, smoothing: Smoothing.Plain }), frame);
-  return { list, images: await inlineImages(imageSources(list), fetcher) };
+  const prepared = prepare(doc, tokens, assets, { fonts, smoothing: Smoothing.Plain });
+  const lists = frames.map((frame) => drawFrame(prepared, frame));
+  return { lists, images: await inlineImages([...new Set(lists.flatMap(imageSources))], fetcher) };
 }

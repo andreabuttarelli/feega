@@ -58,7 +58,7 @@ test.describe('export a selection @real', () => {
     expect([...zip[names[0]].slice(0, 4)]).toEqual(PNG_MAGIC);
   });
 
-  test('SVG keeps text as text and a PDF has one page per frame', async ({ page, session, admin, seedNode }) => {
+  test('SVG is true vector and a PDF has one page per frame', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(180_000);
     const ids: string[] = [];
     for (const x of [80, 1400]) {
@@ -91,7 +91,8 @@ test.describe('export a selection @real', () => {
     expect(names.filter((n) => n.endsWith('.pdf')), 'one PDF for both frames').toHaveLength(1);
     expect(pdf.match(/\/Type\s*\/Page\b/g), 'a page per frame').toHaveLength(2);
     expect(svgs).toHaveLength(2);
-    expect(Buffer.from(zip[svgs[0]]).toString()).toContain('Vector words');
+    expect(Buffer.from(zip[svgs[0]]).toString()).not.toContain('foreignObject');
+    expect(Buffer.from(zip[svgs[0]]).toString()).toContain('<path');
   });
 
   test('one element inside a frame exports cropped to its own box', async ({ page, session, admin, seedNode }) => {

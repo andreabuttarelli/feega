@@ -1,12 +1,13 @@
-import { Drawing, FILE, rowSize, type ExportRow } from '$lib/motion/export-rows';
+import { Drawing, FILE, FileFormat, rowSize, type ExportRow } from '$lib/motion/export-rows';
 import { printDocument, type Crop } from '$lib/motion/export-vector';
 import { boundsOfClips, svgOf } from '$lib/motion/export-svg';
-import type { DisplayList } from '$lib/motion/gpu-full/display-list';
+import { dotLottieOf, lottieOf } from '$lib/motion/export-lottie';
 import { ancestorsOf } from '$lib/motion/parent';
 import type { MotionDoc } from '$lib/motion/doc';
 import { stillSeconds } from '$lib/motion/still';
 import type { ExportPage, ExportPort } from './server-frames';
 import type { DrawTarget, Drawn } from './selection-export';
+import { Span, type Vector } from './vector-list';
 
 type Opened = { page: ExportPage; crop: Crop | null; scale: number };
 
@@ -24,7 +25,7 @@ async function opened<T>(port: ExportPort, compose: (target: DrawTarget) => Prom
   }
 }
 
-export type VectorPort = (target: DrawTarget) => Promise<{ list: DisplayList; images: ReadonlyMap<string, string> }>;
+export type VectorPort = (target: DrawTarget, span: Span) => Promise<Vector>;
 
 export type DrawPorts = { port: ExportPort; compose: (target: DrawTarget) => Promise<string>; vector: VectorPort };
 
@@ -33,12 +34,21 @@ type Vectored = { svg: string; skipped: string[]; width: number; height: number 
 const clipsUnder = (doc: MotionDoc, elementId: string) => new Set([elementId, ...doc.tracks.flatMap((t) => t.clips.map((c) => c.id)).filter((id) => ancestorsOf(doc, id).includes(elementId))]);
 
 async function vectored(vector: VectorPort, target: DrawTarget, row: ExportRow): Promise<Vectored> {
-  const { list, images } = await vector(target);
+  const { lists: [list], images } = await vector(target, Span.Still);
   const { scale } = rowSize(row, target.doc);
   const crop = target.elementId ? boundsOfClips(list, clipsUnder(target.doc, target.elementId)) : null;
   const box = crop ?? { left: 0, top: 0, width: target.doc.width, height: target.doc.height };
   const { svg, skipped } = svgOf(list, { scale, crop: crop ?? undefined, images });
   return { svg, skipped, width: Math.round(box.width * scale), height: Math.round(box.height * scale) };
+}
+
+async function animated(vector: VectorPort, target: DrawTarget, row: ExportRow): Promise<Drawn> {
+  const { lists } = await vector(target, Span.Whole);
+  const kept = target.elementId ? clipsUnder(target.doc, target.elementId) : null;
+  const shown = kept ? lists.map((l) => ({ ...l, background: null, items: l.items.filter((i) => kept.has(i.clip)) })) : lists;
+  const { json, report } = lottieOf(shown, { width: target.doc.width, height: target.doc.height, fps: target.doc.fps });
+  const bytes = row.format === FileFormat.DotLottie ? Buffer.from(dotLottieOf(json)) : Buffer.from(JSON.stringify(json));
+  return { bytes, skipped: report };
 }
 
 const DRAW: Record<Drawing, (ports: DrawPorts, targets: DrawTarget[], row: ExportRow) => Promise<Drawn>> = {
@@ -47,6 +57,7 @@ const DRAW: Record<Drawing, (ports: DrawPorts, targets: DrawTarget[], row: Expor
     const { svg, skipped } = await vectored(vector, target, row);
     return { bytes: Buffer.from(svg), skipped };
   },
+  [Drawing.Animation]: ({ vector }, [target], row) => animated(vector, target, row),
   [Drawing.Pages]: async ({ port, vector }, targets, row) => {
     const pages = [];
     const skipped = new Set<string>();
