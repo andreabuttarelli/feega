@@ -912,7 +912,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema scale_group 1`] = `"ce3939686bdd45120fabcecf998c80eb358cc7e0762018071264c03ac4b6dbeb"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema set_auto_layout 1`] = `"8b329f9a879091730de84096093b02c671ad6322352945c6c8a7bd84da66ae51"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema set_auto_layout 1`] = `"394be7e1216b3b4cbbd718a13bd6c647eb50dd179f718aee490b96db5735a9f1"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema set_blend_mode 1`] = `"7ae2d989dba86028e43f44935075de8b14415bdfee6318b36293b1ae8f09d66f"`;
 
@@ -1088,7 +1088,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema write_storyboard 1`] = `"89334bf084bba149cc730be4da35193397d8065026cc64112b1636819dfb9328"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op set_auto_layout 1`] = `"b6619692af807469dc5a3a0017b292cdb4502796997b1201ea4af853233b7b00"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op set_auto_layout 1`] = `"1d71efd383b230396cc90e47e576f20a4cc4b3d29d66b544081f2ff9bb261009"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op set_blend_mode 1`] = `"cc9e4e648e1125096fc6ce4ab423f0bb222601ef1fae45aa12a4daf4bf2da875"`;
 
