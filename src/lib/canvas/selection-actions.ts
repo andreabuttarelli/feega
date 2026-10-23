@@ -63,6 +63,7 @@ export type SelectionActionId =
   | 'create-component'
   | 'detach-instance'
   | 'reset-instance'
+  | 'push-instance'
   | 'create-formats'
   | 'export'
   | 'delete'
@@ -118,6 +119,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'outline-text', label: 'Outline text', group: 'menu', minNodes: 1, shortcut: 'Mod+Shift+O' },
   { id: 'create-component', label: 'Create component', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+K' },
   { id: 'detach-instance', label: 'Detach instance', group: 'menu', minNodes: 1 },
+  { id: 'push-instance', label: 'Push overrides to main', group: 'menu', minNodes: 1 },
   { id: 'reset-instance', label: 'Reset all overrides', group: 'menu', minNodes: 1 },
   { id: 'create-formats', label: 'Create formats…', group: 'menu', minNodes: 1 },
   { id: 'export', label: 'Export…', group: 'overflow', minNodes: 1 },

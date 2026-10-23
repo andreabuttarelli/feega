@@ -5,7 +5,7 @@ import { findClip, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc }
 import { addClip, setProps, type OpResult } from './timeline';
 import { flattenComps } from './precomp';
 import { composeHtml } from './hyperframes/compose';
-import { componentOf, createComponent, detachInstance, instanceOf, instanceElements, instanceTexts, Paint, recolorInstance, overrideInstance, resetOverride, resetOverrides } from './main-component';
+import { componentOf, createComponent, detachInstance, instanceOf, instanceElements, instanceTexts, Paint, pushOverrides, recolorInstance, overrideInstance, resetOverride, resetOverrides } from './main-component';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -141,5 +141,43 @@ describe('overrides beyond text', () => {
 
     expect(instanceOf(red, id)!.overrides.bg.fills).toEqual([{ ...fills[0], color: '#ff0000' }]);
     expect(recolorInstance(doc, id, 'label', Paint.Stroke, '#fff').ok).toBe(false);
+  });
+});
+
+describe('pushing instance changes to the main', () => {
+  const twoInstances = () => {
+    const doc = must(createComponent(button(), ['bg', 'label'], newId, 'Button'));
+    const first = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!;
+    const second = { ...first, id: 'copy' };
+    return { doc: { ...doc, tracks: doc.tracks.map((t, i) => (i === 0 ? { ...t, clips: [...t.clips, second] } : t)) }, first: first.id };
+  };
+  const texts = (doc: MotionDoc) => flattenComps(doc).tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.component === 'Text').map((c) => c.props.text);
+
+  it('makes the override the main value for every instance and clears it here', () => {
+    const { doc, first } = twoInstances();
+    const edited = must(overrideInstance(doc, first, 'label', { text: 'Order' }));
+    const pushed = must(pushOverrides(edited, first));
+
+    expect(texts(pushed)).toEqual(['Order', 'Order']);
+    expect(instanceOf(pushed, first)!.clip.props.overrides).toBeUndefined();
+  });
+
+  it('keeps what another instance overrides itself', () => {
+    const { doc, first } = twoInstances();
+    const other = must(overrideInstance(doc, 'copy', 'label', { text: 'Mine' }));
+    const pushed = must(pushOverrides(must(overrideInstance(other, first, 'label', { text: 'Order' })), first));
+
+    expect(texts(pushed).sort()).toEqual(['Mine', 'Order']);
+  });
+
+  it('pushes clip-level properties too', () => {
+    const { doc, first } = twoInstances();
+    const pushed = must(pushOverrides(must(overrideInstance(doc, first, 'bg', { hidden: true })), first));
+
+    expect(flattenComps(pushed).tracks.flatMap((t) => t.clips).some((c) => c.id.endsWith('bg'))).toBe(false);
+  });
+
+  it('refuses a clip that is not an instance', () => {
+    expect(pushOverrides(button(), 'bg').ok).toBe(false);
   });
 });

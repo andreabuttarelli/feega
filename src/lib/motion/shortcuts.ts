@@ -96,6 +96,7 @@ export enum Command {
   CreateComponent = 'create-component',
   DetachInstance = 'detach-instance',
   ResetInstance = 'reset-instance',
+  PushInstance = 'push-instance',
   ToolSelect = 'tool-select',
   ToolText = 'tool-text',
   ToolRectangle = 'tool-rectangle',

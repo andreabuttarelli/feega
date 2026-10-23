@@ -3,6 +3,7 @@
  * di Lucide qui, dati puri in `selection-actions.ts`, perché quella tabella la legge anche codice
  * che non disegna niente.
  */
+import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
 import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
 import Globe from '@lucide/svelte/icons/globe';
 import Copy from '@lucide/svelte/icons/copy';
@@ -99,6 +100,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'outline-text': TypeIcon,
   'create-component': ComponentIcon,
   'detach-instance': Unlink,
+  'push-instance': ArrowUpToLine,
   'reset-instance': RotateCcw,
   'create-formats': Proportions,
   export: Download,
