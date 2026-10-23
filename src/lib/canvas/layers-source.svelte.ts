@@ -10,6 +10,7 @@ export type CanvasSide = {
   previewUrl(nodeId: string): string;
   select(ids: string[]): void;
   open(nodeId: string): void;
+  rename(nodeId: string, name: string): void;
 };
 
 export type VideoSide = {

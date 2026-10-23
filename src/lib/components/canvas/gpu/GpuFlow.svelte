@@ -174,7 +174,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -1121,12 +1121,60 @@
     clickNode(id, e.shiftKey || e.metaKey || e.ctrlKey);
   }
 
+  let naming = $state<{ nodeId: string; value: string; was: string } | null>(null);
+
+  const NAME_MIN_WIDTH = 120;
+  const NAME_HEIGHT = 22;
+
+  const namingBox = $derived.by(() => {
+    const tile = naming ? byId.get(naming.nodeId) : null;
+    if (!tile) {
+      return null;
+    }
+    const s = screenSize();
+    return { left: s.left + view.x + tile.x * view.zoom, top: s.top + view.y + (tile.y - LABEL_CLEARANCE) * view.zoom, width: Math.max(tile.w * view.zoom, NAME_MIN_WIDTH) };
+  });
+
+  function titledAt(world: Point): Tile | null {
+    const hit = placed.findLast((t) => t.tag !== NameTag.Hidden && world.x >= t.x && world.x <= t.x + t.w && world.y >= t.y - LABEL_CLEARANCE && world.y < t.y);
+    return hit ?? null;
+  }
+
+  function startNaming(tile: Tile) {
+    const was = tile.displayName?.trim() ?? '';
+    select([tile.id]);
+    naming = { nodeId: tile.id, value: was, was };
+  }
+
+  function endNaming(save: boolean) {
+    const open = naming;
+    naming = null;
+    if (open && save && open.value.trim() !== open.was) {
+      props.onRename?.(open.nodeId, open.value);
+    }
+  }
+
+  function onNamingKey(e: KeyboardEvent) {
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      endNaming(true);
+    }
+    if (e.key === 'Escape') {
+      endNaming(false);
+    }
+  }
+
   function onDouble(e: MouseEvent) {
     const target = e.target as HTMLElement;
     if (target.closest('.gpu-dom-node [data-motion-node]')) {
       return;
     }
     const world = toWorld(view, local(e as PointerEvent));
+    const titled = spec.chrome && props.onRename ? titledAt(world) : null;
+    if (titled) {
+      startNaming(titled);
+      return;
+    }
     const hit = hitAt(world);
     const id = hit.kind === HitKind.Node ? hit.nodeId : null;
     const deeper = id ? framePickAt(world) : null;
@@ -3076,6 +3124,19 @@
 
   <PageZoomLock zoom={pageZoom} />
 
+  {#if naming && namingBox}
+    <input
+      class="name-input"
+      data-testid="node-name-input"
+      aria-label="Node name"
+      style={`left:${namingBox.left}px;top:${namingBox.top}px;width:${namingBox.width}px;height:${NAME_HEIGHT}px`}
+      bind:value={naming.value}
+      {@attach (el) => (el.focus(), el.select())}
+      onkeydown={onNamingKey}
+      onblur={() => endNaming(true)}
+    />
+  {/if}
+
   {#if dev}
     <RendererBadge renderer={scene?.backend ?? (coreOn ? CORE : 'starting')} reason={lossNote} />
   {/if}
@@ -3424,6 +3485,19 @@
     translate: -50% 0;
     max-width: calc(100% - 32px);
     z-index: 5;
+  }
+
+  .name-input {
+    position: fixed;
+    z-index: 30;
+    padding: 0 6px;
+    border: 1px solid var(--ui-accent, #0a84ff);
+    border-radius: var(--ui-radius-sm);
+    background: var(--paper, #fff);
+    color: var(--ink, #1d1d1f);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
   }
 
   .edge-refusal {
