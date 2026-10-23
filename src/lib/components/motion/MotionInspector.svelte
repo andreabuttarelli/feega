@@ -63,6 +63,7 @@
   import TextPresetGallery from './TextPresetGallery.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
+  import VariablesSection from './VariablesSection.svelte';
   import { registerFont, replaceFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
   import { isBuiltin } from '$lib/motion/fonts/model';
   import type { FontLibrary } from '$lib/motion/fonts/library';
@@ -500,6 +501,7 @@
       </details>
     {/if}
     {#if visual}<StyleSection {doc} {clip} {commit} />{/if}
+    {#if visual}<VariablesSection {doc} {clip} {commit} />{/if}
     {#if visual}<AutoLayoutSection {doc} {clip} {commit} />{/if}
   {/if}
 
