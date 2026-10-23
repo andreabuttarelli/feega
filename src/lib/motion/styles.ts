@@ -1,9 +1,11 @@
 import type { z } from 'zod';
-import { findClip, type MotionDoc } from './doc';
+import { findClip, type MotionClip, type MotionDoc } from './doc';
 import { fieldsOf } from './inspector';
 import { FillType } from './fill/model';
-import { setProps, type OpResult } from './timeline';
-import type { ComponentId } from './components';
+import { FILLED, elementFills } from './fill/elements';
+import { effectOfKey, effectsProblem, type Effect } from './effects/model';
+import { editClip, setProps, type OpResult } from './timeline';
+import { COMPONENTS, TrackKind, type ComponentId } from './components';
 import { STYLE_NAME, StyleKind, styleSchema, stylesSchema, type Style, type textStyleSchema, type colourStyleSchema } from './styles-model';
 
 export { StyleKind };
@@ -12,12 +14,28 @@ export enum StyleAction {
   Define = 'define',
   Apply = 'apply',
   Detach = 'detach',
+  Save = 'save',
   Remove = 'remove',
   Rename = 'rename',
   List = 'list'
 }
 
+export enum StyleSlot {
+  Look = 'styleRef',
+  Effect = 'effectStyleRef'
+}
+
 export type NamedStyle = { name: string; style: Style; clips: string[] };
+
+export const SLOTS = Object.values(StyleSlot);
+const SLOT_OF: Record<StyleKind, StyleSlot> = {
+  [StyleKind.Text]: StyleSlot.Look,
+  [StyleKind.Colour]: StyleSlot.Look,
+  [StyleKind.Paint]: StyleSlot.Look,
+  [StyleKind.Effect]: StyleSlot.Effect
+};
+
+export const slotOf = (kind: StyleKind): StyleSlot => SLOT_OF[kind];
 
 const TEXT_KEY = 'font';
 const COLOUR_KEY = 'color';
@@ -27,37 +45,54 @@ function keysOf(component: ComponentId): Set<string> {
   return new Set(fieldsOf(component).map((f) => f.key));
 }
 
-function textPatch(style: z.infer<typeof textStyleSchema>, keys: Set<string>): Record<string, unknown> | string {
-  if (!keys.has(TEXT_KEY)) {
-    return 'a text style goes on a text clip';
-  }
+const REFUSAL: Record<StyleKind, (component: ComponentId) => string | null> = {
+  [StyleKind.Text]: (component) => (keysOf(component).has(TEXT_KEY) ? null : 'a text style goes on a text clip'),
+  [StyleKind.Colour]: (component) => (keysOf(component).has(COLOUR_KEY) || keysOf(component).has(FILLS_KEY) ? null : 'this clip has no colour to style'),
+  [StyleKind.Paint]: (component) => (component in FILLED ? null : 'this clip has no fill to style'),
+  [StyleKind.Effect]: (component) => (COMPONENTS[component].track === TrackKind.Visual ? null : 'effects go on a visual clip')
+};
+
+function textPatch(style: z.infer<typeof textStyleSchema>, keys: Set<string>): Record<string, unknown> {
   const { kind: _kind, ...props } = style;
   return Object.fromEntries(Object.entries(props).filter(([k, v]) => v !== undefined && keys.has(k)));
 }
 
-function colourPatch(style: z.infer<typeof colourStyleSchema>, keys: Set<string>): Record<string, unknown> | string {
-  if (keys.has(COLOUR_KEY)) {
-    return { color: style.color };
-  }
-  if (keys.has(FILLS_KEY)) {
-    return { fills: [{ type: FillType.Solid, color: style.color, opacity: 1, visible: true }] };
-  }
-  return 'this clip has no colour to style';
+function colourPatch(style: z.infer<typeof colourStyleSchema>, keys: Set<string>): Record<string, unknown> {
+  return keys.has(COLOUR_KEY) ? { color: style.color } : { fills: [{ type: FillType.Solid, color: style.color, opacity: 1, visible: true }] };
 }
 
-function patchFor(style: Style, component: ComponentId): Record<string, unknown> | string {
-  const keys = keysOf(component);
-  return style.kind === StyleKind.Text ? textPatch(style, keys) : colourPatch(style, keys);
+const omitKeys = <T>(record: Record<string, T>, drop: (key: string) => boolean): Record<string, T> => Object.fromEntries(Object.entries(record).filter(([key]) => !drop(key)));
+
+function effectsApplied(doc: MotionDoc, clipId: string, effects: Effect[]): OpResult {
+  const kept = new Set(effects.map((e) => e.id));
+  const stale = (key: string) => {
+    const ref = effectOfKey(key);
+    return ref !== null && !kept.has(ref.effectId);
+  };
+  return editClip(doc, clipId, (clip) => effectsProblem(effects) ?? { ...clip, effects, keyframes: omitKeys(clip.keyframes, stale), expressions: omitKeys(clip.expressions, stale) });
 }
+
+type StyleOf<K extends StyleKind> = Extract<Style, { kind: K }>;
+
+const APPLY: { [K in StyleKind]: (doc: MotionDoc, clip: MotionClip, style: StyleOf<K>) => OpResult } = {
+  [StyleKind.Text]: (doc, clip, style) => setProps(doc, clip.id, textPatch(style, keysOf(clip.component))),
+  [StyleKind.Colour]: (doc, clip, style) => setProps(doc, clip.id, colourPatch(style, keysOf(clip.component))),
+  [StyleKind.Paint]: (doc, clip, style) => setProps(doc, clip.id, { fills: style.fills }),
+  [StyleKind.Effect]: (doc, clip, style) => effectsApplied(doc, clip.id, style.effects)
+};
 
 function linked(doc: MotionDoc, name: string): string[] {
-  return doc.tracks.flatMap((t) => t.clips.filter((c) => c.styleRef === name).map((c) => c.id));
+  return doc.tracks.flatMap((t) => t.clips.filter((c) => SLOTS.some((slot) => c[slot] === name)).map((c) => c.id));
 }
 
-function withRef(doc: MotionDoc, ids: readonly string[], name: string | undefined): MotionDoc {
+function withRef(doc: MotionDoc, ids: readonly string[], slot: StyleSlot, name: string | undefined): MotionDoc {
   const pick = new Set(ids);
-  const tracks = doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (pick.has(c.id) ? { ...c, styleRef: name } : c)) }));
+  const tracks = doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (pick.has(c.id) ? { ...c, [slot]: name } : c)) }));
   return { ...doc, tracks };
+}
+
+function withoutRefs(doc: MotionDoc, ids: readonly string[], slots: readonly StyleSlot[]): MotionDoc {
+  return slots.reduce((next, slot) => withRef(next, ids, slot, undefined), doc);
 }
 
 function paint(doc: MotionDoc, ids: readonly string[], style: Style): OpResult {
@@ -67,11 +102,11 @@ function paint(doc: MotionDoc, ids: readonly string[], style: Style): OpResult {
     if (!found) {
       return { ok: false, error: `no clip ${id}` };
     }
-    const patch = patchFor(style, found.clip.component);
-    if (typeof patch === 'string') {
-      return { ok: false, error: `${id}: ${patch}` };
+    const refusal = REFUSAL[style.kind](found.clip.component);
+    if (refusal) {
+      return { ok: false, error: `${id}: ${refusal}` };
     }
-    const r = setProps(next, id, patch);
+    const r = (APPLY[style.kind] as (doc: MotionDoc, clip: MotionClip, style: Style) => OpResult)(next, found.clip, style);
     if (!r.ok) {
       return r;
     }
@@ -104,11 +139,11 @@ export function applyStyle(doc: MotionDoc, ids: readonly string[], name: string)
     return { ok: false, error: `no style ${name}${known.length ? `: this video has ${known.join(', ')}` : ''}` };
   }
   const painted = paint(doc, ids, style);
-  return painted.ok ? { ok: true, doc: withRef(painted.doc, ids, name) } : painted;
+  return painted.ok ? { ok: true, doc: withRef(painted.doc, ids, SLOT_OF[style.kind], name) } : painted;
 }
 
-export function detachStyle(doc: MotionDoc, ids: readonly string[]): OpResult {
-  return { ok: true, doc: withRef(doc, ids, undefined) };
+export function detachStyle(doc: MotionDoc, ids: readonly string[], slot?: StyleSlot): OpResult {
+  return { ok: true, doc: withoutRefs(doc, ids, slot ? [slot] : SLOTS) };
 }
 
 export function removeStyle(doc: MotionDoc, name: string): OpResult {
@@ -116,7 +151,11 @@ export function removeStyle(doc: MotionDoc, name: string): OpResult {
     return { ok: false, error: `no style ${name}` };
   }
   const { [name]: _gone, ...styles } = doc.styles;
-  return { ok: true, doc: { ...withRef(doc, linked(doc, name), undefined), styles } };
+  return { ok: true, doc: { ...withoutRefs(doc, linked(doc, name), SLOTS), styles } };
+}
+
+function renamedRefs(clip: MotionClip, from: string, to: string): MotionClip {
+  return SLOTS.reduce((next, slot) => (next[slot] === from ? { ...next, [slot]: to } : next), clip);
 }
 
 export function renameStyle(doc: MotionDoc, from: string, to: string): OpResult {
@@ -131,7 +170,7 @@ export function renameStyle(doc: MotionDoc, from: string, to: string): OpResult 
     return { ok: false, error: `a style ${to} already exists` };
   }
   const { [from]: _old, ...others } = doc.styles;
-  const tracks = doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.styleRef === from ? { ...c, styleRef: to } : c)) }));
+  const tracks = doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => renamedRefs(c, from, to)) }));
   return { ok: true, doc: { ...doc, tracks, styles: { ...others, [to]: style } } };
 }
 
@@ -142,22 +181,22 @@ function colourOf(props: Record<string, unknown>): unknown {
   return props.color ?? fills?.find((f) => f.color)?.color ?? props.fill;
 }
 
-function lookOf(props: Record<string, unknown>, kind: StyleKind): Record<string, unknown> {
-  if (kind === StyleKind.Colour) {
-    return { kind, color: colourOf(props) };
-  }
-  return { kind, ...Object.fromEntries(TEXT_PROPS.filter((k) => props[k] !== undefined).map((k) => [k, props[k]])) };
-}
+const LOOK_OF: Record<StyleKind, (clip: MotionClip) => Record<string, unknown>> = {
+  [StyleKind.Text]: (clip) => ({ kind: StyleKind.Text, ...Object.fromEntries(TEXT_PROPS.filter((k) => clip.props[k] !== undefined).map((k) => [k, clip.props[k]])) }),
+  [StyleKind.Colour]: (clip) => ({ kind: StyleKind.Colour, color: colourOf(clip.props) }),
+  [StyleKind.Paint]: (clip) => ({ kind: StyleKind.Paint, fills: elementFills(clip.component, clip.props) }),
+  [StyleKind.Effect]: (clip) => ({ kind: StyleKind.Effect, effects: clip.effects.map(({ lut: _lut, ...effect }) => effect) })
+};
 
 export function saveAsStyle(doc: MotionDoc, clipId: string, name: string, kind: StyleKind): OpResult {
   const found = findClip(doc, clipId);
   if (!found) {
     return { ok: false, error: `no clip ${clipId}` };
   }
-  const defined = defineStyle(doc, name, lookOf(found.clip.props, kind));
+  const defined = defineStyle(doc, name, LOOK_OF[kind](found.clip));
   return defined.ok ? applyStyle(defined.doc, [clipId], name) : defined;
 }
 
 export function stylesFor(doc: MotionDoc, component: ComponentId): NamedStyle[] {
-  return stylesOf(doc).filter((s) => typeof patchFor(s.style, component) !== 'string');
+  return stylesOf(doc).filter((s) => REFUSAL[s.style.kind](component) === null);
 }

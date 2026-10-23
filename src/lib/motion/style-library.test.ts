@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, type OpResult } from './timeline';
 import { defineStyle } from './styles';
-import { StyleKind } from './styles-model';
-import { adoptStyle, libraryOf, offeredStyles, syncedDoc } from './style-library';
+import { StyleKind, type Style } from './styles-model';
+import { EffectKind } from './effects/registry';
+import { FillType } from './fill/model';
+import { BlendMode } from './blend';
+import { adoptStyle, libraryOf, offeredStyles, styleLabel, syncedDoc } from './style-library';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -44,5 +47,20 @@ describe('the styles library shared by the frames of a canvas', () => {
       ['Accent', true],
       ['Brand', false]
     ]);
+  });
+
+  it('an effect style is shared like any other: adopted by an element, restyled on edit', () => {
+    const shadow = (blur: number): Style => ({ kind: StyleKind.Effect, effects: [{ id: 'sh', kind: EffectKind.DropShadow, enabled: true, params: { blur } }] });
+    const using = must(adoptStyle(withText(), ['t'], 'Lifted', shadow(30)));
+    const synced = syncedDoc(using, 'Lifted', shadow(5))!;
+
+    expect(findClip(using, 't')!.clip.effectStyleRef).toBe('Lifted');
+    expect((findClip(synced, 't')!.clip.effects[0].params as { blur: number }).blur).toBe(5);
+  });
+
+  it('names a style by what it holds', () => {
+    expect(styleLabel({ kind: StyleKind.Colour, color: '#ff0000' })).toBe('Colour');
+    expect(styleLabel({ kind: StyleKind.Effect, effects: [{ id: 'a', kind: EffectKind.DropShadow, enabled: true, params: {} }, { id: 'b', kind: EffectKind.GaussianBlur, enabled: true, params: {} }] })).toBe('Drop shadow + Gaussian blur');
+    expect(styleLabel({ kind: StyleKind.Paint, fills: [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }], opacity: 1, visible: true, blend: BlendMode.Normal }] })).toBe('Linear');
   });
 });
