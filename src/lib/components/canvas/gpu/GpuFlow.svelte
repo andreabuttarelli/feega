@@ -30,6 +30,10 @@
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { libraryOf, syncedDoc } from '$lib/motion/style-library';
   import { renameStyle } from '$lib/motion/styles';
+  import { variableLibrary } from '$lib/canvas/variable-library.svelte';
+  import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
+  import { removeVariable } from '$lib/motion/variables';
+  import type { Collection } from '$lib/motion/variables-model';
   import type { Style } from '$lib/motion/styles-model';
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
   import type { Fill } from '$lib/motion/fill/model';
@@ -140,7 +144,7 @@
   import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
 
   import { dragOffset } from '$lib/canvas/duplicate-plan';
-  import { enterFrame } from '$lib/canvas/enter-frame';
+  import { enterSelected } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
   import type { Edge } from '$lib/motion/space';
   import MeasureLayer from '../MeasureLayer.svelte';
@@ -1582,6 +1586,37 @@
   });
 
   $effect(() => {
+    variableLibrary.collections = variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
+  });
+
+  const sharedShape = (c: Collection | undefined) => JSON.stringify(c && { modes: c.modes, vars: c.vars });
+
+  function syncCollection(name: string, collection: Collection) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.variables?.[name])) {
+      const present = saverOf(frame.id)?.history.present;
+      const synced = present && sharedShape(present.variables?.[name]) !== sharedShape(collection) ? syncedCollection(present, name, collection) : null;
+      if (synced) {
+        commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} variables`);
+      }
+    }
+  }
+
+  function syncRemoval(collection: string, variable: string) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.variables?.[collection]?.vars[variable])) {
+      const present = saverOf(frame.id)?.history.present;
+      const removed = present ? removeVariable(present, collection, variable) : null;
+      if (removed?.ok) {
+        commit(frame.id, removed, `Removed ${collection}/${variable}`);
+      }
+    }
+  }
+
+  onMount(() => {
+    variableLibrary.connect({ push: syncCollection, remove: syncRemoval });
+    return () => variableLibrary.connect(null);
+  });
+
+  $effect(() => {
     peering?.select(pointedFrame, picks);
   });
 
@@ -2584,12 +2619,7 @@
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
-    enter: () => {
-      const only = selected.length === 1 ? selected[0] : null;
-      if (only) {
-        enterFrame(only, String(summaries.get(only)?.data.kind ?? '') || undefined);
-      }
-    },
+    enter: () => enterSelected(selected, summaries),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
     tool: (c) => {
@@ -3197,7 +3227,7 @@
         >
           <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} knobDrawn={coreRotate.some((r) => r.id === t.id)} />
           {#if !domIds.has(t.id) && holdsDoc(t.kind ?? '')}
-            {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
+            {@const kind = kindOfNode(t.id)}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
               <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage data-drawn={drawn.has(t.id) || coreDrawn.has(t.id)}>
                 {#if t.poster}

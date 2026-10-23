@@ -267,6 +267,16 @@ clip keeps one effect style next to one text, colour or paint style); `"detach"`
 `styleRef` or `effectStyleRef`, both when omitted), `"remove"` deletes, `"list"` lists them with
 their clips. Editing a style restyles every linked clip. Through `motion_tool`.
 
+Variables with modes (light/dark, brand A/B): `variable` `{ action: "define", collection, name, type:
+"colour"|"number"|"string"|"boolean", values: { <mode>: value | { alias: "Collection/name" } },
+modes? }` creates or edits one (every mode needs a value); `"add_mode"` adds a mode; `"mode"`
+switches the video to a mode and every bound clip takes that mode's value; `"bind"` `{ collection,
+name, clip_id, target }` links a prop (a colour to fill/stroke/color, a number to roundness, opacity,
+width, `autoLayout.gap`, `autoLayout.padding`...); `"unbind"`, `"remove"`, `"list"`. `set_props` on
+a bound prop is refused. Through `motion_tool`. Across the frames of a canvas: edit op `variables`
+(list; define a value, synced to every frame that has the collection; switch a mode per frame with
+`frames`; bind `ids` as `frameId:elementId`).
+
 The frame editor page's own actions (read the head, save the whole doc, apply doc ops, render and
 batch status) run through `motion_editor_op` `{ node_id, op, input }` with the same answers as
 the page. CLI: `feega motion op <nodeId> <op> --input '{...}'`.

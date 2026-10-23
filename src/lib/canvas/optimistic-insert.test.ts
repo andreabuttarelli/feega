@@ -42,7 +42,7 @@ describe('a shape drawn on the canvas before the server answers', () => {
   it('stands where the saved element will, as a chromeless element showing what was drawn', () => {
     const drawn = drawnTile('e1', { tool: DrawTool.Rectangle, box: { left: 120, top: 40, width: 300, height: 100 } });
 
-    expect(drawn?.node).toMatchObject({ id: 'e1', type: 'motion', position: { x: 120, y: 40 }, size: { width: 300, height: 100 }, data: { kind: 'element', docHeadRevision: 1 } });
+    expect(drawn?.node).toMatchObject({ id: 'e1', type: 'element', position: { x: 120, y: 40 }, size: { width: 300, height: 100 }, data: { docHeadRevision: 1 } });
     expect(drawn?.look).toMatch(/^data:image\/svg\+xml,/);
   });
 

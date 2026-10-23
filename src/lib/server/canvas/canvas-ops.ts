@@ -25,6 +25,7 @@ import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
 import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles';
+import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-variables';
 import { drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
@@ -212,7 +213,7 @@ const createdSize = (type: string, data: Record<string, unknown>) => {
   return { width: size.w, height: size.h };
 };
 
-const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (frame nodes with data.kind element)') }).strict();
+const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (element nodes)') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
 const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
@@ -651,6 +652,23 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => {
       const frames = framesOf(ctx);
       return canvasStyle(
+        {
+          ids: async () => (await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })).filter((n) => n.type === MOTION_TYPE).map((n) => n.id),
+          read: frames.read,
+          write: frames.write
+        },
+        input
+      );
+    }
+  }),
+
+  variables: op({
+    access: Access.Write,
+    audience: Audience.Mcp,
+    input: canvasVariableInput,
+    run: async (ctx, input) => {
+      const frames = framesOf(ctx);
+      return canvasVariable(
         {
           ids: async () => (await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })).filter((n) => n.type === MOTION_TYPE).map((n) => n.id),
           read: frames.read,

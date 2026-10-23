@@ -24,7 +24,7 @@ type Placed = { id: string; kind: string | null };
 
 async function nodesOf(admin: SupabaseClient, session: E2eSession): Promise<Placed[]> {
   const { data } = await admin.from('nodes').select('id, type, data').eq('canvas_id', session.canvasId).is('deleted_at', null);
-  return (data ?? []).filter((n) => n.type === 'motion').map((n) => ({ id: n.id, kind: (n.data as { kind?: string }).kind ?? 'frame' }));
+  return (data ?? []).filter((n) => n.type === 'motion' || n.type === 'element').map((n) => ({ id: n.id, kind: n.type === 'element' ? 'element' : ((n.data as { kind?: string }).kind ?? 'frame') }));
 }
 
 async function drawAt(page: Page, tool: string, share: { x: number; y: number }) {

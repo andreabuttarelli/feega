@@ -110,19 +110,20 @@ describe('a free element is a frame without chrome', () => {
   it('is the drawn box exactly: no bar, in preview or edit', () => {
     const made = elementNodeOf({ width: 240, height: 80 });
 
-    expect(made.data.kind).toBe(FrameKind.Element);
+    expect(made.type).toBe('element');
+    expect(motionOf({ id: 'e', type: made.type, data: made.data })?.kind).toBe(FrameKind.Element);
     expect({ w: made.w, h: made.h }).toEqual({ w: 240, h: 80 });
     expect(frameNodeSize(120, { width: 480, height: 160 }, NodeMode.Preview, FrameKind.Element)).toEqual({ w: 120, h: 40 });
   });
 
   it('has no ports, no name tag and a small minimum size: it is a shape, not a node', () => {
-    const element = { id: 'e', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }).data };
+    const element = { id: 'e', type: 'element', data: elementNodeOf({ width: 10, height: 10 }).data };
 
     expect(tileChromeOf(element)).toMatchObject({ ports: false, label: false, bar: false, takesDrops: false });
     expect(tileChromeOf(element)).toMatchObject({ timeline: false });
     expect(tileChromeOf({ id: 'f', type: 'motion', data: newMotionData() })).toMatchObject({ ports: true, label: true, bar: true, timeline: true });
     expect(tileChromeOf({ id: 't', type: 'text', data: {} })).toMatchObject({ ports: true, label: true });
-    expect(nodeSize('motion', element.data).w).toBeLessThan(40);
+    expect(nodeSize('element', element.data).w).toBeLessThan(40);
   });
 
   it('opens with its own shapes selected, so the properties show at once; a frame opens on nothing', () => {
@@ -165,7 +166,7 @@ describe('a free element is a frame without chrome', () => {
   });
 
   it('reads back as an element; an old frame without the field stays a frame', () => {
-    expect(motionOf({ id: 'e', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }).data })?.kind).toBe(FrameKind.Element);
+    expect(motionOf({ id: 'e', type: 'element', data: elementNodeOf({ width: 10, height: 10 }).data })?.kind).toBe(FrameKind.Element);
     expect(motionOf({ id: 'f', type: 'motion', data: { format: '9:16', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } })?.kind).toBe(FrameKind.Frame);
   });
 });
@@ -179,7 +180,7 @@ describe('a custom frame takes the size the hand gives it', () => {
   });
 
   it('only a preset grows its node to the open doc; a custom frame or a free element is sized by the node, never by a stale doc', () => {
-    const element = motionOf({ id: 'e', type: 'motion', data: elementNodeOf({ width: 300, height: 100 }).data })!;
+    const element = motionOf({ id: 'e', type: 'element', data: elementNodeOf({ width: 300, height: 100 }).data })!;
 
     expect(heightFollowsDoc(preset)).toBe(true);
     expect(heightFollowsDoc(custom)).toBe(false);

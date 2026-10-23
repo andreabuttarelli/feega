@@ -238,13 +238,17 @@ export function addMode(doc: MotionDoc, collection: string, mode: string): OpRes
 
 export type VariableEntry = { key: string; type: VarType };
 
-export function variableEntries(doc: MotionDoc): VariableEntry[] {
-  return Object.entries(doc.variables ?? {}).flatMap(([collection, c]) => Object.entries(c.vars).map(([name, v]) => ({ key: keyOf(collection, name), type: v.type })));
+export function variableEntries(variables: Variables | undefined): VariableEntry[] {
+  return Object.entries(variables ?? {}).flatMap(([collection, c]) => Object.entries(c.vars).map(([name, v]) => ({ key: keyOf(collection, name), type: v.type })));
 }
 
-export const typeOfVariable = (doc: MotionDoc, key: string) => typeOfKey(doc.variables, key);
+export const typeOfVariable = (variables: Variables | undefined, key: string) => typeOfKey(variables, key);
 
 export function activeModeOf(doc: MotionDoc, collection: string): string {
   const existing = doc.variables?.[collection];
   return existing ? activeMode(existing) : '';
+}
+
+export function setCollection(doc: MotionDoc, name: string, collection: Collection): OpResult {
+  return withVariables(doc, { ...doc.variables, [name]: collection });
 }

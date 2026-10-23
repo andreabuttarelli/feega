@@ -4,17 +4,21 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
   import { bindVariable, bindableTargets, typeOfVariable, unbindVariable, variableEntries } from '$lib/motion/variables';
+  import { adoptCollection } from '$lib/motion/variable-library';
+  import { splitKey } from '$lib/motion/variables-model';
+  import { variableLibrary } from '$lib/canvas/variable-library.svelte';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
 
   const NONE = '';
 
-  const entries = $derived(variableEntries(doc));
+  const offered = $derived({ ...variableLibrary.collections, ...doc.variables });
+  const entries = $derived(variableEntries(offered));
   const bound = $derived(Object.entries(clip.bind ?? {}));
   let key = $state(NONE);
   let target = $state(NONE);
 
-  const type = $derived(key === NONE ? undefined : typeOfVariable(doc, key));
+  const type = $derived(key === NONE ? undefined : typeOfVariable(offered, key));
   const targets = $derived(type ? bindableTargets(clip, type).filter((t) => !clip.bind?.[t]) : []);
 
   function pickVariable(value: string) {
@@ -26,7 +30,9 @@
     if (key === NONE || target === NONE) {
       return;
     }
-    commit(bindVariable(doc, clip.id, target, key), `Bound ${target} to ${key}`);
+    const collection = splitKey(key)?.[0] ?? '';
+    const adopted = offered[collection] ? adoptCollection(doc, collection, offered[collection]) : { ok: false as const, error: `no collection ${collection}` };
+    commit(adopted.ok ? bindVariable(adopted.doc, clip.id, target, key) : adopted, `Bound ${target} to ${key}`);
     target = NONE;
   }
 </script>

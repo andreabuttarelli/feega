@@ -5,7 +5,7 @@ import type { Db } from '$lib/server/db/client';
 import { createNode, deleteConnection, deleteNode, findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, leftEmpty, motionNodeSize } from '$lib/canvas/motion-node';
+import { DocNodeType, FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, leftEmpty, motionNodeSize, type DocNodeShape } from '$lib/canvas/motion-node';
 import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
@@ -66,7 +66,7 @@ export type StoredFrame = { nodeId: string; projectId: string; canvasId: string;
 
 export type Place = { projectId: string; canvasId: string };
 
-export type NodeShape = { data: Record<string, unknown>; width: number; height: number; displayName?: string };
+export type NodeShape = { type: DocNodeType; data: Record<string, unknown>; width: number; height: number; displayName?: string };
 
 export type FrameStore = {
   read: (nodeId: string) => Promise<StoredFrame | null>;
@@ -166,7 +166,7 @@ async function landFree(store: FrameStore, place: Place & { id?: string }, eleme
   const shaped = elementNodeOf({ width: area.width * stage.width, height: area.height * stage.height });
   const at = { x: drop.x - shaped.w / 2, y: drop.y - shaped.h / 2 };
   const doc = STILL_AT[stillAt]({ ...frameOf(atCanvasPixels(element, area, shaped), mode, area, newId), background: Background.Transparent });
-  const frameId = await store.create({ ...place, ...at }, doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: elementName(element.clip) });
+  const frameId = await store.create({ ...place, ...at }, doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: elementName(element.clip) });
   const clipId = doc.tracks.flatMap((t) => t.clips)[0]?.id ?? element.clip.id;
   return { frameId, clipId, created: true, version: 1, undo: [created(frameId, at)], rollback: () => store.remove(frameId) };
 }
@@ -470,8 +470,8 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
     },
     write: (nodeId, expectedVersion, doc, summary) => saveMotionDoc(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
     create: async (at, doc, shape) => {
-      const { data, ...size } = shape ?? frameShape(doc);
-      const node = await createNode(db, { id: at.id, orgId, projectId: at.projectId, canvasId: at.canvasId, type: 'motion', x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...size, data: { ...atFirstRevision(data), format: formatOf(doc) }, actor });
+      const { type, data, ...size } = shape ?? frameShape(doc);
+      const node = await createNode(db, { id: at.id, orgId, projectId: at.projectId, canvasId: at.canvasId, type, x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...size, data: { ...atFirstRevision(data), format: formatOf(doc) }, actor });
       await appendRevision(db, { orgId, nodeId: node.id, expectedVersion: 0, doc, actor, summary: SUMMARY.movedIn });
       return node.id;
     },
@@ -553,7 +553,7 @@ export async function drawElement(store: FrameStore, place: Place & { id?: strin
   const shaped = elementNodeOf(made.box);
   const at = { x: made.box.left, y: made.box.top };
   const first = made.doc.tracks.flatMap((t) => t.clips)[0];
-  const frameId = await store.create({ ...place, ...at }, made.doc, { data: shaped.data, width: shaped.w, height: shaped.h, ...(first ? { displayName: elementName(first) } : {}) });
+  const frameId = await store.create({ ...place, ...at }, made.doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, ...(first ? { displayName: elementName(first) } : {}) });
   const clipId = first?.id ?? '';
   return { outcome: MoveOutcome.Done, frameId, clipId, created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
 }
@@ -561,7 +561,7 @@ export async function drawElement(store: FrameStore, place: Place & { id?: strin
 export async function drawFrameAt(store: FrameStore, place: Place & { id?: string }, box: CanvasBox, format?: MotionFormat, stillSeconds?: number): Promise<Extract<Moved, { outcome: MoveOutcome.Done }>> {
   const shaped = drawnFrameNodeOf(box);
   const at = { x: box.left, y: box.top };
-  const frameId = await store.create({ ...place, ...at }, drawnFrame(box, format, stillSeconds), { data: shaped.data, width: shaped.w, height: shaped.h });
+  const frameId = await store.create({ ...place, ...at }, drawnFrame(box, format, stillSeconds), { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h });
   return { outcome: MoveOutcome.Done, frameId, clipId: '', created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
 }
 
@@ -569,7 +569,7 @@ export type FigmaFill = { nodeId: string; images: FigmaImage[] };
 
 export type FigmaPasteOutcome = { outcome: MoveOutcome.Done; frameIds: string[]; undo: UndoItem[]; skipped: string[]; fills: FigmaFill[]; fileKey: string | null } | null;
 
-const ITEM_SHAPE: Record<Destination, (item: PlanItem) => { data: Record<string, unknown>; w: number; h: number }> = {
+const ITEM_SHAPE: Record<Destination, (item: PlanItem) => DocNodeShape> = {
   [Destination.Frame]: (item) => drawnFrameNodeOf(item.size),
   [Destination.Free]: (item) => elementNodeOf(item.size, item.kind)
 };
@@ -585,7 +585,7 @@ export async function pasteFigmaAt(store: FrameStore, place: Place, html: string
   for (const item of plan.items) {
     const shaped = ITEM_SHAPE[item.destination](item);
     const at = { x: Math.round(centre.x + item.centre.x - item.size.width / 2), y: Math.round(centre.y + item.centre.y - item.size.height / 2) };
-    const frameId = await store.create({ ...place, ...at }, item.doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: item.name });
+    const frameId = await store.create({ ...place, ...at }, item.doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: item.name });
     frameIds.push(frameId);
     undo.push(created(frameId, at));
     if (item.images.length) {

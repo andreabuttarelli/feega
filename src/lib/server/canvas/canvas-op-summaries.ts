@@ -19,6 +19,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   connect_nodes: 'Draw a line from a source node to a target node (a frame takes no inputs: use place_in_frame).',
   create_formats: 'Editable copies of a frame in other formats, content refitted, placed to its right.',
   export_selection: 'Export frames or frame elements as png, jpg, webp, svg or pdf, one file or a zip; answers a url.',
+  variables: 'Variable collections shared by the frames: list, define a value (synced to every frame that has the collection), switch a mode per frame, bind an element.',
   move_frame_element: 'Move an element inside its frame, to another frame, or out onto the canvas.',
   copy_frame_element: 'Copy an element the same way move_frame_element moves it; the source keeps it.',
   draw_element: 'Draw a free Text, Box, Ellipse or Path on the canvas, outside any frame.',
