@@ -10,6 +10,7 @@ import { RING_LAYOUT, ringCards, ringRadiusPx, ringSliceId, slicesFor } from './
 import { BENTO_LAYOUT, bentoCellId, heldCell, type BentoCard } from './bento/model';
 import { facesOf, screenCompOf, screenHostId } from './device-screen';
 import type { Device } from './devices';
+import { propertyOverride, type PropertyValues } from './property-resolve';
 
 export type CompPath = readonly string[];
 export type GroupProps = { span?: number };
@@ -151,12 +152,14 @@ export function withOverride(clip: MotionClip, override: Record<string, unknown>
   return { ...clip, ...level, props: { ...clip.props, ...props } };
 }
 
-export function overridden(tracks: MotionTrack[], host: MotionClip): MotionTrack[] {
+export function overridden(tracks: MotionTrack[], host: MotionClip, main?: MotionComp['component']): MotionTrack[] {
   const overrides = host.props.overrides as Overrides | undefined;
-  if (!overrides) {
+  const values = host.props.propValues as PropertyValues | undefined;
+  if (!overrides && !main?.properties) {
     return tracks;
   }
-  return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (overrides[c.id] ? withOverride(c, overrides[c.id]) : c)) }));
+  const merged = (c: MotionClip) => ({ ...propertyOverride(main, values, c), ...overrides?.[c.id] });
+  return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (Object.keys(merged(c)).length ? withOverride(c, merged(c)) : c)) }));
 }
 
 type Expander = (doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number) => MotionTrack[];
@@ -175,7 +178,7 @@ function combinedInside(doc: MotionDoc, tracks: MotionTrack[], op: unknown): Mot
 
 function precompTracks(doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number): MotionTrack[] {
   const comp = doc.comps[compOf(host)!];
-  const inner = combinedInside(doc, expand(doc, withoutHidden({ ...doc, tracks: overridden(comp.tracks, host) }).tracks, depth + 1), host.props.boolean);
+  const inner = combinedInside(doc, expand(doc, withoutHidden({ ...doc, tracks: overridden(comp.tracks, host, comp.component) }).tracks, depth + 1), host.props.boolean);
   const laid = placed(host, comp, inner);
   const group: MotionClip = { ...host, props: { ...host.props, span: laid.length } };
   return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...laid];

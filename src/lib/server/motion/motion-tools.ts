@@ -176,6 +176,9 @@ import { flattenComps } from '$lib/motion/precomp';
 import { clearTextRuns, styleTextRange } from '$lib/motion/text-run-ops';
 import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, pushOverrides, resetOverride, resetOverrides } from '$lib/motion/main-component';
 import { addVariant, pickVariant, swapInstance } from '$lib/motion/variants';
+import { defineProperty, removeProperty, resetProperty, setProperty } from '$lib/motion/component-properties';
+import { propertyDefSchema } from '$lib/motion/doc';
+import type { PropertyDef } from '$lib/motion/property-resolve';
 import { placeInstance } from '$lib/motion/canvas-components';
 import { runEditSchema, type RunEdit } from '$lib/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
@@ -2795,8 +2798,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     component: tool({
-      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value).',
-      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.string().optional() }),
+      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop).',
+      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.union([z.string(), z.boolean()]).optional(), property: propertyDefSchema.optional() }),
       execute: async (input) => {
         const ids: string[] = [];
         const newId = () => {
@@ -2814,7 +2817,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           [ComponentAction.Reset]: () => resetOverrides(session.doc, id),
           [ComponentAction.Detach]: () => detachInstance(session.doc, id, newId),
           [ComponentAction.AddVariant]: () => addVariant(session.doc, input.comp ?? '', input.variant ?? {}, newId),
-          [ComponentAction.Swap]: () => (input.comp ? swapInstance(session.doc, id, input.comp) : pickVariant(session.doc, id, input.prop ?? '', input.value ?? ''))
+          [ComponentAction.Swap]: () => (input.comp ? swapInstance(session.doc, id, input.comp) : pickVariant(session.doc, id, input.prop ?? '', String(input.value ?? ''))),
+          [ComponentAction.DefineProp]: () => (input.property ? defineProperty(session.doc, input.comp ?? '', input.prop ?? '', input.property as PropertyDef) : { ok: false, error: 'define-prop needs property' }),
+          [ComponentAction.RemoveProp]: () => removeProperty(session.doc, input.comp ?? '', input.prop ?? ''),
+          [ComponentAction.SetProp]: () => (input.value === undefined ? { ok: false, error: 'set-prop needs value' } : setProperty(session.doc, id, input.prop ?? '', input.value)),
+          [ComponentAction.ResetPropValue]: () => resetProperty(session.doc, id, input.prop ?? '')
         };
         const out = apply(run[input.action](), `component ${input.action}`);
         if (out.ok && input.action === ComponentAction.Place) {
