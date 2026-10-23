@@ -1130,16 +1130,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
-    set_lane_muted: tool({
-      description: 'Mute or unmute the keyframes of one prop of a clip, like the eye on an animation track: a muted lane is left out of playback and of the render, so the prop stays at its base value, but the keyframes are kept. Lists in mutedLanes of get_motion_doc.',
-      inputSchema: z.object({ clip_id: z.string(), prop: z.string(), muted: z.boolean() }),
-      execute: async (input) => apply(setLaneMuted(session.doc, input.clip_id, input.prop, input.muted), `${input.muted ? 'muted' : 'unmuted'} ${input.prop} of ${input.clip_id}`)
-    }),
-
-    duplicate_keyframes: tool({
-      description: 'Copy keyframes of one prop of a clip (the ones at times, seconds from the clip start; all when omitted) to just after the last of them, keeping their spacing, like Cmd+D on selected keyframes.',
-      inputSchema: z.object({ clip_id: z.string(), prop: z.string(), times: z.array(z.number().min(0)).optional() }),
+    edit_lane: tool({
+      description: 'Edit one keyframe lane (prop) of a clip. mute/unmute: leave the lane out of playback and render, keys kept (mutedLanes in get_motion_doc). duplicate: copy the keys at times (s from the clip start; all if omitted) after the last of them, spacing kept.',
+      inputSchema: z.object({ clip_id: z.string(), prop: z.string(), action: z.enum(['mute', 'unmute', 'duplicate']), times: z.array(z.number().min(0)).optional() }),
       execute: async (input) => {
+        if (input.action !== 'duplicate') {
+          return apply(setLaneMuted(session.doc, input.clip_id, input.prop, input.action === 'mute'), `${input.action} ${input.prop} of ${input.clip_id}`);
+        }
         const track = findClip(session.doc, input.clip_id)?.clip.keyframes[input.prop] ?? [];
         const picked = input.times ? input.times.map(frames) : track.map((k) => k.frame);
         return apply(duplicateKeyframes(session.doc, picked.map((frame) => ({ clipId: input.clip_id, prop: input.prop, frame }))), `duplicated keyframes of ${input.prop} on ${input.clip_id}`);

@@ -14,6 +14,6 @@ select them by area, copy them, or silence one lane to compare.
 - Duplicate (Cmd/Ctrl+D with keyframes selected, `duplicateKeyframes`): copies land after the
   last selected key, 15 frames on, spacing kept. Without keyframes selected Cmd+D still
   duplicates the layer. `KeyBoard` now carries `intensity` so a pasted elastic key keeps it.
-- MCP: `set_lane_muted`, `duplicate_keyframes`; `mutedLanes` is in `get_motion_doc`.
+- MCP: `edit_lane` (mute, unmute, duplicate); `mutedLanes` is in `get_motion_doc`.
 
 Not done: grouping timeline segments (AN-11), snapping to the playhead (AN-06).

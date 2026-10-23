@@ -84,7 +84,7 @@ const CLIP: Record<string, Access> = {
   path: { write: ['set_motion_path', 'set_path_tangent'], read: 'path' },
   physics: { write: ['set_physics', 'apply_physics_preset'], read: 'physics' },
   hidden: { write: ['set_visibility'], read: 'hidden' },
-  mutedLanes: { write: ['set_lane_muted'], read: 'mutedLanes' },
+  mutedLanes: { write: ['edit_lane'], read: 'mutedLanes' },
   locked: { write: ['set_visibility'], read: 'locked' },
   bleed: { write: ['set_visibility'], read: 'bleed' },
   clipContent: { write: ['set_visibility'], read: 'clipContent' },
