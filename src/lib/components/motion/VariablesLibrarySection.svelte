@@ -3,6 +3,8 @@
   import type { OpResult } from '$lib/motion/timeline';
   import { DEFAULT_MODE, VARIABLE_NAME, VarType, type VarAlias, type VarLiteral } from '$lib/motion/variables-model';
   import { activeModeOf, addMode, defineVariable, removeVariable, setActiveMode } from '$lib/motion/variables';
+  import { adoptCollection } from '$lib/motion/variable-library';
+  import { variableLibrary } from '$lib/canvas/variable-library.svelte';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
 
@@ -12,12 +14,26 @@
   const HEX = /^#[0-9a-fA-F]{6}$/;
 
   const collections = $derived(Object.entries(doc.variables ?? {}));
+  const shared = $derived(Object.entries(variableLibrary.collections).filter(([group]) => !doc.variables?.[group]));
   let collection = $state(NEW_COLLECTION);
   let name = $state('');
   let type = $state<VarType>(VarType.Colour);
   let modeName = $state<Record<string, string>>({});
 
   const isAlias = (value: VarLiteral | VarAlias): value is VarAlias => typeof value === 'object';
+
+  function edited(result: OpResult, summary: string, group: string) {
+    onchange(result, summary);
+    const collection = result.ok ? result.doc.variables?.[group] : undefined;
+    if (collection) {
+      variableLibrary.push(group, collection);
+    }
+  }
+
+  function removed(group: string, variable: string) {
+    onchange(removeVariable(doc, group, variable), `Removed ${group}/${variable}`);
+    variableLibrary.remove(group, variable);
+  }
 
   function addVariable() {
     const trimmed = name.trim();
@@ -26,12 +42,12 @@
     }
     const modes = doc.variables?.[collection]?.modes ?? [DEFAULT_MODE];
     const values = Object.fromEntries(modes.map((m) => [m, FRESH[type]]));
-    onchange(defineVariable(doc, collection, trimmed, { type, values }), `Added the ${collection}/${trimmed} variable`);
+    edited(defineVariable(doc, collection, trimmed, { type, values }), `Added the ${collection}/${trimmed} variable`, collection);
     name = '';
   }
 
   function setValue(group: string, variable: string, kind: VarType, values: Record<string, VarLiteral | VarAlias>, mode: string, value: VarLiteral) {
-    onchange(defineVariable(doc, group, variable, { type: kind, values: { ...values, [mode]: value } }), `Changed ${group}/${variable}`);
+    edited(defineVariable(doc, group, variable, { type: kind, values: { ...values, [mode]: value } }), `Changed ${group}/${variable}`, group);
   }
 
   function newMode(group: string) {
@@ -39,7 +55,7 @@
     if (!VARIABLE_NAME.test(trimmed)) {
       return;
     }
-    onchange(addMode(doc, group, trimmed), `Added the ${trimmed} mode to ${group}`);
+    edited(addMode(doc, group, trimmed), `Added the ${trimmed} mode to ${group}`, group);
     modeName = { ...modeName, [group]: '' };
   }
 
@@ -64,7 +80,7 @@
         <div class="var" data-testid="variable-row" data-variable={`${group}/${variable}`}>
           <div class="row">
             <span>{variable} · {v.type}</span>
-            <button type="button" aria-label={`Remove ${group}/${variable}`} data-testid={`variable-remove-${group}-${variable}`} onclick={() => onchange(removeVariable(doc, group, variable), `Removed ${group}/${variable}`)}>Remove</button>
+            <button type="button" aria-label={`Remove ${group}/${variable}`} data-testid={`variable-remove-${group}-${variable}`} onclick={() => removed(group, variable)}>Remove</button>
           </div>
           {#each c.modes as m (m)}
             {@const value = v.values[m]}
@@ -85,6 +101,12 @@
           {/each}
         </div>
       {/each}
+    </div>
+  {/each}
+  {#each shared as [group, c] (group)}
+    <div class="row" data-testid="variable-shared" data-collection={group}>
+      <span>{group} · canvas · {Object.keys(c.vars).length}</span>
+      <button type="button" data-testid={`variable-use-${group}`} onclick={() => onchange(adoptCollection(doc, group, c), `Used the ${group} variables`)}>Use here</button>
     </div>
   {/each}
   <div class="add" data-testid="variable-add">
