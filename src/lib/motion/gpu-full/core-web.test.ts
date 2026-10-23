@@ -53,3 +53,15 @@ describe('uploading a group\'s pictures', () => {
     expect(sent).toEqual(['a', 'b']);
   });
 });
+
+describe('a group sent to the core', () => {
+  it('carries a whole-pixel size, because the core reads it as an integer', () => {
+    const sent: string[] = [];
+    const attached = { put_group: (_key: string, json: string) => sent.push(json) } as unknown as Parameters<typeof rasterOf>[0];
+    const list = { width: 886.5603019630531, height: 401.2, background: null, items: [] } as unknown as DisplayList;
+
+    rasterOf(attached).putGroup('g', list);
+
+    expect(JSON.parse(sent[0])).toMatchObject({ width: 887, height: 402 });
+  });
+});
