@@ -36,6 +36,8 @@ export type MotionRevision = { version: number; summary: string | null; actorKin
 
 export type VideoBudget = { ok: true; spent_usd: number; cap_usd: number; raise_usd: number };
 
+export type FrameShare = { url: string; embed_url: string };
+
 export type EmbedState = { published: boolean; url?: string; snippet?: string; react?: string; flutter?: string; revision?: number };
 
 function renderBody(opts: RenderOptions): Record<string, unknown> {
@@ -89,6 +91,7 @@ export const motionApi = {
   list: (token: string, projectId?: string, org?: string) => request<{ videos: MotionVideo[] }>(withQuery('/api/v1/motion', { project: projectId, org }), token),
   embed: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token, { method: 'POST' }),
   unembed: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token, { method: 'DELETE' }),
+  share: (token: string, nodeId: string, org?: string) => request<FrameShare>(withOrg(`/api/v1/motion/${id(nodeId)}/share`, org), token, { method: 'POST' }),
   embedState: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token),
   budget: (token: string, nodeId: string, org?: string) => request<VideoBudget>(withOrg(`/api/v1/motion/${id(nodeId)}/budget`, org), token),
   raiseBudget: (token: string, nodeId: string, org?: string) => request<VideoBudget>(withOrg(`/api/v1/motion/${id(nodeId)}/budget`, org), token, { method: 'POST' }),

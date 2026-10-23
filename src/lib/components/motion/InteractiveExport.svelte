@@ -94,6 +94,11 @@
     updated = false;
     hosted = hosted && { ...hosted, published: false };
   }
+
+  async function viewerLink(): Promise<string | null> {
+    const res = await fetch(`${editorUrl}/share`, { method: 'POST' });
+    return res.ok ? ((await res.json()) as { url: string }).url : null;
+  }
 </script>
 
-<EmbedView {doc} {bundle} {href} {hosted} {hostedSnippet} appSnippets={snippets} {reactions} bind:settings busy={hosting} {error} {updated} onpublish={publish} onunpublish={unpublish} {onpresets} />
+<EmbedView {doc} {bundle} {href} {hosted} {hostedSnippet} appSnippets={snippets} {reactions} bind:settings busy={hosting} {error} {updated} onpublish={publish} onunpublish={unpublish} onlink={viewerLink} {onpresets} />
