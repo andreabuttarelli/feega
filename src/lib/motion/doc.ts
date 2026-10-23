@@ -16,6 +16,7 @@ import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
 import { expressionsSchema, expressionsProblem } from './expression/schema';
 import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
 import { stylesSchema } from './styles-model';
+import { bindSchema, variablesSchema } from './variables-model';
 import { effectsSchema, effectsProblem } from './effects/model';
 import { clipShadersSchema, clipShadersProblem, shadersSchema } from './shaders/model';
 import { BLEND_MODES, BlendMode } from './blend';
@@ -121,7 +122,8 @@ const clipSchema = z.object({
   layoutItem: layoutItemSchema.optional(),
   constraints: constraintsSchema.optional(),
   partStyles: partStylesSchema.optional(),
-  styleRef: z.string().min(1).optional()
+  styleRef: z.string().min(1).optional(),
+  bind: bindSchema
 });
 
 const trackSchema = z.object({
@@ -212,7 +214,8 @@ export const motionDocSchema = z
     freeSize: z.boolean().optional(),
     layoutGuides: layoutGuidesSchema,
     links: z.record(z.string().min(1), z.string().min(1)).optional(),
-    styles: stylesSchema
+    styles: stylesSchema,
+    variables: variablesSchema
   })
   .refine(fitsResolution, RESOLUTION_PROBLEM)
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] })

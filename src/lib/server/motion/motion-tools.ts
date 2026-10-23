@@ -2,6 +2,8 @@ import { ungroupClip } from '$lib/motion/group';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
 import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, stylesOf } from '$lib/motion/styles';
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
+import { VariableAction, bindVariable, defineVariable, removeVariable, setActiveMode, unbindVariable } from '$lib/motion/variables';
+import { VARIABLE_NAME, VarType, type VarInput } from '$lib/motion/variables-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
 import { setNetwork, toVector } from '$lib/motion/vector/ops';
@@ -424,6 +426,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
+        bind: c.bind ?? null,
         expressions: c.expressions,
         effects: c.effects,
         shaders: c.shaders,
@@ -447,6 +450,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     layoutGuides: doc.layoutGuides ?? [],
     fonts: doc.fonts,
     styles: stylesOf(doc),
+    variables: doc.variables ?? {},
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     interactive: interactiveOf(doc),
@@ -877,6 +881,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     [StyleAction.Rename]: (input) => apply(renameStyle(session.doc, named(input), input.to ?? ''), `renamed style ${named(input)} to ${input.to}`),
     [StyleAction.Remove]: (input) => apply(removeStyle(session.doc, named(input)), `removed style ${named(input)}`),
     [StyleAction.List]: () => ({ styles: stylesOf(session.doc) })
+  };
+
+  type VariableInput = { action: VariableAction; collection?: string; name?: string; type?: VarType; values?: Record<string, unknown>; modes?: string[]; mode?: string; clip_id?: string; target?: string };
+  const keyOfInput = (input: VariableInput) => `${input.collection ?? ''}/${input.name ?? ''}`;
+  const VARIABLE_ACTIONS: Record<VariableAction, (input: VariableInput) => unknown> = {
+    [VariableAction.Define]: (input) => apply(defineVariable(session.doc, input.collection ?? '', input.name ?? '', { type: input.type, values: input.values } as VarInput, input.modes), `variable ${keyOfInput(input)}`),
+    [VariableAction.Mode]: (input) => apply(setActiveMode(session.doc, input.collection ?? '', input.mode ?? ''), `${input.collection} mode ${input.mode}`),
+    [VariableAction.Bind]: (input) => apply(bindVariable(session.doc, input.clip_id ?? '', input.target ?? '', keyOfInput(input)), `bound ${input.target} of ${input.clip_id} to ${keyOfInput(input)}`),
+    [VariableAction.Unbind]: (input) => apply(unbindVariable(session.doc, input.clip_id ?? '', input.target ?? ''), `unbound ${input.target} of ${input.clip_id}`),
+    [VariableAction.Remove]: (input) => apply(removeVariable(session.doc, input.collection ?? '', input.name ?? ''), `removed variable ${keyOfInput(input)}`),
+    [VariableAction.List]: () => ({ variables: session.doc.variables ?? {} })
   };
 
   const tools: Record<string, Tool> = {
@@ -2137,6 +2152,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color, or kind ${StyleKind.Colour} with color; editing restyles every clip using it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill. detach (clip_ids) unlinks them, keeping their look. remove (name) deletes a style. rename (name, to) renames it, elements stay linked. list returns the styles with their clips (also in get_motion_doc).`,
       inputSchema: z.object({ action: z.enum(StyleAction), name: z.string().regex(STYLE_NAME).optional(), style: styleSchema.optional(), clip_ids: z.array(z.string()).optional(), to: z.string().regex(STYLE_NAME).optional() }),
       execute: async (input) => STYLE_ACTIONS[input.action](input)
+    }),
+
+    variable: tool({
+      description: `Variables with modes, bound to clip props. action define (collection, name, type ${Object.values(VarType).join('|')}, values {mode: value or {alias: "Collection/name"}}, modes optional list, first is the default) creates or edits a variable, creating its collection; every mode needs a value; an alias points to a variable of the same type, no loops. mode (collection, mode) switches this video to that mode: every bound clip takes that mode's value (light/dark, brand A/B). bind (collection, name, clip_id, target) links a prop to the variable: a colour variable to fill, stroke, color; a number to roundness, opacity, width, height, size, autoLayout.gap, autoLayout.crossGap, autoLayout.padding (all four sides); a string to a text prop; a boolean to a toggle. Number values are in the prop's own units (sizes and opacity are shares 0..1, gap and padding px). unbind (clip_id, target) keeps the current value. remove (collection, name) deletes one and unbinds its clips. list returns all (also in get_motion_doc). set_props on a bound prop is refused: unbind first.`,
+      inputSchema: z.object({
+        action: z.enum(VariableAction),
+        collection: z.string().regex(VARIABLE_NAME).optional(),
+        name: z.string().regex(VARIABLE_NAME).optional(),
+        type: z.enum(VarType).optional(),
+        values: z.record(z.string(), z.unknown()).optional(),
+        modes: z.array(z.string().regex(VARIABLE_NAME)).optional(),
+        mode: z.string().regex(VARIABLE_NAME).optional(),
+        clip_id: z.string().optional(),
+        target: z.string().optional()
+      }),
+      execute: async (input) => VARIABLE_ACTIONS[input.action](input)
     }),
 
     register_font: tool({
