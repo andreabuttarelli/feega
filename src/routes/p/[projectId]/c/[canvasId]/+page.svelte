@@ -230,6 +230,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { Product } from '$lib/server/repos/products';
   import type { SocialPost } from '$lib/server/repos/social-posts';
   import { BILLING_PATH } from '$lib/billing-path';
+  import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
+  import type { FigmaJob } from '$lib/canvas/figma/images';
+  import { ImagesOutcome } from '$lib/canvas/figma/fetch-images';
 
   let { data } = $props();
 
@@ -3114,6 +3117,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (skipped.length) {
       failed = `${FIGMA_SKIPPED} ${skipped.join('; ')}`;
     }
+    const fileKey = (res?.fileKey ?? null) as string | null;
+    const fills = (res?.fills ?? []) as { nodeId: string; images: FigmaImage[] }[];
+    if (fileKey && fills.length) {
+      figmaJobs = [...figmaJobs, ...fills.map((f) => ({ ...f, fileKey }))];
+    }
+  }
+
+  let figmaJobs = $state<FigmaJob[]>([]);
+  let figmaTokenMissing = $state(false);
+
+  function figmaImagesAnswered(outcome: ImagesOutcome) {
+    figmaTokenMissing = outcome === ImagesOutcome.NoToken;
   }
 
   async function pasteSvg(svg: string, at: { x: number; y: number }) {
@@ -3407,6 +3422,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {/if}
     </p>
   {/if}
+  {#if figmaTokenMissing}
+    <p class="warning" role="status" data-testid="figma-token-hint">
+      Add a Figma token in Settings to import images
+      <a href="/p/{data.projectId}/settings/profile">Open settings</a>
+    </p>
+  {/if}
   {#if fontAdded}
     <p class="warning" role="status" data-testid="font-added">{fontAdded}</p>
   {/if}
@@ -3490,6 +3511,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onPaste={paste}
     onClip={copy}
     onPasteData={pasteData}
+    {figmaJobs}
+    onFigmaImages={figmaImagesAnswered}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
