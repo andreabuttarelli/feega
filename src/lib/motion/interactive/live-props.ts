@@ -31,7 +31,8 @@ const SOURCE_PAINT: Record<Source, (component: ComponentId) => LivePaint | null>
   [Source.Remap]: FROZEN,
   [Source.Sound]: FROZEN,
   [Source.Layout]: FROZEN,
-  [Source.TextPath]: FROZEN
+  [Source.TextPath]: FROZEN,
+  [Source.Fill]: FROZEN
 };
 
 export function paintOf(component: ComponentId, prop: AnimProp): LivePaint | null {

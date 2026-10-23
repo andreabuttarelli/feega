@@ -1,9 +1,11 @@
 import type { MotionClip } from '../doc';
-import { Source, animProp, sampleTrack } from '../keyframes';
+import { Source, animProp, sampleColor, sampleTrack, type KeyValue } from '../keyframes';
 import type { Size } from '../shape/geometry';
 import { movesOverTime } from '../shape/modifiers';
 import { shapeDrawing, unionExtent, type Extent, type ShapeLook } from '../shape/render';
 import { modifierOfKey, modifierValues, type Modifier } from '../shape/schema';
+import { applyFillKeys, fillOfKey } from '../fill/keys';
+import { fillsOf } from '../fill/model';
 import { js } from './html';
 import { seekDriver } from './stage';
 import { hotScope, hotSeek } from './hot';
@@ -14,15 +16,22 @@ type Env = { width: number; height: number; unit: number; fps: number; color: (v
 const SHAPE_TIMELINE = 'feegaShapes';
 const svgId = (id: string) => `sv-${id}`;
 
-const isGeometric = (key: string) => modifierOfKey(key) !== null || animProp('Shape', key)?.source === Source.Param;
+const isGeometric = (key: string) => modifierOfKey(key) !== null || fillOfKey(key) !== null || animProp('Shape', key)?.source === Source.Param;
 
 const runsByItself = (m: Modifier) => m.enabled && movesOverTime({ kind: m.kind, values: modifierValues(m) });
 
-export function lookAt(clip: MotionClip, frame: number): ShapeLook {
+const SAME_COLOUR = (value: string) => value;
+
+export function lookAt(clip: MotionClip, frame: number, colour: (value: string) => string = SAME_COLOUR): ShapeLook {
   const look = { ...(clip.props as unknown as ShapeLook) };
   const params = new Map<string, Record<string, number>>();
+  const fills: Record<string, KeyValue> = {};
   for (const [key, track] of Object.entries(clip.keyframes)) {
     if (!track.length || !isGeometric(key)) {
+      continue;
+    }
+    if (fillOfKey(key)) {
+      fills[key] = typeof track[0].value === 'string' ? sampleColor(track, frame, colour) : sampleTrack(track, frame);
       continue;
     }
     const value = sampleTrack(track, frame);
@@ -34,7 +43,7 @@ export function lookAt(clip: MotionClip, frame: number): ShapeLook {
     params.set(ref.id, { ...params.get(ref.id), [ref.param]: value });
   }
   look.modifiers = look.modifiers.map((m) => ({ ...m, params: { ...m.params, ...params.get(m.id) } }));
-  return look;
+  return Object.keys(fills).length ? { ...look, fills: applyFillKeys(fillsOf(clip.props), fills) } : look;
 }
 
 function sizeOf(clip: MotionClip, env: Env): Size {
@@ -61,13 +70,13 @@ export function shapeStudy(clip: MotionClip, env: Env): ShapeStudy {
   const moving = Object.keys(clip.keyframes).some(isGeometric) || modifiers.some(runsByItself);
   const size = sizeOf(clip, env);
   if (!moving) {
-    return { bake: null, extent: drawingAt(clip.id, env, 0, size, lookAt(clip, 0)).extent };
+    return { bake: null, extent: drawingAt(clip.id, env, 0, size, lookAt(clip, 0, env.color)).extent };
   }
   const frames: string[] = [];
   const seen = new Map<string, number>();
   let extent: Extent | null = null;
   const index = Array.from({ length: clip.durationInFrames }, (_, f) => {
-    const drawing = drawingAt(clip.id, env, f, size, lookAt(clip, f));
+    const drawing = drawingAt(clip.id, env, f, size, lookAt(clip, f, env.color));
     extent = unionExtent(extent, drawing.extent);
     if (!seen.has(drawing.markup)) {
       seen.set(drawing.markup, frames.length);

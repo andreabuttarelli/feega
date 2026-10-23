@@ -13,6 +13,7 @@ import { BlendMode } from '../blend';
 import { MASK_KEYS } from '../mask';
 import { mattePairs, MATTE_READ } from '../matte';
 import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, fillsOf, type Fill, type FillOf } from '../fill/model';
+import { applyFillKeys, fillOfKey } from '../fill/keys';
 import { StrokeAlign, dashOf, strokesOf, type Stroke } from '../stroke/model';
 import { Cap, Join, dashes, strokePolygons } from './stroke';
 import { arrowHeads } from '../stroke/arrows';
@@ -335,7 +336,7 @@ const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (c
 
 const MASKED: ReadonlySet<string> = new Set(MASK_KEYS);
 
-const drawnKey = (clip: MotionClip, key: string) => MASKED.has(key) || effectOfKey(key) !== null || animatorOfKey(key) !== null || modifierOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
+const drawnKey = (clip: MotionClip, key: string) => MASKED.has(key) || effectOfKey(key) !== null || animatorOfKey(key) !== null || modifierOfKey(key) !== null || fillOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
 
 const drawnSource = (clip: MotionClip, source: Source | undefined) => (source !== undefined && (DRAWN_SOURCES.has(source) || SAMPLED_IN_PLACE.has(source))) || (source === Source.Remap && REMAPPED.has(clip.component));
 
@@ -357,7 +358,12 @@ function propsAt(clip: MotionClip, frame: number, colour: (v: string) => string)
     }
     return [[key, prop.kind === ValueKind.Color ? sampleColor(track, local, colour) : sampleTrack(track, local)]];
   });
-  return counted(clip.component, { ...clip.props, ...Object.fromEntries(sampled) }, local);
+  return counted(clip.component, { ...clip.props, ...Object.fromEntries(sampled), ...fillsAt(clip, local, colour) }, local);
+}
+
+function fillsAt(clip: MotionClip, local: number, colour: (v: string) => string): { fills?: Fill[] } {
+  const values = Object.entries(clip.keyframes).flatMap(([key, track]) => (fillOfKey(key) && track.length ? [[key, typeof track[0].value === 'string' ? sampleColor(track, local, colour) : sampleTrack(track, local)] as const] : []));
+  return values.length ? { fills: applyFillKeys(fillsOf(clip.props), Object.fromEntries(values)) } : {};
 }
 
 const SELECTOR_FIELDS: ReadonlySet<string> = new Set(SELECTOR_KEYS);

@@ -90,6 +90,19 @@ describe('displayListAt', () => {
     expect(pathOf(graded, 'card')?.paint).toMatchObject({ kind: PaintKind.Linear, from: [0, 54], to: [192, 54] });
   });
 
+  it('samples a keyed gradient stop colour and angle at the frame drawn', () => {
+    const fills = [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
+    const graded = patch(withCard, 'card', { props: { ...cardProps, fills } });
+    const keyed = must(setKeyframes(graded, 'card', 'fill.0.stop.1.color', [{ frame: 0, value: '#ffffff', ease: Ease.Linear }, { frame: 60, value: '#ff0000', ease: Ease.Linear }]));
+    const turning = must(setKeyframes(keyed, 'card', 'fill.0.angle', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 60, value: 90, ease: Ease.Linear }]));
+    const end = pathOf(turning, 'card', 60)?.paint as { from: number[]; to: number[]; stops: { color: number[] }[] };
+
+    expect(pathOf(turning, 'card', 0)?.paint).toMatchObject({ kind: PaintKind.Linear, from: [0, 54], to: [192, 54] });
+    expect(end.from[0]).toBeCloseTo(96);
+    expect(end.stops[1].color.slice(0, 3)).toEqual([1, 0, 0]);
+    expect(list(turning, 60).unsupported).toEqual([]);
+  });
+
   it('reads a gaussian blur effect as a CSS blur filter', () => {
     const blurred = patch(withCard, 'card', { effects: [{ id: 'e1', kind: 'gaussian-blur', enabled: true, params: { radius: 12 } }] } as never);
 
