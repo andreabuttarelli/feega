@@ -3247,3 +3247,11 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## The core canvas freezes a shape mid-gesture
 
 **Signal:** during a resize the selection follows the pointer but the shape stops at an intermediate size; `pageerror` shows `floating point \`131.25\`, expected u32`. **Move:** the wasm core rejects a display list whose `width`/`height` is fractional and the whole paint aborts. Round every size that becomes a `DisplayList` (placeholders, stand-ins) before it reaches `putGroup`.
+
+## An agent worktree's dev server serves old code for files it already loaded
+
+**Signal:** a new file shows up in the browser but your edit to an existing module (a `.svelte` the page already imported) does nothing, no error. **Cause:** `server.watch.ignored` skips `**/.claude/worktrees/**`, so Vite never invalidates anything inside a worktree. **Move:** restart the dev server after editing an existing module; new files are fine.
+
+## An `$effect` that reads the `$state` it writes loops forever
+
+**Signal:** a debug `console.info` in the effect prints a thousand times a second and the page stalls. **Cause:** logging or reading `store.value` right after assigning it subscribes the effect to its own write. **Move:** compute into a local, assign once, read nothing from the target inside the effect.
