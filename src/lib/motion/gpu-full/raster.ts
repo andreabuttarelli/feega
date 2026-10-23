@@ -1,6 +1,8 @@
 import { FillRule, ItemKind, PaintKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem, type LensItem, type Paint, type PathItem } from './display-list';
 import { BLOB_FRAGMENT } from '../hyperframes/blob';
-import { imageRect, type Size } from './image-rect';
+import { cropRect, imageRect, type Size } from './image-rect';
+import { tileCells } from './image-tile';
+import { mul2d, type Affine } from '../affine';
 import { gaussianKernel, MAX_TAPS } from './kernel';
 import { BLEND_FS, BLUR_FS, QUAD_VS, plain, program, texture } from './gl-kit';
 import { createFilters } from './filters-gpu';
@@ -389,9 +391,23 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     if (!picture) {
       return;
     }
-    const fitted = imageRect(item.size, picture.size, item.fit, item.focus, item.zoom);
+    if (item.fit === 'tile') {
+      drawTiles(item, picture, opacity);
+      return;
+    }
+    const fitted = item.fit === 'crop' && item.crop ? cropRect(item.size, item.crop) : imageRect(item.size, picture.size, item.fit, item.focus, item.zoom);
     const [k, , , , tx, ty] = item.inner;
     drawPicture(item, picture, { x: fitted.x * k + tx, y: fitted.y * k + ty, width: fitted.width * k, height: fitted.height * k }, item.clipped, opacity);
+  }
+
+  function drawTiles(item: ImageItem, picture: Picture, opacity: number) {
+    const turn = item.tileTurn ?? 0;
+    const cx = item.size.width / 2;
+    const cy = item.size.height / 2;
+    const angle = (turn * Math.PI) / 180;
+    const spin: Affine = [Math.cos(angle), Math.sin(angle), -Math.sin(angle), Math.cos(angle), cx - cx * Math.cos(angle) + cy * Math.sin(angle), cy - cx * Math.sin(angle) - cy * Math.cos(angle)];
+    const matrix = mul2d(item.matrix, spin);
+    tileCells(item.size, picture.size, { scale: item.zoom, rotation: turn, focus: item.focus }).forEach((cell) => drawPicture({ ...item, matrix }, picture, cell, false, opacity));
   }
 
   function drawLayer(item: LayerItem, opacity: number, pictures: Pictures) {

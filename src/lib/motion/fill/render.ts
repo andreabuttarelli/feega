@@ -57,6 +57,8 @@ type HtmlFill = {
   fit?: string;
   focus?: Point;
   scale?: number;
+  crop?: { x: number; y: number; w: number; h: number };
+  rotation?: number;
 };
 
 export function fillLayersHtml(fills: readonly HtmlFill[]): string {
@@ -82,7 +84,18 @@ export function fillLayersHtml(fills: readonly HtmlFill[]): string {
     const focus = at(f.focus!);
     const scale = f.scale!;
     if (f.fit === 'tile') {
-      return layer(f, 'tile', 'background-image:url(' + esc('"' + f.src + '"') + ');background-repeat:repeat;background-size:' + r(scale * TILE_SHARE) + '% auto;background-position:' + focus);
+      const sheet = (size: string) => 'background-image:url(' + esc('"' + f.src + '"') + ');background-repeat:repeat;background-size:' + size + ';background-position:' + focus;
+      if (!f.rotation) {
+        return layer(f, 'tile', sheet(r(scale * TILE_SHARE) + '% auto'));
+      }
+      const cover = 'calc(max(100cqw,100cqh) * 1.5)';
+      const turned = 'inset:auto;left:50%;top:50%;width:' + cover + ';height:' + cover + ';transform:translate(-50%,-50%) rotate(' + r(f.rotation) + 'deg)';
+      return layer(f, 'tile', '', '<div class="fl-turn" style="position:absolute;' + turned + ';' + sheet('calc(100cqw * ' + r((scale * TILE_SHARE) / PERCENT) + ') auto') + '"></div>');
+    }
+    if (f.fit === 'crop') {
+      const c = f.crop || { x: 0, y: 0, w: 1, h: 1 };
+      const window = 'position:absolute;left:' + r((-c.x / c.w) * PERCENT) + '%;top:' + r((-c.y / c.h) * PERCENT) + '%;width:' + r(PERCENT / c.w) + '%;height:' + r(PERCENT / c.h) + '%;max-width:none;object-fit:fill';
+      return layer(f, 'image', '', '<img class="fl-image" decoding="sync" draggable="false" src="' + esc(f.src) + '" alt="" style="' + window + '">');
     }
     const zoom = scale === 1 ? '' : ';transform:scale(' + r(scale) + ');transform-origin:' + focus;
     return layer(f, 'image', '', '<img class="fl-image" decoding="sync" draggable="false" src="' + esc(f.src) + '" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:' + f.fit + ';object-position:' + focus + zoom + '">');
@@ -134,6 +147,7 @@ const IMAGE_SIZE: Record<ImageFit, (scale: number) => string> = {
   [ImageFit.Cover]: () => 'cover',
   [ImageFit.Contain]: () => 'contain',
   [ImageFit.Fill]: () => '100% 100%',
+  [ImageFit.Crop]: () => 'cover',
   [ImageFit.Tile]: (scale) => `${round(scale * TEXT_TILE_SHARE)}% auto`
 };
 

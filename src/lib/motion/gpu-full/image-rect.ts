@@ -18,3 +18,9 @@ export function imageRect(box: Size, natural: Size, fit: string, [fx, fy]: [numb
   const y = (box.height - height) * fy;
   return { x: px + (x - px) * zoom, y: py + (y - py) * zoom, width: width * zoom, height: height * zoom };
 }
+
+export type Crop = [number, number, number, number];
+
+export function cropRect(box: Size, [x, y, w, h]: Crop): Rect {
+  return { x: (-x / w) * box.width, y: (-y / h) * box.height, width: box.width / w, height: box.height / h };
+}

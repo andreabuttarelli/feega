@@ -3,7 +3,7 @@
   import { FIELD_INPUT, FOCUS_RING, MENU_CONTENT, MENU_ITEM, SECTION_LABEL } from '$lib/components/ui/shell/styles';
   import { BLEND_MODES } from '$lib/motion/blend';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
-  import { FILL_LABEL, FILL_TYPES, FillType, IMAGE_FITS, addFill, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '$lib/motion/fill/model';
+  import { FILL_LABEL, FILL_TYPES, FillType, IMAGE_CONTROLS, IMAGE_FITS, IMAGE_FIT_LABEL, ImageControl, addFill, cropOf, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '$lib/motion/fill/model';
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
@@ -21,6 +21,7 @@
   let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, keys = null, onchange }: { keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
+  const CROP_SIDES = ['x', 'y', 'w', 'h'] as const;
   const ICON = cn('inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-ui-icon hover:bg-ui-wash hover:text-ui-text', FOCUS_RING);
   const LABEL = 'text-ui-label text-ui-text-2';
   const FIELD_ROW = 'flex items-center justify-between gap-2';
@@ -259,12 +260,25 @@
           <label class={FIELD_ROW}
             ><span class={LABEL}>Fit</span>
             <select class={cn(FIELD_INPUT, 'w-28')} data-testid="fill-fit" value={fill.fit} onchange={(e) => patch(index, { fit: e.currentTarget.value }, 'Image fit')}>
-              {#each IMAGE_FITS as fit (fit)}<option value={fit}>{fit}</option>{/each}
+              {#each IMAGE_FITS as fit (fit)}<option value={fit}>{IMAGE_FIT_LABEL[fit]}</option>{/each}
             </select>
           </label>
-          <label class={FIELD_ROW}><span class={LABEL}>Focus X</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" data-testid="fill-focus-x" value={pct(fill.focus.x)} onchange={(e) => patch(index, { focus: { ...fill.focus, x: percentOf(e) } }, 'Image focus')} /></label>
-          <label class={FIELD_ROW}><span class={LABEL}>Focus Y</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" data-testid="fill-focus-y" value={pct(fill.focus.y)} onchange={(e) => patch(index, { focus: { ...fill.focus, y: percentOf(e) } }, 'Image focus')} /></label>
-          <label class={FIELD_ROW}><span class={LABEL}>Scale</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="10" max="1000" step="5" data-testid="fill-scale" value={pct(fill.scale)} onchange={(e) => patch(index, { scale: Math.max(10, Number(e.currentTarget.value)) / PERCENT }, 'Image scale')} /></label>
+          {@const controls = IMAGE_CONTROLS[fill.fit]}
+          {#if controls.includes(ImageControl.Focus)}
+            <label class={FIELD_ROW}><span class={LABEL}>{controls.includes(ImageControl.Tile) ? 'Offset X' : 'Focus X'}</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" data-testid="fill-focus-x" value={pct(fill.focus.x)} onchange={(e) => patch(index, { focus: { ...fill.focus, x: percentOf(e) } }, 'Image focus')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>{controls.includes(ImageControl.Tile) ? 'Offset Y' : 'Focus Y'}</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" data-testid="fill-focus-y" value={pct(fill.focus.y)} onchange={(e) => patch(index, { focus: { ...fill.focus, y: percentOf(e) } }, 'Image focus')} /></label>
+          {/if}
+          {#if controls.includes(ImageControl.Zoom) || controls.includes(ImageControl.Tile)}
+            <label class={FIELD_ROW}><span class={LABEL}>Scale</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="10" max="1000" step="5" data-testid="fill-scale" value={pct(fill.scale)} onchange={(e) => patch(index, { scale: Math.max(10, Number(e.currentTarget.value)) / PERCENT }, 'Image scale')} /></label>
+          {/if}
+          {#if controls.includes(ImageControl.Tile)}
+            <label class={FIELD_ROW}><span class={LABEL}>Rotation</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-rotation" value={fill.rotation ?? 0} onchange={(e) => patch(index, { rotation: Number(e.currentTarget.value) }, 'Tile rotation')} /></label>
+          {/if}
+          {#if controls.includes(ImageControl.Crop)}
+            {#each CROP_SIDES as side (side)}
+              <label class={FIELD_ROW}><span class={LABEL}>Crop {side.toUpperCase()}</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" data-testid="fill-crop-{side}" value={pct(cropOf(fill)[side])} onchange={(e) => patch(index, { crop: { ...cropOf(fill), [side]: percentOf(e) } }, 'Image crop')} /></label>
+            {/each}
+          {/if}
         {/if}
         <label class={FIELD_ROW}
           ><span class={LABEL}>Blend</span>
