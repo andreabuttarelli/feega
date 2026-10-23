@@ -26,7 +26,7 @@ describe('system clipboard', () => {
 
   it('recognises a figma clipboard', () => {
     const html = '<meta charset="utf-8"><span data-metadata="<!--(figmeta)eyJ9(/figmeta)-->"></span><span data-buffer="<!--(figma)ZmlnLWtpd2k=(/figma)-->"></span>';
-    expect(readPaste({ html, text: '', files: [] })).toEqual({ kind: Pasted.Figma });
+    expect(readPaste({ html, text: '', files: [] })).toEqual({ kind: Pasted.Figma, html });
   });
 
   it('falls back to plain text, and to nothing when empty', () => {

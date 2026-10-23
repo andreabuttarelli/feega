@@ -24,7 +24,7 @@
   import { loadOutliner } from '$lib/motion/fonts/outliner';
   import type { ActionId } from '$lib/motion/actions';
   import type { OpResult } from '$lib/motion/timeline';
-  import { mergeView, viewOf } from '$lib/motion/precomp';
+  import { mergeScope, scopeView } from '$lib/motion/instance-view';
 
   const FIRST_FRAME = 0;
 
@@ -51,8 +51,8 @@
   const doc = $derived(session?.history.present ?? null);
   const shown = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
   const edit = (next: NonNullable<typeof doc>, summary: string) => session?.edit(next, summary);
-  const shownDoc = $derived(doc && shown ? viewOf(doc, shown.path) : doc);
-  const editShown = (next: NonNullable<typeof doc>, summary: string) => doc && shown && edit(mergeView(doc, shown.path, next), summary);
+  const shownDoc = $derived(doc && shown ? scopeView(doc, shown) : doc);
+  const editShown = (next: NonNullable<typeof doc>, summary: string) => doc && shown && edit(mergeScope(doc, shown, next), summary);
   const editGuides = (result: OpResult, summary: string) => result.ok && edit(result.doc, summary);
 
   async function runBar(id: ActionId) {

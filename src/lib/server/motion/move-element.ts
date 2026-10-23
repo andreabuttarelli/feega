@@ -5,12 +5,13 @@ import type { Db } from '$lib/server/db/client';
 import { createNode, deleteConnection, deleteNode, findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, frameChrome, motionNodeSize } from '$lib/canvas/motion-node';
+import { FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, leftEmpty, motionNodeSize } from '$lib/canvas/motion-node';
 import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { gradientFillSchema } from '$lib/motion/fill/model';
 import { frameShape } from './start';
+import { figmaFrameDoc } from '$lib/canvas/figma/figma-doc';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
 import { saveMotionDoc } from './editor';
@@ -210,8 +211,6 @@ export async function landElement(store: FrameStore, from: StoredFrame & { right
   return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
 }
 
-const emptied = (source: StoredFrame, doc: MotionDoc) => !frameChrome(source.kind ?? FrameKind.Frame).takesDrops && doc.tracks.every((t) => t.clips.length === 0);
-
 function landOut(store: FrameStore, source: StoredFrame, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, box: Box | null): Promise<Landing> {
   const mode = docMode(source.doc);
   return source.stage ? landFree(store, source, element, drop, mode, box, source.stage) : landOnCanvas(store, source, element, drop, mode, box);
@@ -245,7 +244,7 @@ export async function moveElement(store: FrameStore, ask: MoveAsk): Promise<Move
     return landing;
   }
 
-  if (emptied(source, lifted.doc)) {
+  if (leftEmpty(source.kind ?? FrameKind.Frame, lifted.doc)) {
     await store.remove(source.nodeId);
     return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: [...landing.undo, deleted(source)] };
   }
@@ -562,6 +561,19 @@ export async function drawFrameAt(store: FrameStore, place: Place & { id?: strin
   const at = { x: box.left, y: box.top };
   const frameId = await store.create({ ...place, ...at }, drawnFrame(box, format, stillSeconds), { data: shaped.data, width: shaped.w, height: shaped.h });
   return { outcome: MoveOutcome.Done, frameId, clipId: '', created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
+}
+
+export type FigmaPasteOutcome = (Extract<Moved, { outcome: MoveOutcome.Done }> & { skipped: string[] }) | null;
+
+export async function pasteFigmaAt(store: FrameStore, place: Place & { id?: string }, html: string, centre: Point, newId: NewId): Promise<FigmaPasteOutcome> {
+  const made = figmaFrameDoc(html, newId);
+  if (!made) {
+    return null;
+  }
+  const shaped = drawnFrameNodeOf(made.box);
+  const at = { x: Math.round(centre.x - made.box.width / 2), y: Math.round(centre.y - made.box.height / 2) };
+  const frameId = await store.create({ ...place, ...at }, made.doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: made.name });
+  return { outcome: MoveOutcome.Done, frameId, clipId: '', created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)], skipped: made.skipped };
 }
 
 export async function canvasFrameInputs<T extends FrameLine>(db: Db, scope: { orgId: string; actor: Actor; projectId: string }, nodes: Array<{ id: string; type: string }>, lines: T[]): Promise<T[]> {

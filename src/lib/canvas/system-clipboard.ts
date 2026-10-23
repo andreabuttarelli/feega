@@ -24,7 +24,7 @@ export type PasteData<F extends PasteFile = PasteFile> =
   | { kind: Pasted.Feega; payload: ClipboardPayload }
   | { kind: Pasted.Svg; svg: string }
   | { kind: Pasted.Image; file: F }
-  | { kind: Pasted.Figma }
+  | { kind: Pasted.Figma; html: string }
   | { kind: Pasted.Text; text: string };
 
 export const HTML_MIME = 'text/html';
@@ -69,7 +69,7 @@ export function readPaste<F extends PasteFile>(source: PasteSource<F>): PasteDat
     return { kind: Pasted.Feega, payload };
   }
   if (FIGMA.test(source.html)) {
-    return { kind: Pasted.Figma };
+    return { kind: Pasted.Figma, html: source.html };
   }
   if (SVG_MARKUP.test(source.text)) {
     return { kind: Pasted.Svg, svg: source.text };

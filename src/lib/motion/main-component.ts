@@ -9,6 +9,8 @@ export enum ComponentAction {
   Override = 'override',
   Reset = 'reset',
   ResetProp = 'reset-prop',
+  Push = 'push',
+  Place = 'place',
   Detach = 'detach',
   AddVariant = 'add-variant',
   Swap = 'swap'
@@ -71,13 +73,25 @@ export function resetOverride(doc: MotionDoc, instanceId: string, innerId: strin
   return setProps(doc, instanceId, { overrides: Object.keys(overrides).length ? overrides : undefined });
 }
 
+const baked = (comp: MotionComp, overrides: Overrides) => comp.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (overrides[c.id] ? withOverride(c, overrides[c.id]) : c)) }));
+
+export function pushOverrides(doc: MotionDoc, instanceId: string): OpResult {
+  const instance = instanceOf(doc, instanceId);
+  if (!instance) {
+    return fail(`${instanceId} is not an instance of a component`);
+  }
+  const main = { ...instance.comp, tracks: baked(instance.comp, instance.overrides) };
+  const withMain = { ...doc, comps: { ...doc.comps, [instance.compId]: main } };
+  return setProps(withMain, instanceId, { overrides: undefined });
+}
+
 export function detachInstance(doc: MotionDoc, instanceId: string, newId: NewId): OpResult {
   const instance = instanceOf(doc, instanceId);
   if (!instance) {
     return fail(`${instanceId} is not an instance of a component`);
   }
   const { component: _main, ...plain } = instance.comp;
-  const tracks = plain.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (instance.overrides[c.id] ? withOverride(c, instance.overrides[c.id]) : c)) }));
+  const tracks = baked(plain, instance.overrides);
   const compId = newId();
   const withComp = { ...doc, comps: { ...doc.comps, [compId]: { ...plain, tracks } } };
   return setProps(withComp, instanceId, { comp: compId, overrides: undefined });

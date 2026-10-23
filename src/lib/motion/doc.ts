@@ -112,6 +112,7 @@ const clipSchema = z.object({
   path: motionPathSchema.nullable().default(null),
   physics: physicsSchema.nullable().optional(),
   hidden: z.boolean().optional(),
+  mutedLanes: z.array(z.string().min(1)).optional(),
   locked: z.boolean().optional(),
   bleed: z.boolean().optional(),
   clipContent: z.boolean().optional(),

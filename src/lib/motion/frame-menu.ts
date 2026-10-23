@@ -16,6 +16,7 @@ const FRAME_COMMAND: Partial<Record<SelectionActionId, Command>> = {
   'create-component': Command.CreateComponent,
   'detach-instance': Command.DetachInstance,
   'reset-instance': Command.ResetInstance,
+  'push-instance': Command.PushInstance,
   'use-as-mask': Command.UseAsMask,
   'release-mask': Command.RemoveMask,
   'select-matching': Command.SelectMatching,

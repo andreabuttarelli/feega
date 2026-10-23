@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { MotionDoc } from '$lib/motion/doc';
+import { renameStyle } from '$lib/motion/styles';
 import { adoptStyle, libraryOf, syncedDoc, type Library } from '$lib/motion/style-library';
 import { styleSchema, type Style } from '$lib/motion/styles-model';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
@@ -9,6 +10,7 @@ const ELEMENT_SEP = ':';
 export const canvasStyleInput = z.object({
   canvasId: z.string().uuid(),
   name: z.string().min(1).max(40).optional(),
+  to: z.string().min(1).max(40).optional().describe('rename: the new name, in every frame that has the style'),
   style: styleSchema.optional().describe('define: restyles every frame with this name'),
   ids: z.array(z.string()).optional().describe('apply name to frameId:elementId; none of style/ids lists the canvas styles')
 });
@@ -22,10 +24,11 @@ export type StyleFrames = {
 export enum CanvasStyleAction {
   List = 'list',
   Define = 'define',
-  Apply = 'apply'
+  Apply = 'apply',
+  Rename = 'rename'
 }
 
-export type StyleAsk = { name?: string; style?: Style; ids?: string[] };
+export type StyleAsk = { name?: string; to?: string; style?: Style; ids?: string[] };
 
 export type StyleAnswer = { ok: true; styles?: Library; frames?: string[] } | { ok: false; error: string };
 
@@ -52,7 +55,13 @@ async function saved(store: StyleFrames, frame: Frame, doc: MotionDoc | null, su
   return doc && written(await store.write(frame.id, frame.version, doc, summary)) ? [frame.id] : [];
 }
 
-export const actionOf = (ask: StyleAsk): CanvasStyleAction => (ask.ids?.length ? CanvasStyleAction.Apply : ask.style ? CanvasStyleAction.Define : CanvasStyleAction.List);
+const ASKS: [(ask: StyleAsk) => boolean, CanvasStyleAction][] = [
+  [(ask) => !!ask.to, CanvasStyleAction.Rename],
+  [(ask) => !!ask.ids?.length, CanvasStyleAction.Apply],
+  [(ask) => !!ask.style, CanvasStyleAction.Define]
+];
+
+export const actionOf = (ask: StyleAsk): CanvasStyleAction => ASKS.find(([matches]) => matches(ask))?.[1] ?? CanvasStyleAction.List;
 
 const ACTIONS: Record<CanvasStyleAction, (store: StyleFrames, ask: StyleAsk) => Promise<StyleAnswer>> = {
   [CanvasStyleAction.List]: async (store) => ({ ok: true, styles: libraryOf((await framesOf(store)).map((f) => f.doc)) }),
@@ -62,6 +71,23 @@ const ACTIONS: Record<CanvasStyleAction, (store: StyleFrames, ask: StyleAsk) => 
     }
     const frames = await framesOf(store);
     const changed = await Promise.all(frames.map((f) => saved(store, f, syncedDoc(f.doc, ask.name!, ask.style!), `Updated the ${ask.name} style`)));
+    return { ok: true, frames: changed.flat() };
+  },
+  [CanvasStyleAction.Rename]: async (store, ask) => {
+    const frames = await framesOf(store);
+    const library = libraryOf(frames.map((f) => f.doc));
+    if (!ask.name || !ask.to || !library[ask.name]) {
+      return { ok: false, error: `rename takes an existing canvas style and a new name; no canvas style ${ask.name ?? ''}` };
+    }
+    if (library[ask.to]) {
+      return { ok: false, error: `a canvas style ${ask.to} already exists` };
+    }
+    const changed = await Promise.all(
+      frames.map((f) => {
+        const renamed = f.doc.styles?.[ask.name!] ? renameStyle(f.doc, ask.name!, ask.to!) : null;
+        return saved(store, f, renamed?.ok ? renamed.doc : null, `Renamed the ${ask.name} style to ${ask.to}`);
+      })
+    );
     return { ok: true, frames: changed.flat() };
   },
   [CanvasStyleAction.Apply]: async (store, ask) => {

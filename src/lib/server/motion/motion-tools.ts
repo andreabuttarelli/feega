@@ -1,6 +1,6 @@
 import { ungroupClip } from '$lib/motion/group';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
-import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeStyle, stylesOf } from '$lib/motion/styles';
+import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, stylesOf } from '$lib/motion/styles';
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
@@ -41,7 +41,7 @@ import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
-import { ClipEdge, Side, TOP_LEFT_START, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, TOP_LEFT_START, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, duplicateKeyframes, setKeyEase, setLaneMuted, type OpResult } from '$lib/motion/timeline';
 import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
@@ -117,6 +117,7 @@ const ARRANGE: Record<(typeof ARRANGE_OPS)[number], (doc: MotionDoc, ids: string
 import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { COUNTER_FORMATS } from '$lib/motion/text-counter';
 import { setTextCounter } from '$lib/motion/text-counter-ops';
+import { animateTo } from '$lib/motion/animate-to';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '$lib/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '$lib/motion/keyframes';
 import type { MotionAsset } from './editor';
@@ -169,8 +170,9 @@ import { fileSnippet } from '$lib/motion/interactive/bundle';
 import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, removeVar, unbindVar, type VarDecl } from '$lib/motion/interactive/vars';
 import { flattenComps } from '$lib/motion/precomp';
 import { clearTextRuns, styleTextRange } from '$lib/motion/text-run-ops';
-import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, resetOverride, resetOverrides } from '$lib/motion/main-component';
+import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, pushOverrides, resetOverride, resetOverrides } from '$lib/motion/main-component';
 import { addVariant, pickVariant, swapInstance } from '$lib/motion/variants';
+import { placeInstance } from '$lib/motion/canvas-components';
 import { runEditSchema, type RunEdit } from '$lib/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
@@ -430,6 +432,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         textPath: c.textPath,
         motionBlur: c.motionBlur,
         hidden: c.hidden ?? false,
+        mutedLanes: c.mutedLanes ?? [],
         locked: c.locked ?? false,
         bleed: c.bleed ?? false,
         clipContent: c.clipContent ?? false,
@@ -865,12 +868,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return laid.ok ? `${cues.length} sound effects on the SFX track` : laid.error;
   };
 
-  type StyleInput = { name?: string; style?: unknown; clip_ids?: string[] };
+  type StyleInput = { name?: string; to?: string; style?: unknown; clip_ids?: string[] };
   const named = (input: StyleInput) => input.name ?? '';
   const STYLE_ACTIONS: Record<StyleAction, (input: StyleInput) => unknown> = {
     [StyleAction.Define]: (input) => apply(defineStyle(session.doc, named(input), input.style), `style ${named(input)}`),
     [StyleAction.Apply]: (input) => apply(applyStyle(session.doc, input.clip_ids ?? [], named(input)), `style ${named(input)} on ${(input.clip_ids ?? []).join(', ')}`),
     [StyleAction.Detach]: (input) => apply(detachStyle(session.doc, input.clip_ids ?? []), `detached ${(input.clip_ids ?? []).join(', ')}`),
+    [StyleAction.Rename]: (input) => apply(renameStyle(session.doc, named(input), input.to ?? ''), `renamed style ${named(input)} to ${input.to}`),
     [StyleAction.Remove]: (input) => apply(removeStyle(session.doc, named(input)), `removed style ${named(input)}`),
     [StyleAction.List]: () => ({ styles: stylesOf(session.doc) })
   };
@@ -1110,6 +1114,35 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         keyframes: z.array(z.object({ time: z.number().min(0), value: z.union([z.number(), z.string()]), ease: easeSchema.default(Ease.Standard), intensity: z.number().min(0).max(1).optional(), ...keyShape })).min(1)
       }),
       execute: async (input) => apply(setKeyframes(session.doc, input.clip_id, input.prop, input.keyframes.map(keyIn(ownerOf(input.clip_id), input.prop))), `animated ${input.prop} of ${input.clip_id}`)
+    }),
+
+    animate_to: tool({
+      description: `Animate a clip to a target: for each prop in to, key its current value at start (s from the clip start, default 0) and the target duration s later (default 1). Units of set_transform; keys in the span are replaced. ease as in set_keyframes.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        to: z.record(z.string(), z.union([z.number(), z.string()])).refine((to) => Object.keys(to).length > 0, 'give at least one prop'),
+        start: z.number().min(0).default(0),
+        duration: z.number().positive().default(1),
+        ease: easeSchema.default(Ease.Standard)
+      }),
+      execute: async (input) => {
+        const owner = ownerOf(input.clip_id);
+        const targets = Object.fromEntries(Object.entries(input.to).map(([prop, value]) => [prop, typeof value === 'number' ? toStored(owner, prop, value, session.doc) : value]));
+        return apply(animateTo(session.doc, input.clip_id, targets, { start: frames(input.start), duration: Math.max(1, frames(input.duration)), ease: input.ease }, (c) => c), `animated ${input.clip_id} to ${Object.keys(input.to).join(', ')}`);
+      }
+    }),
+
+    edit_lane: tool({
+      description: 'Edit one keyframe lane (prop) of a clip. mute/unmute: leave the lane out of playback and render, keys kept (mutedLanes in get_motion_doc). duplicate: copy the keys at times (s from the clip start; all if omitted) after the last of them, spacing kept.',
+      inputSchema: z.object({ clip_id: z.string(), prop: z.string(), action: z.enum(['mute', 'unmute', 'duplicate']), times: z.array(z.number().min(0)).optional() }),
+      execute: async (input) => {
+        if (input.action !== 'duplicate') {
+          return apply(setLaneMuted(session.doc, input.clip_id, input.prop, input.action === 'mute'), `${input.action} ${input.prop} of ${input.clip_id}`);
+        }
+        const track = findClip(session.doc, input.clip_id)?.clip.keyframes[input.prop] ?? [];
+        const picked = input.times ? input.times.map(frames) : track.map((k) => k.frame);
+        return apply(duplicateKeyframes(session.doc, picked.map((frame) => ({ clipId: input.clip_id, prop: input.prop, frame }))), `duplicated keyframes of ${input.prop} on ${input.clip_id}`);
+      }
     }),
 
     set_key_interpolation: tool({
@@ -2092,8 +2125,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     named_style: tool({
-      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color, or kind ${StyleKind.Colour} with color; editing restyles every clip using it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill. detach (clip_ids) unlinks them, keeping their look. remove (name) deletes a style. list returns the styles with their clips (also in get_motion_doc).`,
-      inputSchema: z.object({ action: z.enum(StyleAction), name: z.string().regex(STYLE_NAME).optional(), style: styleSchema.optional(), clip_ids: z.array(z.string()).optional() }),
+      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color, or kind ${StyleKind.Colour} with color; editing restyles every clip using it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill. detach (clip_ids) unlinks them, keeping their look. remove (name) deletes a style. rename (name, to) renames it, elements stay linked. list returns the styles with their clips (also in get_motion_doc).`,
+      inputSchema: z.object({ action: z.enum(StyleAction), name: z.string().regex(STYLE_NAME).optional(), style: styleSchema.optional(), clip_ids: z.array(z.string()).optional(), to: z.string().regex(STYLE_NAME).optional() }),
       execute: async (input) => STYLE_ACTIONS[input.action](input)
     }),
 
@@ -2705,7 +2738,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     component: tool({
-      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value).',
+      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value).',
       inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.string().optional() }),
       execute: async (input) => {
         const ids: string[] = [];
@@ -2719,12 +2752,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           [ComponentAction.Create]: () => createComponent(session.doc, input.clip_ids ?? [], newId, input.name ?? `Component ${Object.values(session.doc.comps).filter((c) => c.component).length + 1}`),
           [ComponentAction.Override]: () => overrideInstance(session.doc, id, input.inner_clip_id ?? '', input.props ?? {}),
           [ComponentAction.ResetProp]: () => resetOverride(session.doc, id, input.inner_clip_id ?? '', input.prop ?? ''),
+          [ComponentAction.Place]: () => placeInstance(session.doc, session.doc, input.comp ?? '', newId),
+          [ComponentAction.Push]: () => pushOverrides(session.doc, id),
           [ComponentAction.Reset]: () => resetOverrides(session.doc, id),
           [ComponentAction.Detach]: () => detachInstance(session.doc, id, newId),
           [ComponentAction.AddVariant]: () => addVariant(session.doc, input.comp ?? '', input.variant ?? {}, newId),
           [ComponentAction.Swap]: () => (input.comp ? swapInstance(session.doc, id, input.comp) : pickVariant(session.doc, id, input.prop ?? '', input.value ?? ''))
         };
         const out = apply(run[input.action](), `component ${input.action}`);
+        if (out.ok && input.action === ComponentAction.Place) {
+          return { ...out, clip_id: ids[0] };
+        }
         return out.ok && ids.length ? { ...out, comp: ids[0], clip_id: ids[1] ?? id } : out;
       }
     }),

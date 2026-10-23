@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server';
 import { fakeDb } from '$lib/server/db/fake-db';
@@ -349,6 +350,28 @@ describe('drawFrame action', () => {
     const input = event({ box: JSON.stringify({ left: 0, top: 0, width: -1, height: 1 }) });
 
     expect(await actions.drawFrame(input as never)).toMatchObject({ status: 400 });
+    expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
+  });
+});
+
+describe('pasteFigma action', () => {
+  const FIGMA = readFileSync(new URL('../../../../tests/fixtures/figma/clip-1.html', import.meta.url), 'utf8');
+
+  it('a Figma clipboard lands as one frame of the copied size, centred on the pointer, with editable layers', async () => {
+    const id = '7b0c2f0e-8a51-4d0e-9a8e-2f2f6c1b9a12';
+    const input = event({ html: FIGMA, at: JSON.stringify({ x: 1000, y: 600 }), node_id: id });
+
+    expect(await actions.pasteFigma(input as never)).toMatchObject({ outcome: 'done', created: true, skipped: [] });
+    const rows = input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { id: string; x: number; y: number; width: number; display_name: string });
+    expect(rows).toMatchObject([{ id, x: 40, y: 60, width: 1920, display_name: 'Cover' }]);
+    const doc = input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')!.payload as { doc: MotionDoc };
+    expect(doc.doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual(expect.arrayContaining(['Shape', 'Precomp', 'Text']));
+  });
+
+  it('html without Figma data is a 400, nothing written', async () => {
+    const input = event({ html: '<p>hi</p>', at: JSON.stringify({ x: 0, y: 0 }) });
+
+    expect(await actions.pasteFigma(input as never)).toMatchObject({ status: 400 });
     expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
   });
 });

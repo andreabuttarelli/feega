@@ -3,7 +3,7 @@
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
   import { FrameFit, framePicker } from '$lib/canvas/frame-pick';
-  import { onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
   import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
@@ -29,6 +29,7 @@
   import GradientHandles from '../GradientHandles.svelte';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import { renameStyle } from '$lib/motion/styles';
   import type { Style } from '$lib/motion/styles-model';
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
   import type { Fill } from '$lib/motion/fill/model';
@@ -84,6 +85,9 @@
   import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
+  import { CANVAS_DRAG_COMPONENT, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
+  import { placeInstance } from '$lib/motion/canvas-components';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
@@ -101,7 +105,7 @@
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { isSvgFile } from '$lib/canvas/system-clipboard';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { FrameKind, MOTION_NODE_BAR_H, TileBody, frameChrome } from '$lib/canvas/motion-node';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, frameChrome, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -1311,6 +1315,15 @@
   });
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
+  $effect(() => {
+    canvasComponents.set(
+      coreFrames.flatMap((f) => {
+        const live = liveOf(f.id);
+        return live ? [{ id: f.id, doc: live.doc }] : [];
+      })
+    );
+  });
+  onDestroy(() => canvasComponents.set([]));
 
   const PRIMARY_BUTTON = 0;
   let picks = $state<string[]>([]);
@@ -1551,8 +1564,18 @@
     }
   }
 
+  function syncRename(from: string, to: string) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[from])) {
+      const present = saverOf(frame.id)?.history.present;
+      const renamed = present ? renameStyle(present, from, to) : null;
+      if (renamed?.ok) {
+        commit(frame.id, renamed, `Renamed the ${from} style to ${to}`);
+      }
+    }
+  }
+
   onMount(() => {
-    styleLibrary.connect(syncStyle);
+    styleLibrary.connect({ push: syncStyle, rename: syncRename });
     return () => styleLibrary.connect(null);
   });
 
@@ -1733,8 +1756,13 @@
     if (!nodeId || !at || !done) {
       return false;
     }
-    commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
+    const doc = at.merge(done.doc);
     picks = [];
+    if (leftEmpty(kindOfNode(nodeId), doc)) {
+      dropSelection([nodeId], []);
+      return true;
+    }
+    commit(nodeId, { ok: true, doc }, done.summary);
     return true;
   }
 
@@ -2692,7 +2720,8 @@
 
   const IN_FRAME: { [K in Pasted]?: (data: Extract<PasteData<File>, { kind: K }>) => FramePaste } = {
     [Pasted.Svg]: ({ svg }) => ({ svg }),
-    [Pasted.Text]: ({ text }) => ({ text })
+    [Pasted.Text]: ({ text }) => ({ text }),
+    [Pasted.Figma]: ({ html }) => ({ figma: html })
   };
   const PASTED_SUMMARY = 'Pasted';
 
@@ -2840,11 +2869,23 @@
 
   function onDragOver(e: DragEvent) {
     const types = e.dataTransfer?.types ?? [];
-    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, OS_FILES].some((type) => types.includes(type))) {
+    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, CANVAS_DRAG_COMPONENT, OS_FILES].some((type) => types.includes(type))) {
       return;
     }
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'copy';
+  }
+
+  function dropComponent(dragged: ComponentDrag, world: Point) {
+    const targetId = topNodeAt(world);
+    const frame = coreFrames.find((f) => f.id === targetId);
+    const saver = frame ? saverOf(frame.id) : null;
+    const source = liveOf(dragged.frameId)?.doc;
+    if (!frame || !saver || !source) {
+      return;
+    }
+    const offset = { x: (world.x - (frame.box.x + frame.box.w / 2)) / frame.box.w, y: (world.y - (frame.box.y + frame.box.h / 2)) / frame.box.h };
+    commit(frame.id, placeInstance(saver.history.present, source, dragged.compId, () => crypto.randomUUID().slice(0, 8), offset), 'Inserted a component');
   }
 
   function onDrop(e: DragEvent) {
@@ -2859,6 +2900,12 @@
     if (output) {
       e.preventDefault();
       props.onDropOutput?.(output, at, toFlow(at));
+      return;
+    }
+    const component = parseComponentDrag(e.dataTransfer?.getData(CANVAS_DRAG_COMPONENT) ?? '');
+    if (component) {
+      e.preventDefault();
+      dropComponent(component, toFlow(at));
       return;
     }
     const filled = parseFilledNodeDrag(e.dataTransfer?.getData(CANVAS_DRAG_FILLED_NODE) ?? '');

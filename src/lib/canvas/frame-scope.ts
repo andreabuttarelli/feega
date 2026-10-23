@@ -1,5 +1,6 @@
 import { compOf, findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-import { MAX_COMP_DEPTH, SEPARATOR, mergeView, viewOf, type CompPath } from '$lib/motion/precomp';
+import { MAX_COMP_DEPTH, SEPARATOR, viewOf, type CompPath } from '$lib/motion/precomp';
+import { mergeScope, scopeView } from '$lib/motion/instance-view';
 import { apply2d, invert2d, worldAt } from '$lib/motion/parent';
 import type { Pt } from '$lib/motion/scene-select';
 import { Reach, clickTarget } from './frame-select';
@@ -17,7 +18,7 @@ function hostOf(view: MotionDoc, rest: string): MotionClip | null {
 export function scopeOf(doc: MotionDoc, sceneId: string): { scope: Scope; id: string } | null {
   let scope = ROOT;
   for (let depth = 0; depth <= MAX_COMP_DEPTH; depth++) {
-    const view = viewOf(doc, scope.path);
+    const view = scopeView(doc, scope);
     const rest = sceneId.slice(scope.prefix.length);
     if (findClip(view, rest)) {
       return { scope, id: rest };
@@ -54,10 +55,10 @@ export function scoped(doc: MotionDoc, sceneIds: readonly string[], frame: numbe
   }
   const inside = descend(doc, scope, frame);
   return {
-    view: viewOf(doc, scope.path),
+    view: scopeView(doc, scope),
     ids: read.map((r) => r!.id),
     frame: inside.frame,
-    merge: (view) => mergeView(doc, scope.path, view),
+    merge: (view) => mergeScope(doc, scope, view),
     scene: (ids) => ids.map((id) => `${scope.prefix}${id}`),
     toView: inside.toView
   };

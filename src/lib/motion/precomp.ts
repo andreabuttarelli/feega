@@ -141,7 +141,7 @@ function placed(host: MotionClip, comp: MotionComp, tracks: MotionTrack[]): Moti
 
 type Overrides = Record<string, Record<string, unknown>>;
 
-export const CLIP_LEVEL_OVERRIDES = ['hidden', 'effects'] as const;
+export const CLIP_LEVEL_OVERRIDES = ['hidden', 'effects', 'transform'] as const;
 
 export function withOverride(clip: MotionClip, override: Record<string, unknown>): MotionClip {
   const level = Object.fromEntries(CLIP_LEVEL_OVERRIDES.filter((k) => k in override).map((k) => [k, override[k]]));
@@ -149,7 +149,7 @@ export function withOverride(clip: MotionClip, override: Record<string, unknown>
   return { ...clip, ...level, props: { ...clip.props, ...props } };
 }
 
-function overridden(tracks: MotionTrack[], host: MotionClip): MotionTrack[] {
+export function overridden(tracks: MotionTrack[], host: MotionClip): MotionTrack[] {
   const overrides = host.props.overrides as Overrides | undefined;
   if (!overrides) {
     return tracks;
