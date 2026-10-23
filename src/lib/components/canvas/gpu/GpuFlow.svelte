@@ -140,7 +140,7 @@
   import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
 
   import { dragOffset } from '$lib/canvas/duplicate-plan';
-  import { enterFrame } from '$lib/canvas/enter-frame';
+  import { enterSelected } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
   import type { Edge } from '$lib/motion/space';
   import MeasureLayer from '../MeasureLayer.svelte';
@@ -2584,12 +2584,7 @@
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
-    enter: () => {
-      const only = selected.length === 1 ? selected[0] : null;
-      if (only) {
-        enterFrame(only, String(summaries.get(only)?.data.kind ?? '') || undefined);
-      }
-    },
+    enter: () => enterSelected(selected, summaries),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
     tool: (c) => {
