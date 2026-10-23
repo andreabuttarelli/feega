@@ -1,7 +1,9 @@
 import type { MotionClip, MotionDoc, MotionTrack } from '../doc';
 import type { Box } from '../layout';
 import { pivotBox, type Size } from '../parent';
-import { Sizing, layoutTree, type Item } from './auto-layout';
+import type { ShapeKind } from '../shape/schema';
+import { StrokeAlign, sidesShown, strokesOf } from '../stroke/model';
+import { Sizing, layoutTree, type Item, type Padding } from './auto-layout';
 import { DEFAULT_LAYOUT_ITEM, type AutoLayout } from './model';
 import { isText, textBaseline, textExtent } from './text-extent';
 
@@ -30,6 +32,24 @@ function intrinsic(clip: MotionClip, size: Size): Size {
   return { width: item.width === Sizing.Hug ? extent.width : box.width, height: item.height === Sizing.Hug ? extent.height : box.height };
 }
 
+const NO_INSET: Padding = { top: 0, right: 0, bottom: 0, left: 0 };
+
+const widest = (a: Padding, b: Padding): Padding => ({ top: Math.max(a.top, b.top), right: Math.max(a.right, b.right), bottom: Math.max(a.bottom, b.bottom), left: Math.max(a.left, b.left) });
+
+function strokeInset(clip: MotionClip, size: Size): Padding {
+  const unit = Math.min(size.width, size.height);
+  const sided = sidesShown(clip.props.shape as ShapeKind);
+  return strokesOf(clip.props)
+    .filter((s) => s.visible && s.align === StrokeAlign.Inside)
+    .map((s) => {
+      const [top, right, bottom, left] = s.sides && sided ? s.sides : [s.width, s.width, s.width, s.width];
+      return { top: top * unit, right: right * unit, bottom: bottom * unit, left: left * unit };
+    })
+    .reduce(widest, NO_INSET);
+}
+
+const withInset = (padding: Padding, inset: Padding): Padding => ({ top: padding.top + inset.top, right: padding.right + inset.right, bottom: padding.bottom + inset.bottom, left: padding.left + inset.left });
+
 function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size): Item {
   const own = clip.layoutItem ?? DEFAULT_LAYOUT_ITEM;
   const base: Item = {
@@ -45,7 +65,8 @@ function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size): Ite
   if (!isContainer(clip)) {
     return base;
   }
-  const { order: _order, ...flow } = clip.autoLayout;
+  const { order: _order, firstOnTop: _firstOnTop, strokesIncluded, ...rest } = clip.autoLayout;
+  const flow = strokesIncluded ? { ...rest, padding: withInset(rest.padding, strokeInset(clip, size)) } : rest;
   return { ...base, flow, children: childrenInOrder(clips, clip).map((c) => itemOf(c, clips, size)) };
 }
 

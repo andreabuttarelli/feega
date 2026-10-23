@@ -100,6 +100,39 @@ describe('withAutoLayout', () => {
   });
 });
 
+describe('strokes in layout', () => {
+  const stroked = (align: string, over: Partial<AutoLayout> = {}, extra: object = {}) =>
+    docOf([
+      shape('a', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'c' }),
+      shape('c', { x: 0.5, y: 0.5, width: 0.5, height: 0.5, shape: 'rect', strokes: [{ paint: { type: 'solid', color: '#000' }, width: 0.01, align, ...extra }] } as never, { autoLayout: flow(over) })
+    ]);
+
+  it('an inside stroke shrinks the content box of its container', () => {
+    expect(propsOf(withAutoLayout(stroked('inside')), 'a')).toMatchObject({ x: 0.31, y: 0.31 });
+  });
+
+  it('a centre or outside stroke leaves the content box alone', () => {
+    expect(propsOf(withAutoLayout(stroked('center')), 'a')).toMatchObject({ x: 0.3, y: 0.3 });
+    expect(propsOf(withAutoLayout(stroked('outside')), 'a')).toMatchObject({ x: 0.3, y: 0.3 });
+  });
+
+  it('a hidden stroke does not count', () => {
+    expect(propsOf(withAutoLayout(stroked('inside', {}, { visible: false })), 'a')).toMatchObject({ x: 0.3, y: 0.3 });
+  });
+
+  it('strokesIncluded false ignores the stroke', () => {
+    expect(propsOf(withAutoLayout(stroked('inside', { strokesIncluded: false })), 'a')).toMatchObject({ x: 0.3, y: 0.3 });
+  });
+
+  it('the stroke adds to the padding', () => {
+    expect(propsOf(withAutoLayout(stroked('inside', { padding: { top: 10, right: 0, bottom: 0, left: 10 } })), 'a')).toMatchObject({ x: 0.32, y: 0.32 });
+  });
+
+  it('per-side widths of a rectangle count side by side', () => {
+    expect(propsOf(withAutoLayout(stroked('inside', {}, { sides: [0.02, 0, 0, 0.01] })), 'a')).toMatchObject({ x: 0.31, y: 0.32 });
+  });
+});
+
 describe('the doc model', () => {
   it('an old doc without the fields still parses', () => {
     expect(parseMotionDoc(docOf([shape('a', { x: 0.5, y: 0.5, width: 0.1, height: 0.1 })])).ok).toBe(true);

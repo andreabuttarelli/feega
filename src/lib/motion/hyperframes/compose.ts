@@ -1,4 +1,5 @@
 import { withAutoLayout } from '../layout/resolve';
+import { withStacking } from '../layout/stacking';
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
 import { EASE_NAME, easeName } from '../keyframes';
@@ -647,7 +648,7 @@ function onlyClips(doc: MotionDoc, only: ReadonlySet<string> | undefined): Motio
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).filter(kept) })) };
 }
 
-const shownDoc = (raw: ComposeInput): MotionDoc => withAutoLayout(withoutHidden(withoutMutedLanes(boundDoc(withVars(raw.doc, raw.vars)))));
+const shownDoc = (raw: ComposeInput): MotionDoc => withStacking(withAutoLayout(withoutHidden(withoutMutedLanes(boundDoc(withVars(raw.doc, raw.vars))))));
 
 const liveDoc = (raw: ComposeInput, shown: MotionDoc): MotionDoc => bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), raw.only)));
 

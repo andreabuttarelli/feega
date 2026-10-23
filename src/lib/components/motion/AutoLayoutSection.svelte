@@ -16,7 +16,7 @@
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
-  import { Align, AutoFlow, Direction, Justify, Sizing } from '$lib/motion/layout/auto-layout';
+  import { Align, AlignContent, AutoFlow, Direction, Justify, Sizing } from '$lib/motion/layout/auto-layout';
   import { formatTracks, parseTracks } from '$lib/motion/layout/tracks-text';
   import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '$lib/motion/layout/model';
   import { hasBox, layoutParent, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
@@ -55,6 +55,10 @@
   const AUTO_FLOWS: SegmentOption[] = [
     { value: AutoFlow.Row, label: 'Rows first' },
     { value: AutoFlow.Column, label: 'Columns first' }
+  ];
+  const LINE_SPREADS: SegmentOption[] = [
+    { value: AlignContent.Auto, label: 'Packed' },
+    { value: AlignContent.SpaceBetween, label: 'Space between' }
   ];
   const CELL_ALIGNS = ['', Align.Start, Align.Center, Align.End] as const;
   const CELL_ALIGN_LABEL: Record<(typeof CELL_ALIGNS)[number], string> = { '': 'Auto', [Align.Start]: 'Start', [Align.Center]: 'Center', [Align.End]: 'End' };
@@ -152,6 +156,11 @@
           <input aria-label="Gap between lines" class={cn(FIELD_INPUT, 'w-full')} type="number" value={layout.crossGap} onchange={(e) => set({ crossGap: signedPx(e.currentTarget.value) }, 'Changed the gap between lines')} />
         {/if}
       </Field>
+      {#if layout.wrap}
+        <Field label="Lines">
+          <div class="flex min-w-0 flex-1" data-testid="auto-layout-align-content"><SegmentedControl label="Lines" options={LINE_SPREADS} value={layout.alignContent} onchange={(v) => set({ alignContent: v as AlignContent }, 'Changed how the lines spread')} /></div>
+        </Field>
+      {/if}
       <Field label="Padding">
         {#if perSide}
           {#each SIDES as side (side)}
@@ -161,6 +170,15 @@
           <input aria-label="Padding" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.padding.top} data-testid="auto-layout-padding" onchange={(e) => set({ padding: { top: px(e.currentTarget.value), right: px(e.currentTarget.value), bottom: px(e.currentTarget.value), left: px(e.currentTarget.value) } }, 'Changed the padding')} />
           <button type="button" class={cn('shrink-0 rounded-sm px-1.5 text-ui-label text-ui-text-2 hover:bg-ui-wash', FOCUS_RING)} data-testid="auto-layout-padding-sides" onclick={() => (splitPadding = true)}>Per side</button>
         {/if}
+      </Field>
+    {/if}
+
+    {#if layout}
+      <Field label="First on top">
+        <div class="flex min-w-0 flex-1" data-testid="auto-layout-first-on-top"><SegmentedField name="First on top" options={YES_NO} value={answerOf(layout.firstOnTop)} onchange={(v) => set({ firstOnTop: v === Answer.Yes }, 'Changed the stacking')} /></div>
+      </Field>
+      <Field label="Strokes included">
+        <div class="flex min-w-0 flex-1" data-testid="auto-layout-strokes-included"><SegmentedField name="Strokes included" options={YES_NO} value={answerOf(layout.strokesIncluded)} onchange={(v) => set({ strokesIncluded: v === Answer.Yes }, 'Changed the strokes in layout')} /></div>
       </Field>
     {/if}
 

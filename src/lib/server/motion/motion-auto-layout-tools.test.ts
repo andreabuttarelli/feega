@@ -40,6 +40,16 @@ describe('motion agent auto layout tools', () => {
     expect(findClip(session.doc, 'id1')!.clip.parent).toBeNull();
   });
 
+  it('sets how the lines spread, the stacking and whether strokes count', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
+    const container = String((await run('add_auto_layout', { clip_ids: ['id1'] })).container_id);
+
+    await run('set_auto_layout', { clip_id: container, wrap: true, alignContent: 'space-between', firstOnTop: true, strokesIncluded: false });
+
+    expect(findClip(session.doc, container)!.clip.autoLayout).toMatchObject({ alignContent: 'space-between', firstOnTop: true, strokesIncluded: false });
+  });
+
   it('keeps fill outside a container and refuses auto layout on a clip without a box', async () => {
     const { run } = setup();
     await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
