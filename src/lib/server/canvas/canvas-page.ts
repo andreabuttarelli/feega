@@ -85,7 +85,7 @@ import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motio
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
-import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
 import { DropOn, OutputKind } from '$lib/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -260,6 +260,7 @@ function jsonObject(value: FormDataEntryValue | null): Record<string, unknown> |
 
 const HTTP_BAD_REQUEST = 400;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const figmaAtSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 
@@ -1334,6 +1335,21 @@ export const actions: Actions<CanvasParams> = {
     }
     const drawn = await drawFrameAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, box.data);
     return { ...drawn, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: drawn.frameId }) };
+  },
+
+  pasteFigma: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const at = figmaAtSchema.safeParse(jsonField(fd, 'at'));
+    const id = String(fd.get('node_id') ?? '') || undefined;
+    if (!at.success || (id && !UUID.test(id))) {
+      return fail(400, { error: 'invalid paste' });
+    }
+    const pasted = await pasteFigmaAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, String(fd.get('html') ?? ''), at.data, () => crypto.randomUUID().slice(0, 8));
+    if (!pasted) {
+      return fail(400, { error: 'no Figma layers in this paste' });
+    }
+    return { ...pasted, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: pasted.frameId }) };
   },
 
   placeOutput: async ({ request, params, locals, setHeaders }) => {

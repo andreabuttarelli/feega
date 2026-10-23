@@ -73,6 +73,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
   drawFrame: canvas('draw_frame'),
+  pasteFigma: uiOnly('decodes the Figma clipboard of the browser; agents draw the same layers with draw_frame and edit'),
   moveFree: canvas('move_frame_element'),
   copyFree: canvas('copy_frame_element'),
   groupElements: canvas('group_elements'),

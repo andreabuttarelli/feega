@@ -5,8 +5,9 @@ import { groupClips } from '$lib/motion/group';
 import { mapOutline, parsePath, type Pt } from '$lib/motion/shape/geometry';
 import { svgShapes, type SvgText } from '$lib/motion/shape/svg-import';
 import { TextSizing } from '$lib/motion/text-sizing';
+import { figmaIntoFrame } from './figma/figma-doc';
 
-export type FramePaste = { svg: string } | { text: string };
+export type FramePaste = { svg: string } | { text: string } | { figma: string };
 export type Pasted = { doc: MotionDoc; selection: string[] };
 type Unit = { x: number; y: number };
 type NewId = () => string;
@@ -75,5 +76,8 @@ function pastedText(doc: MotionDoc, text: string, at: Unit, scale: number, frame
 }
 
 export function pastedInFrame(doc: MotionDoc, paste: FramePaste, at: Unit, scale: number, frame: number, newId: NewId): Pasted | null {
+  if ('figma' in paste) {
+    return figmaIntoFrame(doc, paste.figma, at, scale, frame, newId);
+  }
   return 'svg' in paste ? pastedSvg(doc, paste.svg, at, scale, frame, newId) : pastedText(doc, paste.text, at, scale, frame, newId);
 }

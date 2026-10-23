@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { Background, MotionFormat, compOf, newMotionDoc, type MotionClip } from '$lib/motion/doc';
 import { FEEGA_TOKENS, resolveColor } from '$lib/motion/brand';
@@ -77,5 +78,14 @@ describe('pastedInFrame', () => {
 
   it('pastes nothing from an SVG without shapes', () => {
     expect(pastedInFrame(frame, { svg: '<svg></svg>' }, AT, 2, 0, ids())).toBeNull();
+  });
+});
+
+describe('a Figma paste into a frame', () => {
+  it('lands the copied layers as one group named after the Figma frame', () => {
+    const html = readFileSync(new URL('../../../tests/fixtures/figma/clip-1.html', import.meta.url), 'utf8');
+    const done = pastedInFrame(frame, { figma: html }, AT, 0.5, 0, ids())!;
+    expect(done.selection).toHaveLength(1);
+    expect(topClips(done.doc).find((c) => c.id === done.selection[0])?.name).toBe('Cover');
   });
 });
