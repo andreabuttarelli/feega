@@ -16,7 +16,7 @@ async function definitions(tools: Record<string, Tool>) {
   return Promise.all(names.map(async (name) => ({ name, description: tools[name].description ?? '', schema: await asSchema(tools[name].inputSchema).jsonSchema })));
 }
 
-describe('the tool surfaces do not move while their code is reorganised', () => {
+describe('the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot)', () => {
   it('the chat tool definitions are byte-identical', async () => {
     const { db } = fakeDb({});
     const tools = {

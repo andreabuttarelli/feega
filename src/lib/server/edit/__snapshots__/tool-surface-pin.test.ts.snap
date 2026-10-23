@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`the tool surfaces do not move while their code is reorganised > the chat tool definitions are byte-identical 1`] = `
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical 1`] = `
 {
   "fingerprint": "bf9f0fba392317ca16b4e78045d235ce3fa5c0b8cbd3058d87280857812bddd6",
   "names": [
@@ -52,6 +52,6 @@ exports[`the tool surfaces do not move while their code is reorganised > the cha
 }
 `;
 
-exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 1`] = `"11d8f8bac4a823c4ab13e0225626db1070b3c567338a1d1b5f7a5d8f3f18ee62"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas 1`] = `"11d8f8bac4a823c4ab13e0225626db1070b3c567338a1d1b5f7a5d8f3f18ee62"`;
 
-exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 2`] = `"346ab677eb2c41217453d63421cc08d7418394aeffabee42032178ac8dcb188d"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas 2`] = `"346ab677eb2c41217453d63421cc08d7418394aeffabee42032178ac8dcb188d"`;
