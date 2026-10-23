@@ -9,10 +9,11 @@ import { copyStyle, pasteStyle } from '$lib/motion/style-copy';
 import { replaceElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
 import { setClipFlags } from '$lib/motion/organize';
-import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
+import { BooleanOp, flattenShapes } from '$lib/motion/shape/boolean';
+import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
-import type { OpResult } from '$lib/motion/timeline';
+import { setProps, type OpResult } from '$lib/motion/timeline';
 import { Command, commandFor } from '$lib/motion/shortcuts';
 import { Same, matchingLayers, sameLayers } from '$lib/motion/select-matching';
 import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
@@ -98,7 +99,32 @@ const clipOp = (op: ClipOp): BarOp => ({ shown: any, run: (ctx) => {
   return result.ok ? result : null;
 } });
 
-const combine = (op: BooleanOp): BarOp => ({ shown: shapes(MIN_COMBINED), run: (ctx) => kept(ctx, combineShapes(ctx.doc, ctx.selection, op, ctx.frame), `Combined shapes: ${op}`) });
+const loneBooleanGroup = (doc: MotionDoc, selection: readonly string[]): MotionClip | null => {
+  const [clip] = selection.length === 1 ? clipsOf(doc, selection) : [];
+  return clip && isBooleanGroup(clip) ? clip : null;
+};
+
+const combine = (op: BooleanOp): BarOp => ({
+  shown: (doc, selection) => shapes(MIN_COMBINED)(doc, selection) || loneBooleanGroup(doc, selection) !== null,
+  run: (ctx) => {
+    const group = loneBooleanGroup(ctx.doc, ctx.selection);
+    if (group) {
+      return kept(ctx, setProps(ctx.doc, group.id, { boolean: op }), `Changed boolean to ${op}`);
+    }
+    return regrouped(ctx, liveCombine(ctx.doc, ctx.selection, op, ctx.newId), `Combined shapes: ${op}`);
+  }
+});
+
+const flattenOp: BarOp = {
+  shown: (doc, selection) => shapes(1)(doc, selection) || loneBooleanGroup(doc, selection) !== null,
+  run: (ctx) => {
+    const group = loneBooleanGroup(ctx.doc, ctx.selection);
+    if (group) {
+      return regrouped(ctx, bakeBooleanGroup(ctx.doc, group.id, ctx.newId), 'Flattened boolean group');
+    }
+    return kept(ctx, flattenShapes(ctx.doc, ctx.selection, ctx.frame), 'Flattened shapes');
+  }
+};
 
 const flip = (way: Flip, summary: string): BarOp => ({ shown: any, run: (ctx) => kept(ctx, flipClips(ctx.doc, ctx.selection, way), summary) });
 
@@ -149,7 +175,7 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.Subtract]: combine(BooleanOp.Subtract),
   [Action.Intersect]: combine(BooleanOp.Intersect),
   [Action.Exclude]: combine(BooleanOp.Exclude),
-  [Action.Flatten]: { shown: shapes(1), run: (ctx) => kept(ctx, flattenShapes(ctx.doc, ctx.selection, ctx.frame), 'Flattened shapes') },
+  [Action.Flatten]: flattenOp,
   [Action.OutlineStroke]: { shown: someShape, run: (ctx) => kept(ctx, outlineStrokes(ctx.doc, ctx.selection, ctx.frame, ctx.newId), 'Outlined the stroke') },
   [Action.FlipHorizontal]: flip(Flip.Horizontal, 'Flipped horizontally'),
   [Action.FlipVertical]: flip(Flip.Vertical, 'Flipped vertically'),

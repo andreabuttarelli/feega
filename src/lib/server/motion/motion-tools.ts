@@ -11,6 +11,7 @@ import { PointOp, editPathPoints } from '$lib/motion/shape/point-ops';
 import { Handle } from '$lib/motion/shape/pen';
 import { networkSchema } from '$lib/motion/vector/model';
 import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
+import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { scaleClips } from '$lib/motion/scale-tool';
 import { setLayoutGuides } from '$lib/motion/layout-guides/guides';
@@ -59,6 +60,7 @@ const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) =
 
 const OUTLINE_STROKE = 'outline_stroke';
 const FLATTEN = 'flatten';
+const isBooleanOp = (op: string): op is BooleanOp => (Object.values(BooleanOp) as string[]).includes(op);
 const SHAPE_OPS = [BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude, OUTLINE_STROKE, FLATTEN] as const;
 
 type ShapeOp = (doc: MotionDoc, ids: string[], frame: number) => OpResult;
@@ -612,7 +614,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   const SHAPE_OP: Record<(typeof SHAPE_OPS)[number], ShapeOp> = {
     ...(Object.fromEntries(Object.values(BooleanOp).map((op) => [op, (doc: MotionDoc, ids: string[], frame: number) => combineShapes(doc, ids, op, frame)])) as Record<BooleanOp, ShapeOp>),
     [OUTLINE_STROKE]: (doc, ids, frame) => outlineStrokes(doc, ids, frame, deps.newId),
-    [FLATTEN]: flattenShapes
+    [FLATTEN]: (doc, ids, frame) => {
+      const [only] = ids.length === 1 ? [findClip(doc, ids[0])?.clip] : [];
+      return only && isBooleanGroup(only) ? bakeBooleanGroup(doc, only.id, deps.newId) : flattenShapes(doc, ids, frame);
+    }
   };
 
   const layoutWritten = (written: LayoutWritten | null) => {
@@ -1828,9 +1833,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     combine_shapes: tool({
-      description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed. flatten (one or more shapes) merges their outlines into one editable path as they are, curves kept, with no boolean. outline_stroke (one or more shapes) turns the first visible stroke into a filled path of the same look; a shape that also has a fill keeps it and gets the outlined stroke as a new layer above.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum([...SHAPE_OPS]), at: z.number().min(0).optional().describe('seconds; default 0') }),
-      execute: async (input) => apply(SHAPE_OP[input.op](session.doc, input.clip_ids, frames(input.at ?? 0)), `${input.op} ${input.clip_ids.join(', ')}`)
+      description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed. live (union, subtract, intersect or exclude only) instead groups the shapes into a live boolean group: they stay separate and editable inside it, the group draws the result and redraws it when a child changes; set_props boolean on the group changes the operation. flatten (one or more shapes, or one live boolean group) merges their outlines into one editable path as they are, curves kept, with no boolean; a live boolean group is baked into one plain shape. outline_stroke (one or more shapes) turns the first visible stroke into a filled path of the same look; a shape that also has a fill keeps it and gets the outlined stroke as a new layer above.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum([...SHAPE_OPS]), live: z.boolean().optional().describe('boolean ops only: keep the shapes editable in a live boolean group'), at: z.number().min(0).optional().describe('seconds; default 0') }),
+      execute: async (input) => {
+        const result = input.live && isBooleanOp(input.op) ? liveCombine(session.doc, input.clip_ids, input.op, deps.newId) : SHAPE_OP[input.op](session.doc, input.clip_ids, frames(input.at ?? 0));
+        return apply(result, `${input.op} ${input.clip_ids.join(', ')}`);
+      }
     }),
 
     to_vector: tool({
