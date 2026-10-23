@@ -176,6 +176,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
   import { nodeSize } from '$lib/canvas/node-size';
+  import { cleanNodeName } from '$lib/canvas/node-name';
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
@@ -2287,6 +2288,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
+  function renameNode(id: string, name: string) {
+    nodes = nodes.map((n) => (n.id === id ? { ...n, displayName: cleanNodeName(name) } : n));
+    void post('rename', { node_id: id, name });
+  }
+
   async function resize(id: string, width: number, height: number) {
     const group = nodes.find((n) => n.id === id);
     if (group && motionOf(group)?.kind === FrameKind.Group) {
@@ -2568,7 +2574,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         return selectedIds;
       },
       select: (ids) => focusOn(ids, undefined, FocusMode.Select),
-      open: (id) => focusOn([id], undefined, FocusMode.Select)
+      open: (id) => focusOn([id], undefined, FocusMode.Select),
+      rename: renameNode
     })
   );
 
@@ -3442,6 +3449,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onMove={move}
     onMoveEnd={moveEnd}
     onResize={resize}
+    onRename={renameNode}
     onConnect={connect}
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}

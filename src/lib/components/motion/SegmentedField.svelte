@@ -3,6 +3,10 @@
   import AlignLeft from '@lucide/svelte/icons/text-align-start';
   import AlignCenter from '@lucide/svelte/icons/text-align-center';
   import AlignRight from '@lucide/svelte/icons/text-align-end';
+  import AlignJustify from '@lucide/svelte/icons/text-align-justify';
+  import AlignTop from '@lucide/svelte/icons/align-vertical-justify-start';
+  import AlignMiddle from '@lucide/svelte/icons/align-vertical-justify-center';
+  import AlignBottom from '@lucide/svelte/icons/align-vertical-justify-end';
   import MoveHorizontal from '@lucide/svelte/icons/move-horizontal';
   import MoveVertical from '@lucide/svelte/icons/move-vertical';
   import Maximize from '@lucide/svelte/icons/maximize';
@@ -15,6 +19,10 @@
     [SegmentIcon.AlignLeft]: AlignLeft,
     [SegmentIcon.AlignCenter]: AlignCenter,
     [SegmentIcon.AlignRight]: AlignRight,
+    [SegmentIcon.Justify]: AlignJustify,
+    [SegmentIcon.Top]: AlignTop,
+    [SegmentIcon.Middle]: AlignMiddle,
+    [SegmentIcon.Bottom]: AlignBottom,
     [SegmentIcon.AutoWidth]: MoveHorizontal,
     [SegmentIcon.AutoHeight]: MoveVertical,
     [SegmentIcon.FixedSize]: Maximize

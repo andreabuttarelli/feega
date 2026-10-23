@@ -1,4 +1,5 @@
-import { Ligatures, type Face, type FaceBook, type Request } from './face';
+import { Ligatures, type Face, type FaceBook, type Features, type Request } from './face';
+import { AUTO, type Leading } from '../../type-units';
 
 export enum Spaces {
   Collapse = 'collapse',
@@ -12,13 +13,35 @@ export enum Shaping {
 
 export type Flow = { spaces: Spaces; wraps: boolean };
 
-export type Look = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: number };
+export type Look = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: Leading };
 
 export type RequestAt = (paragraph: number, char: number) => Look;
 
-export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: number; inset: number; shaping: Shaping; requestAt?: RequestAt };
+export enum Justify {
+  Off = 'off',
+  On = 'on'
+}
 
-export type Glyph = { face: Face; glyph: number; skew: number; x: number; dy: number; char: number; pen: number; advance: number; word: number; letter: number; size: number; leading: number };
+export enum Wrap {
+  Greedy = 'greedy',
+  Balance = 'balance',
+  Pretty = 'pretty'
+}
+
+export enum Trim {
+  None = 'none',
+  Cap = 'cap'
+}
+
+export const NO_LIMIT = 0;
+
+export type Paragraph = { indent: number; spacing: number; justify: Justify; wrap: Wrap; limit: number; trim: Trim };
+
+export const PLAIN_PARAGRAPH: Paragraph = { indent: 0, spacing: 0, justify: Justify.Off, wrap: Wrap.Greedy, limit: NO_LIMIT, trim: Trim.None };
+
+export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: Leading; inset: number; shaping: Shaping; requestAt?: RequestAt; paragraph?: Paragraph; features?: Features };
+
+export type Glyph = { face: Face; glyph: number; skew: number; x: number; dy: number; char: number; pen: number; advance: number; word: number; letter: number; size: number; leading: Leading };
 
 export type Line = { glyphs: Glyph[]; width: number; baseline: number; top: number; height: number };
 
@@ -86,7 +109,7 @@ function shapedOf(text: string, first: number, type: Type, asked: Asked, book: F
     const tracking = run.look.tracking * size;
     const scale = size / run.face.unitsPerEm;
     let char = first + run.at;
-    for (const g of run.face.shape(run.text, ligatures)) {
+    for (const g of run.face.shape(run.text, ligatures, type.features)) {
       const advance = g.advance * scale + tracking * g.chars + Array.from({ length: g.chars }, (_, k) => extra(char + k)).reduce((n, e) => n + e, 0) * size;
       glyphs.push({ face: run.face, glyph: g.glyph, skew: run.skew, x: x + g.dx * scale, dy: g.dy * scale, char, pen: x, advance, word: -1, letter: char - first, size, leading });
       x += advance;
@@ -112,11 +135,13 @@ function shift(glyphs: Glyph[], by: number): Glyph[] {
   return glyphs.map((g) => ({ ...g, x: g.x + by, pen: g.pen + by }));
 }
 
-function wrapped(tokens: Token[], flow: Flow, room: number, inset: number): { glyphs: Glyph[]; width: number }[] {
-  const lines: { glyphs: Glyph[]; width: number }[] = [];
+type Broken = { glyphs: Glyph[]; width: number };
+
+function wrapped(tokens: Token[], flow: Flow, room: number, inset: number, indent: number): Broken[] {
+  const lines: Broken[] = [];
   let glyphs: Glyph[] = [];
-  let pen = inset;
-  let inked = inset;
+  let pen = inset + indent;
+  let inked = pen;
   let words = 0;
   let kept = 0;
   const close = () => {
@@ -152,6 +177,83 @@ function wrapped(tokens: Token[], flow: Flow, room: number, inset: number): { gl
   return lines;
 }
 
+function gapsOf(glyphs: Glyph[]): number[] {
+  const starts: number[] = [];
+  glyphs.forEach((g, i) => {
+    const after = glyphs[i - 1];
+    if (g.word >= 0 && after && after.word < 0 && glyphs.slice(0, i).some((h) => h.word >= 0)) {
+      starts.push(i);
+    }
+  });
+  return starts;
+}
+
+function justified(line: { glyphs: Glyph[]; width: number }, room: number): { glyphs: Glyph[]; width: number } {
+  const gaps = gapsOf(line.glyphs);
+  if (!gaps.length || line.width >= room) {
+    return line;
+  }
+  const extra = (room - line.width) / gaps.length;
+  const glyphs = line.glyphs.map((g, i) => {
+    const by = gaps.filter((at) => at <= i).length * extra;
+    return { ...g, x: g.x + by, pen: g.pen + by };
+  });
+  return { glyphs, width: room };
+}
+
+const wordsIn = (line: Broken) => new Set(line.glyphs.filter((g) => g.word >= 0).map((g) => g.word)).size;
+
+const BALANCE_MAX_LINES = 6;
+const BALANCE_STEPS = 20;
+const PRETTY_STEP = 0.02;
+const PRETTY_FLOOR = 0.7;
+
+function balancedRoom(lay: (room: number) => Broken[], room: number): number {
+  const count = lay(room).length;
+  if (count < 2 || count > BALANCE_MAX_LINES) {
+    return room;
+  }
+  let low = room / count;
+  let high = room;
+  for (let i = 0; i < BALANCE_STEPS; i++) {
+    const mid = (low + high) / 2;
+    if (lay(mid).length > count) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+  return high;
+}
+
+function prettyRoom(lay: (room: number) => Broken[], room: number): number {
+  const lines = lay(room);
+  if (lines.length < 2 || wordsIn(lines.at(-1)!) > 1) {
+    return room;
+  }
+  for (let share = 1 - PRETTY_STEP; share >= PRETTY_FLOOR; share -= PRETTY_STEP) {
+    const tried = lay(room * share);
+    if (tried.length > lines.length) {
+      return room;
+    }
+    if (wordsIn(tried.at(-1)!) > 1) {
+      return room * share;
+    }
+  }
+  return room;
+}
+
+const WRAP_ROOM: Record<Wrap, (lay: (room: number) => Broken[], room: number) => number> = {
+  [Wrap.Greedy]: (_lay, room) => room,
+  [Wrap.Balance]: balancedRoom,
+  [Wrap.Pretty]: prettyRoom
+};
+
+const JUSTIFIED: Record<Justify, (lines: Broken[], room: number) => Broken[]> = {
+  [Justify.Off]: (lines) => lines,
+  [Justify.On]: (lines, room) => lines.map((line, i) => (i < lines.length - 1 ? justified(line, room) : line))
+};
+
 function primary(type: Type, book: FaceBook, text: string): Face | null {
   const request = { ...type.request, size: type.size };
   const first = text.codePointAt(0);
@@ -166,7 +268,7 @@ function glyphMetrics(g: Glyph): Metrics {
   const scale = g.size / g.face.unitsPerEm;
   const ascent = Math.round(g.face.ascent * scale);
   const descent = Math.round(g.face.descent * scale);
-  const height = lineHeightOf(g.size, g.leading);
+  const height = g.leading === AUTO ? ascent + descent : lineHeightOf(g.size, g.leading);
   const above = Math.floor((height - ascent - descent) / 2) + ascent;
   return { above, below: height - above };
 }
@@ -183,17 +285,75 @@ function mixedLines(lines: { glyphs: Glyph[]; width: number }[], uniform: Metric
   });
 }
 
+const ELLIPSIS = '…';
+const CAP_LETTER = 'H';
+
+const inkedEnd = (glyphs: Glyph[]) => {
+  const last = glyphs.at(-1);
+  return last ? last.pen + last.advance : 0;
+};
+
+function ellipsised(line: Broken, room: number, ellipsis: Token): Broken {
+  const glyphs = [...line.glyphs];
+  while (glyphs.length && (glyphs.at(-1)!.word < 0 || inkedEnd(glyphs) + ellipsis.width > room + SLACK)) {
+    glyphs.pop();
+  }
+  const at = inkedEnd(glyphs);
+  const char = (glyphs.at(-1)?.char ?? -1) + 1;
+  const tail = shift(ellipsis.glyphs, at).map((g) => ({ ...g, char, word: -1 }));
+  return { glyphs: [...glyphs, ...tail], width: at + ellipsis.width };
+}
+
+function limited(blocks: Block[], limit: number, room: number, ellipsis: () => Token): Block[] {
+  const total = blocks.reduce((n, b) => n + b.lines.length, 0);
+  if (limit === NO_LIMIT || total <= limit) {
+    return blocks;
+  }
+  const kept: Block[] = [];
+  let left = limit;
+  for (const block of blocks) {
+    if (left === 0) {
+      break;
+    }
+    const lines = block.lines.slice(0, left);
+    left -= lines.length;
+    kept.push({ ...block, lines, height: block.height * (lines.length / block.lines.length) });
+  }
+  const last = kept.at(-1)!;
+  const closing = last.lines.at(-1)!;
+  last.lines[last.lines.length - 1] = { ...closing, ...ellipsised(closing, room, ellipsis()) };
+  return kept;
+}
+
+function capHeightOf(type: Type, book: FaceBook): number {
+  const resolved = book({ ...type.request, size: type.size }, CAP_LETTER.codePointAt(0)!);
+  if (!resolved) {
+    return 0;
+  }
+  const [shaped] = resolved.face.shape(CAP_LETTER, Ligatures.Off);
+  const ys = (shaped ? resolved.face.outline(shaped.glyph) : []).flatMap((c) => c.at.filter((_, i) => i % 2 === 1));
+  return (Math.max(0, ...ys) * type.size) / resolved.face.unitsPerEm;
+}
+
+function typeLineHeight(type: Type, face: Face | null, ascent: number, descent: number): number {
+  if (type.leading === AUTO) {
+    return ascent + descent + Math.round((face?.lineGap ?? 0) * (face ? type.size / face.unitsPerEm : 0));
+  }
+  return lineHeightOf(type.size, type.leading);
+}
+
 export function layOut(paragraphs: string[], type: Type, flow: Flow, room: number, book: FaceBook, extra: Extra = NO_EXTRA): Laid {
   const face = primary(type, book, paragraphs.join(''));
   const scale = face ? type.size / face.unitsPerEm : 0;
   const ascent = Math.round((face?.ascent ?? 0) * scale);
   const descent = Math.round((face?.descent ?? 0) * scale);
-  const lineHeight = lineHeightOf(type.size, type.leading);
+  const lineHeight = typeLineHeight(type, face, ascent, descent);
   const baseline = Math.floor((lineHeight - ascent - descent) / 2) + ascent;
+  const paragraph = type.paragraph ?? PLAIN_PARAGRAPH;
   let missing = false;
   let top = 0;
-  const blocks = paragraphs.map((paragraph, at): Block => {
-    const text = collapsed(paragraph, flow.spaces);
+  const blocks = paragraphs.map((source, at): Block => {
+    const text = collapsed(source, flow.spaces);
     const asked = askedOf(type, at);
     let first = 0;
     let words = 0;
@@ -204,12 +364,21 @@ export function layOut(paragraphs: string[], type: Type, flow: Flow, room: numbe
       missing ||= token.missing;
       return token;
     });
-    const laid = wrapped(tokens, flow, room, type.inset);
+    const lay = (width: number) => wrapped(tokens, flow, width, type.inset, paragraph.indent);
+    const fitted = flow.wraps ? WRAP_ROOM[paragraph.wrap](lay, room) : room;
+    const laid = JUSTIFIED[flow.wraps ? paragraph.justify : Justify.Off](lay(fitted), room);
     const lines = type.requestAt ? mixedLines(laid, { above: baseline, below: lineHeight - baseline }) : laid.map((l, i) => ({ ...l, top: i * lineHeight, height: lineHeight, baseline: i * lineHeight + baseline }));
     const block = { lines, top, height: lines.reduce((n, l) => n + l.height, 0) };
-    top += block.height;
+    top += block.height + paragraph.spacing;
     return block;
   });
-  const width = Math.max(0, ...blocks.flatMap((b) => b.lines.map((l) => l.width)));
-  return { blocks, width, height: top, ascent, descent, lineHeight, missing };
+  const ellipsis = () => shapedOf(ELLIPSIS, 0, type, askedOf(type, 0), book, () => 0);
+  const kept = limited(blocks, paragraph.limit, room, ellipsis);
+  const bottom = kept.at(-1);
+  const height = bottom ? bottom.top + bottom.height : 0;
+  const trimTop = paragraph.trim === Trim.Cap ? baseline - capHeightOf(type, book) : 0;
+  const trimBottom = paragraph.trim === Trim.Cap ? lineHeight - baseline : 0;
+  const trimmed = kept.map((b) => ({ ...b, top: b.top - trimTop }));
+  const width = Math.max(0, ...trimmed.flatMap((b) => b.lines.map((l) => l.width)));
+  return { blocks: trimmed, width, height: Math.max(0, height - trimTop - trimBottom), ascent, descent, lineHeight, missing };
 }

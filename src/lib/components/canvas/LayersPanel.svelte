@@ -176,7 +176,7 @@
   const visible = $derived(shown.slice(span.start, span.end));
   const ROW_HUE: Record<string, string> = { motion: 'var(--ui-type-frame)', image: 'var(--ui-type-media)', video: 'var(--ui-type-media)', text: 'var(--ui-type-text)' };
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
-  const renamable = (row: LayerRow) => editable(row) && row.kind !== LayerKind.Part;
+  const renamable = (row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
 
   function enterRow(row: LayerRow, e: KeyboardEvent) {
     if (isPicked(row) && renamable(row)) {
@@ -243,6 +243,12 @@
 
   function rename(row: LayerRow, name: string) {
     renaming = null;
+    if (row.kind === LayerKind.Node) {
+      if (name.trim() !== row.label) {
+        canvas?.rename(row.id, name);
+      }
+      return;
+    }
     if (name.trim() !== row.label) {
       run([row.id], LayerAction.Rename, SUMMARY[LayerAction.Rename], name);
     }

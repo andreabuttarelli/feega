@@ -11,8 +11,13 @@ import { textPaint } from '$lib/motion/fill/render';
 import { css } from '$lib/motion/hyperframes/html';
 import { mul2d, type Affine } from '$lib/motion/affine';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
+import type { TextCase } from '$lib/motion/components';
+import { decorationCss } from '$lib/motion/decoration';
+import { AUTO, CAP_TRIM_CSS, CSS_AUTO, CSS_NORMAL, leadingOf, trackingOf } from '$lib/motion/type-units';
 
 type Size = { width: number; height: number };
+
+const TEXT_TRANSFORM: Record<TextCase, string> = { 'as-typed': 'none', upper: 'uppercase', lower: 'lowercase', title: 'capitalize', 'small-caps': 'none' };
 
 export type TextEditStyle = {
   fontPx: number;
@@ -20,10 +25,13 @@ export type TextEditStyle = {
   weight: number;
   italic: boolean;
   trackingEm: number;
-  leading: number;
+  leading: number | string;
   color: string;
-  upper: boolean;
+  textTransform: string;
   align: string;
+  wrap: string;
+  trim: string;
+  decoration: string;
 };
 
 export function editsText(doc: MotionDoc, clipId: string): boolean {
@@ -54,24 +62,28 @@ export function textEditStyle(input: { clip: MotionClip; doc: MotionDoc; tokens:
   const verdict = clipProps(input.doc.components, input.clip.component, input.clip.props, Strictness.Lenient);
   const p = (verdict.ok ? verdict.props : input.clip.props) as Record<string, unknown>;
   const unit = Math.min(input.frame.width, input.frame.height);
+  const sizePx = Number(p.size) * unit;
   return {
     fontPx: Number(p.size) * unit * input.scale,
     family: fontStack(String(p.font), input.doc.fonts),
     weight: Number(p.weight),
     italic: p.italic === true,
-    trackingEm: Number(p.tracking),
-    leading: Number(p.leading),
+    trackingEm: trackingOf(p, sizePx),
+    leading: leadingOf(p, sizePx) === AUTO ? CSS_NORMAL : leadingOf(p, sizePx),
     color: resolveColor(p.color, input.tokens),
-    upper: p.textCase === 'upper',
-    align: String(p.align)
+    textTransform: TEXT_TRANSFORM[(p.textCase as TextCase) ?? 'as-typed'] ?? 'none',
+    align: String(p.align),
+    wrap: p.textWrap === 'balance' || p.textWrap === 'pretty' ? p.textWrap : CSS_AUTO,
+    trim: p.leadingTrim === 'cap' ? CAP_TRIM_CSS : CSS_NORMAL,
+    decoration: css(decorationCss(p, (v) => resolveColor(v, input.tokens)))
   };
 }
 
-export type EditLayout = { transform: string; width: number; height: number; fontPx: number; wraps: boolean; centred: boolean };
+export type EditLayout = { transform: string; width: number; height: number; fontPx: number; wraps: boolean; vertical: number };
 
 export function editLayout(caret: TextCaret, screen: Affine): EditLayout {
   const m = mul2d(screen, caret.matrix);
-  return { transform: `matrix(${m.join(',')})`, width: caret.width, height: caret.height, fontPx: caret.size, wraps: caret.flow.wraps, centred: caret.centred };
+  return { transform: `matrix(${m.join(',')})`, width: caret.width, height: caret.height, fontPx: caret.size, wraps: caret.flow.wraps, vertical: caret.vertical };
 }
 
 const FLOW_CSS: Record<'wraps' | 'line', (layout: EditLayout) => string> = {
@@ -82,7 +94,7 @@ const FLOW_CSS: Record<'wraps' | 'line', (layout: EditLayout) => string> = {
 export function editCss(look: TextEditStyle, layout: EditLayout): string {
   const flow = FLOW_CSS[layout.wraps ? 'wraps' : 'line'](layout);
   const font = `${look.italic ? 'italic ' : ''}${look.weight} ${layout.fontPx}px/${look.leading} ${look.family}`;
-  return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};${look.upper ? 'text-transform:uppercase;' : ''}`;
+  return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};text-transform:${look.textTransform};text-wrap-style:${look.wrap};text-box:${look.trim};${look.decoration}`;
 }
 
 export type PaintedSpan = { text: string; style: string };

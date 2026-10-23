@@ -5,7 +5,7 @@ type Keyed = number | string;
 
 export type TypeProps = { font: string; weight: Keyed; italic: boolean; tracking: Keyed; leading: Keyed; stretch: Keyed; slant: Keyed; axes: string; textCase?: TextCase };
 
-const TRANSFORM: Record<TextCase, string | undefined> = { 'as-typed': undefined, upper: 'uppercase', lower: 'lowercase' };
+const TRANSFORM: Record<TextCase, string | undefined> = { 'as-typed': undefined, upper: 'uppercase', lower: 'lowercase', title: 'capitalize', 'small-caps': undefined };
 
 type TypeCtx = { font: (family: string) => string; weight: (family: string, weight: number) => number };
 

@@ -28,7 +28,8 @@ import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles'
 import { drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
-import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
+import { NODE_NAME_MAX } from '$lib/canvas/node-name';
+import { removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
@@ -272,6 +273,7 @@ const renameCanvasInput = z.object({ canvasId: z.string(), name: z.string().min(
 const renameProjectInput = z.object({ name: z.string().min(1) }).strict();
 const connectionIdInput = z.object({ connectionId: z.string().describe('from list_connections') }).strict();
 const edgeModeInput = z.object({ connectionId: z.string(), mode: z.enum(WIRE_MODES).describe('iterate makes the line a loop axis') }).strict();
+const renameNodeInput = z.object({ nodeId: z.string(), name: z.string() }).strict();
 const resizeNodeInput = z.object({ nodeId: z.string(), width: z.number().positive(), height: z.number().positive() }).strict();
 const nodeIdsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1) }).strict();
 const duplicateInput = nodeIdsInput
@@ -912,6 +914,19 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => {
       const connection = await setConnectionMode(ctx.db, { orgId: ctx.orgId, ...input });
       return connection ? { connection } : { error: 'connection_not_found' };
+    }
+  }),
+
+  rename_node: op({
+    access: Access.Write,
+    input: renameNodeInput,
+    run: async (ctx, input) => {
+      const node = await findNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId });
+      if (!node) {
+        return NODE_NOT_FOUND;
+      }
+      await renameOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input });
+      return { renamed: true };
     }
   }),
 

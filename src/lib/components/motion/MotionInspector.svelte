@@ -61,7 +61,8 @@
   import TextPresetGallery from './TextPresetGallery.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
-  import { registerFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+  import { registerFont, replaceFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+  import { isBuiltin } from '$lib/motion/fonts/model';
   import type { FontLibrary } from '$lib/motion/fonts/library';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
@@ -228,6 +229,16 @@
       return;
     }
     commit(setProps(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
+  }
+
+  let replacing = $state(false);
+
+  const missingFont = (family: string) => !isBuiltin(family) && !doc.fonts.some((f) => f.family === family);
+
+  function swapFont(from: string, asked: string, catalogue: CatalogueFont[]) {
+    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
+    replacing = false;
+    commit(replaceFont(base, from, family, catalogue), `Replaced ${from} with ${family}`);
   }
 
   function pickFont(field: Field, asked: string, catalogue: CatalogueFont[]) {
@@ -577,7 +588,12 @@
         {:else if field.control === Control.MediaList}
           <MediaListField label={field.label} value={value(field)} {assets} {upload} onchange={(list) => setProp(field, list)} />
         {:else if field.control === Control.Font}
-          <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} library={fonts} />
+          <div class="comp">
+            <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => (replacing ? swapFont(String(value(field)), family, catalogue) : pickFont(field, family, catalogue))} library={fonts} />
+            {#if !isBuiltin(String(value(field)))}
+              <button type="button" class:on={replacing} data-testid="replace-font" title={missingFont(String(value(field))) ? 'Missing font: pick a replacement for the whole video' : 'Pick a font to replace this one in the whole video'} aria-pressed={replacing} onclick={() => (replacing = !replacing)}>{missingFont(String(value(field))) ? 'Missing · Replace' : 'Replace all'}</button>
+            {/if}
+          </div>
         {:else if field.control === Control.Comp}
           <div class="comp">
             <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
@@ -1212,6 +1228,11 @@
   .comp {
     display: flex;
     gap: var(--ui-space-1);
+  }
+
+  .comp button.on {
+    background: var(--ui-ink);
+    color: var(--ui-bg);
   }
 
   .comp select {
