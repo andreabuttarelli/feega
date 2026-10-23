@@ -212,8 +212,18 @@ describe('the help card', () => {
   });
 });
 
+describe('comment mode', () => {
+  it('c toggles comment mode', () => {
+    expect(matchCanvasShortcut(ev('c'))).toEqual({ id: 'comment' });
+  });
+
+  it('c while typing is a letter', () => {
+    expect(matchCanvasShortcut(ev('c', { target: TEXTAREA }))).toBeNull();
+  });
+});
+
 describe('non pesta i piedi al registro globale', () => {
-  for (const key of ['g', 'k', 'c', 'l', 's', 'r', 'd', 't', 'h', 'b', 'm', 'w', 'p', 'z']) {
+  for (const key of ['g', 'k', 'l', 's', 'r', 'd', 't', 'h', 'b', 'm', 'w', 'p', 'z']) {
     it(`"${key}" nudo resta del registro globale`, () => {
       expect(matchCanvasShortcut(ev(key))).toBeNull();
     });

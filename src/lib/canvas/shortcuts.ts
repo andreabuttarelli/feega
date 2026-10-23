@@ -32,6 +32,7 @@ export type CanvasCommandId =
   | 'group'
   | 'ungroup'
   | 'tool'
+  | 'comment'
   | 'bring-front'
   | 'send-back'
   | 'help'
@@ -145,6 +146,7 @@ const ARROWS: Record<string, { dx: number; dy: number }> = {
 const ZOOM_IN_KEYS = ['+', '='];
 
 const HELP_KEY = '?';
+const COMMENT_KEY = 'c';
 const MOD_KEY = 'mod';
 
 const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'> = { Digit0: 'zoom-actual', Digit1: 'fit', Digit2: 'zoom-selection' };
@@ -181,6 +183,7 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   }
 
   if (key === HELP_KEY) return { id: 'help' };
+  if (key === COMMENT_KEY) return { id: 'comment' };
 
   const tool = toolFor(e);
   if (tool) return { id: 'tool', tool };
@@ -247,6 +250,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'zoom-selection', keys: ['⇧2'], label: 'Zoom to selection' },
   { id: 'zoom-in', keys: ['+'], label: 'Zoom in' },
   { id: 'zoom-out', keys: ['-'], label: 'Zoom out' },
+  { id: 'comment', keys: ['C'], label: 'Comment mode' },
   { id: 'help', keys: [HELP_KEY], label: 'Keyboard shortcuts' }
 ];
 
@@ -268,6 +272,7 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   'select-next': GuideGroup.Select,
   'select-previous': GuideGroup.Select,
   tool: GuideGroup.Select,
+  comment: GuideGroup.Edit,
   undo: GuideGroup.Edit,
   redo: GuideGroup.Edit,
   duplicate: GuideGroup.Edit,

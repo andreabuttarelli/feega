@@ -13,6 +13,7 @@ export enum BarSlot {
   Select = 'select',
   Generate = 'generate',
   Upload = 'upload',
+  Comment = 'comment',
   More = 'more',
   Templates = 'templates',
   FrameTemplates = 'frame-templates',
@@ -22,8 +23,8 @@ export enum BarSlot {
 }
 
 const CANVAS_SLOTS: Record<BarMode, readonly BarSlot[]> = {
-  [BarMode.Design]: [BarSlot.Mode, BarSlot.Draw, BarSlot.Upload, BarSlot.FrameTemplates],
-  [BarMode.Generate]: [BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates]
+  [BarMode.Design]: [BarSlot.Mode, BarSlot.Draw, BarSlot.Upload, BarSlot.Comment, BarSlot.FrameTemplates],
+  [BarMode.Generate]: [BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.Comment, BarSlot.FrameTemplates]
 };
 
 const FRAME_SLOTS: readonly BarSlot[] = [BarSlot.Image, BarSlot.FrameLibrary];

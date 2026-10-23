@@ -3,6 +3,7 @@
   import { localStore } from '$lib/browser-storage';
   import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
+  import MessageCircle from '@lucide/svelte/icons/message-circle';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
@@ -32,6 +33,8 @@
     ontrailer,
     onimage,
     onframelibrary,
+    oncomment,
+    commenting = false,
     context = BarContext.Canvas,
     zoom
   }: {
@@ -42,6 +45,8 @@
     ontrailer?: () => void;
     onimage?: (file: File) => void;
     onframelibrary?: () => void;
+    oncomment?: () => void;
+    commenting?: boolean;
     context?: BarContext;
     zoom?: number;
   } = $props();
@@ -221,6 +226,7 @@
     [BarSlot.Select]: selectSlot,
     [BarSlot.Generate]: nodesSlot,
     [BarSlot.Upload]: uploadSlot,
+    [BarSlot.Comment]: commentSlot,
     [BarSlot.More]: moreSlot,
     [BarSlot.Templates]: templatesSlot,
     [BarSlot.FrameTemplates]: frameTemplatesSlot,
@@ -247,6 +253,17 @@
     </button>
     <span class="add-tip" role="tooltip">{SELECT_TOOL.label}</span>
   </span>
+{/snippet}
+
+{#snippet commentSlot()}
+  {#if oncomment}
+    <span class="tool">
+      <button type="button" class="pick" class:on={commenting} aria-pressed={commenting} title="Comment (C)" aria-label="Comment" data-testid="comment-mode" onclick={oncomment}>
+        <MessageCircle size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Comment (C)</span>
+    </span>
+  {/if}
 {/snippet}
 
 {#snippet uploadSlot()}
