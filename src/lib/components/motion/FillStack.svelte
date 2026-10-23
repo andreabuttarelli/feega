@@ -20,7 +20,7 @@
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
   type Keys = { mark: (key: string) => KeyMark; toggle: (key: string) => void };
 
-  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, keys = null, onchange }: { keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, keys = null, oncrop = null, onchange }: { oncrop?: (() => void) | null; keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const setAdjust = (i: number, current: FillOf<FillType.Image>, key: Adjustment, value: number) => patch(i, { adjust: { ...current.adjust, [key]: value / PERCENT } }, 'Image adjustment');
@@ -266,6 +266,9 @@
               {#each IMAGE_FITS as fit (fit)}<option value={fit}>{IMAGE_FIT_LABEL[fit]}</option>{/each}
             </select>
           </label>
+          {#if oncrop}
+            <button type="button" class={cn(MENU_ITEM, 'justify-center')} data-testid="fill-crop-edit" onclick={oncrop}>Crop image</button>
+          {/if}
           {@const controls = IMAGE_CONTROLS[fill.fit]}
           {#if controls.includes(ImageControl.Focus)}
             <label class={FIELD_ROW}><span class={LABEL}>{controls.includes(ImageControl.Tile) ? 'Offset X' : 'Focus X'}</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" data-testid="fill-focus-x" value={pct(fill.focus.x)} onchange={(e) => patch(index, { focus: { ...fill.focus, x: percentOf(e) } }, 'Image focus')} /></label>

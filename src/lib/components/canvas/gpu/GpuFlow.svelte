@@ -28,6 +28,7 @@
   import { TRANSFORM } from '$lib/motion/keyframes';
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import GradientHandles from '../GradientHandles.svelte';
+  import CropHandles from '../CropHandles.svelte';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { libraryOf, syncedDoc } from '$lib/motion/style-library';
   import { renameStyle } from '$lib/motion/styles';
@@ -37,6 +38,9 @@
   import type { Collection } from '$lib/motion/variables-model';
   import type { Style } from '$lib/motion/styles-model';
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
+  import { imageTarget } from '$lib/canvas/crop-handles';
+  import { cropRequest } from '$lib/canvas/crop-request.svelte';
+  import type { FillOf, FillType } from '$lib/motion/fill/model';
   import type { Fill } from '$lib/motion/fill/model';
   import { baseStyle, commitText, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
@@ -1224,6 +1228,7 @@
       select([id]);
       goInside(id, Gesture.Double, deeper.clip);
       void startTyping(id, deeper.clip);
+      startCrop(id, deeper.clip);
       return;
     }
     if (id) {
@@ -1793,6 +1798,67 @@
       commit(nodeId, withFill(saver.history.present, clip, index, fill), 'Edited gradient');
     }
   }
+
+  type Cropping = { nodeId: string; clip: string; index: number; next: FillOf<FillType.Image> };
+  let cropping = $state<Cropping | null>(null);
+
+  function startCrop(nodeId: string, clip: string): boolean {
+    const saver = saverOf(nodeId);
+    const target = saver ? imageTarget(saver.history.present, clip) : null;
+    if (!target) {
+      return false;
+    }
+    cropping = { nodeId, clip, index: target.index, next: target.fill };
+    return true;
+  }
+
+  function cropMark(nodeId: string) {
+    const open = cropping?.nodeId === nodeId ? cropping : null;
+    const mark = open && inside?.nodeId === nodeId ? selectionMarks(nodeId).find((m) => m.clip === open.clip) : null;
+    const saver = mark ? saverOf(nodeId) : null;
+    const target = saver ? imageTarget(saver.history.present, open!.clip) : null;
+    const src = target ? (target.fill.src ?? liveOf(nodeId)?.assets[target.fill.assetId]) : null;
+    return mark && target && src ? { rect: quadBox(mark.quad), fill: target.fill, src } : null;
+  }
+
+  function dragCrop(fill: FillOf<FillType.Image>) {
+    const open = cropping;
+    const saver = open ? saverOf(open.nodeId) : null;
+    const result = open && saver ? withFill(saver.history.present, open.clip, open.index, fill) : null;
+    if (open && result?.ok) {
+      cropping = { ...open, next: fill };
+      liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: result.doc });
+    }
+  }
+
+  function endCrop(apply: boolean) {
+    const open = cropping;
+    const saver = open ? saverOf(open.nodeId) : null;
+    cropping = null;
+    if (!open || !saver) {
+      return;
+    }
+    if (apply) {
+      commit(open.nodeId, withFill(saver.history.present, open.clip, open.index, open.next), 'Cropped image');
+      return;
+    }
+    liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
+  }
+
+  let cropAsks = 0;
+
+  $effect(() => {
+    const asked = cropRequest.asked;
+    if (asked === cropAsks) {
+      return;
+    }
+    cropAsks = asked;
+    untrack(() => {
+      if (inside && picks.length === 1) {
+        startCrop(inside.nodeId, picks[0]);
+      }
+    });
+  });
 
   function groupMark(nodeId: string): [number, number][] | null {
     const marks = selectionMarks(nodeId);
@@ -2770,6 +2836,11 @@
     if (e.key === ' ' && !(e.target as HTMLElement).closest?.(INTERACTIVE)) {
       space = true;
     }
+    if (cropping && (e.key === 'Enter' || e.key === 'Escape')) {
+      e.preventDefault();
+      endCrop(e.key === 'Enter');
+      return;
+    }
     const group = e.key === 'Escape' && inside && picks.length === 1 ? groupOfPick(inside.nodeId) : null;
     if (inside && group) {
       pickMany(inside.nodeId, [group]);
@@ -2789,6 +2860,7 @@
     if (entered) {
       e.preventDefault();
       void startTyping(inside!.nodeId, inside!.level.clip!);
+      startCrop(inside!.nodeId, inside!.level.clip!);
       return;
     }
     if (!spec.chrome || keyRegion.current !== Region.Canvas) {
@@ -3253,14 +3325,18 @@
         {#if edit}
           <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
-        {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
+        {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={shows(frameViews, FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}
           <GradientHandles rect={gradient.rect} fill={gradient.fill} onchange={(f) => dragGradient(frame.id, gradient.clip, gradient.index, f)} ondone={(f) => dropGradient(frame.id, gradient.clip, gradient.index, f)} />
         {/if}
-        {@const group = typing?.nodeId === frame.id ? null : groupMark(frame.id)}
+        {@const crop = cropMark(frame.id)}
+        {#if crop}
+          <CropHandles rect={crop.rect} fill={crop.fill} src={crop.src} onchange={dragCrop} onapply={() => endCrop(true)} oncancel={() => endCrop(false)} />
+        {/if}
+        {@const group = typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? null : groupMark(frame.id)}
         {#if group}
           <FrameSelection clip="" quad={group} kind={SelectionKind.Group} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
         {/if}
