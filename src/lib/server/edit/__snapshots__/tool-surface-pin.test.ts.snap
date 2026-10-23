@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the tool surfaces do not move while their code is reorganised > the chat tool definitions are byte-identical 1`] = `
+{
+  "fingerprint": "6bb7528334c9bce2b8770eb52392cd8fa841b94c36db3eb0e498a1b502b18269",
+  "names": [
+    "apply_effects",
+    "ask_motion_agent",
+    "cancel_node_loop",
+    "canvas_tool",
+    "connect_nodes",
+    "create_motion_video",
+    "create_node",
+    "delete_node",
+    "describe_frame_tool",
+    "describe_node_types",
+    "draw_element",
+    "frame_tool",
+    "get_motion_embed",
+    "get_motion_render",
+    "get_motion_run",
+    "group_elements",
+    "list_assets",
+    "list_canvases",
+    "list_components",
+    "list_effects",
+    "list_frame_tools",
+    "list_motion_videos",
+    "list_nodes",
+    "list_runs",
+    "make_effects_pair",
+    "move_frame_element",
+    "move_node",
+    "place_in_frame",
+    "preview_node_loop",
+    "preview_run_graph",
+    "publish_motion_embed",
+    "publish_to_gallery",
+    "remix_gallery_item",
+    "render_motion_video",
+    "rotate_group",
+    "run_graph",
+    "run_node",
+    "run_node_loop",
+    "search_gallery",
+    "set_composition_component",
+    "ungroup_element",
+    "update_node",
+    "view_motion_frames",
+    "write_effect",
+  ],
+}
+`;
+
+exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 1`] = `"2ea4afc4ae7b94778cc1758a99d11a1285bfac81a1c5a72298865df15bf114e4"`;
+
+exports[`the tool surfaces do not move while their code is reorganised > the edit catalogue lists the same ops, summaries and schemas 2`] = `"72d5095d59f70a62e9f446f3d64b49f7337d3c2c05e5e48c6adcc31253aac8b8"`;
