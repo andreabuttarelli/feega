@@ -3126,7 +3126,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
     clipboard = {
       freeIds: chosen.flatMap((n) => freeElement([n.id]) ?? []),
-      nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy })),
+      nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy, source: n.id, width: n.w, height: n.h })),
       edges: edges
         .filter((e) => indexOf.has(e.source) && indexOf.has(e.target))
         .map((e) => ({
@@ -3265,7 +3265,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
 
     const result = await post('paste', {
-      nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy }))),
+      nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy, source: n.source, width: n.width, height: n.height }))),
       edges: JSON.stringify(clipboard.edges)
     });
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];

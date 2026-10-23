@@ -212,7 +212,7 @@ const createdSize = (type: string, data: Record<string, unknown>) => {
   return { width: size.w, height: size.h };
 };
 
-const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (frame nodes with data.kind element)') }).strict();
+const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (element nodes)') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
 const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();

@@ -1,7 +1,7 @@
 import type { CopiedElements } from '$lib/canvas/element-clipboard.svelte';
 
 export type CopiedTiles = {
-  nodes: { type: string; data: Record<string, unknown>; dx: number; dy: number }[];
+  nodes: { type: string; data: Record<string, unknown>; dx: number; dy: number; source?: string; width?: number; height?: number }[];
   edges: { sourceIndex: number; targetIndex: number; sourceHandle: string | null; targetHandle: string | null }[];
   freeIds: string[];
 };

@@ -95,7 +95,7 @@ export async function groupElements(store: FrameStore, members: Members, place: 
 
   const shaped = elementNodeOf(bounds, FrameKind.Group);
   const at = { x: bounds.left, y: bounds.top };
-  const groupId = await store.create({ ...place, ...at, id }, doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: GROUP_NAME });
+  const groupId = await store.create({ ...place, ...at, id }, doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: GROUP_NAME });
   await Promise.all(sources.map((s) => store.remove(s.nodeId)));
   if (joined.length) {
     await members.sendBack(groupId);
@@ -125,7 +125,7 @@ export async function ungroupElement(store: FrameStore, members: Members, place:
     const shaped = elementNodeOf(box);
     const at = { x: box.left, y: box.top };
     const doc = { ...frameOf(lifted.element, mode, area, newId), background: Background.Transparent };
-    made.push({ id: await store.create({ ...place, ...at }, doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: elementName(clip) }), at });
+    made.push({ id: await store.create({ ...place, ...at }, doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: elementName(clip) }), at });
   }
   await store.remove(group.nodeId);
   const first = made[0]?.id ?? '';

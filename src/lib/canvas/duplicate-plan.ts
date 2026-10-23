@@ -19,7 +19,7 @@
 export type DuplicateNode = { id: string; type: string; data: Record<string, unknown>; x: number; y: number };
 export type DuplicateEdge = { id: string; source: string; target: string; sourceHandle: string | null; targetHandle: string | null };
 
-export type DuplicatedNode = { sourceIndex: number; type: string; data: Record<string, unknown>; x: number; y: number };
+export type DuplicatedNode = { sourceIndex: number; type: string; data: Record<string, unknown>; x: number; y: number; width?: number; height?: number };
 export type DuplicatedEdge = {
   sourceIndex: number;
   targetIndex: number;
