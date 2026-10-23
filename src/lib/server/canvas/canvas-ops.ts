@@ -33,7 +33,7 @@ import { NODE_NAME_MAX } from '$lib/canvas/node-name';
 import { removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
-import { addComment, listComments, resolveThread } from '$lib/server/canvas/canvas-comments';
+import { addComment, deleteComment, editComment, listComments, resolveThread, teammates } from '$lib/server/canvas/canvas-comments';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
@@ -990,7 +990,7 @@ export const CANVAS_OPS = {
   list_canvas_comments: op({
     access: Access.Read,
     input: z.object({ canvasId: z.string() }).strict(),
-    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { threads: await listComments(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) } : NOT_IN_PROJECT)
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { threads: await listComments(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }), teammates: await teammates(ctx.db, ctx.orgId) } : NOT_IN_PROJECT)
   }),
 
   add_canvas_comment: op({
@@ -1002,10 +1002,24 @@ export const CANVAS_OPS = {
         nodeId: z.string().optional().describe('pin to this node; x/y are then relative to its top-left'),
         parentId: z.string().optional().describe('reply to this thread (a comment id from list_canvas_comments)'),
         x: z.number().optional(),
-        y: z.number().optional()
+        y: z.number().optional(),
+        timeMs: z.number().int().min(0).optional().describe('the moment of a motion frame the comment is about, in milliseconds'),
+        mentions: z.array(z.string()).optional().describe('teammate ids from list_canvas_comments; write @Name in the body too')
       })
       .strict(),
     run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? addComment(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, ...input }) : NOT_IN_PROJECT)
+  }),
+
+  edit_canvas_comment: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), commentId: z.string(), body: z.string().max(2000), mentions: z.array(z.string()).optional() }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { outcome: await editComment(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, ...input }) } : NOT_IN_PROJECT)
+  }),
+
+  delete_canvas_comment: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), commentId: z.string() }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { outcome: await deleteComment(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, ...input }) } : NOT_IN_PROJECT)
   }),
 
   resolve_canvas_comment: op({

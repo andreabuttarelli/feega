@@ -9,10 +9,13 @@ export type CommentRow = {
   y: number;
   body: string;
   resolvedAt: string | null;
+  timeMs: number | null;
+  mentions: string[];
+  editedAt: string | null;
   createdAt: string;
 };
 
-export type CommentReply = Pick<CommentRow, 'id' | 'authorId' | 'body' | 'createdAt'>;
+export type CommentReply = Pick<CommentRow, 'id' | 'authorId' | 'body' | 'mentions' | 'editedAt' | 'createdAt'>;
 
 export type CommentThread = Omit<CommentRow, 'parentId' | 'resolvedAt'> & { number: number; resolved: boolean; replies: CommentReply[] };
 
@@ -34,6 +37,6 @@ export function threadsOf(rows: CommentRow[]): CommentThread[] {
     ...root,
     number: i + 1,
     resolved: resolvedAt !== null,
-    replies: replies.filter((r) => r.parentId === root.id).map(({ id, authorId, body, createdAt }) => ({ id, authorId, body, createdAt }))
+    replies: replies.filter((r) => r.parentId === root.id).map(({ id, authorId, body, mentions, editedAt, createdAt }) => ({ id, authorId, body, mentions, editedAt, createdAt }))
   }));
 }

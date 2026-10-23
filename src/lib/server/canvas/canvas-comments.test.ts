@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { CommentOutcome, addComment, listComments, resolveThread } from './canvas-comments';
+import { CommentOutcome, addComment, deleteComment, editComment, listComments, resolveThread, teammates } from './canvas-comments';
 
 const scope = { orgId: 'org', canvasId: 'c' };
 const user = { kind: 'user' as const, id: 'u1' };
-const stored = (id: string, over: Record<string, unknown> = {}) => ({ id, org_id: 'org', canvas_id: 'c', node_id: null, parent_id: null, author_id: 'u1', x: 5, y: 6, body: id, resolved_at: null, created_at: `2026-10-23T10:00:0${id.length}Z`, deleted_at: null, ...over });
-const open = (rows: Record<string, unknown>[] = []) => fakeDb({ canvas_comments: rows, nodes: [{ id: 'n1', org_id: 'org', canvas_id: 'c', deleted_at: null }] }, { filter: true, store: true, mutate: true });
+const stored = (id: string, over: Record<string, unknown> = {}) => ({ id, org_id: 'org', canvas_id: 'c', node_id: null, parent_id: null, author_id: 'u1', x: 5, y: 6, body: id, resolved_at: null, time_ms: null, edited_at: null, mentions: [], created_at: `2026-10-23T10:00:0${id.length}Z`, deleted_at: null, ...over });
+const member = (userId: string, name: string, orgId = 'org') => ({ org_id: orgId, user_id: userId, role: 'editor', profiles: { email: `${name}@x.co`, name } });
+const open = (rows: Record<string, unknown>[] = []) => fakeDb({ canvas_comments: rows, nodes: [{ id: 'n1', org_id: 'org', canvas_id: 'c', deleted_at: null }], orgs_members: [member('u1', 'Ana'), member('u2', 'Bo'), member('u9', 'Out', 'elsewhere')] }, { filter: true, store: true, mutate: true });
 
 describe('canvas comments', () => {
   it('a comment pinned to a frame is stored against that frame, written by the user', async () => {
@@ -52,5 +53,79 @@ describe('canvas comments', () => {
     const fake = open([stored('a'), stored('b', { canvas_id: 'other' }), stored('cc', { deleted_at: '2026-10-23' })]);
 
     expect((await listComments(fake.db, scope)).map((t) => t.id)).toEqual(['a']);
+  });
+
+  it('a comment on a motion frame can carry the time it is about', async () => {
+    const fake = open();
+
+    await addComment(fake.db, { ...scope, nodeId: 'n1', timeMs: 1500, body: 'too slow here', actor: user });
+
+    expect(fake.calls.find((c) => c.table === 'canvas_comments' && c.op === 'insert')?.payload).toMatchObject({ time_ms: 1500 });
+    expect((await listComments(fake.db, scope))[0].timeMs).toBe(1500);
+  });
+
+  it('a time that is not a moment is dropped, not stored', async () => {
+    const fake = open();
+
+    await addComment(fake.db, { ...scope, nodeId: 'n1', timeMs: Number.NaN, body: 'when?', actor: user });
+
+    expect(fake.calls.find((c) => c.table === 'canvas_comments' && c.op === 'insert')?.payload).toMatchObject({ time_ms: null });
+  });
+
+  it('keeps only mentions that are members of this org', async () => {
+    const fake = open();
+
+    await addComment(fake.db, { ...scope, mentions: ['u2', 'u9', 'ghost', 'u2'], body: '@Bo look', actor: user });
+
+    expect(fake.calls.find((c) => c.table === 'canvas_comments' && c.op === 'insert')?.payload).toMatchObject({ mentions: ['u2'] });
+  });
+
+  it('the author edits a comment, which is marked as edited and re-reads its mentions', async () => {
+    const fake = open([stored('a')]);
+
+    const out = await editComment(fake.db, { ...scope, commentId: 'a', body: ' better ', mentions: ['u2'], actor: user });
+
+    expect(out).toBe(CommentOutcome.Added);
+    const [thread] = await listComments(fake.db, scope);
+    expect(thread.body).toBe('better');
+    expect(thread.mentions).toEqual(['u2']);
+    expect(thread.editedAt).not.toBeNull();
+  });
+
+  it('nobody edits or deletes a comment somebody else wrote', async () => {
+    const fake = open([stored('a')]);
+    const other = { kind: 'user' as const, id: 'u2' };
+
+    expect(await editComment(fake.db, { ...scope, commentId: 'a', body: 'mine now', actor: other })).toBe(CommentOutcome.Missing);
+    expect(await deleteComment(fake.db, { ...scope, commentId: 'a', actor: other })).toBe(CommentOutcome.Missing);
+    expect((await listComments(fake.db, scope))[0].body).toBe('a');
+  });
+
+  it('an edit that leaves the comment empty is refused', async () => {
+    expect(await editComment(open([stored('a')]).db, { ...scope, commentId: 'a', body: '  ', actor: user })).toBe(CommentOutcome.Invalid);
+  });
+
+  it('the author deletes a reply, and the thread stays', async () => {
+    const fake = open([stored('a'), stored('rr', { parent_id: 'a', created_at: '2026-10-23T11:00:00Z' })]);
+
+    expect(await deleteComment(fake.db, { ...scope, commentId: 'rr', actor: user })).toBe(CommentOutcome.Added);
+
+    const [thread] = await listComments(fake.db, scope);
+    expect(thread.replies).toEqual([]);
+  });
+
+  it('deleting the first comment takes the whole thread away', async () => {
+    const fake = open([stored('a'), stored('rr', { parent_id: 'a' })]);
+
+    await deleteComment(fake.db, { ...scope, commentId: 'a', actor: user });
+
+    expect(await listComments(fake.db, scope)).toEqual([]);
+  });
+
+  it('lists the teammates of the org to mention, by name', async () => {
+    expect(await teammates(open().db, 'org')).toEqual([
+      { id: 'u1', name: 'Ana' },
+      { id: 'u2', name: 'Bo' }
+    ]);
   });
 });

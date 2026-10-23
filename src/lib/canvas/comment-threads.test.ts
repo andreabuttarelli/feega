@@ -10,6 +10,9 @@ const row = (id: string, at: number, over: Partial<CommentRow> = {}): CommentRow
   y: 20,
   body: id,
   resolvedAt: null,
+  timeMs: null,
+  mentions: [],
+  editedAt: null,
   createdAt: new Date(at).toISOString(),
   ...over
 });
