@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath, holdsDoc } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -204,5 +204,23 @@ describe('who hears a pointer over a frame\'s children', () => {
 
   it('a tile with a DOM node keeps its own hover', () => {
     expect(hoverHostOf(TileBody.Dom)).toBe(HoverHost.Node);
+  });
+});
+
+describe('an element node is its own type, not a frame', () => {
+  it('reads as an element, with no frame format in its data', () => {
+    expect(motionOf({ id: 'e', type: 'element', data: { docHeadRevision: 2 } })?.kind).toBe(FrameKind.Element);
+  });
+
+  it('a group of elements keeps its group behaviour', () => {
+    expect(motionOf({ id: 'g', type: 'element', data: { docHeadRevision: 1, kind: 'group' } })?.kind).toBe(FrameKind.Group);
+  });
+
+  it('never reads as a frame, whatever its data says', () => {
+    expect(motionOf({ id: 'e', type: 'element', data: { docHeadRevision: 1, kind: 'frame' } })?.kind).toBe(FrameKind.Element);
+  });
+
+  it('holds a doc like a frame does; other types do not', () => {
+    expect(['motion', 'element', 'image'].map(holdsDoc)).toEqual([true, true, false]);
   });
 });

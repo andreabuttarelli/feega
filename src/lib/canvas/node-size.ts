@@ -36,6 +36,7 @@ const NODE_SIZE: Record<NodeType, (data: Record<string, unknown>) => Size> = {
   audio: () => genNodeSize('audio'),
   model3d: () => genNodeSize('model3d'),
   motion: frameDefaultSize,
+  element: frameDefaultSize,
   studio_batch: studioBatchNodeSize
 };
 

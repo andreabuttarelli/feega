@@ -13,6 +13,7 @@ const BY_KIND: Record<NodeType, Record<string, unknown>> = {
   audio: { prompt: 'Calm piano loop' },
   model3d: { prompt: 'A low poly fox', error: 'Provider timed out' },
   motion: { kind: 'frame' },
+  element: {},
   doc: { content: 'Brand voice: warm, direct, never smug. Short sentences. One idea per line.' },
   iframe: { url: 'https://example.com' },
   social_account_feed: { handle: 'studio', platform: 'instagram' },

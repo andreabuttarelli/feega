@@ -162,6 +162,7 @@ const FACES: Record<NodeType, Draw> = {
   audio: textGenerate,
   model3d: (d, asset, t) => ({ ...generate(false)(d, asset, t), media: str(d.posterRefId) ? { url: asset(str(d.posterRefId)), video: false } : null }),
   motion,
+  element: motion,
   doc: (d) => ({ surface: Surface.Doc, text: str(d.content), pills: ['Read', 'Write'], count: d.public === true ? 'Revoke' : 'Public link' }),
   iframe: embedFace,
   social_account_feed: preview(feedTitle, 'Select the node to choose the account.', 'No posts yet. Select the node to sync.', (d) => str(d.handle).trim() !== ''),

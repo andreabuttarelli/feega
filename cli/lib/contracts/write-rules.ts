@@ -75,7 +75,7 @@ export const TABLE_CHECKS: Record<string, string> = {
   "gtm_plans_horizon_check": "horizon in ('90d', '6m')",
   "gtm_plans_source_check": "source = any (array['manual','revision','phase_review','onboarding','analytics_review','autopilot'])",
   "moderation_checks_stage_check": "stage in ('rules', 'jev', 'llm', 'identifiability')",
-  "nodes_type_check": "type in ( 'text', 'image', 'video', 'doc', 'iframe', 'social_account_feed', 'social_post_mockup', 'products', 'ads', 'influencer', 'list', 'select', 'effects', 'composition', 'calendar' )",
+  "nodes_type_check": "type in ( 'text', 'image', 'video', 'doc', 'iframe', 'social_account_feed', 'social_post_mockup', 'products', 'ads', 'influencer', 'list', 'select', 'effects', 'composition', 'calendar', 'audio', 'model3d', 'motion', 'element', 'studio_batch' )",
   "onboarding_step_jobs_kind_check": "kind in ('competitors', 'research', 'plan_posts', 'preview_images')",
   "orgs_invites_role_check": "role in ('owner', 'admin', 'member', 'viewer')",
   "orgs_members_role_check": "role in ('owner', 'admin', 'member', 'viewer')",

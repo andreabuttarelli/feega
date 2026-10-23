@@ -43,6 +43,7 @@ describe('cosa una riga di `nodes` può essere', () => {
       'audio',
       'model3d',
       'motion',
+      'element',
       'studio_batch'
     ]);
   });

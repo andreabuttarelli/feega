@@ -82,6 +82,13 @@ export const motionNodeSchema = z.object({
   interactive: z.boolean().default(false)
 });
 
+export const elementNodeSchema = z.object({
+  docHeadRevision: z.number().int().min(0),
+  posterRevision: z.number().int().min(0).optional(),
+  kind: z.literal(FrameKind.Group).optional(),
+  interactive: z.boolean().default(false)
+});
+
 export function storyboardOf(data: Record<string, unknown>): StoryboardLink | null {
   const parsed = linkSchema.safeParse(data.storyboard);
   return parsed.success ? parsed.data : null;
@@ -175,14 +182,32 @@ export function newMotionData(format: MotionFormat = MotionFormat.Vertical): Rec
   return { format, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null };
 }
 
+export enum DocNodeType {
+  Motion = 'motion',
+  Element = 'element'
+}
+
+export const DOC_NODE_TYPES: readonly string[] = Object.values(DocNodeType);
+
+export const holdsDoc = (type: string): type is DocNodeType => DOC_NODE_TYPES.includes(type);
+
+const KIND_OF_TYPE: Record<DocNodeType, (stored: FrameKind | undefined) => FrameKind> = {
+  [DocNodeType.Motion]: (stored) => stored ?? FrameKind.Frame,
+  [DocNodeType.Element]: (stored) => (stored === FrameKind.Group ? FrameKind.Group : FrameKind.Element)
+};
+
+const storedKind = (raw: unknown): FrameKind | undefined => (Object.values(FrameKind).includes(raw as FrameKind) ? (raw as FrameKind) : undefined);
+
+export const docKindOf = (type: DocNodeType, raw: unknown): FrameKind => KIND_OF_TYPE[type](storedKind(raw));
+
 export function motionOf(row: { id: string; type: string; data: Record<string, unknown> }): MotionNode | null {
-  if (row.type !== 'motion') {
+  if (!holdsDoc(row.type)) {
     return null;
   }
 
   const parsed = motionNodeSchema.safeParse({ ...newMotionData(), ...row.data });
   const data = parsed.success ? parsed.data : motionNodeSchema.parse(newMotionData());
-  return { id: row.id, ...data, kind: data.kind ?? FrameKind.Frame };
+  return { id: row.id, ...data, kind: docKindOf(row.type, data.kind) };
 }
 
 export const FRAME_PARAM = 'frame';
