@@ -303,6 +303,29 @@ export function replaceElements(doc: MotionDoc, ids: readonly string[], elements
   return placedIds.length ? { ok: true, doc: next, ids: placedIds } : { ok: false, error: 'nothing selected to replace' };
 }
 
+const meanOf = (points: readonly Point[]): Point => ({ x: points.reduce((sum, p) => sum + p.x, 0) / points.length, y: points.reduce((sum, p) => sum + p.y, 0) / points.length });
+
+export function pasteOverElements(doc: MotionDoc, ids: readonly string[], elements: readonly Element[], newId: NewId): PastedElements {
+  const selected = ids.flatMap((id) => findClip(doc, id)?.clip ?? []);
+  if (!elements.length || !selected.length) {
+    return { ok: false, error: 'nothing selected to paste over' };
+  }
+  const target = meanOf(selected.map(clipCentre));
+  const source = meanOf(elements.map((e) => clipCentre(e.clip)));
+  let next = doc;
+  const placedIds: string[] = [];
+  for (const element of elements) {
+    const own = clipCentre(element.clip);
+    const placed = placeElement(next, { ...element, clip: { ...element.clip, id: newId() } }, { at: { x: own.x + target.x - source.x, y: own.y + target.y - source.y }, frame: selected[0].from }, newId);
+    if (!placed.ok) {
+      return placed;
+    }
+    next = placed.doc;
+    placedIds.push(placed.clipId);
+  }
+  return { ok: true, doc: next, ids: placedIds };
+}
+
 function ownBox(clip: MotionClip): Box | null {
   const { props } = clip;
   if (!laidOut(clip.component) || typeof props.width !== 'number' || typeof props.height !== 'number') {

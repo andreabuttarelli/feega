@@ -264,6 +264,10 @@ describe('frameKeyAction', () => {
     expect(frameKeyAction(press('t', { meta: true, alt: true }))).toBe(Command.TidyUp);
   });
 
+  it('pastes over the selection with Shift Cmd V', () => {
+    expect(frameKeyAction(press('V', { meta: true, shift: true }))).toBe(Action.PasteOver);
+  });
+
   it('flips with Shift H and Shift V', () => {
     expect(frameKeyAction(press('H', { shift: true }))).toBe(Action.FlipHorizontal);
     expect(frameKeyAction(press('V', { shift: true }))).toBe(Action.FlipVertical);
