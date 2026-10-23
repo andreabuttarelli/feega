@@ -1772,6 +1772,11 @@
     return true;
   }
 
+  function leaveBuilder() {
+    picks = [];
+    frameBar.tool = DrawTool.Select;
+  }
+
   function drawnInside(id: string) {
     picks = [id];
     frameBar.tool = DrawTool.Select;
@@ -3148,7 +3153,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} />
+          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
@@ -3273,7 +3278,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && (frameBar.tool === DrawTool.Frame || !inside)}
+  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && (frameBar.tool === DrawTool.Frame || !inside)}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
