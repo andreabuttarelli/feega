@@ -58,6 +58,7 @@ import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
+import { runTechnique, saveFromSelection, TechniqueRun } from '$lib/server/canvas/techniques';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
@@ -1726,6 +1727,47 @@ export const actions: Actions<CanvasParams> = {
     }
 
     return out;
+  },
+
+  save_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ids = z.array(z.string().min(1)).min(2).max(50).safeParse(jsonField(fd, 'ids'));
+    if (!ids.success) {
+      return fail(400, { error: 'invalid selection' });
+    }
+
+    const saved = await saveFromSelection(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds: ids.data, name: String(fd.get('name') ?? ''), actor: userActor(scope) });
+    return saved.outcome === 'saved' ? { technique: { id: saved.technique.id, name: saved.technique.name } } : fail(400, { error: saved.error });
+  },
+
+  insert_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
+    if (!Number.isFinite(at.x) || !Number.isFinite(at.y)) {
+      return fail(400, { error: 'invalid position' });
+    }
+
+    const placed = await runTechnique(scope.db, {
+      orgId: scope.orgId,
+      projectId: scope.canvas.projectId,
+      canvasId: scope.canvasId,
+      userId: scope.userId,
+      techniqueId: String(fd.get('technique_id') ?? ''),
+      at,
+      inputs: [],
+      then: TechniqueRun.Place,
+      actor: userActor(scope)
+    });
+    if (placed.outcome === 'refused') {
+      return fail(400, { error: placed.error });
+    }
+
+    const scopeIds = { orgId: scope.orgId, canvasId: scope.canvasId };
+    const ids = new Set(placed.nodeIds);
+    const [nodes, connections] = await Promise.all([listNodes(scope.db, scopeIds), listConnections(scope.db, scopeIds)]);
+    return { nodes: nodes.filter((n) => ids.has(n.id)), connections: connections.filter((c) => ids.has(c.sourceNodeId) && ids.has(c.targetNodeId)) };
   },
 
   /**

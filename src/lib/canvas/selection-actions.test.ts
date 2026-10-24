@@ -39,6 +39,7 @@ describe('group and ungroup', () => {
       ['tidy-up', 'Mod+Alt+T'],
       ['stack', 'Shift+A'],
       ['section-selection', 'Shift+S'],
+      ['save-technique', null],
       ['flip-horizontal', 'Shift+H'],
       ['flip-vertical', 'Shift+V'],
       ['use-as-mask', 'Mod+Ctrl+M'],
@@ -139,6 +140,16 @@ describe('enabledFor', () => {
     const result = enabledFor('run-workflow', nodes, []);
     expect(result.enabled).toBe(false);
     expect(result.reason).toBe('The selected nodes are not all connected');
+  });
+
+  it('save-technique takes a connected flow of any node types and says why not otherwise', () => {
+    const nodes = [
+      { id: '1', type: 'text', data: {} },
+      { id: 'd', type: 'doc', data: {} }
+    ];
+
+    expect(enabledFor('save-technique', nodes, [{ sourceNodeId: '1', targetNodeId: 'd' }]).enabled).toBe(true);
+    expect(enabledFor('save-technique', nodes, [])).toEqual({ enabled: false, reason: 'The selected nodes are not all connected' });
   });
 
   it('run-downstream needs exactly one node that runs or feeds something', () => {

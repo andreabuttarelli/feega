@@ -29,6 +29,8 @@
     onpick,
     onupload,
     ontemplate,
+    techniques = [],
+    ontechnique,
     onframes,
     ontrailer,
     onimage,
@@ -41,6 +43,8 @@
     onpick?: (what: Addable) => void;
     onupload?: (file: File) => void;
     ontemplate?: (id: string) => void;
+    techniques?: { id: string; name: string; nodes: number }[];
+    ontechnique?: (id: string) => void;
     onframes?: () => void;
     ontrailer?: () => void;
     onimage?: (file: File) => void;
@@ -79,6 +83,11 @@
     showMore = false;
     showTemplates = false;
   });
+
+  function pickTechnique(id: string) {
+    showTemplates = false;
+    ontechnique?.(id);
+  }
 
   function pickTemplate(id: string) {
     showTemplates = false;
@@ -409,7 +418,7 @@
   />
 
   {#if ontemplate}
-    <CanvasTemplateGallery bind:open={showTemplates} onpick={pickTemplate} />
+    <CanvasTemplateGallery bind:open={showTemplates} onpick={pickTemplate} {techniques} onpicktechnique={ontechnique ? pickTechnique : undefined} />
   {/if}
 
   {#if showMore}

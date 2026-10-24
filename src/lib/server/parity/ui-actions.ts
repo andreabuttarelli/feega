@@ -104,6 +104,8 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   onboarding_end: canvas('end_onboarding'),
   frame_template: canvas('add_frame_from_template'),
   template: canvas('insert_template'),
+  save_technique: canvas('save_technique'),
+  insert_technique: canvas('run_technique'),
   undo: canvas('undo_gesture'),
   suggestNextStep: canvas('suggest_next_steps')
 };
@@ -314,6 +316,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'connect-new': canvas('connect_nodes'),
   'connect-existing': canvas('connect_nodes'),
   'run-workflow': canvas('run_workflow'),
+  'save-technique': canvas('save_technique'),
   'run-downstream': canvas('run_graph'),
   'run-stale': canvas('run_graph'),
   'remove-background': canvas('image_tool'),
