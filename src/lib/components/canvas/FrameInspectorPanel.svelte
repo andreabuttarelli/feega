@@ -14,6 +14,7 @@
   import ParticlePresets from '$lib/components/motion/ParticlePresets.svelte';
   import PosterPartPanel from '$lib/components/motion/PosterPartPanel.svelte';
   import DocFields from '$lib/components/motion/DocFields.svelte';
+  import ScenesSection from '$lib/components/motion/ScenesSection.svelte';
   import FramePresetSection from '$lib/components/motion/FramePresetSection.svelte';
   import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
@@ -75,6 +76,7 @@
 {#if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
     <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
+    <ScenesSection {doc} onchange={editGuides} />
     <FramePresetSection {doc} onchange={editGuides} />
     <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
     <LayoutGuidesSection {doc} onchange={editGuides} />

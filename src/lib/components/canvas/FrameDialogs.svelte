@@ -82,8 +82,9 @@
   const data = $derived(extras.data);
   const editorUrl = extras.editorUrl;
   const sound = $derived(SOUND_OF[dialog] ?? null);
-  let scenes = $state<LoadedScenes>({ docs: {}, assets: {} });
+  let scenes = $state<LoadedScenes & { key: string }>({ docs: {}, assets: {}, key: '' });
   const sceneKey = $derived(sceneNodeIds(doc).join(','));
+  const scenesReady = $derived(scenes.key === sceneKey);
   $effect(() => {
     if (!sceneKey) {
       return;
@@ -92,7 +93,8 @@
       const res = await fetch(`/p/${projectId}/c/${canvasId}/motion/${id}/source`);
       return res.ok ? await res.json() : null;
     };
-    void loadScenes(untrack(() => doc), sourceOf).then((loaded) => (scenes = loaded));
+    const key = sceneKey;
+    void loadScenes(untrack(() => doc), sourceOf).then((loaded) => (scenes = { ...loaded, key }));
   });
   const assetUrls = $derived({ ...scenes.assets, ...extras.assetUrls });
   const played = (d: MotionDoc) => resolveScenes(d, scenes.docs);
@@ -281,7 +283,7 @@
 <div class="layer">
 {#if dialog === FrameDialog.Export && data && docMode(doc) === DocMode.Still}
   <StillExport {doc} {editorUrl} fileName={data.node.name ?? 'still'} saved={session.saveState === SaveState.Saved} {onclose} />
-{:else if dialog === FrameDialog.Export && data}
+{:else if dialog === FrameDialog.Export && data && scenesReady}
   <ExportDialog
     doc={played(doc)}
     {assetUrls}
