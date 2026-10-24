@@ -23,3 +23,9 @@ export const HISTORY_TAB = 'history';
 export function isHistoryTab(raw: string | null): boolean {
   return raw === HISTORY_TAB;
 }
+
+export const LIBRARY_TAB = 'library';
+
+export function isLibraryTab(raw: string | null): boolean {
+  return raw === LIBRARY_TAB;
+}

@@ -15,13 +15,14 @@
 
   let { data } = $props();
 
-  type Filter = 'all' | 'generated' | 'upload' | 'global' | 'history';
+  type Filter = 'all' | 'generated' | 'upload' | 'global' | 'history' | 'library';
 
   const EMPTY_HINT: Record<Filter, string> = {
     all: 'Generate or upload something and it lands here.',
     generated: 'Nothing generated yet. Run a node on the canvas to fill this in.',
     upload: 'Nothing uploaded yet. Upload a file, or drop one onto a canvas.',
     global: 'The shared reference catalogue is empty.',
+    library: 'Nothing saved to the library yet. Use "Save to library" on any asset to share it with every project.',
     history: 'No finished generations yet. Run a node on any canvas and it lands here.'
   };
 
@@ -29,6 +30,7 @@
     { value: 'all', label: 'All' },
     { value: 'generated', label: 'Generated' },
     { value: 'upload', label: 'Uploaded' },
+    { value: 'library', label: 'Library' },
     { value: 'global', label: 'Global' },
     { value: 'history', label: 'History' }
   ];
@@ -110,6 +112,22 @@
     }
   }
 
+  let saveError = $state<string | null>(null);
+  let savedId = $state<string | null>(null);
+
+  async function saveToLibrary(assetId: string) {
+    saveError = null;
+    const body = new FormData();
+    body.set('asset_id', assetId);
+
+    const result = await postPageAction(location.pathname, 'saveToLibrary', body);
+    if (result.type !== 'success') {
+      saveError = 'Could not save to the library';
+      return;
+    }
+    savedId = assetId;
+  }
+
   function onFilePicked(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
@@ -157,6 +175,9 @@
 
   {#if uploadError}
     <Notice tone="error">{uploadError}</Notice>
+  {/if}
+  {#if saveError}
+    <Notice tone="error">{saveError}</Notice>
   {/if}
 
   {#if data.filter === 'history'}
@@ -264,6 +285,11 @@
             {:else if item.sourceNodeId}
               <span class="node-gone">node deleted</span>
             {/if}
+            {#if data.filter !== 'library'}
+              <button type="button" class="node-link save-link" data-testid="save-to-library" onclick={() => saveToLibrary(item.id)}>
+                {savedId === item.id ? 'Saved to library' : 'Save to library'}
+              </button>
+            {/if}
           </div>
         </div>
       {/each}
@@ -319,5 +345,6 @@
   .dim { font-size: 11px; color: var(--ink-faint); }
   .node-link { font-size: 11px; color: var(--accent, #6d4aff); text-decoration: none; }
   .node-link:hover { text-decoration: underline; }
+  .save-link { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
   .node-gone { font-size: 11px; color: var(--ink-faint); font-style: italic; }
 </style>
