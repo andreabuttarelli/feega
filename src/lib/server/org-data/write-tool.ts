@@ -19,6 +19,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { logAiCall } from '$lib/server/ai-log';
 import type { OrgQueryAuthority } from './query-tool';
 import { announcePresence } from './presence';
+import { Detail, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
 import type { Actor } from '$lib/server/repos/actor';
 import { validateNewNodeData, validateNodeDataUpdate } from '$lib/canvas/node-data';
 import { mergeNodeData, type NodeData } from '$lib/canvas/node-patch';
@@ -128,8 +129,11 @@ export const ORG_NO_AUTHORITY_WRITE_ERROR = {
   fix: 'Internal wiring error. Report it.'
 } as const;
 
-type InsertInput = { table: string; values: Record<string, unknown> };
-type UpdateInput = { table: string; where: Filter[]; values: Record<string, unknown> };
+type InsertInput = { table: string; values: Record<string, unknown>; verbose?: boolean };
+type UpdateInput = { table: string; where: Filter[]; values: Record<string, unknown>; verbose?: boolean };
+
+const shownAs = (verbose: boolean | undefined, values: Record<string, unknown>, out: Record<string, unknown>) =>
+  compactWrite(out, { touched: touchedOf({ values }), detail: verbose ? Detail.Verbose : Detail.Compact }) as Record<string, unknown>;
 type DeleteInput = { table: string; where: Filter[] };
 
 type Refusal = { error: string; message: string; fix?: string };
@@ -314,7 +318,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     await canvasAnnounce(table, rows);
     return finish(
-      { table, row: rows[0], inserted: rows.length },
+      shownAs(input.verbose, values, { table, row: rows[0], inserted: rows.length }),
       `org_db_write:${table}:insert:cols=${Object.keys(values).length}`,
       t0
     );
@@ -341,7 +345,8 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
     values: Record<string, unknown>,
     merged: NodeMerge[],
     matched: number,
-    t0: number
+    t0: number,
+    verbose?: boolean
   ) => {
     const rows: Array<Record<string, unknown>> = [];
     const conflicts: string[] = [];
@@ -367,14 +372,14 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
 
     await canvasAnnounce(table, rows);
     return finish(
-      {
+      shownAs(verbose, values, {
         table,
         rows,
         updated: rows.length,
         matched,
         conflicts,
         note: `data was merged into each row: keys you did not send are kept, a key set to null is removed.${conflicts.length ? ' Rows in conflicts changed while writing: read them again and retry.' : ''}`
-      },
+      }),
       `org_db_write:${table}:update:merged:rows=${rows.length}/${matched}`,
       t0
     );
@@ -474,7 +479,7 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
         merged.push({ id: row.id, version: row.version, data: mergeNodeData((row.data ?? {}) as NodeData, values.data as NodeData) });
       }
 
-      return writeMergedNodes(table, values, merged, matched, t0);
+      return writeMergedNodes(table, values, merged, matched, t0, input.verbose);
     }
     if (table !== NODES_TABLE) {
       const refusedJsonb = firstInvalidJsonbColumn(table, values);
@@ -490,13 +495,13 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
     const rows = (written.data ?? []) as Array<Record<string, unknown>>;
     await canvasAnnounce(table, rows);
     return finish(
-      {
+      shownAs(input.verbose, values, {
         table,
         rows,
         updated: rows.length,
         matched,
         note: `Only ${Object.keys(values).join(', ')} changed — every other column of those rows is untouched.`
-      },
+      }),
       `org_db_write:${table}:update:rows=${rows.length}/${matched}`,
       t0
     );

@@ -2,7 +2,7 @@ import { requestRaw, type RawAnswer } from './api.ts';
 
 export type EditStep = { op: string; target?: string; element?: string; input?: Record<string, unknown>; version?: number };
 
-export type EditCall = EditStep & { project_id?: string; ops?: EditStep[] };
+export type EditCall = EditStep & { project_id?: string; verbose?: boolean; ops?: EditStep[] };
 
 export type ViewCall = { op: string; input?: Record<string, unknown> };
 
