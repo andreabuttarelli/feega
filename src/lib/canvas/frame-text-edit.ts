@@ -2,14 +2,14 @@ import type { BrandTokens } from '$lib/motion/brand';
 import { resolveColor } from '$lib/motion/brand';
 import { Strictness } from '$lib/motion/custom/component';
 import { clipProps, findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-import { fontStack } from '$lib/motion/fonts/model';
+import { fontStack, loadedWeight } from '$lib/motion/fonts/model';
 import { CLIP_TEXT, editablePart, PartEdit } from '$lib/motion/poster-parts';
 import { setProps, type OpResult } from '$lib/motion/timeline';
 import { styledComponent } from '$lib/motion/text-run-ops';
 import { normalLists, type ListItem } from '$lib/motion/text-lists';
-import { segmentsOf, type RunCase, type RunStyle, type TextRun } from '$lib/motion/text-runs';
-import { textPaint } from '$lib/motion/fill/render';
-import { css } from '$lib/motion/hyperframes/html';
+import { type RunCase, type RunStyle, type TextRun } from '$lib/motion/text-runs';
+import { textBody, TextBodyFor } from '$lib/motion/hyperframes/text-body';
+import { css, esc } from '$lib/motion/hyperframes/html';
 import { mul2d, type Affine } from '$lib/motion/affine';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
 import type { TextCase } from '$lib/motion/components';
@@ -100,14 +100,24 @@ export function editCss(look: TextEditStyle, layout: EditLayout): string {
   return `left:0;top:0;transform-origin:0 0;transform:${layout.transform};${flow}height:${layout.height}px;font:${font};letter-spacing:${look.trackingEm}em;color:${look.color};caret-color:${look.color};text-align:${look.align};text-transform:${look.textTransform};text-wrap-style:${look.wrap};text-box:${look.trim};${look.decoration}`;
 }
 
-export type PaintedSpan = { text: string; style: string };
+export type EditBody = (text: string, runs: readonly TextRun[], lists: readonly ListItem[]) => string;
 
-const asWritten = (value: string) => value;
-const noAsset = () => null;
+const NEWLINE = '\n';
 
-export function gradientSpans(text: string, runs: readonly TextRun[]): PaintedSpan[] {
-  if (!runs.some((r) => r.fill)) {
-    return [];
-  }
-  return segmentsOf(text, runs).map(({ text: part, run }) => ({ text: part, style: run?.fill ? css(textPaint([run.fill], asWritten, noAsset)) : '' }));
+export function editBody(clip: Pick<MotionClip, 'props'>, doc: MotionDoc, tokens: BrandTokens): EditBody {
+  const p = clip.props;
+  const spacing = Number(p.paragraphSpacing ?? 0);
+  const indent = Number(p.paragraphIndent ?? 0);
+  return (text, runs, lists) =>
+    textBody(
+      {
+        p: { text, size: Number(p.size), font: String(p.font), runs: [...runs], lists: [...lists], paragraphSpacing: spacing, paragraphIndent: indent },
+        text: { id: null, lines: (t) => t.split(NEWLINE).map(esc) },
+        color: (v) => resolveColor(v, tokens),
+        asset: () => null,
+        font: (family) => fontStack(family, doc.fonts),
+        weight: (family, weight) => loadedWeight(family, weight, doc.fonts)
+      },
+      TextBodyFor.Editor
+    );
 }
