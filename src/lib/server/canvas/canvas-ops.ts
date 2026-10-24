@@ -252,8 +252,8 @@ const runNodeInput = z
     model: z.string().optional().describe('Omit to keep the model already on the node.'),
     params: z.record(z.string(), z.unknown()).optional().describe('e.g. { aspectRatio: "1:1", duration: 8 }.'),
     provider: z.string().optional().describe('A provider id from list_models routes (e.g. "kie", "openrouter"); omit or "auto" for the cheapest healthy one.'),
-    variants: z.number().int().optional().describe('1, 2, 4 or 8 (video up to 4): how many results to make in one go. Omit for one.'),
-    into: z.enum(['nodes', 'history']).optional().describe('With variants > 1: "nodes" (default) makes new output nodes next to this one, wired from the same inputs; "history" keeps all results in this node\'s own history.'),
+    variants: z.number().int().optional().describe('1, 2, 4 or 8 results; omit for one.'),
+    into: z.enum(['nodes', 'history']).optional().describe('With variants: new nodes (default) or this node\'s history.'),
     expectedVersion: z.number().int()
   })
   .strict();
