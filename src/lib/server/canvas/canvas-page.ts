@@ -50,6 +50,9 @@ import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } 
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { RestoreOutcome, listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { answerMention } from '$lib/server/canvas/comment-agent';
+import { httpAgent } from '$lib/server/canvas/comment-agent-http';
+import { runInBackground } from '$lib/server/background-work';
 import { CommentOutcome, addComment, deleteComment, editComment, listComments, resolveThread, teammates } from '$lib/server/canvas/canvas-comments';
 import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
@@ -1535,22 +1538,35 @@ export const actions: Actions<CanvasParams> = {
     return { threads: await listComments(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }), teammates: await teammates(scope.db, scope.orgId) };
   },
 
-  addComment: async ({ request, params, locals }) => {
+  addComment: async ({ request, params, locals, url }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
+    const body = String(fd.get('body') ?? '');
+    const nodeId = fd.get('node_id') ? String(fd.get('node_id')) : null;
+    const parentId = fd.get('parent_id') ? String(fd.get('parent_id')) : null;
     const out = await addComment(scope.db, {
       orgId: scope.orgId,
       canvasId: scope.canvasId,
       actor: userActor(scope),
-      body: String(fd.get('body') ?? ''),
-      nodeId: fd.get('node_id') ? String(fd.get('node_id')) : null,
-      parentId: fd.get('parent_id') ? String(fd.get('parent_id')) : null,
+      body,
+      nodeId,
+      parentId,
       x: Number(fd.get('x') ?? 0),
       y: Number(fd.get('y') ?? 0),
       timeMs: fd.get('time_ms') ? Number(fd.get('time_ms')) : null,
       mentions: fd.getAll('mention').map(String)
     });
-    return out.outcome === CommentOutcome.Added ? out : fail(out.outcome === CommentOutcome.Missing ? 404 : 400, { error: out.outcome });
+    if (out.outcome !== CommentOutcome.Added) {
+      return fail(out.outcome === CommentOutcome.Missing ? 404 : 400, { error: out.outcome });
+    }
+
+    const { session } = await locals.safeGetSession();
+    const agent = httpAgent({ origin: url.origin, token: session?.access_token ?? '' });
+    runInBackground(
+      () => answerMention({ db: scope.db, agent }, { orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId, userId: scope.userId, commentId: out.id!, parentId, nodeId, body }),
+      'comment-agent'
+    );
+    return out;
   },
 
   editComment: async ({ request, params, locals }) => {
