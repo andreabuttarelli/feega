@@ -46,6 +46,9 @@ import { listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$li
 import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
 import { combineScenes, MAX_SCENES } from '$lib/server/motion/combine-scenes';
 import { insertTemplate } from '$lib/server/canvas/templates';
+import { runTechnique, saveFromSelection, TechniqueRun } from '$lib/server/canvas/techniques';
+import { detachInstance, openDefinition, placeInstance, runInstance } from '$lib/server/canvas/technique-instance';
+import { deleteTechnique, listTechniques, TechniqueOutcome } from '$lib/server/repos/techniques';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
@@ -290,6 +293,21 @@ const duplicateInput = nodeIdsInput
 const shareCanvasInput = z.object({ canvasId: z.string(), on: z.boolean().describe('true mints a view-only link; false revokes it') }).strict();
 const shareDocInput = z.object({ nodeId: z.string().describe('a doc node'), on: z.boolean() }).strict();
 const insertTemplateInput = z.object({ canvasId: z.string(), templateId: z.string().describe('from list_templates'), x: z.number(), y: z.number() }).strict();
+const saveTechniqueInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2), name: z.string().describe('kebab-case, at most 48 characters') }).strict();
+const runTechniqueInput = z
+  .object({
+    canvasId: z.string(),
+    techniqueId: z.string().describe('from list_techniques'),
+    x: z.number(),
+    y: z.number(),
+    inputs: z.array(z.object({ node: z.number().int(), value: z.string().max(4000) }).strict()).optional().describe('one value per input slot of the technique: the prompt of that node'),
+    run: z.boolean().optional().describe('default true: run the inner graph (spends credits); false only places it')
+  })
+  .strict();
+const techniqueIdInput = z.object({ techniqueId: z.string() }).strict();
+const placeTechniqueInput = z.object({ canvasId: z.string(), techniqueId: z.string(), x: z.number(), y: z.number() }).strict();
+const techniqueNodeInput = z.object({ nodeId: z.string() }).strict();
+const detachTechniqueInput = z.object({ canvasId: z.string(), nodeId: z.string() }).strict();
 const addFrameInput = z
   .object({
     canvasId: z.string(),
@@ -1103,6 +1121,83 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => {
       const out = await insertTemplate(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, templateId: input.templateId, at: { x: input.x, y: input.y }, actor: ctx.actor });
       return out ?? { error: 'unknown_template' };
+    }
+  }),
+
+  list_techniques: op({
+    access: Access.Read,
+    input: listCanvasesInput,
+    run: async (ctx) => {
+      const techniques = await listTechniques(ctx.db, ctx.orgId);
+      return { techniques: (techniques ?? []).map((t) => ({ id: t.id, name: t.name, nodes: t.plan.nodes.length, version: t.version, inputs: t.inputs, outputs: t.outputs })), available: techniques !== null };
+    }
+  }),
+
+  save_technique: op({
+    access: Access.Write,
+    input: saveTechniqueInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const saved = await saveFromSelection(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, nodeIds: input.nodeIds, name: input.name, actor: ctx.actor });
+      return saved.outcome === 'saved' ? { outcome: 'saved', techniqueId: saved.technique.id, name: saved.technique.name, inputs: saved.technique.inputs, outputs: saved.technique.outputs } : saved;
+    }
+  }),
+
+  run_technique: op({
+    access: Access.Spend,
+    input: runTechniqueInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const then = input.run === false ? TechniqueRun.Place : TechniqueRun.Run;
+      const ask = { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, userId: ctx.userId, techniqueId: input.techniqueId, at: { x: input.x, y: input.y }, inputs: input.inputs ?? [], then, actor: ctx.actor };
+      return then === TechniqueRun.Run ? ctx.billed(() => runTechnique(ctx.db, ask)) : runTechnique(ctx.db, ask);
+    }
+  }),
+
+  place_technique: op({
+    access: Access.Write,
+    input: placeTechniqueInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return placeInstance(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, userId: ctx.userId, techniqueId: input.techniqueId, at: { x: input.x, y: input.y }, actor: ctx.actor });
+    }
+  }),
+
+  run_technique_node: op({
+    access: Access.Spend,
+    input: techniqueNodeInput,
+    run: async (ctx, input) => ctx.billed(() => runInstance(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, nodeId: input.nodeId, actor: ctx.actor }))
+  }),
+
+  detach_technique: op({
+    access: Access.Write,
+    input: detachTechniqueInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return detachInstance(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, nodeId: input.nodeId, actor: ctx.actor });
+    }
+  }),
+
+  open_technique: op({
+    access: Access.Write,
+    input: techniqueIdInput,
+    run: async (ctx, input) => openDefinition(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, techniqueId: input.techniqueId, actor: ctx.actor })
+  }),
+
+  delete_technique: op({
+    access: Access.Write,
+    input: techniqueIdInput,
+    run: async (ctx, input) => {
+      const outcome = await deleteTechnique(ctx.db, ctx.orgId, input.techniqueId);
+      return outcome === TechniqueOutcome.Ok ? { deleted: true } : { error: outcome };
     }
   }),
 

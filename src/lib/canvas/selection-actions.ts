@@ -25,6 +25,10 @@ export type SelectionActionId =
   | 'connect-new'
   | 'connect-existing'
   | 'run-workflow'
+  | 'save-technique'
+  | 'run-technique'
+  | 'edit-technique'
+  | 'detach-technique'
   | 'run-downstream'
   | 'run-stale'
   | 'remove-background'
@@ -90,6 +94,10 @@ export type SelectionAction = {
 
 export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'run-workflow', label: 'Run flow', group: 'primary', minNodes: 2 },
+  { id: 'save-technique', label: 'Save as technique…', group: 'menu', minNodes: 2 },
+  { id: 'run-technique', label: 'Run technique', group: 'secondary', minNodes: 1 },
+  { id: 'edit-technique', label: 'Edit technique', group: 'menu', minNodes: 1 },
+  { id: 'detach-technique', label: 'Detach technique', group: 'menu', minNodes: 1 },
   { id: 'run-downstream', label: 'Run from here', group: 'secondary', minNodes: 1 },
   { id: 'run-stale', label: 'Re-run out of date', group: 'secondary', minNodes: 1 },
   { id: 'connect-new', label: 'Connect to new…', group: 'secondary', minNodes: 1 },
@@ -169,7 +177,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -189,8 +197,13 @@ const FRAME_DIALOG_SHOWN = Object.fromEntries((Object.keys(FRAME_DIALOG_ACTIONS)
 
 const isOneFinishedImage = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'image' && Boolean(summaries[0].data.refId);
 
+const isOneTechnique = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'technique';
+
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
   ...FRAME_DIALOG_SHOWN,
+  'run-technique': isOneTechnique,
+  'edit-technique': isOneTechnique,
+  'detach-technique': isOneTechnique,
   'remove-background': isOneFinishedImage,
   'upscale-image': isOneFinishedImage,
   inpaint: isOneFinishedImage,
@@ -243,6 +256,11 @@ const GATES: Partial<Record<SelectionActionId, (input: GateInput) => Gate>> = {
       edges,
       nodeTypesById
     );
+    return { enabled: plan.ok, reason: plan.ok ? undefined : plan.reason };
+  },
+  'save-technique': ({ nodeSummaries, edges }) => {
+    const asGenerative = new Map(nodeSummaries.map((n) => [n.id, [...GENERATIVE_TYPES][0]]));
+    const plan = planWorkflow(nodeSummaries.map((n) => n.id), edges, asGenerative);
     return { enabled: plan.ok, reason: plan.ok ? undefined : plan.reason };
   },
   'run-downstream': ({ nodeSummaries, edges }) => {

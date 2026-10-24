@@ -20,6 +20,7 @@ import MousePointerClick from '@lucide/svelte/icons/mouse-pointer-click';
 import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 import Orbit from '@lucide/svelte/icons/orbit';
 import Shapes from '@lucide/svelte/icons/shapes';
+import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
 import type { Component } from 'svelte';
 import { ADDABLE_ICON } from './addable-icons';
 import { ADDABLE_LABEL } from './addable';
@@ -38,7 +39,8 @@ export const NODE_KIND_ICON: Record<NodeType, Component> = {
   list: List,
   select: MousePointerClick,
   composition: Orbit,
-  element: Shapes
+  element: Shapes,
+  technique: BookmarkPlus
 };
 
 export const NODE_KIND_LABEL: Record<NodeType, string> = {
@@ -49,5 +51,6 @@ export const NODE_KIND_LABEL: Record<NodeType, string> = {
   list: 'List',
   select: 'Select',
   composition: 'Composition',
-  element: 'Element'
+  element: 'Element',
+  technique: 'Technique'
 };
