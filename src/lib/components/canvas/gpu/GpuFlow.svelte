@@ -2038,13 +2038,13 @@
     if (!fit || saver.history.present !== doc) {
       return;
     }
-    if (fit.node) {
-      await saver.flushPending();
-      props.onResize?.(nodeId, fit.node.w, fit.node.h);
-      return;
-    }
     if (fit.doc) {
       saver.amendRoot(fit.doc, 'Fitted text');
+      liveDocs.set(nodeId, { ...live, doc: fit.doc });
+    }
+    if (fit.node) {
+      await saver.flushPending();
+      props.onPlace?.(nodeId, fit.node.w, fit.node.h);
     }
   }
 

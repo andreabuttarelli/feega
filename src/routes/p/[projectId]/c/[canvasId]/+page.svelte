@@ -3643,6 +3643,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onMove={move}
     onMoveEnd={moveEnd}
     onResize={resize}
+    onPlace={storeSize}
     onRename={renameNode}
     onConnect={connect}
     onDelete={remove}
