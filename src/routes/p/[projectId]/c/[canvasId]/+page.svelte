@@ -149,6 +149,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
+  import type { SceneDrop } from '$lib/canvas/scene-drop';
   import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
@@ -3226,6 +3227,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return out?.url ? (out as { url: string; name: string; files: string[]; skipped?: string[] }) : 'Export failed';
   }
 
+  async function insertSceneDrop(drop: SceneDrop) {
+    await Promise.all([saves.flush(drop.targetId), saves.flush(drop.sourceId)]);
+    landed(await post('insertScene', { target: drop.targetId, source: drop.sourceId, at: drop.at }));
+  }
+
   async function combineScenes(frameIds: string[]) {
     landed(await post('combineScenes', { frame_ids: JSON.stringify(frameIds) }));
   }
@@ -3703,6 +3709,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}
     onCombineScenes={combineScenes}
+    onInsertScene={insertSceneDrop}
     onImageTool={imageTool}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}

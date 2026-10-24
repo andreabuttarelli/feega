@@ -79,6 +79,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   deleteComment: canvas('delete_canvas_comment'),
   createFormats: canvas('create_formats'),
   combineScenes: canvas('combine_scenes'),
+  insertScene: motion('edit_scenes'),
   imageTool: canvas('image_tool'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),

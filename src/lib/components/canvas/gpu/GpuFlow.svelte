@@ -138,7 +138,8 @@
   import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { isTypingTarget } from '$lib/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
-  import { DragPhase, DropVerdict, isOutside, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, isOutside, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
   import { isAddable, type Addable } from '$lib/canvas/addable';
@@ -2592,6 +2593,12 @@
     snapGuides = [];
     snapSpacing = [];
     props.onLive?.([]);
+    const asScene = sceneDrop(ids, (id) => liveOf(id)?.doc ?? null, frameUnderPointer(pointOf(e), ids[0] ?? null));
+    if (asScene && props.onInsertScene) {
+      settleOverrides();
+      props.onInsertScene(asScene);
+      return;
+    }
     if (props.onTileDrop?.(ids, pointOf(e)) === DropVerdict.Taken) {
       settleOverrides();
       return;

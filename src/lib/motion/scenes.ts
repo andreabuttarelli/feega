@@ -42,11 +42,23 @@ export function sequenceScenes(host: MotionDoc, scenes: readonly ScenePlacement[
   return withScenes(host, scenes.map((s, i) => sceneClip(`scene-${i + 1}`, s)));
 }
 
+const freeSceneId = (clips: readonly MotionClip[]) => {
+  const taken = new Set(clips.map((c) => c.id));
+  return Array.from({ length: clips.length + 1 }, (_, i) => `scene-${i + 1}`).find((c) => !taken.has(c))!;
+};
+
 export function appendScene(doc: MotionDoc, scene: ScenePlacement): MotionDoc {
   const clips = sceneClips(doc);
-  const taken = new Set(clips.map((c) => c.id));
-  const id = Array.from({ length: clips.length + 1 }, (_, i) => `scene-${i + 1}`).find((c) => !taken.has(c))!;
-  return withScenes(doc, [...clips, sceneClip(id, scene)]);
+  return withScenes(doc, [...clips, sceneClip(freeSceneId(clips), scene)]);
+}
+
+const boundariesOf = (clips: readonly MotionClip[]) => [0, ...clips.map((_, i) => total(clips.slice(0, i + 1)))];
+
+export function insertSceneAt(doc: MotionDoc, scene: ScenePlacement, frame: number): MotionDoc {
+  const clips = sceneClips(doc);
+  const boundaries = boundariesOf(clips);
+  const nearest = boundaries.reduce((best, b, i) => (Math.abs(b - frame) < Math.abs(boundaries[best] - frame) ? i : best), 0);
+  return withScenes(doc, [...clips.slice(0, nearest), sceneClip(freeSceneId(clips), scene), ...clips.slice(nearest)]);
 }
 
 export function scenesOf(doc: MotionDoc): Scene[] {
@@ -111,7 +123,7 @@ export function insertableScenes(frames: readonly { id: string; doc: MotionDoc }
 }
 
 export type SceneEdit =
-  | { op: 'insert'; node_id: string; duration: number }
+  | { op: 'insert'; node_id: string; duration: number; at?: number }
   | { op: 'reorder'; clip_ids: string[] }
   | { op: 'trim'; clip_id: string; duration: number }
   | { op: 'remove'; clip_id: string };
@@ -119,7 +131,10 @@ export type SceneEdit =
 type ToFrames = (seconds: number) => number;
 
 const SCENE_EDITS: { [K in SceneEdit['op']]: (doc: MotionDoc, edit: Extract<SceneEdit, { op: K }>, frames: ToFrames) => OpResult } = {
-  insert: (doc, e, frames) => ({ ok: true, doc: appendScene(doc, { nodeId: e.node_id, durationInFrames: Math.max(1, frames(e.duration)) }) }),
+  insert: (doc, e, frames) => {
+    const scene = { nodeId: e.node_id, durationInFrames: Math.max(1, frames(e.duration)) };
+    return { ok: true, doc: e.at === undefined ? appendScene(doc, scene) : insertSceneAt(doc, scene, frames(e.at)) };
+  },
   reorder: (doc, e) => reorderScenes(doc, e.clip_ids),
   trim: (doc, e, frames) => trimScene(doc, e.clip_id, Math.max(1, frames(e.duration))),
   remove: (doc, e) => removeScene(doc, e.clip_id)
