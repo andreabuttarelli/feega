@@ -1,6 +1,8 @@
 <script lang="ts">
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import Sparkles from '@lucide/svelte/icons/sparkles';
+  import Maximize2 from '@lucide/svelte/icons/maximize-2';
+  import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
   import { isFrameDialogAction } from '$lib/canvas/frame-dialogs';
   import { actionsIn, enabledFor, shownFor, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
@@ -41,7 +43,8 @@
     onaction,
     onpropertychange,
     onsectionchange,
-    oncolourchange
+    oncolourchange,
+    onview
   }: {
     box: { x: number; y: number; width: number } | null;
     zoom?: number;
@@ -58,7 +61,10 @@
     onpropertychange?: (patch: SelectionPatch & { model?: string | null }) => void;
     onsectionchange?: (id: string, patch: { title?: string; fill?: string }) => void;
     oncolourchange?: (tag: ColourTag | null) => void;
+    onview?: () => void;
   } = $props();
+
+  const viewable = $derived(count === 1 && !!nodeSummaries[0] && nodeSummaries[0].type in OUTPUT_KIND_OF && typeof nodeSummaries[0].data.refId === 'string');
 
   const sharedColour = $derived.by(() => {
     const tags = new Set(nodeSummaries.map((node) => colourOf(node.data)));
@@ -200,6 +206,12 @@
       <div class="group" role="group" aria-label="Actions">
         {#if count > 1}
           <span class="count">{count} selected</span>
+        {/if}
+        {#if viewable}
+          <Button variant="ghost" size="sm" class="h-11 md:h-8" data-testid="view-output" onclick={() => onview?.()}>
+            <Maximize2 strokeWidth={1.7} />
+            View
+          </Button>
         {/if}
         {#each secondary as action (action.id)}
           {@render iconAction(action, '')}
