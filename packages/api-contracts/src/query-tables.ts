@@ -28,5 +28,5 @@ export const QUERY_TABLES =
   'org_usage organizations people post_links post_revisions post_verdicts post_visual_meta posts product_batch_items ' +
   'product_batches products profiles publish_logs push_subscriptions reference_images rubrics scheduler_runs ' +
   'scrapecreators_cache shared_views social_accounts social_post_history social_thumb_cache store_events ' +
-  'talent_views talents thread_events tool_usage user_age_verifications user_figma_tokens video_renders ' +
-  'video_requests video_reviews webhook_deliveries zernio_ad_accounts';
+  'talent_views talents techniques thread_events tool_usage user_age_verifications user_figma_tokens ' +
+  'video_renders video_requests video_reviews webhook_deliveries zernio_ad_accounts';
