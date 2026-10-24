@@ -211,6 +211,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
   import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
+  import type { ImageTool } from '$lib/image-tools';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
   import {
     docData,
@@ -3227,6 +3228,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     landed(await post('combineScenes', { frame_ids: JSON.stringify(frameIds) }));
   }
 
+  async function imageTool(nodeId: string, tool: ImageTool) {
+    landed(await post('imageTool', { node_id: nodeId, tool }));
+    void invalidate('app:credits');
+  }
+
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
     landed(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
   }
@@ -3695,6 +3701,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}
     onCombineScenes={combineScenes}
+    onImageTool={imageTool}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}
     onEdgeDelete={disconnect}

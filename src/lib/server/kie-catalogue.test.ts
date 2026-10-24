@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IMAGE_MODEL_CHOICES } from '$lib/image-models';
+import { IMAGE_TOOLS_GROUP, IMAGE_TOOL_MODEL, ImageTool } from '$lib/image-tools';
 import { KIE_CREDIT_USD } from './kie';
 import { KieBilling, KIE_MODELS, kieModelRows } from './kie-catalogue';
 import { taskUsdFor } from './generation/task-pricing';
@@ -30,6 +31,23 @@ describe('the kie catalogue', () => {
     expect(taskUsdFor(grok.pricing, { resolution: '480p', duration: '6' })).toBeCloseTo(6 * 2.4 * KIE_CREDIT_USD, 6);
     expect(taskUsdFor(grok.pricing, { resolution: '720p', duration: '10' })).toBeCloseTo(10 * 4.5 * KIE_CREDIT_USD, 6);
     expect(grok.param_schema).toMatchObject({ duration: { type: 'enum', values: ['6', '10', '15', '20', '30'] } });
+  });
+
+  it('offers background removal as an image-only tool in the Image tools group, one flat price', () => {
+    const tool = rows.find((r) => r.id === IMAGE_TOOL_MODEL[ImageTool.RemoveBackground])!;
+
+    expect(tool.catalogue).toBe('image');
+    expect(tool.wire_spec).toMatchObject({ model: 'recraft/remove-background', requiresImage: true, menuGroup: IMAGE_TOOLS_GROUP, fields: { images: ['image'] } });
+    expect(taskUsdFor(tool.pricing, {})).toBeCloseTo(1 * KIE_CREDIT_USD, 6);
+  });
+
+  it('offers the image upscale priced per factor', () => {
+    const tool = rows.find((r) => r.id === IMAGE_TOOL_MODEL[ImageTool.Upscale])!;
+
+    expect(tool.wire_spec).toMatchObject({ model: 'topaz/image-upscale', requiresImage: true, menuGroup: IMAGE_TOOLS_GROUP, fields: { images: ['image_url'] } });
+    expect(tool.param_schema).toMatchObject({ upscale_factor: { type: 'enum', values: ['2', '4'] } });
+    expect(taskUsdFor(tool.pricing, { upscale_factor: '2' })).toBeCloseTo(10 * KIE_CREDIT_USD, 6);
+    expect(taskUsdFor(tool.pricing, { upscale_factor: '4' })).toBeCloseTo(20 * KIE_CREDIT_USD, 6);
   });
 
   it('is never uncensored and always provider kie', () => {

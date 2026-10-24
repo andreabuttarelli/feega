@@ -4,6 +4,7 @@ import { PER_RUN, type TaskPriceLine } from './generation/task-pricing';
 import { idPrefixOf, TaskProviderName } from './generation/task-providers';
 import type { WireFields } from './canvas/task-provider';
 import { NANO_BANANA_2_MODEL, NANO_BANANA_PRO_MODEL } from '$lib/image-models';
+import { IMAGE_TOOLS_GROUP, IMAGE_TOOL_MODEL, ImageTool } from '$lib/image-tools';
 
 export enum KieBilling {
   PerRun = 'per_run',
@@ -121,6 +122,57 @@ function kieRow(model: KieModel, syncedAt: string): AiModelRow {
   };
 }
 
+type KieToolModel = {
+  tool: ImageTool;
+  kieModel: string;
+  label: string;
+  imageField: string;
+  creditsByFactor?: Readonly<Record<string, number>>;
+  flatCredits?: number;
+};
+
+const KIE_TOOL_MODELS: readonly KieToolModel[] = [
+  { tool: ImageTool.RemoveBackground, kieModel: 'recraft/remove-background', label: 'Remove background', imageField: 'image', flatCredits: 1 },
+  { tool: ImageTool.Upscale, kieModel: 'topaz/image-upscale', label: 'Upscale image', imageField: 'image_url', creditsByFactor: { '2': 10, '4': 20 } }
+];
+
+const UPSCALE_FACTOR_FIELD = 'upscale_factor';
+
+function toolPriceLines(model: KieToolModel): TaskPriceLine[] {
+  if (model.creditsByFactor) {
+    return Object.entries(model.creditsByFactor).map(([factor, credits]) => line({ [UPSCALE_FACTOR_FIELD]: factor }, credits));
+  }
+  return [line({}, model.flatCredits!)];
+}
+
+function kieToolRow(model: KieToolModel, syncedAt: string): AiModelRow {
+  return {
+    id: IMAGE_TOOL_MODEL[model.tool],
+    catalogue: 'image',
+    provider: TaskProviderName.Kie,
+    label: model.label,
+    input_modalities: ['image'],
+    output_modalities: ['image'],
+    supported_parameters: [model.imageField],
+    supported_resolutions: [],
+    param_schema: model.creditsByFactor ? { [UPSCALE_FACTOR_FIELD]: { type: 'enum', values: Object.keys(model.creditsByFactor) } } : {},
+    pricing: { lines: toolPriceLines(model) },
+    synced_at: syncedAt,
+    released_at: null,
+    expires_at: null,
+    context_length: null,
+    intelligence_index: null,
+    uncensored: false,
+    wire_spec: {
+      model: model.kieModel,
+      requiresImage: true,
+      menuGroup: IMAGE_TOOLS_GROUP,
+      maxRefs: 1,
+      fields: { images: [model.imageField] }
+    }
+  };
+}
+
 export function kieModelRows(syncedAt: string): AiModelRow[] {
-  return KIE_MODELS.map((model) => kieRow(model, syncedAt));
+  return [...KIE_MODELS.map((model) => kieRow(model, syncedAt)), ...KIE_TOOL_MODELS.map((model) => kieToolRow(model, syncedAt))];
 }

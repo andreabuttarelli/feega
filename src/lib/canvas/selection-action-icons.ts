@@ -6,6 +6,8 @@
 import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
 import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
 import Globe from '@lucide/svelte/icons/globe';
+import Eraser from '@lucide/svelte/icons/eraser';
+import Scaling from '@lucide/svelte/icons/scaling';
 import Copy from '@lucide/svelte/icons/copy';
 import Download from '@lucide/svelte/icons/download';
 import Workflow from '@lucide/svelte/icons/workflow';
@@ -69,6 +71,8 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'run-workflow': Play,
   'run-downstream': ListEnd,
   'run-stale': RefreshCw,
+  'remove-background': Eraser,
+  'upscale-image': Scaling,
   'copy-id': Hash,
   report: Flag,
   group: Group,

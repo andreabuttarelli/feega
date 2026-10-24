@@ -13,6 +13,7 @@
  * nodo nasce senza formato — il vuoto è onesto, un «1:1» inventato no.
  */
 import { upscaleLimitsOf } from '$lib/video-models';
+import { isImageToolModel } from '$lib/image-tools';
 import { GENERATED_MEDIUMS } from './graph';
 import type { ModelParam } from './model-params';
 import type { RecommendationTier } from './recommended-models';
@@ -166,7 +167,7 @@ export function hasPrompt(node: GenNode, upstream: UpstreamTextAvailability = { 
 const PROMPT_OPTIONAL_MEDIUMS: ReadonlySet<GenMedium> = new Set(['model3d']);
 
 export function promptRequired(medium: GenMedium, model: string | null = null): boolean {
-  return !PROMPT_OPTIONAL_MEDIUMS.has(medium) && !upscaleLimitsOf(model);
+  return !PROMPT_OPTIONAL_MEDIUMS.has(medium) && !upscaleLimitsOf(model) && !isImageToolModel(model);
 }
 
 export function runStateOf(node: GenNode, upstream: UpstreamTextAvailability = { hasUpstreamText: false }): RunState {

@@ -27,6 +27,8 @@ export type SelectionActionId =
   | 'run-workflow'
   | 'run-downstream'
   | 'run-stale'
+  | 'remove-background'
+  | 'upscale-image'
   | 'copy-id'
   | 'report'
   | 'group'
@@ -92,6 +94,8 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, shortcut: 'Mod+D' },
   { id: 'group', label: 'Group', group: 'secondary', minNodes: 2, shortcut: 'Mod+G' },
   { id: 'ungroup', label: 'Ungroup', group: 'secondary', minNodes: 1, shortcut: 'Mod+Shift+G' },
+  { id: 'remove-background', label: 'Remove background', group: 'secondary', minNodes: 1 },
+  { id: 'upscale-image', label: 'Upscale 2×', group: 'secondary', minNodes: 1 },
   { id: 'copy', label: 'Copy', group: 'menu', minNodes: 1, shortcut: 'Mod+C' },
   { id: 'paste', label: 'Paste', group: 'menu', minNodes: 1, shortcut: 'Mod+V' },
   { id: 'bring-front', label: 'Bring to front', group: 'menu', minNodes: 1, shortcut: 'Mod+]' },
@@ -177,8 +181,12 @@ const isOneFrame = (summaries: readonly Summary[]) => summaries.length === 1 && 
 
 const FRAME_DIALOG_SHOWN = Object.fromEntries((Object.keys(FRAME_DIALOG_ACTIONS) as FrameDialogActionId[]).map((id) => [id, isOneFrame]));
 
+const isOneFinishedImage = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'image' && Boolean(summaries[0].data.refId);
+
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
   ...FRAME_DIALOG_SHOWN,
+  'remove-background': isOneFinishedImage,
+  'upscale-image': isOneFinishedImage,
   ungroup: (summaries) => summaries.some(isGroup),
   'create-formats': (summaries) => summaries.length === 1 && isFrame(summaries[0]),
   'combine-video': (summaries) => summaries.length > 1 && summaries.every(isFrame),

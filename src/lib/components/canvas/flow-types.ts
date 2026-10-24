@@ -18,6 +18,7 @@ import type { CanvasNode } from '$lib/canvas/graph';
 import type { CanvasMode } from '$lib/canvas/canvas-mode';
 import type { RunQuote } from '$lib/canvas/run-quote';
 import type { GraphScope } from '$lib/canvas/run-graph';
+import type { ImageTool } from '$lib/image-tools';
 import type { DragPhase, DropVerdict, ElementOut, PointerPoint } from '$lib/canvas/canvas-drop';
 import type { Stack } from '$lib/canvas/stacking';
 import type { DeleteMode } from '$lib/canvas/section';
@@ -69,6 +70,7 @@ export type FlowProps = {
   onSectionChange?: (id: string, patch: { title?: string; fill?: string }) => void;
   onCreateFormats?: (frameId: string) => void;
   onCombineScenes?: (frameIds: string[]) => void;
+  onImageTool?: (nodeId: string, tool: ImageTool) => void;
   onExport?: (frameIds: string[]) => void;
   onEdgeDelete?: (edgeId: string) => void;
   onEdgeRetype?: (edgeId: string, kind: CanvasEdgeKind) => void;
