@@ -3235,6 +3235,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void invalidate('app:credits');
   }
 
+  async function layersToFrame(nodeId: string) {
+    landed(await post('layersToFrame', { node_id: nodeId }));
+  }
+
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
     landed(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
   }
@@ -3704,6 +3708,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCreateFormats={(id) => (formatsFor = id)}
     onCombineScenes={combineScenes}
     onImageTool={imageTool}
+    onLayersToFrame={layersToFrame}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}
     onEdgeDelete={disconnect}

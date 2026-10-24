@@ -7,12 +7,18 @@ const SCOPE = { orgId: 'org', projectId: 'p1', userId: 'u1' };
 
 const source = { id: 'n-src', canvasId: 'c1', projectId: 'p1', type: 'image', displayName: 'Shoe', position: { x: 100, y: 40, z: 0 }, size: { width: 320, height: 240 }, data: { refId: 'asset-1' }, version: 3 };
 
+const TITLE_AND_PARROT = [
+  { label: 'title', box: { left: 0.1, top: 0.05, width: 0.8, height: 0.15 } },
+  { label: 'parrot', box: { left: 0.33, top: 0.274, width: 0.311, height: 0.717 } }
+];
+
 function deps(over: Partial<ImageToolDeps> = {}): ImageToolDeps {
   return {
     findNode: vi.fn(async () => source),
     createNode: vi.fn(async () => ({ id: 'n-out', version: 1 })),
     createConnection: vi.fn(async () => ({ id: 'e1' })),
     runGenNode: vi.fn(async () => ({ kind: 'queued', run: { id: 'r1' } })),
+    detectLayers: vi.fn(async () => TITLE_AND_PARROT),
     ...over
   } as unknown as ImageToolDeps;
 }
@@ -66,5 +72,35 @@ describe('startImageTool puts a tool node beside an image and runs it', () => {
     const out = await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.RemoveBackground });
 
     expect(out).toEqual({ ok: false, error: 'not_configured' });
+  });
+
+  it('split layers: detects the elements first, prompts the model with their boxes and keeps the boxes on the node', async () => {
+    const d = deps();
+
+    const out = await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.SplitLayers });
+
+    const prompt = 'Separate the title <bbox>100 50 900 200</bbox> and the parrot <bbox>330 274 641 991</bbox> into independent layers';
+    expect(out).toMatchObject({ ok: true, nodeId: 'n-out' });
+    expect(d.detectLayers).toHaveBeenCalledWith(db, { orgId: 'org', assetId: 'asset-1' });
+    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ displayName: 'Layers', data: { prompt, model: IMAGE_TOOL_MODEL[ImageTool.SplitLayers], params: {}, layerBoxes: TITLE_AND_PARROT } }));
+    expect(d.runGenNode).toHaveBeenCalledWith(db, expect.objectContaining({ prompt, model: IMAGE_TOOL_MODEL[ImageTool.SplitLayers] }));
+  });
+
+  it('split layers refuses before spending when no element is found', async () => {
+    const d = deps({ detectLayers: vi.fn(async () => []) as never });
+
+    const out = await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.SplitLayers });
+
+    expect(out).toEqual({ ok: false, error: 'no_layers_found' });
+    expect(d.createNode).not.toHaveBeenCalled();
+    expect(d.runGenNode).not.toHaveBeenCalled();
+  });
+
+  it('the tools that need no detection never ask for it', async () => {
+    const d = deps();
+
+    await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Upscale });
+
+    expect(d.detectLayers).not.toHaveBeenCalled();
   });
 });

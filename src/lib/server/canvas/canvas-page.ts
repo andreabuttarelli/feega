@@ -87,6 +87,7 @@ import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNod
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
+import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-frame';
 import { imageToolAskSchema } from '$lib/image-tools';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
 import { COMBINE_STATUS, CombineOutcome, combineAskSchema, combineScenes } from '$lib/server/motion/combine-scenes';
@@ -1214,6 +1215,17 @@ export const actions: Actions<CanvasParams> = {
 
     const started = await startImageTool(scope.db, IMAGE_TOOL_DEPS, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, sourceNodeId: ask.data.nodeId, tool: ask.data.tool, factor: ask.data.factor });
     return started.ok ? { outcome: 'done', nodeId: started.nodeId } : fail(400, { error: started.error });
+  },
+
+  layersToFrame: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const nodeId = String((await request.formData()).get('node_id') ?? '');
+    if (!nodeId) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    const made = await layersToFrame(scope.db, layersToFrameDeps(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, actor: userActor(scope) }), { orgId: scope.orgId, nodeId });
+    return made.ok ? { outcome: 'done', frameId: made.frameId } : fail(400, { error: made.error });
   },
 
   createFormats: async ({ request, params, locals }) => {

@@ -615,6 +615,8 @@ function fieldsOf(type: NodeType): string[] {
 export const SYSTEM_OWNED_FIELDS = [
   'refId',
   'sourceRefId',
+  'layerRefIds',
+  'layerBoxes',
   'mediaKind',
   'assetId',
   'runId',
@@ -629,6 +631,8 @@ export const SYSTEM_OWNED_FIELDS = [
 export const SERVER_WRITTEN_FIELDS: readonly string[] = [
   'refId',
   'sourceRefId',
+  'layerRefIds',
+  'layerBoxes',
   'mediaKind',
   'assetId',
   'runId',
