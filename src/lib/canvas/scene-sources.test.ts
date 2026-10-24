@@ -4,7 +4,7 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '$li
 import { addClip } from '$lib/motion/timeline';
 import { flattenComps } from '$lib/motion/precomp';
 import { sequenceScenes } from '$lib/motion/scenes';
-import { sceneStamp, withScenes, type SceneSource } from './scene-sources';
+import { sceneRevision, sceneStamp, withScenes, type SceneSource } from './scene-sources';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -55,5 +55,13 @@ describe('scene sources', () => {
 
     expect(sceneStamp(parent, (id) => revisions[id] ?? 0)).toBe(`${A}@3,${B}@7`);
     expect(sceneStamp(newMotionDoc(MotionFormat.Landscape), () => 1)).toBe('');
+  });
+});
+
+describe('a scene being edited moves its stamp before it saves', () => {
+  it('the same saved revision stamps differently with and without live edits', () => {
+    expect(sceneRevision(3, undefined)).toBe('3');
+    expect(sceneRevision(3, 1)).not.toBe(sceneRevision(3, undefined));
+    expect(sceneRevision(3, 2)).not.toBe(sceneRevision(3, 1));
   });
 });
