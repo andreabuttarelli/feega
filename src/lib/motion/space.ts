@@ -133,9 +133,27 @@ const SPAN: Record<Axis, { start: (b: Bounds) => number; size: (b: Bounds) => nu
   [Axis.Y]: { start: (b) => b.top, size: (b) => b.bottom - b.top }
 };
 
-export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, axis: Axis, mode: EditMode): OpResult {
-  if (ids.length < MIN_DISTRIBUTED) {
-    return fail(`distribute needs at least ${MIN_DISTRIBUTED} clips`);
+const SAME_GAP_PX = 0.5;
+
+function gapsOf(bounds: Map<string, Bounds>, ids: readonly string[], axis: Axis): number[] {
+  const { start, size } = SPAN[axis];
+  const ordered = [...ids].map((id) => bounds.get(id)!).sort((a, b) => start(a) - start(b));
+  return ordered.slice(1).map((b, i) => start(b) - (start(ordered[i]) + size(ordered[i])));
+}
+
+export function gapOf(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, axis: Axis): number | null {
+  const bounds = ids.length > 1 ? boundsOf(doc, ids, frame, boxes) : null;
+  if (!bounds || typeof bounds === 'string') {
+    return null;
+  }
+  const gaps = gapsOf(bounds, ids, axis);
+  return gaps.every((g) => Math.abs(g - gaps[0]) <= SAME_GAP_PX) ? gaps[0] : null;
+}
+
+export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, axis: Axis, mode: EditMode, asked?: number): OpResult {
+  const least = asked === undefined ? MIN_DISTRIBUTED : 2;
+  if (ids.length < least) {
+    return fail(`distribute needs at least ${least} clips`);
   }
   const bounds = boundsOf(doc, ids, frame, boxes);
   if (typeof bounds === 'string') {
@@ -146,7 +164,7 @@ export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: n
   const first = bounds.get(ordered[0])!;
   const last = bounds.get(ordered[ordered.length - 1])!;
   const sizes = ordered.map((id) => size(bounds.get(id)!));
-  const gap = (start(last) + size(last) - start(first) - sizes.reduce((a, b) => a + b, 0)) / (ordered.length - 1);
+  const gap = asked ?? (start(last) + size(last) - start(first) - sizes.reduce((a, b) => a + b, 0)) / (ordered.length - 1);
   const moves = ordered.map((id, i): [string, Pt] => {
     const wanted = start(first) + sizes.slice(0, i).reduce((a, b) => a + b, 0) + gap * i;
     return [id, along(axis, wanted - start(bounds.get(id)!))];

@@ -66,7 +66,7 @@ const SHAPE_OPS = [BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, Boo
 
 type ShapeOp = (doc: MotionDoc, ids: string[], frame: number) => OpResult;
 
-type SpaceInput = { doc: MotionDoc; ids: string[]; frame: number; by: Pt; mode: EditMode; factor: number | undefined; factorY: number | undefined; degrees: number | undefined };
+type SpaceInput = { doc: MotionDoc; ids: string[]; frame: number; by: Pt; mode: EditMode; gap: number | undefined; factor: number | undefined; factorY: number | undefined; degrees: number | undefined };
 
 function scaledFromCorner(i: SpaceInput): OpResult {
   if (i.factor === undefined) {
@@ -101,7 +101,7 @@ function aroundJoint(i: SpaceInput, missing: string | undefined, run: (centre: P
 
 const SPACE: Record<(typeof SPACE_OPS)[number], (i: SpaceInput) => OpResult> = {
   ...(Object.fromEntries(EDGES.map((edge) => [`align_${edge}`, (i: SpaceInput) => alignSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), edge, i.mode)])) as Record<`align_${Edge}`, (i: SpaceInput) => OpResult>),
-  ...(Object.fromEntries(AXES.map((axis) => [`distribute_${axis}`, (i: SpaceInput) => distributeSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), axis, i.mode)])) as Record<`distribute_${Axis}`, (i: SpaceInput) => OpResult>),
+  ...(Object.fromEntries(AXES.map((axis) => [`distribute_${axis}`, (i: SpaceInput) => distributeSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), axis, i.mode, i.gap)])) as Record<`distribute_${Axis}`, (i: SpaceInput) => OpResult>),
   tidy: (i) => tidySpace(i.doc, i.ids, i.frame, propBoxes(i.doc), i.mode),
   move: (i) => moveBy(i.doc, i.ids, i.frame, i.by, i.mode),
   scale: scaledFromCorner,
@@ -1084,10 +1084,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     arrange_space: tool({
-      description: `Arrange clips in the frame, like a design tool: align_left/center/right/top/middle/bottom lines up several clips on the edge of their joint box (one clip aligns to the frame); distribute_x/distribute_y spreads 3+ clips so the gaps between them are equal; tidy lays a row or column out with its most common gap, or a grid from its top-left corner (Tidy up); move shifts them by dx/dy px; scale (Scale tool) multiplies size, text size and stroke weight by factor from the top-left of their joint box; scale_group (factor, optional factor_y for a different vertical factor) and rotate_group (degrees) transform the clips together around the centre of their joint box, like dragging the selection handles. at (seconds, default 0) is the moment measured. mode design (default) moves animated positions whole, every keyframe; motion keys the change at that moment. Locked clips are refused.`,
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(SPACE_OPS), dx: z.number().optional(), dy: z.number().optional(), factor: z.number().positive().optional(), degrees: z.number().optional(), factor_y: z.number().positive().optional(), at: z.number().min(0).optional(), mode: z.enum(EditMode).optional() }),
+      description: `Arrange clips in the frame, like a design tool: align_left/center/right/top/middle/bottom lines up several clips on the edge of their joint box (one clip aligns to the frame); distribute_x/distribute_y spreads 3+ clips so the gaps between them are equal (gap px sets every gap to that value, first clip fixed, 2+ clips: the smart-selection spacing field); tidy lays a row or column out with its most common gap, or a grid from its top-left corner (Tidy up); move shifts them by dx/dy px; scale (Scale tool) multiplies size, text size and stroke weight by factor from the top-left of their joint box; scale_group (factor, optional factor_y for a different vertical factor) and rotate_group (degrees) transform the clips together around the centre of their joint box, like dragging the selection handles. at (seconds, default 0) is the moment measured. mode design (default) moves animated positions whole, every keyframe; motion keys the change at that moment. Locked clips are refused.`,
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(SPACE_OPS), dx: z.number().optional(), dy: z.number().optional(), factor: z.number().positive().optional(), degrees: z.number().optional(), gap: z.number().optional(), factor_y: z.number().positive().optional(), at: z.number().min(0).optional(), mode: z.enum(EditMode).optional() }),
       execute: async (input) =>
-        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [input.dx ?? 0, input.dy ?? 0], mode: input.mode ?? EditMode.Design, factor: input.factor, factorY: input.factor_y, degrees: input.degrees }), `${input.op} ${input.clip_ids.length} clip(s)`)
+        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [input.dx ?? 0, input.dy ?? 0], mode: input.mode ?? EditMode.Design, factor: input.factor, factorY: input.factor_y, degrees: input.degrees, gap: input.gap }), `${input.op} ${input.clip_ids.length} clip(s)`)
     }),
 
     remove_clip: tool({

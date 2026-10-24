@@ -20,6 +20,7 @@
   import { PropKind, STYLE_PROPS, placeBox, setPropAcross, sharedConstraint, sharedProp, type BoxPatch } from '$lib/motion/selection-props';
   import { isBrandToken, recolour, selectionColours } from '$lib/motion/selection-colours';
   import { BRAND_COLORS } from '$lib/motion/components';
+  import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
   import NumberField from './NumberField.svelte';
 
   let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; onchange: (doc: MotionDoc, summary: string) => void } = $props();
@@ -71,6 +72,21 @@
     const result = bounds ? placeBox(doc, [...ids], frame, bounds, patch, mode) : null;
     if (result?.ok) {
       onchange(result.doc, `Placed ${ids.length} layers`);
+    }
+  }
+
+  const GAP_RANGE = { min: -100000, max: 100000, step: 1 };
+  const GAP_FIELDS = [
+    { axis: Axis.X, label: 'H', name: 'Horizontal gap' },
+    { axis: Axis.Y, label: 'V', name: 'Vertical gap' }
+  ] as const;
+  const gaps = $derived(Object.fromEntries(GAP_FIELDS.map((f) => [f.axis, gapOf(doc, [...ids], frame, propBoxes(doc), f.axis)])) as Record<Axis, number | null>);
+  const gapShown = (axis: Axis): Shared<number> => (gaps[axis] === null ? MIXED : Math.round(gaps[axis]! * 100) / 100);
+
+  function setGap(axis: Axis, px: number) {
+    const result = distributeSpace(doc, [...ids], frame, propBoxes(doc), axis, EditMode.Design, px);
+    if (result.ok) {
+      onchange(result.doc, `Spaced ${ids.length} layers`);
     }
   }
 
@@ -134,6 +150,16 @@
         </div>
       </section>
     {/if}
+    <section class="section" data-section="spacing">
+      <h3>Spacing</h3>
+      <div class="grid2">
+        {#each GAP_FIELDS as f (f.axis)}
+          <div data-prop={`gap-${f.axis}`}>
+            <NumberField label={f.label} kind={FieldKind.Glyph} name={f.name} value={gapShown(f.axis)} range={GAP_RANGE} unit="px" onchange={(v) => setGap(f.axis, v)} />
+          </div>
+        {/each}
+      </div>
+    </section>
     <section class="section" data-section="layout">
       <h3>Layout</h3>
       <div class="grid2">

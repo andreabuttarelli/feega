@@ -13,7 +13,7 @@
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import { Pasted, isSvgFile, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
   import { svgDrawings } from '$lib/canvas/svg-drawings';
-  import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
+import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { stackedLocally, type Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
   import { TEXT_BOX } from '$lib/canvas/frame-paste';
@@ -3287,6 +3287,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   const FRAME_CENTRE = { x: 0.5, y: 0.5 };
 
+  async function pasteElementsIntoEach(frameIds: string[], copied: CopiedElements) {
+    for (const nodeId of frameIds) {
+      for (const clip of copied.clipIds) {
+        landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Frame, nodeId, at: FRAME_CENTRE }) }));
+      }
+    }
+  }
+
   async function pasteFreeInto(frameId: string, freeIds: string[]) {
     for (const source of freeIds) {
       landed(await post('copyFree', { source, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frameId, at: FRAME_CENTRE }) }));
@@ -3295,14 +3303,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function paste(at: { x: number; y: number }) {
     const copied = elementClipboard.elements;
+    const selectedTiles = nodes.filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, takesDrops: tileChromeOf(n).takesDrops }));
     if (elementClipboard.kind === Copied.Elements && copied) {
-      await pasteElementsAt(at, copied);
+      const frames = pasteTargets(selectedTiles, copied.clipIds);
+      await (frames.length > 1 ? pasteElementsIntoEach(frames, copied) : pasteElementsAt(at, copied));
       return;
     }
     if (!clipboard) { return; }
-    const frameId = pasteIntoFrame(nodes.filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, takesDrops: tileChromeOf(n).takesDrops })), clipboard.freeIds);
-    if (frameId) {
-      await pasteFreeInto(frameId, clipboard.freeIds);
+    const frames = pasteTargets(selectedTiles, clipboard.freeIds);
+    if (frames.length) {
+      for (const frameId of frames) {
+        await pasteFreeInto(frameId, clipboard.freeIds);
+      }
       return;
     }
 
