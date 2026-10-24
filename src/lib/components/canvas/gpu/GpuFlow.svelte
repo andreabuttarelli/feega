@@ -3584,6 +3584,7 @@
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
       onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}
       oncolourchange={(tag) => props.onColourChange?.(selected, tag)}
+      onview={() => props.onViewOutput?.(selected[0])}
     />
     {#if props.postAction}
       <NextStepChips postAction={props.postAction} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
