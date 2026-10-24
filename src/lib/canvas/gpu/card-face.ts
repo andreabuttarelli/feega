@@ -6,6 +6,7 @@ import { isUploadedNodeRow } from '../uploaded-node';
 import type { Poster } from '../poster-lod';
 import type { GenTileView } from '../gen-tile-view';
 import type { SourceTile } from '../source-thumbs';
+import { techniqueFace } from '../technique-face';
 import { selectView, type BatchView, type NodeView, type SelectView } from '../node-view';
 import { EMBED_REFUSAL_HINT, normalizeEmbedUrl, sourceOf } from '../iframe-node';
 
@@ -178,7 +179,8 @@ const FACES: Record<NodeType, Draw> = {
   composition: (d, asset) => ({ surface: Surface.Effects, media: ref(d) ? { url: asset(ref(d)!), video: true } : null, empty: COMPOSITION_EMPTY, actions: [COMPONENT, OPEN_EDITOR] }),
   calendar: hollow('calendar'),
   studio_batch: (_d, _a, _t, view) => ({ surface: Surface.Pick, title: 'Open Photo studio', batch: view?.batch ?? null }),
-  section: (d) => ({ surface: Surface.Section, title: str(d.title) || 'Section', tint: str(d.fill) || null })
+  section: (d) => ({ surface: Surface.Section, title: str(d.title) || 'Section', tint: str(d.fill) || null }),
+  technique: (d, _a, _t, view) => techniqueFace(str(d.name), view?.technique ?? null)
 };
 
 const BLANK: CardFace = {

@@ -22,5 +22,5 @@ export const GET: RequestHandler = async ({ params, locals }) => {
   }
 
   const techniques = await listTechniques(db, found.orgId);
-  return json({ techniques: (techniques ?? []).map((t) => ({ id: t.id, name: t.name, nodes: t.plan.nodes.length })), available: techniques !== null });
+  return json({ techniques: (techniques ?? []).map((t) => ({ id: t.id, name: t.name, nodes: t.plan.nodes.length, version: t.version, inputs: t.inputs, outputs: t.outputs })), available: techniques !== null });
 };

@@ -1,4 +1,6 @@
-export type TechniqueItem = { id: string; name: string; nodes: number };
+import type { TechniqueSlot } from './technique';
+
+export type TechniqueItem = { id: string; name: string; nodes: number; version: number; inputs: TechniqueSlot[]; outputs: TechniqueSlot[] };
 
 type Shelf = { list: TechniqueItem[] };
 

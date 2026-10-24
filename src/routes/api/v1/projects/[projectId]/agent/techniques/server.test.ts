@@ -8,7 +8,7 @@ vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: 
 
 import { GET } from './+server';
 
-const row = { id: 'tq-1', org_id: 'org-1', name: 'idea-to-picture', version: 1, plan: { nodes: [{}, {}], edges: [] }, inputs: [], outputs: [], deleted_at: null };
+const row = { id: 'tq-1', org_id: 'org-1', name: 'idea-to-picture', version: 1, plan: { nodes: [{}, {}], edges: [] }, inputs: [{ node: 0, type: 'text' }], outputs: [{ node: 1, type: 'image' }], deleted_at: null };
 
 function call(user: { id: string } | null) {
   const db = fakeDb({ techniques: [row] }, { filter: true });
@@ -27,7 +27,7 @@ describe('GET /api/v1/projects/[projectId]/agent/techniques', () => {
     const { res, body, calls } = await call({ id: 'user-1' });
 
     expect(res.status).toBe(200);
-    expect(body.techniques).toEqual([{ id: 'tq-1', name: 'idea-to-picture', nodes: 2 }]);
+    expect(body.techniques).toEqual([{ id: 'tq-1', name: 'idea-to-picture', nodes: 2, version: 1, inputs: [{ node: 0, type: 'text' }], outputs: [{ node: 1, type: 'image' }] }]);
     expect(calls[0].filters).toContainEqual(['org_id', 'org-1']);
   });
 

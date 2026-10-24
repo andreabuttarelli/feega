@@ -39,6 +39,8 @@ describe('group and ungroup', () => {
       ['tidy-up', 'Mod+Alt+T'],
       ['stack', 'Shift+A'],
       ['section-selection', 'Shift+S'],
+      ['edit-technique', null],
+      ['detach-technique', null],
       ['save-technique', null],
       ['flip-horizontal', 'Shift+H'],
       ['flip-vertical', 'Shift+V'],
@@ -95,7 +97,7 @@ describe('group and ungroup', () => {
 
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
-    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup', 'remove-background', 'upscale-image']);
+    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-technique', 'run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup', 'remove-background', 'upscale-image']);
     expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['export', ...Object.keys(FRAME_DIALOG_ACTIONS), 'copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });
@@ -131,6 +133,15 @@ describe('enabledFor', () => {
     const result = enabledFor('run-workflow', nodes, []);
     expect(result.enabled).toBe(false);
     expect(result.reason).toBe('The selected nodes are not all connected');
+  });
+
+  it('shows the technique actions for one technique node only', () => {
+    const technique = { type: 'technique', data: {} };
+
+    expect(shownFor('run-technique', [technique])).toBe(true);
+    expect(shownFor('detach-technique', [technique])).toBe(true);
+    expect(shownFor('edit-technique', [technique, technique])).toBe(false);
+    expect(shownFor('run-technique', [{ type: 'text', data: {} }])).toBe(false);
   });
 
   it('save-technique takes a connected flow of any node types and says why not otherwise', () => {

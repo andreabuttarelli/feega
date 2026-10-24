@@ -110,6 +110,9 @@ export type FlowProps = {
   onConnectExisting?: (ids: string[], targetId: string) => void;
   onRunWorkflow?: (ids: string[]) => void;
   onSaveTechnique?: (ids: string[]) => void;
+  onRunTechnique?: (ids: string[]) => void;
+  onEditTechnique?: (ids: string[]) => void;
+  onDetachTechnique?: (ids: string[]) => void;
   techniques?: { id: string; name: string; nodes: number }[];
   onTechnique?: (id: string, at: { x: number; y: number }) => void;
   onRunGraph?: (graph: GraphScope, ids: string[]) => void;

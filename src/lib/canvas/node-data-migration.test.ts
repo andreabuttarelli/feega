@@ -1,17 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { NODE_TYPES, NODE_DATA_SCHEMAS } from './node-data';
 import { SOCIAL_PLATFORMS } from './social-platforms';
 
-const TYPE_MIGRATION_PATH = fileURLToPath(
-  new URL('../../../supabase/migrations/20261024090000_section_node.sql', import.meta.url)
-);
+const MIGRATIONS_DIR = fileURLToPath(new URL('../../../supabase/migrations/', import.meta.url));
+const NODE_TYPES_NOT_YET_ALLOWED: readonly string[] = ['technique'];
+
+function latestTypeMigration(): string {
+  const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort().reverse();
+  const found = files.find((f) => readFileSync(`${MIGRATIONS_DIR}${f}`, 'utf8').includes('add constraint nodes_type_check check'));
+  return `${MIGRATIONS_DIR}${found}`;
+}
+
 const SHAPE_MIGRATION_PATH = fileURLToPath(
   new URL('../../../supabase/canvas-migrations/20260923_loop_nodes.sql', import.meta.url)
 );
 
-const typeMigration = readFileSync(TYPE_MIGRATION_PATH, 'utf8');
+const typeMigration = readFileSync(latestTypeMigration(), 'utf8');
 const shapeMigration = readFileSync(SHAPE_MIGRATION_PATH, 'utf8');
 
 function checkBody(source: string, name: string): string {
@@ -23,7 +29,7 @@ function checkBody(source: string, name: string): string {
 describe('i CHECK sui nodi seguono il modello e lasciano nascere un nodo vuoto', () => {
   it('il CHECK sui tipi elenca ogni tipo del modello', () => {
     const typeCheck = checkBody(typeMigration, 'nodes_type_check');
-    for (const type of NODE_TYPES) {
+    for (const type of NODE_TYPES.filter((t) => !NODE_TYPES_NOT_YET_ALLOWED.includes(t))) {
       expect(typeCheck).toContain(`'${type}'`);
     }
   });

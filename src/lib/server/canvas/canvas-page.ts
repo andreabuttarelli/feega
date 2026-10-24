@@ -58,7 +58,8 @@ import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
-import { runTechnique, saveFromSelection, TechniqueRun } from '$lib/server/canvas/techniques';
+import { saveFromSelection } from '$lib/server/canvas/techniques';
+import { detachInstance, openDefinition, placeInstance, runInstance } from '$lib/server/canvas/technique-instance';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
@@ -1725,15 +1726,13 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid position' });
     }
 
-    const placed = await runTechnique(scope.db, {
+    const placed = await placeInstance(scope.db, {
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
       userId: scope.userId,
       techniqueId: String(fd.get('technique_id') ?? ''),
       at,
-      inputs: [],
-      then: TechniqueRun.Place,
       actor: userActor(scope)
     });
     if (placed.outcome === 'refused') {
@@ -1743,7 +1742,40 @@ export const actions: Actions<CanvasParams> = {
     const scopeIds = { orgId: scope.orgId, canvasId: scope.canvasId };
     const ids = new Set(placed.nodeIds);
     const [nodes, connections] = await Promise.all([listNodes(scope.db, scopeIds), listConnections(scope.db, scopeIds)]);
-    return { nodes: nodes.filter((n) => ids.has(n.id)), connections: connections.filter((c) => ids.has(c.sourceNodeId) && ids.has(c.targetNodeId)) };
+    return { nodes: nodes.filter((n) => ids.has(n.id)), connections: connections.filter((c) => ids.has(c.sourceNodeId) && ids.has(c.targetNodeId)), message: placed.message };
+  },
+
+  run_technique_node: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    if (denied) {
+      return fail(denied.status, denied.data);
+    }
+
+    const out = await runInstance(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, nodeId: String(fd.get('node_id') ?? ''), actor: userActor(scope) });
+    return out.outcome === 'queued' ? out : fail(400, { error: out.error });
+  },
+
+  detach_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const out = await detachInstance(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId, nodeId: String(fd.get('node_id') ?? ''), actor: userActor(scope) });
+    if (out.outcome === 'refused') {
+      return fail(400, { error: out.error });
+    }
+
+    const scopeIds = { orgId: scope.orgId, canvasId: scope.canvasId };
+    const ids = new Set(out.nodeIds);
+    const [nodes, connections] = await Promise.all([listNodes(scope.db, scopeIds), listConnections(scope.db, scopeIds)]);
+    return { removedId: out.removedId, nodes: nodes.filter((n) => ids.has(n.id)), connections: connections.filter((c) => ids.has(c.sourceNodeId) && ids.has(c.targetNodeId)) };
+  },
+
+  open_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const out = await openDefinition(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, techniqueId: String(fd.get('technique_id') ?? ''), actor: userActor(scope) });
+    return out.outcome === 'opened' ? out : fail(400, { error: out.error });
   },
 
   /**

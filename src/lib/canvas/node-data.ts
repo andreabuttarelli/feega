@@ -404,6 +404,14 @@ const sectionSchema = z.object({
   fill: z.string().regex(HEX_COLOR, 'invalid colour, expected #rrggbb').default(SECTION_DEFAULT_FILL)
 });
 
+const techniqueSchema = z.object({
+  techniqueId: z.string().uuid(),
+  name: z.string().max(48),
+  runY: z.number().nullish(),
+  workflowId: z.string().nullish(),
+  ranVersion: z.number().int().nullish()
+});
+
 const calendarSchema = z.object({
   view: z.enum(CALENDAR_VIEWS),
   scope: z.enum(CALENDAR_SCOPES),
@@ -470,7 +478,8 @@ export const NODE_DATA_SCHEMAS = {
   motion: motionNodeSchema,
   element: elementNodeSchema,
   studio_batch: studioBatchNodeSchema,
-  section: sectionSchema
+  section: sectionSchema,
+  technique: techniqueSchema
 } as const;
 
 export type NodeType = keyof typeof NODE_DATA_SCHEMAS;

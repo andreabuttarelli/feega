@@ -12,6 +12,7 @@ import Copy from '@lucide/svelte/icons/copy';
 import Download from '@lucide/svelte/icons/download';
 import Workflow from '@lucide/svelte/icons/workflow';
 import Link2 from '@lucide/svelte/icons/link-2';
+import Pencil from '@lucide/svelte/icons/pencil';
 import Play from '@lucide/svelte/icons/play';
 import Clapperboard from '@lucide/svelte/icons/clapperboard';
 import ListEnd from '@lucide/svelte/icons/list-end';
@@ -70,6 +71,9 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'connect-existing': Link2,
   'run-workflow': Play,
   'save-technique': BookmarkPlus,
+  'run-technique': Play,
+  'edit-technique': Pencil,
+  'detach-technique': Unlink,
   'run-downstream': ListEnd,
   'run-stale': RefreshCw,
   'remove-background': Eraser,
