@@ -206,12 +206,17 @@ describe('the resizing a drawn text starts with', () => {
   const box = { x: 0.5, y: 0.5, width: 0.3, height: 0.1 };
   const sizingOf = (r: OpResult) => (r.ok ? findClip(r.doc, 'tx')?.clip.props.sizing : null);
 
-  it('a dragged text keeps its width and grows in height', () => {
-    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx'))).toBe('auto-height');
+  it('a text drawn without a sizing grows with its line', () => {
+    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx'))).toBe('auto');
   });
 
-  it('a clicked text grows with its line', () => {
-    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx', TextSizing.AutoWidth))).toBe('auto');
+  it('a text the chat or an agent draws without a sizing grows with its line', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 40 } }, 'tx');
+    expect(drawn.ok ? findClip(drawn.doc, 'tx')?.clip.props.sizing : null).toBe('auto');
+  });
+
+  it('a dragged text keeps its width and grows in height', () => {
+    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx', TextSizing.AutoHeight))).toBe('auto-height');
   });
 
   it('a free text drawn on the canvas keeps the resizing it was drawn with', () => {
