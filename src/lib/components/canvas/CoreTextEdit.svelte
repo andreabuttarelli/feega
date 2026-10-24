@@ -1,35 +1,37 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { editCss, gradientSpans, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { rangeOf, select, selectionIn, textOf, type Span } from '$lib/canvas/editable-text';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import GradientHandles from './GradientHandles.svelte';
-  import { ListKind, MARKER_GAP_EM, markersOf, type ListItem } from '$lib/motion/text-lists';
+  import { ListKind, type ListItem } from '$lib/motion/text-lists';
   import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '$lib/motion/text-runs';
 
-  let { layout, look, text, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
+  let { layout, look, text, body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
 
   type Box = { left: number; top: number; width: number; height: number };
+  type Snapshot = { text: string; runs: TextRun[]; lists: ListItem[]; sel: Span };
 
-  let field = $state<HTMLTextAreaElement>();
+  let field = $state<HTMLDivElement>();
   let rangeBox = $state<Box | null>(null);
   let value = $state('');
   let tint = $state('#000000');
-  let mirrorStyle = $state('');
   let linkOpen = $state(false);
   let linkField = $state<HTMLInputElement>();
 
   const SHORTCUTS: Record<string, RunEdit> = { b: { weight: RunToggle.Bold }, i: { italic: RunToggle.Italic }, u: { underline: RunToggle.Underline } };
   const PANEL = '[data-text-range-panel]';
   const CLEARED: RunEdit = Object.fromEntries(STYLE_KEYS.map((k) => [k, null]));
+  const HISTORY_LIMIT = 200;
+  const NEWLINE = '\n';
   const picked = $derived(textRange.range);
   let composing = false;
   let ended = false;
+  let sel: Span = { start: 0, end: 0 };
+  const past: Snapshot[] = [];
+  const future: Snapshot[] = [];
 
   const style = $derived(editCss(look, layout));
-  const spans = $derived(gradientSpans(value, textRange.runs));
-  const markers = $derived(markersOf(textRange.lists));
-  const paragraphs = $derived(value.split('\n'));
-  const fieldStyle = $derived(spans.length ? `${style};color:transparent` : style);
   let barAt = $state({ left: 0, top: 0 });
   let laid: number | null = null;
 
@@ -37,7 +39,7 @@
   const BAR_GAP_PX = 32;
 
   function fit() {
-    if (!field) {
+    if (!field?.firstChild) {
       return;
     }
     field.style.height = '0';
@@ -52,7 +54,30 @@
     const own = field.getBoundingClientRect();
     const host = field.offsetParent?.getBoundingClientRect() ?? own;
     barAt = { left: own.left - host.left, top: own.top - host.top - BAR_GAP_PX };
-    mirrorStyle = field.style.cssText;
+  }
+
+  const focused = () => !!field && document.activeElement === field;
+
+  function measureRange(): Box | null {
+    const host = field?.offsetParent;
+    if (!field?.firstChild || !host || sel.start === sel.end) {
+      return null;
+    }
+    const own = rangeOf(field, sel).getBoundingClientRect();
+    const origin = host.getBoundingClientRect();
+    return { left: own.left - origin.left, top: own.top - origin.top, width: own.width, height: own.height };
+  }
+
+  function paint() {
+    if (!field) {
+      return;
+    }
+    field.innerHTML = body(value, textRange.runs, textRange.lists);
+    if (focused()) {
+      select(field, sel);
+    }
+    fit();
+    rangeBox = measureRange();
   }
 
   $effect(() => {
@@ -60,30 +85,11 @@
     fit();
   });
 
-  function measureRange(): Box | null {
-    const host = field?.offsetParent;
-    if (!field || !host || field.selectionStart === field.selectionEnd) {
-      return null;
-    }
-    const mirror = document.createElement('div');
-    mirror.style.cssText = field.style.cssText;
-    Object.assign(mirror.style, { position: 'absolute', visibility: 'hidden', pointerEvents: 'none', height: 'auto', margin: field.style.marginTop ? `${field.style.marginTop} 0 0` : '0', overflowWrap: 'break-word' });
-    const [before, within, after] = [value.slice(0, field.selectionStart), value.slice(field.selectionStart, field.selectionEnd), value.slice(field.selectionEnd)];
-    const mark = document.createElement('span');
-    mark.textContent = within;
-    mirror.append(before, mark, after);
-    host.append(mirror);
-    const own = mark.getBoundingClientRect();
-    const origin = host.getBoundingClientRect();
-    mirror.remove();
-    return { left: own.left - origin.left, top: own.top - origin.top, width: own.width, height: own.height };
-  }
-
   $effect(() => {
-    void style;
     void value;
-    void picked;
-    rangeBox = textRange.values?.fill && textRange.values.fill !== MIXED ? measureRange() : null;
+    void textRange.runs;
+    void textRange.lists;
+    paint();
   });
 
   function end() {
@@ -98,7 +104,7 @@
 
   let bar = $state<HTMLDivElement>();
 
-  const kept = (target: EventTarget | null) => target instanceof Element && ((bar?.contains(target) ?? false) || target === field || target.closest(PANEL) !== null);
+  const kept = (target: EventTarget | null) => target instanceof Element && ((bar?.contains(target) ?? false) || (field?.contains(target) ?? false) || target.closest(PANEL) !== null);
 
   function left(e: FocusEvent) {
     if (kept(e.relatedTarget)) {
@@ -114,22 +120,116 @@
   }
 
   function refocus() {
-    field?.focus();
-  }
-
-  function retyped() {
-    textRange.retype(value);
-    fit();
-  }
-
-  function selected() {
     if (!field) {
       return;
     }
-    textRange.select({ start: codeIndex(value, field.selectionStart), end: codeIndex(value, field.selectionEnd) });
+    field.focus();
+    select(field, sel);
+  }
+
+  function syncRange() {
+    textRange.select({ start: codeIndex(value, sel.start), end: codeIndex(value, sel.end) });
+  }
+
+  function selected() {
+    const now = field ? selectionIn(field) : null;
+    if (!now) {
+      return;
+    }
+    sel = now;
+    syncRange();
+    rangeBox = measureRange();
+  }
+
+  const snapshot = (): Snapshot => ({ text: value, runs: textRange.runs, lists: textRange.lists, sel });
+
+  function record() {
+    past.push(snapshot());
+    past.splice(0, past.length - HISTORY_LIMIT);
+    future.length = 0;
+  }
+
+  function restore(from: Snapshot[], to: Snapshot[]) {
+    const back = from.pop();
+    if (!back) {
+      return;
+    }
+    to.push(snapshot());
+    sel = back.sel;
+    textRange.text = back.text;
+    textRange.runs = back.runs;
+    textRange.lists = back.lists;
+    value = back.text;
+    syncRange();
+  }
+
+  function write(next: string, caret: number) {
+    sel = { start: caret, end: caret };
+    value = next;
+    textRange.retype(next);
+    syncRange();
+  }
+
+  function insert(typed: string) {
+    record();
+    const plain = typed.replaceAll('\r\n', NEWLINE).replaceAll('\r', NEWLINE);
+    write(value.slice(0, sel.start) + plain + value.slice(sel.end), sel.start + plain.length);
+  }
+
+  function readBack() {
+    if (!field) {
+      return;
+    }
+    const next = textOf(field);
+    sel = selectionIn(field) ?? sel;
+    if (next === value) {
+      paint();
+      return;
+    }
+    write(next, sel.start);
+  }
+
+  const dropped = (e: InputEvent) => insert(e.dataTransfer?.getData('text/plain') ?? '');
+
+  const OWN_INPUT: Record<string, (e: InputEvent) => void> = {
+    insertParagraph: () => insert(NEWLINE),
+    insertLineBreak: () => insert(NEWLINE),
+    insertFromPaste: dropped,
+    insertFromDrop: dropped,
+    historyUndo: () => restore(past, future),
+    historyRedo: () => restore(future, past)
+  };
+
+  function beforeInput(e: InputEvent) {
+    const own = OWN_INPUT[e.inputType];
+    if (own) {
+      e.preventDefault();
+      own(e);
+      return;
+    }
+    if (e.inputType.startsWith('format')) {
+      e.preventDefault();
+      return;
+    }
+    if (!composing) {
+      record();
+    }
+  }
+
+  function pasted(e: ClipboardEvent) {
+    e.preventDefault();
+    insert(e.clipboardData?.getData('text/plain') ?? '');
+  }
+
+  function typed() {
+    if (composing) {
+      return;
+    }
+    readBack();
   }
 
   function restyle(edit: RunEdit) {
+    record();
     textRange.restyle(edit);
   }
 
@@ -167,34 +267,50 @@
 
   const LIST_SHORTCUTS: Record<string, ListKind> = { Digit7: ListKind.Number, Digit8: ListKind.Bullet };
 
-  function atParagraphStart(): boolean {
-    return field !== null && field !== undefined && field.selectionStart === field.selectionEnd && (field.selectionStart === 0 || value[field.selectionStart - 1] === '\n');
-  }
+  const atParagraphStart = () => sel.start === sel.end && (sel.start === 0 || value[sel.start - 1] === NEWLINE);
 
-  function emptyParagraph(): boolean {
-    return atParagraphStart() && (value[field!.selectionStart] ?? '\n') === '\n';
-  }
+  const emptyParagraph = () => atParagraphStart() && (value[sel.start] ?? NEWLINE) === NEWLINE;
 
   function onListKey(e: KeyboardEvent): boolean {
     const listKind = (e.metaKey || e.ctrlKey) && e.shiftKey ? LIST_SHORTCUTS[e.code] : undefined;
     if (listKind) {
       selected();
+      record();
       textRange.setList(listKind);
       return true;
     }
     selected();
     if (e.key === 'Tab' && textRange.listed) {
+      record();
       textRange.indent(e.shiftKey ? -1 : 1);
       return true;
     }
     if ((e.key === 'Enter' && emptyParagraph() && textRange.listed) || (e.key === 'Backspace' && atParagraphStart() && textRange.listed)) {
+      record();
       textRange.unlist();
       return true;
     }
     return false;
   }
 
+  function onHistoryKey(e: KeyboardEvent): boolean {
+    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') {
+      return false;
+    }
+    if (e.shiftKey) {
+      restore(future, past);
+      return true;
+    }
+    restore(past, future);
+    return true;
+  }
+
   function onKey(e: KeyboardEvent) {
+    if (!composing && onHistoryKey(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (styled && e.shiftKey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'u') {
       e.preventDefault();
       e.stopPropagation();
@@ -221,16 +337,27 @@
     }
   }
 
+  function compositionStarted() {
+    composing = true;
+    record();
+  }
+
+  function compositionEnded() {
+    composing = false;
+    readBack();
+  }
+
   onMount(() => {
     value = text;
     textRange.open({ clipId: styled ? clipId : '', text, runs: initialRuns, lists: initialLists, base });
     window.addEventListener('pointerdown', outside, true);
-    const follow = () => document.activeElement === field && selected();
+    const follow = () => focused() && !composing && selected();
     document.addEventListener('selectionchange', follow);
     void tick().then(() => {
-      fit();
+      sel = { start: 0, end: value.length };
       field?.focus();
-      field?.select();
+      paint();
+      syncRange();
     });
     return () => {
       window.removeEventListener('pointerdown', outside, true);
@@ -239,33 +366,28 @@
   });
 </script>
 
-{#if markers.some(Boolean)}
-  <div class="edit mirror gutter" data-testid="core-text-markers" style="{mirrorStyle};color:transparent" aria-hidden="true">{#each paragraphs as paragraph, i (i)}{#if markers[i]}<span class="marker" style="color:{look.color};--gap:{MARKER_GAP_EM}em">{markers[i]}</span>{/if}{paragraph}{i < paragraphs.length - 1 ? '\n' : ''}{/each}</div>
-{/if}
-
-{#if spans.length}
-  <div class="edit mirror" data-testid="core-text-paint" style="{mirrorStyle};color:transparent" aria-hidden="true">{#each spans as span, i (i)}<span style={span.style || `color:${look.color}`}>{span.text}</span>{/each}</div>
-{/if}
-
-<textarea
+<div
   bind:this={field}
-  bind:value
   class="edit"
   data-testid="core-text-edit"
-  style={fieldStyle}
-  rows="1"
+  {style}
+  role="textbox"
+  aria-multiline="true"
+  tabindex="0"
+  contenteditable="true"
   spellcheck="false"
-  oninput={retyped}
+  onbeforeinput={beforeInput}
+  oninput={typed}
+  onpaste={pasted}
   onkeydown={onKey}
-  onselect={selected}
   onkeyup={selected}
   onpointerup={selected}
-  oncompositionstart={() => (composing = true)}
-  oncompositionend={() => (composing = false)}
+  oncompositionstart={compositionStarted}
+  oncompositionend={compositionEnded}
   onblur={left}
   onpointerdown={(e) => e.stopPropagation()}
   ondblclick={(e) => e.stopPropagation()}
-></textarea>
+></div>
 
 {#if rangeBox && textRange.values?.fill && textRange.values.fill !== MIXED}
   <div data-text-range-panel style="display:contents">
@@ -330,22 +452,6 @@
     background: var(--ui-hover, rgb(0 0 0 / 0.06));
   }
 
-  .mirror {
-    outline: 0;
-    pointer-events: none;
-  }
-
-  .edit.gutter {
-    overflow: visible;
-  }
-
-  .marker {
-    position: absolute;
-    text-indent: 0;
-    white-space: nowrap;
-    transform: translateX(calc(-100% - var(--gap)));
-  }
-
   .edit {
     position: absolute;
     box-sizing: border-box;
@@ -354,7 +460,6 @@
     border: 0;
     outline: 1px solid var(--ui-accent, #3b82f6);
     background: transparent;
-    resize: none;
     overflow: hidden;
     pointer-events: auto;
   }

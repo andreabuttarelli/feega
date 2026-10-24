@@ -63,18 +63,31 @@ function runParagraphs(ctx: TextBodyCtx): string[] {
 
 const paragraphsOf = (ctx: TextBodyCtx): string[] => (!ctx.p.runs?.length || ctx.text.id !== null ? ctx.text.lines(ctx.p.text) : runParagraphs(ctx));
 
-function listMarker(marker: string, level: number): string {
+export enum TextBodyFor {
+  Export = 'export',
+  Editor = 'editor'
+}
+
+export const MARKER_ATTR = 'data-list-marker';
+
+const BODY_FOR: Record<TextBodyFor, { plainJoin: boolean; markerAttrs: string }> = {
+  [TextBodyFor.Export]: { plainJoin: true, markerAttrs: '' },
+  [TextBodyFor.Editor]: { plainJoin: false, markerAttrs: ` ${MARKER_ATTR} contenteditable="false"` }
+};
+
+function listMarker(marker: string, level: number, attrs: string): string {
   const style = css({ position: 'absolute', left: '0', width: `${emOf((level + 1) * LIST_STEP_EM - MARKER_GAP_EM)}em`, textAlign: 'right', textIndent: '0', whiteSpace: 'nowrap' });
-  return `<span style="${style}">${marker}</span>`;
+  return `<span${attrs} style="${style}">${marker}</span>`;
 }
 
 const emOf = (n: number) => Math.round(n * EM_PRECISION) / EM_PRECISION;
 
-export function textBody(ctx: TextBodyCtx): string {
+export function textBody(ctx: TextBodyCtx, use: TextBodyFor = TextBodyFor.Export): string {
   const paragraphs = paragraphsOf(ctx);
   const { paragraphSpacing: spacing, paragraphIndent: indent, lists } = ctx.p;
   const markers = markersOf(lists ?? []);
-  if (!spacing && !indent && !markers.some(Boolean)) {
+  const { plainJoin, markerAttrs } = BODY_FOR[use];
+  if (plainJoin && !spacing && !indent && !markers.some(Boolean)) {
     return paragraphs.join('\n');
   }
   return paragraphs
@@ -82,7 +95,7 @@ export function textBody(ctx: TextBodyCtx): string {
       const marker = markers[i];
       const level = lists?.[i]?.level ?? 0;
       const style = css({ position: marker ? 'relative' : undefined, paddingLeft: marker ? `${emOf((level + 1) * LIST_STEP_EM)}em` : undefined, textIndent: `${indent}em`, marginBottom: `${i < paragraphs.length - 1 ? spacing : 0}em` });
-      return `<div style="${style}">${marker ? listMarker(marker, level) : ''}${html || EMPTY_LINE}</div>`;
+      return `<div style="${style}">${marker ? listMarker(marker, level, markerAttrs) : ''}${html || EMPTY_LINE}</div>`;
     })
     .join('');
 }

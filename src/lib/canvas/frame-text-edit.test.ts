@@ -3,7 +3,7 @@ import { findClip, MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { ListKind } from '$lib/motion/text-lists';
-import { commitText, editCss, editLayout, editsText, gradientSpans, hideText, listsOfClip, runsOfClip, textEditStyle } from './frame-text-edit';
+import { commitText, editBody, editCss, editLayout, editsText, hideText, listsOfClip, runsOfClip, textEditStyle } from './frame-text-edit';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
 
 function withText() {
@@ -144,19 +144,27 @@ describe('the editing box follows the drawn text', () => {
   });
 });
 
-describe('gradientSpans', () => {
+describe('the editor body is the export markup', () => {
   const fill = { type: 'linear-gradient', angle: 90, opacity: 1, visible: true, blend: 'normal', stops: [{ pos: 0, color: '#ff0000', opacity: 1 }, { pos: 1, color: '#0000ff', opacity: 1 }] } as never;
+  const doc = withText();
+  const body = editBody(findClip(doc, 'title')!.clip, doc, FEEGA_TOKENS);
 
-  it('is empty while no range carries a gradient', () => {
-    expect(gradientSpans('Hello world', [{ start: 6, end: 11, color: '#fff' }])).toEqual([]);
+  it('paints a gradient range with the clipped background the export uses', () => {
+    const html = body('Hello world', [{ start: 6, end: 11, fill }], []);
+
+    expect(html).toContain('linear-gradient');
+    expect(html).toContain('background-clip:text');
   });
 
-  it('splits the text at the gradient range and paints only that range', () => {
-    const spans = gradientSpans('Hello world', [{ start: 6, end: 11, fill }]);
+  it('styles runs and draws list markers the caret cannot enter', () => {
+    const html = body('Hello\nworld', [{ start: 0, end: 5, weight: 700 }], [null, { kind: ListKind.Bullet, level: 1 }]);
 
-    expect(spans.map((s) => s.text)).toEqual(['Hello ', 'world']);
-    expect(spans[0].style).toBe('');
-    expect(spans[1].style).toContain('linear-gradient');
-    expect(spans[1].style).toContain('background-clip:text');
+    expect(html).toContain('font-weight:700');
+    expect(html).toContain('contenteditable="false"');
+    expect(html).toContain('padding-left:3em');
+  });
+
+  it('keeps one block per paragraph even without lists', () => {
+    expect(body('a\nb', [], [])).toMatch(/^<div[^>]*>a<\/div><div[^>]*>b<\/div>$/);
   });
 });

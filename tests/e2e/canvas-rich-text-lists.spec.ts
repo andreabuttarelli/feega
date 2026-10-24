@@ -40,7 +40,7 @@ test.describe('lists in a canvas frame @real', () => {
     await expect(field).toBeVisible({ timeout: 15_000 });
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('ControlOrMeta+Shift+8');
-    await expect(page.getByTestId('core-text-markers')).toBeVisible();
+    await expect(page.getByTestId('core-text-edit').locator('[data-list-marker]').first()).toBeVisible();
     await page.keyboard.press('ArrowLeft');
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Tab');

@@ -57,7 +57,7 @@ test.describe('gradient fill on a text selection @real', () => {
     await expect(page.getByTestId('range-text-inspector')).toBeVisible({ timeout: 10_000 });
     await page.getByTestId('range-fill-type').selectOption('linear-gradient');
     await paintStops(page);
-    await expect(page.getByTestId('core-text-paint')).toBeVisible();
+    await expect(page.getByTestId('core-text-edit').locator('span[style*="background-clip"]').first()).toBeVisible();
     const start = page.getByTestId('gradient-start');
     await expect(start).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: `${SHOTS}/textgrad2-1-linear-handles.png` });
@@ -101,7 +101,7 @@ test.describe('gradient fill on a text selection @real', () => {
     await expect(page.getByTestId('range-text-inspector')).toBeVisible({ timeout: 10_000 });
     await page.getByTestId('range-fill-type').selectOption('radial-gradient');
     await paintStops(page);
-    await expect(page.getByTestId('core-text-paint')).toBeVisible();
+    await expect(page.getByTestId('core-text-edit').locator('span[style*="background-clip"]').first()).toBeVisible();
     await expect(page.getByTestId('gradient-handles')).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: `${SHOTS}/textgrad2-4-radial-handles.png` });
 

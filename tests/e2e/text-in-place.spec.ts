@@ -110,10 +110,10 @@ test.describe("text edited where it is drawn on the gpu canvas @real", () => {
     });
 
     const field = page.getByTestId(EDITOR);
-    await expect(field).toHaveValue("Hello");
+    await expect(field).toHaveText("Hello");
     await page.keyboard.press("End");
     await page.keyboard.type(" there");
-    await expect(field).toHaveValue("Hello there");
+    await expect(field).toHaveText("Hello there");
     await page.keyboard.press("Escape");
     await expect(field).toHaveCount(0);
 
@@ -135,7 +135,7 @@ test.describe("text edited where it is drawn on the gpu canvas @real", () => {
       await page.mouse.dblclick(again.x, again.y);
       await expect(page.getByTestId(EDITOR)).toBeVisible({ timeout: 1500 });
     }).toPass({ timeout: 25_000 });
-    await expect(page.getByTestId(EDITOR)).toHaveValue("Hello there");
+    await expect(page.getByTestId(EDITOR)).toHaveText("Hello there");
   });
 
   test("a free text on the canvas edits in place on double-click", async ({
