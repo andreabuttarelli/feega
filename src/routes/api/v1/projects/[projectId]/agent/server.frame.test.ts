@@ -10,7 +10,7 @@ const PROJECT = 'p-1';
 const NODE = 'node-1';
 const SAID = 'Typed in the frame chat';
 
-const calls = vi.hoisted(() => ({ systems: [] as string[], threads: [] as unknown[], logged: 0, db: null as unknown }));
+const calls = vi.hoisted(() => ({ offered: [] as string[][], systems: [] as string[], threads: [] as unknown[], logged: 0, db: null as unknown }));
 
 const usage = { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } };
 
@@ -19,10 +19,14 @@ function scriptedModel() {
   return new MockLanguageModelV4({
     doStream: async (options) => {
       calls.systems.push(JSON.stringify(options.prompt[0]));
-      const first = step++ === 0;
-      const chunks = first
-        ? [{ type: 'tool-call', toolCallId: 'call-1', toolName: 'frame_tool', input: JSON.stringify({ tool: 'add_clip', input: { component: 'Title', start: 0, duration: 2, props: { text: SAID } } }) }, { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_calls' }, usage }]
-        : [{ type: 'text-start', id: 't' }, { type: 'text-delta', id: 't', delta: 'Done.' }, { type: 'text-end', id: 't' }, { type: 'finish', finishReason: { unified: 'stop', raw: 'stop' }, usage }];
+      calls.offered.push((options.tools ?? []).map((t) => t.name));
+      const at = step++;
+      const called = (toolName: string, input: unknown) => [{ type: 'tool-call', toolCallId: `call-${at}`, toolName, input: JSON.stringify(input) }, { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_calls' }, usage }];
+      const chunks = at === 0
+        ? called('load_tools', { names: ['add_clip'] })
+        : at === 1
+          ? called('add_clip', { component: 'Title', start: 0, duration: 2, props: { text: SAID } })
+          : [{ type: 'text-start', id: 't' }, { type: 'text-delta', id: 't', delta: 'Done.' }, { type: 'text-end', id: 't' }, { type: 'finish', finishReason: { unified: 'stop', raw: 'stop' }, usage }];
       return {
         stream: new ReadableStream({
           start(controller) {
@@ -99,6 +103,7 @@ beforeEach(async () => {
   const fake = revisionsDb();
   calls.db = Object.assign(fake.db, { storage: { from: () => ({}) } });
   calls.systems.length = 0;
+  calls.offered.length = 0;
   calls.threads.length = 0;
   calls.logged = 0;
   await appendRevision(fake.db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Portrait), actor: { kind: 'user', id: 'u-1' }, summary: 'start' });
@@ -111,6 +116,14 @@ describe('one chat: the canvas chat edits the frame open in the editor', () => {
     expect(JSON.stringify((await head()).tracks)).toContain(SAID);
     const [latest] = await listRevisions(calls.db as never, { orgId: ORG, nodeId: NODE });
     expect(latest).toMatchObject({ version: 2, actorKind: 'agent' });
+  });
+
+  it('a frame tool is offered only after the chat loads it', async () => {
+    await settled(await post({ frame: { nodeId: NODE, selection: [], playhead: 0 } }));
+
+    expect(calls.offered[0]).not.toContain('add_clip');
+    expect(calls.offered[0]).toContain('load_tools');
+    expect(calls.offered[1]).toContain('add_clip');
   });
 
   it('the open frame, its selection and playhead reach the system prompt', async () => {
