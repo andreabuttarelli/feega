@@ -193,6 +193,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { cleanNodeName } from '$lib/canvas/node-name';
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
+  import { reloadTechniques, techniquesOf } from '$lib/canvas/techniques.svelte';
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
@@ -251,6 +252,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const LINK_COPIED_MS = 1500;
 
   let { data } = $props();
+  const techniqueShelf = techniquesOf(untrack(() => data.projectId));
 
   function announceWelcome() {
     const campaign = campaignOf(page.url.searchParams.get(WELCOME_PARAM));
@@ -3433,6 +3435,30 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (created.length) { pushGesture(createManyGesture(created, connected)); }
   }
 
+  async function saveTechnique(ids: string[]) {
+    const name = prompt('Technique name (lowercase words with dashes)')?.trim();
+    if (!name) {
+      return;
+    }
+
+    const saved = await post('save_technique', { ids: JSON.stringify(ids), name });
+    if (saved) {
+      void reloadTechniques(data.projectId, techniqueShelf);
+    }
+  }
+
+  async function insertTechnique(id: string, at: { x: number; y: number }) {
+    const result = await post('insert_technique', { technique_id: id, x: at.x, y: at.y });
+    const created = (result?.nodes ?? []) as CanvasNodeRecord[];
+    const connected = (result?.connections ?? []) as Connection[];
+    if (!created.length) {
+      return;
+    }
+    nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))];
+    edges = [...edges, ...connected.map(toEdge)];
+    pushGesture(createManyGesture(created, connected));
+  }
+
   async function insertTemplate(id: string, at: { x: number; y: number }) {
     const result = await post('template', { template_id: id, x: at.x, y: at.y });
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
@@ -3732,6 +3758,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onFigmaImages={figmaImagesAnswered}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
+    techniques={techniqueShelf.list}
+    onTechnique={insertTechnique}
+    onSaveTechnique={saveTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}

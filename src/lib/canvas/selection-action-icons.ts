@@ -69,6 +69,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'connect-new': Workflow,
   'connect-existing': Link2,
   'run-workflow': Play,
+  'save-technique': BookmarkPlus,
   'run-downstream': ListEnd,
   'run-stale': RefreshCw,
   'remove-background': Eraser,

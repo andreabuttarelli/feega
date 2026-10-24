@@ -199,7 +199,7 @@ through the same code (op `describe` `{}` lists them all, `{ op }` gives one inp
 `write_nodes`, `paste_nodes`,
 `connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,
 `rename_canvas`, `delete_canvas`, `rename_project`, `share_canvas`, `share_doc`,
-`insert_template`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
+`insert_template`, `list_techniques`, `save_technique`, `run_technique`, `delete_technique`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
 `show_run`, `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
 `retry_loop_combination`, `preview_workflow`, `run_workflow`, `cancel_workflow`,
 `preview_run_graph`, `run_graph`, `cancel_render`, `withdraw_from_gallery`, `request_upload`,

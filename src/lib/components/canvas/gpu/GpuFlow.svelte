@@ -3108,6 +3108,7 @@
       targeting = ids;
     },
     'run-workflow': (ids) => props.onRunWorkflow?.(ids),
+    'save-technique': (ids) => props.onSaveTechnique?.(ids),
     'run-downstream': (ids) => props.onRunGraph?.(GraphScope.Downstream, ids),
     'run-stale': (ids) => props.onRunGraph?.(GraphScope.Stale, ids),
     'copy-id': (ids) => void navigator.clipboard?.writeText(ids.join('\n')),
@@ -3549,6 +3550,8 @@
       onpick={addAtCentre}
       onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) ? viewCentre() : undefined) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
+      techniques={props.techniques}
+      ontechnique={props.onTechnique ? (id) => props.onTechnique?.(id, viewCentre()) : undefined}
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
       onimage={insertImageInFrame}

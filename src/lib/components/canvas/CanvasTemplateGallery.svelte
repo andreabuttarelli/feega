@@ -11,7 +11,17 @@
   } from '$lib/canvas/templates';
   import { NODE_KIND_ICON, NODE_KIND_LABEL } from '$lib/canvas/node-label';
 
-  let { open = $bindable(false), onpick }: { open?: boolean; onpick: (id: string) => void } = $props();
+  let {
+    open = $bindable(false),
+    onpick,
+    techniques = [],
+    onpicktechnique
+  }: {
+    open?: boolean;
+    onpick: (id: string) => void;
+    techniques?: { id: string; name: string; nodes: number }[];
+    onpicktechnique?: (id: string) => void;
+  } = $props();
 
   const FILTERS: { id: TemplateFilter; label: string }[] = [{ id: ALL_TEMPLATES, label: 'All' }, ...TEMPLATE_CATEGORIES];
 
@@ -109,6 +119,20 @@
       {/each}
     </div>
 
+    {#if onpicktechnique && techniques.length}
+      <section class="techniques" aria-label="Techniques" data-testid="technique-list">
+        <h3>Your techniques</h3>
+        <div class="technique-row">
+          {#each techniques as technique (technique.id)}
+            <button type="button" class="technique" data-testid="technique-pick" onclick={() => onpicktechnique(technique.id)}>
+              {technique.name}
+              <span class="count">{technique.nodes} nodes</span>
+            </button>
+          {/each}
+        </div>
+      </section>
+    {/if}
+
     <div class="scroll">
       <div class="grid" role="menu" aria-label="Templates" tabindex="-1" bind:this={grid} onkeydown={moveFocus}>
         {#each shown as template (template.id)}
@@ -138,6 +162,34 @@
 </Dialog.Root>
 
 <style>
+  .techniques {
+    padding: 12px 24px 0;
+  }
+  .techniques h3 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .technique-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .technique {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    padding: 4px 10px;
+    border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--ui-radius-sm, 4px);
+    background: var(--paper, #fff);
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--ink, #1d1d1f);
+    cursor: pointer;
+  }
+
   @layer utilities {
     :global([data-slot='dialog-content'].template-sheet) {
       display: flex !important;
