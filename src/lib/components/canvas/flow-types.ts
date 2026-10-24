@@ -75,6 +75,7 @@ export type FlowProps = {
   onCombineScenes?: (frameIds: string[]) => void;
   onInsertScene?: (drop: SceneDrop) => void;
   onImageTool?: (nodeId: string, tool: ImageTool) => void;
+  onLayersToFrame?: (nodeId: string) => void;
   onExport?: (frameIds: string[]) => void;
   onEdgeDelete?: (edgeId: string) => void;
   onEdgeRetype?: (edgeId: string, kind: CanvasEdgeKind) => void;
@@ -123,6 +124,7 @@ export type FlowProps = {
   stale?: string[];
   runQuoteFor?: (ids: string[]) => RunQuote | null;
   onRunNode?: (id: string) => void;
+  onViewOutput?: (id: string) => void;
   nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
   modelChoicesFor?: (type: GenPropertyType) => ModelChoice[];
   catalogueSyncedFor?: (type: GenPropertyType) => boolean;

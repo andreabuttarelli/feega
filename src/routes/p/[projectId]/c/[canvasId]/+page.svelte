@@ -3,6 +3,8 @@
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
   import { withColour } from '$lib/canvas/node-colour';
+  import OutputViewer from '$lib/components/canvas/OutputViewer.svelte';
+  import { OUTPUT_KIND_OF, viewableRuns, type OutputKind, type ViewerRun } from '$lib/canvas/run-info';
   import NodeSearch from '$lib/components/canvas/NodeSearch.svelte';
   import { NODES_PARAM, idsFromLink, selectionLink } from '$lib/canvas/selection-link';
   import type { CommentThread } from '$lib/canvas/comment-threads';
@@ -286,6 +288,22 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let linkCopied = $state(false);
+
+  let viewing = $state<{ runs: ViewerRun[]; start: number; kind: OutputKind } | null>(null);
+
+  function viewOutput(id: string) {
+    const node = nodes.find((n) => n.id === id);
+    const kind = node ? OUTPUT_KIND_OF[node.type] : undefined;
+    if (!node || !kind) {
+      return;
+    }
+    const outputs = viewableRuns((runs[id] ?? []) as ViewerRun[]);
+    const shown = outputs.findIndex((run) => run.outputAssetId === node.data.refId);
+    if (!outputs.length) {
+      return;
+    }
+    viewing = { runs: outputs, start: Math.max(shown, 0), kind };
+  }
 
   async function copySelectionLink() {
     await navigator.clipboard.writeText(selectionLink(page.url, selectedIds));
@@ -3265,6 +3283,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void invalidate('app:credits');
   }
 
+  async function layersToFrame(nodeId: string) {
+    landed(await post('layersToFrame', { node_id: nodeId }));
+  }
+
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
     landed(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
   }
@@ -3795,6 +3817,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCombineScenes={combineScenes}
     onInsertScene={insertSceneDrop}
     onImageTool={imageTool}
+    onLayersToFrame={layersToFrame}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}
     onEdgeDelete={disconnect}
@@ -3808,6 +3831,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onAddBeside={addFrameBeside}
     onSection={wrapInSection}
     onSectionChange={(id, patch) => void write(id, patch, SaveTiming.Now)}
+    onViewOutput={viewOutput}
     onColourChange={(ids, tag) => ids.forEach((id) => void write(id, withColour(tag), SaveTiming.Now))}
     onGroup={groupElements}
     onUngroup={ungroupElements}
@@ -4163,6 +4187,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
 
   <NodeSearch {nodes} onjump={(id) => focusOn([id], undefined, FocusMode.Select)} />
+
+  {#if viewing}
+    <OutputViewer runs={viewing.runs} start={viewing.start} kind={viewing.kind} urlFor={(assetId) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full)} onclose={() => (viewing = null)} />
+  {/if}
 
   {#if selectedIds.length}
     <button type="button" class="copy-link" data-testid="copy-selection-link" onclick={copySelectionLink}>{linkCopied ? 'Link copied' : 'Copy link to selection'}</button>

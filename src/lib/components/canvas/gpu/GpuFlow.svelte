@@ -3133,6 +3133,8 @@
     'combine-video': (ids) => props.onCombineScenes?.(ids),
     'remove-background': (ids) => props.onImageTool?.(ids[0], ImageTool.RemoveBackground),
     'upscale-image': (ids) => props.onImageTool?.(ids[0], ImageTool.Upscale),
+    'split-layers': (ids) => props.onImageTool?.(ids[0], ImageTool.SplitLayers),
+    'layers-to-frame': (ids) => props.onLayersToFrame?.(ids[0]),
     export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
     delete: (ids) => props.onDelete?.(ids)
   };
@@ -3590,6 +3592,7 @@
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
       onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}
       oncolourchange={(tag) => props.onColourChange?.(selected, tag)}
+      onview={() => props.onViewOutput?.(selected[0])}
     />
     {#if props.postAction}
       <NextStepChips postAction={props.postAction} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
