@@ -3,7 +3,7 @@ import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from
 import { setStill } from './still';
 import { COMPONENTS } from './components';
 import { DrawTool } from './draw-tool';
-import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, lineOutline, penClip } from './draw-create';
+import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
 import { parsePath, type Outline } from './shape/geometry';
 import type { OpResult } from './timeline';
 import { TextSizing } from './text-sizing';
@@ -117,6 +117,29 @@ describe('drawing an element on the canvas, outside any frame', () => {
 
     expect(drawn.box).toEqual({ left: 10, top: 20, width: 100, height: 50 });
     expect(findClip(drawn.doc, 'p1')!.clip.props).toMatchObject({ shape: 'path', x: 0.5, y: 0.5, width: 1, height: 1 });
+  });
+
+  it('an arrow drawn from two points is a stroked open path with its head at the end', () => {
+    const wire = drawnOf({ tool: DrawTool.Arrow, from: { x: 0, y: 100 }, to: { x: 300, y: 100 } });
+    if (typeof wire === 'string') {
+      throw new Error(wire);
+    }
+    const drawn = made(drawnElement(wire, 'a1'));
+    const props = findClip(drawn.doc, 'a1')!.clip.props;
+
+    expect(drawn.box.left).toBe(0);
+    expect(drawn.box.left + drawn.box.width).toBe(300);
+    expect(props).toMatchObject({ shape: 'path', fillKind: 'none', strokeKind: 'solid', stroke: CANVAS_INK[CanvasTheme.Light] });
+    expect(String(props.path).match(/L/g)?.length).toBeGreaterThan(1);
+  });
+
+  it('a line takes the stroke colour it is given', () => {
+    const wire = drawnOf({ tool: DrawTool.Line, from: { x: 0, y: 0 }, to: { x: 100, y: 100 }, stroke: '#ff0000' });
+    if (typeof wire === 'string') {
+      throw new Error(wire);
+    }
+
+    expect(findClip(made(drawnElement(wire, 'l1')).doc, 'l1')!.clip.props).toMatchObject({ stroke: '#ff0000', fillKind: 'none' });
   });
 
   it('a pasted path keeps its fill, and a stroke-only path draws its stroke without fill', () => {
