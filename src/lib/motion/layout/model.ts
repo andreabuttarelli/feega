@@ -38,7 +38,7 @@ export const autoLayoutSchema = z.object({
   autoFlow: z.enum(AUTO_FLOWS).default(AutoFlow.Row),
   alignContent: z.enum(ALIGN_CONTENTS).default(AlignContent.Auto),
   firstOnTop: z.boolean().default(false),
-  strokesIncluded: z.boolean().default(true),
+  strokesIncluded: z.boolean().default(false),
   order: z.array(z.string().min(1)).max(MAX_LAYOUT_CHILDREN).default([])
 });
 
@@ -71,6 +71,7 @@ export type AutoLayout = z.infer<typeof autoLayoutSchema>;
 export type LayoutItem = z.infer<typeof layoutItemSchema>;
 
 export const DEFAULT_AUTO_LAYOUT: AutoLayout = autoLayoutSchema.parse({});
+export const NEW_AUTO_LAYOUT: AutoLayout = { ...DEFAULT_AUTO_LAYOUT, strokesIncluded: true };
 export const DEFAULT_LAYOUT_ITEM: LayoutItem = layoutItemSchema.parse({});
 
 const TRACKS_OF_AXIS = { width: 'columnTracks', height: 'rowTracks' } as const;

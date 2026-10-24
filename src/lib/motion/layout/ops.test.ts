@@ -24,6 +24,19 @@ const row = (() => {
 
 const clip = (doc: MotionDoc, id: string) => findClip(doc, id)!.clip;
 
+describe('a new auto layout container', () => {
+  it('counts inside strokes explicitly', () => {
+    expect(clip(must(setAutoLayout(row, 'a', {})), 'a').autoLayout?.strokesIncluded).toBe(true);
+    expect(clip(must(wrapInAutoLayout(row, ['a', 'b'], 'box', 'lane')), 'box').autoLayout?.strokesIncluded).toBe(true);
+  });
+
+  it('keeps the choice of an existing container', () => {
+    const off = must(setAutoLayout(row, 'a', { strokesIncluded: false }));
+
+    expect(clip(must(setAutoLayout(off, 'a', { gap: 4 })), 'a').autoLayout?.strokesIncluded).toBe(false);
+  });
+});
+
 describe('wrapInAutoLayout', () => {
   const wrapped = must(wrapInAutoLayout(row, ['b', 'k', 'a'], 'box', 'lane'));
 
