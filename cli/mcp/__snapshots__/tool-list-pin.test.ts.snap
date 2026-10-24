@@ -1,4 +1,11 @@
-// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the MCP tool list does not move while the server code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > tool names and descriptions are byte-identical 1`] = `
+{
+  "count": 10,
+  "fingerprint": "ba4030fee3812e7f12d14e23df295bbfbc5aa0eb513101d346d73512f3a023ce",
+}
+`;
 
 exports[`the MCP tool list does not move while the server code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) tool names and descriptions are byte-identical 1`] = `
 {

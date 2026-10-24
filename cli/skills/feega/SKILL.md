@@ -33,7 +33,7 @@ iframe, social feed, social post mockup, products, ads) — through **MCP tools*
 MCP reaches the whole org: any project, canvas, node the signed-in user can
 see. A session lists 10 core tools; every other tool named here is found with `find_tools`,
 listed with `load_tools`, or run through `edit` `{op: "<tool>", input}`. `describe {op}` gives any
-exact schema. The CLI is narrower — it is the fallback for motion and gallery without a connected
+exact schema. `ask_motion_agent` and `get_motion_run` are unlisted aliases kept for one release; build with frame ops instead. The CLI is narrower — it is the fallback for motion and gallery without a connected
 agent. Never invent REST endpoints or API keys.
 
 ## Auth (always OAuth)
