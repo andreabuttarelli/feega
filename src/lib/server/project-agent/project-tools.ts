@@ -41,7 +41,7 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
   draw_element:
     'Draw a free graphic element on a canvas of THIS project, outside any frame: drawn { tool: "text" | "rectangle" | "ellipse", box: { left, top, width, height } } in canvas units, or { tool: "pen", path: "<SVG d in canvas units>" }. A text takes sizing auto (one line), auto-height or fixed. Not a Generate text node. Answers frame_id (the element node) and element_id (its clip): edit it with the frame tools.',
   group_elements:
-    'Group two or more things on the canvas of THIS project into one Group; they keep their places and sizes and move as one. Free elements (type element) are drawn inside the Group; frames and other nodes join it (data.groupId) and keep working. Inside a frame, group clips with the frame tool precompose instead.',
+    'Group two or more things on the canvas of THIS project into one Group; they keep their places and sizes and move as one. Free elements (type element) are drawn inside the Group; frames and other nodes join it (data.groupId) and keep working. Inside a frame, group clips with the frame tool precompose instead. section true wraps any nodes in a Section instead: a titled rectangle behind them that they join, so moving it moves them.',
   rotate_group:
     'Turn a Group on the canvas of THIS project by degrees (clockwise); everything in it, frames included, turns around the group centre.',
   ungroup_element:

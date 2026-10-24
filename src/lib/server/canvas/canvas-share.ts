@@ -259,7 +259,8 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   model3d: model3dView,
   motion: () => EMPTY,
   element: () => EMPTY,
-  studio_batch: () => EMPTY
+  studio_batch: () => EMPTY,
+  section: () => EMPTY
 };
 
 async function viewOf(input: ViewInput): Promise<SharedView> {

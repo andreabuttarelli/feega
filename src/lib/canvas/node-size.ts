@@ -16,6 +16,7 @@ import { studioBatchNodeSize } from './studio-batch-node';
 type Size = { w: number; h: number };
 
 const FALLBACK_SIZE: Size = { w: 320, h: 240 };
+export const SECTION_SIZE: Size = { w: 640, h: 420 };
 
 const NODE_SIZE: Record<NodeType, (data: Record<string, unknown>) => Size> = {
   text: () => genNodeSize('text'),
@@ -37,7 +38,8 @@ const NODE_SIZE: Record<NodeType, (data: Record<string, unknown>) => Size> = {
   model3d: () => genNodeSize('model3d'),
   motion: frameDefaultSize,
   element: (data) => frameDefaultSize(data, DocNodeType.Element),
-  studio_batch: studioBatchNodeSize
+  studio_batch: studioBatchNodeSize,
+  section: () => SECTION_SIZE
 };
 
 export function nodeSize(type: string, data: Record<string, unknown> = {}): Size {

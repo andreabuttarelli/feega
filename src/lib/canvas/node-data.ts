@@ -397,6 +397,13 @@ const effectsSchema = z.object({
   sourceRefId: z.string().nullish()
 });
 
+export const SECTION_DEFAULT_FILL = '#f3f3f3';
+
+const sectionSchema = z.object({
+  title: z.string().max(80).default('Section'),
+  fill: z.string().regex(HEX_COLOR, 'invalid colour, expected #rrggbb').default(SECTION_DEFAULT_FILL)
+});
+
 const calendarSchema = z.object({
   view: z.enum(CALENDAR_VIEWS),
   scope: z.enum(CALENDAR_SCOPES),
@@ -462,7 +469,8 @@ export const NODE_DATA_SCHEMAS = {
   model3d: model3dSchema,
   motion: motionNodeSchema,
   element: elementNodeSchema,
-  studio_batch: studioBatchNodeSchema
+  studio_batch: studioBatchNodeSchema,
+  section: sectionSchema
 } as const;
 
 export type NodeType = keyof typeof NODE_DATA_SCHEMAS;

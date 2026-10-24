@@ -27,6 +27,7 @@ import GenerateAudio from '$lib/components/canvas/icons/GenerateAudio.svelte';
 import GenerateModel3d from '$lib/components/canvas/icons/GenerateModel3d.svelte';
 import Clapperboard from '@lucide/svelte/icons/clapperboard';
 import Camera from '@lucide/svelte/icons/camera';
+import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
 import type { Component } from 'svelte';
 import type { Addable } from './addable';
 
@@ -46,5 +47,6 @@ export const ADDABLE_ICON: Record<Addable, Component> = {
   audio: GenerateAudio,
   model3d: GenerateModel3d,
   motion: Clapperboard,
-  studio_batch: Camera
+  studio_batch: Camera,
+  section: LayoutDashboard
 };

@@ -50,7 +50,8 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   model3d: { inputs: ['images', 'text'], output: null },
   motion: { inputs: NONE, output: 'motions' },
   element: { inputs: NONE, output: null },
-  studio_batch: { inputs: NONE, output: 'images' }
+  studio_batch: { inputs: NONE, output: 'images' },
+  section: { inputs: NONE, output: null }
 };
 
 const DEFAULT_AUDIO_OPERATION_CTX = (): AudioOperationId => audioOperationOf({});

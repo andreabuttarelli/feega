@@ -20,6 +20,7 @@ import type { RunQuote } from '$lib/canvas/run-quote';
 import type { GraphScope } from '$lib/canvas/run-graph';
 import type { DragPhase, DropVerdict, ElementOut, PointerPoint } from '$lib/canvas/canvas-drop';
 import type { Stack } from '$lib/canvas/stacking';
+import type { DeleteMode } from '$lib/canvas/section';
 
 export type Tile = {
   id: string;
@@ -63,7 +64,8 @@ export type FlowProps = {
     targetHandle: ConnectorType | null,
     sourceHandle: string | null,
   ) => void;
-  onDelete?: (ids: string[]) => void;
+  onDelete?: (ids: string[], mode?: DeleteMode) => void;
+  onSection?: (ids: string[]) => void;
   onCreateFormats?: (frameId: string) => void;
   onExport?: (frameIds: string[]) => void;
   onEdgeDelete?: (edgeId: string) => void;

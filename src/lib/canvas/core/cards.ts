@@ -3,7 +3,7 @@ import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
 import { Surface, type CardFace } from '$lib/canvas/gpu/card-face';
 import type { Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
-import { circle, rect, solid } from './shapes';
+import { circle, line, rect, solid } from './shapes';
 import { emptyItems } from './empty-card';
 import { embedItems } from './embed-card';
 import { batchItems, effectsItems } from './media-card';
@@ -106,6 +106,15 @@ const list = (x: Ctx): Item[] => [...panel(x), ...head(x, x.c.face.pills, 0), ..
 
 const doc = (x: Ctx): Item[] => [...panel(x), ...head(x, x.c.face.pills, 0), ...text(x, CardPart.Body, markdownText(x.c.face.text), BODY_SIZE, x.theme.ink, PAD, HEAD_H + ROW_GAP + PAD / 2, x.c.w - PAD * 2, x.c.h - HEAD_H - ROW_GAP - PAD * 1.5)];
 
+function section(x: Ctx): Item[] {
+  const { c, theme } = x;
+  return [
+    solid(x.clip(CardPart.Panel), at(c, [rect(0, 0, c.w, c.h)]), c.face.tint ?? theme.paper2),
+    solid(x.clip(CardPart.Panel), at(c, line(rect(BORDER / 2, BORDER / 2, c.w - BORDER, c.h - BORDER), BORDER, true)), theme.line),
+    ...text(x, CardPart.Title, c.face.title, HEAD_SIZE, theme.inkSoft, PAD, PAD / 2, c.w - PAD * 2)
+  ];
+}
+
 const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
   [Surface.Media]: (x) => [...panel(x), ...(x.c.face.media ? [image(x, CardPart.Media, x.c.face.media, whole(x.c), Fit.Contain)] : [])],
   [Surface.Frame]: frame,
@@ -122,6 +131,7 @@ const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
   [Surface.Effects]: effectsItems,
   [Surface.List]: list,
   [Surface.Doc]: doc,
+  [Surface.Section]: section,
   [Surface.Blank]: (x) => panel(x)
 };
 

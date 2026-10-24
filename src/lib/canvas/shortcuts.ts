@@ -23,6 +23,8 @@ export type CanvasCommandId =
   | 'tidy'
   | 'stack'
   | 'edit-mode'
+  | 'section'
+  | 'delete-keep'
   | 'enter'
   | 'select-next'
   | 'select-previous'
@@ -74,6 +76,10 @@ function viewFor(e: KeyboardEvent): FrameView | null {
   return command ? (VIEW_OF_COMMAND[command] ?? null) : null;
 }
 
+function sectionFor(e: KeyboardEvent): boolean {
+  return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.Section;
+}
+
 function stackFor(e: KeyboardEvent): boolean {
   return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.AutoLayout;
 }
@@ -113,6 +119,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.TidyUp]: { id: 'tidy' },
   [Command.AutoLayout]: { id: 'stack' },
   [Command.ToggleEditMode]: { id: 'edit-mode' },
+  [Command.Section]: { id: 'section' },
   [Command.AlignLeft]: { id: 'align', edge: Edge.Left },
   [Command.AlignCenter]: { id: 'align', edge: Edge.Center },
   [Command.AlignRight]: { id: 'align', edge: Edge.Right },
@@ -190,6 +197,7 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   if (mod) {
     if (key.toLowerCase() === 'z') return { id: e.shiftKey ? 'redo' : 'undo' };
     if (key.toLowerCase() === 'g') return { id: e.shiftKey ? 'ungroup' : 'group' };
+    if (key === 'Backspace' || key === 'Delete') return { id: 'delete-keep' };
     if (e.shiftKey) return null;
     if (key.toLowerCase() === 'a') return { id: 'select-all' };
     const command = PASTE_MOD_KEYS[key.toLowerCase()];
@@ -202,6 +210,7 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
 
   if (stackFor(e)) return { id: 'stack' };
   if (editModeFor(e)) return { id: 'edit-mode' };
+  if (sectionFor(e)) return { id: 'section' };
 
   const tool = toolFor(e);
   if (tool) return { id: 'tool', tool };
@@ -263,6 +272,8 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
   { id: 'stack', keys: ['⇧A'], label: 'Stack the selected tiles' },
   { id: 'edit-mode', keys: ['E'], label: 'Design or Animate: edit the resting state or key at the playhead' },
+  { id: 'section', keys: ['⇧S'], label: 'Wrap the selection in a section' },
+  { id: 'delete-keep', keys: ['mod', '⌫'], label: 'Delete a section, keep what is in it' },
   { id: 'view', keys: ["⇧'", '⇧G', 'mod Y'], label: 'Pixel grid, layout guides, outline view' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
   { id: 'fit', keys: ['0', '⇧1'], label: 'Zoom to fit' },
@@ -306,6 +317,8 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   tidy: GuideGroup.Edit,
   stack: GuideGroup.Edit,
   'edit-mode': GuideGroup.Edit,
+  section: GuideGroup.Edit,
+  'delete-keep': GuideGroup.Edit,
   nudge: GuideGroup.Edit,
   fit: GuideGroup.View,
   'zoom-actual': GuideGroup.View,
