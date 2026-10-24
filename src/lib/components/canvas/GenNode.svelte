@@ -18,6 +18,7 @@
   import { loopCreditsOf, runQuoteOf } from '$lib/canvas/run-quote';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
+  import { filterSkills, insertSkill, slashQueryAt, type PromptSkill, type SlashQuery } from '$lib/canvas/prompt-skills';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { untrack } from 'svelte';
   import OutputDragHandle from './OutputDragHandle.svelte';
@@ -46,7 +47,9 @@
     onestimate,
     result,
     references,
-    example = null
+    example = null,
+    skills = [],
+    onsaveskill
   }: {
     node: GenNode;
     /** I modelli che questo medium può usare, dal catalogo del brand. */
@@ -101,7 +104,59 @@
     result?: import('svelte').Snippet<[{ refId: string; text: string | null }]>;
     references?: import('svelte').Snippet;
     example?: DemoResult | null;
+    skills?: PromptSkill[];
+    onsaveskill?: (name: string, body: string) => Promise<boolean>;
   } = $props();
+
+  let slash = $state<SlashQuery | null>(null);
+  let picked = $state(0);
+  let promptEl = $state<HTMLTextAreaElement | null>(null);
+  let naming = $state<string | null>(null);
+  const SKILL_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+  const matches = $derived(slash ? filterSkills(skills, slash.query) : []);
+
+  function trackSlash(el: HTMLTextAreaElement) {
+    slash = slashQueryAt(el.value, el.selectionStart);
+    picked = 0;
+  }
+
+  function useSkill(skill: PromptSkill) {
+    if (!slash || !promptEl) {
+      return;
+    }
+    const out = insertSkill(promptEl.value, slash, skill);
+    slash = null;
+    onchange?.({ prompt: out.text });
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(out.caret, out.caret);
+    });
+  }
+
+  function pickKey(e: KeyboardEvent) {
+    if (!slash || matches.length === 0) {
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      picked = (picked + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length;
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      useSkill(matches[picked]);
+    } else if (e.key === 'Escape') {
+      slash = null;
+    }
+  }
+
+  async function saveNamed() {
+    const name = naming?.trim() ?? '';
+    if (!SKILL_NAME.test(name) || !onsaveskill) {
+      return;
+    }
+    if (await onsaveskill(name, node.prompt)) {
+      naming = null;
+    }
+  }
 
   /**
    * IL MODELLO CHE CONTA È QUELLO RISOLTO, non `node.model`: un nodo nato prima del default per
@@ -115,7 +170,7 @@
   );
   const choice = $derived(quote.choice);
   const upstream = $derived({ hasUpstreamText });
-  const state = $derived(runStateOf(node, upstream));
+  const runState = $derived(runStateOf(node, upstream));
   const tooLong = $derived(quote.tooLong);
   const TEXT_ESTIMATE_DELAY_MS = 400;
 
@@ -148,7 +203,7 @@
    * uno spazio vuoto.
    */
   const shownExample = $derived(node.refId ? null : example);
-  const hasBody = $derived(hasGenBody(node.medium, state, node.refId, !!shownExample));
+  const hasBody = $derived(hasGenBody(node.medium, runState, node.refId, !!shownExample));
 
 
   /**
@@ -195,7 +250,7 @@
   }
 </script>
 
-<div class="gen" class:is-running={state === 'running' || loopQueued > 0} use:measureHeight>
+<div class="gen" class:is-running={runState === 'running' || loopQueued > 0} use:measureHeight>
   <!-- Il risultato, quando c'è. Il testo lo mostra qui perché è esso stesso il prodotto; immagine
        e video li disegna chi usa il nodo, che sa da dove viene l'URL firmato.
 
@@ -206,12 +261,12 @@
        anteprima prima di girare, non una ripetizione di quel che il prompt già dice. -->
   {#if hasBody}
     <div class="gen-body">
-      {#if state === 'running'}
+      {#if runState === 'running'}
         <div class="gen-busy">
           <span class="gen-dots" aria-label={RUN_LABEL.running}><i></i><i></i><i></i></span>
           <button type="button" class="gen-unlock" onclick={() => onunlock?.()}>Sblocca</button>
         </div>
-      {:else if state === 'failed'}
+      {:else if runState === 'failed'}
         <div class="gen-fail" role="alert">
           <p class="gen-fail-title">{RUN_LABEL.failed}</p>
           {#if node.error}
@@ -234,7 +289,7 @@
           {/if}
         </div>
       {:else}
-        <p class="gen-hint">{RUN_LABEL[state]}</p>
+        <p class="gen-hint">{RUN_LABEL[runState]}</p>
       {/if}
     </div>
   {/if}
@@ -282,9 +337,40 @@
       rows="2"
       placeholder={PROMPT_PLACEHOLDER[node.medium]}
       value={node.prompt}
-      oninput={(e) => onchange?.({ prompt: e.currentTarget.value })}
+      bind:this={promptEl}
+      oninput={(e) => {
+        onchange?.({ prompt: e.currentTarget.value });
+        trackSlash(e.currentTarget);
+      }}
+      onkeydown={pickKey}
+      onblur={() => setTimeout(() => (slash = null), 150)}
       use:scrollGuard
     ></textarea>
+
+    {#if slash && matches.length > 0}
+      <ul class="gen-skills nodrag" role="listbox" data-testid="skill-picker">
+        {#each matches as skill, i (skill.id)}
+          <li role="option" aria-selected={i === picked}>
+            <button type="button" class:is-picked={i === picked} onmousedown={(e) => e.preventDefault()} onclick={() => useSkill(skill)}>
+              <b>/{skill.name}</b>
+              <span>{skill.body}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
+    {#if onsaveskill && node.prompt.trim()}
+      {#if naming === null}
+        <button type="button" class="gen-skill-save nodrag" data-testid="skill-save" onclick={() => (naming = '')}>Save as skill</button>
+      {:else}
+        <form class="gen-skill-name nodrag" onsubmit={(e) => { e.preventDefault(); void saveNamed(); }}>
+          <input placeholder="skill-name" bind:value={naming} data-testid="skill-name" />
+          <button type="submit" disabled={!SKILL_NAME.test(naming.trim())}>Save</button>
+          <button type="button" onclick={() => (naming = null)}>Cancel</button>
+        </form>
+      {/if}
+    {/if}
 
     <div class="gen-actions">
       <!-- Il perché sta ACCANTO al bottone spento, non altrove: un motivo che non si vede da dove
@@ -305,7 +391,7 @@
         </button>
       {/if}
       <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
-        {state === 'done' ? 'Redo' : 'Generate'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
+        {runState === 'done' ? 'Redo' : 'Generate'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
       </button>
     </div>
   </footer>
@@ -557,6 +643,59 @@
     line-height: 1.45;
     color: var(--ink, #1d1d1f);
     background: var(--paper-2, #f9f9f9);
+  }
+  .gen-skills {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 2px;
+    max-height: 132px;
+    overflow-y: auto;
+    border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--ui-radius-md, 6px);
+    background: var(--paper, #fff);
+  }
+  .gen-skills button {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm, 4px);
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .gen-skills button.is-picked {
+    background: var(--paper-2, #f2f2f2);
+  }
+  .gen-skills span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-3, #6e6e73);
+  }
+  .gen-skill-save {
+    margin-top: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 11.5px;
+    color: var(--ink-3, #6e6e73);
+    cursor: pointer;
+  }
+  .gen-skill-name {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 12px;
+  }
+  .gen-skill-name input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
   }
   .gen-prompt.is-full {
     flex: 1;
