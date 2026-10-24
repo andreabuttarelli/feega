@@ -29,6 +29,8 @@ export type SelectionActionId =
   | 'run-stale'
   | 'remove-background'
   | 'upscale-image'
+  | 'split-layers'
+  | 'layers-to-frame'
   | 'copy-id'
   | 'report'
   | 'group'
@@ -96,6 +98,8 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'ungroup', label: 'Ungroup', group: 'secondary', minNodes: 1, shortcut: 'Mod+Shift+G' },
   { id: 'remove-background', label: 'Remove background', group: 'secondary', minNodes: 1 },
   { id: 'upscale-image', label: 'Upscale 2×', group: 'secondary', minNodes: 1 },
+  { id: 'split-layers', label: 'Split into layers', group: 'secondary', minNodes: 1 },
+  { id: 'layers-to-frame', label: 'Layers to frame', group: 'secondary', minNodes: 1 },
   { id: 'copy', label: 'Copy', group: 'menu', minNodes: 1, shortcut: 'Mod+C' },
   { id: 'paste', label: 'Paste', group: 'menu', minNodes: 1, shortcut: 'Mod+V' },
   { id: 'bring-front', label: 'Bring to front', group: 'menu', minNodes: 1, shortcut: 'Mod+]' },
@@ -187,6 +191,8 @@ const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) =
   ...FRAME_DIALOG_SHOWN,
   'remove-background': isOneFinishedImage,
   'upscale-image': isOneFinishedImage,
+  'split-layers': isOneFinishedImage,
+  'layers-to-frame': (summaries) => isOneFinishedImage(summaries) && Array.isArray(summaries[0].data.layerRefIds) && summaries[0].data.layerRefIds.length > 0,
   ungroup: (summaries) => summaries.some(isGroup),
   'create-formats': (summaries) => summaries.length === 1 && isFrame(summaries[0]),
   'combine-video': (summaries) => summaries.length > 1 && summaries.every(isFrame),

@@ -8,6 +8,7 @@ import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
 import Globe from '@lucide/svelte/icons/globe';
 import Eraser from '@lucide/svelte/icons/eraser';
 import Scaling from '@lucide/svelte/icons/scaling';
+import Layers from '@lucide/svelte/icons/layers';
 import Copy from '@lucide/svelte/icons/copy';
 import Download from '@lucide/svelte/icons/download';
 import Workflow from '@lucide/svelte/icons/workflow';
@@ -73,6 +74,8 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'run-stale': RefreshCw,
   'remove-background': Eraser,
   'upscale-image': Scaling,
+  'split-layers': Layers,
+  'layers-to-frame': Frame,
   'copy-id': Hash,
   report: Flag,
   group: Group,

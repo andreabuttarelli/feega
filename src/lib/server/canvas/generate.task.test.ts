@@ -15,6 +15,7 @@ const INFLUENCER_NODE = '77777777-7777-7777-7777-777777777777';
 
 const UNCENSORED = 'wiro/wiro-partners/z-image-uncensored';
 const SAFE = 'wiro/alibaba/qwen-image-3-0-pro';
+const LAYERS = 'wiro/seedream/layers';
 
 const REFERENCE_VIDEO = 'higgsfield/bytedance/seedance-2.5/reference-to-video';
 
@@ -47,6 +48,13 @@ const models: Record<string, TaskModel> = {
     uncensored: true,
     spec: { owner: 'wiro-partners', project: 'z-image-uncensored', fields: { prompt: 'prompt', aspectRatio: 'ratio', images: [] } },
     paramSchema: { aspect_ratio: { type: 'enum', values: ['1:1'] }, promptExtend: { type: 'enum', values: ['false', 'true'] } }
+  },
+  [LAYERS]: {
+    id: LAYERS,
+    catalogue: 'image',
+    uncensored: false,
+    spec: { owner: 'seedream', project: 'layers', layers: true, fields: { prompt: 'prompt', images: ['image_url'] } },
+    paramSchema: {}
   },
   [SAFE]: {
     id: SAFE,
@@ -323,6 +331,17 @@ describe('the run tick finishes a Wiro task', () => {
     expect(gateway.purge).not.toHaveBeenCalled();
     const shown = calls.find((c) => c.table === 'nodes' && c.op === 'update' && JSON.stringify(c.payload).includes('outputUncensored'));
     expect(shown).toBeTruthy();
+  });
+
+  it('a layer model lands its first output as the result and keeps every other one on the node as a layer', async () => {
+    gateway.task.mockResolvedValue({ state: 'done', costUsd: 0.12, outputs: ['base', 'one', 'two'].map((name) => ({ url: `https://cdn.wiro.test/${name}.png`, contentType: 'image/png' })) });
+    const { db, calls } = fakeDb({ node_runs: [{ ...queued, model: LAYERS }], nodes: [imageNode({ running: true, runId: RUN })], projects: [uncensoredProject] });
+
+    expect(await reconcileTaskNodeRuns(db)).toMatchObject({ done: 1 });
+
+    expect(calls.filter((c) => c.table === 'assets' && c.op === 'insert')).toHaveLength(3);
+    const shown = calls.find((c) => c.table === 'nodes' && c.op === 'update' && JSON.stringify(c.payload).includes('layerRefIds'));
+    expect((shown?.payload as { data: { layerRefIds: string[] } }).data.layerRefIds).toHaveLength(2);
   });
 
   it('stores a Wiro png marked with the Wiro model, and records it', async () => {

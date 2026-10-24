@@ -19,6 +19,7 @@ import {
 } from '$lib/server/repos/canvas';
 import { runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate';
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
+import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-frame';
 import { ImageTool, UPSCALE_FACTORS } from '$lib/image-tools';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
@@ -823,6 +824,15 @@ export const CANVAS_OPS = {
         return { error: started.error };
       }
       return { nodeId: started.nodeId, ...outcomeOf(started.outcome) };
+    }
+  }),
+
+  layers_to_frame: op({
+    access: Access.Write,
+    input: nodeIdInput,
+    run: async (ctx, input) => {
+      const made = await layersToFrame(ctx.db, layersToFrameDeps(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, actor: ctx.actor }), { orgId: ctx.orgId, nodeId: input.nodeId });
+      return made.ok ? { outcome: 'done', frameId: made.frameId } : { error: made.error };
     }
   }),
 
