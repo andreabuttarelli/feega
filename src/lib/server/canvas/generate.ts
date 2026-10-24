@@ -83,6 +83,7 @@ export type StartRun = {
    *  giro ordinario, ogni `list` a monte si comporta come un filo `fixed`. */
   iterateSelection?: Record<string, number>;
   route?: RouteRole;
+  variants?: { group: string; source: string; sharesNode: boolean };
 };
 
 export type RunOutcome =
@@ -187,15 +188,34 @@ async function land(
   return { kind: 'done', run: { ...run, status: 'done', outputAssetId: asset.id }, asset };
 }
 
+export const VARIANT_GROUP_PARAM = 'variantGroup';
+export const VARIANT_SOURCE_PARAM = 'variantSource';
+
+const IN_FLIGHT: ReadonlySet<string> = new Set(['running', 'finishing']);
+
+function variantTagOf(input: StartRun): Record<string, string> {
+  return input.variants ? { [VARIANT_GROUP_PARAM]: input.variants.group, [VARIANT_SOURCE_PARAM]: input.variants.source } : {};
+}
+
+async function siblingsInFlight(db: Db, input: { orgId: string; nodeId: string }, runId: unknown): Promise<boolean> {
+  const runs = await listNodeRuns(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => []);
+  const group = runs.find((r) => r.id === runId)?.params[VARIANT_GROUP_PARAM];
+  if (!group) {
+    return false;
+  }
+  return runs.some((r) => r.id !== runId && IN_FLIGHT.has(r.status) && r.params[VARIANT_GROUP_PARAM] === group);
+}
+
 async function showRunState(
   db: Db,
   input: { orgId: string; nodeId: string; actor?: Actor },
   patch: Record<string, unknown>
 ): Promise<boolean> {
+  const stillRunning = patch.running === false && (await siblingsInFlight(db, input, patch.runId));
   const written = await patchNodeData(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,
-    patch,
+    patch: stillRunning ? { ...patch, running: true } : patch,
     check: DataCheck.None,
     actor: input.actor
   }).catch(() => null);
@@ -578,7 +598,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     nodeId: input.nodeId,
     prompt: input.prompt,
     model: input.model,
-    params: input.params,
+    params: { ...input.params, ...variantTagOf(input) },
     actorKind: input.actor?.kind ?? 'user',
     actorId: input.actor?.id ?? input.userId
   });
@@ -589,22 +609,24 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   // sparisce nell'istante in cui `running` si accende, e se il giro nuovo fallisce non c'è più un
   // `prior` che lo riporti indietro — l'immagine buona è persa per un giro che non ha prodotto
   // niente.
-  const marked = await writeNodeData(db, {
-    orgId: input.orgId,
-    nodeId: input.nodeId,
-    expectedVersion: input.expectedVersion,
-    actor: input.actor,
-    data: {
-      ...priorNode?.data,
-      prompt: input.prompt,
-      model: input.model,
-      params: input.params,
-      running: true,
-      runId: run.id,
-      routeNote: null
-    }
-  });
-  if (marked.outcome === 'conflict') {
+  const marking = {
+    prompt: input.prompt,
+    model: input.model,
+    params: input.params,
+    running: true,
+    runId: run.id,
+    routeNote: null
+  };
+  const marked = input.variants?.sharesNode
+    ? await patchNodeData(db, { orgId: input.orgId, nodeId: input.nodeId, patch: marking, check: DataCheck.None, actor: input.actor })
+    : await writeNodeData(db, {
+        orgId: input.orgId,
+        nodeId: input.nodeId,
+        expectedVersion: input.expectedVersion,
+        actor: input.actor,
+        data: { ...priorNode?.data, ...marking }
+      });
+  if (marked.outcome !== 'written') {
     await failRun(db, { orgId: input.orgId, runId: run.id, error: 'conflict' }).catch(() => {});
     return { kind: 'conflict' };
   }

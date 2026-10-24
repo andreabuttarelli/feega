@@ -3313,3 +3313,7 @@ Signal: a `@real` spec polls `nodes` and never finds the row it just made, right
 ## An OpenRouter call that 402s with plenty of credit left
 
 Signal: `This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens` from a judge or any call that sets no `max_tokens`. Cause: OpenRouter reserves the model's maximum output against the balance before the call. Move: always pass `max_tokens` sized to the answer (a 5-axis JSON verdict needs ~1500).
+
+## A mocked canvas generation refused `moderation_unavailable`
+
+Signal: an `@real` spec with `E2E_FAKE_IMAGES=1` runs a canvas node and every run comes back `moderation_unavailable: the safety review could not run`, though the image mock is up. Cause: the prompt is screened first by an LLM judge that calls `LLM_BASE_URL/responses` (and `/chat/completions`), which the mock did not serve. Move: `fixtures/mock-images.ts` answers both with a safe verdict; start your own dev server with `LLM_BASE_URL` on the mock and `KIE_API_KEY=` blank so no discount route can reach a real provider.

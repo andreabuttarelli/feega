@@ -3583,6 +3583,9 @@
       runQuote={props.runQuoteFor?.(selected) ?? null}
       frameTools
       onrun={() => props.onRunNode?.(selected[0])}
+      variantsInFlight={selected.length === 1 ? (props.variantsInFlightFor?.(selected[0]) ?? 0) : 0}
+      oncancelvariants={() => props.onCancelVariants?.(selected[0])}
+      history={selected.length === 1 ? (props.historyFor?.(selected[0]) ?? null) : null}
       onaction={runSelectionAction}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
       onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}
