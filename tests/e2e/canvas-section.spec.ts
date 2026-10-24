@@ -74,4 +74,53 @@ test.describe('sections @real', () => {
     expect(left).toEqual([first.id, second.id].sort());
     await page.screenshot({ path: `${SHOT_PREFIX}-st04-kept.png` });
   });
+
+  test('the title and fill are edited from the toolbar', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(150_000);
+    await setup(page, session, admin, seedNode as never);
+    await expect.poll(async () => (await rows(admin, session.canvasId)).filter((n) => n.type === 'section').length, { timeout: SAVED_MS }).toBe(1);
+    await page.waitForTimeout(SETTLE_MS);
+
+    const section = (await rows(admin, session.canvasId)).find((n) => n.type === 'section')!;
+    const box = (await page.locator(`[data-id="${section.id}"]`).boundingBox())!;
+    await page.mouse.click(box.x + box.width * 0.5, box.y + box.height - 12);
+    await page.getByLabel('Section title').fill('Launch');
+    await page.getByLabel('Section title').press('Tab');
+    await page.getByLabel('Section fill').fill('#ffe0b2');
+
+    await expect.poll(async () => ((await rows(admin, session.canvasId)).find((n) => n.id === section.id)!.data as { title?: string; fill?: string }), { timeout: SAVED_MS }).toMatchObject({ title: 'Launch', fill: '#ffe0b2' });
+    await page.waitForTimeout(SETTLE_MS);
+    await page.screenshot({ path: `${SHOT_PREFIX}-st05-edited.png` });
+  });
+
+  test('dragging a node out of a section leaves it, dragging it back joins', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(150_000);
+    const { first } = await setup(page, session, admin, seedNode as never);
+    await expect.poll(async () => (await rows(admin, session.canvasId)).filter((n) => n.type === 'section').length, { timeout: SAVED_MS }).toBe(1);
+    await page.waitForTimeout(SETTLE_MS);
+
+    const section = (await rows(admin, session.canvasId)).find((n) => n.type === 'section')!;
+    const groupOf = async () => ((await rows(admin, session.canvasId)).find((n) => n.id === first.id)!.data as { groupId?: string | null }).groupId ?? null;
+    await expect.poll(groupOf, { timeout: SAVED_MS }).toBe(section.id);
+
+    const frame = (await page.locator(`[data-frame="${first.id}"]`).boundingBox())!;
+    const grab = { x: frame.x + frame.width / 2, y: frame.y + frame.height * 0.15 };
+    await page.mouse.click(grab.x, grab.y);
+    await page.mouse.move(grab.x, grab.y);
+    await page.mouse.down();
+    await page.mouse.move(grab.x, grab.y + 400, { steps: 12 });
+    await page.mouse.up();
+    await expect.poll(groupOf, { timeout: SAVED_MS }).toBeNull();
+    await page.screenshot({ path: `${SHOT_PREFIX}-st05-left.png` });
+
+    await page.waitForTimeout(SETTLE_MS);
+    const out = (await page.locator(`[data-frame="${first.id}"]`).boundingBox())!;
+    const back = { x: out.x + out.width / 2, y: out.y + out.height * 0.15 };
+    await page.mouse.move(back.x, back.y);
+    await page.mouse.down();
+    await page.mouse.move(back.x, back.y - 400, { steps: 12 });
+    await page.mouse.up();
+    await expect.poll(groupOf, { timeout: SAVED_MS }).toBe(section.id);
+    await page.screenshot({ path: `${SHOT_PREFIX}-st05-joined.png` });
+  });
 });

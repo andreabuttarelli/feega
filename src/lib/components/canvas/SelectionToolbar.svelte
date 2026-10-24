@@ -20,6 +20,8 @@
   import ModelMenu from './ModelMenu.svelte';
   import { PROVIDER_PARAM } from '$lib/canvas/model-routes';
   import NodeSettings from './NodeSettings.svelte';
+  import { SECTION_TYPE } from '$lib/canvas/section';
+  import { SECTION_DEFAULT_FILL } from '$lib/canvas/node-data';
 
   const ICON_BUTTON = 'size-11 md:size-8';
 
@@ -36,7 +38,8 @@
     frameTools = false,
     onrun,
     onaction,
-    onpropertychange
+    onpropertychange,
+    onsectionchange
   }: {
     box: { x: number; y: number; width: number } | null;
     zoom?: number;
@@ -51,6 +54,7 @@
     onrun?: () => void;
     onaction?: (id: SelectionActionId) => void;
     onpropertychange?: (patch: SelectionPatch & { model?: string | null }) => void;
+    onsectionchange?: (id: string, patch: { title?: string; fill?: string }) => void;
   } = $props();
 
   const visible = $derived(box !== null && zoom >= TOOLBAR_HIDE_BELOW_ZOOM);
@@ -68,6 +72,9 @@
   );
 
   const properties = $derived(commonPropertiesOf(nodeSummaries));
+  const section = $derived(count === 1 && nodeSummaries[0]?.type === SECTION_TYPE ? nodeSummaries[0] : null);
+  const sectionTitle = $derived(typeof section?.data.title === 'string' ? section.data.title : '');
+  const sectionFill = $derived(typeof section?.data.fill === 'string' ? section.data.fill : SECTION_DEFAULT_FILL);
   const choices = $derived(properties.type && choicesFor ? choicesFor(properties.type) : []);
   const modelValue = $derived(
     properties.model.kind === 'same' && properties.type ? effectiveModel(properties.type, properties.model.value, choices) : null
@@ -141,6 +148,13 @@
           {#if controls.length}
             <NodeSettings {controls} onchange={(patch) => onpropertychange?.(patch)} />
           {/if}
+        </div>
+      {/if}
+
+      {#if section}
+        <div class="group" role="group" aria-label="Section">
+          <input class="section-title" aria-label="Section title" value={sectionTitle} onchange={(e) => onsectionchange?.(section.id, { title: e.currentTarget.value.trim() || 'Section' })} onkeydown={(e) => e.stopPropagation()} />
+          <input class="section-fill" type="color" aria-label="Section fill" value={sectionFill} onchange={(e) => onsectionchange?.(section.id, { fill: e.currentTarget.value })} />
         </div>
       {/if}
 
@@ -274,6 +288,21 @@
     .group[aria-label='Actions'] {
       justify-content: space-between;
     }
+  }
+
+  .section-title {
+    width: 9rem;
+    padding: 0 0.5rem;
+    font-size: 0.8125rem;
+    background: transparent;
+  }
+
+  .section-fill {
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
   }
 
   .warn {
