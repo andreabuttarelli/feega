@@ -15,6 +15,7 @@ import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
 import { latestAnswer, readAnswer } from '$lib/reference-pick';
+import { stopTurn } from '$lib/server/repos/chat-reply';
 import type { RequestHandler } from './$types';
 
 /**
@@ -135,4 +136,25 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 
   const [messages, running] = await Promise.all([loadTurns(db, { orgId, threadId }), turnRunning(db, { orgId, threadId })]);
   return json({ threadId, messages, running });
+};
+
+export const DELETE: RequestHandler = async ({ params, locals }) => {
+  const { user } = await locals.safeGetSession();
+  if (!user) return json({ error: 'unauthenticated' }, { status: 401 });
+
+  const db = await locals.db();
+  if (!db) {
+    return json({ error: 'no_client' }, { status: 500 });
+  }
+
+  const memberships = await listMemberships(db, user.id);
+  const found = await findReachableProject(db, { projectId: params.projectId ?? '', memberships, userId: user.id });
+  if (!found) {
+    return json({ error: 'project_not_found' }, { status: 404 });
+  }
+
+  const { orgId, project } = found;
+  const threadId = await openThread(db, { orgId, projectId: project.id, userId: user.id, brandId: project.brandId });
+  await stopTurn(db, { orgId, threadId });
+  return json({ stopped: true });
 };
