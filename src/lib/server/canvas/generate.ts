@@ -1216,7 +1216,8 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
 
       await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: progress.asset.id, costUsd: progress.costUsd });
       const poster = progress.poster ? { posterRefId: progress.poster.id } : {};
-      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored, ...poster });
+      const layerRefIds = progress.layers.length ? progress.layers.map((layer) => layer.id) : null;
+      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored, layerRefIds, ...poster });
       outcome.done += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'task_reconcile_failed';

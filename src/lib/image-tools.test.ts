@@ -8,6 +8,11 @@ describe('image tools', () => {
     expect(IMAGE_TOOL_MODEL[ImageTool.Upscale]).toBe('kie/topaz/image-upscale');
   });
 
+  it('splits layers on kie seedream and carries no params', () => {
+    expect(IMAGE_TOOL_MODEL[ImageTool.SplitLayers]).toBe('kie/seedream/5-flash-layer-decomposition');
+    expect(imageToolParams(ImageTool.SplitLayers, undefined)).toEqual({});
+  });
+
   it('recognises a tool model and nothing else', () => {
     expect(isImageToolModel('kie/recraft/remove-background')).toBe(true);
     expect(isImageToolModel('kie/nano-banana-2')).toBe(false);
