@@ -50,6 +50,7 @@ export async function renderVideoEffects(input: Buffer, steps: EffectStep[]): Pr
       '-framerate', String(fps), '-i', frames,
       '-i', source,
       '-map', '0:v:0', '-map', '1:a?',
+      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
       '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
       '-c:a', 'copy', '-shortest', '-movflags', '+faststart', '-y', output
     ];

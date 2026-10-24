@@ -14,7 +14,10 @@ export type EffectId =
 	| 'pinch'
 	| 'ascii'
 	| 'shape-mosaic'
-	| 'shape-cutout';
+	| 'shape-cutout'
+	| 'colour-grade'
+	| 'chroma-key'
+	| 'fit-aspect';
 
 export type EffectParam =
 	| { name: string; label: string; kind: 'range'; min: number; max: number; step: number; default: number }

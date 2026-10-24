@@ -1,6 +1,9 @@
 import { apply as applyAscii } from './ascii';
+import { apply as applyChromaKey } from './chroma-key';
+import { apply as applyColourGrade } from './colour-grade';
 import { apply as applyDither } from './dither';
 import { apply as applyDuotone } from './duotone';
+import { apply as applyFitAspect, FIT_MODE_OPTIONS, FitMode, RATIO_OPTIONS } from './fit-aspect';
 import { apply as applyGlitch } from './glitch';
 import { apply as applyHalftone } from './halftone';
 import { apply as applyHueSaturation } from './hue-saturation';
@@ -199,6 +202,32 @@ export const EFFECTS: Record<EffectId, EffectDefinition> = {
 			{ name: 'seed', label: 'Seed', kind: 'seed', default: 1 }
 		],
 		apply: applyShapeCutout
+	},
+	'colour-grade': {
+		label: 'Colour grade',
+		params: [
+			{ name: 'brightness', label: 'Brightness', kind: 'range', min: -100, max: 100, step: 1, default: 0 },
+			{ name: 'contrast', label: 'Contrast', kind: 'range', min: 0.5, max: 2, step: 0.05, default: 1 },
+			{ name: 'temperature', label: 'Temperature', kind: 'range', min: -100, max: 100, step: 1, default: 0 }
+		],
+		apply: applyColourGrade
+	},
+	'chroma-key': {
+		label: 'Chroma key',
+		params: [
+			{ name: 'color', label: 'Key colour', kind: 'color', default: '#00ff00' },
+			{ name: 'tolerance', label: 'Tolerance', kind: 'range', min: 0, max: 255, step: 1, default: 80 }
+		],
+		apply: applyChromaKey
+	},
+	'fit-aspect': {
+		label: 'Crop or pad to ratio',
+		params: [
+			{ name: 'ratio', label: 'Ratio', kind: 'select', options: RATIO_OPTIONS, default: '1:1' },
+			{ name: 'mode', label: 'Mode', kind: 'select', options: FIT_MODE_OPTIONS, default: FitMode.Pad },
+			{ name: 'background', label: 'Padding colour', kind: 'color', default: '#000000' }
+		],
+		apply: applyFitAspect
 	}
 };
 
