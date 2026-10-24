@@ -36,18 +36,28 @@ describe('docker-compose del self-host', () => {
 		expect(offenders, `usano $env/static/public: ${offenders.join(', ')}`).toEqual([]);
 	});
 
-	it('worker riusa l’immagine di app: due build identiche non entrano insieme negli 8 GiB del builder', () => {
+	it('app e migrate: l’app parte solo dopo che schema e demo sono nel database', () => {
 		const block = (service: string) =>
-			COMPOSE.match(new RegExp(`\\n  ${service}:\\n([\\s\\S]*?)(?=\\n  \\w+:|\\n\\w|$)`))?.[1] ?? '';
+			COMPOSE.match(new RegExp(`\\n  ${service}:\\n([\\s\\S]*?)(?=\\n  [\\w-]+:\\n|\\n\\w|$)`))?.[1] ?? '';
 
 		expect(PKG.scripts['build:node']).toContain('max-old-space-size=8192');
 		expect(block('app')).toMatch(/^\s{4}build:/m);
-		expect(block('worker'), 'worker ricostruisce la stessa immagine di app in parallelo').not.toMatch(/^\s{4}build:/m);
+		expect(block('app')).toMatch(/migrate:\s*\n\s*condition: service_completed_successfully/);
+		expect(block('migrate')).toContain('infra/setup/Dockerfile');
+	});
+
+	it('l’app condivide la rete di kong: browser e server raggiungono Supabase allo stesso indirizzo', () => {
+		expect(COMPOSE).toMatch(/network_mode: 'service:kong'/);
+		expect(COMPOSE).toMatch(/PUBLIC_SUPABASE_URL: \$\{SUPABASE_PUBLIC_URL:-http:\/\/localhost:8000\}/);
+	});
+
+	it('ogni porta pubblicata sta su 127.0.0.1: i segreti demo non escono dalla macchina', () => {
+		expect(publishedPorts().filter((p) => !p.startsWith('127.0.0.1:'))).toEqual([]);
 	});
 
 	it('la porta del database è la stessa dentro e fuori: cambiarla non lo stacca dall’host', () => {
 		const mapping = publishedPorts().find((p) => p.includes('POSTGRES_PORT')) ?? '';
-		const sides = mapping.match(/^(\$\{[^}]*\}|\d+):(\$\{[^}]*\}|\d+)(\/tcp)?$/);
+		const sides = mapping.replace(/^127\.0\.0\.1:/, '').match(/^(\$\{[^}]*\}|\d+):(\$\{[^}]*\}|\d+)(\/tcp)?$/);
 
 		expect(sides, `pubblicazione illeggibile: ${mapping}`).not.toBeNull();
 		expect(sides?.[1]).toBe(sides?.[2]);
@@ -102,59 +112,29 @@ describe('healthcheck dell’app', () => {
 
 describe('Realtime dello stack locale', () => {
 	it('usa il servizio Realtime dello stesso compose e propaga il flag kit all’app', () => {
-		expect(COMPOSE).toContain('AGENT_KIT: ${AGENT_KIT:-off}');
 		expect(COMPOSE).toContain('BILLING_PROVIDER: ${BILLING_PROVIDER:-open}');
-		expect(COMPOSE).toContain('worker:');
-		expect(COMPOSE).toContain("command: ['node', 'build-worker/index.js']");
 		expect(COMPOSE).not.toContain('container_name:');
 		expect(KONG).toContain('url: http://realtime-dev:4000/socket');
 		expect(KONG).not.toContain('realtime-dev.feega-realtime');
 		expect(KONG.match(/Host: realtime-dev/g) ?? []).toHaveLength(2);
-		expect(APP_DOCKERFILE).toContain('RUN npm run worker:build');
-		expect(APP_DOCKERFILE).toContain('COPY --from=builder /app/build-worker /app/build-worker');
 	});
 });
 
-describe('le migration ricostruiscono ciò che il codice scrive', () => {
+describe('lo schema di un’installazione nuova', () => {
 	/**
-	 * Trovato installando: su un database appena migrato ogni riga di `ai_calls` veniva rifiutata
+	 * Provato installando: su un database appena migrato ogni riga di `ai_calls` veniva rifiutata
 	 * («Could not find the 'cached_tokens' column»), e il rifiuto è un `console.warn` — l'app
-	 * funziona, il conto di quanto costa non esiste. In produzione le colonne ci sono perché sono
-	 * state aggiunte a mano: nessuna migration le crea, quindi solo chi installa da zero le perde.
-	 *
-	 * 2026-09-22: `ai_calls` sull'hosted (klnswzhhgrqvbfjzioul) è stata riscritta a mano su una
-	 * FORMA nuova — `operation`/`status`/`prompt_tokens`/`completion_tokens`/`org_id NOT NULL
-	 * references orgs(id)` — che le migration di self-host non hanno mai visto: qui la tabella è
-	 * ancora quella di `0050_ai_calls.sql` (`label`, `ms`, `ok`, `org_id references organizations`,
-	 * nessun `orgs`). `ai-log.ts` ora scrive la forma hosted, quindi self-host è rotto finché
-	 * qualcuno non porta `ai_calls` alla stessa forma — cosa che qui aspetta la rinomina
-	 * `organizations` → `orgs` descritta in NEW_DATABASE_STRUCTURE.md, non ancora fatta in nessuna
-	 * migration. Il test resta rosso di proposito: è il segnale, non un fastidio da silenziare.
+	 * funziona, il conto di quanto costa non esiste. Le migration legacy descrivono un altro
+	 * prodotto: lo schema di una nuova installazione è `supabase/baseline`.
 	 */
-	it.fails('ogni colonna che ai-log.ts inserisce esiste in qualche migration — self-host è dietro allo schema hosted', () => {
+	it('ogni colonna che ai-log.ts inserisce esiste nel baseline', () => {
 		const source = readFileSync('src/lib/server/ai-log.ts', 'utf8');
 		const insert = source.slice(source.indexOf('const row: AiCallInsert = {'));
 		const columns = [...insert.slice(0, insert.indexOf('};')).matchAll(/^\s{8}([a-z_]+):/gm)].map((m) => m[1]);
-
-		// Solo le istruzioni che parlano di ai_calls: `input_tokens` esiste anche su chat_messages,
-		// e cercarlo in tutto il corpus direbbe «c'è» mentre su questa tabella non c'è.
-		const statements = readdirSync('supabase/migrations')
-			.map((f) => readFileSync(`supabase/migrations/${f}`, 'utf8'))
-			.join('\n')
-			.replace(/--[^\n]*/g, '')
-			.split(';')
-			.filter((statement) => statement.includes('ai_calls'))
-			.join(';');
-
-		// Le colonne DICHIARATE: nome + tipo, dentro il create table o in un add column. Cercare il
-		// nome nudo direbbe «c'è» anche quando compare solo in un indice o in un commento.
-		const declared = new Set(
-			[...statements.matchAll(
-				/(?:add column(?: if not exists)?\s+|[(,]\s*)([a-z_]+)\s+(text|integer|smallint|bigint|uuid|boolean|numeric|jsonb|timestamptz|timestamp)/gm
-			)].map((m) => m[1])
-		);
+		const baseline = readFileSync('supabase/baseline/0001_tables.sql', 'utf8');
+		const aiCalls = baseline.slice(baseline.indexOf('create table public.ai_calls'), baseline.indexOf('create table public.ai_models'));
 
 		expect(columns.length).toBeGreaterThan(10);
-		expect(columns.filter((c) => !declared.has(c))).toEqual([]);
+		expect(columns.filter((c) => !new RegExp(`^  ${c} `, 'm').test(aiCalls))).toEqual([]);
 	});
 });

@@ -2,6 +2,16 @@
 
 Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa riconoscere, e la mossa che li risolve. Una sezione per tema. Una lezione nova entra qui nel commit che l'ha pagata.
 
+## Self-host
+
+### Docker on macOS hangs the database container when the clone lives in ~/Documents
+
+**Signal:** `docker compose up` stalls on the `db` service ("unhealthy"), `docker exec ... ls` on a bind-mounted path never returns, `docker kill` answers "did not receive an exit event". Nothing in the logs. **Move:** clone outside `~/Documents`, `~/Desktop` and `~/Downloads` (or grant Docker/OrbStack access to the folder), then `orbctl restart docker`. A volume left half-initialised by that run keeps failing with `password authentication failed for user "authenticator"`: `docker compose down -v` first.
+
+### A migrations folder can be a different product than the schema
+
+**Signal:** a fresh database applies every file and the app still answers `PGRST205` for `orgs`. **Move:** the new schema was never a migration; `supabase/baseline` is generated from production catalogs and `db:migrate` applies it, then only files dated after its cutoff. Never delete or rename the legacy files.
+
 ## Motion editor
 
 ### A PR that adds or changes a tool fails the tool surface pins
