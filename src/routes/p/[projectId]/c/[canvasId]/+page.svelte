@@ -4,6 +4,8 @@
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
   import type { CommentThread } from '$lib/canvas/comment-threads';
   import { marksFor } from '$lib/canvas/comment-marks';
+  import { hasUnseenMention, latestActivity, mentionedIds, type Teammate } from '$lib/canvas/comment-mentions';
+  import { readSeen, writeSeen } from '$lib/canvas/comments-seen';
   import { keepTextSize } from '$lib/motion/text-fit';
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
@@ -1448,10 +1450,34 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   });
 
+  let commentTeam = $state<Teammate[]>([]);
+  const me = $derived(data.session?.user?.id ?? '');
+
   async function loadComments() {
     const res = await post('canvasComments', {});
     commentThreads = (res?.threads as CommentThread[] | undefined) ?? [];
+    commentTeam = (res?.teammates as Teammate[] | undefined) ?? [];
   }
+
+  onMount(() => {
+    void loadComments();
+  });
+
+  $effect(() => {
+    const threads = commentThreads;
+    if (!threads) {
+      return;
+    }
+    if (commentsPanel.open) {
+      const latest = latestActivity(threads);
+      if (latest) {
+        writeSeen(data.canvas.id, latest);
+      }
+      commentsPanel.setUnseen(false);
+      return;
+    }
+    commentsPanel.setUnseen(hasUnseenMention(threads, me, readSeen(data.canvas.id)));
+  });
 
   const pinTarget = $derived.by(() => {
     const dropped = commentsPanel.pending;
@@ -1464,13 +1490,23 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function addThread(body: string) {
     const at = pinTarget;
-    await post('addComment', { body, x: at.x, y: at.y, ...(at.nodeId ? { node_id: at.nodeId } : {}), ...(at.timeMs === undefined ? {} : { time_ms: at.timeMs }) });
+    await post('addComment', { body, x: at.x, y: at.y, ...(at.nodeId ? { node_id: at.nodeId } : {}), ...(at.timeMs === undefined ? {} : { time_ms: at.timeMs }), mention: mentionedIds(body, commentTeam) });
     commentsPanel.settle();
     await loadComments();
   }
 
   async function replyTo(threadId: string, body: string) {
-    await post('addComment', { body, parent_id: threadId });
+    await post('addComment', { body, parent_id: threadId, mention: mentionedIds(body, commentTeam) });
+    await loadComments();
+  }
+
+  async function editCommentBody(commentId: string, body: string) {
+    await post('editComment', { comment_id: commentId, body, mention: mentionedIds(body, commentTeam) });
+    await loadComments();
+  }
+
+  async function deleteCommentById(commentId: string) {
+    await post('deleteComment', { comment_id: commentId });
     await loadComments();
   }
 
@@ -3561,7 +3597,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
 
   {#if commentsPanel.open}
-    <CanvasCommentsPanel threads={commentThreads} me={data.session?.user?.id ?? ''} pinsTo={pinTarget.label} onadd={addThread} onreply={replyTo} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
+    <CanvasCommentsPanel threads={commentThreads} {me} team={commentTeam} pinsTo={pinTarget.label} onadd={addThread} onreply={replyTo} onedit={editCommentBody} ondelete={deleteCommentById} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
   {/if}
 
   <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />

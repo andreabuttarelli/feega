@@ -4,6 +4,7 @@ let open = $state(false);
 let active = $state<string | null>(null);
 let placing = $state(false);
 let pending = $state<CommentPlacement | null>(null);
+let unseen = $state(false);
 
 export const commentsPanel = {
   get open(): boolean {
@@ -17,6 +18,12 @@ export const commentsPanel = {
   },
   get pending(): CommentPlacement | null {
     return pending;
+  },
+  get unseen(): boolean {
+    return unseen;
+  },
+  setUnseen(on: boolean) {
+    unseen = on;
   },
   show() {
     open = true;

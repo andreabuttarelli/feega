@@ -255,6 +255,7 @@
       projectMode={data.project.mode}
       brandName={data.brand?.name ?? null}
       onComments={() => commentsPanel.show()}
+      commentsUnseen={commentsPanel.unseen}
       canvasName={currentCanvas?.name ?? ''}
       canvasHref={currentCanvas?.href ?? ''}
       canvases={data.canvases}
