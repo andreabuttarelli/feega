@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 import { startImageTool, type ImageToolDeps } from './image-tool';
 import { IMAGE_TOOL_MODEL, ImageTool } from '$lib/image-tools';
@@ -19,6 +20,8 @@ function deps(over: Partial<ImageToolDeps> = {}): ImageToolDeps {
     createConnection: vi.fn(async () => ({ id: 'e1' })),
     runGenNode: vi.fn(async () => ({ kind: 'queued', run: { id: 'r1' } })),
     detectLayers: vi.fn(async () => TITLE_AND_PARROT),
+    pixelSizeOf: vi.fn(async () => ({ width: 80, height: 40 })),
+    storePng: vi.fn(async () => ({ id: 'mask-asset' })),
     ...over
   } as unknown as ImageToolDeps;
 }
@@ -102,5 +105,39 @@ describe('startImageTool puts a tool node beside an image and runs it', () => {
     await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Upscale });
 
     expect(d.detectLayers).not.toHaveBeenCalled();
+  });
+
+  describe('inpaint', () => {
+    const mask = { regions: [{ left: 0.5, top: 0, width: 0.5, height: 1 }] };
+
+    it('draws the mask at the picture size, keeps it as an asset and runs the edit model with the prompt', async () => {
+      const d = deps();
+
+      const out = await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Inpaint, prompt: 'a red hat', mask });
+
+      expect(out).toMatchObject({ ok: true, nodeId: 'n-out' });
+      expect(d.pixelSizeOf).toHaveBeenCalledWith(db, { orgId: 'org', assetId: 'asset-1' });
+      const stored = (d.storePng as ReturnType<typeof vi.fn>).mock.calls[0][1];
+      expect(stored).toMatchObject({ orgId: 'org', projectId: 'p1', userId: 'u1', nodeId: 'n-src', width: 80, height: 40 });
+      const meta = await sharp(stored.png).metadata();
+      expect({ width: meta.width, height: meta.height }).toEqual({ width: 80, height: 40 });
+      const data = { prompt: 'a red hat', model: IMAGE_TOOL_MODEL[ImageTool.Inpaint], params: { rendering_speed: 'BALANCED' }, maskRefId: 'mask-asset' };
+      expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ displayName: 'Inpaint', data }));
+      expect(d.runGenNode).toHaveBeenCalledWith(db, expect.objectContaining({ nodeId: 'n-out', prompt: 'a red hat', model: IMAGE_TOOL_MODEL[ImageTool.Inpaint] }));
+    });
+
+    it('refuses before writing anything without a prompt, without a mask, or when the picture has no known size', async () => {
+      for (const [ask, over, error] of [
+        [{ mask }, {}, 'prompt_required'],
+        [{ prompt: 'a red hat' }, {}, 'mask_required'],
+        [{ prompt: 'a red hat', mask }, { pixelSizeOf: vi.fn(async () => null) }, 'source_size_unknown']
+      ] as const) {
+        const d = deps(over as never);
+
+        expect(await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Inpaint, ...ask })).toEqual({ ok: false, error });
+        expect(d.storePng).not.toHaveBeenCalled();
+        expect(d.createNode).not.toHaveBeenCalled();
+      }
+    });
   });
 });
