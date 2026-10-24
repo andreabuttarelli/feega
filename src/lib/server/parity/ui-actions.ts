@@ -75,6 +75,8 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   canvasComments: canvas('list_canvas_comments'),
   addComment: canvas('add_canvas_comment'),
   resolveComment: canvas('resolve_canvas_comment'),
+  editComment: canvas('edit_canvas_comment'),
+  deleteComment: canvas('delete_canvas_comment'),
   createFormats: canvas('create_formats'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),

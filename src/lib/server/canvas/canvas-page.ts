@@ -49,7 +49,7 @@ import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } 
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { RestoreOutcome, listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
-import { CommentOutcome, addComment, listComments, resolveThread } from '$lib/server/canvas/canvas-comments';
+import { CommentOutcome, addComment, deleteComment, editComment, listComments, resolveThread, teammates } from '$lib/server/canvas/canvas-comments';
 import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
@@ -1482,7 +1482,7 @@ export const actions: Actions<CanvasParams> = {
 
   canvasComments: async ({ params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    return { threads: await listComments(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
+    return { threads: await listComments(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }), teammates: await teammates(scope.db, scope.orgId) };
   },
 
   addComment: async ({ request, params, locals }) => {
@@ -1496,9 +1496,25 @@ export const actions: Actions<CanvasParams> = {
       nodeId: fd.get('node_id') ? String(fd.get('node_id')) : null,
       parentId: fd.get('parent_id') ? String(fd.get('parent_id')) : null,
       x: Number(fd.get('x') ?? 0),
-      y: Number(fd.get('y') ?? 0)
+      y: Number(fd.get('y') ?? 0),
+      timeMs: fd.get('time_ms') ? Number(fd.get('time_ms')) : null,
+      mentions: fd.getAll('mention').map(String)
     });
     return out.outcome === CommentOutcome.Added ? out : fail(out.outcome === CommentOutcome.Missing ? 404 : 400, { error: out.outcome });
+  },
+
+  editComment: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const outcome = await editComment(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, actor: userActor(scope), commentId: String(fd.get('comment_id') ?? ''), body: String(fd.get('body') ?? ''), mentions: fd.getAll('mention').map(String) });
+    return outcome === CommentOutcome.Added ? { outcome } : fail(outcome === CommentOutcome.Invalid ? 400 : 404, { error: outcome });
+  },
+
+  deleteComment: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const outcome = await deleteComment(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, actor: userActor(scope), commentId: String(fd.get('comment_id') ?? '') });
+    return outcome === CommentOutcome.Added ? { outcome } : fail(404, { error: outcome });
   },
 
   resolveComment: async ({ request, params, locals }) => {
