@@ -2,6 +2,8 @@
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
+  import NodeSearch from '$lib/components/canvas/NodeSearch.svelte';
+  import { NODES_PARAM, idsFromLink, selectionLink } from '$lib/canvas/selection-link';
   import type { CommentThread } from '$lib/canvas/comment-threads';
   import { marksFor } from '$lib/canvas/comment-marks';
   import { hasUnseenMention, latestActivity, mentionedIds, type Teammate } from '$lib/canvas/comment-mentions';
@@ -245,6 +247,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { FigmaJob } from '$lib/canvas/figma/images';
   import { ImagesOutcome } from '$lib/canvas/figma/fetch-images';
 
+  const LINK_COPIED_MS = 1500;
+
   let { data } = $props();
 
   function announceWelcome() {
@@ -263,7 +267,30 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     untrack(announceWelcome);
   });
 
+  function openLinkedNodes() {
+    const ids = idsFromLink(page.url.searchParams).filter((id) => nodes.some((n) => n.id === id));
+    const clean = new URL(page.url);
+    clean.searchParams.delete(NODES_PARAM);
+    replaceState(clean, page.state);
+    if (ids.length) {
+      focusOn(ids, undefined, FocusMode.Select);
+    }
+  }
+
+  let linkCopied = $state(false);
+
+  async function copySelectionLink() {
+    await navigator.clipboard.writeText(selectionLink(page.url, selectedIds));
+    linkCopied = true;
+    setTimeout(() => (linkCopied = false), LINK_COPIED_MS);
+  }
+
   function openLinkedFrame() {
+    if (page.url.searchParams.has(NODES_PARAM)) {
+      openLinkedNodes();
+      return;
+    }
+
     const id = page.url.searchParams.get(FRAME_PARAM);
     if (!id) {
       return;
@@ -4005,6 +4032,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
 
 
+  <NodeSearch {nodes} onjump={(id) => focusOn([id], undefined, FocusMode.Select)} />
+
+  {#if selectedIds.length}
+    <button type="button" class="copy-link" data-testid="copy-selection-link" onclick={copySelectionLink}>{linkCopied ? 'Link copied' : 'Copy link to selection'}</button>
+  {/if}
+
   {#if coachOpen}
     <OnboardingCoach
       step={coachStep}
@@ -4225,5 +4258,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     color: var(--color-destructive);
     background: var(--color-background);
     border: 1px solid var(--color-destructive);
+  }
+
+  .copy-link {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    z-index: 5;
+    transform: translateX(-50%);
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-surface, var(--background));
+    color: var(--ui-ink);
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
   }
 </style>
