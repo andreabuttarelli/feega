@@ -1206,7 +1206,7 @@ export const actions: Actions<CanvasParams> = {
   imageTool: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = imageToolAskSchema.safeParse({ nodeId: fd.get('node_id'), tool: fd.get('tool'), factor: fd.get('factor') ?? undefined });
+    const ask = imageToolAskSchema.safeParse({ nodeId: fd.get('node_id'), tool: fd.get('tool'), factor: fd.get('factor') ?? undefined, prompt: fd.get('prompt') ?? undefined, mask: jsonField(fd, 'mask') });
     if (!ask.success) {
       return fail(400, { error: 'invalid request' });
     }
@@ -1216,7 +1216,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(denied.status, denied.data);
     }
 
-    const started = await startImageTool(scope.db, IMAGE_TOOL_DEPS, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, sourceNodeId: ask.data.nodeId, tool: ask.data.tool, factor: ask.data.factor });
+    const started = await startImageTool(scope.db, IMAGE_TOOL_DEPS, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, sourceNodeId: ask.data.nodeId, tool: ask.data.tool, factor: ask.data.factor, prompt: ask.data.prompt, mask: ask.data.mask });
     return started.ok ? { outcome: 'done', nodeId: started.nodeId } : fail(400, { error: started.error });
   },
 

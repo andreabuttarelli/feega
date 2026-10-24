@@ -327,6 +327,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'run-stale': canvas('run_graph'),
   'remove-background': canvas('image_tool'),
   'upscale-image': canvas('image_tool'),
+  inpaint: canvas('image_tool'),
   'split-layers': canvas('image_tool'),
   'layers-to-frame': canvas('layers_to_frame'),
   'copy-id': CLIPBOARD,

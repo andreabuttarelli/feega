@@ -76,6 +76,7 @@ export type FlowProps = {
   onInsertScene?: (drop: SceneDrop) => void;
   onImageTool?: (nodeId: string, tool: ImageTool) => void;
   onLayersToFrame?: (nodeId: string) => void;
+  onInpaint?: (nodeId: string) => void;
   onExport?: (frameIds: string[]) => void;
   onEdgeDelete?: (edgeId: string) => void;
   onEdgeRetype?: (edgeId: string, kind: CanvasEdgeKind) => void;

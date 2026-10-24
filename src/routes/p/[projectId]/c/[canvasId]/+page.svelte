@@ -215,10 +215,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
+  import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
+  import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
   import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
-  import type { ImageTool } from '$lib/image-tools';
+  import { ImageTool } from '$lib/image-tools';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
   import {
     docData,
@@ -3253,6 +3255,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let formatsFor = $state<string | null>(null);
+  let inpaintFor = $state<string | null>(null);
   let exportFor = $state<string[] | null>(null);
   let exportElements = $state<{ frameId: string; elementIds: string[] } | null>(null);
 
@@ -3280,6 +3283,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function imageTool(nodeId: string, tool: ImageTool) {
     landed(await post('imageTool', { node_id: nodeId, tool }));
+    void invalidate('app:credits');
+  }
+
+  async function inpaint(nodeId: string, prompt: string, mask: Mask) {
+    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Inpaint, prompt, mask: JSON.stringify(mask) }));
     void invalidate('app:credits');
   }
 
@@ -3777,6 +3785,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if versionsPanel.open}
     <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
   {/if}
+  {#if inpaintFor}
+    <InpaintDialog src={assetUrl(String(nodes.find((n) => n.id === inpaintFor)?.data?.refId ?? '')) ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
+  {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
   {/if}
@@ -3818,6 +3829,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onInsertScene={insertSceneDrop}
     onImageTool={imageTool}
     onLayersToFrame={layersToFrame}
+    onInpaint={(id) => (inpaintFor = id)}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}
     onEdgeDelete={disconnect}
