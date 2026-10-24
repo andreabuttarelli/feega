@@ -32,7 +32,7 @@ export class FrameEditSession {
   history = $state.raw<History>(startHistory({} as MotionDoc));
   version = $state(0);
   selection = $state<string[]>([]);
-  mode = $state<EditMode>(EditMode.Motion);
+  mode = $state<EditMode>(EditMode.Design);
   saveState = $state<SaveState>(SaveState.Saved);
   notice = $state('');
   readonly live: LiveEdits<MotionDoc>;
@@ -52,7 +52,7 @@ export class FrameEditSession {
     this.history = startHistory(start.head.doc);
     this.version = start.head.version;
     this.selection = start.selection;
-    this.mode = start.mode ?? EditMode.Motion;
+    this.mode = start.mode ?? EditMode.Design;
     this.baseDoc = start.head.doc;
     this.live = liveEdits<MotionDoc>({
       show: (next) => this.port.show(next),

@@ -25,6 +25,10 @@ describe('the edit mode a frame opens in', () => {
     expect(startMode(still, EditMode.Motion)).toBe(EditMode.Design);
   });
 
+  it('a motion frame opens in Design when no mode was ever chosen', () => {
+    expect(startMode(video, null)).toBe(EditMode.Design);
+  });
+
   it('a motion frame opens in the last mode used', () => {
     expect(startMode(video, EditMode.Motion)).toBe(EditMode.Motion);
     expect(startMode(video, EditMode.Design)).toBe(EditMode.Design);

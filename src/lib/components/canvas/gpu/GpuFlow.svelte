@@ -2785,7 +2785,7 @@
       return false;
     }
     const at = scoped(tools.doc, picks, tools.frame);
-    const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy], savers.get(nodeId)?.mode ?? EditMode.Motion) : null;
+    const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy], savers.get(nodeId)?.mode ?? EditMode.Design) : null;
     if (at && result?.ok) {
       commit(nodeId, { ok: true, doc: at.merge(result.doc) }, GRIP_SUMMARY[Grip.Move]);
     }

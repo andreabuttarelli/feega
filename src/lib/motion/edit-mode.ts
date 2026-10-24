@@ -61,7 +61,7 @@ const NEXT: Record<EditMode, EditMode> = { [EditMode.Design]: EditMode.Motion, [
 
 export const nextMode = (mode: EditMode): EditMode => NEXT[mode];
 
-export const readMode = (stored: string | null): EditMode => (Object.values(EditMode) as string[]).includes(stored ?? '') ? (stored as EditMode) : EditMode.Motion;
+export const readMode = (stored: string | null): EditMode => (Object.values(EditMode) as string[]).includes(stored ?? '') ? (stored as EditMode) : EditMode.Design;
 
 export function startMode(doc: MotionDoc, stored: string | null): EditMode {
   return controlShown(doc, VideoControl.EditMode) && timelineFits(doc) ? readMode(stored) : EditMode.Design;
