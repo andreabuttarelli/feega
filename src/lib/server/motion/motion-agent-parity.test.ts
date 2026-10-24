@@ -90,6 +90,7 @@ const CLIP: Record<string, Access> = {
   mutedLanes: { write: ['edit_lane'], read: 'mutedLanes' },
   locked: { write: ['set_visibility'], read: 'locked' },
   bleed: { write: ['set_visibility'], read: 'bleed' },
+  lockRatio: { write: ['set_visibility'], read: 'lockRatio' },
   clipContent: { write: ['set_visibility'], read: 'clipContent' },
   markers: { write: ['set_marker', 'remove_marker'], read: 'markers' }
 };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, setTransform, type OpResult } from '$lib/motion/timeline';
+import { setClipFlags } from '$lib/motion/organize';
 import { Grip, aabb, handlesOf, quadOf, type Bounds } from '$lib/motion/scene-select';
 import { guessedBoxes } from '$lib/motion/move-element';
 import { transformAt } from '$lib/motion/parent';
@@ -67,6 +68,25 @@ describe('dragClips', () => {
     const { result } = dragClips(drag({ to: [1000, 530], keys: { shift: true, alt: false }, reach: 0 }));
 
     expect(centre(boundsOf(must(result), 'card'))[1]).toBeCloseTo(centre(boundsOf(DOC, 'card'))[1]);
+  });
+
+  describe('a locked aspect ratio', () => {
+    const lockedDoc = must(setClipFlags(DOC, 'card', { lockRatio: true }));
+    const corner = boundsOf(lockedDoc, 'card');
+    const resize = (keys: Drag['keys']) => {
+      const { result } = dragClips(drag({ doc: lockedDoc, grip: Grip.Scale, handle: CORNER_BOTTOM_RIGHT, from: [corner.right, corner.bottom], to: [corner.right + 80, corner.bottom + 5], keys, reach: 0 }));
+      const after = boundsOf(must(result), 'card');
+      return (after.right - after.left) / (after.bottom - after.top);
+    };
+    const ratio = (corner.right - corner.left) / (corner.bottom - corner.top);
+
+    it('keeps the ratio when a corner is dragged without Shift', () => {
+      expect(resize(NO_KEYS)).toBeCloseTo(ratio, 3);
+    });
+
+    it('Ctrl unlocks it for the drag', () => {
+      expect(Math.abs(resize({ shift: false, alt: false, ctrl: true }) - ratio)).toBeGreaterThan(0.1);
+    });
   });
 
   it('resizes from the centre while Alt is held', () => {

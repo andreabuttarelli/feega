@@ -218,7 +218,19 @@ export function removeClips(doc: MotionDoc, ids: readonly string[]): OpResult {
   return { ok: true, doc: { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.includes(c.id)).map(orphan) })) } };
 }
 
-export function setProps(doc: MotionDoc, clipId: string, patch: Record<string, unknown>): OpResult {
+function ratioKept(clip: MotionClip | undefined, doc: MotionDoc, patch: Record<string, unknown>): Record<string, unknown> {
+  const { width, height } = patch;
+  const asked = typeof width === 'number' !== (typeof height === 'number');
+  const [oldW, oldH] = [Number(clip?.props.width), Number(clip?.props.height)];
+  if (!clip?.lockRatio || !asked || !(oldW > 0) || !(oldH > 0)) {
+    return patch;
+  }
+  const ratio = (oldW * doc.width) / (oldH * doc.height);
+  return typeof width === 'number' ? { ...patch, height: (width * doc.width) / ratio / doc.height } : { ...patch, width: (Number(height) * doc.height * ratio) / doc.width };
+}
+
+export function setProps(doc: MotionDoc, clipId: string, asked: Record<string, unknown>): OpResult {
+  const patch = ratioKept(findClip(doc, clipId)?.clip, doc, asked);
   const bound = Object.keys(patch).find((key) => findClip(doc, clipId)?.clip.bind?.[key]);
   if (bound) {
     return fail(`${bound} is bound to ${findClip(doc, clipId)?.clip.bind?.[bound]}: unbind it first`);

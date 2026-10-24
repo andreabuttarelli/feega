@@ -121,6 +121,7 @@ const clipSchema = z.object({
   autoLayout: autoLayoutSchema.nullable().optional(),
   layoutItem: layoutItemSchema.optional(),
   constraints: constraintsSchema.optional(),
+  lockRatio: z.boolean().optional(),
   partStyles: partStylesSchema.optional(),
   styleRef: z.string().min(1).optional(),
   effectStyleRef: z.string().min(1).optional(),

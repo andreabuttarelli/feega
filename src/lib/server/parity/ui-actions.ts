@@ -284,6 +284,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Tool.ShowLayer]: motion('set_visibility'),
   [Tool.LockLayer]: motion('set_visibility'),
   [Tool.UnlockLayer]: motion('set_visibility'),
+  [Tool.LockRatio]: motion('set_visibility'),
+  [Tool.UnlockRatio]: motion('set_visibility'),
   [Tool.ItemUp]: motion('set_effect'),
   [Tool.ItemDown]: motion('set_effect'),
   [Tool.Remove]: motion('remove_effect'),
