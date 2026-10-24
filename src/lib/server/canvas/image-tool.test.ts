@@ -21,7 +21,8 @@ function deps(over: Partial<ImageToolDeps> = {}): ImageToolDeps {
     runGenNode: vi.fn(async () => ({ kind: 'queued', run: { id: 'r1' } })),
     detectLayers: vi.fn(async () => TITLE_AND_PARROT),
     pixelSizeOf: vi.fn(async () => ({ width: 80, height: 40 })),
-    storePng: vi.fn(async () => ({ id: 'mask-asset' })),
+    storePng: vi.fn(async (_db: unknown, input: { png: Buffer }) => ({ id: input.png.byteLength === 7 ? 'padded-asset' : 'mask-asset' })),
+    paddedPng: vi.fn(async () => Buffer.from('padded!')),
     ...over
   } as unknown as ImageToolDeps;
 }
@@ -105,6 +106,36 @@ describe('startImageTool puts a tool node beside an image and runs it', () => {
     await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Upscale });
 
     expect(d.detectLayers).not.toHaveBeenCalled();
+  });
+
+  describe('outpaint', () => {
+    const extend = { right: 0.5 };
+
+    it('pads the picture, masks the new strip, and runs the edit model on the padded picture', async () => {
+      const d = deps();
+
+      const out = await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Outpaint, prompt: 'more beach', extend });
+
+      expect(out).toMatchObject({ ok: true, nodeId: 'n-out' });
+      expect(d.paddedPng).toHaveBeenCalledWith(db, { orgId: 'org', assetId: 'asset-1' }, { width: 80, height: 40 }, expect.objectContaining({ padded: { width: 120, height: 40 } }));
+      const stored = (d.storePng as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[1]);
+      expect(stored.map((s) => ({ width: s.width, height: s.height }))).toEqual([{ width: 120, height: 40 }, { width: 120, height: 40 }]);
+      const data = { prompt: 'more beach', model: IMAGE_TOOL_MODEL[ImageTool.Outpaint], params: { rendering_speed: 'BALANCED' }, editImageRefId: 'padded-asset', maskRefId: 'mask-asset' };
+      expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ displayName: 'Outpaint', data }));
+    });
+
+    it('refuses before writing without a prompt, without an extension, or when the size is unknown', async () => {
+      for (const [ask, over, error] of [
+        [{ extend }, {}, 'prompt_required'],
+        [{ prompt: 'more beach' }, {}, 'extend_required'],
+        [{ prompt: 'more beach', extend }, { pixelSizeOf: vi.fn(async () => null) }, 'source_size_unknown']
+      ] as const) {
+        const d = deps(over as never);
+
+        expect(await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Outpaint, ...ask })).toEqual({ ok: false, error });
+        expect(d.createNode).not.toHaveBeenCalled();
+      }
+    });
   });
 
   describe('inpaint', () => {

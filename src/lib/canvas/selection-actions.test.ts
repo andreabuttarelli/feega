@@ -72,7 +72,7 @@ describe('group and ungroup', () => {
 
   it('offers the image tools on one image that has a result, and nowhere else', () => {
     const done = { type: 'image', data: { refId: 'a1' } };
-    for (const id of ['remove-background', 'upscale-image', 'inpaint', 'split-layers'] as const) {
+    for (const id of ['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'split-layers'] as const) {
       expect(shownFor(id, [done])).toBe(true);
       expect(shownFor(id, [done, done])).toBe(false);
       expect(shownFor(id, [{ type: 'image', data: {} }])).toBe(false);
@@ -103,7 +103,7 @@ describe('group and ungroup', () => {
 
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
-    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup', 'remove-background', 'upscale-image', 'inpaint', 'split-layers', 'layers-to-frame']);
+    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup', 'remove-background', 'upscale-image', 'inpaint', 'outpaint', 'split-layers', 'layers-to-frame']);
     expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['export', ...Object.keys(FRAME_DIALOG_ACTIONS), 'copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });

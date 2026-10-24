@@ -11,7 +11,8 @@ vi.mock('$lib/server/repos/assets', async (importOriginal) => ({ ...(await impor
 vi.mock('./sign-media', () => ({ signMediaPaths }));
 
 import sharp from 'sharp';
-import { pixelSizeOf, storePng } from './edit-assets';
+import { paddedPng, pixelSizeOf, storePng } from './edit-assets';
+import { outpaintPlan } from '$lib/outpaint';
 
 const upload = vi.fn(async () => ({ error: null }));
 const db = { storage: { from: () => ({ upload }) } } as never;
@@ -63,5 +64,23 @@ describe('pixelSizeOf', () => {
 
     findAsset.mockResolvedValue({ id: 'a1', type: 'video', url: 'u1/clip.mp4', width: null, height: null });
     expect(await pixelSizeOf(db, { orgId: 'org', assetId: 'a1' })).toBeNull();
+  });
+});
+
+describe('paddedPng', () => {
+  it('puts the picture on a larger canvas at the planned offset', async () => {
+    const png = await sharp({ create: { width: 20, height: 10, channels: 3, background: '#f00' } }).png().toBuffer();
+    findAsset.mockResolvedValue({ id: 'a1', type: 'image', url: 'u1/pic.png', width: 20, height: 10 });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(png))));
+    const plan = outpaintPlan({ width: 20, height: 10 }, { left: 0.5, right: 0, top: 0, bottom: 0 });
+
+    const padded = await paddedPng(db, { orgId: 'org', assetId: 'a1' }, { width: 20, height: 10 }, plan);
+
+    const { data, info } = await sharp(padded).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect({ width: info.width, height: info.height }).toEqual({ width: 30, height: 10 });
+    const pixel = (x: number) => [data[x * 3], data[x * 3 + 1], data[x * 3 + 2]];
+    expect(pixel(15)).toEqual([255, 0, 0]);
+    expect(pixel(2)).not.toEqual([255, 0, 0]);
+    vi.unstubAllGlobals();
   });
 });

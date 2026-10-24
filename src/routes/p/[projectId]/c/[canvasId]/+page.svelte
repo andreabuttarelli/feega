@@ -214,6 +214,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
+  import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
+  import type { Extend } from '$lib/outpaint';
   import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
@@ -3233,6 +3235,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let formatsFor = $state<string | null>(null);
   let inpaintFor = $state<string | null>(null);
+  let outpaintFor = $state<string | null>(null);
   let exportFor = $state<string[] | null>(null);
   let exportElements = $state<{ frameId: string; elementIds: string[] } | null>(null);
 
@@ -3265,6 +3268,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function inpaint(nodeId: string, prompt: string, mask: Mask) {
     landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Inpaint, prompt, mask: JSON.stringify(mask) }));
+    void invalidate('app:credits');
+  }
+
+  async function outpaint(nodeId: string, prompt: string, extend: Extend) {
+    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
     void invalidate('app:credits');
   }
 
@@ -3702,6 +3710,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if versionsPanel.open}
     <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
   {/if}
+  {#if outpaintFor}
+    <OutpaintDialog onapply={(prompt, extend) => outpaint(outpaintFor!, prompt, extend)} onclose={() => (outpaintFor = null)} />
+  {/if}
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(String(nodes.find((n) => n.id === inpaintFor)?.data?.refId ?? '')) ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
   {/if}
@@ -3747,6 +3758,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onImageTool={imageTool}
     onLayersToFrame={layersToFrame}
     onInpaint={(id) => (inpaintFor = id)}
+    onOutpaint={(id) => (outpaintFor = id)}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}
     onEdgeDelete={disconnect}
