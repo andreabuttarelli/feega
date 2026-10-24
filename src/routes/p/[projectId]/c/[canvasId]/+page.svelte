@@ -193,6 +193,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { cleanNodeName } from '$lib/canvas/node-name';
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
+  import { promptSkillsOf, saveSkill } from '$lib/canvas/prompt-skills.svelte';
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
@@ -251,6 +252,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const LINK_COPIED_MS = 1500;
 
   let { data } = $props();
+  const skillShelf = promptSkillsOf(untrack(() => data.projectId));
 
   function announceWelcome() {
     const campaign = campaignOf(page.url.searchParams.get(WELCOME_PARAM));
@@ -3845,6 +3847,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onshow={(runId) => restore(id, gen, runId)}
             onmeasure={(contentHeight) => (grownHeights[id] = contentHeight)}
             example={exampleFor(row)}
+            skills={skillShelf.list}
+            onsaveskill={(name, body) => saveSkill(data.projectId, name, body)}
           >
             {#snippet result({ refId, text })}
               <!-- `/c/<tela>/assets/<id>` firma lo storage al volo: un URL firmato messo qui
