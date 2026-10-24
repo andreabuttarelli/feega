@@ -1,12 +1,14 @@
-import { jsonSchema, tool, type Tool } from 'ai';
+import { asSchema, jsonSchema, tool, type Tool } from 'ai';
 import { z } from 'zod';
 import type { Turn } from '$lib/server/repos/chat';
 import { motionToolList, motionToolSpec } from '$lib/server/motion/tool-run';
 import { withFrames } from '$lib/server/motion/frames';
+import { firstLine, slimCore } from './core-tools';
 import { FRAME_TOOL, createFrameTools, type FrameRunner, type FrameToolDeps } from './frame-tools';
 
 export const FIND_TOOLS = 'find_tools';
 export const LOAD_TOOLS = 'load_tools';
+export const DESCRIBE_TOOLS = 'describe_tools';
 export const LOADED_CAP = 40;
 export const WARM_TURNS = 3;
 const FOUND_MAX = 25;
@@ -92,14 +94,17 @@ function score(query: string, name: string, description: string): number {
   return words(query).reduce((sum, w) => sum + (named.includes(w) ? NAME_WEIGHT : 0) + (described.includes(w) ? 1 : 0), 0);
 }
 
-export function loaderTools(direct: Record<string, Tool>, loaded: LoadedSet): Record<string, Tool> {
-  const loadable = new Set(Object.keys(direct));
-  const entries = motionToolList().filter((t) => loadable.has(t.name));
-  const described = (name: string) => String(direct[name]?.description ?? '');
+type Entry = { name: string; summary: string };
+
+export type Catalogue = { full: Record<string, Tool>; entries: Entry[]; loaded: LoadedSet };
+
+export function loaderTools({ full, entries, loaded }: Catalogue): Record<string, Tool> {
+  const loadable = new Set(entries.map((e) => e.name));
+  const described = (name: string) => String(full[name]?.description ?? '');
 
   return {
     [FIND_TOOLS]: tool({
-      description: `Search the frame editor tools (motion videos, stills, graphic elements) by keywords, best match first; omit query to list all of them at once. Free. Answers name and one line each; ${LOAD_TOOLS} them to call them directly.`,
+      description: `Search the other tools (frame editor, effects, gallery, groups, loops...) by keywords, best match first; omit query to list all. Free. ${LOAD_TOOLS} them to call them.`,
       inputSchema: z.object({ query: z.string().optional() }).strict(),
       execute: async ({ query }: { query?: string }) => {
         const ranked = query ? entries.map((e) => ({ e, score: score(query, e.name, described(e.name)) })).filter((r) => r.score > 0).sort((a, b) => b.score - a.score).map((r) => r.e) : entries;
@@ -109,13 +114,22 @@ export function loaderTools(direct: Record<string, Tool>, loaded: LoadedSet): Re
     }),
 
     [LOAD_TOOLS]: tool({
-      description: `Load frame editor tools by name (several in one call): from your next step they are callable directly, with their full input schema. Free. At most ${LOADED_CAP} stay loaded; the oldest drop.`,
+      description: `Load tools by name, several at once: callable from the next step with full schema. At most ${LOADED_CAP}, oldest drop.`,
       inputSchema: z.object({ names: z.array(z.string().min(1)).min(1).max(LOADED_CAP) }).strict(),
       execute: async ({ names }: { names: string[] }) => {
         const known = names.filter((n) => loadable.has(n));
         loaded.add(known);
         return { loaded: known, unknown: names.filter((n) => !loadable.has(n)), callable_from: 'next step' };
       }
+    }),
+
+    [DESCRIBE_TOOLS]: tool({
+      description: 'Full description and input schema of any tool by name: {names}.',
+      inputSchema: z.object({ names: z.array(z.string().min(1)).min(1).max(LOADED_CAP) }).strict(),
+      execute: async ({ names }: { names: string[] }) => ({
+        tools: names.filter((n) => n in full).map((name) => ({ name, description: described(name), schema: asSchema(full[name].inputSchema).jsonSchema })),
+        unknown: names.filter((n) => !(n in full))
+      })
     })
   };
 }
@@ -124,9 +138,9 @@ export type FrameSurface = { tools: Record<string, Tool>; active: () => string[]
 
 export const PROXY_GUIDANCE = 'Edit frames (motion videos and stills) yourself with frame_tool: its description names the editor tools, describe_frame_tool gives one schema. Small, precise changes (a text, a colour, a timing, a still export) go through frame_tool.';
 const DIRECT_GUIDANCE = 'Edit frames (motion videos and stills) yourself with the frame editor tools (add_clip, set_props, set_keyframes…): each takes node_id, default the open frame. Small, precise changes (a text, a colour, a timing, a still export) go through them.';
-const LOAD_GUIDANCE = `Edit frames (motion videos and stills) yourself with the frame editor tools: ${FIND_TOOLS} searches them (one call with every keyword you need), ${LOAD_TOOLS} makes them callable directly from the next step (load every tool you will need in one call). Each takes node_id, default the open frame. Small, precise changes (a text, a colour, a timing, a still export) go through them.`;
+const LOAD_GUIDANCE = `Only a few tools are listed. Edit frames (motion videos and stills) yourself with the frame editor tools, and reach every other tool (effects, gallery, groups, loops, connecting nodes...) the same way: ${FIND_TOOLS} searches them (one call with every keyword you need), ${LOAD_TOOLS} makes them callable from the next step (load every tool you will need in one call), ${DESCRIBE_TOOLS} gives an exact schema. Frame tools take node_id, default the open frame. Small, precise changes (a text, a colour, a timing, a still export) go through them.`;
 
-export async function frameSurface(mode: ToolLoading, deps: FrameToolDeps, runner: FrameRunner, core: Record<string, Tool>, turns: readonly Turn[]): Promise<FrameSurface> {
+export async function frameSurface(mode: ToolLoading, deps: FrameToolDeps, runner: FrameRunner, core: Record<string, Tool>, turns: readonly Turn[], kept: Record<string, Tool> = {}): Promise<FrameSurface> {
   if (mode === ToolLoading.Proxy) {
     return { tools: createFrameTools(deps, runner), active: () => undefined, guidance: PROXY_GUIDANCE };
   }
@@ -136,15 +150,21 @@ export async function frameSurface(mode: ToolLoading, deps: FrameToolDeps, runne
     return { tools: direct, active: () => undefined, guidance: DIRECT_GUIDANCE };
   }
 
-  const loadable = new Set(Object.keys(direct));
-  const loaded = new LoadedSet(warmTools(turns, loadable));
-  const loader = loaderTools(direct, loaded);
-  const always = [...Object.keys(core), ...Object.keys(loader)];
+  const slim = slimCore(core);
+  const deferred = Object.keys(core).filter((name) => !(name in slim) && !(name in kept));
+  const entries: Entry[] = [
+    ...motionToolList().filter((t) => t.name in direct),
+    ...deferred.map((name) => ({ name, summary: firstLine(String(core[name].description ?? '')) }))
+  ];
+  const loaded = new LoadedSet(warmTools(turns, new Set(entries.map((e) => e.name))));
+  const loader = loaderTools({ full: { ...core, ...direct }, entries, loaded });
+  const alwaysOn = new Set([...Object.keys(slim), ...Object.keys(kept), ...Object.keys(loader)]);
+  const order = [...Object.keys(core), ...Object.keys(loader), ...Object.keys(direct)];
   return {
-    tools: { ...loader, ...direct },
+    tools: { ...loader, ...direct, ...slim },
     active: () => {
-      const on = new Set([...always, ...loaded.list()]);
-      return [...Object.keys(core), ...Object.keys(loader), ...Object.keys(direct)].filter((name) => on.has(name));
+      const on = new Set([...alwaysOn, ...loaded.list()]);
+      return order.filter((name) => on.has(name));
     },
     guidance: LOAD_GUIDANCE
   };
