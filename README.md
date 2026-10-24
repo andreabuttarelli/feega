@@ -31,7 +31,7 @@ nodes you do, from the sidebar chat, the [CLI / MCP server](cli/), or any MCP cl
 - TypeScript and SvelteKit
 - Supabase (Postgres, Auth, Storage, Realtime)
 - Node.js 22
-- MCP server and CLI in [`cli/`](cli/)
+- MCP server and CLI in [`cli/`](cli/), with a [quickstart for agents](docs/agents-quickstart.md)
 
 ## Run locally
 
