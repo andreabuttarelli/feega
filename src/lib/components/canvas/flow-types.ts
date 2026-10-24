@@ -68,6 +68,7 @@ export type FlowProps = {
   onSection?: (ids: string[]) => void;
   onSectionChange?: (id: string, patch: { title?: string; fill?: string }) => void;
   onCreateFormats?: (frameId: string) => void;
+  onCombineScenes?: (frameIds: string[]) => void;
   onExport?: (frameIds: string[]) => void;
   onEdgeDelete?: (edgeId: string) => void;
   onEdgeRetype?: (edgeId: string, kind: CanvasEdgeKind) => void;

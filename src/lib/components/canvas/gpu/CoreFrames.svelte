@@ -27,6 +27,7 @@
   import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { withScenes } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
@@ -48,7 +49,7 @@
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
   const media = createMedia({ videoPreload: VideoPreload.Metadata });
   const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
-  const keyOf = (f: FrameAt) => `${f.id}:${f.revision}`;
+  const keyOf = (f: FrameAt) => `${f.id}:${f.revision}${f.scenes ? `:${f.scenes}` : ''}`;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
 
   let readsHost = $state<HTMLDivElement | null>(null);
@@ -84,7 +85,17 @@
     return buildSource(f, (await res.json()) as FrameDoc);
   }
 
-  async function buildSource(f: FrameAt, source: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
+  async function sceneSource(id: string): Promise<FrameDoc | null> {
+    const held = live.get(id);
+    if (held) {
+      return { revision: 0, ...held };
+    }
+    const res = await fetch(new URL(sourceUrl(id), location.href).href);
+    return res.ok ? ((await res.json()) as FrameDoc) : null;
+  }
+
+  async function buildSource(f: FrameAt, given: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
+    const source = await withScenes(given, sceneSource);
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
     const still = frameOfLive(source);
@@ -94,7 +105,7 @@
 
   async function load(f: FrameAt) {
     const url = new URL(`${sourceUrl(f.id)}?revision=${f.revision}`, location.href).href;
-    const away = await buildAway(url, smoothing).catch(() => null);
+    const away = f.scenes ? null : await buildAway(url, smoothing).catch(() => null);
     const built = away ? { list: away, custom: null } : await buildHere(f, url);
     if (!built || (await media.ready(built.list)) === Readiness.Partial) {
       return;
@@ -107,6 +118,7 @@
 
   let liveGroup = $state(new Map<string, string>());
   const liveBuilt = new Map<string, LiveDoc>();
+  const liveStamp = new Map<string, string | undefined>();
   const liveGeneration = new Map<string, number>();
   const liveAtRevision = new Map<string, number>();
   const groupOf = (f: FrameAt) => liveGroup.get(f.id) ?? keyOf(f);
@@ -127,8 +139,9 @@
   $effect(() => {
     for (const f of frames) {
       const source = live.get(f.id);
-      if (source && liveBuilt.get(f.id) !== source) {
+      if (source && (liveBuilt.get(f.id) !== source || liveStamp.get(f.id) !== f.scenes)) {
         liveBuilt.set(f.id, source);
+        liveStamp.set(f.id, f.scenes);
         void rebuildLive(f, source);
       }
     }

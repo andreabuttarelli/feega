@@ -98,6 +98,7 @@
   import GpuTileChrome from './GpuTileChrome.svelte';
   import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
+  import { sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
@@ -1374,6 +1375,12 @@
   });
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
+  const revisionOfFrame = (id: string) => coreFrames.find((f) => f.id === id)?.revision ?? 0;
+  const drawnFrames = $derived(coreFrames.map((f) => {
+    const doc = liveOf(f.id)?.doc;
+    const scenes = doc ? sceneStamp(doc, revisionOfFrame) : '';
+    return scenes ? { ...f, scenes } : f;
+  }));
   $effect(() => {
     canvasComponents.set(
       coreFrames.flatMap((f) => {
@@ -3111,6 +3118,7 @@
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
+    'combine-video': (ids) => props.onCombineScenes?.(ids),
     export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
     delete: (ids) => props.onDelete?.(ids)
   };
@@ -3352,7 +3360,7 @@
   >
     {#if coreOn}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>

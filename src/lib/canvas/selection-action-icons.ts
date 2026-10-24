@@ -11,6 +11,7 @@ import Download from '@lucide/svelte/icons/download';
 import Workflow from '@lucide/svelte/icons/workflow';
 import Link2 from '@lucide/svelte/icons/link-2';
 import Play from '@lucide/svelte/icons/play';
+import Clapperboard from '@lucide/svelte/icons/clapperboard';
 import ListEnd from '@lucide/svelte/icons/list-end';
 import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -109,6 +110,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'push-instance': ArrowUpToLine,
   'reset-instance': RotateCcw,
   'create-formats': Proportions,
+  'combine-video': Clapperboard,
   export: Download,
   'frame-voice': Mic,
   'frame-music': Music,

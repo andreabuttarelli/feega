@@ -84,6 +84,7 @@ import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNod
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
+import { COMBINE_STATUS, CombineOutcome, combineAskSchema, combineScenes } from '$lib/server/motion/combine-scenes';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
@@ -1202,6 +1203,17 @@ export const actions: Actions<CanvasParams> = {
     }
     const made = await createFormats(canvasFrames(scope), ask.data);
     return made.outcome === FormatsOutcome.Done ? made : fail(FORMATS_STATUS[made.outcome], { error: made.outcome, detail: made.detail });
+  },
+
+  combineScenes: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = combineAskSchema.safeParse({ frameIds: jsonField(fd, 'frame_ids') });
+    if (!ask.success) {
+      return fail(400, { error: 'pick two or more frames' });
+    }
+    const made = await combineScenes(canvasFrames(scope), ask.data);
+    return made.outcome === CombineOutcome.Done ? made : fail(COMBINE_STATUS[made.outcome], { error: made.outcome });
   },
 
   frameSize: async ({ request, params, locals }) => {

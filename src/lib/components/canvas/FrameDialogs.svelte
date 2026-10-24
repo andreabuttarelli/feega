@@ -32,6 +32,8 @@
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
   import type { ExportRow } from '$lib/motion/export-rows';
   import type { FrameSource } from '$lib/motion/export/browser-render';
+  import { loadScenes, type LoadedScenes } from '$lib/canvas/scene-sources';
+  import { resolveScenes, sceneNodeIds } from '$lib/motion/scenes';
 
   type Branch = { id: string; frameId: string; name: string; baseVersion: number };
   type Conflict = { path: string; branch: unknown; main: unknown };
@@ -80,7 +82,20 @@
   const data = $derived(extras.data);
   const editorUrl = extras.editorUrl;
   const sound = $derived(SOUND_OF[dialog] ?? null);
-  const assetUrls = $derived(extras.assetUrls);
+  let scenes = $state<LoadedScenes>({ docs: {}, assets: {} });
+  const sceneKey = $derived(sceneNodeIds(doc).join(','));
+  $effect(() => {
+    if (!sceneKey) {
+      return;
+    }
+    const sourceOf = async (id: string) => {
+      const res = await fetch(`/p/${projectId}/c/${canvasId}/motion/${id}/source`);
+      return res.ok ? await res.json() : null;
+    };
+    void loadScenes(untrack(() => doc), sourceOf).then((loaded) => (scenes = loaded));
+  });
+  const assetUrls = $derived({ ...scenes.assets, ...extras.assetUrls });
+  const played = (d: MotionDoc) => resolveScenes(d, scenes.docs);
   const selected = $derived(session.selection.length === 1 ? (findClip(doc, session.selection[0])?.clip ?? null) : null);
 
   $effect(() => {
@@ -88,7 +103,7 @@
   });
 
   let capture = $state<MotionPreview | null>(null);
-  const captureHtml = $derived(composeHtml({ doc, tokens, assets: assetUrls, analyses: extras.analyses, liveness: Liveness.Baked, target: Target.Screen }));
+  const captureHtml = $derived(composeHtml({ doc: played(doc), tokens, assets: assetUrls, analyses: extras.analyses, liveness: Liveness.Baked, target: Target.Screen }));
 
   $effect(() => {
     if (dialog !== FrameDialog.Export) {
@@ -122,7 +137,7 @@
     return made?.ok ? { doc: made.doc, clipId: made.clipId } : null;
   }
 
-  const composeDraft = (d: MotionDoc) => composeHtml({ doc: d, tokens, assets: assetUrls, analyses: extras.analyses, liveness: Liveness.Baked, target: Target.Screen });
+  const composeDraft = (d: MotionDoc) => composeHtml({ doc: played(d), tokens, assets: assetUrls, analyses: extras.analyses, liveness: Liveness.Baked, target: Target.Screen });
 
   function placedWith(entry: TemplateEntry, draft: Instance | null): Inserted {
     const placed = insertTemplate(doc, entry, { from: frame, newId });
@@ -268,7 +283,7 @@
   <StillExport {doc} {editorUrl} fileName={data.node.name ?? 'still'} saved={session.saveState === SaveState.Saved} {onclose} />
 {:else if dialog === FrameDialog.Export && data}
   <ExportDialog
-    {doc}
+    doc={played(doc)}
     {assetUrls}
     scope={{ orgId: data.orgId, projectId, nodeId }}
     {editorUrl}

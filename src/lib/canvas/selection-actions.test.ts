@@ -24,6 +24,7 @@ describe('group and ungroup', () => {
       ['ungroup', 'Mod+Shift+G'],
       ['duplicate', 'Mod+D'],
       ['create-formats', null],
+      ['combine-video', null],
       ['export', null],
       ['copy', 'Mod+C'],
       ['paste', 'Mod+V'],
@@ -148,5 +149,16 @@ describe('create formats', () => {
     expect(shownFor('create-formats', [frame, frame])).toBe(false);
     expect(shownFor('create-formats', [{ type: 'motion', data: { format: '16:9', kind: 'element' } }])).toBe(false);
     expect(shownFor('create-formats', [{ type: 'text', data: { prompt: 'x' } }])).toBe(false);
+  });
+});
+
+describe('combine into video', () => {
+  const frame = { type: 'motion', data: { format: '16:9' } };
+
+  it('is offered on two or more frames only', () => {
+    expect(shownFor('combine-video', [frame, frame])).toBe(true);
+    expect(shownFor('combine-video', [frame])).toBe(false);
+    expect(shownFor('combine-video', [frame, { type: 'motion', data: { format: '16:9', kind: 'element' } }])).toBe(false);
+    expect(CANVAS_MENU.map((a) => a.id)).toContain('combine-video');
   });
 });

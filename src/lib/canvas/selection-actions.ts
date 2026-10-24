@@ -68,6 +68,7 @@ export type SelectionActionId =
   | 'reset-instance'
   | 'push-instance'
   | 'create-formats'
+  | 'combine-video'
   | 'export'
   | 'delete'
   | FrameDialogActionId;
@@ -128,6 +129,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'push-instance', label: 'Push overrides to main', group: 'menu', minNodes: 1 },
   { id: 'reset-instance', label: 'Reset all overrides', group: 'menu', minNodes: 1 },
   { id: 'create-formats', label: 'Create formats…', group: 'menu', minNodes: 1 },
+  { id: 'combine-video', label: 'Combine into video', group: 'menu', minNodes: 2 },
   { id: 'export', label: 'Export…', group: 'overflow', minNodes: 1 },
   { id: 'frame-voice', label: 'Add voice-over…', group: 'overflow', minNodes: 1 },
   { id: 'frame-music', label: 'Add music…', group: 'overflow', minNodes: 1 },
@@ -157,7 +159,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -179,6 +181,7 @@ const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) =
   ...FRAME_DIALOG_SHOWN,
   ungroup: (summaries) => summaries.some(isGroup),
   'create-formats': (summaries) => summaries.length === 1 && isFrame(summaries[0]),
+  'combine-video': (summaries) => summaries.length > 1 && summaries.every(isFrame),
   export: (summaries) => summaries.length > 0 && summaries.every(isDrawn)
 };
 

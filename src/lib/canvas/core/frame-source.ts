@@ -8,7 +8,7 @@ import type { Box } from './canvas-scene';
 
 export type FrameTile = { id: string; kind?: string | null; x: number; y: number; w: number; h: number; rotation?: number };
 export type FrameData = { kind?: unknown; docHeadRevision?: unknown };
-export type FrameAt = { id: string; kind: FrameKind; revision: number; box: Box; turn?: { degrees: number; about: { x: number; y: number } } };
+export type FrameAt = { id: string; kind: FrameKind; revision: number; scenes?: string; box: Box; turn?: { degrees: number; about: { x: number; y: number } } };
 
 export function framesOnCanvas(tiles: readonly FrameTile[], dataOf: (id: string) => FrameData): FrameAt[] {
   return tiles.flatMap((t) => {
