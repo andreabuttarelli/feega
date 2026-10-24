@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SECTION_PAD, SECTION_TITLE_H, membersOf, sectionBoxAround, withMembers } from './section';
+import { SECTION_PAD, SECTION_TITLE_H, membersOf, membershipAfter, sectionBoxAround, withMembers } from './section';
 
 const box = (left: number, top: number, width: number, height: number) => ({ left, top, width, height });
 
@@ -26,5 +26,31 @@ describe('what a section holds', () => {
   it('goes with the section when it is deleted, unless the contents are kept', () => {
     expect(withMembers(nodes, ['s'])).toEqual(['s', 'a', 'b']);
     expect(withMembers(nodes, ['c'])).toEqual(['c']);
+  });
+});
+
+describe('where a dragged node ends up', () => {
+  const area = (id: string, x: number, y: number, w: number, h: number, data: Record<string, unknown> = {}, type = 'text') => ({ id, type, x, y, w, h, data });
+  const nodes = [area('s', 0, 0, 400, 300, {}, 'section'), area('in', 50, 100, 100, 50, { groupId: 's' }), area('out', 600, 0, 100, 50), area('grouped', 600, 200, 100, 50, { groupId: 'g' })];
+  const to = (id: string, x: number, y: number) => ({ id, x, y });
+
+  it('joins the section it is dropped into', () => {
+    expect(membershipAfter(nodes, [to('out', 100, 100)])).toEqual([{ id: 'out', groupId: 's' }]);
+  });
+
+  it('leaves the section it is dragged out of', () => {
+    expect(membershipAfter(nodes, [to('in', 800, 100)])).toEqual([{ id: 'in', groupId: null }]);
+  });
+
+  it('stays put when it lands where it already belongs', () => {
+    expect(membershipAfter(nodes, [to('in', 60, 110)])).toEqual([]);
+  });
+
+  it('is left alone when it moves with its section', () => {
+    expect(membershipAfter(nodes, [to('s', 100, 100), to('in', 150, 200)])).toEqual([]);
+  });
+
+  it('keeps an element group and never nests a section', () => {
+    expect(membershipAfter(nodes, [to('grouped', 100, 100), to('s', 0, 0)])).toEqual([]);
   });
 });

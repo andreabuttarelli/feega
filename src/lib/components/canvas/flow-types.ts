@@ -66,6 +66,7 @@ export type FlowProps = {
   ) => void;
   onDelete?: (ids: string[], mode?: DeleteMode) => void;
   onSection?: (ids: string[]) => void;
+  onSectionChange?: (id: string, patch: { title?: string; fill?: string }) => void;
   onCreateFormats?: (frameId: string) => void;
   onExport?: (frameIds: string[]) => void;
   onEdgeDelete?: (edgeId: string) => void;

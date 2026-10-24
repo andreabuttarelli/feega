@@ -15,7 +15,7 @@
   import { Pasted, isSvgFile, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
   import { svgDrawings } from '$lib/canvas/svg-drawings';
 import { pasteTargets } from '$lib/canvas/paste-into-frame';
-  import { DeleteMode, SECTION_TYPE, withMembers } from '$lib/canvas/section';
+  import { DeleteMode, SECTION_TYPE, membershipAfter, withMembers } from '$lib/canvas/section';
   import { stackedLocally, type Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
   import { TEXT_BOX } from '$lib/canvas/frame-paste';
@@ -3464,6 +3464,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * un peer non le ha mai spostate.
    */
   async function moveEnd(moves: { id: string; x: number; y: number }[]) {
+    for (const change of membershipAfter(nodes, moves)) {
+      void write(change.id, { groupId: change.groupId }, SaveTiming.Now);
+    }
+
     const gesture = buildMoveGesture(
       moves.map((m) => ({ nodeId: m.id, after: { x: m.x, y: m.y } })),
       (nodeId) => {
@@ -3619,6 +3623,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onRotate={rotateGroupBy}
     onAddBeside={addFrameBeside}
     onSection={wrapInSection}
+    onSectionChange={(id, patch) => void write(id, patch, SaveTiming.Now)}
     onGroup={groupElements}
     onUngroup={ungroupElements}
     onRestack={restack}
