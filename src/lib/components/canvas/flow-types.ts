@@ -3,6 +3,7 @@ import type { Snippet } from 'svelte';
 import type { Offset } from '$lib/canvas/duplicate-plan';
 import type { FocusRequest } from '$lib/canvas/free-area';
 import type { GenPropertyType } from '$lib/canvas/common-properties';
+import type { ColourTag } from '$lib/canvas/node-colour';
 import type { Poster } from '$lib/canvas/poster-lod';
 import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
 import type { BarContext } from '$lib/canvas/bottom-bar';
@@ -67,6 +68,7 @@ export type FlowProps = {
   ) => void;
   onDelete?: (ids: string[], mode?: DeleteMode) => void;
   onSection?: (ids: string[]) => void;
+  onColourChange?: (ids: string[], tag: ColourTag | null) => void;
   onSectionChange?: (id: string, patch: { title?: string; fill?: string }) => void;
   onCreateFormats?: (frameId: string) => void;
   onCombineScenes?: (frameIds: string[]) => void;
