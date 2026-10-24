@@ -96,6 +96,27 @@ test.describe('scenes combined into one video @real', () => {
     }).toPass({ timeout: 25_000 });
     await page.waitForTimeout(SETTLE_MS);
     await page.screenshot({ path: `${SHOTS}/seq-3-parent-timeline.png` });
+    await page.getByRole('tab', { name: 'Properties', exact: true }).click();
+    const sceneRows = page.getByTestId('scene-row');
+    await expect(sceneRows).toHaveCount(3);
+    await sceneRows.nth(2).dragTo(sceneRows.nth(0));
+    await expect(sceneRows.first()).toHaveAttribute('data-scene', ids[0]);
+    await sceneRows.nth(1).getByTestId('scene-transition').selectOption('push-left');
+    await page.getByTestId('scenes-section').screenshot({ path: `${SHOTS}/seq-3b-scenes-panel.png` });
+    const order = async () => {
+      const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', parentId).order('version', { ascending: false }).limit(1);
+      const clips = (data?.[0]?.doc as Head).tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Precomp') as (Clip & { junction?: { kind: string } | null })[];
+      return clips.map((c) => [c.props.scene, c.junction?.kind ?? null]);
+    };
+    await expect.poll(order, { timeout: 20_000 }).toEqual([
+      [ids[0], null],
+      [ids[1], 'push-left'],
+      [ids[2], null]
+    ]);
+    await page.getByTestId('scene-insert').selectOption({ label: 'one · 1.5 s' });
+    await expect(sceneRows).toHaveCount(4);
+    await page.getByTestId('scenes-section').screenshot({ path: `${SHOTS}/seq-3c-scene-inserted.png` });
+    await expect.poll(async () => (await order()).map(([scene]) => scene), { timeout: 20_000 }).toEqual([ids[0], ids[1], ids[2], ids[1]]);
     await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Export…' }).click();
     await page.getByTestId('export-mode-video').click();

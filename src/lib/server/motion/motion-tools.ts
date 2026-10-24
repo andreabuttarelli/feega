@@ -44,6 +44,7 @@ import { EASE_IDS, Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
+import { sceneEdit } from '$lib/motion/scenes';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
 import { ClipEdge, Side, TOP_LEFT_START, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, duplicateKeyframes, setKeyEase, setLaneMuted, type OpResult } from '$lib/motion/timeline';
 import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
@@ -1032,6 +1033,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Transition between two clips at a cut, like a dissolve in an editor: put it on the clip that arrives (clip_id); the clip that ends exactly where it starts (same track first, else any video track) is the one that leaves. Kinds: ${JUNCTION_KINDS.map((k) => `${k} (${JUNCTION[k].label})`).join(', ')}; none removes it. duration in seconds, centred on the cut: both clips stay on screen half of it longer. It replaces the out transition of the leaving clip and the in transition of the arriving one.`,
       inputSchema: z.object({ clip_id: z.string(), kind: z.enum([...JUNCTION_KINDS, 'none']), duration: z.number().min(0.05).max(2).default(0.5) }),
       execute: async (input) => apply(setJunction(session.doc, input.clip_id, input.kind === 'none' ? null : { kind: input.kind, durationInFrames: frames(input.duration) }), `transition into ${input.clip_id}`)
+    }),
+
+    edit_scenes: tool({
+      description: 'Scenes of a video frame made by combining frames: each scene is another frame on the canvas, played by reference, back to back. insert adds a frame (node_id) at the end; reorder lists every scene clip id in the new order; trim sets a scene length in seconds; remove drops one. Transitions between scenes: set_clip_transition on the arriving scene clip.',
+      inputSchema: z.discriminatedUnion('op', [
+        z.object({ op: z.literal('insert'), node_id: z.string().uuid(), duration: z.number().min(0.1).max(MAX_SECONDS).default(3) }),
+        z.object({ op: z.literal('reorder'), clip_ids: z.array(z.string()).min(1) }),
+        z.object({ op: z.literal('trim'), clip_id: z.string(), duration: z.number().min(0.05).max(MAX_SECONDS) }),
+        z.object({ op: z.literal('remove'), clip_id: z.string() })
+      ]),
+      execute: async (input) => apply(sceneEdit(session.doc, input, frames), `scenes: ${input.op}`)
     }),
 
     trim_clip: tool({

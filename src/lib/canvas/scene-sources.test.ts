@@ -26,6 +26,7 @@ const texts = (doc: MotionDoc) =>
   flattenComps(doc)
     .tracks.flatMap((t) => t.clips as MotionClip[])
     .filter((c) => c.component === 'Text')
+    .sort((a, b) => a.from - b.from)
     .map((c) => c.props.text);
 
 describe('scene sources', () => {
