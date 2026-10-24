@@ -720,7 +720,7 @@ describe('transitions between clips', () => {
     const html = compose(must(setJunction(cut, 'b', { kind: JunctionKind.Crossfade, durationInFrames: 12 })));
 
     expect(html).toContain('data-clip="b" data-start="2.8"');
-    expect(html).toContain('tl.fromTo("#fx-b",{"opacity":0},{"opacity":1,"duration":0.4,"ease":"none","immediateRender":false},2.8);');
+    expect(html).toContain('tl.fromTo("#fx-b",{"opacity":0},{"opacity":1,"duration":0.4,"ease":"feega.inOut","immediateRender":false},2.8);');
   });
 
   it('a dip to black darkens the first clip, then lights the second', () => {
