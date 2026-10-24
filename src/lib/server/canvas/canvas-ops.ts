@@ -313,9 +313,9 @@ const runTechniqueInput = z
   })
   .strict();
 const techniqueIdInput = z.object({ techniqueId: z.string() }).strict();
-const placeTechniqueInput = z.object({ canvasId: z.string(), techniqueId: z.string().describe('from list_techniques'), x: z.number(), y: z.number() }).strict();
-const techniqueNodeInput = z.object({ nodeId: z.string().describe('a technique node on the canvas') }).strict();
-const detachTechniqueInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a technique node on the canvas') }).strict();
+const placeTechniqueInput = z.object({ canvasId: z.string(), techniqueId: z.string(), x: z.number(), y: z.number() }).strict();
+const techniqueNodeInput = z.object({ nodeId: z.string() }).strict();
+const detachTechniqueInput = z.object({ canvasId: z.string(), nodeId: z.string() }).strict();
 const addFrameInput = z
   .object({
     canvasId: z.string(),
