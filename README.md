@@ -11,63 +11,50 @@
   <a href="https://feega.app"><img src="https://img.shields.io/badge/Get_started-feega.app-c485fe?style=flat&labelColor=131313" alt="Get started on feega.app" /></a>
 </p>
 
-![feega — Your marketing department, automated.](./docs/readme-hero.png)
+![feega](./docs/readme-hero.png)
 
-Your marketing department, automated. feega is an open-source Grok Bot
-alternative specialized in marketing, distribution, and sales. It plans, writes,
-designs, and publishes across social, blog, and SEO — nothing goes out until you
-approve. Use it hosted at [feega.app](https://feega.app), or run the complete
-stack yourself.
+An open-source infinite canvas for design that moves. Frames, vector tools, animation and a
+timeline sit on one canvas; generation (text, image, video, audio, 3D) and the agent work on the same
+nodes you do, from the sidebar chat, the [CLI / MCP server](cli/), or any MCP client. Use it hosted at
+[feega.app](https://feega.app) or run it yourself.
 
 ## Features
 
-- Weekly editorial plan, then on-brand posts, carousels, and video
-- Calendar and one-tap approve — from the app, email, or
-  [CLI / MCP](cli/)
-- Studio: brand kit, products, people, competitors, and voice
-- Radar: news and conversations turned into drafts and lead replies
-- Blog, SEO, and GEO — rank on Google and get cited by AI assistants
-- Multi-brand workspaces (one account, many brands)
-- Propose-approve throughout: the AI never publishes silently
-- Drive it from Cursor or Claude via MCP, or from the `feega` CLI
+- Frames, shapes, text, pen and shape tools, auto layout, components
+- Keyframe animation and a timeline, exported as PNG, JPG, WebP, SVG, PDF, GIF, MP4
+- Generate text, images, video, audio and 3D on the canvas, wired together as nodes
+- A chat agent that edits the canvas, plus an MCP server and a `feega` CLI
+- Realtime multiplayer, comments, versions, organisations
 
 ## Stack
 
 - TypeScript and SvelteKit
-- Supabase (Postgres, Auth, Storage)
-- Node.js 22 and Docker Compose
-- MCP server and CLI in [`cli/`](cli/) — installable binary, npm, Homebrew
+- Supabase (Postgres, Auth, Storage, Realtime)
+- Node.js 22
+- MCP server and CLI in [`cli/`](cli/)
 
-## Quick start
+## Run locally
 
-You need Node.js 22+, Docker with Compose, and openssl.
+You need Docker (or OrbStack). With only the required settings the canvas, animation and export work;
+AI features say which key to add.
 
 ```sh
-cp infra/compose/.env.example infra/compose/.env   # fill POSTGRES_PASSWORD, DASHBOARD_PASSWORD, SECRET_KEY_BASE
-cp .env.example .env                               # set PUBLIC_SUPABASE_URL=http://localhost:8000 and copy ANON_KEY / SERVICE_ROLE_KEY from infra/compose/.env into PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY
-(cd infra/compose && docker compose up -d --wait db kong auth rest realtime storage)
-npm install
-
-export DATABASE_URL="postgres://postgres:<POSTGRES_PASSWORD>@localhost:5432/postgres"
-npm run db:migrate
-(cd infra/compose && docker compose --profile init run --rm realtime-policies)
-npm run db:seed
-npm run dev          # http://localhost:5173 — login with the seeded demo@example.com / change-me-now-12345
+git clone https://github.com/andreabuttarelli/feega && cd feega/infra/compose
+docker compose up          # Supabase + schema + demo data + the app, about 5 minutes the first time
 ```
 
-`--wait` is required: migrate needs tables that storage and realtime create on
-startup. The `realtime-policies` init runs after Realtime health and is safe to
-repeat; it records 0226 only after both policies exist.
+Open http://localhost:3000 and sign in with `demo@feega.local` / `feega-demo-2026` (printed by the
+`migrate` service).
 
-`db:seed` prints the `TENANT_BRAND_ID` line to paste into `.env` for a
-single-brand install. The demo login comes from `SEED_DEMO_EMAIL` /
-`SEED_DEMO_PASSWORD` if you want different ones. Skip the compose step if you
-already have a hosted Supabase project — point the same keys at it.
+Developing the app instead of running the image:
 
-Production: `npm run build:node && npm start` (port 3000), or from
-`infra/compose/`: `docker compose up -d --build app`.
+```sh
+supabase start && npm ci && npm run setup && npm run dev    # http://localhost:5173
+```
 
-Read [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md) for the complete guide.
+Optional keys (AI providers, Stripe, Sentry, email) are listed by feature in
+[`.env.example`](.env.example). Nothing is credit-gated: `BILLING_PROVIDER=open`. Full guide, limits
+and timings: [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
 
 ## Contributing
 

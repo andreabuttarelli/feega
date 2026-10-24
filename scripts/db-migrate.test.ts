@@ -11,7 +11,8 @@ import {
   lineForPosition,
   runsInTransaction,
   statementChunks,
-  applyOne
+  applyOne,
+  selfHostPlan
 } from './db-migrate.mjs';
 
 function makeMigrationsDir(files: Record<string, string>) {
@@ -186,5 +187,35 @@ describe('applyOne', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('selfHostPlan', () => {
+  it('applies the baseline first, then only migrations newer than it, in timestamp order', () => {
+    const baseline = makeMigrationsDir({ '0001_tables.sql': 'select 1;', '0000_types.sql': 'select 1;' });
+    const legacy = makeMigrationsDir({
+      '0099_old_product.sql': 'select 1;',
+      '20260921_before_baseline.sql': 'select 1;',
+      '20261024090000_last_in_baseline.sql': 'select 1;',
+      '20261025090000_after_b.sql': 'select 1;',
+      '20261025080000_after_a.sql': 'select 1;',
+      '20261025080000_after_a.down.sql': 'select 1;'
+    });
+
+    const plan = selfHostPlan(baseline, [legacy, join(legacy, 'missing')]);
+
+    expect(plan.map((entry) => entry.recordedAs)).toEqual([
+      'baseline/0000_types.sql',
+      'baseline/0001_tables.sql',
+      '20261025080000_after_a.sql',
+      '20261025090000_after_b.sql'
+    ]);
+  });
+
+  it('treats a date-only canvas migration after the cutoff as newer', () => {
+    const baseline = makeMigrationsDir({ '0000_types.sql': 'select 1;' });
+    const canvas = makeMigrationsDir({ '20261101_later.sql': 'select 1;', '20261022_earlier.sql': 'select 1;' });
+
+    expect(selfHostPlan(baseline, [canvas]).map((entry) => entry.file)).toEqual(['0000_types.sql', '20261101_later.sql']);
   });
 });

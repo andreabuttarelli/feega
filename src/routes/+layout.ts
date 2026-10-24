@@ -8,7 +8,7 @@ import { bundleApiBase } from '$lib/api/bundle-fetch';
 import { keepAssetGrant } from '$lib/api/asset-grant';
 import type { RootShell } from '$lib/server/root-shell';
 
-if (!browser || !bundleApiBase()) {
+if (import.meta.env.VITE_VERCEL_ANALYTICS && (!browser || !bundleApiBase())) {
   injectAnalytics({ mode: dev ? 'development' : 'production' });
 }
 

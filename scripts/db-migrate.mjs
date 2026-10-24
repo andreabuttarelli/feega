@@ -1,30 +1,49 @@
 /**
- * Self-host migration applier.
+ * Self-host schema applier. A fresh database gets supabase/baseline (the whole current schema, in
+ * file order), then any migration dated after the baseline. The 386 legacy files in
+ * supabase/migrations describe the old product and are never applied here; they stay in the repo
+ * because migrations are immutable.
  *
- * Applies `supabase/migrations/*.sql` in order against DATABASE_URL, tracking what already ran
- * in a `app_schema_migrations` table (filename + applied_at). Idempotent: re-running only applies
- * new files. Each file runs inside its own transaction — a failure rolls back that one file and
- * stops before touching the next, naming the file and (when Postgres reports a character
- * position) the line inside it.
+ * What ran is recorded in app_schema_migrations; re-running applies only what is new. Each file runs
+ * in its own transaction and a failure names the file and line. DATABASE_URL is required and never
+ * defaults to a database for you.
  *
- * DATABASE_URL is required and NEVER defaults to feega's own database — this script is meant
- * to run against a self-hoster's own Postgres.
- *
- *   DATABASE_URL=postgres://... node --env-file-if-exists=.env scripts/db-migrate.mjs
  *   npm run db:migrate
- *
- * ponytail: no ORM, no query builder — the migrations are already plain .sql files, `pg`'s simple
- * query protocol runs a whole file (multiple ';'-separated statements) in one `client.query(sql)`
- * call, so there is nothing to parse here beyond "which files, in what order". The DB I/O (connect
- * /query/end) is the only part that touches `pg`; everything else is plain functions so the ordering
- * and error-location logic can be tested with a fake client instead of a real Postgres.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const MIGRATIONS_DIR = join(ROOT, 'supabase/migrations');
+export const CANVAS_MIGRATIONS_DIR = join(ROOT, 'supabase/canvas-migrations');
+export const BASELINE_DIR = join(ROOT, 'supabase/baseline');
+const BASELINE_THROUGH = '20261024090000';
+const TIMESTAMP_DIGITS = 14;
+
+function timestampOf(file) {
+  const m = file.match(/^(\d+)/);
+  return m ? m[1].padEnd(TIMESTAMP_DIGITS, '0') : null;
+}
+
+export function selfHostPlan(
+  baselineDir = BASELINE_DIR,
+  migrationDirs = [MIGRATIONS_DIR, CANVAS_MIGRATIONS_DIR]
+) {
+  const baseline = readdirSync(baselineDir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+    .map((file) => ({ file, dir: baselineDir, recordedAs: `baseline/${file}` }));
+
+  const after = migrationDirs
+    .flatMap((dir) => (existsSync(dir) ? readdirSync(dir).map((file) => ({ file, dir })) : []))
+    .filter(({ file }) => file.endsWith('.sql') && !file.endsWith('.down.sql'))
+    .filter(({ file }) => timestampOf(file) > BASELINE_THROUGH)
+    .map((entry) => ({ ...entry, recordedAs: entry.file }))
+    .sort((a, b) => timestampOf(a.file).localeCompare(timestampOf(b.file)) || a.file.localeCompare(b.file));
+
+  return [...baseline, ...after];
+}
 
 /** Every migration file, ordered by its leading number (0007 → 7, 20260702… → 20260702).
  *  Il repo mescola prefissi corti e timestamp: il sort lessicale mette «0089_x» DOPO
@@ -105,7 +124,7 @@ function missingPrerequisite(file, error) {
   return prerequisite;
 }
 
-export async function applyOne(client, file, dir = MIGRATIONS_DIR) {
+export async function applyOne(client, file, dir = MIGRATIONS_DIR, recordedAs = file) {
   const sql = readFileSync(join(dir, file), 'utf8');
   const transactional = runsInTransaction(sql);
 
@@ -113,7 +132,7 @@ export async function applyOne(client, file, dir = MIGRATIONS_DIR) {
   try {
     // Simple query protocol (no parameters) — runs every ';'-separated statement in the file.
     for (const chunk of transactional ? [sql] : statementChunks(sql)) await client.query(chunk);
-    await client.query('insert into app_schema_migrations (filename) values ($1)', [file]);
+    await client.query('insert into app_schema_migrations (filename) values ($1)', [recordedAs]);
     if (transactional) await client.query('commit');
   } catch (err) {
     if (transactional) await client.query('rollback').catch(() => {});
@@ -150,7 +169,8 @@ async function main() {
     `);
 
     const { rows } = await client.query('select filename from app_schema_migrations');
-    const all = listMigrationFiles();
+    const plan = selfHostPlan();
+    const all = plan.map((entry) => entry.recordedAs);
     const pending = pendingMigrations(
       all,
       rows.map((r) => r.filename)
@@ -165,8 +185,10 @@ async function main() {
     for (const file of pending) console.log(`  ${file}`);
 
     let applied = 0;
-    for (const file of pending) {
-      const result = await applyOne(client, file);
+    for (const name of pending) {
+      const entry = plan.find((e) => e.recordedAs === name);
+      const file = entry.recordedAs;
+      const result = await applyOne(client, entry.file, entry.dir, entry.recordedAs);
       if (result.status === 'deferred') {
         console.log(`deferred ${file} — waiting for ${result.prerequisite}`);
         continue;

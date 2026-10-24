@@ -1,207 +1,191 @@
 # Self-hosting
 
-Run feega against your own Supabase instance instead of ours. This covers the app + database;
-read it alongside [`infra/compose/docker-compose.yml`](../infra/compose/docker-compose.yml)
-(the Supabase stack) and the two root env files, [`.env.example`](../.env.example) (the app) and
-[`infra/compose/.env.example`](../infra/compose/.env.example) (the stack).
+Run feega on your own machine or server: the infinite canvas, design and motion editing, image
+export, and the agent and MCP surface. Nothing is credit-gated.
 
-## What you get, and what you don't
+Two ways in, both end at a demo login and a canvas with one frame on it:
 
-The core product works self-hosted: onboarding, content generation, planning, scheduling and the
-chat agents. Two things degrade **on purpose**, loudly, instead of half-working:
+| | Needs | One command |
+|---|---|---|
+| **Docker** | Docker (or OrbStack) | `cd infra/compose && docker compose up` |
+| **Supabase CLI** | Node 22+, Docker (the CLI runs Supabase in it) | `supabase start`, then `npm ci && npm run setup && npm run dev` |
 
-- **AI providers.** Every model call reads an API key from env (`LLM_API_KEY`,
-  `OPENROUTER_API_KEY`, …). Without one, that provider's feature says why it's off instead of
-  failing silently — see `.env.example` for the full list and what falls back to what.
-- **Connecting social accounts, publishing, post analytics and ads.** All of it goes through
-  Zernio (`ZERNIO_API_KEY`, `src/lib/server/zernio.ts`) — a hosted API with no self-hostable
-  alternative shipped here and no provider interface to swap for your own. Without the key you
-  cannot connect an account at all, so approved posts stay `approved` and quietly never go out
-  (`publish.ts` returns `noAccount` and leaves the status untouched). `GET /api/status` reports
-  `social:publishing — publishing API key not set` if you want to check. Everything upstream still
-  works; only the last mile is gone.
+Both were run from a clean clone; timings are at the end.
 
-**Billing is not one of them, and not what the README used to imply.** The default provider is the
-metered one that runs the hosted product: credits are counted and plans are gated unless you set
-`BILLING_PROVIDER=open`. And `open` removes credit and quota metering only — the ~75 call sites
-that gate a feature by reading `brands.plan` / `brands.status` directly are unaffected, and the
-upsell screens still point at Stripe. `npm run db:seed` therefore creates its brand on
-`plan='pro', status='active'` (override with `SEED_BRAND_PLAN` / `SEED_BRAND_STATUS`); set those to
-something unpaid and connecting a social account stops working, by design.
+## What works with no keys
 
-**Production builds are supported.** `svelte.config.js` still defaults to `@sveltejs/adapter-vercel`,
-so the cloud deploy is untouched; setting `DEPLOY_TARGET=node` selects `@sveltejs/adapter-node`
-instead. `npm run build:node && npm run start` goes through the exact same chain as the cloud build
-(Vite; the runtime typecheck gate runs in CI) and serves the compiled app on port 3000 (`PORT` to
-change). Or don't build anything yourself: [`infra/app/Dockerfile`](../infra/app/Dockerfile) is a
-multi-stage non-root image built from that same target (give the build stage a few GB of RAM —
-the adapter re-bundles the whole server, and Node's default 4 GB heap OOMs on it), and
-[`infra/compose/docker-compose.yml`](../infra/compose/docker-compose.yml) has an `app` service wired
-to the stack below — from `infra/compose/`, once `docker compose up -d --wait` has brought the stack
-up, `docker compose up -d --build app` starts the app on `${APP_PORT:-3000}`, pointed in-network at
-Kong with the stack's own keys (set `APP_SECRET`, `GEMINI_API_KEY` and optionally `CRON_SECRET` in
-`infra/compose/.env`; see its App section). What has not changed: these are real production builds,
-so the cron/worker check that `npm run dev` skips on purpose is fail-closed against you too — see
-"Cron" just below and "Security" at the end before you put this on a public hostname.
+With only the required environment (below), you get:
 
-**Cron.** In production, Vercel Cron calls the ~45 endpoints listed under `crons` in `vercel.json`
-(mostly `/tick` and `/work`) on a schedule, authenticated with `CRON_SECRET`. Self-hosted, nothing
-calls them for you — wire your own scheduler (system `cron` + `curl`, a GitHub Actions schedule,
-anything that can do `curl -H "Authorization: Bearer $CRON_SECRET" https://your-host/api/v1/autopilot/tick`)
-at whatever cadence you want. In a **production build** every handler is fail-closed: no
-`CRON_SECRET` set, no cron runs. Under `npm run dev` that check is skipped by design (`if (dev)
-return true` in 48 of them), so read the security note below before putting a proxy in front of it.
+- sign in, organisations, projects, canvases
+- frames, shapes, text, vector tools, animation and the timeline
+- exporting a frame as PNG/JPG/WebP/SVG/PDF
+- realtime presence and edits between browsers
+- the CLI and the MCP server against your instance
 
-## One brand or many
+What needs a key, and what it says when the key is missing:
 
-feega is built multi-tenant: a brand is the tenant, every table is scoped to one, and an agency
-runs several side by side. Self-hosting for yourself, that shell is furniture you never use — a
-switcher with one entry, a brands grid with one card, an invite screen for a team of one.
-
-Set `TENANT_BRAND_ID` to a brand's UUID and it goes away:
-
-| | with `TENANT_BRAND_ID` set |
+| Feature | Env to add |
 |---|---|
-| Brand switcher | not rendered — the app never asks for the other brands |
-| `/app` | redirects straight to that brand instead of offering a choice |
-| Settings › Team (members, invites) | 404 |
-| Settings › Danger (delete brand) | 404 — deleting the only brand would brick the install |
-| Onboarding | fills the brand you seeded instead of creating a second one |
+| The chat agent, text generation, prompt enhancement | `LLM_API_KEY` |
+| Image, video, audio, 3D generation | `OPENROUTER_API_KEY`, `WIRO_API_KEY` + `WIRO_API_SECRET`, `KIE_API_KEY`, `HIGGSFIELD_API_KEY_ID` + `HIGGSFIELD_API_KEY_SECRET` |
+| Web search and browsing in the agent | `EXA_API_KEY`, `BROWSERLESS_API_KEY` |
+| Paid plans | `STRIPE_SECRET_KEY` (not needed, see Billing) |
+| Email | `RESEND_API_KEY` |
 
-**Onboarding still matters.** A seeded row is empty — no strategy, no editorial plan, no people.
-The wizard is what fills it, so it is not switched off: it is pointed at the brand that already
-exists. Run it once at `/app/onboarding` and it writes into that row instead of creating another,
-leaving the slug alone (renaming it would change every URL to distinguish the brand from nothing).
+A feature without its key answers with a line such as `Add LLM_API_KEY to .env to enable the AI agent
+and text generation.` instead of failing. [`.env.example`](../.env.example) lists every optional key
+grouped by feature.
 
-`npm run db:seed` prints the line to paste. What it does **not** change is the database: every
-table keeps its `brand_id` and every row-level-security policy stays exactly as it is. With one
-brand `auth_brand_ids()` returns that one id, so `where brand_id in (…)` is already the right
-answer — no migration, no downtime, and going back to many brands is deleting a line from `.env`.
-
-**The UUID and nothing else.** The name and the slug live on the `brands` row; a copy of them in
-env would be a second source of truth that drifts the day someone renames the brand, silently and
-with no error anywhere. If the id points at a row that does not exist, the app says so and stops:
-it never invents a brand, because an app that looks empty without explaining why is the worst of
-the failure modes.
-
-**What this is not.** It is a configuration, not a build: the multi-brand code is still in the
-repo, switched off. A build that ships without it is a separate step and is not done here.
-
-## Prerequisites
-
-- Docker (for the Supabase stack in `infra/compose/`)
-- Node.js ≥ 22, npm
-- `openssl` (to generate secrets)
-
-## Install
+## Docker
 
 ```bash
-# 1. Stack secrets — fill POSTGRES_PASSWORD, DASHBOARD_PASSWORD, SECRET_KEY_BASE
-#    (openssl rand -base64 32/48, see comments in the file). Leave JWT_SECRET as shipped: it,
-#    ANON_KEY and SERVICE_ROLE_KEY are one matched set — change one alone and every service
-#    answers 401 to everything.
-cp infra/compose/.env.example infra/compose/.env
-
-# 2. App env — at minimum PUBLIC_SUPABASE_URL=http://localhost:8000 and PUBLIC_SUPABASE_ANON_KEY
-#    matching infra/compose/.env's ANON_KEY; add AI provider keys as you get them
-cp .env.example .env
-
-# 3. Supabase stack: Postgres + Auth + REST + Storage + Realtime + the API gateway
-#    --wait is not optional: step 5 needs tables that the storage and realtime containers
-#    create during their own startup.
-(cd infra/compose && docker compose up -d --wait db kong auth rest realtime storage)
-
-# 4. App dependencies
-npm install
-
-# 5. Schema — applies every supabase/migrations/*.sql file in order, tracked in
-#    app_schema_migrations (the name is app-prefixed: GoTrue owns a schema_migrations of its own)
-DATABASE_URL="postgres://postgres:<POSTGRES_PASSWORD from infra/compose/.env>@localhost:5432/postgres" \
-  npm run db:migrate
-
-# 6. Realtime's policies depend on a table created by the Realtime service, so
-#    apply this idempotent hook after the service is healthy.
-(cd infra/compose && docker compose --profile init run --rm realtime-policies)
-
-# 7. One demo user + org + brand to log in with
-DATABASE_URL="postgres://postgres:<same password>@localhost:5432/postgres" npm run db:seed
-
-# 8. The app
-npm run dev
-
-#    `npm run dev` is the local-trial path. For a real deployment use the production build:
-#    npm run build:node && npm run start
-#    …or skip Node entirely and let compose build the image (see "What you get" above).
+git clone https://github.com/andreabuttarelli/feega && cd feega/infra/compose
+docker compose up
 ```
 
-`db:seed` needs two more variables besides `DATABASE_URL` — `PUBLIC_SUPABASE_URL=http://localhost:8000`
-and `SUPABASE_SERVICE_ROLE_KEY` (the `SERVICE_ROLE_KEY` from `infra/compose/.env`): it creates the
-demo user through GoTrue's admin API, not with a hand-written insert.
+It starts Postgres, Auth, REST, Realtime, Storage and the API gateway, applies the schema, seeds the
+demo data and starts the app. The `migrate` service prints the login when it finishes:
 
-`npm run db:migrate`, the Realtime policy hook and `npm run db:seed` are idempotent — re-run any of
-them after pulling new migrations, for instance, without duplicating anything. If migration runs
-before Realtime has created `realtime.messages`, it defers 0226 without recording it; the hook
-applies and records it after the Realtime healthcheck.
+```
+Log in at http://localhost:3000/login
+  email:    demo@feega.local
+  password: feega-demo-2026
+```
 
-If `db:migrate` stops on `0004` with `relation "storage.buckets" does not exist`, the storage
-container hadn't finished creating its own tables yet (this is what `--wait` above prevents). Just
-run `npm run db:migrate` again: it resumes from the first unapplied file.
+- The first run builds the app image: about 3 to 4 minutes on a laptop, plus the image pulls. Later
+  runs start in under a minute.
+- Every port is bound to `127.0.0.1`. `infra/compose/.env` holds **public demo secrets**; replace all
+  of them before anything else can reach the stack (the file says which).
+- Studio (table editor): `docker compose --profile studio up`, then http://localhost:54323.
+- The app's own keys (`LLM_API_KEY`, ...) go in `infra/compose/.env` too; the compose file passes the
+  ones it lists to the container.
+- If the first start fails, `docker compose down -v` before trying again. A half-initialised database
+  volume keeps its broken state and every later start fails on it.
+- On macOS, clone outside `~/Documents`, `~/Desktop` and `~/Downloads`, or give Docker/OrbStack access
+  to that folder in System Settings. A bind mount from a protected folder blocks the database
+  container at startup with no error.
 
-Want the Supabase Studio dashboard (table editor, SQL runner) too? `docker compose --profile
-studio up -d` from `infra/compose/`, then open `http://localhost:8000` with the
-`DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD` you set.
+Image export (PNG, PDF, ...) draws on the server with headless Chromium; the app image ships one.
 
-## Required env — the app (`.env`)
+## Supabase CLI
 
-`TENANT_BRAND_ID` is optional and covered in [One brand or many](#one-brand-or-many).
+```bash
+git clone https://github.com/andreabuttarelli/feega && cd feega
+supabase start      # Postgres, Auth, Storage, Realtime on :54321
+npm ci
+npm run setup       # writes .env from the running stack, applies the schema, seeds the demo
+npm run dev         # http://localhost:5173
+```
 
-Everything else in `.env.example` is optional (a feature degrades or turns off without it, and
-says so). These are the ones the app won't run at all without:
+`npm run setup` is idempotent. It creates `.env` from `.env.example`, fills the Supabase URL and keys
+from `supabase status`, generates `APP_SECRET`, sets `BILLING_PROVIDER=open`, runs `db:migrate` and
+`db:seed`, and prints the login. If `supabase` is not running it says which keys are missing.
+
+If port 5173 is taken, `npm run dev -- --port 5301` and set `PUBLIC_APP_URL=http://localhost:5301` in
+`.env`: the app builds absolute links from that value, and form posts are checked against it.
+
+Image export needs Chrome or Chromium on the machine running the app (found automatically on macOS and
+Linux, or set `CHROMIUM_PATH`). Without one, export says the server renderer is not available.
+
+### Your own Supabase project
+
+Create a project, then fill the three Supabase values and `DATABASE_URL` (the direct Postgres
+connection) in `.env`, and run `npm run setup`. The baseline needs the `pgcrypto`, `uuid-ossp` and
+`vector` extensions, and `pg_jsonschema` when your plan offers it (without it the JSON shape checks are
+skipped and the app still works).
+
+## Required environment
 
 | Variable | Why |
 |---|---|
-| `PUBLIC_SUPABASE_URL` | Your Supabase project URL — `http://localhost:8000` for the compose stack above. |
-| `PUBLIC_SUPABASE_ANON_KEY` | The anon/publishable key. Public by design, but must be **your** project's — never reuse a value from a repo. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only, full-table-access key. Powers every admin DB write (webhooks, cron, migrations helpers). Never send to the client. |
-| `PUBLIC_APP_URL` | Your app's own origin — builds absolute links in emails and cron-sent messages, which have no browser `url.origin` to read. |
-| `ORIGIN` | The origin the Node server believes it is serving (compose sets it from `PUBLIC_APP_URL`). Leave it set: without it adapter-node assumes `https`, so every form POST — sign-in included — is rejected as cross-site, and the cron's internal calls get routed to the brand-blog group and 404. The cost is that brand blogs on their own domains need a reverse proxy in front of the app. |
-| `APP_SECRET` | Signs one-tap email approve links. Any long random string. |
-| `GEMINI_API_KEY` | Runs onboarding's website analysis and most background AI. Nothing AI-shaped works without this one specifically. |
+| `PUBLIC_SUPABASE_URL` | Your Supabase API. The browser and the server use the same address. |
+| `PUBLIC_SUPABASE_ANON_KEY` | Public key. Must be your project's. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only. Never sent to the client. |
+| `PUBLIC_APP_URL` | The origin the app is served from, no trailing slash. |
+| `APP_SECRET` | Signs tokens and seals stored secrets. `openssl rand -hex 32`. |
+| `DATABASE_URL` | Only `npm run setup`, `db:migrate` and `db:seed` read it. |
 
-One more that isn't required but that you almost certainly want: `BILLING_PROVIDER=open`, which
-turns off credit and quota metering. Leave it unset and your own instance, on your own API keys,
-stops at the hosted product's credit ceiling.
+Everything else is optional and grouped by feature in `.env.example`.
 
-## Required env — the stack (`infra/compose/.env`)
+## Billing
 
-| Variable | Why |
-|---|---|
-| `POSTGRES_PASSWORD` | Every service below authenticates to Postgres with this — Auth, REST, Storage, Realtime, and you via `DATABASE_URL`. |
-| `JWT_SECRET` | The symmetric key Auth signs tokens with and REST/Storage/Realtime verify them against. Shipped pre-filled and matching the two keys below — if you change it, regenerate `ANON_KEY` and `SERVICE_ROLE_KEY` in the same step or nothing authenticates. Changing it after go-live also invalidates every session. |
-| `ANON_KEY` / `SERVICE_ROLE_KEY` | Match `PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` in the app's `.env`. Ship with Supabase's own published demo values — fine on a machine only you reach, mint your own (`utils/generate-keys.sh` in supabase/supabase) before anyone else can reach this instance. |
-| `DASHBOARD_PASSWORD` | Gates Kong's login prompt in front of Studio (`--profile studio`). |
-| `SECRET_KEY_BASE` | Encrypts Realtime's internal channel state. 64+ random characters. |
+`BILLING_PROVIDER=open` is the self-host default (`.env.example`, `npm run setup` and the compose file
+all set it). It removes credit and quota metering: nothing is gated, and the credit chip in the UI is
+informational. Leave it as is. Without it the app tries the hosted billing module, which is not part of
+this repository, falls back to open and logs that it did.
+
+## The schema
+
+`supabase/baseline/` is the whole current schema as ordered SQL files: tables, constraints, functions,
+indexes, triggers, row-level security, storage buckets and policies, realtime publication, grants and
+the two reference tables. `npm run db:migrate` applies it to an empty database, then any migration in
+`supabase/migrations/` or `supabase/canvas-migrations/` dated after the baseline
+(`20261024090000`). What ran is recorded in `app_schema_migrations`; re-running applies only what is
+new. The 386 older files in `supabase/migrations/` describe the previous product and are not applied.
+
+Row-level security is on for every table. The service-role key bypasses it and is read only in
+`src/lib/server/`.
+
+## Models and generation
+
+The model picker reads the `ai_models` table, which a cron fills from the providers. After adding keys,
+fill it once by hand (under `npm run dev` the endpoint needs no secret):
+
+```bash
+curl http://localhost:5173/api/v1/ai-models/sync
+```
+
+Video and long image generations finish in the background: something has to call the cron endpoints
+listed under `crons` in `vercel.json` with `Authorization: Bearer $CRON_SECRET`. A production build
+refuses them without `CRON_SECRET`; `npm run dev` skips the check, which is safe on localhost only.
+
+## Production build
+
+```bash
+npm run build:node && npm run start    # port 3000, reads .env
+```
+
+or the compose app image, which is the same build. Put your own TLS reverse proxy in front, set
+`PUBLIC_APP_URL` and `ORIGIN` to the public origin, and replace every demo secret.
 
 ## Security
 
-- **The service-role key never reaches the client.** It's read only in `src/lib/server/**`
-  (`$env/dynamic/private`, not `$env/dynamic/public`) — grep `SUPABASE_SERVICE_ROLE_KEY` if you
-  add a new server module and keep it that way.
-- **RLS is on everywhere.** Every table migration in `supabase/migrations/` enables row-level
-  security and scopes reads/writes to the authenticated owner (`auth_brand_ids()`,
-  `org_members`, …). The anon key alone can't read another tenant's rows; `db-seed.mjs`'s demo
-  user goes through the same GoTrue signup path a real user takes, not a bypass.
-- **Every cron/worker endpoint is fail-closed — in a production build.** `CRON_SECRET` (or the
-  endpoint's own secret, e.g. `AUTOPILOT_SECRET`) unset means 401 on every call. Under
-  `npm run dev`, which is what the install above tells you to run, 48 of those handlers skip the
-  check on purpose (`if (dev) return true`). Vite only binds localhost, so that is safe on your own
-  machine — it stops being safe the moment you put a reverse proxy in front of it. Expose the app
-  only from a real build.
-- **No telemetry defaults to us.** PostHog, Sentry, Clarity, Seline and the Meta Pixel / CAPI all
-  read a key from your own env and no-op without one; none of them ship with an feega project
-  id, token or DSN baked in as a default. (Seline and the Meta Pixel did until this was fixed — a
-  self-hosted instance served from a real hostname was loading our pixel and identifying its own
-  logged-in users, email included, into our Seline project. If you forked before that, update.)
-  If you set `PUBLIC_SENTRY_DSN`, use your own Sentry project, not ours.
-- **Don't commit `infra/compose/.env` or the app's `.env`.** Both are gitignored already; double
-  check before pushing a fork.
+- The service-role key never reaches the client.
+- Telemetry (Sentry, PostHog, Clarity, Seline, Meta Pixel) is off until you set your own key. Use your
+  own projects.
+- The demo user's password is public. Change `SEED_DEMO_PASSWORD` before you seed anything reachable.
+- Do not commit `.env`.
+
+## Limits today
+
+- The model catalogue starts empty (see Models and generation); there is no seed of provider models.
+- Server-side video rendering (agent and API MP4 output) defaults to the hosted render farm,
+  `REMOTE_RENDER_URL`. Browser-side work and image export do not use it. Point it at your own or leave
+  it unused.
+- The docs reference no hosted-only services: social publishing, ads and calendar are gone from the
+  product; some of their tables remain in the schema and are unused.
+- The schema is a snapshot of production. Until migrations are written against it, an upgrade that
+  adds a table ships as a new dated file under `supabase/migrations/`.
+
+## Timings
+
+Measured from a clean clone on a laptop (Apple silicon, images cached after the first pull):
+
+| Step | Docker | Supabase CLI |
+|---|---|---|
+| Start Supabase | included below | 30 s |
+| `npm ci` | in the image build | 14 s |
+| `npm run setup` | in `migrate` | 1.5 s |
+| App ready | 4.5 min first run (image build), 30 s after | `npm run dev` in ~2 s, first page compile ~10 s |
+| Login, frame, shape, animation, PNG export (`npm run smoke:selfhost`) | 29 s | 26 s |
+
+Add image pulls on a cold machine.
+
+## Check it works
+
+```bash
+npm run smoke:selfhost    # logs in as the demo user, creates a frame, draws a shape,
+                          # animates it, exports a PNG, and fails loudly if any step breaks
+```
+
+Set `PUBLIC_APP_URL` to where the app runs (`http://localhost:3000` for compose).
