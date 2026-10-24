@@ -133,6 +133,14 @@ describe('tileChrome', () => {
     expect(box(ofPart(t, ChromePart.Label)[0].contours)).toEqual([117, 178, 177, 190]);
   });
 
+  it('draws the colour tag as a dot at the right end of the label row, even with no label', () => {
+    const [dot] = ofPart(tile({ tag: '#e5484d' }), ChromePart.Tag);
+
+    expect(dot.paint).toEqual({ kind: PaintKind.Solid, color: rgbaOf('#e5484d') });
+    expect(box(dot.contours)).toEqual([392, 182, 400, 190]);
+    expect(ofPart(tile(), ChromePart.Tag)).toHaveLength(0);
+  });
+
   it('fills the icon strokes as a union, so overlapping round joins never cancel', () => {
     const [icon] = ofPart(tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]] }), ChromePart.Icon);
 

@@ -37,6 +37,7 @@ test.describe('colour tags @real', () => {
     await gotoHydrated(page, canvas);
     await expect(page.locator('[data-canvas-surface]')).toHaveAttribute('data-renderer', 'core', { timeout: 30_000 });
     await page.waitForTimeout(SETTLE_MS);
+    await page.screenshot({ path: `${SHOTS_DIR}/f4-colour-dot.png` });
     await page.keyboard.press('Control+f');
     await page.getByTestId('search-colour-red').click();
     await expect(page.getByTestId('node-search').getByRole('option')).toHaveCount(2);
