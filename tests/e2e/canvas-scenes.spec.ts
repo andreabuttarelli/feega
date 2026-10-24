@@ -113,6 +113,10 @@ test.describe('scenes combined into one video @real', () => {
       [ids[1], 'push-left'],
       [ids[2], null]
     ]);
+    await page.getByTestId('scene-insert').selectOption({ label: 'one · 1.5 s' });
+    await expect(sceneRows).toHaveCount(4);
+    await page.getByTestId('scenes-section').screenshot({ path: `${SHOTS}/seq-3c-scene-inserted.png` });
+    await expect.poll(async () => (await order()).map(([scene]) => scene), { timeout: 20_000 }).toEqual([ids[0], ids[1], ids[2], ids[1]]);
     await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Export…' }).click();
     await page.getByTestId('export-mode-video').click();

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from './doc';
 import { addClip, type OpResult } from './timeline';
 import { flattenComps } from './precomp';
-import { appendScene, reorderScenes, sceneEdit, resolveScenes, sceneNodeIds, scenesLeftToRight, scenesOf, sceneTransition, sequenceScenes, trimScene } from './scenes';
+import { appendScene, insertableScenes, reorderScenes, sceneEdit, resolveScenes, sceneNodeIds, scenesLeftToRight, scenesOf, sceneTransition, sequenceScenes, trimScene } from './scenes';
 import { JunctionKind } from './junction-model';
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -137,6 +137,20 @@ describe('scenes sequenced in a parent frame', () => {
       [B, 15, 30]
     ]);
     expect(scenesOf(removed).map((s) => [s.nodeId, s.from])).toEqual([[B, 0]]);
+  });
+
+  it('offers as new scenes the frames that are not themselves sequences', () => {
+    const parent = sequenceScenes(newMotionDoc(MotionFormat.Landscape), [{ nodeId: A, durationInFrames: 60 }]);
+    const frames = [
+      { id: A, doc: scene('hello', 60) },
+      { id: B, doc: scene('world', 30) },
+      { id: 'parent', doc: parent }
+    ];
+
+    expect(insertableScenes(frames)).toEqual([
+      { nodeId: A, label: 'hello', durationInFrames: 60 },
+      { nodeId: B, label: 'world', durationInFrames: 30 }
+    ]);
   });
 
   it('orders frames left to right, top to bottom on ties', () => {

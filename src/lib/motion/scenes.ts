@@ -96,6 +96,20 @@ export function removeScene(doc: MotionDoc, clipId: string): OpResult {
   return { ok: true, doc: withScenes(doc, clips.filter((c) => c.id !== clipId)) };
 }
 
+export type InsertableScene = ScenePlacement & { label: string };
+
+const FALLBACK_LABEL = 'Frame';
+const LABEL_MAX = 40;
+
+const labelOf = (doc: MotionDoc) => {
+  const text = doc.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.component === 'Text' && typeof c.props.text === 'string')?.props.text as string | undefined;
+  return text?.trim().slice(0, LABEL_MAX) || FALLBACK_LABEL;
+};
+
+export function insertableScenes(frames: readonly { id: string; doc: MotionDoc }[]): InsertableScene[] {
+  return frames.filter((f) => !sceneNodeIds(f.doc).length).map((f) => ({ nodeId: f.id, label: labelOf(f.doc), durationInFrames: f.doc.durationInFrames }));
+}
+
 export type SceneEdit =
   | { op: 'insert'; node_id: string; duration: number }
   | { op: 'reorder'; clip_ids: string[] }

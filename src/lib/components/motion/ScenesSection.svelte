@@ -2,7 +2,8 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
   import { JUNCTION, JUNCTION_KINDS, type JunctionKind } from '$lib/motion/junction-model';
-  import { removeScene, reorderScenes, sceneTransition, scenesOf, trimScene } from '$lib/motion/scenes';
+  import { appendScene, insertableScenes, removeScene, reorderScenes, sceneTransition, scenesOf, trimScene } from '$lib/motion/scenes';
+  import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
 
@@ -11,6 +12,14 @@
   const scenes = $derived(scenesOf(doc));
   const seconds = (frames: number) => Math.round((frames / doc.fps) * 100) / 100;
   let dragging = $state<string | null>(null);
+  const candidates = $derived(insertableScenes(canvasComponents.frames));
+
+  function insert(nodeId: string) {
+    const picked = candidates.find((c) => c.nodeId === nodeId);
+    if (picked) {
+      onchange({ ok: true, doc: appendScene(doc, picked) }, 'Inserted a scene');
+    }
+  }
 
   function dropOn(target: string) {
     const from = dragging;
@@ -63,6 +72,10 @@
         </div>
       </div>
     {/each}
+    <select aria-label="Insert frame" data-testid="scene-insert" value="" onchange={(e) => (insert(e.currentTarget.value), (e.currentTarget.value = ''))}>
+      <option value="" disabled>Insert frame…</option>
+      {#each candidates as c (c.nodeId)}<option value={c.nodeId}>{c.label} · {seconds(c.durationInFrames)} s</option>{/each}
+    </select>
   </section>
 {/if}
 
