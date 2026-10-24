@@ -449,6 +449,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         bleed: c.bleed ?? false,
         lockRatio: c.lockRatio ?? false,
         clipContent: c.clipContent ?? false,
+        group: c.group ?? false,
         markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
         physics: c.physics ? shownRecord(c.component, c.physics, doc) : null,
         path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map((t) => ({ time: secs(t.frame), in: shownOffset(c.component, t.in, doc), out: shownOffset(c.component, t.out, doc) })), problem: pathProblem(c) } : null

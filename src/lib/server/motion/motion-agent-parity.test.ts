@@ -92,6 +92,7 @@ const CLIP: Record<string, Access> = {
   bleed: { write: ['set_visibility'], read: 'bleed' },
   lockRatio: { write: ['set_visibility'], read: 'lockRatio' },
   clipContent: { write: ['set_visibility'], read: 'clipContent' },
+  group: { write: ['frame_clips', 'ungroup'], read: 'group' },
   markers: { write: ['set_marker', 'remove_marker'], read: 'markers' }
 };
 
