@@ -47,6 +47,8 @@ const { deps, upstream, imageStep, moderation } = vi.hoisted(() => ({
 }));
 imageStep.generate = vi.fn();
 moderation.screen = vi.fn();
+const ledger = vi.hoisted(() => ({ db: null as unknown }));
+vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => ledger.db }));
 vi.mock('$lib/server/media-generate', () => ({ generateImagesWithoutBrand: (...args: unknown[]) => imageStep.generate(...args) }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: (...args: unknown[]) => moderation.screen(...args) }));
 vi.mock('$lib/server/offerable-models', () => ({
@@ -183,6 +185,27 @@ describe('a 3D node on a Wiro image-to-3D model', () => {
     const out = await runGenNode(db, start());
 
     expect(out).toEqual({ kind: 'refused', error: MODEL_NOT_ALLOWED });
+    expect(gateway.run).not.toHaveBeenCalled();
+  });
+
+  it('refuses a run once the spending cap of the person is reached, before spending anything', async () => {
+    upstream.referenceImageUrls = [PRODUCT_URL];
+    const { db } = fakeDb(
+      {
+        nodes: [model3dNode()],
+        nodes_connections: [],
+        assets: [],
+        projects: [standardProject],
+        org_spend_caps: [{ org_id: ORG, scope: 'org_member', project_id: null, cap_usd: 5, reset: 'none' }],
+        ai_calls: [{ cost_usd: 3 }, { cost_usd: 2.5 }]
+      },
+      { updateRows: { nodes: [{ ...model3dNode(), version: 2 }] } }
+    );
+    ledger.db = db;
+
+    const out = await runGenNode(db, start());
+
+    expect(out).toMatchObject({ kind: 'refused', error: expect.stringContaining('cap_reached') });
     expect(gateway.run).not.toHaveBeenCalled();
   });
 

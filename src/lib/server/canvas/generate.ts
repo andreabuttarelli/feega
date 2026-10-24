@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { allowlistRefusal } from '$lib/server/model-allowlist/allowlist';
+import { capRefusal, liveCapReader } from '$lib/server/spend-caps/gate';
 import { RENDER_DEADLINE_MS } from '$lib/server/motion/farm-render';
 import { BROWSER_RENDER_DEADLINE_MS } from '$lib/motion/render-link';
 import { releaseHold } from '$lib/server/motion/render-run';
@@ -556,6 +557,11 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   const notAllowed = await allowlistRefusal(db, { orgId: input.orgId, medium: input.medium, model: input.model });
   if (notAllowed) {
     return { kind: 'refused', error: notAllowed };
+  }
+
+  const capped = await capRefusal(await liveCapReader(db), { orgId: input.orgId, userId: input.userId, projectId: input.projectId });
+  if (capped) {
+    return { kind: 'refused', error: capped };
   }
 
   const refusal = await generationRefusal(db, { orgId: input.orgId, projectId: input.projectId, userId: input.userId, model: input.model });

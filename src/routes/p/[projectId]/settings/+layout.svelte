@@ -52,6 +52,9 @@
       [`${base}/models`]: {
         title: $_('app.settings.models.title')
       },
+      [`${base}/spend`]: {
+        title: $_('app.settings.spend.title')
+      },
       [`${base}/team`]: {
         title: $_('app.settings.team.title')
       },
