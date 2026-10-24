@@ -1,4 +1,5 @@
 import { ungroupClip } from '$lib/motion/group';
+import { groupLight, settleGroups, ungroupLight } from '$lib/motion/light-group';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
 import { StyleAction, StyleKind, StyleSlot, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, saveAsStyle, stylesOf } from '$lib/motion/styles';
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
@@ -162,6 +163,7 @@ import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCamer
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
+import { FRAME_PRESETS, PRESET_SIZE } from '$lib/motion/frame-presets';
 import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '$lib/motion/layout/model';
 import { expressionToKeys, setCameraExpression, setExpression } from '$lib/motion/expression/ops';
@@ -447,6 +449,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         bleed: c.bleed ?? false,
         lockRatio: c.lockRatio ?? false,
         clipContent: c.clipContent ?? false,
+        group: c.group ?? false,
         markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
         physics: c.physics ? shownRecord(c.component, c.physics, doc) : null,
         path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map((t) => ({ time: secs(t.frame), in: shownOffset(c.component, t.in, doc), out: shownOffset(c.component, t.out, doc) })), problem: pathProblem(c) } : null
@@ -737,7 +740,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     if (blownUp.length) {
       return { ok: false, error: blownUp.map((p) => p.detail).join('; ') };
     }
-    session.doc = result.doc;
+    session.doc = settleGroups(result.doc);
     session.edits.push(what);
     return { ok: true, edit: what };
   };
@@ -1706,11 +1709,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     frame_clips: tool({
-      description: 'Frame the selection, like the editor Frame selection: wraps those visual clips in a transparent rectangle Shape drawn directly under them and parents them to it, without auto layout; children stay where they are. Returns container_id.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
-      execute: async ({ clip_ids }) => {
+      description: 'Frame the selection, like the editor Frame selection: wraps those visual clips in a transparent rectangle Shape drawn directly under them and parents them to it, without auto layout; children stay where they are. group true makes a light group instead, like ⌘G: no fill, its bounds always follow its members and it deletes itself when the last one leaves; ungroup takes it apart. Returns container_id.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), group: z.boolean().optional() }),
+      execute: async ({ clip_ids, group }) => {
         const id = deps.newId();
-        const out = apply(wrapInFrame(session.doc, clip_ids, id, deps.newId()), `framed ${clip_ids.length} clip(s)`);
+        const wrap = group ? groupLight : wrapInFrame;
+        const out = apply(wrap(session.doc, clip_ids, id, deps.newId()), `${group ? 'grouped' : 'framed'} ${clip_ids.length} clip(s)`);
         return out.ok ? { ...out, container_id: id } : out;
       }
     }),
@@ -2345,6 +2349,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to ${MAX_SHORT_SIDE}; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor. layout_guides replaces the frame's layout guides (columns/rows: count a number or "auto" (as many sections of size px as fit), gutter px, align stretch|min|max|center (stretch fills the frame between margin px; the others draw sections of size px from the start/end by offset px, or centred), color #rrggbb (default red) and opacity 0..1 (default 0.1); grid: size px; hidden true keeps the guide snapping without drawing it; [] removes them): drawn over the frame in the editor, never in the export, and layers snap to their edges.`,
       inputSchema: z.object({
         format: z.enum(MOTION_FORMATS).optional(),
+        preset: z.enum(FRAME_PRESETS).optional().describe('a device, paper or social size: phone, tablet, desktop, presentation, watch, paper, social; layers pinned with constraints keep their edge distance'),
         width: z.number().int().min(DESIGN_MIN_SIDE).max(DESIGN_MAX_SIDE).optional(),
         height: z.number().int().min(DESIGN_MIN_SIDE).max(DESIGN_MAX_SIDE).optional(),
         duration: z.number().positive().max(MAX_SECONDS).optional(),
@@ -2361,7 +2366,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const early = typeof input.still === 'number' ? designStill(session.doc, input.still) : ({ ok: true, doc: session.doc } as OpResult);
         const animated = !early.ok || input.still !== false ? early : animateStill(early.doc, input.duration);
         const paced = !animated.ok || input.fps === undefined ? animated : setFrameRate(animated.doc, input.fps);
-        const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
+        const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.preset ? PRESET_SIZE[input.preset] : input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         const guided = pinned.ok && input.layout_guides ? setLayoutGuides(pinned.doc, input.layout_guides) : pinned;
         return apply(guided, 'changed the canvas');
@@ -2843,9 +2848,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     ungroup: tool({
-      description: 'Ungroup: put the clips of a group (a Precomp made by precompose or ⌘G) back on the top level, at the same place and time; its offset is carried to each clip. Refused when the group is scaled, rotated or animated.',
+      description: 'Ungroup: put the clips of a group back on the top level, at the same place and time. A light group (frame_clips group true, ⌘G) just lets go of its members; a Precomp made by precompose carries its offset to each clip and is refused when scaled, rotated or animated.',
       inputSchema: z.object({ clip_id: z.string() }),
-      execute: async (input) => apply(ungroupClip(session.doc, input.clip_id, deps.newId), 'ungrouped')
+      execute: async (input) => apply(findClip(session.doc, input.clip_id)?.clip.group ? ungroupLight(session.doc, input.clip_id) : ungroupClip(session.doc, input.clip_id, deps.newId), 'ungrouped')
     }),
 
     create_comp: tool({

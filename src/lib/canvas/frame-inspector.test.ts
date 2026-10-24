@@ -120,8 +120,11 @@ describe('barAction', () => {
   it('groups two elements into one group and selects it', () => {
     const done = barAction(Action.Group, { doc: fixture(), selection: ['a', 'b'], frame: 0, newId: fresh() });
 
+    const clips = done?.doc.tracks.flatMap((t) => t.clips) ?? [];
+
     expect(done?.selection).toHaveLength(1);
-    expect(done?.doc.tracks.flatMap((t) => t.clips).map((c) => c.id)).toEqual(done?.selection);
+    expect(clips.find((c) => c.id === done?.selection[0])?.group).toBe(true);
+    expect(clips.filter((c) => c.parent === done?.selection[0]).map((c) => c.id).sort()).toEqual(['a', 'b']);
   });
 
   it('ungroups a group back into its elements', () => {

@@ -21,6 +21,16 @@ const still = () => ok(setStill(video(), 0));
 const BOX = { x: 0.4, y: 0.3, width: 0.2, height: 0.1 };
 const TEXT_LEADING = COMPONENTS.Text.schema.parse({}).leading;
 
+describe('drawing a frame inside a frame', () => {
+  it('is a rect Shape container that clips its content and carries its own fill', () => {
+    const clip = findClip(ok(drawClip(video(), DrawTool.Frame, BOX, 0, 'f1')), 'f1')!.clip;
+
+    expect(clip.component).toBe('Shape');
+    expect(clip.clipContent).toBe(true);
+    expect(clip.props).toMatchObject({ shape: 'rect', ...BOX, fills: [{ type: FillType.Solid }] });
+  });
+});
+
 describe('creating an element by drawing inside a frame', () => {
   it('a rectangle is a rect Shape clip on the drawn box', () => {
     const clip = findClip(ok(drawClip(video(), DrawTool.Rectangle, BOX, 0, 'r1')), 'r1')!.clip;

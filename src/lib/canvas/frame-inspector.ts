@@ -1,7 +1,8 @@
 import { compOf, findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
 import { Action, type ActionId } from '$lib/motion/actions';
 import { ClipOp, runClipOp, type ClipDone } from '$lib/motion/clip-ops';
-import { groupClips, ungroupClip } from '$lib/motion/group';
+import { ungroupClip } from '$lib/motion/group';
+import { groupLight, ungroupLight } from '$lib/motion/light-group';
 import { addAutoLayout, removeAutoLayout, resizeToFit, wrapInFrame } from '$lib/motion/layout/ops';
 import { isText } from '$lib/motion/layout/text-extent';
 import { Flip, flipClips } from '$lib/motion/layer-props';
@@ -59,7 +60,7 @@ const isOutlinable = (clip: MotionClip) => isText(clip.component) && clip.compon
 
 const any = () => true;
 const several = (_doc: MotionDoc, selection: readonly string[]) => selection.length >= MIN_COMBINED;
-const oneGroup = (doc: MotionDoc, selection: readonly string[]) => selection.length === 1 && clipsOf(doc, selection).some((c) => compOf(c));
+const oneGroup = (doc: MotionDoc, selection: readonly string[]) => selection.length === 1 && clipsOf(doc, selection).some((c) => compOf(c) || c.group);
 const shapes = (least: number) => (doc: MotionDoc, selection: readonly string[]) => {
   const clips = clipsOf(doc, selection);
   return clips.length >= least && clips.every(isShape);
@@ -79,6 +80,18 @@ const kept = (ctx: BarCtx, result: OpResult, summary: string) => done(result, su
 function regrouped(ctx: BarCtx, result: OpResult, summary: string): Done | null {
   const before = new Set(topIds(ctx.doc));
   return done(result, summary, result.ok ? topIds(result.doc).filter((id) => !before.has(id)) : []);
+}
+
+function ungrouped(ctx: BarCtx): Done | null {
+  const [only] = ctx.selection.length === 1 ? clipsOf(ctx.doc, ctx.selection) : [];
+  if (!only) {
+    return null;
+  }
+  if (only.group) {
+    const members = clipsOf(ctx.doc, topIds(ctx.doc)).filter((c) => c.parent === only.id).map((c) => c.id);
+    return done(ungroupLight(ctx.doc, only.id), 'Ungrouped', members);
+  }
+  return regrouped(ctx, ungroupClip(ctx.doc, only.id, ctx.newId), 'Ungrouped');
 }
 
 function framed(ctx: BarCtx): Done | null {
@@ -180,8 +193,8 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.Split]: clipOp(ClipOp.Split),
   [Action.Duplicate]: clipOp(ClipOp.Duplicate),
   [Action.Delete]: clipOp(ClipOp.Delete),
-  [Action.Group]: { shown: several, run: (ctx) => (ctx.selection.length >= MIN_COMBINED ? regrouped(ctx, groupClips(ctx.doc, ctx.selection, ctx.newId), 'Grouped') : null) },
-  [Action.Ungroup]: { shown: oneGroup, run: (ctx) => (ctx.selection.length === 1 ? regrouped(ctx, ungroupClip(ctx.doc, ctx.selection[0], ctx.newId), 'Ungrouped') : null) },
+  [Action.Group]: { shown: several, run: (ctx) => (ctx.selection.length >= MIN_COMBINED ? regrouped(ctx, groupLight(ctx.doc, ctx.selection, ctx.newId(), ctx.newId()), 'Grouped') : null) },
+  [Action.Ungroup]: { shown: oneGroup, run: ungrouped },
   [Action.FrameSelection]: { shown: any, run: framed },
   [Action.ResizeToFit]: { shown: any, run: (ctx) => kept(ctx, resizeToFit(ctx.doc, ctx.selection[0]), 'Resized the frame to fit') },
   [Action.AutoLayout]: { shown: any, run: autoLayout },

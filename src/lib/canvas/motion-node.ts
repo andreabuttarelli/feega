@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { versionNamesSchema, type VersionNames } from '$lib/motion/version-names';
-import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
+import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat, type MotionDoc } from '$lib/motion/doc';
+import { presetOf } from '$lib/motion/frame-presets';
 import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
@@ -146,6 +147,8 @@ const FREE_KIND: ReadonlySet<FrameKind> = new Set([FrameKind.Frame, FrameKind.El
 const sizingOf = (node: Pick<MotionNode, 'kind'>): Sizing => (FREE_KIND.has(node.kind) ? Sizing.Free : Sizing.Fixed);
 
 export const heightFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>): boolean => node.kind === FrameKind.Frame && node.format !== MotionFormat.Custom;
+
+export const tileFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>, doc: Pick<MotionDoc, 'width' | 'height'>): boolean => heightFollowsDoc(node) || (node.kind === FrameKind.Frame && presetOf(doc) !== null);
 
 export type FrameResize = { w: number; h: number; picture: Picture | null };
 

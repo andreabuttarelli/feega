@@ -6,7 +6,7 @@ import { TransitionKind } from '../design';
 import { addClip, setTransform, setTransition, Side, type OpResult } from '../timeline';
 import { composeHtml } from '../hyperframes/compose';
 import { compileScene } from './scene';
-import { leafRectsAt, pickAt, pickOwnersAt, quadOf, rectOf } from './pick';
+import { leafRectsAt, pickAt, pickOwnersAt, pickStackAt, quadOf, rectOf } from './pick';
 import { groupClips } from '../group';
 import { drawClip } from '../draw-create';
 import { DrawTool } from '../draw-tool';
@@ -191,5 +191,19 @@ describe('a group', () => {
     expect(Object.keys(leaves)).toHaveLength(2);
     expect(Object.keys(leaves)).not.toContain(group);
     expect(Object.values(leaves).every((r) => r.width > 0)).toBe(true);
+  });
+});
+
+describe('pickStackAt', () => {
+  const stacked = ['a', 'b', 'c'].reduce((doc, id) => shape(doc, id, 0.5, 0.5, 0.3), empty);
+
+  it('lists every layer under the point, top first', () => {
+    expect(pickStackAt(sceneOf(stacked), centre(stacked, 'a'), 0)).toEqual(['c', 'b', 'a']);
+  });
+
+  it('leaves out layers the point misses', () => {
+    const apart = shape(stacked, 'far', 0.9, 0.1, 0.05);
+
+    expect(pickStackAt(sceneOf(apart), centre(apart, 'a'), 0)).toEqual(['c', 'b', 'a']);
   });
 });

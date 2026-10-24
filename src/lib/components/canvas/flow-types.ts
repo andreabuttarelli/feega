@@ -93,6 +93,7 @@ export type FlowProps = {
     target: { box: CanvasBox } | { at: { x: number; y: number } },
   ) => Promise<void>;
   onRotate?: (id: string, degrees: number) => void;
+  onAddBeside?: (id: string) => void;
   onGroup?: (ids: string[]) => void;
   onUngroup?: (ids: string[]) => void;
   onRestack?: (ids: string[], to: Stack) => void;

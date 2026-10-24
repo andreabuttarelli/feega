@@ -5,6 +5,7 @@ import { SaveState } from './editor-bar';
 import { landed, outgoing, remote, type Revision, type Synced } from './frame-sync';
 import { adoptHead, amend, followHead, record, redo, startHistory, undo, type History } from './history';
 import { liveEdits, type LiveEdits } from './live-edit';
+import { settleGroups } from './light-group';
 import { mergeView } from './precomp';
 import type { OpResult } from './timeline';
 
@@ -88,7 +89,7 @@ export class FrameEditSession {
   recordEdit(next: MotionDoc, summary: string) {
     this.port.recorded();
     const now = Date.now();
-    const root = mergeView(this.history.present, this.port.viewPath(), next);
+    const root = settleGroups(mergeView(this.history.present, this.port.viewPath(), next));
     const typedOn = summary === this.lastEdit.summary && now - this.lastEdit.at < COALESCE_MS;
     this.history = typedOn ? amend(this.history, root) : record(this.history, root);
     if (!typedOn) {

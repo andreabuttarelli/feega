@@ -1,5 +1,5 @@
 import { composeHtml } from '$lib/motion/hyperframes/compose';
-import { leafRectsAt, pickOwnersAt, quadOf, rectOf } from '$lib/motion/gpu/pick';
+import { leafRectsAt, pickOwnersAt, pickStackAt, quadOf, rectOf } from '$lib/motion/gpu/pick';
 import { findClip } from '$lib/motion/doc';
 import { compileScene, type Scene } from '$lib/motion/gpu/scene';
 import { frameOfLive } from '$lib/canvas/core/frame-source';
@@ -72,6 +72,11 @@ export function framePicker(live: LiveDoc, playhead: () => number | undefined = 
     },
     pick(world: World, space: FrameSpace): string | null {
       return ownersAt(world, space).findLast((id) => findClip(live.doc, id)) ?? null;
+    },
+    stack(world: World, space: FrameSpace): string[] {
+      const s = scene();
+      const [x, y] = space.toFrame(world);
+      return x < 0 || y < 0 || x > s.width || y > s.height ? [] : pickStackAt(s, [x, y], time()).filter((id) => findClip(live.doc, id));
     },
     chain(world: World, space: FrameSpace): string[] {
       return ownersAt(world, space).filter((id) => scopeOf(live.doc, id));

@@ -135,6 +135,19 @@ const SPAN: Record<Axis, { start: (b: Bounds) => number; size: (b: Bounds) => nu
   [Axis.Y]: { start: (b) => b.top, size: (b) => b.bottom - b.top }
 };
 
+const SAME_GAP_PX = 0.5;
+
+export function gapOf(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, axis: Axis): number | null {
+  const bounds = ids.length > 1 ? boundsOf(doc, ids, frame, boxes) : null;
+  if (!bounds || typeof bounds === 'string') {
+    return null;
+  }
+  const { start, size } = SPAN[axis];
+  const ordered = [...ids].map((id) => bounds.get(id)!).sort((a, b) => start(a) - start(b));
+  const gaps = ordered.slice(1).map((b, i) => start(b) - (start(ordered[i]) + size(ordered[i])));
+  return gaps.every((g) => Math.abs(g - gaps[0]) <= SAME_GAP_PX) ? gaps[0] : null;
+}
+
 const MIN_SPACED = 2;
 
 export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, axis: Axis, mode: EditMode, spacing?: number): OpResult {

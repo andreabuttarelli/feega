@@ -15,7 +15,7 @@
   import { FRAME_ELEMENT_MENU, canRunInFrame, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { loadOutliner } from '$lib/motion/fonts/outliner';
-  import { frameSummaries } from '$lib/motion/frame-menu';
+  import { frameLayers, frameSummaries } from '$lib/motion/frame-menu';
   import { followDocks } from '$lib/canvas/dock-lift';
   import { frameScreenRect } from '$lib/canvas/frame-screen';
   import FrameSelection from '../FrameSelection.svelte';
@@ -250,6 +250,20 @@
   let selected = $state<string[]>([]);
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
+  let addLinger = $state<string | null>(null);
+  let addLingerTimer: ReturnType<typeof setTimeout> | undefined;
+  const ADD_LINGER_MS = 600;
+
+  $effect(() => {
+    const now = hovered;
+    clearTimeout(addLingerTimer);
+    if (now) {
+      addLinger = now;
+      return;
+    }
+    addLingerTimer = setTimeout(() => (addLinger = null), ADD_LINGER_MS);
+    return () => clearTimeout(addLingerTimer);
+  });
   let pickHover = $state<{ nodeId: string; clip: string; quad: Point[] } | null>(null);
   let overrides = $state<Map<string, Box>>(new Map());
   let copies = $state<Map<string, Box>>(new Map());
@@ -1472,6 +1486,7 @@
   }
 
   let elementMenu = $state<Point | null>(null);
+  let elementLayers = $state<{ id: string; label: string }[]>([]);
 
   function openElementMenu(e: MouseEvent): boolean {
     const hit = elementAt(toWorld(view, local(e)), Reach.Top);
@@ -1482,6 +1497,10 @@
       select([hit.nodeId]);
       goInside(hit.nodeId, Gesture.Click, hit.clip);
     }
+    const world = toWorld(view, local(e));
+    const under = framePickAt(world);
+    const doc = liveOf(hit.nodeId)?.doc;
+    elementLayers = under && doc ? frameLayers(doc, under.picker.stack(world, under.space)) : [];
     elementMenu = { x: e.clientX, y: e.clientY };
     return true;
   }
@@ -3406,7 +3425,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px;--bar-h:${holdsDoc(t.kind ?? '') && frameChrome(kindOfNode(t.id)).bar ? MOTION_NODE_BAR_H : 0}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} />
+          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onaddbeside={holdsDoc(t.kind ?? '') && kindOfNode(t.id) === FrameKind.Frame ? props.onAddBeside : undefined} showAdd={on || hovered === t.id || addLinger === t.id} />
           {#if !domIds.has(t.id) && holdsDoc(t.kind ?? '')}
             {@const kind = kindOfNode(t.id)}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
@@ -3490,7 +3509,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && (frameBar.tool === DrawTool.Frame || !inside)}
+  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && !inside}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
@@ -3571,7 +3590,7 @@
 
   {#if elementMenu && inside && spec.chrome}
     {@const doc = liveOf(inside.nodeId)?.doc}
-    {#if doc}<CanvasContextMenu at={elementMenu} summaries={frameSummaries(doc, picks)} available={FRAME_ELEMENT_MENU} onpick={runElementMenu} onclose={() => (elementMenu = null)} />{/if}
+    {#if doc}<CanvasContextMenu at={elementMenu} summaries={frameSummaries(doc, picks)} available={FRAME_ELEMENT_MENU} layers={elementLayers} onlayer={(id) => inside && pickMany(inside.nodeId, [id])} onpick={runElementMenu} onclose={() => (elementMenu = null)} />{/if}
   {/if}
 
   {#if spec.chrome}
