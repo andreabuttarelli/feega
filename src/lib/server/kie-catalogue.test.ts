@@ -41,6 +41,27 @@ describe('the kie catalogue', () => {
     expect(taskUsdFor(tool.pricing, {})).toBeCloseTo(1 * KIE_CREDIT_USD, 6);
   });
 
+  it('offers layer decomposition taking a prompt and keeping the extra outputs as layers', () => {
+    const tool = rows.find((r) => r.id === IMAGE_TOOL_MODEL[ImageTool.SplitLayers])!;
+
+    expect(tool.wire_spec).toMatchObject({ model: 'seedream/5-flash-layer-decomposition', requiresImage: true, layers: true, menuGroup: IMAGE_TOOLS_GROUP, fields: { prompt: 'prompt', images: ['image_url'] } });
+    expect(taskUsdFor(tool.pricing, {})).toBeGreaterThan(0);
+  });
+
+  it('offers inpainting taking a prompt, the picture and a mask, priced by rendering speed', () => {
+    const tool = rows.find((r) => r.id === IMAGE_TOOL_MODEL[ImageTool.Inpaint])!;
+
+    expect(tool.wire_spec).toMatchObject({
+      model: 'ideogram/v3-edit',
+      requiresImage: true,
+      requiresMask: true,
+      menuGroup: IMAGE_TOOLS_GROUP,
+      fields: { prompt: 'prompt', images: ['image_url'], mask: 'mask_url' }
+    });
+    expect(tool.param_schema).toMatchObject({ rendering_speed: { type: 'enum', values: ['TURBO', 'BALANCED', 'QUALITY'] } });
+    expect(taskUsdFor(tool.pricing, { rendering_speed: 'TURBO' })).toBeLessThan(taskUsdFor(tool.pricing, { rendering_speed: 'QUALITY' })!);
+  });
+
   it('offers the image upscale priced per factor', () => {
     const tool = rows.find((r) => r.id === IMAGE_TOOL_MODEL[ImageTool.Upscale])!;
 

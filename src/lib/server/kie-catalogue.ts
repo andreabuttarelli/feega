@@ -127,20 +127,24 @@ type KieToolModel = {
   kieModel: string;
   label: string;
   imageField: string;
-  creditsByFactor?: Readonly<Record<string, number>>;
+  priceBy?: { field: string; credits: Readonly<Record<string, number>> };
   flatCredits?: number;
+  takesPrompt?: boolean;
+  keepsLayers?: boolean;
+  maskField?: string;
 };
 
 const KIE_TOOL_MODELS: readonly KieToolModel[] = [
   { tool: ImageTool.RemoveBackground, kieModel: 'recraft/remove-background', label: 'Remove background', imageField: 'image', flatCredits: 1 },
-  { tool: ImageTool.Upscale, kieModel: 'topaz/image-upscale', label: 'Upscale image', imageField: 'image_url', creditsByFactor: { '2': 10, '4': 20 } }
+  { tool: ImageTool.Upscale, kieModel: 'topaz/image-upscale', label: 'Upscale image', imageField: 'image_url', priceBy: { field: 'upscale_factor', credits: { '2': 10, '4': 20 } } },
+  { tool: ImageTool.SplitLayers, kieModel: 'seedream/5-flash-layer-decomposition', label: 'Split into layers', imageField: 'image_url', flatCredits: 24, takesPrompt: true, keepsLayers: true },
+  { tool: ImageTool.Inpaint, kieModel: 'ideogram/v3-edit', label: 'Inpaint', imageField: 'image_url', maskField: 'mask_url', takesPrompt: true, priceBy: { field: 'rendering_speed', credits: { TURBO: 6, BALANCED: 12, QUALITY: 18 } } }
 ];
 
-const UPSCALE_FACTOR_FIELD = 'upscale_factor';
-
 function toolPriceLines(model: KieToolModel): TaskPriceLine[] {
-  if (model.creditsByFactor) {
-    return Object.entries(model.creditsByFactor).map(([factor, credits]) => line({ [UPSCALE_FACTOR_FIELD]: factor }, credits));
+  if (model.priceBy) {
+    const { field, credits } = model.priceBy;
+    return Object.entries(credits).map(([value, priced]) => line({ [field]: value }, priced));
   }
   return [line({}, model.flatCredits!)];
 }
@@ -155,7 +159,7 @@ function kieToolRow(model: KieToolModel, syncedAt: string): AiModelRow {
     output_modalities: ['image'],
     supported_parameters: [model.imageField],
     supported_resolutions: [],
-    param_schema: model.creditsByFactor ? { [UPSCALE_FACTOR_FIELD]: { type: 'enum', values: Object.keys(model.creditsByFactor) } } : {},
+    param_schema: model.priceBy ? { [model.priceBy.field]: { type: 'enum', values: Object.keys(model.priceBy.credits) } } : {},
     pricing: { lines: toolPriceLines(model) },
     synced_at: syncedAt,
     released_at: null,
@@ -166,9 +170,11 @@ function kieToolRow(model: KieToolModel, syncedAt: string): AiModelRow {
     wire_spec: {
       model: model.kieModel,
       requiresImage: true,
+      ...(model.keepsLayers ? { layers: true } : {}),
+      ...(model.maskField ? { requiresMask: true } : {}),
       menuGroup: IMAGE_TOOLS_GROUP,
       maxRefs: 1,
-      fields: { images: [model.imageField] }
+      fields: { ...(model.takesPrompt ? { prompt: 'prompt' } : {}), images: [model.imageField], ...(model.maskField ? { mask: model.maskField } : {}) }
     }
   };
 }

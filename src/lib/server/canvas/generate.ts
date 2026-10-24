@@ -34,6 +34,7 @@ import {
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
 import { signMediaPaths } from './sign-media';
+import { editInputsOf } from './edit-inputs';
 import { peopleScreened, ReferenceMedium } from '$lib/server/moderation/people';
 import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
@@ -316,8 +317,10 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
   ]);
   const node = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => null);
   const ttl = inputTtlOf(taskProviderOf(input.model));
-  const [imageUrls, lastFrame, videoUrls, audioUrls, provenance] = await Promise.all([
-    signMediaPaths(db, TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? [], ttl),
+  const edit = await editInputsOf(db, { orgId: input.orgId, data: node?.data, wiredImagePaths: TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? [] });
+  const [imageUrls, maskUrls, lastFrame, videoUrls, audioUrls, provenance] = await Promise.all([
+    signMediaPaths(db, edit.imagePaths, ttl),
+    signMediaPaths(db, edit.maskPath ? [edit.maskPath] : [], ttl),
     signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : [], ttl),
     signMediaPaths(db, upstream.referenceVideoUrls, ttl),
     signMediaPaths(db, upstream.referenceAudioUrls, ttl),
@@ -332,6 +335,7 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
     prompt,
     params: input.params,
     imageUrls,
+    maskUrl: maskUrls[0] ?? null,
     lastFrameUrl: lastFrame[0] ?? null,
     videoUrls,
     audioUrls,
@@ -1216,7 +1220,8 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
 
       await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: progress.asset.id, costUsd: progress.costUsd });
       const poster = progress.poster ? { posterRefId: progress.poster.id } : {};
-      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored, ...poster });
+      const layerRefIds = progress.layers.length ? progress.layers.map((layer) => layer.id) : null;
+      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored, layerRefIds, ...poster });
       outcome.done += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'task_reconcile_failed';

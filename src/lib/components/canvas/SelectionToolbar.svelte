@@ -1,6 +1,8 @@
 <script lang="ts">
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import Sparkles from '@lucide/svelte/icons/sparkles';
+  import Maximize2 from '@lucide/svelte/icons/maximize-2';
+  import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
   import { isFrameDialogAction } from '$lib/canvas/frame-dialogs';
   import { actionsIn, enabledFor, shownFor, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
@@ -21,6 +23,7 @@
   import { PROVIDER_PARAM } from '$lib/canvas/model-routes';
   import NodeSettings from './NodeSettings.svelte';
   import { SECTION_TYPE } from '$lib/canvas/section';
+  import { COLOUR_TAGS, COLOUR_TAG_HEX, colourOf, type ColourTag } from '$lib/canvas/node-colour';
   import { SECTION_DEFAULT_FILL } from '$lib/canvas/node-data';
 
   const ICON_BUTTON = 'size-11 md:size-8';
@@ -39,7 +42,9 @@
     onrun,
     onaction,
     onpropertychange,
-    onsectionchange
+    onsectionchange,
+    oncolourchange,
+    onview
   }: {
     box: { x: number; y: number; width: number } | null;
     zoom?: number;
@@ -55,7 +60,16 @@
     onaction?: (id: SelectionActionId) => void;
     onpropertychange?: (patch: SelectionPatch & { model?: string | null }) => void;
     onsectionchange?: (id: string, patch: { title?: string; fill?: string }) => void;
+    oncolourchange?: (tag: ColourTag | null) => void;
+    onview?: () => void;
   } = $props();
+
+  const viewable = $derived(count === 1 && !!nodeSummaries[0] && nodeSummaries[0].type in OUTPUT_KIND_OF && typeof nodeSummaries[0].data.refId === 'string');
+
+  const sharedColour = $derived.by(() => {
+    const tags = new Set(nodeSummaries.map((node) => colourOf(node.data)));
+    return tags.size === 1 ? [...tags][0] : null;
+  });
 
   const visible = $derived(box !== null && zoom >= TOOLBAR_HIDE_BELOW_ZOOM);
   const scale = $derived(toolbarScale(zoom));
@@ -193,9 +207,38 @@
         {#if count > 1}
           <span class="count">{count} selected</span>
         {/if}
+        {#if viewable}
+          <Button variant="ghost" size="sm" class="h-11 md:h-8" data-testid="view-output" onclick={() => onview?.()}>
+            <Maximize2 strokeWidth={1.7} />
+            View
+          </Button>
+        {/if}
         {#each secondary as action (action.id)}
           {@render iconAction(action, '')}
         {/each}
+        {#if oncolourchange}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger>
+              {#snippet child({ props })}
+                <Button {...props} variant="ghost" size="icon-sm" class={ICON_BUTTON} aria-label="Colour tag" data-testid="colour-tag-menu">
+                  <span class="tag-dot" style={`--tag:${sharedColour ? COLOUR_TAG_HEX[sharedColour] : 'transparent'}`}></span>
+                </Button>
+              {/snippet}
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="end" class="w-auto p-2">
+              <div class="tag-row">
+                {#each COLOUR_TAGS as tag (tag)}
+                  <DropdownMenu.Item class="tag-pick" aria-label={`Tag ${tag}`} data-testid={`colour-tag-${tag}`} onSelect={() => oncolourchange(tag)}>
+                    <span class="tag-dot" style={`--tag:${COLOUR_TAG_HEX[tag]}`}></span>
+                  </DropdownMenu.Item>
+                {/each}
+                <DropdownMenu.Item class="tag-pick" aria-label="Clear tag" data-testid="colour-tag-clear" onSelect={() => oncolourchange(null)}>
+                  <span class="tag-dot"></span>
+                </DropdownMenu.Item>
+              </div>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        {/if}
         {#if overflow.length}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>
@@ -288,6 +331,20 @@
     .group[aria-label='Actions'] {
       justify-content: space-between;
     }
+  }
+
+  .tag-row {
+    display: flex;
+    gap: 4px;
+  }
+
+  .tag-dot {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--tag, var(--ui-ink-3));
+    border-radius: 9999px;
+    background: var(--tag, transparent);
   }
 
   .section-title {

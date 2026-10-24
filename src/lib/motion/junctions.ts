@@ -93,13 +93,13 @@ function incomingOnTop(doc: MotionDoc, pair: JunctionPair): boolean {
   return inTrack !== outTrack ? inTrack > outTrack : inIndex > outIndex;
 }
 
-export function junctionMoves(doc: MotionDoc, pairs: JunctionPair[]): JunctionMove[] {
+export function junctionMoves(doc: MotionDoc, pairs: JunctionPair[], stack: MotionDoc = doc): JunctionMove[] {
   const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]);
   return pairs.flatMap((pair) => {
     const spec = JUNCTION[pair.kind];
     const incoming = clips.find((c) => c.id === pair.incoming)!;
     const at = incoming.from - junctionHalves(pair.durationInFrames).before;
-    const below = spec.incomingBelow && !incomingOnTop(doc, pair);
+    const below = spec.incomingBelow && !incomingOnTop(stack, pair);
     const moves = (clip: string, list: Move[]): JunctionMove[] =>
       list.map((move) => {
         const { offset, length } = SPAN[move.span](pair.durationInFrames);

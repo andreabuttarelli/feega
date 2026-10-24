@@ -586,6 +586,19 @@ no. Svelte 5 delega `dblclick`/`click` alla radice; un antenato (la tela, un nod
 propagazione prima. Mossa: `addEventListener('dblclick', …)` diretto sull'elemento in un
 `$effect`, e un test e2e che fa il gesto vero.
 
+### Con un `.env` copiato nel worktree la suite unitaria diventa rossa
+Segnale: dopo aver copiato `.env` per un e2e `@real`, `ai-models-sync`, `canvas-catalogue`,
+`generate.test`, `settings-actions-upgrade` e altri falliscono con `.eq(...).eq is not a function`
+o liste con un modello in più, e in CI sono verdi. Causa: i test leggono la configurazione vera
+(chiavi Kie, Stripe) invece dei default vuoti. Mossa: sposta `.env` fuori dal worktree prima di
+`vitest`, rimettilo solo per l'e2e.
+
+### Un'op nuova che il chat elenca sfora il budget di caratteri
+Segnale: `tool-budget.test.ts` rosso di poche decine di caratteri su una PR che aggiunge un'op
+`canvas_tool`. Causa: il chat elenca nome e campi di ogni op, quindi ogni op costa il suo nome.
+Mossa: prima accorcia i riepiloghi; se non basta, alza `CANVAS_CHAT_MAX_CHARS` di poco (come
+#1172) nello stesso commit. Un'op con un enum di strumenti (`image_tool`) costa meno di un'op per strumento.
+
 ## Test: distinguere il tuo difetto dal rumore
 
 ### Un test "lento a intermittenza" può non essere lento affatto

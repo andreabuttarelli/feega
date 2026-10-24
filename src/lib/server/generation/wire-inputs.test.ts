@@ -15,6 +15,13 @@ describe('wireInputs', () => {
     expect(wireInputs(shape, { ...NO_MEDIA, imageUrls: ['i1', 'i2'] }, {})).toEqual({ prompt: 'p', image_urls: ['i1'] });
   });
 
+  it('sends the mask to its own field, next to the image it covers', () => {
+    const shape = { fields: { prompt: 'prompt', images: ['image_url'], mask: 'mask_url' } };
+
+    expect(wireInputs(shape, { ...NO_MEDIA, imageUrls: ['pic'], maskUrl: 'mask' }, {})).toEqual({ prompt: 'p', image_url: 'pic', mask_url: 'mask' });
+    expect(wireInputs(shape, { ...NO_MEDIA, imageUrls: ['pic'] }, {})).toEqual({ prompt: 'p', image_url: 'pic' });
+  });
+
   it('sends the first upstream video to a single video field', () => {
     const inputs = wireInputs({ fields: { prompt: 'prompt', images: [], video: 'video_url' } }, { ...NO_MEDIA, videoUrls: ['v1', 'v2'] }, {});
     expect(inputs).toEqual({ prompt: 'p', video_url: 'v1' });

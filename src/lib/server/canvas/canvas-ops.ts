@@ -19,7 +19,8 @@ import {
 } from '$lib/server/repos/canvas';
 import { runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate';
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
-import { ImageTool, UPSCALE_FACTORS } from '$lib/image-tools';
+import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-frame';
+import { imageToolAskSchema } from '$lib/image-tools';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
@@ -246,14 +247,6 @@ const runNodeInput = z
     params: z.record(z.string(), z.unknown()).optional().describe('e.g. { aspectRatio: "1:1", duration: 8 }.'),
     provider: z.string().optional().describe('A provider id from list_models routes (e.g. "kie", "openrouter"); omit or "auto" for the cheapest healthy one.'),
     expectedVersion: z.number().int()
-  })
-  .strict();
-
-const imageToolInput = z
-  .object({
-    nodeId: z.string().describe('An image node with a result.'),
-    tool: z.nativeEnum(ImageTool),
-    factor: z.enum(UPSCALE_FACTORS).optional().describe('upscale only: 2 or 4 (default 2).')
   })
   .strict();
 
@@ -814,15 +807,24 @@ export const CANVAS_OPS = {
 
   image_tool: op({
     access: Access.Spend,
-    input: imageToolInput,
+    input: imageToolAskSchema,
     run: async (ctx, input) => {
       const started = await ctx.billed(() =>
-        startImageTool(ctx.db, IMAGE_TOOL_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, tool: input.tool, factor: input.factor, actor: ctx.actor })
+        startImageTool(ctx.db, IMAGE_TOOL_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, tool: input.tool, factor: input.factor, prompt: input.prompt, mask: input.mask, actor: ctx.actor })
       );
       if (!started.ok) {
         return { error: started.error };
       }
       return { nodeId: started.nodeId, ...outcomeOf(started.outcome) };
+    }
+  }),
+
+  layers_to_frame: op({
+    access: Access.Write,
+    input: nodeIdInput,
+    run: async (ctx, input) => {
+      const made = await layersToFrame(ctx.db, layersToFrameDeps(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, actor: ctx.actor }), { orgId: ctx.orgId, nodeId: input.nodeId });
+      return made.ok ? { outcome: 'done', frameId: made.frameId } : { error: made.error };
     }
   }),
 
