@@ -7,7 +7,8 @@ import { frameRunner } from './frame-tools';
 import { LOADED_CAP, LOAD_TOOLS, ToolLoading, frameSurface } from './tool-loading';
 
 const SCOPE = { orgId: 'o', projectId: 'p', userId: 'u' };
-const CORE_MAX_CHARS = 29_000;
+const CORE_MAX_CHARS = 8_000;
+const TOOL_MAX_CHARS = 600;
 const CATALOGUE_TO_CORE_RATIO = 6;
 
 async function promptChars(tools: Record<string, Tool>): Promise<number> {
@@ -25,7 +26,19 @@ describe('the canvas chat offers a small core and loads the rest', () => {
   it('the core stays under its budget', async () => {
     const { tools, active } = await made;
 
-    expect(await promptChars(offered({ ...core, ...tools }, active()!))).toBeLessThan(CORE_MAX_CHARS);
+    const chars = await promptChars(offered({ ...core, ...tools }, active()!));
+
+    console.log(`chat core: ${chars} chars, ${active()!.length} tools`);
+    expect(chars).toBeLessThan(CORE_MAX_CHARS);
+  });
+
+  it('no core tool is heavier than its own budget', async () => {
+    const { tools, active } = await made;
+    const shown = offered({ ...core, ...tools }, active()!);
+
+    for (const [name, t] of Object.entries(shown)) {
+      expect(await promptChars({ [name]: t }), name).toBeLessThan(TOOL_MAX_CHARS);
+    }
   });
 
   it('the catalogue it reaches is several times the core', async () => {
@@ -36,7 +49,7 @@ describe('the canvas chat offers a small core and loads the rest', () => {
 
   it('never offers more than the loaded cap on top of the core', async () => {
     const { tools, active } = await made;
-    const frameNames = Object.keys(tools).filter((n) => !n.endsWith('_tools'));
+    const frameNames = Object.keys(tools).filter((n) => !n.endsWith('_tools') && !(n in core));
 
     await tools[LOAD_TOOLS].execute!({ names: frameNames.slice(0, LOADED_CAP) } as never, { toolCallId: 'a', messages: [] } as never);
     await tools[LOAD_TOOLS].execute!({ names: frameNames.slice(LOADED_CAP, LOADED_CAP + 5) } as never, { toolCallId: 'b', messages: [] } as never);

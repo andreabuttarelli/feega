@@ -108,7 +108,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
       )
     )
   });
-  const frames = await frameSurface(toolLoadingOf(env.TOOL_LOADING), frameDeps, frameRunner(frameDeps), core, turns);
+  const frames = await frameSurface(toolLoadingOf(env.TOOL_LOADING), frameDeps, frameRunner(frameDeps), core, turns, { ...webTools, [SPAWN_AGENT]: core[SPAWN_AGENT] });
   const projectTools = { ...core, ...frames.tools };
   const agent = await openAgentTools({
     projectTools,

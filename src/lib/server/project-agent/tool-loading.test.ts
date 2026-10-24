@@ -4,7 +4,8 @@ import { fakeDb } from '$lib/server/db/fake-db';
 import type { Turn } from '$lib/server/repos/chat';
 import { createProjectTools } from './project-tools';
 import { FRAME_TOOL, frameRunner, type FrameAsk } from './frame-tools';
-import { FIND_TOOLS, LOADED_CAP, LOAD_TOOLS, LoadedSet, ToolLoading, frameSurface, toolLoadingOf, warmTools } from './tool-loading';
+import { CORE_LINES } from './core-tools';
+import { DESCRIBE_TOOLS, FIND_TOOLS, LOADED_CAP, LOAD_TOOLS, LoadedSet, ToolLoading, frameSurface, toolLoadingOf, warmTools } from './tool-loading';
 
 const SCOPE = { orgId: 'o', projectId: 'p', userId: 'u' };
 const CALL = { toolCallId: 'c', messages: [] };
@@ -25,7 +26,44 @@ describe('the canvas chat loads frame tools instead of carrying them all', () =>
     const { core, made } = surface(ToolLoading.Load);
     const { active } = await made;
 
-    expect(active()).toEqual([...Object.keys(core), FIND_TOOLS, LOAD_TOOLS]);
+    expect(active()).toEqual([...Object.keys(core).filter((name) => name in CORE_LINES), FIND_TOOLS, LOAD_TOOLS, DESCRIBE_TOOLS]);
+  });
+
+  it('a project tool outside the core is found, loaded and then offered', async () => {
+    const { tools, active } = await surface(ToolLoading.Load).made;
+
+    const found = (await run(tools[FIND_TOOLS], { query: 'connect' })) as { tools: { name: string }[] };
+    await run(tools[LOAD_TOOLS], { names: ['connect_nodes'] });
+
+    expect(found.tools.map((t) => t.name)).toContain('connect_nodes');
+    expect(active()).toContain('connect_nodes');
+  });
+
+  it('a tool kept by the caller stays offered without being loaded', async () => {
+    const { db } = fakeDb({});
+    const deps = { db, ...SCOPE, open: null, editor: null };
+    const runner = { run: async () => ({}), seen: new Map() };
+    const core = { ...createProjectTools({ db, ...SCOPE }), ask_reference_pick: createProjectTools({ db, ...SCOPE }).list_nodes };
+
+    const { active } = await frameSurface(ToolLoading.Load, deps, runner, core, [], { ask_reference_pick: core.ask_reference_pick });
+
+    expect(active()).toContain('ask_reference_pick');
+  });
+
+  it('describes a core tool by its exact schema, the slim one hides the details', async () => {
+    const { tools } = await surface(ToolLoading.Load).made;
+
+    const answer = (await run(tools[DESCRIBE_TOOLS], { names: ['create_node', 'nope'] })) as { tools: { name: string; schema: { properties: Record<string, { description?: string }> } }[]; unknown: string[] };
+
+    expect(answer.tools[0].name).toBe('create_node');
+    expect(JSON.stringify(answer.tools[0].schema).length).toBeGreaterThan(JSON.stringify(tools.create_node.inputSchema).length);
+    expect(answer.unknown).toEqual(['nope']);
+  });
+
+  it('a slim core tool still refuses bad input with the reason', async () => {
+    const { tools } = await surface(ToolLoading.Load).made;
+
+    expect(await run(tools.update_node, { nodeId: 3 })).toMatchObject({ error: 'invalid_input' });
   });
 
   it('offers a loaded tool directly from the next step', async () => {
@@ -59,7 +97,7 @@ describe('the canvas chat loads frame tools instead of carrying them all', () =>
     const { core, made } = surface(ToolLoading.Load);
     const { tools } = await made;
 
-    expect(Object.keys(tools).filter((name) => name in core)).toEqual([]);
+    expect(Object.keys(tools).filter((name) => name in core && !(name in CORE_LINES))).toEqual([]);
   });
 
   it('keeps the proxy as the only frame surface in proxy mode', async () => {
