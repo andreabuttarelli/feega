@@ -101,8 +101,27 @@ Tools take an optional `org` when you belong to more than one org.
 - **`view`** reads: `canvas_summary`, `get`, `snapshot`, `activity`.
 - Text sizes are shares of the frame height (`0.11` is 119 px on a 1080 frame). Colours are
   `#rrggbb` or `brand.primary|secondary|accent|background|text`.
-- Spending: `ask_motion_agent`, `run_node_generation` and `generate_voiceover` use credits. Layout
+- Spending: `run_node_generation` and `generate_voiceover` use credits. Layout
   ops, `render_video` in browser mode, exports and sharing are free.
+
+### The tool list is small on purpose
+
+A session lists 10 tools (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`,
+`list_orgs`, `find_tools`, `load_tools`, `unload_tools`), about 870 tokens. Every client resends
+the list each turn, so the rest stays out until asked for:
+
+- `describe` `{op}` gives the exact schema of any tool or op. A wrong call answers with it too.
+- `find_tools` `{query, family?}` searches every tool and edit op by keywords.
+- `load_tools` `{names}` adds them to this session's list (at most 40, oldest drop first) and
+  sends `notifications/tools/list_changed`; `unload_tools` drops them.
+- Any listed-or-not tool also runs through `edit`: `{ "op": "insert_row", "input": { ... } }`.
+  Old tool names still answer when called directly.
+
+Whether the client refreshes on `list_changed` (checked 2026-10-24): Claude Code yes (since 2.1.0;
+in `-p` and the Agent SDK only the tool list); Cursor no (0.47, per canimcp.dev); Claude Desktop
+unverified. Without it, call loaded tools by name or through `edit`: they work the same. Over
+remote HTTP the server is stateless, so loaded tools are kept per Bearer token on a best-effort
+basis and a notification cannot be pushed; stdio holds them for the whole session.
 
 ## 5. Flows
 
@@ -110,10 +129,10 @@ The five flows build on each other. Ids in `<angle brackets>` come from the prev
 
 ### Setup: a project and a canvas
 
-`insert_row`:
+`edit` (runs `insert_row`):
 
 ```json
-{ "table": "projects", "values": { "name": "Launch video", "slug": "launch-video-1" } }
+{ "op": "insert_row", "input": { "table": "projects", "values": { "name": "Launch video", "slug": "launch-video-1" } } }
 ```
 
 `edit`:
@@ -122,8 +141,8 @@ The five flows build on each other. Ids in `<angle brackets>` come from the prev
 { "op": "create_canvas", "project_id": "<project_id>" }
 ```
 
-Keep `project_id` and the canvas id. Delete the project later with `delete_row`
-`{ "table": "projects", "where": [{ "column": "id", "op": "eq", "value": "<project_id>" }] }`.
+Keep `project_id` and the canvas id. Delete the project later with `edit` op `delete_row`,
+input `{ "table": "projects", "where": [{ "column": "id", "op": "eq", "value": "<project_id>" }] }`.
 
 ### Flow 1: a 3-scene launch video from a URL
 
@@ -146,33 +165,7 @@ Set each to 3 seconds, one revision per frame, in one call (`edit`):
   { "op": "set_canvas", "target": "<frame_3>", "input": { "duration": 3 } } ] }
 ```
 
-Let the editor agent read the site and design each scene. `ask_motion_agent`, one call per frame
-(spends credits):
-
-```json
-{ "node_id": "<frame_1>", "wait": true,
-  "prompt": "Scene 1 of 3, 3 seconds. Use https://example.com for brand, colours and copy. Hero title only, few words, big type." }
-```
-
-```json
-{ "node_id": "<frame_2>", "wait": true,
-  "prompt": "Scene 2 of 3, 3 seconds. One product UI moment from https://example.com, zoomed on one real element." }
-```
-
-```json
-{ "node_id": "<frame_3>", "wait": true,
-  "prompt": "Scene 3 of 3, 3 seconds. Call to action with the site address, same style as the other scenes." }
-```
-
-Look at the result with `view`:
-
-```json
-{ "op": "snapshot", "input": { "node_id": "<frame_1>", "time": 1.5 } }
-```
-
-If a call returns `running` instead of `done`, poll `get_motion_run` `{ "run_id": "<run_id>" }`.
-
-Without credits, build a scene by hand with frame ops (`edit`):
+Build each scene with frame ops (`edit`):
 
 ```json
 { "op": "batch", "project_id": "<project_id>", "ops": [
@@ -215,8 +208,7 @@ Several changes in one revision, all or none (`edit`):
 ```
 
 Move a clip with `set_transform` (`x`, `y` offsets in px) and retime it with `set_timing`
-(`start`, `duration` in seconds), same shape. Or describe the change in words with
-`ask_motion_agent` (spends credits). Verify with `view` `snapshot`.
+(`start`, `duration` in seconds), same shape. Verify with `view` `snapshot`.
 
 ### Flow 3: generate images into a frame
 
@@ -303,6 +295,4 @@ Turn it off with `"on": false`; that also kills every frame link.
 
 - A later step of a `batch` cannot use an id created by an earlier step. Create, then batch.
 - A frame op answers 409 on a stale `version`. Re-read and retry.
-- `ask_motion_agent` `wait: true` waits about 4 minutes; a turn can run up to 30. Poll
-  `get_motion_run` after that.
 - Uncensored projects have extra refusals (sharing, models); see `describe` and the error `fix`.

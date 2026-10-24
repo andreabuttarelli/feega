@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
+import { listAllTools } from './server.ts';
 import { createServer, type Server } from 'node:http';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -90,7 +91,7 @@ describe('canvas_tool: the chat canvas ops over MCP', () => {
 
   test('teaches describe and the poster still in its description', async () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'canvas', version: '0.0.1' } });
-    const tools = (await rpc('tools/list', {})).result?.tools ?? [];
+    const tools = (await listAllTools());
     const description = tools.find((t) => t.name === 'canvas_tool')?.description ?? '';
 
     expect(description).toContain('describe');
@@ -99,7 +100,7 @@ describe('canvas_tool: the chat canvas ops over MCP', () => {
 
   test('names every op it reaches in its description', async () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'canvas', version: '0.0.1' } });
-    const tools = (await rpc('tools/list', {})).result?.tools ?? [];
+    const tools = (await listAllTools());
     const description = tools.find((t) => t.name === 'canvas_tool')?.description ?? '';
 
     for (const op of ['list_canvases', 'list_nodes', 'create_node', 'update_node', 'move_node', 'connect_nodes', 'delete_node', 'run_node', 'list_runs', 'list_models', 'preview_run_graph', 'run_graph']) {

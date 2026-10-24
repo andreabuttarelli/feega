@@ -26,11 +26,12 @@ export type RunStats = {
   usage: Usage;
   finalText: string;
   error: string | null;
+  transcript: Message[];
 };
 
 type ToolCall = { id: string; function: { name: string; arguments: string } };
 
-type Message = Record<string, unknown>;
+export type Message = Record<string, unknown>;
 
 export type ChatReply = {
   message: { content: string | null; tool_calls?: ToolCall[] };
@@ -93,13 +94,12 @@ function imageMessage(images: Image[]): Message {
 
 export async function runAgent(input: LoopInput): Promise<RunStats> {
   const chat = input.chat ?? openRouterChat();
-  const apiTools = toApiTools(input.tools.specs);
   const limit = input.maxTurns ?? MAX_TURNS;
   const messages: Message[] = [
     { role: 'system', content: [{ type: 'text', text: input.system, cache_control: { type: 'ephemeral' } }] },
     { role: 'user', content: input.task }
   ];
-  const stats: RunStats = { stop: Stop.Done, turns: 0, toolCalls: 0, toolCallsByName: {}, toolErrors: 0, usage: NO_USAGE, finalText: '', error: null };
+  const stats: RunStats = { stop: Stop.Done, turns: 0, toolCalls: 0, toolCallsByName: {}, toolErrors: 0, usage: NO_USAGE, finalText: '', error: null, transcript: messages };
 
   while (true) {
     if (stats.turns >= limit) {
@@ -111,7 +111,7 @@ export async function runAgent(input: LoopInput): Promise<RunStats> {
 
     let reply: ChatReply;
     try {
-      reply = await chat(messages, apiTools);
+      reply = await chat(messages, toApiTools(input.tools.specs));
     } catch (e) {
       return { ...stats, stop: Stop.Error, error: e instanceof Error ? e.message : String(e) };
     }

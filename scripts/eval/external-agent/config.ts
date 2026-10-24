@@ -12,8 +12,8 @@ export const TASK = `3-scene 9-second launch video for ${SITE_URL}: hero title, 
 
 export const VIDEO = { width: 1920, height: 1080, fps: 30, seconds: 9 } as const;
 
-export const HARD_CAP_USD = 8;
-export const ARM_CAP_USD = 3.5;
+export const HARD_CAP_USD = 5;
+export const ARM_CAP_USD = 1.5;
 export const JUDGE_RESERVE_USD = 0.5;
 export const JUDGE_MAX_TOKENS = 1500;
 export const MAX_TURNS = 60;

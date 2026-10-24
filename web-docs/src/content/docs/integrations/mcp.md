@@ -46,8 +46,10 @@ Some Cursor builds register a `cursor://` OAuth callback that feega's registrati
 ## First calls
 
 1. `query` on `projects` or `brands`.
-2. `view` with op `describe`, and `edit` with op `describe`, to see what you can do.
-3. `list_motion_videos` to find a frame's node id.
+2. `describe` with `{}` to see every tool and op; `find_tools` to search them.
+3. `load_tools` to list the ones you need, or run any through `edit` `{op, input}`.
+
+A session lists 10 core tools (about 870 tokens); the rest load on demand. Claude Code refreshes on `tools/list_changed`; Cursor does not, so call loaded tools by name.
 
 The whole surface: [MCP tools](/reference/generated/mcp-tools/) and [Edit ops](/reference/generated/edit-ops/). Never guess an org, brand or project id: read it with `query` first.
 

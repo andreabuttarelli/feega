@@ -282,7 +282,7 @@ list. Returns how many combinations it actually stopped.
 `project_id`, `canvas_id`, `format`, `version` (0 = empty), signed `poster_url` /
 `last_render_url` (one hour) and `editor_url` (the canvas, with the frame selected).
 
-`ask_motion_agent({ org, node_id, prompt, wait? })` runs one turn of the motion editor's agent on
+`ask_motion_agent({ org, node_id, prompt, wait? })` (MCP: unlisted alias, to be removed next release; the CLI keeps `feega motion ask`) runs one turn of the motion editor's agent on
 a `motion` node, with the editor's own tools, and saves a new revision. It returns at once with
 `{ run_id, status: "running" }`; poll `get_motion_run({ org, run_id })` until `done`, which carries
 `reply`, `summary`, `version` and `cost_usd`. `wait: true` polls for you, up to about 4 minutes of a turn that can run up to 30. The agent

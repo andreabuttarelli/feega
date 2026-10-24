@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { CORE_TOOLS } from './surface.ts';
 import { handleMcpFetch } from './http-app.ts';
 import { routeMcpHttp } from './http-router.ts';
 import { authServerUrl } from '../lib/config.ts';
@@ -78,7 +79,7 @@ describe('mcp HTTP transport', () => {
     const listBody = await listRes.json();
     const names = (listBody.result?.tools ?? []).map((t: { name: string }) => t.name);
     expect(names).toContain('query');
-    expect(names.length).toBe(54);
+    expect(names.length).toBe(Object.keys(CORE_TOOLS).length);
   });
 
   /**

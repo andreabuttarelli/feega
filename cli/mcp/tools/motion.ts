@@ -336,7 +336,7 @@ export function registerMotionTools(server: McpServer) {
         const { frames, ...notes } = await motionApi.frames(auth.session.access_token, node_id, { times, width }, org);
         const shown = { ...notes, times: frames.map((f) => f.time) };
         return {
-          content: [{ type: 'text', text: JSON.stringify(shown, null, 2) }, ...frames.map((f) => ({ type: 'image' as const, data: f.data, mimeType: f.mime }))],
+          content: [{ type: 'text', text: JSON.stringify(shown) }, ...frames.map((f) => ({ type: 'image' as const, data: f.data, mimeType: f.mime }))],
           structuredContent: shown
         };
       } catch (e) {
