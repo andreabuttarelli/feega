@@ -3,7 +3,8 @@
   import { localStore } from '$lib/browser-storage';
   import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
-  import MessageCircle from '@lucide/svelte/icons/message-circle';
+  import Cloud from '@lucide/svelte/icons/cloud';
+    import MessageCircle from '@lucide/svelte/icons/message-circle';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
@@ -28,6 +29,7 @@
   let {
     onpick,
     onupload,
+    oncloud,
     ontemplate,
     onframes,
     ontrailer,
@@ -40,6 +42,7 @@
   }: {
     onpick?: (what: Addable) => void;
     onupload?: (file: File) => void;
+    oncloud?: () => void;
     ontemplate?: (id: string) => void;
     onframes?: () => void;
     ontrailer?: () => void;
@@ -190,6 +193,7 @@
   const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], icon: ADDABLE_ICON[what], run: () => onpick?.(what) });
   const drawTiles = $derived(DRAW_TOOLS.filter((t) => t.tool !== DrawTool.Select).map((t) => ({ id: `draw-${t.tool}`, label: t.name, icon: t.icon, run: () => (frameBar.tool = t.tool) })));
   const UPLOAD_TILE: Tile = { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile };
+  const cloudTiles = (): Tile[] => (oncloud ? [{ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: oncloud }] : []);
   const TRAILER_LABEL = 'Start from the feega trailer';
   const trailerTiles = $derived<Tile[]>(ontrailer ? [{ id: 'feega-trailer', label: TRAILER_LABEL, icon: Film, run: ontrailer }] : []);
 
@@ -199,7 +203,7 @@
   const canvasSections = (): Section[] => [
     { title: 'Design', tiles: drawTiles },
     { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].map(addTile) },
-    { title: 'Media', tiles: [UPLOAD_TILE] },
+    { title: 'Media', tiles: [UPLOAD_TILE, ...cloudTiles()] },
     {
       title: 'Templates',
       tiles: [
@@ -273,6 +277,14 @@
     </button>
     <span class="add-tip" role="tooltip">Upload file</span>
   </span>
+  {#if oncloud}
+    <span class="tool">
+      <button type="button" title="Import from Drive or Dropbox" aria-label="Import from Drive or Dropbox" data-testid="cloud-import" onclick={oncloud}>
+        <Cloud size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Drive / Dropbox</span>
+    </span>
+  {/if}
 {/snippet}
 
 {#snippet nodesSlot()}

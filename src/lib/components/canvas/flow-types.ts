@@ -4,6 +4,7 @@ import type { Offset } from '$lib/canvas/duplicate-plan';
 import type { FocusRequest } from '$lib/canvas/free-area';
 import type { GenPropertyType } from '$lib/canvas/common-properties';
 import type { ColourTag } from '$lib/canvas/node-colour';
+import type { CloudMode, CloudProviderId } from '$lib/canvas/cloud-picker';
 import type { Poster } from '$lib/canvas/poster-lod';
 import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
 import type { BarContext } from '$lib/canvas/bottom-bar';
@@ -117,6 +118,7 @@ export type FlowProps = {
   stale?: string[];
   runQuoteFor?: (ids: string[]) => RunQuote | null;
   onRunNode?: (id: string) => void;
+  onCloud?: (provider: CloudProviderId, mode: CloudMode, nodeId: string | null, at: { x: number; y: number }) => void;
   nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
   modelChoicesFor?: (type: GenPropertyType) => ModelChoice[];
   catalogueSyncedFor?: (type: GenPropertyType) => boolean;

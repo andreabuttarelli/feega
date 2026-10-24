@@ -88,6 +88,7 @@
   import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
+  import { CloudMode } from '$lib/canvas/cloud-picker';
   import SelectionToolbar from '../SelectionToolbar.svelte';
   import NextStepChips from '../NextStepChips.svelte';
   import CanvasContextMenu from '../CanvasContextMenu.svelte';
@@ -3555,6 +3556,7 @@
     <CanvasAddBar
       onpick={addAtCentre}
       onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) ? viewCentre() : undefined) : undefined}
+      oncloud={props.onCloud ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
@@ -3584,6 +3586,7 @@
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
       onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}
       oncolourchange={(tag) => props.onColourChange?.(selected, tag)}
+      onexportcloud={(provider) => props.onCloud?.(provider, CloudMode.Export, selected[0], viewCentre())}
     />
     {#if props.postAction}
       <NextStepChips postAction={props.postAction} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
