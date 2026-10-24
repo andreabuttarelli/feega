@@ -63,7 +63,6 @@ test.describe('animation authoring on the canvas @real', () => {
     expect(playhead).toBeLessThan(148);
 
     const mode = page.getByTestId('frame-timeline-mode');
-    await mode.click();
     await expect(mode).toHaveAttribute('data-mode', 'design');
     await page.keyboard.press('Shift+ArrowRight');
     await expect.poll(async () => clipIn(await headDoc(admin, seeded.nodeId), 'slide').keyframes.x[0].value, { timeout: 15_000 }).toBeGreaterThan(0.3);

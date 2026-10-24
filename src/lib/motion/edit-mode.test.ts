@@ -66,12 +66,13 @@ describe('Design and Motion modes', () => {
     expect(designWarning(EditMode.Design, clipOf(doc))).toBeNull();
   });
 
-  it('toggles between the two and reads a remembered mode, Motion when unknown', () => {
+  it('toggles between the two and reads a remembered mode, Design when unknown', () => {
     expect(nextMode(EditMode.Design)).toBe(EditMode.Motion);
     expect(nextMode(EditMode.Motion)).toBe(EditMode.Design);
     expect(readMode('design')).toBe(EditMode.Design);
-    expect(readMode('nonsense')).toBe(EditMode.Motion);
-    expect(readMode(null)).toBe(EditMode.Motion);
+    expect(readMode('nonsense')).toBe(EditMode.Design);
+    expect(readMode(null)).toBe(EditMode.Design);
+    expect(readMode('motion')).toBe(EditMode.Motion);
   });
 });
 
