@@ -133,6 +133,7 @@ export type FlowProps = {
   onCancelVariants?: (id: string) => void;
   historyFor?: (id: string) => { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void } | null;
   onCancelRun?: (id: string) => void;
+  onCompareOutputs?: (ids: string[]) => void;
   nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
   modelChoicesFor?: (type: GenPropertyType) => ModelChoice[];
   catalogueSyncedFor?: (type: GenPropertyType) => boolean;

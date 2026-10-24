@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CompareSlider from './CompareSlider.svelte';
   import { copyableParams, OutputKind, runInfoOf, type ViewerRun } from '$lib/canvas/run-info';
 
   const STEPS: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1 };
@@ -12,6 +13,9 @@
   const info = $derived(run ? runInfoOf(run) : null);
   const url = $derived(run?.outputAssetId ? urlFor(run.outputAssetId) : null);
 
+  let comparing = $state(false);
+  const before = $derived(kind === OutputKind.Image && index > 0 && runs[index - 1]?.outputAssetId ? runs[index - 1] : null);
+
   function step(by: number) {
     index = Math.min(Math.max(index + by, 0), runs.length - 1);
   }
@@ -23,7 +27,7 @@
       return;
     }
     const by = STEPS[e.key];
-    if (by) {
+    if (by && !comparing) {
       e.preventDefault();
       e.stopPropagation();
       step(by);
@@ -45,7 +49,9 @@
 {#if run && info && url}
   <div class="viewer" role="dialog" aria-label="Output viewer" data-testid="output-viewer">
     <div class="stage">
-      {#if kind === OutputKind.Video}
+      {#if comparing && before}
+        <CompareSlider left={urlFor(before.outputAssetId!)} right={url} leftLabel="Previous" rightLabel="This" />
+      {:else if kind === OutputKind.Video}
         <video src={url} controls autoplay loop playsinline></video>
       {:else if kind === OutputKind.Audio}
         <audio src={url} controls></audio>
@@ -66,6 +72,9 @@
         <dd data-testid="info-cost">{info.cost ?? '—'}</dd>
       </dl>
       <button type="button" onclick={copy} data-testid="copy-params">{copied ? 'Copied' : 'Copy params'}</button>
+      {#if before}
+        <button type="button" onclick={() => (comparing = !comparing)} aria-pressed={comparing} data-testid="compare-previous">{comparing ? 'Stop comparing' : 'Compare with previous'}</button>
+      {/if}
       {#if runs.length > 1}
         <div class="steps">
           <button type="button" aria-label="Previous output" disabled={index === 0} onclick={() => step(-1)}>Prev</button>
