@@ -6,7 +6,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool cancel_node_loop 1`] = `"f92dcb4ab3229951252b7ca1976793be73be4eb5c58d91f4d0cd6639efc9318f"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool canvas_tool 1`] = `"139de7a1aaf0cfcbad6ac9a0f29b79646006552d652a4480d178ab05e906aec9"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool canvas_tool 1`] = `"87f6b35ebf136c7f12e23ffaf4e19b7847c44c95f5e2c1a0a222c9f5df70ca40"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool connect_nodes 1`] = `"c750f821558c17d14b967ffcb1709f66491241d2eec28037415d46fd856ccb96"`;
 
@@ -187,6 +187,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op click_ui 1`] = `"1c9b4d578938ff176da6038453e99f6ac4739da494b3aaf6f31bd141928b081c"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op clone_voice 1`] = `"b993d4e6a63106af222b48562afbaa8d84d52ca76339f8663af1324d0e1b389a"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op combine_scenes 1`] = `"b93b340f343bb93e95af7437a991a00d4f62a8b50c99ad3bf8bd6ad3de1123f7"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op combine_shapes 1`] = `"f8d8e1e51bb4550e932a35fb169dc98dbc97dba5da2f62549f7a4442f03b19de"`;
 
@@ -607,6 +609,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema click_ui 1`] = `"0997f9e3aeba17d17541fd553be3f5c9bcacee01f0b65ce9f86f0fbcb9310746"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema clone_voice 1`] = `"d589b52af858e251fb9484fbac2b7ba01ff9806ecb951d0dee00378fd63525cd"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema combine_scenes 1`] = `"f809e3f0973c452e2cefb008e6eed42eaa1bad2884da0538006311bab657d2af"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema combine_shapes 1`] = `"1f59994991a2bdeec79f8445df6a5fb0764b815721452bc91923056d4bf332da"`;
 

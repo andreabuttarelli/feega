@@ -41,6 +41,7 @@ import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
 import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
+import { combineScenes, MAX_SCENES } from '$lib/server/motion/combine-scenes';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
@@ -623,6 +624,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ frameId: z.string(), targets: z.array(formatTargetSchema).min(1).max(8).describe('each {format: 1:1 | 4:5 | 9:16 | 16:9 …} or {size: {width, height}} px') }).strict(),
     run: async (ctx, input) => createFormats(framesOf(ctx), { nodeId: input.frameId, targets: input.targets })
+  }),
+
+  combine_scenes: op({
+    access: Access.Write,
+    input: z.object({ frameIds: z.array(z.string().uuid()).min(2).max(MAX_SCENES).describe('scene frames; they play left to right as placed on the canvas') }).strict(),
+    run: async (ctx, input) => combineScenes(framesOf(ctx), { frameIds: input.frameIds })
   }),
 
   export_selection: op({

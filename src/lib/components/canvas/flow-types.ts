@@ -67,6 +67,7 @@ export type FlowProps = {
   onDelete?: (ids: string[], mode?: DeleteMode) => void;
   onSection?: (ids: string[]) => void;
   onCreateFormats?: (frameId: string) => void;
+  onCombineScenes?: (frameIds: string[]) => void;
   onExport?: (frameIds: string[]) => void;
   onEdgeDelete?: (edgeId: string) => void;
   onEdgeRetype?: (edgeId: string, kind: CanvasEdgeKind) => void;

@@ -3144,6 +3144,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return out?.url ? (out as { url: string; name: string; files: string[]; skipped?: string[] }) : 'Export failed';
   }
 
+  async function combineScenes(frameIds: string[]) {
+    landed(await post('combineScenes', { frame_ids: JSON.stringify(frameIds) }));
+  }
+
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
     landed(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
   }
@@ -3606,6 +3610,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onConnect={connect}
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}
+    onCombineScenes={combineScenes}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}
     onEdgeDelete={disconnect}
