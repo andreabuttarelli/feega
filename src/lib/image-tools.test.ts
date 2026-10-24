@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IMAGE_TOOL_MODEL, ImageTool, imageToolParams, isImageToolModel } from './image-tools';
+import { IMAGE_TOOL_MODEL, ImageTool, imageToolAskSchema, imageToolParams, isImageToolModel } from './image-tools';
 import { promptRequired } from '$lib/canvas/gen-node';
 
 describe('image tools', () => {
@@ -11,6 +11,21 @@ describe('image tools', () => {
   it('splits layers on kie seedream and carries no params', () => {
     expect(IMAGE_TOOL_MODEL[ImageTool.SplitLayers]).toBe('kie/seedream/5-flash-layer-decomposition');
     expect(imageToolParams(ImageTool.SplitLayers, undefined)).toEqual({});
+  });
+
+  it('inpaints on kie ideogram edit, balanced by default, and still wants a prompt', () => {
+    expect(IMAGE_TOOL_MODEL[ImageTool.Inpaint]).toBe('kie/ideogram/v3-edit');
+    expect(imageToolParams(ImageTool.Inpaint, undefined)).toEqual({ rendering_speed: 'BALANCED' });
+    expect(promptRequired('image', IMAGE_TOOL_MODEL[ImageTool.Inpaint])).toBe(true);
+  });
+
+  it('inpaint needs a prompt and a mask, the other tools need neither', () => {
+    const mask = { regions: [{ left: 0, top: 0, width: 0.5, height: 0.5 }] };
+
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Inpaint, prompt: 'a red hat', mask }).success).toBe(true);
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Inpaint, mask }).success).toBe(false);
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Inpaint, prompt: 'a red hat' }).success).toBe(false);
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.RemoveBackground }).success).toBe(true);
   });
 
   it('recognises a tool model and nothing else', () => {

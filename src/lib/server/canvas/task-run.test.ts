@@ -310,6 +310,34 @@ describe('startTaskRun — a request the provider would refuse never leaves', ()
     expect(gatewayRun).not.toHaveBeenCalled();
   });
 
+  describe('a model that fills a masked area', () => {
+    const inpaint: TaskModel = {
+      id: 'wiro/ideogram/inpaint',
+      catalogue: 'image',
+      spec: { owner: 'ideogram', project: 'inpaint', fields: { prompt: 'prompt', images: ['image_url'], mask: 'mask_url' }, requiresImage: true, requiresMask: true },
+      uncensored: false,
+      paramSchema: {}
+    };
+
+    it('refuses before any call when the node carries no mask', async () => {
+      const { deps, gatewayRun } = depsFor(inpaint);
+
+      const out = await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: inpaint.id, imageUrls: ['https://signed/pic.png'] });
+
+      expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.needsMask, stage: RefusalStage.Policy });
+      expect(gatewayRun).not.toHaveBeenCalled();
+    });
+
+    it('sends the image and its mask, and nothing of the spec flags', async () => {
+      const { deps, gatewayRun } = depsFor(inpaint);
+
+      await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: inpaint.id, imageUrls: ['https://signed/pic.png'], maskUrl: 'https://signed/mask.png' });
+
+      expect(gatewayRun.mock.calls[0][0]).toEqual({ owner: 'ideogram', project: 'inpaint' });
+      expect(gatewayRun.mock.calls[0][1]).toEqual({ prompt: 'a picture', image_url: 'https://signed/pic.png', mask_url: 'https://signed/mask.png' });
+    });
+  });
+
   it('refuses a model the catalogue marked unrunnable', async () => {
     const model: TaskModel = { ...editModel, spec: { owner: 'o', project: 'p', fields: { prompt: 'prompt', images: [] }, unrunnable: 'required_field_without_default' } };
     const { deps, gatewayRun } = depsFor(model);

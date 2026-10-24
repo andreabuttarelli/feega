@@ -11,6 +11,7 @@ export type WireFields = {
   videoList?: string;
   audioList?: string;
   lastFrame?: string;
+  mask?: string;
 };
 
 export type TaskWireRef = Readonly<Record<string, unknown>>;
