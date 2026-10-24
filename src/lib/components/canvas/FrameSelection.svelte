@@ -5,7 +5,7 @@
   import { ROTATE_REACH_PX } from '$lib/canvas/gpu/geometry';
   import { quadBox, quadStyle, type ScreenQuad } from '$lib/canvas/quad-box';
 
-  let { clip, quad: drawn, kind = SelectionKind.Element, ongrab, turn = 0 }: { clip: string; quad: ScreenQuad; kind?: SelectionKind; turn?: number; ongrab: (grip: Grip, handle: number, e: PointerEvent) => void } = $props();
+  let { clip, quad: drawn, kind = SelectionKind.Element, ongrab, turn = 0, pivot = null }: { clip: string; quad: ScreenQuad; kind?: SelectionKind; turn?: number; pivot?: Pt | null; ongrab: (grip: Grip, handle: number, e: PointerEvent) => void } = $props();
 
   const rect = $derived(quadBox(drawn));
   const TESTID: Record<SelectionKind, string> = { [SelectionKind.Element]: 'frame-selection', [SelectionKind.Member]: 'frame-selection', [SelectionKind.Group]: 'frame-group-selection' };
@@ -40,6 +40,9 @@
   {#each sides as s (s.index)}
     <div class="edge" data-testid="frame-selection-edge" data-handle={s.index} style={`${edgeBox(s.unit)};cursor:${cursorOf(s.unit)}`} onpointerdown={(e) => ongrab(Grip.Scale, s.index, e)} role="presentation"></div>
   {/each}
+  {#if pivot}
+    <div class="pivot" data-testid="frame-selection-pivot" style={`left:${pivot[0] * rect.width}px;top:${pivot[1] * rect.height}px`} onpointerdown={(e) => ongrab(Grip.Anchor, 0, e)} role="presentation"></div>
+  {/if}
   {#each handles as h, i (i)}
     <div class="handle" data-testid="frame-selection-handle" data-handle={i} style={`left:${h.at[0]}px;top:${h.at[1]}px;cursor:${cursorOf(h.unit)}`} onpointerdown={(e) => ongrab(Grip.Scale, i, e)} role="presentation"></div>
   {/each}
@@ -77,6 +80,19 @@
     background: var(--ui-bg, #fff);
     border: 1px solid var(--ui-accent, #3b82f6);
     border-radius: var(--ui-radius-xs, 2px);
+    pointer-events: auto;
+  }
+
+  .pivot {
+    position: absolute;
+    z-index: 1;
+    width: 12px;
+    height: 12px;
+    transform: translate(-50%, -50%);
+    background: var(--ui-accent, #3b82f6);
+    border: 2px solid var(--ui-bg, #fff);
+    border-radius: 50%;
+    cursor: move;
     pointer-events: auto;
   }
 

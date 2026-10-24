@@ -196,6 +196,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleTimeline]: VIEW,
   [Command.TogglePixelGrid]: VIEW,
   [Command.ToggleLayoutGuides]: VIEW,
+  [Command.TogglePivot]: VIEW,
   [Command.ToggleOutlines]: VIEW,
   [Command.Help]: VIEW,
   [Command.Precompose]: motion('precompose'),
