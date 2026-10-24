@@ -1,5 +1,6 @@
 import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
+import { wrapInSection } from './section';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import {
@@ -213,7 +214,7 @@ const createdSize = (type: string, data: Record<string, unknown>) => {
   return { width: size.w, height: size.h };
 };
 
-const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (element nodes)') }).strict();
+const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes), at least 2; or any nodes with section true'), section: z.boolean().optional().describe('wrap the nodes in a Section instead of a Group') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
 const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
@@ -706,7 +707,14 @@ export const CANVAS_OPS = {
   group_elements: op({
     access: Access.Write,
     input: groupElementsInput,
-    run: async (ctx, input) => frameAnswer(await groupElements(framesOf(ctx), membersOf(ctx, input.canvasId), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds))
+    run: async (ctx, input) => {
+      if (input.section) {
+        const create = async ({ x, y, width, height, ...rest }: { id?: string; x: number; y: number; width: number; height: number; data: Record<string, unknown> }) =>
+          createNode(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, type: 'section', x, y, width, height, ...rest, actor: ctx.actor });
+        return frameAnswer(await wrapInSection({ members: membersOf(ctx, input.canvasId), create }, input.nodeIds));
+      }
+      return frameAnswer(await groupElements(framesOf(ctx), membersOf(ctx, input.canvasId), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds));
+    }
   }),
 
   ungroup_element: op({

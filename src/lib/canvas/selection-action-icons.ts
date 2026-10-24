@@ -45,6 +45,8 @@ import Proportions from '@lucide/svelte/icons/proportions';
 import ListChecks from '@lucide/svelte/icons/list-checks';
 import Frame from '@lucide/svelte/icons/frame';
 import Shrink from '@lucide/svelte/icons/shrink';
+import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
+import Rows3 from '@lucide/svelte/icons/rows-3';
 import Columns2 from '@lucide/svelte/icons/columns-2';
 import SquaresUnite from '@lucide/svelte/icons/squares-unite';
 import SquaresSubtract from '@lucide/svelte/icons/squares-subtract';
@@ -92,6 +94,8 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'select-same-effect': ListChecks,
   'frame-selection': Frame,
   'resize-to-fit': Shrink,
+  'section-selection': LayoutDashboard,
+  stack: Rows3,
   'auto-layout': Columns2,
   'union': SquaresUnite,
   'subtract': SquaresSubtract,

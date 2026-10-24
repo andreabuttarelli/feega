@@ -26,6 +26,7 @@ import {
 } from '$lib/server/repos/canvas';
 import { nodeSize } from '$lib/canvas/node-size';
 import { isNodeType, influencerOf } from '$lib/canvas-node-data';
+import { sectionAskSchema, wrapInSection } from './section';
 import { validateNodeData } from '$lib/canvas/node-data';
 import type { Actor } from '$lib/server/repos/actor';
 import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
@@ -863,6 +864,11 @@ export const actions: Actions<CanvasParams> = {
   },
 
   create: async ({ request, params, locals }) => {
+    const sizeOf = (form: FormData) => {
+      const width = coord(form.get('width'));
+      const height = coord(form.get('height'));
+      return width !== null && height !== null && width > 0 && height > 0 ? { width, height } : {};
+    };
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
 
@@ -900,6 +906,7 @@ export const actions: Actions<CanvasParams> = {
       x,
       y,
       data: verdict.data,
+      ...sizeOf(fd),
       actor: userActor(scope)
     });
 
@@ -1256,6 +1263,18 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid group' });
     }
     return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
+  },
+
+  wrapSection: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const form = await request.formData();
+    const ask = sectionAskSchema.safeParse({ ids: jsonField(form, 'ids'), id: String(form.get('node_id') ?? '') || undefined });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid section' });
+    }
+    const create = async ({ x, y, width, height, ...rest }: { id?: string; x: number; y: number; width: number; height: number; data: Record<string, unknown> }) =>
+      createNode(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId, type: 'section', x, y, width, height, ...rest, actor: userActor(scope) });
+    return movedAnswer(await wrapInSection({ members: canvasMembers(scope), create }, ask.data.ids, ask.data.id));
   },
 
   restack: async ({ request, params, locals }) => {

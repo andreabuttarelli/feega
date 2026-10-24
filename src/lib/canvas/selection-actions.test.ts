@@ -37,6 +37,7 @@ describe('group and ungroup', () => {
       ['align-bottom', 'Alt+S'],
       ['tidy-up', 'Mod+Alt+T'],
       ['stack', 'Shift+A'],
+      ['section-selection', 'Shift+S'],
       ['flip-horizontal', 'Shift+H'],
       ['flip-vertical', 'Shift+V'],
       ['use-as-mask', 'Mod+Ctrl+M'],

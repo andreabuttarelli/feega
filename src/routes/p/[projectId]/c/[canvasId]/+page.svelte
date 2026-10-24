@@ -14,6 +14,7 @@
   import { Pasted, isSvgFile, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
   import { svgDrawings } from '$lib/canvas/svg-drawings';
 import { pasteTargets } from '$lib/canvas/paste-into-frame';
+  import { DeleteMode, SECTION_TYPE, withMembers } from '$lib/canvas/section';
   import { stackedLocally, type Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
   import { TEXT_BOX } from '$lib/canvas/frame-paste';
@@ -438,6 +439,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const id = crypto.randomUUID();
     nodes = groupedLocally(nodes, ids, id, (record) => toTile(record));
     regroup('groupElements', { ids: JSON.stringify(ids), node_id: id });
+  }
+
+  function wrapInSection(ids: string[]) {
+    const id = crypto.randomUUID();
+    regroup('wrapSection', { ids: JSON.stringify(ids), node_id: id });
   }
 
   function ungroupElements(ids: string[]) {
@@ -1098,8 +1104,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
       rotatable: !!motionOf(n) && chrome.turns,
-      behind: chrome.behind,
-      members: chrome.behind ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
+      behind: chrome.behind || n.type === SECTION_TYPE,
+      members: chrome.behind || n.type === SECTION_TYPE ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
@@ -1981,6 +1987,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     if (created.type === 'influencer') {
       void refresh();
+    }
+    if (created.type === SECTION_TYPE) {
+      void restack([created.id], Stack.Back);
     }
   }
 
@@ -3063,8 +3072,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * Sparisce subito e torna se il server rifiuta: su una tela si lavora a gesti, e un nodo che
    * resta lì mezzo secondo dopo ⌫ fa premere ⌫ una seconda volta.
    */
-  async function remove(ids: string[]) {
-    const plan = planDelete({ ids, edges, undeletable: [] });
+  async function remove(ids: string[], mode = DeleteMode.WithContents) {
+    const plan = planDelete({ ids: mode === DeleteMode.WithContents ? withMembers(nodes, ids) : ids, edges, undeletable: [] });
     if (plan.empty) {
       return;
     }
@@ -3608,6 +3617,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDrawFrame={drawFrame}
     onRotate={rotateGroupBy}
     onAddBeside={addFrameBeside}
+    onSection={wrapInSection}
     onGroup={groupElements}
     onUngroup={ungroupElements}
     onRestack={restack}

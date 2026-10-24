@@ -54,6 +54,7 @@ export type SelectionActionId =
   | 'select-same-effect'
   | 'frame-selection'
   | 'resize-to-fit'
+  | 'section-selection'
   | 'auto-layout'
   | 'union'
   | 'subtract'
@@ -113,6 +114,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'select-same-effect', label: 'Select same effect', group: 'menu', minNodes: 1 },
   { id: 'frame-selection', label: 'Frame selection', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+G' },
   { id: 'resize-to-fit', label: 'Resize to fit', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+Shift+R' },
+  { id: 'section-selection', label: 'Section selection', group: 'menu', minNodes: 1, shortcut: 'Shift+S' },
   { id: 'auto-layout', label: 'Add auto layout', group: 'menu', minNodes: 1, shortcut: 'Shift+A' },
   { id: 'union', label: 'Union', group: 'menu', minNodes: 2, shortcut: 'Alt+Shift+U' },
   { id: 'subtract', label: 'Subtract', group: 'menu', minNodes: 2, shortcut: 'Alt+Shift+S' },
@@ -155,7 +157,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 

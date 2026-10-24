@@ -24,6 +24,7 @@ import { cellSchema, type CellSpec } from '$lib/motion/components';
 import { newCalendarData } from '$lib/canvas/calendar-node';
 import { newMotionData } from '$lib/canvas/motion-node';
 import { newStudioBatchData } from '$lib/canvas/studio-batch-node';
+import { SECTION_DEFAULT_FILL } from '$lib/canvas/node-data';
 export { influencerNodeOf as influencerOf, type InfluencerNode } from '$lib/canvas/influencer-node';
 
 /**
@@ -62,7 +63,8 @@ export const NODE_TYPES = [
   'model3d',
   'motion',
   'element',
-  'studio_batch'
+  'studio_batch',
+  'section'
 ] as const;
 
 function syncStatusOf(v: unknown): SyncStatus {
@@ -402,6 +404,10 @@ export function newNodeRow(what: Addable): Record<string, unknown> {
 
   if (what === 'motion') {
     return newMotionData();
+  }
+
+  if (what === 'section') {
+    return { title: 'Section', fill: SECTION_DEFAULT_FILL };
   }
 
   if (what === 'studio_batch') {

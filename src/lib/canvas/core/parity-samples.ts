@@ -26,7 +26,8 @@ const BY_KIND: Record<NodeType, Record<string, unknown>> = {
   effects: {},
   composition: {},
   calendar: { anchor: '2026-10', view: 'month' },
-  studio_batch: {}
+  studio_batch: {},
+  section: { title: 'Launch', fill: '#f3f3f3' }
 };
 
 const MEDIA: ParitySample[] = [

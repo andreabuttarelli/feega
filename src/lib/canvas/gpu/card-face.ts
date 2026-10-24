@@ -25,6 +25,7 @@ export enum Surface {
   Effects = 'effects',
   List = 'list',
   Doc = 'doc',
+  Section = 'section',
   Blank = 'blank'
 }
 
@@ -59,6 +60,7 @@ export type CardFace = {
   rows: CardRow[];
   pills: string[];
   count: string;
+  tint: string | null;
 };
 
 type Data = Record<string, unknown>;
@@ -175,7 +177,8 @@ const FACES: Record<NodeType, Draw> = {
   effects: (d, _a, _t, view) => ({ surface: Surface.Effects, media: view?.media?.url ? { url: view.media.url, video: view.media.kind === 'video' } : null, subtitle: ref(d) ? '' : EFFECTS_PENDING, empty: EFFECTS_EMPTY, actions: [OPEN_EDITOR] }),
   composition: (d, asset) => ({ surface: Surface.Effects, media: ref(d) ? { url: asset(ref(d)!), video: true } : null, empty: COMPOSITION_EMPTY, actions: [COMPONENT, OPEN_EDITOR] }),
   calendar: hollow('calendar'),
-  studio_batch: (_d, _a, _t, view) => ({ surface: Surface.Pick, title: 'Open Photo studio', batch: view?.batch ?? null })
+  studio_batch: (_d, _a, _t, view) => ({ surface: Surface.Pick, title: 'Open Photo studio', batch: view?.batch ?? null }),
+  section: (d) => ({ surface: Surface.Section, title: str(d.title) || 'Section', tint: str(d.fill) || null })
 };
 
 const BLANK: CardFace = {
@@ -200,7 +203,8 @@ const BLANK: CardFace = {
   batch: null,
   rows: [],
   pills: [],
-  count: ''
+  count: '',
+  tint: null
 };
 
 function labelOf(t: FaceTile, kind: NodeType): string | null {

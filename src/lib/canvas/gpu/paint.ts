@@ -33,7 +33,8 @@ export const PAINT: Record<NodeType, (data: Data) => Paint> = {
   effects: dom,
   composition: dom,
   calendar: dom,
-  studio_batch: dom
+  studio_batch: dom,
+  section: gpu
 };
 
 type Placed = { id: string; kind?: string; x: number; y: number; w: number; h: number };
