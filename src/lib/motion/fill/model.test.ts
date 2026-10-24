@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FillType, ImageFit, addFill, addStop, colourAlpha, removeStop, withAlpha, fillsOf, fillsSchema, moveFill, photoFills, removeFill, retypeFill, setFill, type Fill } from './model';
+import { FillType, ImageFit, addFill, cropOf, addStop, colourAlpha, removeStop, withAlpha, fillsOf, fillsSchema, moveFill, photoFills, removeFill, retypeFill, setFill, type Fill, type FillOf } from './model';
 
 const solid = (color: string, extra: Record<string, unknown> = {}) => fillsSchema.parse([{ type: FillType.Solid, color, ...extra }])[0];
 const colors = (stack: Fill[]) => stack.map((f) => (f as { color: string }).color);
@@ -63,6 +63,18 @@ describe('fill stack model', () => {
       focus: { x: 0.5, y: 0.5 },
       scale: 1
     });
+  });
+
+  it('an image layer without a crop shows the whole picture', () => {
+    const fill = fillsSchema.parse([{ type: 'image', assetId: 'a' }])[0] as FillOf<FillType.Image>;
+    expect(cropOf(fill)).toEqual({ x: 0, y: 0, w: 1, h: 1 });
+  });
+
+  it('a crop window keeps at least a sliver of the picture', () => {
+    const crop = (c: object) => fillsSchema.safeParse([{ type: 'image', assetId: 'a', fit: ImageFit.Crop, crop: c }]).success;
+    expect(crop({ x: 0.2, y: 0.1, w: 0.5, h: 0.5 })).toBe(true);
+    expect(crop({ x: 0, y: 0, w: 0, h: 1 })).toBe(false);
+    expect(crop({ x: -0.1, y: 0, w: 1, h: 1 })).toBe(false);
   });
 
   it('a poster photo from before reads as one image layer with its fit and focus', () => {

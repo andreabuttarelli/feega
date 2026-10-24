@@ -28,6 +28,7 @@ export enum ImageFit {
   Cover = 'cover',
   Contain = 'contain',
   Fill = 'fill',
+  Crop = 'crop',
   Tile = 'tile'
 }
 
@@ -40,6 +41,27 @@ export const FILL_LABEL: Record<FillType, string> = {
   [FillType.Diamond]: 'Diamond',
   [FillType.Image]: 'Image'
 };
+export const IMAGE_FIT_LABEL: Record<ImageFit, string> = {
+  [ImageFit.Cover]: 'Fill',
+  [ImageFit.Contain]: 'Fit',
+  [ImageFit.Fill]: 'Stretch',
+  [ImageFit.Crop]: 'Crop',
+  [ImageFit.Tile]: 'Tile'
+};
+export enum ImageControl {
+  Focus = 'focus',
+  Zoom = 'zoom',
+  Tile = 'tile',
+  Crop = 'crop'
+}
+
+export const IMAGE_CONTROLS: Record<ImageFit, readonly ImageControl[]> = {
+  [ImageFit.Cover]: [ImageControl.Focus, ImageControl.Zoom],
+  [ImageFit.Contain]: [ImageControl.Focus, ImageControl.Zoom],
+  [ImageFit.Fill]: [ImageControl.Focus, ImageControl.Zoom],
+  [ImageFit.Crop]: [ImageControl.Crop],
+  [ImageFit.Tile]: [ImageControl.Focus, ImageControl.Tile]
+};
 export const IMAGE_FITS = Object.values(ImageFit) as [ImageFit, ...ImageFit[]];
 export const MAX_FILLS = 8;
 export const MAX_STOPS = 8;
@@ -48,9 +70,13 @@ const DEFAULT_COLOR = '#000000';
 const DEFAULT_END = '#ffffff';
 const DEFAULT_ANGLE = 90;
 
+const MIN_CROP = 0.01;
 const unit = z.number().min(0).max(1);
 const point = z.object({ x: unit.default(CENTRE), y: unit.default(CENTRE) });
 const stop = z.object({ color: z.string().min(1).max(64), pos: unit });
+const cropWindow = z
+  .object({ x: unit.default(0), y: unit.default(0), w: z.number().min(MIN_CROP).max(1).default(1), h: z.number().min(MIN_CROP).max(1).default(1) })
+  .optional();
 const stops = z.array(stop).min(2).max(MAX_STOPS);
 
 const base = {
@@ -103,6 +129,8 @@ export const fillSchema = z.discriminatedUnion('type', [
     fit: z.enum(IMAGE_FITS).default(ImageFit.Cover),
     focus: point.default({ x: CENTRE, y: CENTRE }),
     scale: z.number().min(0.1).max(10).default(1),
+    crop: cropWindow,
+    rotation: z.number().min(-360).max(360).optional(),
     ...base
   })
 ]);
@@ -175,6 +203,10 @@ export function photoFills(item: LegacyPhoto): Fill[] {
     }
   ]);
 }
+
+export const WHOLE_PICTURE = { x: 0, y: 0, w: 1, h: 1 };
+
+export const cropOf = (fill: FillOf<FillType.Image>) => fill.crop ?? WHOLE_PICTURE;
 
 export const firstImage = (fills: readonly Fill[]): FillOf<FillType.Image> | undefined => fills.find((f): f is FillOf<FillType.Image> => f.type === FillType.Image);
 

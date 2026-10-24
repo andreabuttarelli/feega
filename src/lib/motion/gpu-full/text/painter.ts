@@ -311,7 +311,7 @@ const PLANS: Partial<{ [T in FillType]: (f: FillOf<T>, colour: Colour, asset: (i
   [FillType.Angular]: (f, colour) => ({ kind: PaintKind.Sweep, angle: f.angle, center: [f.center.x, f.center.y], stops: stopsOf(f, colour) }),
   [FillType.Image]: (f, _colour, asset) => {
     const src = f.src ?? asset(f.assetId);
-    return src && f.fit !== ImageFit.Tile ? { kind: ClippedFill.Image, src, fit: f.fit, focus: [f.focus.x, f.focus.y], opacity: f.opacity } : null;
+    return src && f.fit !== ImageFit.Tile && f.fit !== ImageFit.Crop ? { kind: ClippedFill.Image, src, fit: f.fit, focus: [f.focus.x, f.focus.y], opacity: f.opacity } : null;
   }
 };
 

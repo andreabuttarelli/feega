@@ -13,7 +13,7 @@ import { cssFunctions, FilterKind, unsupportedPrimitive, type Filter, type Linea
 import { BlendMode } from '../blend';
 import { MASK_KEYS } from '../mask';
 import { mattePairs, MATTE_READ } from '../matte';
-import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, fillsOf, type Fill, type FillOf } from '../fill/model';
+import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, cropOf, fillsOf, type Fill, type FillOf } from '../fill/model';
 import { applyFillKeys, fillOfKey } from '../fill/keys';
 import { StrokeAlign, dashOf, strokesOf, type Stroke } from '../stroke/model';
 import { Cap, Join, dashes, strokePolygons } from './stroke';
@@ -84,7 +84,7 @@ export type Origin = [number, number];
 
 export type PathItem = { kind: ItemKind.Path; clip: string; contours: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; within?: Within; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
-export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video: boolean; mediaTime: number; size: Size; fit: string; focus: [number, number]; zoom: number; clipped: boolean; inner: Affine; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
+export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video: boolean; mediaTime: number; size: Size; fit: string; focus: [number, number]; zoom: number; crop?: [number, number, number, number]; tileTurn?: number; clipped: boolean; inner: Affine; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
 export type LayerItem = { kind: ItemKind.Layer; clip: string; source: string; size: Size; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
@@ -199,7 +199,7 @@ function shapePainter({ clip, props, size, unit, colour, time, fps, asset }: Env
         return { kind: ItemKind.Path, contours: flat(l.outline), rule, paint: paintOf(f), opacity: f.opacity * l.opacity, matrix };
       }
       const stencil: PathContent = { kind: ItemKind.Path, contours: flat(l.outline), rule, paint: { kind: PaintKind.Solid, color: [1, 1, 1, 1] }, opacity: 1, matrix, blur: 0 };
-      return { ...(picture(src, size, { fit: f.fit, focus: [f.focus.x, f.focus.y], zoom: f.scale, clipped: false, opacity: f.opacity * l.opacity, matrix }) as ImageContent), stencil: [stencil] };
+      return { ...(picture(src, size, { fit: f.fit, focus: [f.focus.x, f.focus.y], zoom: f.scale, crop: [cropOf(f).x, cropOf(f).y, cropOf(f).w, cropOf(f).h], tileTurn: f.rotation ?? 0, clipped: false, opacity: f.opacity * l.opacity, matrix }) as ImageContent), stencil: [stencil] };
     })
   );
   const stroked = strokesOf(props)

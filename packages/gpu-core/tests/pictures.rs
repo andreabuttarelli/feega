@@ -1,5 +1,6 @@
 use gpu_core::display_list::{parse, Item};
-use gpu_core::pictures::Pictures;
+use gpu_core::display_list::Size;
+use gpu_core::pictures::{crop_rect, tile_cells, Pictures, Placed, MAX_TILES};
 #[cfg(feature = "gpu")]
 use gpu_core::pictures::picture;
 use gpu_core::scene::{build, Layers};
@@ -82,4 +83,52 @@ fn an_unclipped_picture_spills_past_its_box() {
 
     assert_eq!(at(&pixels, 4, 32), RED);
     assert_eq!(at(&pixels, 60, 32), GREEN);
+}
+
+const BOX: Size = Size { width: 200.0, height: 100.0 };
+const SQUARE: Size = Size { width: 100.0, height: 100.0 };
+
+#[test]
+fn a_crop_window_stretches_the_picture_so_it_fills_the_box() {
+    let placed = crop_rect(BOX, [0.25, 0.5, 0.5, 0.25]);
+
+    assert_eq!(placed, Placed { x: -100.0, y: -200.0, width: 400.0, height: 400.0 });
+}
+
+#[test]
+fn tiles_are_a_quarter_of_the_box_wide_per_unit_of_scale_placed_by_focus() {
+    let cells = tile_cells(BOX, SQUARE, 2.0, 0.0, [0.5, 0.5]);
+
+    assert_eq!(
+        cells,
+        vec![
+            Placed { x: -50.0, y: 0.0, width: 100.0, height: 100.0 },
+            Placed { x: 50.0, y: 0.0, width: 100.0, height: 100.0 },
+            Placed { x: 150.0, y: 0.0, width: 100.0, height: 100.0 },
+        ]
+    );
+}
+
+#[test]
+fn a_rotated_box_needs_more_tiles_to_reach_its_corners() {
+    assert!(tile_cells(BOX, SQUARE, 2.0, 45.0, [0.5, 0.5]).len() > tile_cells(BOX, SQUARE, 2.0, 0.0, [0.5, 0.5]).len());
+}
+
+#[test]
+fn tiling_never_asks_for_more_cells_than_the_limit() {
+    let wide = Size { width: 1000.0, height: 1.0 };
+
+    assert_eq!(tile_cells(Size { width: 1000.0, height: 1000.0 }, wide, 0.1, 0.0, [0.5, 0.5]).len(), MAX_TILES);
+}
+
+#[test]
+fn parses_a_crop_window_and_a_tile_turn() {
+    let json = list("crop", false).replace(r#""zoom": 1,"#, r#""zoom": 1, "crop": [0.1, 0.2, 0.5, 0.4], "tileTurn": 30,"#);
+
+    assert!(matches!(&parse(&json).unwrap().items[0], Item::Image(i) if i.crop == Some([0.1, 0.2, 0.5, 0.4]) && i.tile_turn == 30.0));
+}
+
+#[test]
+fn an_image_item_from_before_has_no_crop_and_no_turn() {
+    assert!(matches!(&parse(&list("cover", true)).unwrap().items[0], Item::Image(i) if i.crop.is_none() && i.tile_turn == 0.0));
 }

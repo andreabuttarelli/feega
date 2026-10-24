@@ -117,6 +117,20 @@ describe('displayListAt', () => {
       expect(image?.matte?.items[0]).toMatchObject({ kind: ItemKind.Path });
     });
 
+    it('carries a crop window to the picture', () => {
+      const cropped = patch(withCard, 'card', { props: { ...cardProps, fills: [{ type: FillType.Image, assetId: 'photo', fit: 'crop', crop: { x: 0.1, y: 0.2, w: 0.5, h: 0.4 } }] } });
+      const image = drawFrame(prepare(cropped, FEEGA_TOKENS, { photo: 'https://cdn.test/photo.png' }), 0).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(image).toMatchObject({ fit: 'crop', crop: [0.1, 0.2, 0.5, 0.4] });
+    });
+
+    it('carries the tile scale and rotation to the picture', () => {
+      const tiled = patch(withCard, 'card', { props: { ...cardProps, fills: [{ type: FillType.Image, assetId: 'photo', fit: 'tile', scale: 2, rotation: 30 }] } });
+      const image = drawFrame(prepare(tiled, FEEGA_TOKENS, { photo: 'https://cdn.test/photo.png' }), 0).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(image).toMatchObject({ fit: 'tile', zoom: 2, tileTurn: 30 });
+    });
+
     it('stays a gap while the picture has no address', () => {
       expect(drawnWith({}).unsupported).toContainEqual({ clip: 'card', component: 'Shape', reason: Unsupported.Fill });
     });
