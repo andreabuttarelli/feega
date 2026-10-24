@@ -134,7 +134,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
-  import { fitElementToNode, fitToNode } from '$lib/motion/custom-size';
+  import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
   import { decoded, painted } from '$lib/canvas/paint-wait';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
@@ -2376,13 +2376,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return frameResize(shown, { w, h }, open?.doc ?? PICTURE_OF_KIND[motion.kind](motion, row), NodeMode.Preview);
   }
 
+  let resizeMode = ResizeMode.Constrained;
+
+  const readResizeMode = (e: PointerEvent) => {
+    resizeMode = e.metaKey || e.ctrlKey ? ResizeMode.Ignored : ResizeMode.Constrained;
+  };
+
   async function sizeFrameDoc(id: string, picture: { width: number; height: number }, was: { width: number; height: number } | null = null) {
     const open = layersSource.video;
     if (open?.nodeId === id) {
-      open.edit(was ? fitElementToNode(keepTextSize(open.doc, was, picture), picture) : fitToNode(open.doc, picture), 'Resized the frame');
+      open.edit(was ? fitElementToNode(keepTextSize(open.doc, was, picture), picture) : fitToNode(open.doc, picture, resizeMode), 'Resized the frame');
       return;
     }
-    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height });
+    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height, mode: resizeMode });
     if (result?.undo) {
       pushGesture({ items: result.undo as UndoItem[] });
     }
@@ -2424,7 +2430,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     const plan = size ? framePlan(id, size.w, size.h) : null;
-    const fitted = plan?.picture ? fitToNode(open.doc, plan.picture) : null;
+    const fitted = plan?.picture ? fitToNode(open.doc, plan.picture, resizeMode) : null;
     open.preview(fitted?.ok ? fitted.doc : null);
   }
 
@@ -3489,6 +3495,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 </script>
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
+<svelte:window onpointermovecapture={readResizeMode} onpointerupcapture={readResizeMode} />
 
 <div class="canvas" class:view-only={viewOnly}>
   {#if peers.length || canvasPeers.length}

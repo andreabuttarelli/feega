@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { findClip, MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { commitText, editCss, editLayout, editsText, gradientSpans, hideText, runsOfClip, textEditStyle } from './frame-text-edit';
+import { ListKind } from '$lib/motion/text-lists';
+import { commitText, editCss, editLayout, editsText, gradientSpans, hideText, listsOfClip, runsOfClip, textEditStyle } from './frame-text-edit';
 import type { TextCaret } from '$lib/motion/gpu-full/display-list';
 
 function withText() {
@@ -43,6 +44,15 @@ describe('text editing inside a core frame', () => {
     const clip = result.ok ? findClip(result.doc, 'title')!.clip : null;
 
     expect(clip && runsOfClip(clip)).toEqual([{ start: 6, end: 9, weight: 700 }]);
+  });
+
+  it('commits the lists with the text and drops them when none is left', () => {
+    const listed = commitText(withText(), 'title', 'Hello\nyou', [], [{ kind: ListKind.Bullet, level: 0 }]);
+    const clip = listed.ok ? findClip(listed.doc, 'title')!.clip : null;
+
+    expect(clip && listsOfClip(clip)).toEqual([{ kind: 'bullet', level: 0 }]);
+    const cleared = commitText(listed.ok ? listed.doc : withText(), 'title', 'Hello\nyou', [], []);
+    expect(cleared.ok && listsOfClip(findClip(cleared.doc, 'title')!.clip)).toEqual([]);
   });
 
   it('a text kind without styled ranges commits the text alone', () => {

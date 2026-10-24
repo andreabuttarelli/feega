@@ -3,7 +3,7 @@ export enum GridToggle {
   Off = 'off'
 }
 
-export const PIXEL_GRID_ZOOM = 8;
+export const PIXEL_GRID_ZOOM = 4;
 
 export const flipGrid = (toggle: GridToggle): GridToggle => (toggle === GridToggle.On ? GridToggle.Off : GridToggle.On);
 

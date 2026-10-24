@@ -8,6 +8,7 @@ const STEP = 70;
 const QUICK_MS = 150;
 const SETTLE_MS = 1500;
 const DRIFT_PX = 3;
+const OUTSIDE_PX = 10;
 const TURN_DEGREES = 30;
 const TURN_STEPS = 6;
 
@@ -182,8 +183,8 @@ test.describe('a free box stays fluid @real', () => {
       const r = el.getBoundingClientRect();
       return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     });
-    const grip = (await page.getByTestId('rotate-handle').boundingBox())!;
-    const from = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 };
+    const box = (await tile.boundingBox())!;
+    const from = { x: box.x + box.width + OUTSIDE_PX, y: box.y + box.height + OUTSIDE_PX };
     const radius = Math.hypot(from.x - centre.x, from.y - centre.y);
     const start = Math.atan2(from.y - centre.y, from.x - centre.x);
     await page.mouse.move(from.x, from.y);

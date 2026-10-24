@@ -237,6 +237,31 @@ describe('fill stack in html', () => {
     expect(fillLayersHtml(resolved([{ type: 'image', assetId: 'pic', fit: 'tile', scale: 2 }]))).toContain('background-image:url(&quot;https://cdn/pic.png&quot;);background-repeat:repeat;background-size:50% auto');
   });
 
+  it('a cropped image stretches the picture so the window fills the box', () => {
+    const html = fillLayersHtml(resolved([{ type: 'image', assetId: 'pic', fit: 'crop', crop: { x: 0.25, y: 0.5, w: 0.5, h: 0.25 } }]));
+    expect(html).toContain('left:-50%;top:-200%;width:200%;height:400%;max-width:none;object-fit:fill');
+  });
+
+  it('a rotated tile spins a covering square around the centre', () => {
+    const html = fillLayersHtml(resolved([{ type: 'image', assetId: 'pic', fit: 'tile', scale: 2, rotation: 30 }]));
+    expect(html).toContain('rotate(30deg)');
+    expect(html).toContain('background-size:calc(100cqw * 0.5) auto');
+  });
+
+  it('an adjusted image carries an svg filter and points its layer at it', () => {
+    const html = fillLayersHtml(resolved([{ type: 'image', assetId: 'pic', adjust: { exposure: 0.5, shadows: 0.2 } }]));
+    expect(html).toMatch(/<filter id="adj-[a-z0-9]+" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="[^"]+"\/><feComponentTransfer>/);
+    expect(html).toMatch(/filter:url\(#adj-[a-z0-9]+\)/);
+  });
+
+  it('an image without adjustments draws no filter', () => {
+    expect(fillLayersHtml(resolved([{ type: 'image', assetId: 'pic', adjust: { exposure: 0 } }]))).not.toContain('filter');
+  });
+
+  it('an adjusted tile filters the tile layer', () => {
+    expect(fillLayersHtml(resolved([{ type: 'image', assetId: 'pic', fit: 'tile', adjust: { contrast: 0.4 } }]))).toMatch(/fl-tile" style="[^"]*filter:url\(#adj-/);
+  });
+
   it('escapes the picture url', () => {
     expect(fillLayersHtml(resolveFills(stack([{ type: 'image', src: 'https://x/a"b.png' }]), paint.color, () => null))).toContain('a&quot;b.png');
   });

@@ -262,13 +262,13 @@ fn texture_image(u: &UseItem, group: &DisplayList, scale: f64, clip: String) -> 
     let matrix = snapped(times(u.matrix, [1.0 / scale, 0.0, 0.0, 1.0 / scale, 0.0, 0.0]));
     let look = Look { opacity: 1.0, matrix, blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None };
     let size = Size { width: w as f64, height: h as f64 };
-    Item::Image(ImageItem { clip: clip.clone(), src: clip, video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, clipped: true, inner: IDENTITY, look })
+    Item::Image(ImageItem { clip: clip.clone(), src: clip, video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, crop: None, tile_turn: 0.0, clipped: true, inner: IDENTITY, look })
 }
 
 fn partial(group: &str, (w, h): (u32, u32)) -> Item {
     let look = Look { opacity: 1.0, matrix: IDENTITY, blur: 0.0, blend: "normal".into(), scissor: None, masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None };
     let size = Size { width: w as f64, height: h as f64 };
-    Item::Image(ImageItem { clip: building_clip(group), src: building_clip(group), video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, clipped: true, inner: IDENTITY, look })
+    Item::Image(ImageItem { clip: building_clip(group), src: building_clip(group), video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, crop: None, tile_turn: 0.0, clipped: true, inner: IDENTITY, look })
 }
 
 fn chunk_of(u: &UseItem, group: &DisplayList, at: Building, items: usize) -> Chunk {

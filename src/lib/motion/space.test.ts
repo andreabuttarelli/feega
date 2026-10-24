@@ -93,13 +93,19 @@ describe('distribute', () => {
     expect(c.right).toBeCloseTo(bounds(base, 'c').right, 5);
   });
 
-  it('sets every gap to the asked pixels, the first clip staying where it is', () => {
-    const spaced = must(distributeSpace(base, ['a', 'b', 'c'], 0, propBoxes(base), Axis.X, EditMode.Design, 40));
+  it('spaces the clips by an exact gap, keeping the first one in place', () => {
+    const spaced = must(distributeSpace(base, ['c', 'a', 'b'], 0, propBoxes(base), Axis.X, EditMode.Design, 40));
     const [a, b, c] = ['a', 'b', 'c'].map((id) => bounds(spaced, id));
 
+    expect(a.left).toBeCloseTo(bounds(base, 'a').left, 5);
     expect(b.left - a.right).toBeCloseTo(40, 5);
     expect(c.left - b.right).toBeCloseTo(40, 5);
-    expect(a.left).toBeCloseTo(bounds(base, 'a').left, 5);
+  });
+
+  it('an exact gap works for two clips', () => {
+    const spaced = must(distributeSpace(base, ['a', 'b'], 0, propBoxes(base), Axis.X, EditMode.Design, 25));
+
+    expect(bounds(spaced, 'b').left - bounds(spaced, 'a').right).toBeCloseTo(25, 5);
   });
 
   it('reads the gap the clips share, and none when they differ', () => {

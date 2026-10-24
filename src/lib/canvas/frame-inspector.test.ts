@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { Action } from '$lib/motion/actions';
 import { Command } from '$lib/motion/shortcuts';
+import { aabb, quadOf } from '$lib/motion/scene-select';
+import { propBoxes } from '$lib/motion/space';
 import { PropertiesView } from '$lib/motion/properties-view';
 import { addClip, type OpResult } from '$lib/motion/timeline';
 import { FieldType, exposeField } from '$lib/motion/template/fields';
@@ -187,6 +189,18 @@ function shapes(): MotionDoc {
   return must(addClip(must(addTrack(bottom, TrackKind.Visual, 'upper')), { ...square(0.5), trackId: 'upper' }, 'top'));
 }
 
+describe('tidy up inside a frame', () => {
+  const row = () => [0.1, 0.35, 0.8].reduce((doc, x, i) => must(addClip(doc, { ...square(x), props: { ...square(x).props, width: 0.1 } }, `r${i}`)), newMotionDoc(MotionFormat.Square));
+
+  it('evens out the gaps of the picked elements', () => {
+    const tidied = barAction(Command.TidyUp, { doc: row(), selection: ['r0', 'r1', 'r2'], frame: 0, newId: ids() });
+    const xs = ['r0', 'r1', 'r2'].map((id) => aabb(quadOf(tidied!.doc, id, 0, propBoxes(tidied!.doc)[id])).left);
+
+    expect(xs[2] - xs[1]).toBeCloseTo(xs[1] - xs[0], 3);
+    expect(xs[2] - xs[1]).toBeLessThan(300);
+  });
+});
+
 describe('frameBarActions', () => {
   it('offers boolean ops only for two shapes or more', () => {
     expect(frameBarActions(shapes(), ['top', 'bottom'])).toContain(Action.Union);
@@ -247,6 +261,14 @@ describe('frameKeyAction', () => {
     expect(frameKeyAction(press('a', { meta: true, alt: true }))).toBe(Action.SelectMatching);
     expect(frameKeyAction(press('a', { meta: true }))).toBe(Action.SelectAll);
     expect(frameKeyAction(press('e', { meta: true }))).toBe(Action.Flatten);
+  });
+
+  it('tidies up with Ctrl Alt T', () => {
+    expect(frameKeyAction(press('t', { meta: true, alt: true }))).toBe(Command.TidyUp);
+  });
+
+  it('pastes over the selection with Shift Cmd V', () => {
+    expect(frameKeyAction(press('V', { meta: true, shift: true }))).toBe(Action.PasteOver);
   });
 
   it('flips with Shift H and Shift V', () => {

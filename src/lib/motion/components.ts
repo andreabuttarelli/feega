@@ -21,6 +21,7 @@ import { effectProblem } from './shader-effects/preset';
 import { fillsSchema } from './fill/model';
 import { strokesSchema } from './stroke/model';
 import { runsSchema } from './text-runs';
+import { listsSchema } from './text-lists';
 import { LETTER_SPACING, LINE_HEIGHT } from './type-units';
 import { DECORATION_STYLES, DECORATIONS, FEATURES, RULE } from './decoration';
 import { counterSchema } from './text-counter';
@@ -318,7 +319,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), lists: listsSchema.meta(managed('Lists')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
       .strict()
   },
   Kicker: {
@@ -617,7 +618,7 @@ export const COMPONENTS = {
     description: 'A nested composition (precompose clips to make one) played as one clip: trimStart starts it later, loop repeats it to the end of the clip.',
     track: TrackKind.Visual,
     durationInFrames: seconds(5),
-    schema: z.object({ comp: z.string().max(60).default('').meta({ control: Control.Comp, label: 'Composition', group: Group.Content }), loop: toggle(false, 'Loop', Group.Motion), hold: toggle(false, 'Hold last frame', Group.Motion), overrides: z.record(z.string(), z.record(z.string(), z.unknown())).optional().meta(managed('Overrides')), boolean: z.enum(BooleanOp).optional().meta(managed('Boolean operation')) }).strict()
+    schema: z.object({ comp: z.string().max(60).default('').meta({ control: Control.Comp, label: 'Composition', group: Group.Content }), loop: toggle(false, 'Loop', Group.Motion), hold: toggle(false, 'Hold last frame', Group.Motion), overrides: z.record(z.string(), z.record(z.string(), z.unknown())).optional().meta(managed('Overrides')), propValues: z.record(z.string(), z.union([z.string(), z.boolean()])).optional().meta(managed('Property values')), boolean: z.enum(BooleanOp).optional().meta(managed('Boolean operation')) }).strict()
   },
   Adjustment: {
     label: 'Adjustment layer',

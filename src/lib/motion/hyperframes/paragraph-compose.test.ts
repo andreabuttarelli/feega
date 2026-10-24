@@ -41,6 +41,36 @@ describe('paragraph typography in the HTML export', () => {
   });
 });
 
+describe('lists in the HTML export', () => {
+  const bullet = (level = 0) => ({ kind: 'bullet', level });
+  const number = (level = 0) => ({ kind: 'number', level });
+
+  it('hangs a bullet in the gutter and indents the item one step', () => {
+    const html = compose({ text: 'one', lists: [bullet()] });
+
+    expect(html).toMatch(/<div style="[^"]*position:relative[^"]*padding-left:1\.5em[^"]*"><span style="[^"]*position:absolute[^"]*width:1\.1em[^"]*text-align:right[^"]*">•<\/span>one<\/div>/);
+  });
+
+  it('numbers items and nests the next level one step further', () => {
+    const html = compose({ text: 'a\nb\nc', lists: [number(), number(1), number()] });
+
+    expect(html).toMatch(/>1\.<\/span>a<\/div>/);
+    expect(html).toMatch(/padding-left:3em[^"]*"><span[^>]*>a\.<\/span>b<\/div>/);
+    expect(html).toMatch(/>2\.<\/span>c<\/div>/);
+  });
+
+  it('leaves a plain paragraph without a marker and keeps paragraph spacing', () => {
+    const html = compose({ text: 'a\nb', paragraphSpacing: 0.5, lists: [null, bullet()] });
+
+    expect(html).toMatch(/<div style="[^"]*margin-bottom:0.5em[^"]*">a<\/div>/);
+    expect(html).toMatch(/margin-bottom:0em[^"]*"><span[^>]*>•<\/span>b<\/div>/);
+  });
+
+  it('keeps the first-line indent next to the list indent', () => {
+    expect(compose({ text: 'a', paragraphIndent: 2, lists: [bullet()] })).toMatch(/padding-left:1\.5em[^"]*text-indent:2em|text-indent:2em[^"]*padding-left:1\.5em/);
+  });
+});
+
 describe('links in the HTML export', () => {
   it('wraps a linked range in an anchor that opens a new tab safely', () => {
     const html = compose({ text: 'see docs', runs: [{ start: 4, end: 8, link: 'https://feega.app/docs?a=1&b=2' }] });

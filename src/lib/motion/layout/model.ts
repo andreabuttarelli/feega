@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Align, AutoFlow, DEFAULT_COLUMNS, Direction, Justify, Sizing, TrackType } from './auto-layout';
+import { Align, AlignContent, AutoFlow, DEFAULT_COLUMNS, Direction, Justify, Sizing, TrackType } from './auto-layout';
 
 export const MAX_LAYOUT_PX = 4000;
 export const MAX_LAYOUT_CHILDREN = 200;
@@ -10,6 +10,7 @@ const DIRECTIONS = Object.values(Direction) as [Direction, ...Direction[]];
 const JUSTIFIES = Object.values(Justify) as [Justify, ...Justify[]];
 const ALIGNS = Object.values(Align) as [Align, ...Align[]];
 const TRACK_TYPES = Object.values(TrackType) as [TrackType, ...TrackType[]];
+const ALIGN_CONTENTS = Object.values(AlignContent) as [AlignContent, ...AlignContent[]];
 const AUTO_FLOWS = Object.values(AutoFlow) as [AutoFlow, ...AutoFlow[]];
 export const SIZINGS = Object.values(Sizing) as [Sizing, ...Sizing[]];
 
@@ -35,6 +36,9 @@ export const autoLayoutSchema = z.object({
   columnTracks: z.array(trackSchema).max(MAX_GRID_COLUMNS).default([]),
   rowTracks: z.array(trackSchema).max(MAX_GRID_ROWS).default([]),
   autoFlow: z.enum(AUTO_FLOWS).default(AutoFlow.Row),
+  alignContent: z.enum(ALIGN_CONTENTS).default(AlignContent.Auto),
+  firstOnTop: z.boolean().default(false),
+  strokesIncluded: z.boolean().default(true),
   order: z.array(z.string().min(1)).max(MAX_LAYOUT_CHILDREN).default([])
 });
 

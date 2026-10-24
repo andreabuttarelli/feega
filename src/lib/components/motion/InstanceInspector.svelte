@@ -3,6 +3,8 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import { Paint, instanceElements, instanceOf, instanceTexts, overrideInstance, recolorInstance, resetOverride } from '$lib/motion/main-component';
   import { Action, type ActionId } from '$lib/motion/actions';
+  import { defineProperty, exposable, instanceProperties, removeProperty, resetProperty, setProperty, type Exposure } from '$lib/motion/component-properties';
+  import { PropertyKind, type PropertyDef } from '$lib/motion/property-resolve';
   import { addVariant, pickVariant, swapInstance, variantProps } from '$lib/motion/variants';
 
   let { doc, clipId, onchange, onrun }: { doc: MotionDoc; clipId: string; onchange: (doc: MotionDoc, summary: string) => void; onrun: (id: ActionId) => void } = $props();
@@ -40,6 +42,17 @@
   const recolor = (innerId: string, paint: Paint, color: string) => change(recolorInstance(doc, clipId, innerId, paint, color), 'Overrode instance colour');
   const override = (innerId: string, props: Record<string, unknown>) => change(overrideInstance(doc, clipId, innerId, props), 'Overrode instance property');
 
+  const properties = $derived(instanceProperties(doc, clipId));
+
+  const expose = (innerId: string, name: string, exposure: Exposure) => {
+    if (instance) {
+      change(defineProperty(doc, instance.compId, name, { ...exposure.def, target: innerId } as PropertyDef), 'Exposed a property');
+    }
+  };
+  const setProp = (key: string, value: string | boolean) => change(setProperty(doc, clipId, key, value), 'Changed a property');
+  const resetProp = (key: string) => change(resetProperty(doc, clipId, key), 'Reset a property');
+  const dropProp = (key: string) => instance && change(removeProperty(doc, instance.compId, key), 'Removed a property');
+
   function retext(innerId: string, text: string) {
     const result = overrideInstance(doc, clipId, innerId, { text });
     if (result.ok) {
@@ -54,6 +67,21 @@
       <Diamond size={14} />
       <span class="name">{instance.comp.component?.name}</span>
     </header>
+    {#each properties as p (p.key)}
+      <label class="field" data-testid="instance-property" data-key={p.key}>
+        <span class:overridden={p.overridden}>{p.key}</span>
+        {#if p.control === PropertyKind.Boolean}
+          <input type="checkbox" checked={p.value === true} data-testid="instance-property-boolean" onchange={(e) => setProp(p.key, e.currentTarget.checked)} />
+        {:else if p.control === PropertyKind.Swap}
+          <select value={String(p.value)} data-testid="instance-property-swap" onchange={(e) => setProp(p.key, e.currentTarget.value)}>
+            {#each mains as [id, comp] (id)}<option value={id}>{comp.component?.name}</option>{/each}
+          </select>
+        {:else}
+          <input type="text" value={String(p.value)} data-testid="instance-property-text" onchange={(e) => setProp(p.key, e.currentTarget.value)} />
+        {/if}
+        {#if p.overridden}<button type="button" class="reset" data-testid="instance-property-reset" onclick={() => resetProp(p.key)}>Reset</button>{:else}<button type="button" class="reset" data-testid="instance-property-remove" onclick={() => dropProp(p.key)}>Remove</button>{/if}
+      </label>
+    {/each}
     {#each texts as t (t.innerId)}
       <label class="field">
         <span class:overridden={t.overridden}>{t.main}</span>
@@ -92,6 +120,11 @@
           <input type="checkbox" checked={!el.hidden} data-testid="instance-visible" onchange={(e) => override(el.innerId, { hidden: !e.currentTarget.checked })} />
           {#if el.overridden.includes('hidden')}<button type="button" class="reset" data-testid="instance-reset-hidden" onclick={() => reset(el.innerId, 'hidden')}>Reset</button>{/if}
         </label>
+        <div class="expose">
+          {#each exposable(doc, instance.compId, el.innerId) as ex (ex.label)}
+            <button type="button" class="reset" data-testid="instance-expose" onclick={() => expose(el.innerId, `${el.component} ${i + 1} ${ex.label}`, ex)}>◇ {ex.label}</button>
+          {/each}
+        </div>
         {#if el.effects > 0 || el.overridden.includes('effects')}
           <label class="field">
             <span class:overridden={el.overridden.includes('effects')}>Effects</span>
@@ -156,6 +189,11 @@
     font-size: var(--ui-type-caption);
     font-weight: 600;
     color: var(--ui-text);
+  }
+
+  .expose {
+    display: flex;
+    flex-wrap: wrap;
   }
 
   .reset {

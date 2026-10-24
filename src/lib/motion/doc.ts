@@ -122,6 +122,7 @@ const clipSchema = z.object({
   autoLayout: autoLayoutSchema.nullable().optional(),
   layoutItem: layoutItemSchema.optional(),
   constraints: constraintsSchema.optional(),
+  lockRatio: z.boolean().optional(),
   partStyles: partStylesSchema.optional(),
   styleRef: z.string().min(1).optional(),
   effectStyleRef: z.string().min(1).optional(),
@@ -146,7 +147,9 @@ const templateMarkSchema = z.object({
   keyFields: keyFieldsSchema
 });
 
-export const mainComponentSchema = z.object({ name: z.string().min(1).max(60), set: z.string().min(1).max(60).optional(), variant: z.record(z.string().min(1).max(40), z.string().min(1).max(40)).optional() }).strict();
+export const propertyDefSchema = z.object({ kind: z.enum(['boolean', 'text', 'swap', 'nested']), target: z.string().min(1).max(80), default: z.union([z.string().max(2000), z.boolean()]).optional(), nested: z.string().min(1).max(40).optional() }).strict();
+
+export const mainComponentSchema = z.object({ name: z.string().min(1).max(60), set: z.string().min(1).max(60).optional(), variant: z.record(z.string().min(1).max(40), z.string().min(1).max(40)).optional(), properties: z.record(z.string().min(1).max(40), propertyDefSchema).optional() }).strict();
 
 const compSchema = z.object({
   template: templateMarkSchema.optional(),

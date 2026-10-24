@@ -5,7 +5,7 @@ import { groupMove } from './multi-select';
 import { Grip, handlesOf, type Bounds, type Guide, type Pt, type Quad } from './scene-select';
 import type { OpResult } from './timeline';
 
-export type Keys = { shift: boolean; alt: boolean };
+export type Keys = { shift: boolean; alt: boolean; ctrl?: boolean };
 
 export type GroupDrag = {
   doc: MotionDoc;

@@ -22,6 +22,11 @@ export enum Align {
   Baseline = 'baseline'
 }
 
+export enum AlignContent {
+  Auto = 'auto',
+  SpaceBetween = 'space-between'
+}
+
 export enum Sizing {
   Fixed = 'fixed',
   Hug = 'hug',
@@ -58,6 +63,7 @@ export type Flow = {
   columnTracks?: TrackSize[];
   rowTracks?: TrackSize[];
   autoFlow?: AutoFlow;
+  alignContent?: AlignContent;
 };
 
 export const DEFAULT_COLUMNS = 2;
@@ -113,6 +119,11 @@ const JUSTIFIED: Record<Justify, (free: number, gap: number, count: number) => {
   [Justify.SpaceBetween]: (free, gap, count) => ({ offset: 0, gap: count > 1 && free > 0 ? gap + free / (count - 1) : gap }),
   [Justify.SpaceAround]: (free, gap, count) => (free > 0 ? { offset: free / count / 2, gap: gap + free / count } : { offset: 0, gap }),
   [Justify.SpaceEvenly]: (free, gap, count) => (free > 0 ? { offset: free / (count + 1), gap: gap + free / (count + 1) } : { offset: 0, gap })
+};
+
+const LINE_GAP: Record<AlignContent, (free: number, gap: number, count: number) => number> = {
+  [AlignContent.Auto]: (_free, gap) => gap,
+  [AlignContent.SpaceBetween]: (free, gap, count) => (count > 1 && free > 0 ? gap + free / (count - 1) : gap)
 };
 
 const flowing = (item: Item): Item[] => (item.children ?? []).filter((c) => !c.absolute);
@@ -385,14 +396,18 @@ function place(item: Item, at: Box, out: Map<string, Box>): void {
   const stretched = (k: Item) => k.sizing[c] === Sizing.Fill && !flow.wrap;
   const natural = new Map(kids.map((k) => [k, measure(k, stretched(k) ? { [c]: inner[c] } : {})[m]]));
   const rows = flow.wrap ? lines(kids, (k) => natural.get(k)!, inner[m], flow.gap) : [kids];
-  let crossAt = inner[ax.crossStart];
-
-  for (const row of rows) {
+  const stripes = rows.map((row) => {
     const room = inner[m] - gaps(row.length, flow.gap);
     const mains = grow(row, row.map((k) => natural.get(k)!), room, m);
     const crossOf = (k: Item, i: number) => measure(k, { [m]: mains[i] })[c];
     const lineCross = flow.wrap ? Math.max(...row.map(crossOf)) : inner[c];
     const crosses = row.map((k, i) => (k.sizing[c] === Sizing.Fill ? clamp(k, c, lineCross) : crossOf(k, i)));
+    return { row, mains, lineCross, crosses };
+  });
+  const lineGap = LINE_GAP[flow.alignContent ?? AlignContent.Auto](inner[c] - sum(stripes.map((l) => l.lineCross)) - gaps(stripes.length, flow.crossGap), flow.crossGap, stripes.length);
+  let crossAt = inner[ax.crossStart];
+
+  for (const { row, mains, lineCross, crosses } of stripes) {
     const line = baselineLine(crosses, row.map((k, i) => baselineOf(k, crosses[i])));
     const crossOffset = (i: number) => (byBaseline(flow) ? line.baseline - baselineOf(row[i], crosses[i]) : ALIGNED[flow.align](lineCross - crosses[i]));
     const { offset, gap } = JUSTIFIED[flow.justify](inner[m] - sum(mains) - gaps(row.length, flow.gap), flow.gap, row.length);
@@ -403,7 +418,7 @@ function place(item: Item, at: Box, out: Map<string, Box>): void {
       place(k, box, out);
       mainAt += mains[i] + gap;
     });
-    crossAt += lineCross + flow.crossGap;
+    crossAt += lineCross + lineGap;
   }
 }
 

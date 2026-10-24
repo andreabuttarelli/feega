@@ -13,7 +13,8 @@ import { cssFunctions, FilterKind, unsupportedPrimitive, type Filter, type Linea
 import { BlendMode } from '../blend';
 import { MASK_KEYS } from '../mask';
 import { mattePairs, MATTE_READ } from '../matte';
-import { maskLayers, type MaskLayer } from './mask-layers';import { FillType, fillsOf, type Fill, type FillOf } from '../fill/model';
+import { maskLayers, type MaskLayer } from './mask-layers';import { adjustNodes, isNeutral, type Adjust } from '../fill/adjust';
+import { FillType, cropOf, fillsOf, type Fill, type FillOf } from '../fill/model';
 import { applyFillKeys, fillOfKey } from '../fill/keys';
 import { StrokeAlign, dashOf, strokesOf, type Stroke } from '../stroke/model';
 import { Cap, Join, dashes, strokePolygons } from './stroke';
@@ -84,7 +85,7 @@ export type Origin = [number, number];
 
 export type PathItem = { kind: ItemKind.Path; clip: string; contours: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; within?: Within; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
-export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video: boolean; mediaTime: number; size: Size; fit: string; focus: [number, number]; zoom: number; clipped: boolean; inner: Affine; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
+export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video: boolean; mediaTime: number; size: Size; fit: string; focus: [number, number]; zoom: number; crop?: [number, number, number, number]; tileTurn?: number; clipped: boolean; inner: Affine; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
 export type LayerItem = { kind: ItemKind.Layer; clip: string; source: string; size: Size; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; origin?: Origin; backdrop?: number };
 
@@ -112,7 +113,7 @@ export type DisplayList = { width: number; height: number; background: Rgba | nu
 export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset };
 
 type PathContent = Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number };
-type ImageContent = Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { stencil?: PathContent[] };
+type ImageContent = Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { stencil?: PathContent[]; filters?: Filter[]; space?: Linear };
 type GlyphsContent = Omit<GlyphsItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number };
 type Content = PathContent | ImageContent | GlyphsContent | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<TextItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LensItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | { kind: ItemKind.Group; items: Content[]; opacity: number; matrix: Affine };
 type Size = { width: number; height: number };
@@ -154,6 +155,15 @@ const PAINTS: Partial<Record<FillType, (f: never, w: number, h: number, colour: 
   [FillType.Angular]: (f: FillOf<FillType.Angular>, w, h, colour) => ({ kind: PaintKind.Sweep, center: [f.center.x * w, f.center.y * h], start: (f.angle - CSS_TURN) * DEG, stops: stopsOf(f.stops, colour) }),
   [FillType.Diamond]: (f: FillOf<FillType.Diamond>, w, h, colour) => ({ kind: PaintKind.Diamond, center: [w / 2, h / 2], half: [w / 2, h / 2], stops: stopsOf(f.stops, colour) })
 };
+
+const NO_SPACE: Linear = [1, 0, 0, 1];
+
+function adjusted(f: { adjust?: Adjust }): { filters?: Filter[]; space?: Linear } {
+  if (isNeutral(f.adjust)) {
+    return {};
+  }
+  return { filters: [{ kind: FilterKind.Svg, nodes: [adjustNodes(f.adjust!, 'adjust')] }], space: NO_SPACE };
+}
 
 const UNDRAWN_SHAPES: ReadonlySet<ShapeKind> = new Set([ShapeKind.Line, ShapeKind.Vector]);
 
@@ -199,7 +209,7 @@ function shapePainter({ clip, props, size, unit, colour, time, fps, asset }: Env
         return { kind: ItemKind.Path, contours: flat(l.outline), rule, paint: paintOf(f), opacity: f.opacity * l.opacity, matrix };
       }
       const stencil: PathContent = { kind: ItemKind.Path, contours: flat(l.outline), rule, paint: { kind: PaintKind.Solid, color: [1, 1, 1, 1] }, opacity: 1, matrix, blur: 0 };
-      return { ...(picture(src, size, { fit: f.fit, focus: [f.focus.x, f.focus.y], zoom: f.scale, clipped: false, opacity: f.opacity * l.opacity, matrix }) as ImageContent), stencil: [stencil] };
+      return { ...(picture(src, size, { fit: f.fit, focus: [f.focus.x, f.focus.y], zoom: f.scale, crop: [cropOf(f).x, cropOf(f).y, cropOf(f).w, cropOf(f).h], tileTurn: f.rotation ?? 0, clipped: false, opacity: f.opacity * l.opacity, matrix }) as ImageContent), ...adjusted(f), stencil: [stencil] };
     })
   );
   const stroked = strokesOf(props)
@@ -278,7 +288,7 @@ function outlinedText(env: Env): Painted {
     }
     const [l, t, r, b] = ink.picture.area;
     const stencil: PathContent = { ...path, paint: { kind: PaintKind.Solid, color: [1, 1, 1, 1] }, opacity: 1 };
-    return { ...(picture(ink.picture.src, { width: r - l, height: b - t }, { fit: ink.picture.fit, focus: ink.picture.focus, clipped: false, opacity: ink.opacity, matrix: mul2d(path.matrix, [1, 0, 0, 1, l, t]) }) as ImageContent), stencil: [stencil] };
+    return { ...(picture(ink.picture.src, { width: r - l, height: b - t }, { fit: ink.picture.fit, focus: ink.picture.focus, clipped: false, opacity: ink.opacity, matrix: mul2d(path.matrix, [1, 0, 0, 1, l, t]) }) as ImageContent), ...adjusted(ink.picture), stencil: [stencil] };
   });
 }
 

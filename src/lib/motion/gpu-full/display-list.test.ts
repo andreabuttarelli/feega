@@ -117,6 +117,35 @@ describe('displayListAt', () => {
       expect(image?.matte?.items[0]).toMatchObject({ kind: ItemKind.Path });
     });
 
+    it('carries a crop window to the picture', () => {
+      const cropped = patch(withCard, 'card', { props: { ...cardProps, fills: [{ type: FillType.Image, assetId: 'photo', fit: 'crop', crop: { x: 0.1, y: 0.2, w: 0.5, h: 0.4 } }] } });
+      const image = drawFrame(prepare(cropped, FEEGA_TOKENS, { photo: 'https://cdn.test/photo.png' }), 0).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(image).toMatchObject({ fit: 'crop', crop: [0.1, 0.2, 0.5, 0.4] });
+    });
+
+    it('carries the tile scale and rotation to the picture', () => {
+      const tiled = patch(withCard, 'card', { props: { ...cardProps, fills: [{ type: FillType.Image, assetId: 'photo', fit: 'tile', scale: 2, rotation: 30 }] } });
+      const image = drawFrame(prepare(tiled, FEEGA_TOKENS, { photo: 'https://cdn.test/photo.png' }), 0).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(image).toMatchObject({ fit: 'tile', zoom: 2, tileTurn: 30 });
+    });
+
+    it('filters the picture by its adjustments, not the shape around it', () => {
+      const adjusted = patch(withCard, 'card', { props: { ...cardProps, fills: [{ type: FillType.Image, assetId: 'photo', adjust: { exposure: 0.5 } }] } });
+      const image = drawFrame(prepare(adjusted, FEEGA_TOKENS, { photo: 'https://cdn.test/photo.png' }), 0).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(image?.filters).toHaveLength(1);
+      expect(image?.filters?.[0]).toMatchObject({ kind: 'svg', nodes: [{ tag: 'filter', attrs: { 'color-interpolation-filters': 'sRGB' } }] });
+      expect(image?.matte?.items[0].filters).toBeUndefined();
+    });
+
+    it('a picture without adjustments has no filter', () => {
+      const plain = drawnWith({ photo: 'https://cdn.test/photo.png' }).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(plain?.filters).toBeUndefined();
+    });
+
     it('stays a gap while the picture has no address', () => {
       expect(drawnWith({}).unsupported).toContainEqual({ clip: 'card', component: 'Shape', reason: Unsupported.Fill });
     });
@@ -208,6 +237,13 @@ describe('displayListAt', () => {
 
     expect(picture?.src).toBe('https://x.test/p.png');
     expect(picture?.matte?.items.flatMap((i) => (i.kind === ItemKind.Path ? i.contours : []))).toHaveLength(2);
+  });
+
+  it('adjusts the picture shown through the glyphs', () => {
+    const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab', fills: [{ type: 'image', assetId: 'pic', adjust: { saturation: -1 } }] } }, 'text'));
+    const picture = drawFrame(prepare(texted, FEEGA_TOKENS, { pic: 'https://x.test/p.png' }, boxType), 60).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'text');
+
+    expect(picture?.filters).toHaveLength(1);
   });
 
   it('keeps fills the native core cannot read on the JS painter, never in a text plan', () => {

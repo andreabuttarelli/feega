@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, setTransform, type OpResult } from '$lib/motion/timeline';
+import { setClipFlags } from '$lib/motion/organize';
 import { Grip, aabb, handlesOf, quadOf, type Bounds } from '$lib/motion/scene-select';
 import { guessedBoxes } from '$lib/motion/move-element';
 import { transformAt } from '$lib/motion/parent';
-import { dragClips, measuredGaps, nudgeClips, type Drag } from './frame-transform';
+import { GuideAlign, GuideKind, newGuide, setLayoutGuides } from '$lib/motion/layout-guides/guides';
+import { SnapMode, dragClips, measuredGaps, nudgeClips, type Drag } from './frame-transform';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -35,10 +37,56 @@ describe('dragClips', () => {
     expect(guides).toContainEqual({ axis: 'x', at: boundsOf(DOC, 'side').left });
   });
 
+  it('snaps a moved element to the edge of a layout guide, shown or hidden', () => {
+    const guided = must(setLayoutGuides(DOC, [{ ...newGuide(GuideKind.Columns), align: GuideAlign.Min, count: 1, size: 100, offset: 1000, hidden: true }]));
+    const near = 1003 - boundsOf(guided, 'card').right;
+
+    const { result } = dragClips(drag({ doc: guided, to: [900 + near, 500] }));
+
+    expect(boundsOf(must(result), 'card').right).toBeCloseTo(1000);
+  });
+
+  it('suspends snapping and shows no guide when snapping is off', () => {
+    const before = boundsOf(DOC, 'card');
+    const near = boundsOf(DOC, 'side').left - before.right - 3;
+
+    const { result, guides } = dragClips(drag({ to: [900 + near, 500], snap: SnapMode.Off }));
+
+    expect(guides).toEqual([]);
+    expect(boundsOf(must(result), 'card').right).toBeCloseTo(boundsOf(DOC, 'side').left - 3);
+  });
+
+  it('lands a moved element on whole pixels in pixel mode', () => {
+    const { result } = dragClips(drag({ to: [900.4, 500.3], snap: SnapMode.Pixels, reach: 0 }));
+    const after = boundsOf(must(result), 'card');
+
+    expect(after.left).toBeCloseTo(Math.round(after.left));
+    expect(after.top).toBeCloseTo(Math.round(after.top));
+  });
+
   it('locks a Shift move to the dominant axis', () => {
     const { result } = dragClips(drag({ to: [1000, 530], keys: { shift: true, alt: false }, reach: 0 }));
 
     expect(centre(boundsOf(must(result), 'card'))[1]).toBeCloseTo(centre(boundsOf(DOC, 'card'))[1]);
+  });
+
+  describe('a locked aspect ratio', () => {
+    const lockedDoc = must(setClipFlags(DOC, 'card', { lockRatio: true }));
+    const corner = boundsOf(lockedDoc, 'card');
+    const resize = (keys: Drag['keys']) => {
+      const { result } = dragClips(drag({ doc: lockedDoc, grip: Grip.Scale, handle: CORNER_BOTTOM_RIGHT, from: [corner.right, corner.bottom], to: [corner.right + 80, corner.bottom + 5], keys, reach: 0 }));
+      const after = boundsOf(must(result), 'card');
+      return (after.right - after.left) / (after.bottom - after.top);
+    };
+    const ratio = (corner.right - corner.left) / (corner.bottom - corner.top);
+
+    it('keeps the ratio when a corner is dragged without Shift', () => {
+      expect(resize(NO_KEYS)).toBeCloseTo(ratio, 3);
+    });
+
+    it('Ctrl unlocks it for the drag', () => {
+      expect(Math.abs(resize({ shift: false, alt: false, ctrl: true }) - ratio)).toBeGreaterThan(0.1);
+    });
   });
 
   it('resizes from the centre while Alt is held', () => {

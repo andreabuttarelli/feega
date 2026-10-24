@@ -1,5 +1,6 @@
 import { COMPONENTS } from './components';
 import { findClip, type MotionDoc } from './doc';
+import { listChanged, normalLists, type ListChange, type ListItem } from './text-lists';
 import { codePoints, styledRange, type Range, type RunEdit, type TextRun } from './text-runs';
 import { setProps, type OpResult } from './timeline';
 
@@ -23,3 +24,20 @@ export function styleTextRange(doc: MotionDoc, clipId: string, range: Range, edi
 }
 
 export const clearTextRuns = (doc: MotionDoc, clipId: string): OpResult => setProps(doc, clipId, { runs: undefined });
+
+export function listTextRange(doc: MotionDoc, clipId: string, range: Range, change: ListChange): OpResult {
+  const clip = findClip(doc, clipId)?.clip;
+  if (!clip) {
+    return fail(`no clip ${clipId}`);
+  }
+  if (!('lists' in ((COMPONENTS as Record<string, { schema: { shape: object } }>)[clip.component]?.schema.shape ?? {}))) {
+    return fail(`${clip.component} has no lists: only Text does`);
+  }
+  const text = String(clip.props.text ?? '');
+  const length = codePoints(text).length;
+  if (range.start < 0 || range.end > length || range.start > range.end) {
+    return fail(`range ${range.start}..${range.end} is outside the text (0..${length})`);
+  }
+  const lists = listChanged((clip.props.lists as ListItem[] | undefined) ?? [], text, range, change);
+  return setProps(doc, clipId, { lists: normalLists(lists, text.split('\n').length) });
+}

@@ -21,6 +21,7 @@ export type CanvasCommandId =
   | 'nudge'
   | 'align'
   | 'tidy'
+  | 'stack'
   | 'enter'
   | 'select-next'
   | 'select-previous'
@@ -63,12 +64,17 @@ const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
 const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
   [Command.TogglePixelGrid]: FrameView.PixelGrid,
   [Command.ToggleLayoutGuides]: FrameView.Guides,
-  [Command.ToggleOutlines]: FrameView.Outlines
+  [Command.ToggleOutlines]: FrameView.Outlines,
+  [Command.TogglePivot]: FrameView.Pivot
 };
 
 function viewFor(e: KeyboardEvent): FrameView | null {
   const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
   return command ? (VIEW_OF_COMMAND[command] ?? null) : null;
+}
+
+function stackFor(e: KeyboardEvent): boolean {
+  return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.AutoLayout;
 }
 
 function toolFor(e: KeyboardEvent): DrawTool | null {
@@ -100,6 +106,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.PreviewSelection]: { id: 'zoom-selection' },
   [Command.Help]: { id: 'help' },
   [Command.TidyUp]: { id: 'tidy' },
+  [Command.AutoLayout]: { id: 'stack' },
   [Command.AlignLeft]: { id: 'align', edge: Edge.Left },
   [Command.AlignCenter]: { id: 'align', edge: Edge.Center },
   [Command.AlignRight]: { id: 'align', edge: Edge.Right },
@@ -116,6 +123,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.TogglePixelGrid]: { id: 'view', view: FrameView.PixelGrid },
   [Command.ToggleLayoutGuides]: { id: 'view', view: FrameView.Guides },
   [Command.ToggleOutlines]: { id: 'view', view: FrameView.Outlines },
+  [Command.TogglePivot]: { id: 'view', view: FrameView.Pivot },
   [Command.MoveLeft]: nudgeBy(-1, 0, NUDGE_STEP),
   [Command.MoveRight]: nudgeBy(1, 0, NUDGE_STEP),
   [Command.MoveUp]: nudgeBy(0, -1, NUDGE_STEP),
@@ -157,6 +165,7 @@ function altCommand(e: KeyboardEvent): CanvasCommand | null {
   if (isTypingTarget(e.target) || e.shiftKey) return null;
   const mod = e.metaKey || e.ctrlKey;
   if (mod) return e.code === 'KeyT' ? { id: 'tidy' } : null;
+  if (e.code === 'KeyR') return { id: 'view', view: FrameView.Pivot };
   const edge = ALT_ALIGN[e.code];
   return edge ? { id: 'align', edge } : null;
 }
@@ -184,6 +193,8 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
 
   if (key === HELP_KEY) return { id: 'help' };
   if (key === COMMENT_KEY) return { id: 'comment' };
+
+  if (stackFor(e)) return { id: 'stack' };
 
   const tool = toolFor(e);
   if (tool) return { id: 'tool', tool };
@@ -243,6 +254,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'paste', keys: ['mod', 'V'], label: 'Paste' },
   { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
+  { id: 'stack', keys: ['⇧A'], label: 'Stack the selected tiles' },
   { id: 'view', keys: ["⇧'", '⇧G', 'mod Y'], label: 'Pixel grid, layout guides, outline view' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
   { id: 'fit', keys: ['0', '⇧1'], label: 'Zoom to fit' },
@@ -284,6 +296,7 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   'send-back': GuideGroup.Edit,
   align: GuideGroup.Edit,
   tidy: GuideGroup.Edit,
+  stack: GuideGroup.Edit,
   nudge: GuideGroup.Edit,
   fit: GuideGroup.View,
   'zoom-actual': GuideGroup.View,

@@ -7,7 +7,7 @@ use vello::Scene;
 use crate::canvas::{mix, Canvas};
 use crate::fragments::{compose, Fragments};
 use crate::display_list::{Cover, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Look, Paint, PathItem, Ramp, Rgba, Size, Stop};
-use crate::pictures::{image_rect, Pictures};
+use crate::pictures::{crop_rect, image_rect, tile_cells, Pictures, Placed as Window};
 use crate::Skipped;
 
 pub type Shelf<P> = HashMap<String, P>;
@@ -49,22 +49,57 @@ fn draw<C: Canvas>(scene: &mut C, item: &PathItem, frame: Rect) {
     }
 }
 
+fn window_of(item: &ImageItem, natural: Size) -> Window {
+    match (item.fit.as_str(), item.crop) {
+        ("crop", Some(window)) => crop_rect(item.size, window),
+        _ => image_rect(item.size, natural, &item.fit, item.focus, item.zoom),
+    }
+}
+
 fn image_region(item: &ImageItem, natural: Size) -> (Rect, Rect) {
-    let fitted = image_rect(item.size, natural, &item.fit, item.focus, item.zoom);
+    let box_rect = Rect::new(0.0, 0.0, item.size.width, item.size.height);
+    if item.fit == "tile" {
+        return (box_rect, box_rect);
+    }
+    let fitted = window_of(item, natural);
     let [k, _, _, _, tx, ty] = item.inner;
     let placed = Rect::new(fitted.x * k + tx, fitted.y * k + ty, (fitted.x + fitted.width) * k + tx, (fitted.y + fitted.height) * k + ty);
-    let region = if item.clipped { placed.intersect(Rect::new(0.0, 0.0, item.size.width, item.size.height)) } else { placed };
+    let region = if item.clipped { placed.intersect(box_rect) } else { placed };
     (placed, region)
+}
+
+fn draw_tiles<C: Canvas>(scene: &mut C, item: &ImageItem, image: &C::Picture, natural: Size) {
+    let matrix = Affine::new(item.look.matrix);
+    let centre = Point::new(item.size.width / 2.0, item.size.height / 2.0);
+    let spun = matrix * Affine::rotate_about(item.tile_turn.to_radians(), centre);
+    if item.clipped {
+        scene.push_clip(Fill::NonZero, matrix, &Rect::new(0.0, 0.0, item.size.width, item.size.height).to_path(0.1));
+    }
+    for cell in tile_cells(item.size, natural, item.zoom, item.tile_turn, item.focus) {
+        let texels = Affine::translate((cell.x, cell.y)) * Affine::scale_non_uniform(cell.width / natural.width, cell.height / natural.height);
+        scene.picture(spun, image, texels, Rect::new(cell.x, cell.y, cell.x + cell.width, cell.y + cell.height));
+    }
+    if item.clipped {
+        scene.pop();
+    }
 }
 
 fn draw_image<C: Canvas>(scene: &mut C, item: &ImageItem, image: &C::Picture) {
     let natural = C::size(image);
+    if item.fit == "tile" {
+        draw_tiles(scene, item, image, natural);
+        return;
+    }
     let (placed, region) = image_region(item, natural);
     if region.is_zero_area() {
         return;
     }
     let texels = Affine::translate((placed.x0, placed.y0)) * Affine::scale_non_uniform(placed.width() / natural.width, placed.height() / natural.height);
-    scene.picture(Affine::new(item.look.matrix), image, texels, region);
+    scene.picture(matrix_of(item), image, texels, region);
+}
+
+fn matrix_of(item: &ImageItem) -> Affine {
+    Affine::new(item.look.matrix)
 }
 
 fn draw_layer<C: Canvas>(scene: &mut C, item: &LayerItem, image: &C::Picture) {

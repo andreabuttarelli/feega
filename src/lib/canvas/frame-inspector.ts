@@ -7,7 +7,7 @@ import { addAutoLayout, removeAutoLayout, resizeToFit, wrapInFrame } from '$lib/
 import { isText } from '$lib/motion/layout/text-extent';
 import { Flip, flipClips } from '$lib/motion/layer-props';
 import { copyStyle, pasteStyle } from '$lib/motion/style-copy';
-import { replaceElements } from '$lib/motion/move-element';
+import { pasteOverElements, replaceElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
 import { setClipFlags } from '$lib/motion/organize';
 import { BooleanOp, flattenShapes } from '$lib/motion/shape/boolean';
@@ -21,6 +21,7 @@ import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
 import type { SelectionActionId } from './selection-actions';
 import { siblingsOf } from './frame-select';
 import { EditMode } from '$lib/motion/edit-mode';
+import { propBoxes, tidySpace } from '$lib/motion/space';
 import { PropertiesView } from '$lib/motion/properties-view';
 import type { CompPath } from '$lib/motion/precomp';
 import { scopeView } from '$lib/motion/instance-view';
@@ -176,8 +177,15 @@ const opacityOp = (opacity: number): BarOp => ({ shown: any, run: (ctx) => kept(
 
 const OPACITY_OPS = Object.fromEntries(OPACITY_KEYS.map((o) => [o.command, opacityOp(o.opacity)]));
 
+function pasteOver(ctx: BarCtx): Done | null {
+  const copied = elementClipboard.elements;
+  const over = copied ? pasteOverElements(ctx.doc, ctx.selection, copied.elements, ctx.newId) : null;
+  return over?.ok ? { ok: true, doc: over.doc, summary: 'Pasted over the selection', selection: over.ids } : null;
+}
+
 const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   ...OPACITY_OPS,
+  [Action.TidyUp]: { shown: several, run: (ctx) => kept(ctx, tidySpace(ctx.doc, ctx.selection, ctx.frame, propBoxes(ctx.doc), EditMode.Design), 'Tidied up') },
   [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx.doc)), 'Created a component') },
   [Action.DetachInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, detachInstance(ctx.doc, ctx.selection[0], ctx.newId), 'Detached the instance') },
   [Action.PushInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, pushOverrides(ctx.doc, ctx.selection[0]), 'Pushed overrides to the main component') },
@@ -201,6 +209,7 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.CopyProperties]: { shown: any, run: copyProperties },
   [Action.PasteProperties]: { shown: any, run: pasteProperties },
   [Action.PasteReplace]: { shown: any, run: pasteReplace },
+  [Action.PasteOver]: { shown: any, run: pasteOver },
   [Action.ToggleHidden]: { shown: any, run: (ctx) => toggleFlag(ctx, 'hidden', 'Toggled visibility') },
   [Action.ToggleLocked]: { shown: any, run: (ctx) => toggleFlag(ctx, 'locked', 'Toggled lock') }
 };
@@ -260,7 +269,7 @@ export const FRAME_ELEMENT_MENU: ReadonlySet<SelectionActionId> = new Set(
   })
 );
 
-const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
+const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.PasteOver, Command.TidyUp, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
 
 export function frameKeyAction(e: KeyboardEvent): ActionId | null {
   const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, EditMode.Design);

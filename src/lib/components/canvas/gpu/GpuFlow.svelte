@@ -2,7 +2,7 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { FrameFit, framePicker } from '$lib/canvas/frame-pick';
+  import { FrameFit, framePicker, type WorldRect } from '$lib/canvas/frame-pick';
   import { onDestroy, onMount, untrack } from 'svelte';
   import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
@@ -25,6 +25,7 @@
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '$lib/motion/doc';
   import { findClip, type MotionClip } from '$lib/motion/doc';
+  import { TRANSFORM } from '$lib/motion/keyframes';
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import GradientHandles from '../GradientHandles.svelte';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
@@ -37,11 +38,12 @@
   import type { Style } from '$lib/motion/styles-model';
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
   import type { Fill } from '$lib/motion/fill/model';
-  import { baseStyle, commitText, editLayout, editsText, hideText, runsOfClip, styledKind, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { baseStyle, commitText, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
   import { measuredTexts } from '$lib/canvas/text-autosize';
   import type { TextCaret } from '$lib/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '$lib/motion/text-runs';
+  import type { ListItem } from '$lib/motion/text-lists';
   import { frameProperties } from '../frame-properties.svelte';
   import { trailerFrom } from '$lib/motion/trailer';
   import FrameDialogs from '../FrameDialogs.svelte';
@@ -64,7 +66,7 @@
   import { quadBox, quadStyle } from '$lib/canvas/quad-box';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '$lib/motion/timeline';
-  import { GRIP_SUMMARY, SelectionKind, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
+  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
@@ -138,7 +140,7 @@
   import { reportHref } from '$lib/reports/report-link';
   import { GraphScope } from '$lib/canvas/run-graph';
   import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
-  import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { STACK_GAP, alignTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
@@ -152,14 +154,14 @@
   import type { GenMedium } from '$lib/canvas/gen-node';
   import type { CanvasEdgeKind, FlowEdge, WireMode } from '$lib/canvas-edges';
   import { setTileRender } from '$lib/canvas/tile-render-context';
-  import { resizeCursor, type ResizeCursor } from '$lib/canvas/resize-cursor';
+  import { resizeCursor, rotateCursor } from '$lib/canvas/resize-cursor';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
-  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, type Hit } from '$lib/canvas/gpu/gesture';
+  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
@@ -184,7 +186,7 @@
   import { engineOf } from '$lib/motion/engine';
   import { track } from '$lib/analytics';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
-  import { followGroup } from '$lib/canvas/node-layout';
+  import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
   let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void } = $props();
 
@@ -277,7 +279,8 @@
   const tier = $derived(assetTier(view.zoom));
   const tierUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, tier);
 
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}) })));
+  let turning = $state<{ id: string; degrees: number } | null>(null);
+  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning?.id === t.id ? { rotation: turning.degrees } : {}) })));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
@@ -910,6 +913,7 @@
   );
 
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
+  const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && spec.flow.nodesDraggable ? selectedBoxes[0] : null);
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && spec.flow.nodesDraggable);
 
   $effect(() => {
@@ -999,7 +1003,7 @@
     return surfaceRect ?? { width: innerWidth, height: innerHeight, left: 0, top: 0 };
   }
 
-  function boundsOf(boxes: Box[]): { x: number; y: number; width: number; height: number } | null {
+  function boundsOf(boxes: WorldRect[]): { x: number; y: number; width: number; height: number } | null {
     if (!boxes.length) {
       return null;
     }
@@ -1008,7 +1012,7 @@
     return { x, y, width: Math.max(...boxes.map((b) => b.x + b.w)) - x, height: Math.max(...boxes.map((b) => b.y + b.h)) - y };
   }
 
-  function fitTo(boxes: Box[], maxZoom = READABLE_ZOOM) {
+  function fitTo(boxes: WorldRect[], maxZoom = READABLE_ZOOM) {
     const b = boundsOf(boxes);
     if (!b) {
       return;
@@ -1016,6 +1020,22 @@
     const s = screenSize();
     const zoom = Math.max(MIN_ZOOM, Math.min(maxZoom, Math.min(s.width / (b.width * (1 + FIT_PADDING)), s.height / (b.height * (1 + FIT_PADDING)))));
     animateTo({ zoom, x: s.width / 2 - (b.x + b.width / 2) * zoom, y: s.height / 2 - (b.y + b.height / 2) * zoom });
+  }
+
+  function pickedRects(): WorldRect[] {
+    const at = inside?.level.clip && picks.length ? pickerOf(inside.nodeId) : null;
+    return at ? picks.flatMap((id) => at.picker.outline(id, at.space) ?? []) : [];
+  }
+
+  function zoomToSelection() {
+    const rects = pickedRects();
+    if (rects.length) {
+      fitTo(rects, MAX_ZOOM);
+      return;
+    }
+    if (selectedBoxes.length) {
+      fitTo(selectedBoxes);
+    }
   }
 
   let tween = 0;
@@ -1092,6 +1112,7 @@
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
     | { kind: GestureKind.Drag; id: string; start: Point; origins: Map<string, Point>; moved: boolean; toggle: boolean }
     | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number } }
+    | { kind: GestureKind.Rotate; id: string; centre: Point; start: Point; base: number; degrees: number }
     | { kind: GestureKind.Marquee; start: Point; base: string[]; additive: boolean; moved: boolean }
     | { kind: GestureKind.Connect; from: Port }
     | { kind: GestureKind.PickEdge; edgeId: string };
@@ -1123,6 +1144,10 @@
       if (unit) {
         return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
       }
+    }
+    const turnUnit = rotatable ? rotateZoneAt(rotatable, rotatable.rotation ?? 0, w, view.zoom) : null;
+    if (rotatable && turnUnit) {
+      return { kind: HitKind.Rotate, nodeId: rotatable.id, unit: turnUnit };
     }
     const node = topNodeAt(w);
     if (node) {
@@ -1306,12 +1331,17 @@
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
-  let cornerCursor = $state<ResizeCursor | null>(null);
+  let handleCursor = $state<string | null>(null);
 
-  function hoverCorner(w: Point) {
-    const box = resizable ? selectedBoxes[0] : null;
-    const unit = box ? resizeHandleAt(box, w, view.zoom) : null;
-    cornerCursor = box && unit ? resizeCursor([unit[0] * 2 - 1, unit[1] * 2 - 1], box.rotation ?? 0) : null;
+  function hoverHandle(w: Point) {
+    const hit = hitAt(w);
+    const box = hit.kind === HitKind.Corner || hit.kind === HitKind.Rotate ? byId.get(hit.nodeId) : null;
+    if (!box || (hit.kind !== HitKind.Corner && hit.kind !== HitKind.Rotate)) {
+      handleCursor = null;
+      return;
+    }
+    const outward: [number, number] = [hit.unit[0] * 2 - 1, hit.unit[1] * 2 - 1];
+    handleCursor = hit.kind === HitKind.Corner ? resizeCursor(outward, box.rotation ?? 0) : rotateCursor(outward, box.rotation ?? 0);
   }
 
   function dropHover() {
@@ -1347,6 +1377,7 @@
   onDestroy(() => canvasComponents.set([]));
 
   const PRIMARY_BUTTON = 0;
+  const ROTATE_SNAP_DEG = 15;
   let picks = $state<string[]>([]);
   let bandDrag = $state<{ nodeId: string; from: Point; to: Point } | null>(null);
 
@@ -1363,8 +1394,12 @@
   }
 
   function extendPick(e: PointerEvent, w: Point): boolean {
-    const hit = e.shiftKey && e.button === 0 && e.pointerType === 'mouse' ? framePickAt(w) : null;
+    const deep = (e.metaKey || e.ctrlKey) && !e.shiftKey;
+    const hit = (e.shiftKey || deep) && e.button === 0 && e.pointerType === 'mouse' ? framePickAt(w) : null;
     if (!hit || inside?.nodeId !== hit.nodeId) {
+      return false;
+    }
+    if (hit.clip && deep) {
       return false;
     }
     if (hit.clip) {
@@ -1382,10 +1417,12 @@
       bandDrag = null;
       const a = hit.picker.framePoint(from, hit.space);
       const b = hit.picker.framePoint(toWorld(view, local(ev)), hit.space);
-      const rects = Object.fromEntries(clips.flatMap((id) => {
-        const r = hit.picker.frameRect(id);
-        return r ? [[id, r]] : [];
-      }));
+      const rects = deep
+        ? hit.picker.leafRects()
+        : Object.fromEntries(clips.flatMap((id) => {
+            const r = hit.picker.frameRect(id);
+            return r ? [[id, r]] : [];
+          }));
       pickMany(hit.nodeId, marqueeIds(rects, spanOf(a, b)));
     };
     window.addEventListener('pointermove', move);
@@ -1748,7 +1785,9 @@
     const onScreen = (p: Point): [number, number] => [(p.x - at.frame.box.x) * view.zoom, (p.y - at.frame.box.y) * view.zoom];
     return picks.flatMap((clip) => {
       const quad = at.picker.outlineQuad(clip, at.space);
-      return quad ? [{ clip, kind, quad: quad.map(onScreen) }] : [];
+      const own = findClip(at.live.doc, clip)?.clip;
+      const pivot: [number, number] = [own?.transform.anchorX ?? TRANSFORM.anchorX.fallback, own?.transform.anchorY ?? TRANSFORM.anchorY.fallback];
+      return quad ? [{ clip, kind, pivot, quad: quad.map(onScreen) }] : [];
     });
   }
 
@@ -1847,7 +1886,7 @@
     return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
   }
 
-  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle };
+  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle };
   let typing = $state<Typing | null>(null);
 
   async function startTyping(nodeId: string, clip: string) {
@@ -1864,7 +1903,7 @@
       return;
     }
     const look = textEditStyle({ clip: found as MotionClip, doc, tokens: at.live.tokens, frame: size, scale: 1 });
-    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), styled: styledKind(found), base: baseStyle(found) };
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found) };
     liveDocs.set(nodeId, { ...at.live, doc: hideText(doc, clip) });
   }
 
@@ -1881,16 +1920,16 @@
     untrack(() => void startTyping(id, clip.id));
   });
 
-  function stopTyping(text: string, runs: TextRun[]) {
+  function stopTyping(text: string, runs: TextRun[], lists: ListItem[]) {
     const open = typing;
     const saver = open ? saverOf(open.nodeId) : null;
     typing = null;
     if (!open || !saver) {
       return;
     }
-    const result = commitText(saver.history.present, open.clip, text, runs);
+    const result = commitText(saver.history.present, open.clip, text, runs, lists);
     liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
-    if (result.ok && (text !== open.text || JSON.stringify(runs) !== JSON.stringify(open.runs))) {
+    if (result.ok && (text !== open.text || JSON.stringify(runs) !== JSON.stringify(open.runs) || JSON.stringify(lists) !== JSON.stringify(open.lists))) {
       commit(open.nodeId, result, 'Edited text');
     }
   }
@@ -1904,7 +1943,7 @@
     const z = view.zoom;
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
-    return { text: open.text, runs: open.runs, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look };
+    return { text: open.text, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look };
   }
 
   const autosizing = new Map<string, ReturnType<typeof setTimeout>>();
@@ -1956,6 +1995,21 @@
     return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
   }
 
+  function rotateOf(nodeId: string, start: Point): Active {
+    const t = byId.get(nodeId)!;
+    return { kind: GestureKind.Rotate, id: t.id, centre: { x: t.x + t.w / 2, y: t.y + t.h / 2 }, start, base: t.rotation ?? 0, degrees: t.rotation ?? 0 };
+  }
+
+  function rotateHost(nodeId: string, e: PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    downAt = local(e);
+    captureId = e.pointerId;
+    holdSelection(true);
+    active = rotateOf(nodeId, toWorld(view, local(e)));
+    gesturing = true;
+  }
+
   function resizeHost(nodeId: string, handle: number, e: PointerEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -1969,6 +2023,10 @@
   function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
     if (grip === Grip.Scale && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.has(nodeId)) {
       resizeHost(nodeId, handle, e);
+      return;
+    }
+    if (grip === Grip.Rotate && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.get(nodeId)?.rotatable) {
+      rotateHost(nodeId, e);
       return;
     }
     if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && pickElement(e, toWorld(view, local(e)))) {
@@ -1992,6 +2050,7 @@
     const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
     const from = framePt(e);
     const reach = frameReach(at);
+    const snapOf = (ev: PointerEvent) => (ev.ctrlKey ? SnapMode.Off : shows(frameViews, FrameView.PixelGrid) ? SnapMode.Pixels : SnapMode.Guides);
     let result: OpResult | null = null;
     let carried = false;
 
@@ -2013,7 +2072,7 @@
         props.onElementOut?.(nodeId, out ?? { clipId: '', client: { x: ev.clientX, y: ev.clientY }, box: null }, out ? DragPhase.Over : DragPhase.Back);
         carried = !!out;
       }
-      const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey }, reach });
+      const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev) });
       result = dragged.result.ok ? { ok: true, doc: inScope.merge(dragged.result.doc) } : dragged.result;
       frameGuides = { nodeId, guides: dragged.guides, gaps: dragged.gaps };
       if (result.ok) {
@@ -2113,7 +2172,7 @@
       goInside(hit.nodeId, Gesture.Click, null);
     }
     const inDom = target.closest('.gpu-dom-node');
-    if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && target.closest(INTERACTIVE)) {
+    if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && hit.kind !== HitKind.Rotate && target.closest(INTERACTIVE)) {
       return;
     }
     if (e.button === 2 && hit.kind !== HitKind.Empty) {
@@ -2153,6 +2212,12 @@
           return null;
         }
         return resizeOf(hit.nodeId, hit.unit, w);
+      },
+      [GestureKind.Rotate]: () => {
+        if (hit.kind !== HitKind.Rotate) {
+          return null;
+        }
+        return rotateOf(hit.nodeId, w);
       },
       [GestureKind.Marquee]: () => ({ kind: GestureKind.Marquee, start: w, base: selected, additive: e.shiftKey || e.metaKey || e.ctrlKey, moved: false }),
       [GestureKind.Connect]: () => {
@@ -2211,7 +2276,7 @@
       hoverChrome = e.pointerType === 'mouse' ? (hovered ?? portAt(ports, w, view.zoom)?.nodeId ?? null) : null;
       if (e.pointerType === 'mouse' && !e.buttons) {
         hoverElement(w);
-        hoverCorner(w);
+        hoverHandle(w);
       }
       return;
     }
@@ -2275,6 +2340,14 @@
         const box = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
         overrides = new Map([[a.id, box]]);
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
+      },
+      [GestureKind.Rotate]: (a) => {
+        if (a.kind !== GestureKind.Rotate) {
+          return;
+        }
+        const target = a.base + dragAngle(a.centre, a.start, w);
+        a.degrees = e.shiftKey ? Math.round(target / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG : target;
+        turning = byId.get(a.id)?.members?.length ? null : { id: a.id, degrees: a.degrees };
       },
       [GestureKind.Marquee]: (a) => {
         if (a.kind !== GestureKind.Marquee || (!far && !a.moved)) {
@@ -2357,6 +2430,12 @@
         }
         settleOverrides();
       },
+      [GestureKind.Rotate]: () => {
+        turning = null;
+        if (a.kind === GestureKind.Rotate && a.degrees !== a.base) {
+          props.onRotate?.(a.id, a.degrees - a.base);
+        }
+      },
       [GestureKind.Marquee]: () => {
         marquee = null;
         if (a.kind === GestureKind.Marquee && !a.moved) {
@@ -2395,6 +2474,7 @@
 
   function cancelGesture() {
     active = null;
+    turning = null;
     gesturing = false;
     resizing = new Set();
     marquee = null;
@@ -2488,7 +2568,6 @@
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
   const corePeers = $derived(coreOn && coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
-  const coreRotate = $derived(coreOn && props.onRotate ? selectedBoxes.filter((t) => t.rotatable && !t.rotation).map((t) => ({ id: t.id, box: { x: t.x, y: t.y, w: t.w, h: t.h } })) : []);
   const stackOrder = $derived(placed.map((t) => t.id));
   const viewZoom = $derived(view.zoom);
   const coreOverlay = $derived(
@@ -2504,7 +2583,6 @@
           glyphs: coreType.glyphs,
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
-          rotate: coreRotate,
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
           hovered: hovered && !selected.includes(hovered) && layersSource.hovered?.nodeId !== hovered ? (byId.get(hovered) ?? null) : null,
           running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})),
@@ -2650,6 +2728,7 @@
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
+    stack: () => placeTiles(stackTiles(placedBoxes(selected), STACK_GAP)),
     enter: () => enterSelected(selected, summaries),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
@@ -2670,7 +2749,7 @@
       const s = screenSize();
       view = zoomAt(view, { x: s.width / 2, y: s.height / 2 }, 1 / view.zoom);
     },
-    'zoom-selection': () => selectedBoxes.length && fitTo(selectedBoxes),
+    'zoom-selection': zoomToSelection,
     'zoom-in': () => zoomStep(STEP_ZOOM),
     'zoom-out': () => zoomStep(1 / STEP_ZOOM),
     duplicate: () => selected.length && props.onDuplicate?.(selected),
@@ -2926,6 +3005,7 @@
 
   const SELECTION_RUN: Record<CanvasActionId, (ids: string[]) => void> = {
     'tidy-up': (ids) => placeTiles(tidyTiles(placedBoxes(ids))),
+    stack: (ids) => placeTiles(stackTiles(placedBoxes(ids), STACK_GAP)),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => props.onDuplicate?.(ids),
     'connect-new': () => {
@@ -3178,7 +3258,7 @@
       pickHover = null;
     }}
     class:panning={space}
-    style:cursor={cornerCursor}
+    style:cursor={handleCursor}
     data-owns-pinch
   >
     {#if coreOn}
@@ -3190,10 +3270,10 @@
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
-          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} styled={edit.styled} base={edit.base} clipId={edit.clip} oncommit={stopTyping} />
+          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={shows(frameViews, FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}
@@ -3260,7 +3340,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px;--bar-h:${holdsDoc(t.kind ?? '') && frameChrome(kindOfNode(t.id)).bar ? MOTION_NODE_BAR_H : 0}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} knobDrawn={coreRotate.some((r) => r.id === t.id)} onaddbeside={holdsDoc(t.kind ?? '') && kindOfNode(t.id) === FrameKind.Frame ? props.onAddBeside : undefined} showAdd={on || hovered === t.id || addLinger === t.id} />
+          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onaddbeside={holdsDoc(t.kind ?? '') && kindOfNode(t.id) === FrameKind.Frame ? props.onAddBeside : undefined} showAdd={on || hovered === t.id || addLinger === t.id} />
           {#if !domIds.has(t.id) && holdsDoc(t.kind ?? '')}
             {@const kind = kindOfNode(t.id)}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>

@@ -1,4 +1,5 @@
 import { BlendMode } from '../blend';
+import { toneOf, type Tone } from './adjust';
 import { FillType, ImageFit, PAINTED_AS, PaintedAs, colourAlpha, withAlpha, type Fill, type FillOf, type Stop } from './model';
 
 export type FillPaint = {
@@ -34,10 +35,12 @@ const RESOLVE: {
     ...f,
     stops: resolveStops(f.stops, color)
   }),
-  [FillType.Image]: (f, _color, asset) => ({
-    ...f,
-    src: f.src || asset(f.assetId || null) || (LINK.test(f.assetId) ? f.assetId : '')
-  })
+  [FillType.Image]: (f, _color, asset) =>
+    ({
+      ...f,
+      src: f.src || asset(f.assetId || null) || (LINK.test(f.assetId) ? f.assetId : ''),
+      tone: toneOf(f.adjust)
+    }) as FillOf<FillType.Image>
 };
 
 export const resolveFills = (fills: readonly Fill[], color: FillPaint['color'], asset: FillPaint['asset']): Fill[] => fills.map((f) => (RESOLVE[f.type] as (f: Fill, c: FillPaint['color'], a: FillPaint['asset']) => Fill)(f, color, asset));
@@ -57,6 +60,9 @@ type HtmlFill = {
   fit?: string;
   focus?: Point;
   scale?: number;
+  crop?: { x: number; y: number; w: number; h: number };
+  rotation?: number;
+  tone?: Tone;
 };
 
 export function fillLayersHtml(fills: readonly HtmlFill[]): string {
@@ -72,8 +78,15 @@ export function fillLayersHtml(fills: readonly HtmlFill[]): string {
       .join(',');
   const at = (p: { x: number; y: number }) => r(p.x * PERCENT) + '% ' + r(p.y * PERCENT) + '%';
   const layer = (f: HtmlFill, kind: string, style: string, inner = '') => {
-    const look = (f.opacity < 1 ? ';opacity:' + r(f.opacity) : '') + (f.blend !== 'normal' ? ';mix-blend-mode:' + f.blend : '');
+    const look = (f.opacity < 1 ? ';opacity:' + r(f.opacity) : '') + (f.blend !== 'normal' ? ';mix-blend-mode:' + f.blend : '') + (f.tone ? ';filter:url(#' + f.tone.id + ')' : '');
     return '<div class="fl fl-' + kind + '" style="position:absolute;inset:0' + look + (style ? ';' + style : '') + '">' + inner + '</div>';
+  };
+  const tone = (f: HtmlFill) => {
+    if (!f.tone || !f.src) {
+      return '';
+    }
+    const curve = (tag: string) => '<' + tag + ' type="table" tableValues="' + f.tone!.curve + '"/>';
+    return '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="' + f.tone.id + '" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="' + f.tone.matrix + '"/><feComponentTransfer>' + curve('feFuncR') + curve('feFuncG') + curve('feFuncB') + '</feComponentTransfer></filter></svg>';
   };
   const image = (f: HtmlFill) => {
     if (!f.src) {
@@ -82,7 +95,18 @@ export function fillLayersHtml(fills: readonly HtmlFill[]): string {
     const focus = at(f.focus!);
     const scale = f.scale!;
     if (f.fit === 'tile') {
-      return layer(f, 'tile', 'background-image:url(' + esc('"' + f.src + '"') + ');background-repeat:repeat;background-size:' + r(scale * TILE_SHARE) + '% auto;background-position:' + focus);
+      const sheet = (size: string) => 'background-image:url(' + esc('"' + f.src + '"') + ');background-repeat:repeat;background-size:' + size + ';background-position:' + focus;
+      if (!f.rotation) {
+        return layer(f, 'tile', sheet(r(scale * TILE_SHARE) + '% auto'));
+      }
+      const cover = 'calc(max(100cqw,100cqh) * 1.5)';
+      const turned = 'inset:auto;left:50%;top:50%;width:' + cover + ';height:' + cover + ';transform:translate(-50%,-50%) rotate(' + r(f.rotation) + 'deg)';
+      return layer(f, 'tile', '', '<div class="fl-turn" style="position:absolute;' + turned + ';' + sheet('calc(100cqw * ' + r((scale * TILE_SHARE) / PERCENT) + ') auto') + '"></div>');
+    }
+    if (f.fit === 'crop') {
+      const c = f.crop || { x: 0, y: 0, w: 1, h: 1 };
+      const window = 'position:absolute;left:' + r((-c.x / c.w) * PERCENT) + '%;top:' + r((-c.y / c.h) * PERCENT) + '%;width:' + r(PERCENT / c.w) + '%;height:' + r(PERCENT / c.h) + '%;max-width:none;object-fit:fill';
+      return layer(f, 'image', '', '<img class="fl-image" decoding="sync" draggable="false" src="' + esc(f.src) + '" alt="" style="' + window + '">');
     }
     const zoom = scale === 1 ? '' : ';transform:scale(' + r(scale) + ');transform-origin:' + focus;
     return layer(f, 'image', '', '<img class="fl-image" decoding="sync" draggable="false" src="' + esc(f.src) + '" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:' + f.fit + ';object-position:' + focus + zoom + '">');
@@ -113,7 +137,7 @@ export function fillLayersHtml(fills: readonly HtmlFill[]): string {
       ];
       return layer(f, 'diamond', 'background:' + corners.map(([to, where]) => 'linear-gradient(' + to + ',' + half + ') ' + where + '/50% 50% no-repeat').join(','));
     }
-    return image(f);
+    return tone(f) + image(f);
   };
   return '<div class="fls" style="position:absolute;inset:0;overflow:hidden;container-type:size">' + fills.map(html).join('') + '</div>';
 }
@@ -134,6 +158,7 @@ const IMAGE_SIZE: Record<ImageFit, (scale: number) => string> = {
   [ImageFit.Cover]: () => 'cover',
   [ImageFit.Contain]: () => 'contain',
   [ImageFit.Fill]: () => '100% 100%',
+  [ImageFit.Crop]: () => 'cover',
   [ImageFit.Tile]: (scale) => `${round(scale * TEXT_TILE_SHARE)}% auto`
 };
 

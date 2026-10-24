@@ -23,6 +23,7 @@ import { elementFills } from '../fill/elements';
 import { textPaint } from '../fill/render';
 import { elementStrokes } from '../stroke/elements';
 import { textStroke } from '../stroke/render';
+import { LIST_STEP_EM, MARKER_GAP_EM, markersOf } from '../text-lists';
 import { segmentsOf, type RunCase, type TextRun } from '../text-runs';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
@@ -191,13 +192,28 @@ function runParagraphs(ctx: TemplateCtx<'Text'>): string[] {
 
 const paragraphsOf = (ctx: TemplateCtx<'Text'>): string[] => (!ctx.p.runs?.length || ctx.text.id !== null ? ctx.text.lines(ctx.p.text) : runParagraphs(ctx));
 
+function listMarker(marker: string, level: number): string {
+  const style = css({ position: 'absolute', left: '0', width: `${emOf((level + 1) * LIST_STEP_EM - MARKER_GAP_EM)}em`, textAlign: 'right', textIndent: '0', whiteSpace: 'nowrap' });
+  return `<span style="${style}">${marker}</span>`;
+}
+
+const emOf = (n: number) => Math.round(n * EM_PRECISION) / EM_PRECISION;
+
 function textBody(ctx: TemplateCtx<'Text'>): string {
   const paragraphs = paragraphsOf(ctx);
-  const { paragraphSpacing: spacing, paragraphIndent: indent } = ctx.p;
-  if (!spacing && !indent) {
+  const { paragraphSpacing: spacing, paragraphIndent: indent, lists } = ctx.p;
+  const markers = markersOf(lists ?? []);
+  if (!spacing && !indent && !markers.some(Boolean)) {
     return paragraphs.join('\n');
   }
-  return paragraphs.map((html, i) => `<div style="${css({ textIndent: `${indent}em`, marginBottom: `${i < paragraphs.length - 1 ? spacing : 0}em` })}">${html || EMPTY_LINE}</div>`).join('');
+  return paragraphs
+    .map((html, i) => {
+      const marker = markers[i];
+      const level = lists?.[i]?.level ?? 0;
+      const style = css({ position: marker ? 'relative' : undefined, paddingLeft: marker ? `${emOf((level + 1) * LIST_STEP_EM)}em` : undefined, textIndent: `${indent}em`, marginBottom: `${i < paragraphs.length - 1 ? spacing : 0}em` });
+      return `<div style="${style}">${marker ? listMarker(marker, level) : ''}${html || EMPTY_LINE}</div>`;
+    })
+    .join('');
 }
 
 const Title: Template<'Title'> = {

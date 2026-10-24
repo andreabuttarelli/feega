@@ -66,7 +66,7 @@ const SHAPE_OPS = [BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, Boo
 
 type ShapeOp = (doc: MotionDoc, ids: string[], frame: number) => OpResult;
 
-type SpaceInput = { doc: MotionDoc; ids: string[]; frame: number; by: Pt; mode: EditMode; gap: number | undefined; factor: number | undefined; factorY: number | undefined; degrees: number | undefined };
+type SpaceInput = { doc: MotionDoc; ids: string[]; frame: number; by: Pt; mode: EditMode; factor: number | undefined; factorY: number | undefined; degrees: number | undefined; spacing?: number };
 
 function scaledFromCorner(i: SpaceInput): OpResult {
   if (i.factor === undefined) {
@@ -101,7 +101,7 @@ function aroundJoint(i: SpaceInput, missing: string | undefined, run: (centre: P
 
 const SPACE: Record<(typeof SPACE_OPS)[number], (i: SpaceInput) => OpResult> = {
   ...(Object.fromEntries(EDGES.map((edge) => [`align_${edge}`, (i: SpaceInput) => alignSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), edge, i.mode)])) as Record<`align_${Edge}`, (i: SpaceInput) => OpResult>),
-  ...(Object.fromEntries(AXES.map((axis) => [`distribute_${axis}`, (i: SpaceInput) => distributeSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), axis, i.mode, i.gap)])) as Record<`distribute_${Axis}`, (i: SpaceInput) => OpResult>),
+  ...(Object.fromEntries(AXES.map((axis) => [`distribute_${axis}`, (i: SpaceInput) => distributeSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), axis, i.mode, i.spacing)])) as Record<`distribute_${Axis}`, (i: SpaceInput) => OpResult>),
   tidy: (i) => tidySpace(i.doc, i.ids, i.frame, propBoxes(i.doc), i.mode),
   move: (i) => moveBy(i.doc, i.ids, i.frame, i.by, i.mode),
   scale: scaledFromCorner,
@@ -175,9 +175,13 @@ import { liveLanes } from '$lib/motion/interactive/spec';
 import { fileSnippet } from '$lib/motion/interactive/bundle';
 import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, removeVar, unbindVar, type VarDecl } from '$lib/motion/interactive/vars';
 import { flattenComps } from '$lib/motion/precomp';
-import { clearTextRuns, styleTextRange } from '$lib/motion/text-run-ops';
+import { clearTextRuns, listTextRange, styleTextRange } from '$lib/motion/text-run-ops';
+import { ListChange } from '$lib/motion/text-lists';
 import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, pushOverrides, resetOverride, resetOverrides } from '$lib/motion/main-component';
 import { addVariant, pickVariant, swapInstance } from '$lib/motion/variants';
+import { defineProperty, removeProperty, resetProperty, setProperty } from '$lib/motion/component-properties';
+import { propertyDefSchema } from '$lib/motion/doc';
+import type { PropertyDef } from '$lib/motion/property-resolve';
 import { placeInstance } from '$lib/motion/canvas-components';
 import { runEditSchema, type RunEdit } from '$lib/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
@@ -443,6 +447,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         mutedLanes: c.mutedLanes ?? [],
         locked: c.locked ?? false,
         bleed: c.bleed ?? false,
+        lockRatio: c.lockRatio ?? false,
         clipContent: c.clipContent ?? false,
         markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
         physics: c.physics ? shownRecord(c.component, c.physics, doc) : null,
@@ -1000,14 +1005,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     text_style: tool({
-      description: 'Rich text: style characters start..end (end exclusive) of a Text clip only. style takes color (#rrggbb, brand.*) or fill (a gradient: type linear-gradient|radial-gradient|angular-gradient|diamond-gradient, stops [{color,pos 0..1}] of 2 to 8, angle in degrees for linear and angular, center {x,y} and radius for radial, center for angular; it spans the glyph bounds of the range itself; setting one of color and fill drops the other), weight, italic, font (register_font first), size (share of the frame like props.size), tracking (em), leading, underline, strike, textCase, opacity, link (http, https or mailto address; clickable in exports and embeds, underlined, not clickable on the canvas); null drops that field for the range. clear: true drops every range.',
-      inputSchema: z.object({ clip_id: z.string(), start: z.number().int().min(0).optional(), end: z.number().int().min(1).optional(), style: runEditSchema.optional(), clear: z.boolean().optional() }),
+      description: 'Rich text: style characters start..end (end exclusive) of a Text clip only. style takes color (#rrggbb, brand.*) or fill (a gradient: type linear-gradient|radial-gradient|angular-gradient|diamond-gradient, stops [{color,pos 0..1}] of 2 to 8, angle in degrees for linear and angular, center {x,y} and radius for radial, center for angular; it spans the glyph bounds of the range itself; setting one of color and fill drops the other), weight, italic, font (register_font first), size (share of the frame like props.size), tracking (em), leading, underline, strike, textCase, opacity, link (http, https or mailto address; clickable in exports and embeds, underlined, not clickable on the canvas); null drops that field for the range. list sets the paragraphs the range touches (a paragraph is one line of text, split by newlines): bullet or number makes them that list (the same kind on a list that already is one removes it; none removes any list), nest and lift move an item one level in or out; a list item is indented one step with its marker hanging in the gutter. clear: true drops every range.',
+      inputSchema: z.object({ clip_id: z.string(), start: z.number().int().min(0).optional(), end: z.number().int().min(1).optional(), style: runEditSchema.optional(), list: z.enum(ListChange).optional(), clear: z.boolean().optional() }),
       execute: async (input) => {
         if (input.clear) {
           return apply(clearTextRuns(session.doc, input.clip_id), `cleared styled ranges of ${input.clip_id}`);
         }
+        if (input.list && input.start !== undefined && input.end !== undefined) {
+          return apply(listTextRange(session.doc, input.clip_id, { start: input.start, end: input.end }, input.list), `${input.list} on ${input.clip_id} ${input.start}..${input.end}`);
+        }
         if (input.start === undefined || input.end === undefined || !input.style) {
-          return { ok: false, error: 'start, end and style are required unless clear is true' };
+          return { ok: false, error: 'start, end and style (or list) are required unless clear is true' };
         }
         return apply(styleTextRange(session.doc, input.clip_id, { start: input.start, end: input.end }, input.style as RunEdit), `styled ${input.clip_id} ${input.start}..${input.end}`);
       }
@@ -1062,10 +1070,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_visibility: tool({
-      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it. clip_content true on a clip crops its children (set_parent) to its box at rest, like a frame in a design tool.',
-      inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional(), bleed: z.boolean().optional(), clip_content: z.boolean().optional() }),
+      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it. clip_content true on a clip crops its children (set_parent) to its box at rest, like a frame in a design tool. lock_ratio true on a clip keeps its width:height ratio when set_props changes one of them, like the aspect lock.',
+      inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional(), bleed: z.boolean().optional(), clip_content: z.boolean().optional(), lock_ratio: z.boolean().optional() }),
       execute: async (input) => {
-        const flags = { ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }), ...(input.bleed === undefined || !input.clip_id ? {} : { bleed: input.bleed }), ...(input.clip_content === undefined || !input.clip_id ? {} : { clipContent: input.clip_content }) };
+        const flags = { ...(input.lock_ratio === undefined || !input.clip_id ? {} : { lockRatio: input.lock_ratio }), ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }), ...(input.bleed === undefined || !input.clip_id ? {} : { bleed: input.bleed }), ...(input.clip_content === undefined || !input.clip_id ? {} : { clipContent: input.clip_content }) };
         const result = input.clip_id ? setClipFlags(session.doc, input.clip_id, flags) : input.track_id ? setTrackFlags(session.doc, input.track_id, flags) : { ok: false as const, error: 'give a track_id or a clip_id' };
         return apply(result, 'changed visibility');
       }
@@ -1084,10 +1092,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     arrange_space: tool({
-      description: `Arrange clips in the frame, like a design tool: align_left/center/right/top/middle/bottom lines up several clips on the edge of their joint box (one clip aligns to the frame); distribute_x/distribute_y spreads 3+ clips so the gaps between them are equal (gap px sets every gap to that value, first clip fixed, 2+ clips: the smart-selection spacing field); tidy lays a row or column out with its most common gap, or a grid from its top-left corner (Tidy up); move shifts them by dx/dy px; scale (Scale tool) multiplies size, text size and stroke weight by factor from the top-left of their joint box; scale_group (factor, optional factor_y for a different vertical factor) and rotate_group (degrees) transform the clips together around the centre of their joint box, like dragging the selection handles. at (seconds, default 0) is the moment measured. mode design (default) moves animated positions whole, every keyframe; motion keys the change at that moment. Locked clips are refused.`,
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(SPACE_OPS), dx: z.number().optional(), dy: z.number().optional(), factor: z.number().positive().optional(), degrees: z.number().optional(), gap: z.number().optional(), factor_y: z.number().positive().optional(), at: z.number().min(0).optional(), mode: z.enum(EditMode).optional() }),
+      description: `Arrange clips in the frame, like a design tool: align_left/center/right/top/middle/bottom lines up several clips on the edge of their joint box (one clip aligns to the frame); distribute_x/distribute_y spreads 3+ clips so the gaps between them are equal, or with spacing (px) puts exactly that gap between each (2+ clips, the first stays); tidy lays a row or column out with its most common gap, or a grid from its top-left corner (Tidy up); move shifts them by dx/dy px; scale (Scale tool) multiplies size, text size and stroke weight by factor from the top-left of their joint box; scale_group (factor, optional factor_y for a different vertical factor) and rotate_group (degrees) transform the clips together around the centre of their joint box, like dragging the selection handles. at (seconds, default 0) is the moment measured. mode design (default) moves animated positions whole, every keyframe; motion keys the change at that moment. Locked clips are refused.`,
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(SPACE_OPS), dx: z.number().optional(), dy: z.number().optional(), factor: z.number().positive().optional(), degrees: z.number().optional(), factor_y: z.number().positive().optional(), spacing: z.number().optional(), at: z.number().min(0).optional(), mode: z.enum(EditMode).optional() }),
       execute: async (input) =>
-        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [input.dx ?? 0, input.dy ?? 0], mode: input.mode ?? EditMode.Design, factor: input.factor, factorY: input.factor_y, degrees: input.degrees, gap: input.gap }), `${input.op} ${input.clip_ids.length} clip(s)`)
+        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [input.dx ?? 0, input.dy ?? 0], mode: input.mode ?? EditMode.Design, factor: input.factor, factorY: input.factor_y, degrees: input.degrees, spacing: input.spacing }), `${input.op} ${input.clip_ids.length} clip(s)`)
     }),
 
     remove_clip: tool({
@@ -1717,7 +1725,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_auto_layout: tool({
-      description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell; columnTracks/rowTracks [{type fixed|flex|hug, value}] size each column/row: fixed px, flex fr share of the free space, hug its content; empty columnTracks = columns equal flex columns, empty rowTracks = hug rows; flex is refused on an axis where the grid hugs; autoFlow row|column fills rows or columns first), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, negative overlaps the children, padding {top,right,bottom,left} px, justify start|center|end|space-between|space-around|space-evenly on the main axis, align start|center|end|baseline on the cross axis (baseline: horizontal rows line up text baselines, a box sits on its bottom edge), order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent and the boxes the layout gave them).',
+      description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell; columnTracks/rowTracks [{type fixed|flex|hug, value}] size each column/row: fixed px, flex fr share of the free space, hug its content; empty columnTracks = columns equal flex columns, empty rowTracks = hug rows; flex is refused on an axis where the grid hugs; autoFlow row|column fills rows or columns first), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, negative overlaps the children, padding {top,right,bottom,left} px, justify start|center|end|space-between|space-around|space-evenly on the main axis, align start|center|end|baseline on the cross axis (baseline: horizontal rows line up text baselines, a box sits on its bottom edge), order (child ids, first to last), alignContent auto|space-between (wrap: space-between spreads the lines over the container height, needs a fixed cross size), firstOnTop true draws the first child of the order above the others (visual only, default false keeps the track order), strokesIncluded true (default) counts the inside strokes of the container as padding so children sit inside them. Only the fields given change. off true removes the auto layout (children keep their parent and the boxes the layout gave them).',
       inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
       execute: async ({ clip_id, off, ...patch }) => apply(off ? removeAutoLayout(session.doc, clip_id) : setAutoLayout(session.doc, clip_id, patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
     }),
@@ -2331,7 +2339,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_canvas: tool({
-      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to ${MAX_SHORT_SIDE}; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor. layout_guides replaces the frame's layout guides (columns/rows: count, gutter, margin px; grid: size px; [] removes them): drawn over the frame in the editor, never in the export, and layers snap to their edges.`,
+      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to ${MAX_SHORT_SIDE}; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor. layout_guides replaces the frame's layout guides (columns/rows: count a number or "auto" (as many sections of size px as fit), gutter px, align stretch|min|max|center (stretch fills the frame between margin px; the others draw sections of size px from the start/end by offset px, or centred), color #rrggbb (default red) and opacity 0..1 (default 0.1); grid: size px; hidden true keeps the guide snapping without drawing it; [] removes them): drawn over the frame in the editor, never in the export, and layers snap to their edges.`,
       inputSchema: z.object({
         format: z.enum(MOTION_FORMATS).optional(),
         preset: z.enum(FRAME_PRESETS).optional().describe('a device, paper or social size: phone, tablet, desktop, presentation, watch, paper, social; layers pinned with constraints keep their edge distance'),
@@ -2799,8 +2807,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     component: tool({
-      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value).',
-      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.string().optional() }),
+      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop).',
+      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.union([z.string(), z.boolean()]).optional(), property: propertyDefSchema.optional() }),
       execute: async (input) => {
         const ids: string[] = [];
         const newId = () => {
@@ -2818,7 +2826,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           [ComponentAction.Reset]: () => resetOverrides(session.doc, id),
           [ComponentAction.Detach]: () => detachInstance(session.doc, id, newId),
           [ComponentAction.AddVariant]: () => addVariant(session.doc, input.comp ?? '', input.variant ?? {}, newId),
-          [ComponentAction.Swap]: () => (input.comp ? swapInstance(session.doc, id, input.comp) : pickVariant(session.doc, id, input.prop ?? '', input.value ?? ''))
+          [ComponentAction.Swap]: () => (input.comp ? swapInstance(session.doc, id, input.comp) : pickVariant(session.doc, id, input.prop ?? '', String(input.value ?? ''))),
+          [ComponentAction.DefineProp]: () => (input.property ? defineProperty(session.doc, input.comp ?? '', input.prop ?? '', input.property as PropertyDef) : { ok: false, error: 'define-prop needs property' }),
+          [ComponentAction.RemoveProp]: () => removeProperty(session.doc, input.comp ?? '', input.prop ?? ''),
+          [ComponentAction.SetProp]: () => (input.value === undefined ? { ok: false, error: 'set-prop needs value' } : setProperty(session.doc, id, input.prop ?? '', input.value)),
+          [ComponentAction.ResetPropValue]: () => resetProperty(session.doc, id, input.prop ?? '')
         };
         const out = apply(run[input.action](), `component ${input.action}`);
         if (out.ok && input.action === ComponentAction.Place) {

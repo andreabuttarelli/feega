@@ -2,6 +2,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
 
 const SHOTS = process.env.CANVAS_MOTION_SHOTS;
+const OUTSIDE_PX = 10;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const blank = { version: 5, fps: 30, width: 1920, height: 1080, durationInFrames: 150, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [] }], comps: {}, assets: [] };
 const sheet = { ...blank, width: 200, height: 200, background: 'transparent', still: { frame: 0 }, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 's', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 } }] }] };
@@ -36,13 +37,12 @@ test.describe('groups that hold frames, and turn @real', () => {
 
     await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
     await page.locator(`.svelte-flow__node[data-id="${groupId}"]`).click({ position: { x: 4, y: 4 } });
-    const handle = page.getByTestId('rotate-handle');
-    await expect(handle).toBeVisible();
     const tile = (await page.locator(`.svelte-flow__node[data-id="${groupId}"]`).boundingBox())!;
-    const from = (await handle.boundingBox())!;
-    await page.mouse.move(from.x + 6, from.y + 6);
+    const middle = { x: tile.x + tile.width / 2, y: tile.y + tile.height / 2 };
+    const from = { x: tile.x + tile.width + OUTSIDE_PX, y: tile.y - OUTSIDE_PX };
+    await page.mouse.move(from.x, from.y);
     await page.mouse.down();
-    await page.mouse.move(tile.x + tile.width + 80, from.y + 6 + (tile.y + tile.height / 2 - from.y - 6), { steps: 10 });
+    await page.mouse.move(middle.x - (from.y - middle.y), middle.y + (from.x - middle.x), { steps: 10 });
     await page.mouse.up();
     await expect.poll(async () => Math.round(Number((await rowOf(groupId)).data.rotation)), { timeout: 10_000 }).toBe(90);
     const angle = Number((await rowOf(groupId)).data.rotation);

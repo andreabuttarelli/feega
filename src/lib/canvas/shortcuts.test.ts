@@ -23,6 +23,12 @@ describe('frame view shortcuts', () => {
     expect(matchCanvasShortcut({ key: 'G', shiftKey: true, metaKey: false, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Guides });
     expect(matchCanvasShortcut({ key: 'y', shiftKey: false, metaKey: true, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Outlines });
   });
+
+  it('Alt R shows the rotation origin', () => {
+    const at = { tagName: 'DIV', isContentEditable: false };
+
+    expect(matchCanvasShortcut({ key: '®', code: 'KeyR', shiftKey: false, metaKey: false, ctrlKey: false, altKey: true, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Pivot });
+  });
 });
 
 /** Un evento tastiera finto: bastano i campi che il registro guarda. */
@@ -297,6 +303,11 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('ß', { altKey: true, code: 'KeyS' }))).toEqual({ id: 'align', edge: Edge.Bottom });
     expect(matchCanvasShortcut(ev('†', { altKey: true, ctrlKey: true, code: 'KeyT' }))).toEqual({ id: 'tidy' });
     expect(matchCanvasShortcut(ev('π', { altKey: true, code: 'KeyP' }))).toBeNull();
+  });
+
+  it('⇧A stacks the selected tiles', () => {
+    expect(matchCanvasShortcut(ev('A', { shiftKey: true }))).toEqual({ id: 'stack' });
+    expect(matchCanvasShortcut(ev('a'))).toBeNull();
   });
 
   it('zoom keys by physical digit: ⇧0 is 100%, ⇧1 fits everything, ⇧2 zooms to the selection', () => {

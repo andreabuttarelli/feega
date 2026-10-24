@@ -75,6 +75,7 @@ import ChevronsDown from '@lucide/svelte/icons/chevrons-down';
 import Maximize2 from '@lucide/svelte/icons/maximize-2';
 import RotateCw from '@lucide/svelte/icons/rotate-cw';
 import Blend from '@lucide/svelte/icons/blend';
+import Crosshair from '@lucide/svelte/icons/crosshair';
 import Diamond from '@lucide/svelte/icons/diamond';
 import ZoomIn from '@lucide/svelte/icons/zoom-in';
 import ZoomOut from '@lucide/svelte/icons/zoom-out';
@@ -156,7 +157,9 @@ export enum Tool {
   ParentTo = 'parent-to',
   SelectSeveral = 'select-several',
   ClipProperties = 'clip-properties',
-  SampleColour = 'sample-colour'
+  SampleColour = 'sample-colour',
+  LockRatio = 'lock-ratio',
+  UnlockRatio = 'unlock-ratio'
 }
 
 export const Action = { ...Command, ...Tool } as const;
@@ -268,6 +271,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToggleHidden]: { name: 'Hide / show', icon: EyeOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToggleLocked]: { name: 'Lock / unlock', icon: Lock, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.CopyProperties]: { name: 'Copy properties', icon: ClipboardCopy, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.PasteOver]: { name: 'Paste over selection', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.PasteReplace]: { name: 'Paste to replace', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.PasteProperties]: { name: 'Paste properties', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.CreateComponent]: { name: 'Create component', icon: ComponentIcon, group: GuideGroup.Edit, menu: MenuSection.Layer },
@@ -321,6 +325,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Tool.ShowLayer]: { name: 'Show layer', icon: EyeOff, place: Place.Layer },
   [Tool.LockLayer]: { name: 'Lock layer', icon: LockOpen, group: GuideGroup.Timeline, place: Place.Layer },
   [Tool.UnlockLayer]: { name: 'Unlock layer', icon: Lock, place: Place.Layer },
+  [Tool.LockRatio]: { name: 'Lock aspect ratio', icon: LockOpen, group: GuideGroup.Edit },
+  [Tool.UnlockRatio]: { name: 'Unlock aspect ratio', icon: Lock },
   [Command.ToolSelect]: { name: 'Select tool', icon: MousePointer2, group: GuideGroup.Edit, place: Place.Draw },
   [Command.ToolText]: { name: 'Text tool', icon: TypeIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
   [Command.ToolRectangle]: { name: 'Rectangle tool', icon: SquareIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
@@ -341,6 +347,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.PreviewActual]: { name: 'Preview at 100%', icon: SquareDashed, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.TogglePixelGrid]: { name: 'Pixel grid', icon: Grid3x3, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleLayoutGuides]: { name: 'Layout guides', icon: LayoutGrid, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.TogglePivot]: { name: 'Rotation origin', icon: Crosshair, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleOutlines]: { name: 'Outline view', icon: VectorSquare, group: GuideGroup.View, menu: MenuSection.View },
   [Command.PreviewSelection]: { name: 'Zoom to selection', icon: Scan, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleInspector]: { name: 'Properties panel', icon: PanelRight, group: GuideGroup.View, place: Place.Bar },

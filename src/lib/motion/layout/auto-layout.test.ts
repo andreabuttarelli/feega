@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Align, AutoFlow, Direction, Justify, Sizing, TrackType, layoutTree, measure, type Flow, type Item } from './auto-layout';
+import { Align, AlignContent, AutoFlow, Direction, Justify, Sizing, TrackType, layoutTree, measure, type Flow, type Item } from './auto-layout';
 
 const flow = (over: Partial<Flow> = {}): Flow => ({
   direction: Direction.Horizontal,
@@ -182,6 +182,23 @@ describe('wrap', () => {
     const out = layoutTree(box('c', 100, 200, [leaf('a', 40, 10), leaf('b', 40, 30), leaf('c', 40, 10)], { wrap: true, gap: 10, align: Align.End }));
     expect(out.get('a')!.top).toBe(20);
     expect(out.get('c')!.top).toBe(30);
+  });
+
+  it('space-between spreads the lines over the height of the container', () => {
+    const out = layoutTree(box('c', 100, 200, tiles, { wrap: true, gap: 10, crossGap: 5, alignContent: AlignContent.SpaceBetween }));
+    expect(out.get('a')!.top).toBe(0);
+    expect(out.get('c')!.top).toBe(90);
+    expect(out.get('e')!.top).toBe(180);
+  });
+
+  it('space-between keeps the gap when the lines already fill the height', () => {
+    const out = layoutTree(box('c', 100, 40, tiles, { wrap: true, gap: 10, crossGap: 5, alignContent: AlignContent.SpaceBetween }));
+    expect(out.get('c')!.top).toBe(25);
+  });
+
+  it('a single line stays at the start', () => {
+    const out = layoutTree(box('c', 200, 200, tiles.slice(0, 2), { wrap: true, alignContent: AlignContent.SpaceBetween }));
+    expect(out.get('a')!.top).toBe(0);
   });
 
   it('a child longer than the line still gets a line of its own', () => {

@@ -35,6 +35,8 @@ const placed = (props: Record<string, unknown>): props is Record<string, unknown
 
 type Axis = 'x' | 'y';
 
+const clampUnit = (v: number): number => Math.min(1, Math.max(0, v));
+
 const keepsPixels = (rule: Rule): boolean => rule !== scale;
 
 function offsetKept(clip: MotionClip, axis: Axis, ratio: number): MotionClip {
@@ -56,7 +58,9 @@ function constrained(clip: MotionClip, from: CanvasSize, to: CanvasSize): Motion
   const down = VERTICAL[clip.constraints.vertical];
   const wide = across({ start: (p.x - p.width / 2) * from.width, length: p.width * from.width }, from.width, to.width);
   const high = down({ start: (p.y - p.height / 2) * from.height, length: p.height * from.height }, from.height, to.height);
-  const moved = { ...clip, props: { ...p, x: (wide.start + wide.length / 2) / to.width, y: (high.start + high.length / 2) / to.height, width: wide.length / to.width, height: high.length / to.height } };
+  const width = Math.min(1, wide.length / to.width);
+  const height = Math.min(1, high.length / to.height);
+  const moved = { ...clip, props: { ...p, x: clampUnit((wide.start + wide.length / 2) / to.width), y: clampUnit((high.start + high.length / 2) / to.height), width, height } };
   const horizontally = keepsPixels(across) ? offsetKept(moved, 'x', from.width / to.width) : moved;
   return keepsPixels(down) ? offsetKept(horizontally, 'y', from.height / to.height) : horizontally;
 }
