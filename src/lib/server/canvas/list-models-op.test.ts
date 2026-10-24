@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { fakeDb } from '$lib/server/db/fake-db';
 import type { ModelChoice } from '$lib/canvas/gen-node';
 import { ProjectMode } from '$lib/project-mode';
 
@@ -20,7 +21,7 @@ vi.mock('$lib/server/uncensored-access', () => ({
 }));
 
 const { CANVAS_OPS } = await import('./canvas-ops');
-const ctx = { db: {}, orgId: 'o', projectId: 'p', userId: 'u' } as never;
+const ctx = { db: fakeDb({}).db, orgId: 'o', projectId: 'p', userId: 'u' } as never;
 
 describe('list_models — the catalogue the picker shows, for the chat and MCP', () => {
   it('lists provider, credits and the cheaper route, and hides uncensored models in a standard project', async () => {

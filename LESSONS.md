@@ -3288,3 +3288,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## An e2e that finds no row after a node-shape change
 
 Signal: a `@real` spec polls `nodes` and never finds the row it just made, right after a PR changed how that node is stored (type, `data` keys). Move: check the spec's filter against the current row shape before suspecting data loss — #1212 moved free elements from `data.kind` to `type` and seven specs kept reading `data.kind`. Grep `tests/e2e` for the old shape in the same PR that changes it.
+
+## A skill doc edited in one place and red in CI
+
+**Signal:** `plugin skill mirror` fails in CI after a new tool or CLI command, or a long-running dev server does not show your new page action or tab. **Cause:** `cli/skills/feega` is mirrored byte for byte in `cli/plugins/feega/skills/feega`, and a vite dev server keeps serving the modules it loaded before a branch switch. **Move:** copy the edited skill files to the plugin dir in the same commit; restart your own dev server after switching branches.

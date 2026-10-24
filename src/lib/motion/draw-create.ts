@@ -1,5 +1,5 @@
 import { COMPONENTS, TYPE_SIZE, type ComponentId } from './components';
-import { TextSizing } from './text-sizing';
+import { NEW_TEXT_SIZING, TextSizing } from './text-sizing';
 import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { DrawTool, type DragPoint, type DrawBox } from './draw-tool';
 import { corner, mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
@@ -61,7 +61,7 @@ const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox, sizing: TextSizi
   [DrawTool.Frame]: () => ({})
 };
 
-export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = TextSizing.AutoHeight, extra: Record<string, unknown> = {}): OpResult {
+export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = NEW_TEXT_SIZING, extra: Record<string, unknown> = {}): OpResult {
   const made = BOX_CLIP[tool as BoxTool];
   if (!made) {
     return fail(`${tool} does not draw a box`);

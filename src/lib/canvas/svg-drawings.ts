@@ -2,7 +2,7 @@ import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { mapOutline, parsePath, pathData } from '$lib/motion/shape/geometry';
 import { svgShapes } from '$lib/motion/shape/svg-import';
-import { TextSizing } from '$lib/motion/text-sizing';
+import { NEW_TEXT_SIZING } from '$lib/motion/text-sizing';
 import { MAX_PASTED_SHAPES, MAX_PASTED_TEXTS, svgTextBox } from '$lib/canvas/frame-paste';
 
 type Point = { x: number; y: number };
@@ -37,7 +37,7 @@ export function svgDrawings(svg: string, at: Point): SvgDrawing[] {
   const texts = read.texts.slice(0, MAX_PASTED_TEXTS).map((text): SvgDrawing => {
     const box = svgTextBox(text);
     const placed = { ...box, left: box.left + dx, top: box.top + dy };
-    return { wire: { tool: DrawTool.Text, box: placed, text: text.text, sizing: TextSizing.AutoWidth, color: text.fill, weight: text.weight }, box: placed };
+    return { wire: { tool: DrawTool.Text, box: placed, text: text.text, sizing: NEW_TEXT_SIZING, color: text.fill, weight: text.weight }, box: placed };
   });
   return [...pens, ...texts];
 }

@@ -1,4 +1,5 @@
 import type { Db } from '$lib/server/db/client';
+import { allowlistRefusal } from '$lib/server/model-allowlist/allowlist';
 import { RENDER_DEADLINE_MS } from '$lib/server/motion/farm-render';
 import { BROWSER_RENDER_DEADLINE_MS } from '$lib/motion/render-link';
 import { releaseHold } from '$lib/server/motion/render-run';
@@ -551,6 +552,11 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     return { kind: 'refused', error: pick.error };
   }
   const input: StartRun = { ...requested, model: pick.model };
+
+  const notAllowed = await allowlistRefusal(db, { orgId: input.orgId, medium: input.medium, model: input.model });
+  if (notAllowed) {
+    return { kind: 'refused', error: notAllowed };
+  }
 
   const refusal = await generationRefusal(db, { orgId: input.orgId, projectId: input.projectId, userId: input.userId, model: input.model });
   if (refusal) {

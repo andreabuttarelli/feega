@@ -390,3 +390,4 @@ permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publisha
 | `team_op` `invite_link` / `disable_invite_link` | `feega team link` / `link-off` |
 | `team_op` `set_role` / `remove_member` | `feega team role <userId> <role>` / `remove <userId>` |
 | `team_op` `leave` / `transfer_ownership` | `feega team leave` / `transfer <userId>` |
+| `model_allowlist` | `feega allowlist [set <medium> [ids...]]` |

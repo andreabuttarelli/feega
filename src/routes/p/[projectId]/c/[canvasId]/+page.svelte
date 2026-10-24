@@ -135,7 +135,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { DrawTool } from '$lib/motion/draw-tool';
-  import { TextSizing } from '$lib/motion/text-sizing';
+  import { NEW_TEXT_SIZING } from '$lib/motion/text-sizing';
   import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
@@ -194,6 +194,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
   import { reloadTechniques, techniquesOf } from '$lib/canvas/techniques.svelte';
+  import { promptSkillsOf, saveSkill } from '$lib/canvas/prompt-skills.svelte';
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
@@ -253,6 +254,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let { data } = $props();
   const techniqueShelf = techniquesOf(untrack(() => data.projectId));
+  const skillShelf = promptSkillsOf(untrack(() => data.projectId));
 
   function announceWelcome() {
     const campaign = campaignOf(page.url.searchParams.get(WELCOME_PARAM));
@@ -3353,7 +3355,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const longest = Math.min(TEXT_BOX.maxChars, Math.max(...text.split('\n').map((line) => line.length)));
     const width = longest * TEXT_BOX.lineHeight * TEXT_BOX.charWidth;
     const height = TEXT_BOX.lineHeight;
-    void drawElement({ tool: DrawTool.Text, box: { left: at.x - width / 2, top: at.y - height / 2, width, height }, text, sizing: TextSizing.AutoWidth });
+    void drawElement({ tool: DrawTool.Text, box: { left: at.x - width / 2, top: at.y - height / 2, width, height }, text, sizing: NEW_TEXT_SIZING });
   }
 
   const PASTE_DATA: { [K in Pasted]: (data: Extract<PasteData<File>, { kind: K }>, at: { x: number; y: number }) => void } = {
@@ -3874,6 +3876,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onshow={(runId) => restore(id, gen, runId)}
             onmeasure={(contentHeight) => (grownHeights[id] = contentHeight)}
             example={exampleFor(row)}
+            skills={skillShelf.list}
+            onsaveskill={(name, body) => saveSkill(data.projectId, name, body)}
           >
             {#snippet result({ refId, text })}
               <!-- `/c/<tela>/assets/<id>` firma lo storage al volo: un URL firmato messo qui
