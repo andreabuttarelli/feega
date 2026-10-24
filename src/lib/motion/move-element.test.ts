@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, setKeyframes, setTransform } from './timeline';
 import { Ease } from './design';
 import { DocMode, docMode, setStill } from './still';
-import { copyElements, frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, pasteElements, placeElement, replaceElements, OutputKind } from './move-element';
+import { copyElements, frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, pasteElements, placeElement, pasteOverElements, replaceElements, OutputKind } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const VIDEO_ID = '99999999-2222-4333-8444-555555555555';
@@ -288,5 +288,18 @@ describe('copy and paste of a multi-selection', () => {
     expect(findClip(replaced.doc, 'b')).toBeNull();
     expect(replaced.ids.map((id) => findClip(replaced.doc, id)!.clip.props)).toMatchObject([{ shape: 'ellipse', x: 0.2, y: 0.5 }, { shape: 'ellipse', x: 0.7, y: 0.5 }]);
     expect(replaceElements(doc, ['a'], [], ids()).ok).toBe(false);
+  });
+
+  it('paste over centres the copy on the selection and keeps the selection', () => {
+    let doc = two();
+    doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'ellipse', x: 0.5, y: 0.3, width: 0.05, height: 0.05 } }, 'dot'));
+    const over = pasteOverElements(doc, ['a'], copyElements(doc, ['dot']), ids());
+    if (!over.ok) throw new Error(over.error);
+
+    expect(findClip(over.doc, 'a')).not.toBeNull();
+    const props = findClip(over.doc, over.ids[0])!.clip.props;
+    expect([props.shape, props.x, props.y]).toEqual(['ellipse', expect.closeTo(0.2), expect.closeTo(0.5)]);
+    expect(pasteOverElements(doc, ['a'], [], ids()).ok).toBe(false);
+    expect(pasteOverElements(doc, [], copyElements(doc, ['dot']), ids()).ok).toBe(false);
   });
 });

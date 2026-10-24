@@ -268,6 +268,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToggleHidden]: { name: 'Hide / show', icon: EyeOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToggleLocked]: { name: 'Lock / unlock', icon: Lock, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.CopyProperties]: { name: 'Copy properties', icon: ClipboardCopy, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.PasteOver]: { name: 'Paste over selection', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.PasteReplace]: { name: 'Paste to replace', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.PasteProperties]: { name: 'Paste properties', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.CreateComponent]: { name: 'Create component', icon: ComponentIcon, group: GuideGroup.Edit, menu: MenuSection.Layer },
