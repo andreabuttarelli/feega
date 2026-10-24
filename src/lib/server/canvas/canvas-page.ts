@@ -44,7 +44,7 @@ const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number
   voice_not_yours: 403,
   cloning_not_in_this_project: 403
 };
-import { runGenNode, runsOf } from '$lib/server/canvas/generate';
+import { cancelNodeRun, runGenNode, runsOf } from '$lib/server/canvas/generate';
 import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
@@ -689,6 +689,18 @@ export const actions: Actions<CanvasParams> = {
     }
 
     return await cancelLoop(scope.db, { orgId: scope.orgId, nodeId });
+  },
+
+  cancel_run: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+
+    const nodeId = String(fd.get('node_id') ?? '');
+    if (!nodeId) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    return await cancelNodeRun(scope.db, { orgId: scope.orgId, nodeId });
   },
 
   /**

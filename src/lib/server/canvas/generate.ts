@@ -1350,6 +1350,26 @@ const EXPIRE_SWEEP_LIMIT = 2000;
  * Il nodo torna a `running: false` con l'errore scritto: senza, la riga in `node_runs` direbbe la
  * verità e lo schermo continuerebbe a mentire — esattamente il difetto segnalato.
  */
+export const RUN_CANCELLED = 'cancelled';
+
+export async function cancelNodeRun(db: Db, scope: { orgId: string; nodeId: string; actor?: Actor }): Promise<{ cancelled: number }> {
+  const mine = (await listNodeRuns(db, scope)).filter((run) => run.status === 'running' && !isQueuedLoopTicket(run));
+  const node = mine.length ? await findNode(db, scope).catch(() => null) : null;
+
+  let cancelled = 0;
+  for (const run of mine) {
+    const claimed = await claimRun(db, { orgId: run.orgId, runId: run.id });
+    if (!claimed) continue;
+
+    await failRun(db, { orgId: run.orgId, runId: run.id, error: RUN_CANCELLED });
+    await ON_EXPIRE[jobKindOf(run, node?.type ?? null)]?.(run);
+    await showRunState(db, scope, { running: false, runId: run.id, error: null });
+    cancelled += 1;
+  }
+
+  return { cancelled };
+}
+
 export async function expireStuckRuns(db: Db): Promise<ExpireOutcome> {
   const now = Date.now();
   const running = (await runningRuns(db, { limit: EXPIRE_SWEEP_LIMIT })).filter((run) => !isQueuedLoopTicket(run));
