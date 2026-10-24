@@ -71,6 +71,8 @@ export function registerOrgDataTools(server: McpServer) {
           .optional(),
         embed: z.array(z.object({ table: z.string(), columns: z.array(z.string()).optional() })).optional(),
         offset: z.number().int().min(0).optional(),
+        cursor: z.string().optional().describe('`next_cursor` of the previous page.'),
+        verbose: z.boolean().optional().describe('Long values whole, bigger page.'),
         count: z.enum(['estimated', 'exact']).optional(),
         limit: z.number().int().positive().optional()
       }),
@@ -92,7 +94,7 @@ export function registerOrgDataTools(server: McpServer) {
         'rejection names the exact field. On `nodes_connections`, an edge into a node whose model is ' +
         'uncensored is refused — those nodes take no input of any kind. Others are deliberately ' +
         'free-form. Free.',
-      inputSchema: z.object({ org, table: z.string(), values: z.record(z.string(), z.unknown()) }),
+      inputSchema: z.object({ org, table: z.string(), values: z.record(z.string(), z.unknown()), verbose: z.boolean().optional().describe('Whole row back, not id and changed fields.') }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
     async ({ org, ...input }) => withAuth((token) => call(token, 'POST', '/api/v1/org/rows', org, input))
@@ -148,7 +150,8 @@ export function registerOrgDataTools(server: McpServer) {
             negate: z.boolean().optional()
           })
         ),
-        values: z.record(z.string(), z.unknown())
+        values: z.record(z.string(), z.unknown()),
+        verbose: z.boolean().optional().describe('Whole rows back, not ids and changed fields.')
       }),
       annotations: { readOnlyHint: false, destructiveHint: true }
     },

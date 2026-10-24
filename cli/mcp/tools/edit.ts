@@ -59,7 +59,7 @@ export function registerEditTools(server: McpServer, surface: ToolSurface) {
         'In a frame: element ids come from `view` canvas_summary/get; move or restyle with set_props/set_transform; `version` refuses a stale write. Free canvas element or node: move_node, resize_node, rename_node, update_node, delete_node. Between frames: move_frame_element. ' +
         'Names shared by two registries: the canvas op keeps the name, the frame tool becomes `frame_<name>`, the editor action `editor_<name>` (e.g. list_templates = canvas, frame_list_templates). ' +
         'Spending ops (run_node, generate_voiceover...) are marked access "spend" in describe and need credits. Errors answer the reason, with `fix` when known.',
-      inputSchema: z.object({ org, project_id: z.string().optional(), ops: z.array(step).max(500).optional() }).extend(step.shape).partial({ op: true }),
+      inputSchema: z.object({ org, project_id: z.string().optional(), verbose: z.boolean().optional().describe('Whole documents back, not ids and changed fields.'), ops: z.array(step).max(500).optional() }).extend(step.shape).partial({ op: true }),
       annotations: { readOnlyHint: false, destructiveHint: true }
     },
     async ({ org, ...body }) => {

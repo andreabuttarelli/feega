@@ -1,9 +1,12 @@
 import { Family, type EditOp, type Runners } from './edit-catalogue';
 import type { Answer } from './runners';
+import { Detail, compactWrite, touchedOf } from './compact-result';
 
 export type EditStep = { op: string; target?: string; element?: string; input?: Record<string, unknown>; version?: number };
 
-export type EditAsk = { projectId?: string; steps: EditStep[]; batch?: boolean };
+export type EditAsk = { projectId?: string; steps: EditStep[]; batch?: boolean; detail?: Detail };
+
+const WRITE_ACCESS = 'write';
 
 export type EditPorts = Runners & {
   catalogue: Map<string, EditOp>;
@@ -110,7 +113,7 @@ function resultsOf(group: Group, answer: Answer) {
   }));
 }
 
-export async function runEdit(ports: EditPorts, ask: EditAsk): Promise<Answer> {
+async function execute(ports: EditPorts, ask: EditAsk): Promise<Answer> {
   const isBatch = (ask.batch ?? ask.steps.length > 1);
   const all: Resolved[] = [];
   for (const [index, step] of ask.steps.entries()) {
@@ -134,4 +137,16 @@ export async function runEdit(ports: EditPorts, ask: EditAsk): Promise<Answer> {
     results.push(...resultsOf(group, answer));
   }
   return { status: HTTP_OK, body: { applied: results.length, results } };
+}
+
+const writesOnly = (ports: EditPorts, steps: EditStep[]) => steps.every((step) => {
+  return ports.catalogue.get(step.op)?.access === WRITE_ACCESS;
+});
+
+export async function runEdit(ports: EditPorts, ask: EditAsk): Promise<Answer> {
+  const answer = await execute(ports, ask);
+  if (ask.detail === Detail.Verbose || !writesOnly(ports, ask.steps)) {
+    return answer;
+  }
+  return { ...answer, body: compactWrite(answer.body, { touched: [...new Set(ask.steps.flatMap((step) => touchedOf(step.input)))] }) };
 }
