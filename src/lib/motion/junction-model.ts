@@ -36,7 +36,7 @@ const whole = (from: JunctionVars, to: JunctionVars): Move => ({ from, to, span:
 const held = (vars: JunctionVars, span: Span): Move => ({ from: vars, to: vars, span });
 
 export const JUNCTION: Record<JunctionKind, JunctionSpec> = {
-  [JunctionKind.Crossfade]: { label: 'Cross dissolve', ease: Ease.Linear, outgoing: [], incoming: [whole({ opacity: 0 }, { opacity: 1 })], incomingBelow: [whole({ opacity: 1 }, { opacity: 0 })] },
+  [JunctionKind.Crossfade]: { label: 'Cross dissolve', ease: Ease.Standard, outgoing: [], incoming: [whole({ opacity: 0 }, { opacity: 1 })], incomingBelow: [whole({ opacity: 1 }, { opacity: 0 })] },
   [JunctionKind.DipToBlack]: {
     label: 'Dip to black',
     ease: Ease.Standard,
