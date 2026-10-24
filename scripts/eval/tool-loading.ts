@@ -115,7 +115,7 @@ async function headDoc(session: E2eSession, frameId: string): Promise<Doc> {
   return (data?.doc ?? { durationInFrames: 0, fps: 30, tracks: [] }) as Doc;
 }
 
-type Facts = { arm: Arm; case: string; done: boolean; steps: number; tools: string[]; loads: number; finds: number; describes: number; errors: number; costUsd: number; inputTokens: number; cachedTokens: number; ms: number };
+type Facts = { arm: Arm; case: string; done: boolean; failed: string | null; steps: number; tools: string[]; loads: number; finds: number; describes: number; errors: number; costUsd: number; inputTokens: number; cachedTokens: number; ms: number };
 
 async function chat(bearer: string, session: E2eSession, frameId: string, prompt: string) {
   const res = await fetch(`${BASE_URL}/api/v1/projects/${session.projectId}/agent`, {
@@ -135,7 +135,8 @@ async function chat(bearer: string, session: E2eSession, frameId: string, prompt
     status: res.status,
     steps: parts.filter((p) => p.type === 'finish-step').length,
     tools: parts.filter((p) => p.type === 'tool-input-available').map((p) => p.toolName ?? ''),
-    errors: parts.filter((p) => p.type === 'tool-output-error' || (p.type === 'tool-output-available' && JSON.stringify(p).includes('"error"'))).length
+    errors: parts.filter((p) => p.type === 'tool-output-error' || (p.type === 'tool-output-available' && JSON.stringify(p).includes('"error"'))).length,
+    failed: res.ok ? (parts.find((p) => p.type === 'error') as { errorText?: string } | undefined)?.errorText ?? null : `HTTP ${res.status}: ${body.slice(0, 200)}`
   };
 }
 
@@ -164,7 +165,7 @@ async function runCase(arm: Arm, c: Case): Promise<Facts> {
     const { data: nodes } = await admin.from('nodes').select('type').eq('org_id', session.orgId).eq('canvas_id', session.canvasId).is('deleted_at', null);
     const doc = await headDoc(session, frameId);
     const count = (name: string) => ran.tools.filter((t) => t === name).length;
-    return { arm, case: c.name, done: c.done(doc, nodes ?? []), steps: ran.steps, tools: ran.tools, loads: count('load_tools'), finds: count('find_tools') + count('list_frame_tools'), describes: count('describe_frame_tool'), errors: ran.errors, costUsd: cost.usd, inputTokens: cost.input, cachedTokens: cost.cached, ms };
+    return { arm, case: c.name, done: c.done(doc, nodes ?? []), failed: ran.failed, steps: ran.steps, tools: ran.tools, loads: count('load_tools'), finds: count('find_tools') + count('list_frame_tools'), describes: count('describe_frame_tool'), errors: ran.errors, costUsd: cost.usd, inputTokens: cost.input, cachedTokens: cost.cached, ms };
   } finally {
     await teardownE2eSession(session);
   }
@@ -203,6 +204,9 @@ async function main() {
         if (facts) {
           rows.push(facts);
           console.log(JSON.stringify(facts));
+        }
+        if (facts?.failed) {
+          throw new Error(`${arm}/${c.name} failed, stopping before more spend: ${facts.failed}`);
         }
       }
     } finally {
