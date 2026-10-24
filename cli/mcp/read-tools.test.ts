@@ -136,3 +136,11 @@ describe('i tool dei post non esistono più', () => {
     }
   });
 });
+
+describe('run_node_generation fa più risultati in un colpo', () => {
+  test('accetta `variants` e `into`', async () => {
+    const tool = (await tools()).find((t) => t.name === 'run_node_generation');
+
+    expect(Object.keys(tool?.inputSchema?.properties ?? {})).toEqual(expect.arrayContaining(['variants', 'into']));
+  });
+});

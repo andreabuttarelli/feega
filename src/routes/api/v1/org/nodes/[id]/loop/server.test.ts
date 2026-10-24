@@ -13,6 +13,7 @@ const gateOrgAiAction = vi.fn();
 const planLoop = vi.fn();
 const enqueueLoop = vi.fn();
 const cancelLoop = vi.fn();
+const cancelVariants = vi.fn();
 const findNode = vi.fn();
 
 vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
@@ -29,6 +30,9 @@ vi.mock('$lib/server/canvas/loop', () => ({
   planLoop: (...args: unknown[]) => planLoop(...args),
   enqueueLoop: (...args: unknown[]) => enqueueLoop(...args),
   cancelLoop: (...args: unknown[]) => cancelLoop(...args)
+}));
+vi.mock('$lib/server/canvas/variants', () => ({
+  cancelVariants: (...args: unknown[]) => cancelVariants(...args)
 }));
 vi.mock('$lib/server/repos/canvas', () => ({
   findNode: (...args: unknown[]) => findNode(...args)
@@ -139,12 +143,23 @@ describe('POST /api/v1/org/nodes/:id/loop — METTE IN CODA, mai gira da sé', (
 describe('DELETE /api/v1/org/nodes/:id/loop — cancella solo i biglietti non ancora reclamati', () => {
   it('chiama cancelLoop e torna quanti ne ha fermati', async () => {
     cancelLoop.mockResolvedValue({ cancelled: 2 });
+    cancelVariants.mockResolvedValue({ cancelled: 0 });
 
     const { res, body } = await call(DELETE, NODE, undefined, 'DELETE');
 
     expect(res.status).toBe(200);
     expect(cancelLoop).toHaveBeenCalledWith({}, { orgId: ORG, nodeId: NODE });
     expect(body.cancelled).toBe(2);
+  });
+
+  it('ferma anche le varianti in corso del nodo, nello stesso colpo', async () => {
+    cancelLoop.mockResolvedValue({ cancelled: 2 });
+    cancelVariants.mockResolvedValue({ cancelled: 3 });
+
+    const { body } = await call(DELETE, NODE, undefined, 'DELETE');
+
+    expect(cancelVariants).toHaveBeenCalledWith({}, { orgId: ORG, nodeId: NODE });
+    expect(body.cancelled).toBe(5);
   });
 
   it('rejects a read-only API key before calling cancelLoop', async () => {

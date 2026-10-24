@@ -17,7 +17,10 @@ import {
   DataCheck,
   type PatchWrite
 } from '$lib/server/repos/canvas';
-import { runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate';
+import { runsOf } from '$lib/server/canvas/generate';
+import { runGeneration, type GenerationOutcome } from '$lib/server/canvas/variants';
+import { cancelBatch } from '$lib/server/canvas/cancel-batch';
+import { parseVariantsAsk } from '$lib/canvas/variants';
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
 import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-frame';
 import { imageToolAskSchema } from '$lib/image-tools';
@@ -26,7 +29,7 @@ import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
-import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
+import { enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
 import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles';
 import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-variables';
@@ -114,7 +117,10 @@ export const AGENT_PATCH_ANSWERS: Record<PatchWrite['outcome'], (written: PatchW
 
 const BAD_MEDIUM = { error: 'bad_medium', message: `medium must be one of: ${GEN_MEDIUMS.join(', ')}.` };
 
-export function outcomeOf(out: RunOutcome): Record<string, unknown> {
+export function outcomeOf(out: GenerationOutcome): Record<string, unknown> {
+  if (out.kind === 'variants') {
+    return { outcome: 'variants', into: out.into, group: out.group, nodeIds: out.nodeIds, credits: out.credits, runs: out.runs.map(outcomeOf) };
+  }
   if (out.kind === 'done') {
     return { outcome: 'done', runId: out.run.id, assetId: out.asset.id, assetType: out.asset.type };
   }
@@ -246,6 +252,8 @@ const runNodeInput = z
     model: z.string().optional().describe('Omit to keep the model already on the node.'),
     params: z.record(z.string(), z.unknown()).optional().describe('e.g. { aspectRatio: "1:1", duration: 8 }.'),
     provider: z.string().optional().describe('A provider id from list_models routes (e.g. "kie", "openrouter"); omit or "auto" for the cheapest healthy one.'),
+    variants: z.number().int().optional().describe('1, 2, 4 or 8 results; omit for one.'),
+    into: z.enum(['nodes', 'history']).optional().describe('With variants: new nodes (default) or this node\'s history.'),
     expectedVersion: z.number().int()
   })
   .strict();
@@ -784,9 +792,14 @@ export const CANVAS_OPS = {
         return NODE_NOT_FOUND;
       }
 
+      const asked = parseVariantsAsk({ variants: input.variants, into: input.into });
+      if (!asked.ok) {
+        return { outcome: 'refused', error: asked.error };
+      }
+
       const data = node.data as { prompt?: string; model?: string; params?: GenParams };
       const out = await ctx.billed(() =>
-        runGenNode(ctx.db, {
+        runGeneration(ctx.db, {
           orgId: ctx.orgId,
           projectId: ctx.projectId,
           canvasId: node.canvasId,
@@ -797,7 +810,9 @@ export const CANVAS_OPS = {
           model: input.model ?? data.model ?? null,
           params: { ...(input.params ?? data.params ?? {}), ...(input.provider ? { provider: input.provider } : {}) } as GenParams,
           expectedVersion: input.expectedVersion,
-          actor: ctx.actor
+          actor: ctx.actor,
+          count: asked.count,
+          into: asked.into
         })
       );
 
@@ -883,7 +898,7 @@ export const CANVAS_OPS = {
   cancel_node_loop: op({
     access: Access.Write,
     input: nodeIdInput,
-    run: async (ctx, input) => cancelLoop(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId })
+    run: async (ctx, input) => cancelBatch(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId })
   }),
 
   preview_run_graph: op({

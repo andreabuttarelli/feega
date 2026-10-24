@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { withRun, showRun, shownIndex, canStartRun, blockedReason, RUNNABLE_MEDIUMS } from './gen-history';
+import { withRun, showRun, shownIndex, canStartRun, blockedReason, historyItemsOf, RUNNABLE_MEDIUMS } from './gen-history';
 import type { GenNode, GenRun } from './gen-node';
 
 const choices = [{ id: 'm1' }];
@@ -178,5 +178,31 @@ describe('un giro in arrivo con un risultato già in storia non lo duplica', () 
     const node = { runs: [first], refId: 'a' } as unknown as GenNode;
     const next = withRun(node, { ...first, id: 'r1' });
     expect(next.runs.map((r) => r.id)).toEqual(['t1']);
+  });
+});
+
+describe('la griglia della storia', () => {
+  const four = [1, 2, 3, 4].map((n) => run({ id: `r${n}`, mediaId: `media-${n}` }));
+
+  it('non c è con un giro solo: il nodo mostra già quel risultato', () => {
+    expect(historyItemsOf(node({ runs: four.slice(0, 1), refId: 'media-1' }))).toEqual([]);
+  });
+
+  it('elenca ogni risultato nell ordine e accende quello in vetrina', () => {
+    const items = historyItemsOf(node({ runs: four, refId: 'media-3' }));
+
+    expect(items.map((i) => [i.runId, i.mediaId, i.shown])).toEqual([
+      ['r1', 'media-1', false],
+      ['r2', 'media-2', false],
+      ['r3', 'media-3', true],
+      ['r4', 'media-4', false]
+    ]);
+    expect(items.map((i) => i.position)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('salta i giri senza risultato', () => {
+    const items = historyItemsOf(node({ runs: [...four.slice(0, 2), run({ id: 'r3', mediaId: null })], refId: 'media-1' }));
+
+    expect(items.map((i) => i.runId)).toEqual(['r1', 'r2']);
   });
 });

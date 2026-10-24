@@ -18,6 +18,8 @@ import type { ConnectorType } from '$lib/canvas/connectors';
 import type { CanvasNode } from '$lib/canvas/graph';
 import type { CanvasMode } from '$lib/canvas/canvas-mode';
 import type { RunQuote } from '$lib/canvas/run-quote';
+import type { VariantInto } from '$lib/canvas/variants';
+import type { HistoryItem } from '$lib/canvas/gen-history';
 import type { GraphScope } from '$lib/canvas/run-graph';
 import type { ImageTool } from '$lib/image-tools';
 import type { DragPhase, DropVerdict, ElementOut, PointerPoint } from '$lib/canvas/canvas-drop';
@@ -121,6 +123,9 @@ export type FlowProps = {
   runQuoteFor?: (ids: string[]) => RunQuote | null;
   onRunNode?: (id: string) => void;
   onViewOutput?: (id: string) => void;
+  variantsInFlightFor?: (id: string) => number;
+  onCancelVariants?: (id: string) => void;
+  historyFor?: (id: string) => { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void } | null;
   nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
   modelChoicesFor?: (type: GenPropertyType) => ModelChoice[];
   catalogueSyncedFor?: (type: GenPropertyType) => boolean;
@@ -135,6 +140,8 @@ export type FlowProps = {
       audio?: boolean;
       enhancePrompt?: boolean;
       repeat?: number;
+      variants?: number;
+      variantsInto?: VariantInto;
       dynamicParams?: Record<string, unknown>;
     },
   ) => void;
