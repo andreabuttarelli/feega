@@ -1105,6 +1105,10 @@ function statefulNodesDb(initial: { id: string; orgId: string; data: Record<stri
         return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
       }
 
+      if (table === 'org_model_allowlist') {
+        return { select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) }) };
+      }
+
       if (table === 'projects') {
         return { select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { mode: 'standard' }, error: null }) }) }) }) };
       }
