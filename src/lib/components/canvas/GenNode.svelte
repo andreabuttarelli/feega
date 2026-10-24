@@ -665,6 +665,7 @@
     font: inherit;
     font-size: 12px;
     text-align: left;
+    color: var(--ink, #1d1d1f);
     cursor: pointer;
   }
   .gen-skills button.is-picked {
