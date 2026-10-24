@@ -1,5 +1,6 @@
 <script lang="ts">
   import { commentBodyError, type CommentThread } from '$lib/canvas/comment-threads';
+  import { AGENT_MENTION_ID, byAgent } from '$lib/canvas/comment-agent';
   import { insertMention, mentionQuery, type Teammate } from '$lib/canvas/comment-mentions';
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
 
@@ -128,7 +129,7 @@
         </button>
         {@render entry(t.id, t.authorId, t.body, t.editedAt, 'comment-body', 'cm-body', '')}
         {#each t.replies as r (r.id)}
-          {@render entry(r.id, r.authorId, r.body, r.editedAt, 'comment-reply', 'cm-reply', who(r.authorId))}
+          {@render entry(r.id, byAgent(r) ? AGENT_MENTION_ID : r.authorId, r.body, r.editedAt, 'comment-reply', 'cm-reply', who(byAgent(r) ? AGENT_MENTION_ID : r.authorId))}
         {/each}
         {@render picks(replies[t.id] ?? '', (next) => (replies[t.id] = next))}
         <form class="cm-row" onsubmit={(e) => reply(e, t)}>
