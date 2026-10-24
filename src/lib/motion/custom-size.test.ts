@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customSize, fitElementToNode } from './custom-size';
+import { ResizeMode, customSize, fitElementToNode, fitToNode } from './custom-size';
 import { Horizontal, Vertical } from './constraints/model';
 import { MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, formatOf, newMotionDoc, motionDocSchema, type MotionDoc } from './doc';
 import { setCanvas } from './timeline';
@@ -82,5 +82,36 @@ describe('fitElementToNode', () => {
 
     expect(sized.ok && sized.doc.tracks[0].clips[0].props).toMatchObject({ x: 0.5, width: 1 });
     expect(sized.ok && sized.doc.tracks[0].clips[0].constraints).toEqual(shape.constraints);
+  });
+});
+
+describe('resizing a frame while ignoring constraints', () => {
+  const scaled = () => {
+    const base = newMotionDoc(MotionFormat.Landscape);
+    const card = { id: 'card', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.25, y: 0.5, width: 0.25, height: 0.5 }, transform: {}, keyframes: {} };
+    return { ...base, width: 400, height: 200, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [card] }] } as unknown as MotionDoc;
+  };
+  const widthPx = (doc: MotionDoc) => Number(doc.tracks[0].clips[0].props.width) * doc.width;
+
+  it('a layer that scales with the frame grows with it by default', () => {
+    const sized = fitToNode(scaled(), { width: 800, height: 200 });
+
+    expect(sized.ok && widthPx(sized.doc)).toBeCloseTo(200);
+  });
+
+  it('ignoring constraints keeps the layer at its pixel size and place', () => {
+    const sized = fitToNode(scaled(), { width: 800, height: 200 }, ResizeMode.Ignored);
+
+    expect(sized.ok && widthPx(sized.doc)).toBeCloseTo(100);
+    expect(sized.ok && Number(sized.doc.tracks[0].clips[0].props.x) * 800).toBeCloseTo(100);
+  });
+
+  it('leaves the constraints of the layer as they were', () => {
+    const own = { horizontal: Horizontal.Right, vertical: Vertical.Bottom };
+    const doc = scaled();
+    const pinned = { ...doc, tracks: [{ ...doc.tracks[0], clips: [{ ...doc.tracks[0].clips[0], constraints: own }] }] } as MotionDoc;
+    const sized = fitToNode(pinned, { width: 800, height: 200 }, ResizeMode.Ignored);
+
+    expect(sized.ok && sized.doc.tracks[0].clips[0].constraints).toEqual(own);
   });
 });

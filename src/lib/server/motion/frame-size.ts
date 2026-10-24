@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { fitToNode } from '$lib/motion/custom-size';
+import { ResizeMode, fitToNode } from '$lib/motion/custom-size';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import type { FrameStore } from './move-element';
@@ -17,7 +17,7 @@ export const SIZE_STATUS: Record<Exclude<SizeOutcome, SizeOutcome.Done>, number>
   [SizeOutcome.Invalid]: 422
 };
 
-export const sizeAskSchema = z.object({ nodeId: z.string().min(1), width: z.coerce.number().positive(), height: z.coerce.number().positive() }).strict();
+export const sizeAskSchema = z.object({ nodeId: z.string().min(1), width: z.coerce.number().positive(), height: z.coerce.number().positive(), mode: z.enum(ResizeMode).default(ResizeMode.Constrained) }).strict();
 
 export type SizeAsk = z.infer<typeof sizeAskSchema>;
 
@@ -30,7 +30,7 @@ export async function sizeFrame(store: FrameStore, ask: SizeAsk): Promise<Sized>
   if (!frame) {
     return { outcome: SizeOutcome.NotFound };
   }
-  const sized = fitToNode(frame.doc, ask);
+  const sized = fitToNode(frame.doc, ask, ask.mode);
   if (!sized.ok) {
     return { outcome: SizeOutcome.Invalid, detail: sized.error };
   }

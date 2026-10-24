@@ -3,6 +3,8 @@ import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server
 import { fakeDb } from '$lib/server/db/fake-db';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, setCanvas } from '$lib/motion/timeline';
+import { Horizontal, Vertical } from '$lib/motion/constraints/model';
+import { setConstraints } from '$lib/motion/constraints/constraints';
 
 const SOURCE = '44444444-4444-4444-4444-444444444444';
 const TARGET = '66666666-6666-6666-6666-666666666666';
@@ -67,6 +69,26 @@ describe('frameSize action', () => {
     expect(result).toMatchObject({ outcome: 'done', undo: [{ kind: 'doc.revision', nodeId: SOURCE, before: 1, after: 2 }] });
     const [saved] = written(input, SOURCE);
     expect([saved.version, saved.doc.width, saved.doc.height, saved.doc.freeSize]).toEqual([2, 600, 300, true]);
+  });
+
+  it('ignoring constraints keeps a scaling element at its pixel width', async () => {
+    const scaling = (): MotionDoc => {
+      const made = setConstraints(custom(), ['txt'], { horizontal: Horizontal.Scale, vertical: Vertical.Scale });
+      if (!made.ok) {
+        throw new Error(made.error);
+      }
+      return made.doc;
+    };
+    const widthAfter = async (mode?: string) => {
+      const input = event({ node_id: SOURCE, width: '2400', height: '1080', ...(mode ? { mode } : {}) }, { motion_revisions: [revisionRow(SOURCE, 1, scaling())] });
+      await actions.frameSize(input as never);
+      const [saved] = written(input, SOURCE);
+      return Number(saved.doc.tracks[0].clips[0].props.width) * saved.doc.width;
+    };
+    const before = Number(scaling().tracks[0].clips[0].props.width) * scaling().width;
+
+    expect(await widthAfter('ignored')).toBeCloseTo(before);
+    expect(await widthAfter()).not.toBeCloseTo(before);
   });
 
   it('elements keep their place', async () => {

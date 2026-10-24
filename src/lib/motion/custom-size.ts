@@ -19,14 +19,24 @@ function stillSize(node: CanvasSize): CanvasSize {
 
 export const customSize = (node: CanvasSize, doc: Pick<MotionDoc, 'still'> = {}): CanvasSize => (doc.still ? stillSize(node) : videoSize(node));
 
-export const fitToNode = (doc: MotionDoc, node: CanvasSize): OpResult => resizeFrame(doc, customSize(node, doc));
+export enum ResizeMode {
+  Constrained = 'constrained',
+  Ignored = 'ignored'
+}
 
 const SCALES_WITH_NODE = { horizontal: Horizontal.Scale, vertical: Vertical.Scale };
+const STAYS_PUT = { horizontal: Horizontal.Left, vertical: Vertical.Top };
 
 const withConstraintsOf = (doc: MotionDoc, constraintsOf: (clip: MotionClip) => MotionClip['constraints']): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, constraints: constraintsOf(c as MotionClip) })) })) });
 
-export function fitElementToNode(doc: MotionDoc, node: CanvasSize): OpResult {
+const fittedWith = (doc: MotionDoc, node: CanvasSize, pinning: MotionClip['constraints']): OpResult => {
   const own = new Map(doc.tracks.flatMap((t) => t.clips.map((c) => [c.id, (c as MotionClip).constraints] as const)));
-  const sized = fitToNode(withConstraintsOf(doc, () => SCALES_WITH_NODE), node);
+  const sized = resizeFrame(withConstraintsOf(doc, () => pinning), customSize(node, doc));
   return sized.ok ? { ok: true, doc: withConstraintsOf(sized.doc, (c) => own.get(c.id)) } : sized;
+};
+
+export const fitToNode = (doc: MotionDoc, node: CanvasSize, mode: ResizeMode = ResizeMode.Constrained): OpResult => (mode === ResizeMode.Ignored ? fittedWith(doc, node, STAYS_PUT) : resizeFrame(doc, customSize(node, doc)));
+
+export function fitElementToNode(doc: MotionDoc, node: CanvasSize): OpResult {
+  return fittedWith(doc, node, SCALES_WITH_NODE);
 }
