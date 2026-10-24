@@ -316,7 +316,7 @@ function fontsProblem(doc: MotionDoc): string | null {
 }
 
 export function compOf(clip: Pick<MotionClip, 'component' | 'props'>): string | null {
-  return clip.component === 'Precomp' ? String(clip.props.comp) : null;
+  return clip.component === 'Precomp' && !clip.props.scene ? String(clip.props.comp) : null;
 }
 
 type CompositionCard = { assetId: string; kind: string };
