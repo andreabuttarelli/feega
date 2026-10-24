@@ -17,7 +17,7 @@ import {
   DataCheck,
   type PatchWrite
 } from '$lib/server/repos/canvas';
-import { runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate';
+import { cancelNodeRun, runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate';
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
 import { ImageTool, UPSCALE_FACTORS } from '$lib/image-tools';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
@@ -882,6 +882,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: nodeIdInput,
     run: async (ctx, input) => cancelLoop(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId })
+  }),
+
+  cancel_run: op({
+    access: Access.Write,
+    input: nodeIdInput,
+    run: async (ctx, input) => cancelNodeRun(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId, actor: ctx.actor })
   }),
 
   preview_run_graph: op({

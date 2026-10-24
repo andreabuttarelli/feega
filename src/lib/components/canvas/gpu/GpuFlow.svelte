@@ -3580,6 +3580,7 @@
       runQuote={props.runQuoteFor?.(selected) ?? null}
       frameTools
       onrun={() => props.onRunNode?.(selected[0])}
+      onstop={() => props.onCancelRun?.(selected[0])}
       onaction={runSelectionAction}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
       onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}

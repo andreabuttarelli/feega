@@ -39,6 +39,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   preview_node_loop: 'Quote a node loop.',
   run_node_loop: 'Run a node loop (spends credits).',
   cancel_node_loop: 'Cancel a running node loop.',
+  cancel_run: 'Cancel the generation running on one node; nothing is charged for it.',
   preview_run_graph: 'Ordered steps and credits of a graph run, before running it.',
   run_graph: 'Run a graph downstream or the stale part of a canvas (spends credits).',
   create_canvas: 'Add a canvas to the project.',
