@@ -463,7 +463,9 @@ function filtersOf(clip: MotionClip, frame: number, fps: number, size: Size, css
 
 const posed = (pose: Pose, w: number, h: number): Affine => mul2d([1, 0, 0, 1, pose.x * w, pose.y * h], scaleAbout(w / 2, h / 2, 0, pose.scale));
 
-const scissorOf = (pose: Pose, w: number, h: number): Scissor | undefined => (pose.wipe > 0 ? [0, 0, w * (1 - pose.wipe), h] : undefined);
+const scissorOf = (pose: Pose, w: number, h: number): Scissor | undefined => (pose.wipe > 0 || pose.wipeLeft > 0 ? [w * pose.wipeLeft, 0, w * Math.max(0, 1 - pose.wipe - pose.wipeLeft), h] : undefined);
+
+const dimmed = (filters: Filter[], pose: Pose): Filter[] => (pose.dim < 1 ? [...filters, { kind: FilterKind.Css, fns: [{ name: 'brightness', args: [String(pose.dim)] }] }] : filters);
 
 const scaleOf = (m: Affine) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
 
@@ -509,10 +511,11 @@ export function drawFrame({ doc, tokens, assets, typeset, moves }: Prepared, fra
     const edge = effectiveEdge(clip);
     const world = mul2d(posed(edge, size.width, size.height), worldAt(doc, clip.id, frame, size));
     const masks = maskLayers(clip, frame, size, world, asset);
-    const filtered = filtersOf(clip, frame, doc.fps, size, css);
-    if (typeof filtered === 'string') {
-      return filtered;
+    const found = filtersOf(clip, frame, doc.fps, size, css);
+    if (typeof found === 'string') {
+      return found;
     }
+    const filtered = { ...found, filters: dimmed(found.filters, edge) };
     const pair = pairs.get(clip.id);
     const source = pair ? byId.get(pair.source) : undefined;
     const matteItems = source && shown(source) ? clipItems(source) : [];

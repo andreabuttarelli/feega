@@ -36,17 +36,20 @@ const sequence = (kind: JunctionKind): MotionDoc => {
 
 const MID_TRANSITION = SCENE_FRAMES;
 
-const drawn = (kind: JunctionKind) => displayListAt(sequence(kind), MID_TRANSITION, FEEGA_TOKENS).items as PathItem[];
+const drawn = (kind: JunctionKind, frame = MID_TRANSITION) => displayListAt(sequence(kind), frame, FEEGA_TOKENS).items as PathItem[];
 
 const ofScene = (items: PathItem[], index: number) => items.filter((i) => i.clip.startsWith(`scene-${index}__`));
 
 describe('scene transitions draw the whole scene as one group', () => {
   it('a crossfade fades the full-frame shape and the dot together', () => {
     const items = drawn(JunctionKind.Crossfade);
-    const fading = [ofScene(items, 1), ofScene(items, 2)].find((scene) => scene.every((i) => i.opacity < 1))!;
+    const top = items.at(-1)!.clip.split('__')[0];
+    const fading = items.filter((i) => i.clip.startsWith(`${top}__`));
 
+    expect(top).toBe('scene-2');
     expect(fading.map((i) => i.opacity)).toEqual([fading[0].opacity, fading[0].opacity]);
     expect(fading[0].opacity).toBeGreaterThan(0);
+    expect(fading[0].opacity).toBeLessThan(1);
   });
 
   it('a push moves every shape of the incoming scene', () => {
@@ -68,5 +71,26 @@ describe('scene transitions draw the whole scene as one group', () => {
     const incoming = ofScene(drawn(JunctionKind.Blur), 2);
 
     expect(incoming.every((i) => i.blur > 0)).toBe(true);
+  });
+
+  it('opacity stays between 0 and 1 through the whole transition', () => {
+    const all = Array.from({ length: FADE_FRAMES + 2 }, (_, i) => SCENE_FRAMES - FADE_FRAMES / 2 + i).flatMap((f) => drawn(JunctionKind.Crossfade, f).map((i) => i.opacity));
+
+    expect(all.every((o) => o >= 0 && o <= 1)).toBe(true);
+  });
+
+  it('a dip to black darkens the outgoing scene before it disappears', () => {
+    const outgoing = ofScene(drawn(JunctionKind.DipToBlack, SCENE_FRAMES - FADE_FRAMES / 4), 1);
+    const dim = (i: PathItem) => i.filters?.some((f) => f.kind === 'css' && f.fns.some((fn) => fn.name === 'brightness' && Number(fn.args[0]) < 1));
+
+    expect(outgoing.length).toBeGreaterThan(0);
+    expect(outgoing.every(dim)).toBe(true);
+  });
+
+  it('a wipe reveals the incoming scene from the left edge', () => {
+    const items = drawn(JunctionKind.Wipe);
+    const clipped = items.filter((i) => i.scissor);
+
+    expect(clipped.length).toBeGreaterThan(0);
   });
 });
