@@ -1200,7 +1200,7 @@ export const actions: Actions<CanvasParams> = {
   frameSize: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = sizeAskSchema.safeParse({ nodeId: fd.get('node_id'), width: fd.get('width') ?? undefined, height: fd.get('height') ?? undefined });
+    const ask = sizeAskSchema.safeParse({ nodeId: fd.get('node_id'), width: fd.get('width') ?? undefined, height: fd.get('height') ?? undefined, mode: fd.get('mode') ?? undefined });
     if (!ask.success) {
       return fail(400, { error: 'invalid frame size' });
     }
