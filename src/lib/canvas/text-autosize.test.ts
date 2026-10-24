@@ -18,7 +18,18 @@ describe('text boxes follow the laid text', () => {
   it('a free auto-width text resizes its node to the laid line', () => {
     const doc = texted(element(400, 100), 'auto');
 
-    expect(textAutosize(doc, { t: { left: 0, top: 0, width: 250, height: 60 } }, FrameKind.Element, { w: 400, h: 100 })).toEqual({ node: { w: 250, h: 60 } });
+    const fit = textAutosize(doc, { t: { left: 0, top: 0, width: 250, height: 60 } }, FrameKind.Element, { w: 400, h: 100 });
+
+    expect(fit?.node).toEqual({ w: 250, h: 60 });
+  });
+
+  it('a free text that grows carries a doc sized to its node, so the canvas never draws the old picture stretched', () => {
+    const doc = texted(element(400, 100), 'auto-height');
+    const fit = textAutosize(doc, { t: { left: 0, top: 0, width: 400, height: 300 } }, FrameKind.Element, { w: 400, h: 100 });
+
+    expect(fit?.node).toEqual({ w: 400, h: 300 });
+    expect({ width: fit?.doc?.width, height: fit?.doc?.height }).toEqual({ width: 400, height: 300 });
+    expect(findClip(fit!.doc!, 't')!.clip.props).toMatchObject({ x: 0.5, y: 0.5, width: 1, height: 1 });
   });
 
   it('a free fixed text keeps its node', () => {

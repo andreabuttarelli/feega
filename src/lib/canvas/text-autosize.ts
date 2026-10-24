@@ -5,6 +5,7 @@ import { loadFonts } from '$lib/motion/gpu-full/text/load';
 import { Smoothing } from '$lib/motion/gpu-full/text/painter';
 import { fitTexts, freeTextFit, hostFit } from '$lib/motion/text-fit';
 import { FrameKind } from './motion-node';
+import { ResizeMode, fitToNode } from '$lib/motion/custom-size';
 import { stillFrame } from './core/frame-source';
 
 type NodeSize = { w: number; h: number };
@@ -15,7 +16,8 @@ const FIT_BY_KIND: Record<FrameKind, (doc: MotionDoc, boxes: Boxes, node: NodeSi
   [FrameKind.Element]: (doc, boxes, node) => {
     const share = freeTextFit(doc, boxes);
     const next = share ? hostFit(node, share) : null;
-    return next ? { node: next } : null;
+    const fitted = share && next ? fitToNode(doc, { width: share.width * doc.width, height: share.height * doc.height }, ResizeMode.Element) : null;
+    return next && fitted?.ok ? { node: next, doc: fitted.doc } : null;
   },
   [FrameKind.Frame]: (doc, boxes) => {
     const next = fitTexts(doc, boxes);

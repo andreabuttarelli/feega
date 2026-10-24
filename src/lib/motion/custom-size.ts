@@ -1,6 +1,7 @@
 import { MAX_SHORT_SIDE, MAX_SIDE, MIN_SIDE, sideRange, type MotionClip, type MotionDoc } from './doc';
 import type { CanvasSize, OpResult } from './timeline';
 import { Horizontal, Vertical, resizeFrame } from './constraints/constraints';
+import { keepTextSize } from './text-fit';
 
 const evenSide = (n: number) => Math.min(MAX_SIDE, Math.max(MIN_SIDE, Math.round(n / 2) * 2));
 
@@ -21,7 +22,8 @@ export const customSize = (node: CanvasSize, doc: Pick<MotionDoc, 'still'> = {})
 
 export enum ResizeMode {
   Constrained = 'constrained',
-  Ignored = 'ignored'
+  Ignored = 'ignored',
+  Element = 'element'
 }
 
 const SCALES_WITH_NODE = { horizontal: Horizontal.Scale, vertical: Vertical.Scale };
@@ -35,7 +37,13 @@ const fittedWith = (doc: MotionDoc, node: CanvasSize, pinning: MotionClip['const
   return sized.ok ? { ok: true, doc: withConstraintsOf(sized.doc, (c) => own.get(c.id)) } : sized;
 };
 
-export const fitToNode = (doc: MotionDoc, node: CanvasSize, mode: ResizeMode = ResizeMode.Constrained): OpResult => (mode === ResizeMode.Ignored ? fittedWith(doc, node, STAYS_PUT) : resizeFrame(doc, customSize(node, doc)));
+const FIT_BY_MODE: Record<ResizeMode, (doc: MotionDoc, node: CanvasSize) => OpResult> = {
+  [ResizeMode.Constrained]: (doc, node) => resizeFrame(doc, customSize(node, doc)),
+  [ResizeMode.Ignored]: (doc, node) => fittedWith(doc, node, STAYS_PUT),
+  [ResizeMode.Element]: (doc, node) => fitElementToNode(keepTextSize(doc, doc, customSize(node, doc)), node)
+};
+
+export const fitToNode = (doc: MotionDoc, node: CanvasSize, mode: ResizeMode = ResizeMode.Constrained): OpResult => FIT_BY_MODE[mode](doc, node);
 
 export function fitElementToNode(doc: MotionDoc, node: CanvasSize): OpResult {
   return fittedWith(doc, node, SCALES_WITH_NODE);

@@ -128,6 +128,7 @@ export type FlowProps = {
     },
   ) => void;
   onResize?: (id: string, w: number, h: number) => void;
+  onPlace?: (id: string, w: number, h: number) => void;
   peers?: CanvasPeer[];
   onPointer?: (at: { x: number; y: number } | null) => void;
   onLive?: (boxes: LiveBox[]) => void;

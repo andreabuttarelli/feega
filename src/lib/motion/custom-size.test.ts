@@ -85,6 +85,18 @@ describe('fitElementToNode', () => {
   });
 });
 
+describe('resizing a free element', () => {
+  it('a free text that grows down keeps filling its node at the same type size', () => {
+    const base = newMotionDoc(MotionFormat.Landscape);
+    const text = { id: 't', from: 0, durationInFrames: 150, component: 'Text', props: { text: 'Hi', x: 0.5, y: 0.5, width: 1, height: 1, size: 0.75, sizing: 'auto-height' }, transform: {}, keyframes: {} };
+    const doc = { ...base, still: true, width: 240, height: 80, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [text] }] } as unknown as MotionDoc;
+
+    const sized = fitToNode(doc, { width: 240, height: 320 }, ResizeMode.Element);
+
+    expect(sized.ok && sized.doc.tracks[0].clips[0].props).toMatchObject({ x: 0.5, y: 0.5, width: 1, height: 1, size: 0.25 });
+  });
+});
+
 describe('resizing a frame while ignoring constraints', () => {
   const scaled = () => {
     const base = newMotionDoc(MotionFormat.Landscape);
