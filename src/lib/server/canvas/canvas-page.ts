@@ -83,6 +83,8 @@ import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
+import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
+import { imageToolAskSchema } from '$lib/image-tools';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
 import { COMBINE_STATUS, CombineOutcome, combineAskSchema, combineScenes } from '$lib/server/motion/combine-scenes';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
@@ -1192,6 +1194,23 @@ export const actions: Actions<CanvasParams> = {
       return fail(502, { error: `the images could not be drawn: ${out.message}` });
     }
     return out.outcome === ExportOutcome.Done ? out : fail(404, { error: out.outcome });
+  },
+
+  imageTool: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = imageToolAskSchema.safeParse({ nodeId: fd.get('node_id'), tool: fd.get('tool'), factor: fd.get('factor') ?? undefined });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    if (denied) {
+      return fail(denied.status, denied.data);
+    }
+
+    const started = await startImageTool(scope.db, IMAGE_TOOL_DEPS, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, sourceNodeId: ask.data.nodeId, tool: ask.data.tool, factor: ask.data.factor });
+    return started.ok ? { outcome: 'done', nodeId: started.nodeId } : fail(400, { error: started.error });
   },
 
   createFormats: async ({ request, params, locals }) => {

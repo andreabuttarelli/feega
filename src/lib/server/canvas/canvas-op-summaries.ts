@@ -33,6 +33,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   place_in_frame: 'Put a generated media node into a frame.',
   delete_node: 'Soft-delete a node and drop its lines.',
   run_node: 'Generate with a node (spends credits).',
+  image_tool: 'Remove the background of an image node, or upscale it 2x/4x, into a new node beside it (spends credits).',
   list_models: 'Models this project can run for a medium, with credits and routes.',
   list_runs: 'Runs of a node.',
   preview_node_loop: 'Quote a node loop.',

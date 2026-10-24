@@ -40,6 +40,7 @@
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
   import { imageTarget } from '$lib/canvas/crop-handles';
   import { cropRequest } from '$lib/canvas/crop-request.svelte';
+  import { ImageTool } from '$lib/image-tools';
   import type { FillOf, FillType } from '$lib/motion/fill/model';
   import type { Fill } from '$lib/motion/fill/model';
   import { baseStyle, commitText, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
@@ -3119,6 +3120,8 @@
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
     'combine-video': (ids) => props.onCombineScenes?.(ids),
+    'remove-background': (ids) => props.onImageTool?.(ids[0], ImageTool.RemoveBackground),
+    'upscale-image': (ids) => props.onImageTool?.(ids[0], ImageTool.Upscale),
     export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
     delete: (ids) => props.onDelete?.(ids)
   };
