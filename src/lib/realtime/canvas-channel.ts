@@ -22,6 +22,7 @@ type CanvasConnection = {
 	onPeers: (peers: PresencePeer[]) => void;
 	onReconnect: () => void;
 	onCanvasList: () => void;
+	onComments?: () => void;
 	onLink: (state: LinkState) => void;
 	frames?: FrameLine;
 	frameHeads?: HeadLine;
@@ -95,6 +96,16 @@ export function connectCanvas(options: CanvasConnection): () => void {
 			}, (change) => {
 				if (!closed) {
 					onChange(change);
+				}
+			});
+		}
+
+		if (options.onComments) {
+			joined.on('postgres_changes', {
+				event: '*', schema: 'public', table: 'canvas_comments', filter: `canvas_id=eq.${canvasId}`
+			}, () => {
+				if (!closed) {
+					options.onComments?.();
 				}
 			});
 		}
