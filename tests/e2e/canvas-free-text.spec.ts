@@ -119,6 +119,10 @@ test.describe('free text on the canvas @real', () => {
       await leave(page, pane);
       await expect.poll(async () => (await clipsOf(admin, element.id)).map((c) => c.props.text), { timeout: 10_000 }).toEqual(['Hello']);
       await visibleText(page, element.id);
+      if (gesture === Gesture.Click) {
+        await expect.poll(async () => (await elements(admin, session))[0].width, { message: 'a click-made text hugs what was typed' }).toBeLessThan(element.width);
+      }
+      const [drawn] = await elements(admin, session);
       if (SHOTS) {
         await page.screenshot({ path: `${SHOTS}/${gesture}-${theme}.png` });
       }
@@ -128,7 +132,7 @@ test.describe('free text on the canvas @real', () => {
       await page.waitForLoadState('networkidle');
       await visibleText(page, element.id);
       const [after] = await elements(admin, session);
-      expect([after.width, after.height]).toEqual([element.width, element.height]);
+      expect([after.width, after.height]).toEqual([drawn.width, drawn.height]);
     });
   }
 
