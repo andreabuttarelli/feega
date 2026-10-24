@@ -3274,3 +3274,7 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## A fill that is right in the export and wrong on the canvas
 
 **Signal:** unit tests and the HTML/export render agree, the canvas draws the picture as plain cover (crop and tile ignored). **Cause:** the canvas core is Rust (`packages/gpu-core`, committed as `static/gpu-core/*.wasm`); a new `ImageItem` field added in `display-list.ts` is dropped by serde until Rust reads it. **Move:** change `display_list.rs` and `scene.rs` with a `cargo test` first, run `npm run build:gpu-core`, commit the wasm, and prove canvas against export with `npx playwright test image-fills` (`E2E_REAL_STACK=1`).
+
+## An e2e that finds no row after a node-shape change
+
+Signal: a `@real` spec polls `nodes` and never finds the row it just made, right after a PR changed how that node is stored (type, `data` keys). Move: check the spec's filter against the current row shape before suspecting data loss — #1212 moved free elements from `data.kind` to `type` and seven specs kept reading `data.kind`. Grep `tests/e2e` for the old shape in the same PR that changes it.
