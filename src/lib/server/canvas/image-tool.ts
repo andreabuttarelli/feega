@@ -5,9 +5,10 @@ import { runGenNode, type RunOutcome } from '$lib/server/canvas/generate';
 import { detectLayers } from '$lib/server/canvas/layer-detect';
 import { IMAGE_TOOL_MODEL, ImageTool, imageToolParams } from '$lib/image-tools';
 import { layerPrompt } from '$lib/layer-boxes';
-import { pixelSizeOf, storePng } from '$lib/server/canvas/edit-assets';
+import { paddedPng, pixelSizeOf, storePng } from '$lib/server/canvas/edit-assets';
 import { maskPng } from '$lib/server/image-mask';
 import type { Mask } from '$lib/image-mask';
+import { outpaintPlan, type Extend } from '$lib/outpaint';
 
 const COLUMN_GAP = 80;
 const DEFAULT_NODE_WIDTH = 320;
@@ -20,9 +21,10 @@ export type ImageToolDeps = {
   detectLayers: typeof detectLayers;
   pixelSizeOf: typeof pixelSizeOf;
   storePng: typeof storePng;
+  paddedPng: typeof paddedPng;
 };
 
-export const IMAGE_TOOL_DEPS: ImageToolDeps = { findNode, createNode, createConnection, runGenNode, detectLayers, pixelSizeOf, storePng };
+export const IMAGE_TOOL_DEPS: ImageToolDeps = { findNode, createNode, createConnection, runGenNode, detectLayers, pixelSizeOf, storePng, paddedPng };
 
 type ImageToolInput = {
   orgId: string;
@@ -33,6 +35,7 @@ type ImageToolInput = {
   factor?: string;
   prompt?: string;
   mask?: Mask;
+  extend?: Extend;
   actor?: Actor;
 };
 
@@ -73,6 +76,24 @@ const PLAN: Record<ImageTool, (context: PlanContext) => Promise<Plan>> = {
     const png = await maskPng(size, input.mask);
     const stored = await deps.storePng(db, { orgId: input.orgId, projectId: input.projectId, userId: input.userId, nodeId: source.id, png, ...size });
     return { ok: true, name: 'Inpaint', prompt: input.prompt, params: imageToolParams(input.tool, input.factor), extra: { maskRefId: stored.id } };
+  },
+  [ImageTool.Outpaint]: async ({ db, deps, input, source }) => {
+    if (!input.prompt) {
+      return { ok: false, error: 'prompt_required' };
+    }
+    if (!input.extend) {
+      return { ok: false, error: 'extend_required' };
+    }
+    const scope = { orgId: input.orgId, assetId: String(source.data.refId) };
+    const size = await deps.pixelSizeOf(db, scope);
+    if (!size) {
+      return { ok: false, error: 'source_size_unknown' };
+    }
+    const plan = outpaintPlan(size, input.extend);
+    const [padded, mask] = await Promise.all([deps.paddedPng(db, scope, size, plan), maskPng(plan.padded, { regions: plan.regions })]);
+    const owner = { orgId: input.orgId, projectId: input.projectId, userId: input.userId, nodeId: source.id, ...plan.padded };
+    const [paddedAsset, maskAsset] = await Promise.all([deps.storePng(db, { ...owner, png: padded }), deps.storePng(db, { ...owner, png: mask })]);
+    return { ok: true, name: 'Outpaint', prompt: input.prompt, params: imageToolParams(input.tool, input.factor), extra: { editImageRefId: paddedAsset.id, maskRefId: maskAsset.id } };
   }
 };
 

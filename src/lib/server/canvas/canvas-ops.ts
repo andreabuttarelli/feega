@@ -810,7 +810,7 @@ export const CANVAS_OPS = {
     input: imageToolAskSchema,
     run: async (ctx, input) => {
       const started = await ctx.billed(() =>
-        startImageTool(ctx.db, IMAGE_TOOL_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, tool: input.tool, factor: input.factor, prompt: input.prompt, mask: input.mask, actor: ctx.actor })
+        startImageTool(ctx.db, IMAGE_TOOL_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, tool: input.tool, factor: input.factor, prompt: input.prompt, mask: input.mask, extend: input.extend, actor: ctx.actor })
       );
       if (!started.ok) {
         return { error: started.error };
