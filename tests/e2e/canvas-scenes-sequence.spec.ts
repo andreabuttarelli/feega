@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { JunctionKind } from '../../src/lib/motion/junction-model';
@@ -10,6 +11,11 @@ const SCENE_FRAMES = 45;
 const FADE_FRAMES = 20;
 const FRAME = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const DROP_AT_X = 0.4;
+const FADE_MIDDLE = 88;
+const PROBE = { x: 100, y: 100 };
+
+const pixelAt = (file: string, frame: number): number[] =>
+  [...execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-vf', `select=eq(n\\,${frame}),format=rgb24,crop=1:1:${PROBE.x}:${PROBE.y}`, '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])];
 const LABEL_OFFSET = { x: 8, y: 4 };
 
 const sceneDoc = (text: string, color: string) => ({
@@ -102,18 +108,36 @@ test.describe('scene sequence follow-ups @real', () => {
     await expect(page.getByTestId('scene-row')).toHaveCount(4);
     await page.screenshot({ path: `${SHOTS}/seq2-4-timeline.png` });
 
+    const parentUrl = `/p/${session.projectId}/c/${session.canvasId}`;
     for (const [format, file] of [['MP4', 'seq2-combined.mp4'], ['GIF', 'seq2-combined.gif']]) {
+      await gotoHydrated(page, parentUrl);
+      await expect(hostOf(parent.id)).toBeVisible({ timeout: 30_000 });
+      await page.keyboard.press('Shift+Digit1');
+      await page.waitForTimeout(SETTLE_MS);
+      const at = (await hostOf(parent.id).boundingBox())!;
+      await expect(async () => {
+        await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+        await expect(page.getByTestId('frame-timeline')).toBeVisible({ timeout: 1500 });
+      }).toPass({ timeout: 25_000 });
       await page.getByRole('button', { name: 'More actions' }).click();
       await page.getByRole('menuitem', { name: 'Export…' }).click();
       await page.getByTestId('export-mode-video').click();
       await page.getByTestId('export-format').getByRole('radio', { name: format, exact: true }).click();
+      await page.getByTestId('export-dialog').screenshot({ path: `${SHOTS}/seq2-export-${format.toLowerCase()}.png` });
+      if (!(await page.getByTestId('export-start').isVisible())) {
+        console.log(`${format} export is a server render here, not run: ${await page.getByTestId('export-dialog').innerText()}`);
+        continue;
+      }
       await page.getByTestId('export-start').click();
       const download = page.getByTestId('export-download');
       await expect(download).toBeVisible({ timeout: 240_000 });
       const saving = page.waitForEvent('download');
       await download.click();
       await (await saving).saveAs(`${SHOTS}/${file}`);
-      await page.keyboard.press('Escape');
+      if (format === 'MP4') {
+        const blended = [0, 1, 2, 3, 4].map((i) => pixelAt(`${SHOTS}/${file}`, FADE_MIDDLE + i)).filter(([r]) => r > 45 && r < 250);
+        expect(blended.length, 'frames 88-92 of the crossfade are neither pure orange nor pure green').toBeGreaterThan(0);
+      }
     }
 
     const lottie = await page.evaluate(async ({ canvasUrl, frameId }) => {

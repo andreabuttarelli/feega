@@ -145,7 +145,7 @@ function edgeTweens(clip: MotionClip, fps: number): Tween[] {
 }
 
 function junctionTweens(doc: MotionDoc, pairs: JunctionPair[]): Tween[] {
-  return junctionMoves(doc, pairs).map((m) => ({ target: `#fx-${m.clip}`, from: m.from, to: m.to, at: m.at / doc.fps, duration: m.length / doc.fps, ease: m.ease }));
+  return junctionMoves(doc, pairs, flattenComps(doc)).map((m) => ({ target: `#fx-${m.clip}`, from: m.from, to: m.to, at: m.at / doc.fps, duration: m.length / doc.fps, ease: m.ease }));
 }
 
 function moveTweens(clip: MotionClip, fps: number): Tween[] {
@@ -627,7 +627,7 @@ export const preparedDoc = (raw: ComposeInput): MotionDoc => bakedDoc(raw, liveD
 
 export const junctionMovesOf = (raw: ComposeInput): JunctionMove[] => {
   const shown = shownDoc(raw);
-  return junctionMoves(shown, junctionPairs(shown));
+  return junctionMoves(shown, junctionPairs(shown), flattenComps(shown));
 };
 
 export function composeHtml(raw: ComposeInput): string {
