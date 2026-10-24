@@ -199,7 +199,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleOutlines]: VIEW,
   [Command.Help]: VIEW,
   [Command.Precompose]: motion('precompose'),
-  [Command.Group]: motion('precompose'),
+  [Command.Group]: motion('frame_clips'),
   [Command.Ungroup]: motion('ungroup'),
   [Command.AutoLayout]: motion('add_auto_layout'),
   [Command.FrameSelection]: motion('frame_clips'),

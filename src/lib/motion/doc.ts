@@ -117,6 +117,7 @@ const clipSchema = z.object({
   locked: z.boolean().optional(),
   bleed: z.boolean().optional(),
   clipContent: z.boolean().optional(),
+  group: z.boolean().optional(),
   markers: z.array(markerSchema).max(MAX_MARKERS).optional(),
   autoLayout: autoLayoutSchema.nullable().optional(),
   layoutItem: layoutItemSchema.optional(),

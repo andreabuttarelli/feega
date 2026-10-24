@@ -124,12 +124,15 @@ function ownTracks(doc: MotionDoc, clipIds: readonly string[], trackId: string):
 
 enum Container {
   Frame = 'frame',
-  AutoLayout = 'auto-layout'
+  AutoLayout = 'auto-layout',
+  Group = 'group'
 }
 
-const CONTAINER_TRACK: Record<Container, string> = { [Container.Frame]: 'Frame', [Container.AutoLayout]: 'Auto layout' };
+const CONTAINER_TRACK: Record<Container, string> = { [Container.Frame]: 'Frame', [Container.AutoLayout]: 'Auto layout', [Container.Group]: 'Group' };
 
 export const wrapInAutoLayout = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.AutoLayout);
+
+export const wrapInGroup = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Group);
 
 export const wrapInFrame = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Frame);
 
@@ -143,14 +146,17 @@ export function resizeToFit(doc: MotionDoc, containerId: string): OpResult {
     return setLayoutItem(doc, containerId, HUG);
   }
 
+  return { ok: true, doc: withClip(doc, containerId, (c) => ({ ...c, props: { ...c.props, ...boxAround(doc, children) } })) };
+}
+
+export function boxAround(doc: MotionDoc, children: readonly MotionClip[]) {
   const size = { width: doc.width, height: doc.height };
   const boxes = children.map((c) => pivotBox(c.props, size));
   const left = Math.min(...boxes.map((b) => b.left));
   const top = Math.min(...boxes.map((b) => b.top));
   const right = Math.max(...boxes.map((b) => b.left + b.width));
   const bottom = Math.max(...boxes.map((b) => b.top + b.height));
-  const fitted = { x: (left + right) / 2 / size.width, y: (top + bottom) / 2 / size.height, width: (right - left) / size.width, height: (bottom - top) / size.height };
-  return { ok: true, doc: withClip(doc, containerId, (c) => ({ ...c, props: { ...c.props, ...fitted } })) };
+  return { x: (left + right) / 2 / size.width, y: (top + bottom) / 2 / size.height, width: (right - left) / size.width, height: (bottom - top) / size.height };
 }
 
 export function removeAutoLayout(doc: MotionDoc, containerId: string): OpResult {
@@ -196,6 +202,7 @@ function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trac
     return result;
   }
   result = container === Container.AutoLayout ? setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start }) : result;
+  result = container === Container.Group && result.ok ? { ok: true, doc: withClip(result.doc, id, (c) => ({ ...c, group: true })) } : result;
   for (const p of placed) {
     if (!result.ok) {
       return result;

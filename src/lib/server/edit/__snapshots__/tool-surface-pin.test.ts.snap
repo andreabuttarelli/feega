@@ -696,7 +696,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema focus_ui 1`] = `"11adc1364105d244fb01f4a92bf360c700a7ab62a3cd74404ffe636acb64d7fe"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema frame_clips 1`] = `"e15757e25ae6e8fa1b7eb895ce92639852d0ac77c6f4bfa0c62e985c184181f3"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema frame_clips 1`] = `"c42cd59269fb9340d5b021586210694f4ecd196d731b914b5117362ab2522103"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema frame_list_templates 1`] = `"b05507ef7cfe78bbaa184242f14a9c717cea14c1512592ebca7ccb849730d3fe"`;
 
@@ -1050,7 +1050,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema unexpose_field 1`] = `"4b12841d1ed9cb9819b8d3b1aa9f0faa4d8634d2592caa87f9c5270b07e73c7a"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema ungroup 1`] = `"dc2c61c0f000aedc5188a19cff513e695997cbe8e36bed49ec155a5a7222ed83"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema ungroup 1`] = `"9130fed553052bac34093f20236e9d3fa596935d78d072e1efd9e6aea7c3bdbb"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema ungroup_element 1`] = `"65d5490235faf7e3a6f8f4a4dbc9534ab5a1824506bd5de5b344962705e2a829"`;
 
@@ -1226,7 +1226,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op unexpose_field 1`] = `"61ba95de8c38b22f032e1555ffb793d4650f3217d1f24b47226549d5e33a1b8e"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op ungroup 1`] = `"c4c9bb206286c32284beac4945b42fe79a039223e663402b5d1bebbe8795f242"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op ungroup 1`] = `"5c2808fcb6a91b847bd552bb3c72bce2eb30e697192e32237043edb2ffa719fb"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op ungroup_element 1`] = `"2f2add5bba11401327d40cc4ff9768e8c3605886faab9798706afb89c35d1608"`;
 

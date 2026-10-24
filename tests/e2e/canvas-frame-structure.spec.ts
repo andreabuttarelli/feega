@@ -70,25 +70,23 @@ test.describe('group, boolean ops and deep select inside a core frame @real', ()
 
     await page.keyboard.press('ControlOrMeta+g');
     await expect(selections).toHaveCount(1);
-    await expect.poll(async () => (await topIds()).length, { timeout: SAVED_MS }).toBe(1);
+    await expect.poll(async () => (await topIds()).length, { timeout: SAVED_MS }).toBe(3);
     await shot(page, 'grouped');
 
-    const [group] = await topIds();
+    const [group] = (await topIds()).filter((id) => id !== 'a' && id !== 'b');
     await page.keyboard.down('ControlOrMeta');
     await page.mouse.click(left.x, left.y);
     await page.keyboard.up('ControlOrMeta');
-    await expect(selections).toHaveAttribute('data-clip', `${group}__0__a`);
+    await expect(selections).toHaveAttribute('data-clip', 'a');
     await expect(page.getByTestId('frame-inspector')).toBeVisible();
     await page.screenshot({ path: `${process.env.HOME}/Documents/feega-videos/e2e/stab-group-member-props.png` });
     await shot(page, 'deep');
 
     await page.keyboard.press('Escape');
-    await expect(selections).toHaveAttribute('data-clip', group);
-    await page.mouse.dblclick(left.x, left.y);
-    await expect(selections).toHaveAttribute('data-clip', `${group}__0__a`);
-    await shot(page, 'entered');
     await page.keyboard.press('Escape');
+    await page.mouse.click(left.x, left.y);
     await expect(selections).toHaveAttribute('data-clip', group);
+    await shot(page, 'entered');
 
     await page.mouse.click(left.x, left.y);
     await page.keyboard.press('ControlOrMeta+Shift+g');

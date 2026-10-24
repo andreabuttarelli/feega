@@ -1,4 +1,5 @@
 import { ungroupClip } from '$lib/motion/group';
+import { groupLight, settleGroups, ungroupLight } from '$lib/motion/light-group';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
 import { StyleAction, StyleKind, StyleSlot, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, saveAsStyle, stylesOf } from '$lib/motion/styles';
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
@@ -733,7 +734,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     if (blownUp.length) {
       return { ok: false, error: blownUp.map((p) => p.detail).join('; ') };
     }
-    session.doc = result.doc;
+    session.doc = settleGroups(result.doc);
     session.edits.push(what);
     return { ok: true, edit: what };
   };
@@ -1699,11 +1700,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     frame_clips: tool({
-      description: 'Frame the selection, like the editor Frame selection: wraps those visual clips in a transparent rectangle Shape drawn directly under them and parents them to it, without auto layout; children stay where they are. Returns container_id.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
-      execute: async ({ clip_ids }) => {
+      description: 'Frame the selection, like the editor Frame selection: wraps those visual clips in a transparent rectangle Shape drawn directly under them and parents them to it, without auto layout; children stay where they are. group true makes a light group instead, like ⌘G: no fill, its bounds always follow its members and it deletes itself when the last one leaves; ungroup takes it apart. Returns container_id.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), group: z.boolean().optional() }),
+      execute: async ({ clip_ids, group }) => {
         const id = deps.newId();
-        const out = apply(wrapInFrame(session.doc, clip_ids, id, deps.newId()), `framed ${clip_ids.length} clip(s)`);
+        const wrap = group ? groupLight : wrapInFrame;
+        const out = apply(wrap(session.doc, clip_ids, id, deps.newId()), `${group ? 'grouped' : 'framed'} ${clip_ids.length} clip(s)`);
         return out.ok ? { ...out, container_id: id } : out;
       }
     }),
@@ -2827,9 +2829,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     ungroup: tool({
-      description: 'Ungroup: put the clips of a group (a Precomp made by precompose or ⌘G) back on the top level, at the same place and time; its offset is carried to each clip. Refused when the group is scaled, rotated or animated.',
+      description: 'Ungroup: put the clips of a group back on the top level, at the same place and time. A light group (frame_clips group true, ⌘G) just lets go of its members; a Precomp made by precompose carries its offset to each clip and is refused when scaled, rotated or animated.',
       inputSchema: z.object({ clip_id: z.string() }),
-      execute: async (input) => apply(ungroupClip(session.doc, input.clip_id, deps.newId), 'ungrouped')
+      execute: async (input) => apply(findClip(session.doc, input.clip_id)?.clip.group ? ungroupLight(session.doc, input.clip_id) : ungroupClip(session.doc, input.clip_id, deps.newId), 'ungrouped')
     }),
 
     create_comp: tool({
