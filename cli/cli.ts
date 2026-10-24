@@ -551,6 +551,26 @@ allowlist
     await cmdAllowlistSet(medium as 'image' | 'video' | 'model3d', ids, opts);
   });
 
+const caps = program
+  .command('caps')
+  .description('Show the spend caps of your org')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdCaps } = await import('./commands/spend-caps.ts');
+    await cmdCaps(opts);
+  });
+
+caps
+  .command('set <scope> <usd>')
+  .description('Set a cap (scope: org_member, project_member, project_total; usd, or "off" to remove). Admins only')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .option('--project <id>', 'The project, for the project scopes')
+  .option('--reset <reset>', 'none or monthly')
+  .action(async (scope: string, usd: string, opts) => {
+    const { cmdCapsSet } = await import('./commands/spend-caps.ts');
+    await cmdCapsSet(scope as 'org_member', usd, opts);
+  });
+
 const layouts = program
   .command('layouts')
   .description('List the custom composition layouts of your workspace')

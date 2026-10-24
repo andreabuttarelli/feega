@@ -97,6 +97,7 @@ const RESTANO = [
   'list_team',
   'team_op',
   'model_allowlist',
+  'spend_caps',
   'edit',
   'view'
 ];

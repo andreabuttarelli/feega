@@ -4,6 +4,7 @@ import { pickOf, turnModel } from '$lib/server/project-agent/model-route';
 import { startProjectTurn, type BriefBrand } from '$lib/server/project-agent/turn';
 import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
+import { CAP_REACHED, capRefusal, liveCapReader } from '$lib/server/spend-caps/gate';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listCanvases } from '$lib/server/repos/canvas';
 import { findReachableProject } from '$lib/server/projects/lookup';
@@ -28,6 +29,8 @@ import type { RequestHandler } from './$types';
  *   POST { message }  →  stream UI messages (stessa forma della vecchia chat di brand)
  *   GET               →  { threadId, messages: [{ role, content }] }
  */
+const HTTP_FORBIDDEN = 403;
+
 export const config = { maxDuration: AGENT_MAX_DURATION_S };
 
 async function loadBriefBrand(
@@ -65,6 +68,11 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
   if (gated) return gated;
+
+  const capped = await capRefusal(await liveCapReader(db), { orgId, userId: user.id, projectId: project.id });
+  if (capped) {
+    return json({ error: CAP_REACHED, message: capped }, { status: HTTP_FORBIDDEN });
+  }
 
   const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };
   const parsedFrame = openFrameSchema.safeParse(askedFrame);
