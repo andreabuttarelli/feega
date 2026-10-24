@@ -3,6 +3,7 @@
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
   import { withColour } from '$lib/canvas/node-colour';
+  import CompareOverlay from '$lib/components/canvas/CompareOverlay.svelte';
   import OutputViewer from '$lib/components/canvas/OutputViewer.svelte';
   import { OUTPUT_KIND_OF, viewableRuns, type OutputKind, type ViewerRun } from '$lib/canvas/run-info';
   import NodeSearch from '$lib/components/canvas/NodeSearch.svelte';
@@ -287,6 +288,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let linkCopied = $state(false);
 
   let viewing = $state<{ runs: ViewerRun[]; start: number; kind: OutputKind } | null>(null);
+
+  let pairing = $state<{ left: string; right: string; leftLabel: string; rightLabel: string } | null>(null);
+
+  function compareOutputs(ids: string[]) {
+    const [a, b] = ids.map((id) => nodes.find((n) => n.id === id));
+    if (!a || !b || typeof a.data.refId !== 'string' || typeof b.data.refId !== 'string') {
+      return;
+    }
+    const urlOf = (assetId: string) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full);
+    const nameOf = (n: typeof a) => n.displayName ?? (typeof n.data.prompt === 'string' ? n.data.prompt.slice(0, 24) : 'Image');
+    pairing = { left: urlOf(a.data.refId), right: urlOf(b.data.refId), leftLabel: nameOf(a), rightLabel: nameOf(b) };
+  }
 
   function viewOutput(id: string) {
     const node = nodes.find((n) => n.id === id);
@@ -3744,6 +3757,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onSection={wrapInSection}
     onSectionChange={(id, patch) => void write(id, patch, SaveTiming.Now)}
     onViewOutput={viewOutput}
+    onCompareOutputs={compareOutputs}
     onColourChange={(ids, tag) => ids.forEach((id) => void write(id, withColour(tag), SaveTiming.Now))}
     onGroup={groupElements}
     onUngroup={ungroupElements}
@@ -4093,6 +4107,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
 
   <NodeSearch {nodes} onjump={(id) => focusOn([id], undefined, FocusMode.Select)} />
+
+  {#if pairing}
+    <CompareOverlay {...pairing} onclose={() => (pairing = null)} />
+  {/if}
 
   {#if viewing}
     <OutputViewer runs={viewing.runs} start={viewing.start} kind={viewing.kind} urlFor={(assetId) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full)} onclose={() => (viewing = null)} />

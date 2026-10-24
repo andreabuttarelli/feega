@@ -2,6 +2,7 @@
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import Sparkles from '@lucide/svelte/icons/sparkles';
   import Maximize2 from '@lucide/svelte/icons/maximize-2';
+  import Columns2 from '@lucide/svelte/icons/columns-2';
   import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
   import { isFrameDialogAction } from '$lib/canvas/frame-dialogs';
   import { actionsIn, enabledFor, shownFor, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
@@ -44,7 +45,8 @@
     onpropertychange,
     onsectionchange,
     oncolourchange,
-    onview
+    onview,
+    oncompare
   }: {
     box: { x: number; y: number; width: number } | null;
     zoom?: number;
@@ -62,7 +64,10 @@
     onsectionchange?: (id: string, patch: { title?: string; fill?: string }) => void;
     oncolourchange?: (tag: ColourTag | null) => void;
     onview?: () => void;
+    oncompare?: () => void;
   } = $props();
+
+  const comparable = $derived(count === 2 && nodeSummaries.length === 2 && nodeSummaries.every((n) => n.type === 'image' && typeof n.data.refId === 'string'));
 
   const viewable = $derived(count === 1 && !!nodeSummaries[0] && nodeSummaries[0].type in OUTPUT_KIND_OF && typeof nodeSummaries[0].data.refId === 'string');
 
@@ -211,6 +216,12 @@
           <Button variant="ghost" size="sm" class="h-11 md:h-8" data-testid="view-output" onclick={() => onview?.()}>
             <Maximize2 strokeWidth={1.7} />
             View
+          </Button>
+        {/if}
+        {#if comparable}
+          <Button variant="ghost" size="sm" class="h-11 md:h-8" data-testid="compare-outputs" onclick={() => oncompare?.()}>
+            <Columns2 strokeWidth={1.7} />
+            Compare
           </Button>
         {/if}
         {#each secondary as action (action.id)}

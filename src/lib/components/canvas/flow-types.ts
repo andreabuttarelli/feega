@@ -118,6 +118,7 @@ export type FlowProps = {
   runQuoteFor?: (ids: string[]) => RunQuote | null;
   onRunNode?: (id: string) => void;
   onViewOutput?: (id: string) => void;
+  onCompareOutputs?: (ids: string[]) => void;
   nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
   modelChoicesFor?: (type: GenPropertyType) => ModelChoice[];
   catalogueSyncedFor?: (type: GenPropertyType) => boolean;
