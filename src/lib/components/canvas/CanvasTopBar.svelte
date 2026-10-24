@@ -56,7 +56,8 @@
     projectMode = ProjectMode.Standard,
     brandName = null,
     onVersions = null,
-    onComments = null
+    onComments = null,
+    commentsUnseen = false
   }: {
     projectId: string;
     projectName: string;
@@ -75,6 +76,7 @@
     brandName?: string | null;
     onVersions?: (() => void) | null;
     onComments?: (() => void) | null;
+    commentsUnseen?: boolean;
   } = $props();
 
   const ICON = 16;
@@ -224,6 +226,7 @@
     <DropdownMenu.Root>
       <DropdownMenu.Trigger class="switcher-btn" data-testid="canvas-switcher" title={canvasName}>
         <span class="truncate canvas-name">{canvasName}</span>
+        {#if commentsUnseen}<span class="unseen-dot" data-testid="comments-unseen" role="img" aria-label="Unread mention"></span>{/if}
         <ChevronDown size={ICON} />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="start" collisionPadding={EDGE} class="sw-menu w-[300px]">
@@ -296,6 +299,7 @@
           <DropdownMenu.Item class="sw-row" data-testid="canvas-comments" onSelect={onComments}>
             <span class="sw-lead"><MessageSquare size={ICON} /></span>
             Comments
+            {#if commentsUnseen}<span class="unseen-dot" role="img" aria-label="Unread mention"></span>{/if}
           </DropdownMenu.Item>
         {/if}
         <DropdownMenu.Item class="sw-row" data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>
@@ -371,6 +375,15 @@
 </header>
 
 <style>
+  .unseen-dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-left: 4px;
+    background: #0b6bff;
+    border-radius: 9999px;
+  }
+
   .canvas-topbar {
     position: relative;
     z-index: 20;

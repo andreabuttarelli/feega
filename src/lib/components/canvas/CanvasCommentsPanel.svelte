@@ -1,21 +1,28 @@
 <script lang="ts">
   import { commentBodyError, type CommentThread } from '$lib/canvas/comment-threads';
+  import { insertMention, mentionQuery, type Teammate } from '$lib/canvas/comment-mentions';
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
 
   let {
     threads,
     me,
+    team = [],
     pinsTo,
     onadd,
     onreply,
+    onedit,
+    ondelete,
     onresolve,
     onclose
   }: {
     threads: CommentThread[] | null;
     me: string;
+    team?: Teammate[];
     pinsTo: string;
     onadd: (body: string) => Promise<void>;
     onreply: (threadId: string, body: string) => Promise<void>;
+    onedit: (commentId: string, body: string) => Promise<void>;
+    ondelete: (commentId: string) => Promise<void>;
     onresolve: (thread: CommentThread) => void;
     onclose: () => void;
   } = $props();
@@ -26,7 +33,21 @@
 
   const shown = $derived((threads ?? []).filter((t) => showResolved || !t.resolved));
   const hiddenCount = $derived((threads ?? []).filter((t) => t.resolved).length);
-  const who = (id: string) => (id === me ? 'You' : 'Teammate');
+  let editing = $state<{ id: string; body: string } | null>(null);
+  const who = (id: string) => (id === me ? 'You' : (team.find((m) => m.id === id)?.name ?? 'Teammate'));
+  const suggestions = (text: string) => {
+    const query = mentionQuery(text);
+    return query === null ? [] : team.filter((m) => m.id !== me && m.name.toLowerCase().includes(query.toLowerCase())).slice(0, 5);
+  };
+
+  async function saveEdit(e: SubmitEvent) {
+    e.preventDefault();
+    if (!editing || commentBodyError(editing.body)) {
+      return;
+    }
+    await onedit(editing.id, editing.body);
+    editing = null;
+  }
 
   async function add(e: SubmitEvent) {
     e.preventDefault();
@@ -48,6 +69,33 @@
   }
 </script>
 
+{#snippet picks(text: string, pick: (next: string) => void)}
+  {#each suggestions(text) as m (m.id)}
+    <button type="button" class="cm-pick" data-testid="mention-option" onclick={() => pick(insertMention(text, m.name))}>@{m.name}</button>
+  {/each}
+{/snippet}
+
+{#snippet entry(id: string, authorId: string, body: string, editedAt: string | null, testid: string, cls: string, lead: string)}
+  {#if editing?.id === id}
+    <form class="cm-edit" onsubmit={saveEdit}>
+      <textarea aria-label="Edit comment" rows="2" maxlength="2000" bind:value={editing.body} data-testid="comment-edit-input"></textarea>
+      {@render picks(editing.body, (next) => editing && (editing.body = next))}
+      <div class="cm-row">
+        <button type="button" class="cm-btn" onclick={() => (editing = null)}>Cancel</button>
+        <button type="submit" class="cm-btn primary" data-testid="comment-edit-save" disabled={!!commentBodyError(editing.body)}>Save</button>
+      </div>
+    </form>
+  {:else}
+    <p class={cls} data-testid={testid}>{#if lead}<strong>{lead}</strong> {/if}{body}{#if editedAt} <span class="cm-tag" data-testid="comment-edited">(edited)</span>{/if}</p>
+    {#if authorId === me}
+      <div class="cm-own">
+        <button type="button" class="cm-link" data-testid="comment-edit" onclick={() => (editing = { id, body })}>Edit</button>
+        <button type="button" class="cm-link" data-testid="comment-delete" onclick={() => ondelete(id)}>Delete</button>
+      </div>
+    {/if}
+  {/if}
+{/snippet}
+
 <aside class="cm-panel" aria-label="Comments" data-testid="comments-panel">
   <header>
     <h3>Comments</h3>
@@ -56,6 +104,7 @@
 
   <form class="cm-new" onsubmit={add}>
     <textarea placeholder="Add a comment" aria-label="New comment" rows="2" maxlength="2000" bind:value={draft} data-testid="comment-draft"></textarea>
+    {@render picks(draft, (next) => (draft = next))}
     <div class="cm-row">
       <span class="cm-note">Pins to {pinsTo}</span>
       <button type="submit" class="cm-btn primary" data-testid="comment-add" disabled={!!commentBodyError(draft)}>Comment</button>
@@ -77,10 +126,11 @@
           {#if t.timeMs !== null}<span class="cm-tag" data-testid="comment-time">{(t.timeMs / 1000).toFixed(2)}s</span>{/if}
           {#if t.resolved}<span class="cm-tag">Resolved</span>{/if}
         </button>
-        <p class="cm-body">{t.body}</p>
+        {@render entry(t.id, t.authorId, t.body, t.editedAt, 'comment-body', 'cm-body', '')}
         {#each t.replies as r (r.id)}
-          <p class="cm-reply" data-testid="comment-reply"><strong>{who(r.authorId)}</strong> {r.body}</p>
+          {@render entry(r.id, r.authorId, r.body, r.editedAt, 'comment-reply', 'cm-reply', who(r.authorId))}
         {/each}
+        {@render picks(replies[t.id] ?? '', (next) => (replies[t.id] = next))}
         <form class="cm-row" onsubmit={(e) => reply(e, t)}>
           <input placeholder="Reply" aria-label={`Reply to comment ${t.number}`} maxlength="2000" bind:value={replies[t.id]} data-testid="comment-reply-input" />
           <button type="submit" class="cm-btn" data-testid="comment-reply-send">Reply</button>
@@ -120,5 +170,8 @@
   .cm-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 4px 8px; cursor: pointer; background: var(--paper-2, #f5f5f7); color: var(--ink, #1d1d1f); border: 1px solid var(--line, #e3e3e6); border-radius: var(--ui-radius-sm, 4px); }
   .cm-btn.primary { background: var(--ink, #1d1d1f); color: var(--paper, #fff); }
   .cm-btn:disabled { opacity: 0.4; cursor: default; }
+  .cm-edit { display: flex; flex-direction: column; gap: 6px; }
+  .cm-own { display: flex; gap: 10px; }
+  .cm-pick { align-self: flex-start; font: inherit; font-size: 12px; cursor: pointer; padding: 2px 8px; background: var(--paper-2, #f5f5f7); border: 1px solid var(--line, #e3e3e6); border-radius: var(--ui-radius-sm, 4px); }
   .cm-link { align-self: flex-start; font: inherit; font-size: 12px; cursor: pointer; background: none; border: 0; padding: 0; color: var(--ink-soft, #6e6e73); text-decoration: underline; }
 </style>
