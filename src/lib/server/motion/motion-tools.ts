@@ -445,6 +445,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         mutedLanes: c.mutedLanes ?? [],
         locked: c.locked ?? false,
         bleed: c.bleed ?? false,
+        lockRatio: c.lockRatio ?? false,
         clipContent: c.clipContent ?? false,
         markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
         physics: c.physics ? shownRecord(c.component, c.physics, doc) : null,
