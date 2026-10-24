@@ -1,7 +1,7 @@
 import { TrackKind } from './components';
-import { TransitionKind } from './design';
+import { TransitionKind, type Ease } from './design';
 import type { MotionClip, MotionDoc } from './doc';
-import type { Junction, JunctionKind } from './junction-model';
+import { JUNCTION, Span, type Junction, type JunctionKind, type JunctionVars, type Move } from './junction-model';
 
 export * from './junction-model';
 
@@ -73,4 +73,38 @@ export function withJunctions(doc: MotionDoc): MotionDoc {
     };
   };
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(joined) })) };
+}
+
+export type JunctionMove = { clip: string; from: JunctionVars; to: JunctionVars; at: number; length: number; ease: Ease };
+
+const SPAN: Record<Span, (d: number) => { offset: number; length: number }> = {
+  [Span.Whole]: (d) => ({ offset: 0, length: d }),
+  [Span.FirstHalf]: (d) => ({ offset: 0, length: d / 2 }),
+  [Span.SecondHalf]: (d) => ({ offset: d / 2, length: d / 2 })
+};
+
+function incomingOnTop(doc: MotionDoc, pair: JunctionPair): boolean {
+  const rank = (id: string) => {
+    const track = doc.tracks.findIndex((t) => t.clips.some((c) => c.id === id));
+    return [-track, doc.tracks[track].clips.findIndex((c) => c.id === id)];
+  };
+  const [inTrack, inIndex] = rank(pair.incoming);
+  const [outTrack, outIndex] = rank(pair.outgoing);
+  return inTrack !== outTrack ? inTrack > outTrack : inIndex > outIndex;
+}
+
+export function junctionMoves(doc: MotionDoc, pairs: JunctionPair[]): JunctionMove[] {
+  const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]);
+  return pairs.flatMap((pair) => {
+    const spec = JUNCTION[pair.kind];
+    const incoming = clips.find((c) => c.id === pair.incoming)!;
+    const at = incoming.from - junctionHalves(pair.durationInFrames).before;
+    const below = spec.incomingBelow && !incomingOnTop(doc, pair);
+    const moves = (clip: string, list: Move[]): JunctionMove[] =>
+      list.map((move) => {
+        const { offset, length } = SPAN[move.span](pair.durationInFrames);
+        return { clip, from: move.from, to: move.to, at: at + offset, length, ease: spec.ease };
+      });
+    return [...moves(pair.outgoing, below ? spec.incomingBelow! : spec.outgoing), ...(below ? [] : moves(pair.incoming, spec.incoming))];
+  });
 }

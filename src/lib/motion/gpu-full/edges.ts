@@ -1,6 +1,7 @@
 import { Ease, TransitionKind } from '../design';
 import { EDGE_HIDDEN, EDGE_SHOWN, MOVES } from '../hyperframes/compose';
 import { sampleTrack } from '../sample-track';
+import type { JunctionMove } from '../junctions';
 import type { Vars } from '../hyperframes/templates';
 
 export type Pose = { opacity: number; x: number; y: number; scale: number; wipe: number; blur: number };
@@ -9,6 +10,7 @@ type Edge = { kind: TransitionKind; durationInFrames: number };
 type Edged = { from: number; durationInFrames: number; transitionIn: Edge; transitionOut: Edge; props: Record<string, unknown> };
 
 const PERCENT = 100;
+const BLUR = 'blur';
 const NUMBER = /-?[\d.]+/;
 
 const numberIn = (v: unknown) => Number(NUMBER.exec(String(v))?.[0] ?? 0);
@@ -19,7 +21,7 @@ const READ: Record<keyof Pose, (vars: Vars) => number | undefined> = {
   y: (v) => (v.yPercent === undefined ? undefined : Number(v.yPercent) / PERCENT),
   scale: (v) => (v.scale === undefined ? undefined : Number(v.scale)),
   wipe: (v) => (v.clipPath === undefined ? undefined : String(v.clipPath).split(/\s+/).map(numberIn)[1] / PERCENT),
-  blur: (v) => (v.filter === undefined ? undefined : numberIn(v.filter))
+  blur: (v) => (v.filter === undefined || !String(v.filter).startsWith(BLUR) ? undefined : numberIn(v.filter))
 };
 
 const poseOf = (vars: Vars, base: Pose): Pose => Object.fromEntries(Object.entries(READ).map(([k, read]) => [k, read(vars) ?? base[k as keyof Pose]])) as Pose;
@@ -48,3 +50,14 @@ export function moveAt(clip: Edged, frame: number): Pose {
   const move = MOVES[(clip.props.move as keyof typeof MOVES) ?? 'none'] ?? MOVES.none;
   return between(poseOf(move.from, SHOWN), poseOf(move.to, SHOWN), frame, clip.from, clip.durationInFrames, String(clip.props.easing ?? Ease.Standard));
 }
+
+export function junctionPoseAt(moves: readonly JunctionMove[], frame: number): Pose {
+  const started = moves.filter((m) => frame >= m.at).sort((a, b) => a.at - b.at);
+  return started.reduce<Pose>((pose, m) => {
+    const sampled = between(poseOf(m.from, SHOWN), poseOf(m.to, SHOWN), frame, m.at, m.length, m.ease);
+    const owned = Object.keys(READ).filter((k) => READ[k as keyof Pose](m.to) !== undefined);
+    return { ...pose, ...Object.fromEntries(owned.map((k) => [k, sampled[k as keyof Pose]])) };
+  }, SHOWN);
+}
+
+export const composePoses = combine;
