@@ -10,6 +10,7 @@ import { billedCreditsFor } from '$lib/credit-ladder';
 import { videoDurationOptions, VIDEO_RESOLUTIONS, MIN_DURATION } from '$lib/server/video';
 import { modelParamsOf } from '$lib/canvas/model-params';
 import { env } from '$env/dynamic/private';
+import { allowedIds, applyAllowlist } from './model-allowlist/allowlist';
 import { taskChoice } from './task-choice';
 import { configuredIn, taskProviderOf, TaskProviderName } from './generation/task-providers';
 import { discountBook, withDiscountPrices } from './generation/discount-routes';
@@ -421,8 +422,17 @@ const OFFERABLE: Readonly<Record<SyncedCatalogue, (admin: SupabaseClient, view: 
   model3d: offerableModels3d
 };
 
-export async function offerableModels(admin: SupabaseClient, medium: SyncedCatalogue, view = PricingView.Offered): Promise<OfferableModels> {
-  return OFFERABLE[medium](admin, view);
+export async function offerableModels(
+  admin: SupabaseClient,
+  medium: SyncedCatalogue,
+  view = PricingView.Offered,
+  orgId?: string
+): Promise<OfferableModels> {
+  const offered = await OFFERABLE[medium](admin, view);
+  if (!orgId) {
+    return offered;
+  }
+  return { ...offered, choices: applyAllowlist(offered.choices, await allowedIds(admin, orgId, medium)) };
 }
 
 /**

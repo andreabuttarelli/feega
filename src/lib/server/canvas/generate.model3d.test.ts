@@ -7,6 +7,7 @@ import { reconcileTaskNodeRuns, runGenNode } from './generate';
 import type { TaskModel, TaskRunDeps } from './task-run';
 import type { ScreenPorts } from '$lib/server/moderation/screen';
 import { readGlbJson } from '$lib/server/content-credentials';
+import { MODEL_NOT_ALLOWED } from '$lib/server/model-allowlist/allowlist';
 import { MODEL3D_INPUT_REQUIRED } from '$lib/canvas/model3d-run';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
@@ -163,6 +164,25 @@ describe('a 3D node on a Wiro image-to-3D model', () => {
 
     expect(out).toEqual({ kind: 'refused', error: MODEL3D_INPUT_REQUIRED });
     expect(imageStep.generate).not.toHaveBeenCalled();
+    expect(gateway.run).not.toHaveBeenCalled();
+  });
+
+  it('refuses a model the org allow-list leaves out, before spending anything', async () => {
+    upstream.referenceImageUrls = [PRODUCT_URL];
+    const { db } = fakeDb(
+      {
+        nodes: [model3dNode()],
+        nodes_connections: [],
+        assets: [],
+        projects: [standardProject],
+        org_model_allowlist: [{ org_id: ORG, medium: 'model3d', model_id: 'another/model' }]
+      },
+      { updateRows: { nodes: [{ ...model3dNode(), version: 2 }] } }
+    );
+
+    const out = await runGenNode(db, start());
+
+    expect(out).toEqual({ kind: 'refused', error: MODEL_NOT_ALLOWED });
     expect(gateway.run).not.toHaveBeenCalled();
   });
 

@@ -49,6 +49,9 @@
       [`${base}/api-keys`]: {
         title: $_('app.settings.apiKeys.title')
       },
+      [`${base}/models`]: {
+        title: $_('app.settings.models.title')
+      },
       [`${base}/team`]: {
         title: $_('app.settings.team.title')
       },

@@ -58,6 +58,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     scope: 'workspace',
     requiresBrand: false
   },
+  { path: 'models', labelKey: 'app.settings.models.title', scope: 'workspace', requiresBrand: false },
   { path: 'team', labelKey: 'app.settings.team.title', scope: 'workspace', requiresBrand: false },
   {
     path: 'content',

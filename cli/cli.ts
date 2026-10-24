@@ -533,6 +533,24 @@ effects
     await cmdEffectsPatch(effectId, opts);
   });
 
+const allowlist = program
+  .command('allowlist')
+  .description('Show which image, video and 3D models your org offers')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdAllowlist } = await import('./commands/model-allowlist.ts');
+    await cmdAllowlist(opts);
+  });
+
+allowlist
+  .command('set <medium> [ids...]')
+  .description('Replace the models a medium (image, video, model3d) offers; no ids allows every model. Admins only')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (medium: string, ids: string[], opts) => {
+    const { cmdAllowlistSet } = await import('./commands/model-allowlist.ts');
+    await cmdAllowlistSet(medium as 'image' | 'video' | 'model3d', ids, opts);
+  });
+
 const layouts = program
   .command('layouts')
   .description('List the custom composition layouts of your workspace')

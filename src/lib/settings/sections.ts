@@ -6,6 +6,7 @@ export enum SettingsSection {
   Content = 'content',
   Team = 'team',
   ApiKeys = 'api-keys',
+  Models = 'models',
   Danger = 'danger',
   Products = 'products'
 }

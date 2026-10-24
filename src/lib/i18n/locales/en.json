@@ -263,6 +263,17 @@
           "failed": "We couldn't delete the brand. Please try again."
         }
       },
+      "models": {
+        "title": "Models",
+        "subtitle": "Choose which image, video and 3D models your organization can generate with. A medium with nothing checked offers every model.",
+        "image": "Image",
+        "video": "Video",
+        "model3d": "3D",
+        "save": "Save",
+        "saved": "Saved.",
+        "adminOnly": "Only owners and admins can change this.",
+        "unavailable": "Could not save. Try again later."
+      },
       "apiKeys": {
         "title": "API Keys",
         "subtitle": "Generate long-lived keys for custom integrations. Keys have full read & write access. Use them as Bearer tokens in your scripts, CI/CD, or automation tools.",
