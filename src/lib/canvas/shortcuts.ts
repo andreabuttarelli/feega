@@ -76,6 +76,8 @@ function viewFor(e: KeyboardEvent): FrameView | null {
 
 function stackFor(e: KeyboardEvent): boolean {
   return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.AutoLayout;
+}
+
 function editModeFor(e: KeyboardEvent): boolean {
   return commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey }) === Command.ToggleEditMode;
 }
