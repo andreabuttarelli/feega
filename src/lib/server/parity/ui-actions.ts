@@ -46,6 +46,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   loop_plan: canvas('preview_node_loop'),
   run_loop: canvas('run_node_loop'),
   cancel_loop: canvas('cancel_node_loop'),
+  cancel_run: canvas('cancel_run'),
   retry_loop_combo: canvas('retry_loop_combination'),
   workflow_plan: canvas('preview_workflow'),
   run_workflow: canvas('run_workflow'),

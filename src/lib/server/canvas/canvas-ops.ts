@@ -18,7 +18,7 @@ import {
   DataCheck,
   type PatchWrite
 } from '$lib/server/repos/canvas';
-import { runsOf } from '$lib/server/canvas/generate';
+import { cancelNodeRun, runsOf } from '$lib/server/canvas/generate';
 import { runGeneration, type GenerationOutcome } from '$lib/server/canvas/variants';
 import { cancelBatch } from '$lib/server/canvas/cancel-batch';
 import { parseVariantsAsk } from '$lib/canvas/variants';
@@ -934,6 +934,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: nodeIdInput,
     run: async (ctx, input) => cancelBatch(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId })
+  }),
+
+  cancel_run: op({
+    access: Access.Write,
+    input: nodeIdInput,
+    run: async (ctx, input) => cancelNodeRun(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId, actor: ctx.actor })
   }),
 
   preview_run_graph: op({

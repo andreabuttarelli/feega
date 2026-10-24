@@ -2335,6 +2335,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   /** Ferma i biglietti non ancora reclamati da un tick — quelli già in corso finiscono, i
    *  risultati già pronti restano nella lista di output. */
+  async function cancelRunFor(id: string) {
+    await post('cancel_run', { node_id: id });
+    await refresh();
+  }
+
   async function cancelLoopFor(id: string) {
     await post('cancel_loop', { node_id: id });
     await refresh();
@@ -3948,6 +3953,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     {variantsInFlightFor}
     {historyFor}
     onCancelVariants={cancelLoopFor}
+    onCancelRun={cancelRunFor}
     {nodeSummaries}
     {modelChoicesFor}
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
