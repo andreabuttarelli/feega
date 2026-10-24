@@ -8,7 +8,8 @@ import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { listNodesByIds } from '$lib/server/repos/canvas';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
-import { GLOBAL_TAB, isGlobalTab, parseAssetSourceFilter } from '$lib/assets/asset-filter';
+import { GLOBAL_TAB, HISTORY_TAB, isGlobalTab, isHistoryTab, parseAssetSourceFilter } from '$lib/assets/asset-filter';
+import { listRunHistory, type RunHistoryItem, type RunHistoryPage } from '$lib/server/repos/run-history';
 import { listCatalogueImages } from '$lib/server/repos/reference-images';
 
 /**
@@ -52,6 +53,24 @@ async function withSignedUrls(
   );
 }
 
+export type HistoryEntry = RunHistoryItem & { signedUrl: string | null };
+export type HistoryView = { items: HistoryEntry[]; nextBefore: string | null; scope: HistoryScope; model: string | null };
+export type HistoryScope = 'org' | 'project';
+
+const NO_HISTORY: HistoryView = { items: [], nextBefore: null, scope: 'org', model: null };
+
+async function signedHistory(locals: App.Locals, page: RunHistoryPage): Promise<HistoryEntry[]> {
+  const db = await locals.db();
+  if (!db) {
+    throw error(500, 'sessione senza client');
+  }
+
+  const paths = page.items.map((i) => i.asset.url).filter((u): u is string => !!u);
+  const signed = await signAssetPaths(db, createAssetSigningDb(), { generated: paths, uploaded: [] }, undefined, 'mediaGrid');
+
+  return page.items.map((item) => ({ ...item, signedUrl: item.asset.url ? (signed.get(item.asset.url) ?? null) : null }));
+}
+
 export const load = async ({ params, url, locals }: ServerLoadEvent<ProjectParams>) => {
   const { session, user } = await locals.safeGetSession();
   if (!session || !user) {
@@ -73,7 +92,20 @@ export const load = async ({ params, url, locals }: ServerLoadEvent<ProjectParam
   const projectSummary = { id: project.id, name: project.name, slug: project.slug };
 
   if (isGlobalTab(url.searchParams.get('source'))) {
-    return { orgId, project: projectSummary, items: [] as MediaAsset[], catalogue: await listCatalogueImages(db, 'mediaGrid'), filter: GLOBAL_TAB };
+    return { orgId, project: projectSummary, items: [] as MediaAsset[], catalogue: await listCatalogueImages(db, 'mediaGrid'), history: NO_HISTORY, filter: GLOBAL_TAB as string };
+  }
+
+  if (isHistoryTab(url.searchParams.get('source'))) {
+    const scope: HistoryScope = url.searchParams.get('scope') === 'project' ? 'project' : 'org';
+    const model = url.searchParams.get('model');
+    const page = await listRunHistory(db, {
+      orgId,
+      model: model ?? undefined,
+      projectId: scope === 'project' ? project.id : undefined,
+      before: url.searchParams.get('before') ?? undefined
+    });
+    const items = await signedHistory(locals, page);
+    return { orgId, project: projectSummary, items: [] as MediaAsset[], catalogue: [], history: { items, nextBefore: page.nextBefore, scope, model }, filter: HISTORY_TAB as string };
   }
 
   const source = parseAssetSourceFilter(url.searchParams.get('source'));
@@ -103,7 +135,8 @@ export const load = async ({ params, url, locals }: ServerLoadEvent<ProjectParam
     project: projectSummary,
     items,
     catalogue: [],
-    filter: source ?? 'all'
+    history: NO_HISTORY,
+    filter: (source ?? 'all') as string
   };
 };
 

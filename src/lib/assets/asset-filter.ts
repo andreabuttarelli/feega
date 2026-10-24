@@ -17,3 +17,9 @@ export const GLOBAL_TAB = 'global';
 export function isGlobalTab(raw: string | null): boolean {
   return raw === GLOBAL_TAB;
 }
+
+export const HISTORY_TAB = 'history';
+
+export function isHistoryTab(raw: string | null): boolean {
+  return raw === HISTORY_TAB;
+}
