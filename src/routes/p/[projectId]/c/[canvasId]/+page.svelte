@@ -1479,6 +1479,20 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     commentsPanel.setUnseen(hasUnseenMention(threads, me, readSeen(data.canvas.id)));
   });
 
+  $effect(() => {
+    const refreshWhenBack = () => {
+      if (document.visibilityState === 'visible') {
+        void loadComments();
+      }
+    };
+    window.addEventListener('focus', refreshWhenBack);
+    document.addEventListener('visibilitychange', refreshWhenBack);
+    return () => {
+      window.removeEventListener('focus', refreshWhenBack);
+      document.removeEventListener('visibilitychange', refreshWhenBack);
+    };
+  });
+
   const pinTarget = $derived.by(() => {
     const dropped = commentsPanel.pending;
     if (dropped) {
@@ -1601,7 +1615,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         if (moved) { nodes = moved; return; }
         refreshSoon();
       },
-      onReconnect: () => { void checkStale(Trigger.Reconnect); },
+      onReconnect: () => { void checkStale(Trigger.Reconnect); void loadComments(); },
+      onComments: () => { void loadComments(); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
       onPeers: (value) => { peers = value; cursors.port.crowd(value.length + 1); },
       onLink: (state) => { canvasLink.set(state); },
