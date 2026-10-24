@@ -49,7 +49,7 @@
 <svelte:window onpointerdown={outside} onkeydown={(e) => e.key === 'Escape' && onclose()} />
 
 {#if items.length || pickable.length}
-  <div class={MENU_CONTENT} role="menu" data-testid="canvas-menu" onclick={(e) => e.stopPropagation()} onpointerdown={(e) => e.stopPropagation()} style={`position: fixed; z-index: 30; min-width: 200px; left: ${at.x}px; top: ${at.y}px`}>
+  <div class={MENU_CONTENT} role="menu" data-testid="canvas-menu" onclick={(e) => e.stopPropagation()} onpointerdown={(e) => e.stopPropagation()} style={`position: fixed; z-index: 30; min-width: 200px; left: ${at.x}px; top: ${at.y}px; max-height: calc(100vh - ${at.y}px - 8px); overflow-y: auto`}>
     {#if pickable.length}
       <div class="px-2 pt-2 pb-1 text-ui-caption text-ui-text-3" role="presentation">Select layer</div>
       {#each pickable as layer (layer.id)}
