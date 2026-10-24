@@ -1,6 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { listMembers } from '$lib/server/repos/orgs';
 import type { Actor } from '$lib/server/repos/actor';
+import { AGENT_MENTION_ID, agentTeammate } from '$lib/canvas/comment-agent';
 import { commentBodyError, threadsOf, type CommentRow, type CommentThread } from '$lib/canvas/comment-threads';
 
 type Scope = { orgId: string; canvasId: string };
@@ -37,7 +38,7 @@ export enum CommentOutcome {
   Missing = 'missing'
 }
 
-export type NewComment = Scope & { body: string; actor: Actor; nodeId?: string | null; parentId?: string | null; x?: number; y?: number; timeMs?: number | null; mentions?: string[] };
+export type NewComment = Scope & { body: string; actor: Actor; nodeId?: string | null; parentId?: string | null; x?: number; y?: number; timeMs?: number | null; mentions?: string[]; byAgent?: boolean };
 
 export type Teammate = { id: string; name: string };
 
@@ -53,14 +54,14 @@ const momentOf = (ms: number | null | undefined): number | null => (typeof ms ==
 
 export async function teammates(db: Db, orgId: string): Promise<Teammate[]> {
   const members = await listMembers(db, orgId);
-  return members.map((m) => ({ id: m.userId, name: m.name ?? m.email }));
+  return [...members.map((m) => ({ id: m.userId, name: m.name ?? m.email })), agentTeammate()];
 }
 
 async function mentionable(db: Db, orgId: string, ids: string[] | undefined): Promise<string[]> {
   if (!ids?.length) {
     return [];
   }
-  const members = new Set((await teammates(db, orgId)).map((m) => m.id));
+  const members = new Set((await listMembers(db, orgId)).map((m) => m.userId));
   return [...new Set(ids)].filter((id) => members.has(id));
 }
 
@@ -85,7 +86,7 @@ export async function addComment(db: Db, input: NewComment): Promise<{ outcome: 
   }
 
   const { data, error } = await comments(db)
-    .insert({ org_id: input.orgId, canvas_id: input.canvasId, node_id: input.parentId ? null : (input.nodeId ?? null), parent_id: input.parentId ?? null, author_id: input.actor.id, x: input.x ?? 0, y: input.y ?? 0, time_ms: input.parentId ? null : momentOf(input.timeMs), mentions: await mentionable(db, input.orgId, input.mentions), body: input.body.trim() })
+    .insert({ org_id: input.orgId, canvas_id: input.canvasId, node_id: input.parentId ? null : (input.nodeId ?? null), parent_id: input.parentId ?? null, author_id: input.actor.id, x: input.x ?? 0, y: input.y ?? 0, time_ms: input.parentId ? null : momentOf(input.timeMs), mentions: input.byAgent ? [AGENT_MENTION_ID] : await mentionable(db, input.orgId, input.mentions), body: input.body.trim() })
     .select('id')
     .single();
   if (error || !data) {

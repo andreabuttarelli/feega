@@ -1,6 +1,6 @@
 <script lang="ts">
   import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
-  import { TextSizing } from '$lib/motion/text-sizing';
+  import { DRAGGED_TEXT_SIZING, NEW_TEXT_SIZING } from '$lib/motion/text-sizing';
   import type { MotionDoc } from '$lib/motion/doc';
   import { DrawTool, clickBox, closesOnFirst, dragRect, type DragPoint, type DrawBox } from '$lib/motion/draw-tool';
   import { LINE_PAINT, drawClip, lineOutline, penClip, penPaint, type LineTool } from '$lib/motion/draw-create';
@@ -28,6 +28,7 @@
   const LINE_INK = 'brand.text';
   const LINE_TOOLS: ReadonlySet<DrawTool> = new Set([DrawTool.Line, DrawTool.Arrow]);
   const MIN_LINE_PX = 2;
+  const MIN_TEXT_DRAG_PX = 10;
   const PENCIL_SMOOTHING_PX = 2;
 
   const SUMMARY: Record<DrawTool, string> = {
@@ -76,6 +77,7 @@
 
   const docPx = (screenPx: number) => (host ? (screenPx * doc.width) / hostWidth(host) : screenPx);
   const reach = () => docPx(CLOSE_REACH_PX);
+  const clickLike = (box: DrawBox) => tool === DrawTool.Text && Math.max(box.width, box.height) < docPx(MIN_TEXT_DRAG_PX);
   const unit = (box: DrawBox): DrawBox => ({ x: box.x / doc.width, y: box.y / doc.height, width: box.width / doc.width, height: box.height / doc.height });
 
   function create(result: OpResult, id: string) {
@@ -139,7 +141,7 @@
       drag = null;
       return;
     }
-    const dragged = drag ? live : null;
+    const dragged = live && !clickLike(live) ? live : null;
     const box = dragged ?? (tool === DrawTool.Text ? clickBox(drag.from, { width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height }) : null);
     drag = null;
     if (!box) {
@@ -147,7 +149,7 @@
     }
     held = box;
     const id = newId();
-    create(drawClip(doc, tool, unit(box), frame, id, dragged ? TextSizing.AutoHeight : TextSizing.AutoWidth), id);
+    create(drawClip(doc, tool, unit(box), frame, id, dragged ? DRAGGED_TEXT_SIZING : NEW_TEXT_SIZING), id);
   }
 
   function drawLine(from: DragPoint, to: DragPoint) {

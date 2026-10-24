@@ -533,7 +533,10 @@ const hexColour = z.string().regex(/^#[0-9a-f]{6}$/i);
 const drawnBox = z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse, DrawTool.Polygon, DrawTool.Star]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional(), sizing: z.enum(TEXT_SIZINGS).optional() }).strict();
 const drawnPen = z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(1).max(20_000) }).strict();
 
-export const drawnSchema = z.discriminatedUnion('tool', [drawnBox, drawnPen]);
+const canvasPoint = z.object({ x: z.number().finite(), y: z.number().finite() }).strict();
+const drawnLine = z.object({ tool: z.enum([DrawTool.Line, DrawTool.Arrow]), from: canvasPoint, to: canvasPoint, stroke: hexColour.optional(), theme: z.enum(CanvasTheme).optional() }).strict();
+
+export const drawnSchema = z.discriminatedUnion('tool', [drawnBox, drawnPen, drawnLine]);
 
 export const pastedSchema = z.discriminatedUnion('tool', [
   drawnBox.extend({ text: z.string().min(1).max(PASTED_TEXT_MAX).optional(), color: hexColour.optional(), weight: z.number().int().min(PASTED_WEIGHT.min).max(PASTED_WEIGHT.max).optional() }),

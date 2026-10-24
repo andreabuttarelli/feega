@@ -135,7 +135,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { DrawTool } from '$lib/motion/draw-tool';
-  import { TextSizing } from '$lib/motion/text-sizing';
+  import { NEW_TEXT_SIZING } from '$lib/motion/text-sizing';
   import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
@@ -3351,7 +3351,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const longest = Math.min(TEXT_BOX.maxChars, Math.max(...text.split('\n').map((line) => line.length)));
     const width = longest * TEXT_BOX.lineHeight * TEXT_BOX.charWidth;
     const height = TEXT_BOX.lineHeight;
-    void drawElement({ tool: DrawTool.Text, box: { left: at.x - width / 2, top: at.y - height / 2, width, height }, text, sizing: TextSizing.AutoWidth });
+    void drawElement({ tool: DrawTool.Text, box: { left: at.x - width / 2, top: at.y - height / 2, width, height }, text, sizing: NEW_TEXT_SIZING });
   }
 
   const PASTE_DATA: { [K in Pasted]: (data: Extract<PasteData<File>, { kind: K }>, at: { x: number; y: number }) => void } = {

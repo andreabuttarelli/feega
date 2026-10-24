@@ -417,4 +417,26 @@ describe('the chat reaches every canvas op of the API, from the same table', () 
     expect(opsOf(tools())).not.toContain('request_upload');
     expect(opsOf(tools())).not.toContain('clone_voice');
   });
+
+  it('reaches the canvas style library and variables', () => {
+    expect(opsOf(tools())).toEqual(expect.arrayContaining(['styles', 'variables']));
+  });
+});
+
+describe('the chat draws what the canvas draws', () => {
+  it('an arrow from two points becomes a free element', async () => {
+    const rows = {
+      canvases: [{ id: CANVAS, org_id: ORG, project_id: PROJECT, name: 'Canvas', viewport: null }],
+      projects: [{ id: PROJECT, org_id: ORG, name: 'P', slug: 'p', brand_id: null, archived_at: null, updated_at: '', mode: 'standard' }],
+      nodes: [] as Record<string, unknown>[],
+      motion_revisions: [] as Record<string, unknown>[],
+      canvas_events: [{}]
+    };
+    const { db } = fakeDb(rows, { filter: true, mutate: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = await run(tools.draw_element, { canvasId: CANVAS, drawn: { tool: 'arrow', from: { x: 0, y: 100 }, to: { x: 300, y: 100 } } });
+
+    expect(out).toMatchObject({ outcome: 'done', new_frame: true, element_id: expect.any(String) });
+  });
 });

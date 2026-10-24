@@ -4,11 +4,12 @@ import type { Actions, ServerLoadEvent } from '@sveltejs/kit';
 type ProjectParams = { projectId: string };
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findProjectForUser } from '$lib/server/projects/lookup';
-import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
+import { listProjectAssets, listOrgAssets, type Asset } from '$lib/server/repos/assets';
 import { listNodesByIds } from '$lib/server/repos/canvas';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
-import { GLOBAL_TAB, HISTORY_TAB, isGlobalTab, isHistoryTab, parseAssetSourceFilter } from '$lib/assets/asset-filter';
+import { GLOBAL_TAB, HISTORY_TAB, LIBRARY_TAB, isGlobalTab, isHistoryTab, isLibraryTab, parseAssetSourceFilter } from '$lib/assets/asset-filter';
+import { saveToOrgLibrary } from '$lib/server/repos/org-library';
 import { listRunHistory, type RunHistoryItem, type RunHistoryPage } from '$lib/server/repos/run-history';
 import { listCatalogueImages } from '$lib/server/repos/reference-images';
 
@@ -108,9 +109,10 @@ export const load = async ({ params, url, locals }: ServerLoadEvent<ProjectParam
     return { orgId, project: projectSummary, items: [] as MediaAsset[], catalogue: [], history: { items, nextBefore: page.nextBefore, scope, model }, filter: HISTORY_TAB as string };
   }
 
+  const isLibrary = isLibraryTab(url.searchParams.get('source'));
   const source = parseAssetSourceFilter(url.searchParams.get('source'));
 
-  const assets = await listProjectAssets(db, { orgId, projectId: project.id, source });
+  const assets = isLibrary ? await listOrgAssets(db, orgId) : await listProjectAssets(db, { orgId, projectId: project.id, source });
 
   const nodeIds = [...new Set(assets.map((a) => a.sourceNodeId).filter((id): id is string => !!id))];
   const [signedUrls, nodes] = await Promise.all([
@@ -136,7 +138,7 @@ export const load = async ({ params, url, locals }: ServerLoadEvent<ProjectParam
     items,
     catalogue: [],
     history: NO_HISTORY,
-    filter: (source ?? 'all') as string
+    filter: (isLibrary ? LIBRARY_TAB : (source ?? 'all')) as string
   };
 };
 
@@ -147,6 +149,32 @@ export const load = async ({ params, url, locals }: ServerLoadEvent<ProjectParam
  * `registerCanvasUpload`, vedi il commento lì per il perché.
  */
 export const actions: Actions<ProjectParams> = {
+  saveToLibrary: async ({ request, params, locals }) => {
+    const { session, user } = await locals.safeGetSession();
+    if (!session || !user) {
+      throw redirect(303, '/login');
+    }
+
+    const db = await locals.db();
+    if (!db) {
+      throw error(500, 'sessione senza client');
+    }
+
+    const memberships = await listMemberships(db, user.id);
+    const found = await findProjectForUser(db, { projectId: params.projectId ?? '', memberships });
+    if (!found) {
+      throw error(404, 'This project does not exist, or is not yours');
+    }
+
+    const assetId = String((await request.formData()).get('asset_id') ?? '');
+    const saved = assetId ? await saveToOrgLibrary(db, { orgId: found.orgId, assetId }) : null;
+    if (!saved) {
+      return fail(404, { error: 'Asset not found' });
+    }
+
+    return { asset: saved };
+  },
+
   upload: async ({ request, params, locals }) => {
     const { session, user } = await locals.safeGetSession();
     if (!session || !user) {

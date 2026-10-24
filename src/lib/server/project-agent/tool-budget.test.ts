@@ -7,7 +7,7 @@ import { frameRunner } from './frame-tools';
 import { LOADED_CAP, LOAD_TOOLS, ToolLoading, frameSurface } from './tool-loading';
 
 const SCOPE = { orgId: 'o', projectId: 'p', userId: 'u' };
-const CORE_MAX_CHARS = 29_000;
+const CORE_MAX_CHARS = 30_000;
 const CATALOGUE_TO_CORE_RATIO = 6;
 
 async function promptChars(tools: Record<string, Tool>): Promise<number> {

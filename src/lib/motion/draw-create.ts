@@ -1,5 +1,5 @@
 import { COMPONENTS, TYPE_SIZE, type ComponentId } from './components';
-import { TextSizing } from './text-sizing';
+import { NEW_TEXT_SIZING, TextSizing } from './text-sizing';
 import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { DrawTool, type DragPoint, type DrawBox } from './draw-tool';
 import { corner, mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
@@ -61,7 +61,7 @@ const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox, sizing: TextSizi
   [DrawTool.Frame]: () => ({})
 };
 
-export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = TextSizing.AutoHeight, extra: Record<string, unknown> = {}): OpResult {
+export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = NEW_TEXT_SIZING, extra: Record<string, unknown> = {}): OpResult {
   const made = BOX_CLIP[tool as BoxTool];
   if (!made) {
     return fail(`${tool} does not draw a box`);
@@ -134,9 +134,16 @@ type BoxDrawn = { tool: BoxTool; box: CanvasBox; theme?: CanvasTheme; sizing?: T
 
 export type Drawn = BoxDrawn | ({ tool: DrawTool.Pen; outline: Outline } & PenPaint);
 
-export type DrawnWire = BoxDrawn | ({ tool: DrawTool.Pen; path: string } & PenPaint);
+export type LineWire = { tool: LineTool; from: DragPoint; to: DragPoint; stroke?: string; theme?: CanvasTheme };
+
+export type DrawnWire = BoxDrawn | ({ tool: DrawTool.Pen; path: string } & PenPaint) | LineWire;
+
+const isLine = (wire: DrawnWire): wire is LineWire => wire.tool === DrawTool.Line || wire.tool === DrawTool.Arrow;
 
 export function drawnOf(wire: DrawnWire): Drawn | string {
+  if (isLine(wire)) {
+    return { tool: DrawTool.Pen, outline: lineOutline(wire.from, wire.to, wire.tool), ...LINE_PAINT[wire.tool](wire.stroke ?? CANVAS_INK[wire.theme ?? CanvasTheme.Light]) };
+  }
   if (wire.tool !== DrawTool.Pen) {
     return wire;
   }

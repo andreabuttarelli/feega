@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { AGENT_MENTION_ID } from '$lib/canvas/comment-agent';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { CommentOutcome, addComment, deleteComment, editComment, listComments, resolveThread, teammates } from './canvas-comments';
 
@@ -122,10 +123,19 @@ describe('canvas comments', () => {
     expect(await listComments(fake.db, scope)).toEqual([]);
   });
 
-  it('lists the teammates of the org to mention, by name', async () => {
+  it('lists the teammates of the org to mention, by name, and the agent last', async () => {
     expect(await teammates(open().db, 'org')).toEqual([
       { id: 'u1', name: 'Ana' },
-      { id: 'u2', name: 'Bo' }
+      { id: 'u2', name: 'Bo' },
+      { id: AGENT_MENTION_ID, name: 'feega' }
     ]);
+  });
+
+  it('a person cannot pass for the agent by mentioning its marker', async () => {
+    const fake = open();
+
+    await addComment(fake.db, { ...scope, nodeId: 'n1', body: 'hi', actor: user, mentions: [AGENT_MENTION_ID, 'u2'] });
+
+    expect(fake.calls.find((c) => c.table === 'canvas_comments' && c.op === 'insert')?.payload).toMatchObject({ mentions: ['u2'] });
   });
 });
