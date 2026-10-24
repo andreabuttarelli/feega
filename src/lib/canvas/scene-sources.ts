@@ -22,7 +22,9 @@ export async function withScenes<T extends SceneSource>(source: T, load: LoadSce
   return { ...source, doc: resolveScenes(source.doc, scenes.docs), assets: { ...scenes.assets, ...source.assets } };
 }
 
-export function sceneStamp(doc: MotionDoc, revisionOf: (nodeId: string) => number): string {
+export const sceneRevision = (saved: number, edits: number | undefined): string => (edits === undefined ? `${saved}` : `${saved}~${edits}`);
+
+export function sceneStamp(doc: MotionDoc, revisionOf: (nodeId: string) => number | string): string {
   return uniqueScenes(doc)
     .map((id) => `${id}@${revisionOf(id)}`)
     .join(',');
