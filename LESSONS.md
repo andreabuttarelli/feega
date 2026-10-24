@@ -3296,3 +3296,7 @@ Signal: a `@real` spec polls `nodes` and never finds the row it just made, right
 ## Generating docs from app code
 
 **Signal:** a script that imports `$lib/server/...` dies on `$app/...`, `virtual:...` or a missing `.svelte-kit/tsconfig.json`; `vite-node` with the SvelteKit plugin throws "An impossible situation occurred". **Move:** run the script as a vitest file with the app's own `vite.config.ts` (`web-docs/scripts/vitest.gen.config.ts`), overriding only `test.include` and `setupFiles`. A worktree needs a `node_modules` symlink first.
+
+## An OpenRouter call that 402s with plenty of credit left
+
+Signal: `This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens` from a judge or any call that sets no `max_tokens`. Cause: OpenRouter reserves the model's maximum output against the balance before the call. Move: always pass `max_tokens` sized to the answer (a 5-axis JSON verdict needs ~1500).
