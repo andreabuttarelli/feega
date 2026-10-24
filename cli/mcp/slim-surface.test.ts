@@ -87,6 +87,14 @@ describe('nothing is lost: every tool stays reachable', () => {
     expect(local.sort()).toEqual(Object.keys(TOOL_FAMILY).sort());
   });
 
+  test('describe answers its JSON once, as text, not again as structuredContent', async () => {
+    const c = client();
+    await c.init();
+    const described = (await c.call('describe', {})) as { structuredContent?: unknown } | undefined;
+
+    expect(described?.structuredContent).toBeUndefined();
+  });
+
   test('a hidden tool is still callable by its old name', async () => {
     const c = client();
     await c.init();

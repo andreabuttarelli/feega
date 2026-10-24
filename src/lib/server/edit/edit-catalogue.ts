@@ -3,7 +3,7 @@ import { CANVAS_OPS, type CanvasOpName } from '$lib/server/canvas/canvas-ops';
 import { CANVAS_OP_SUMMARIES } from '$lib/server/canvas/canvas-op-summaries';
 import { EDITOR_OPS, type EditorOpName } from '$lib/server/frame-editor/editor-ops';
 import { EDITOR_OP_SUMMARIES } from '$lib/server/frame-editor/editor-op-summaries';
-import { SPENDING_TOOLS, motionToolList, motionToolSpec } from '$lib/server/motion/tool-run';
+import { frameToolAccess, motionToolList, motionToolSpec } from '$lib/server/motion/tool-run';
 import type { Answer, CanvasAsk, EditorAsk, FrameToolAsk } from './runners';
 
 export enum Family {
@@ -58,7 +58,7 @@ const canvasRow: RowOf = (name, source) => {
 const frameRowOf = (): RowOf => {
   const summaries = new Map(motionToolList().map((t) => [t.name, t.summary]));
   return (_name, source) => ({
-    access: SPENDING_TOOLS.has(source) ? 'spend' : 'write',
+    access: frameToolAccess(source),
     summary: summaries.get(source) ?? '',
     schema: async () => (await motionToolSpec(source))?.input_schema ?? null,
     run: (runners, ask) => runners.frame({ nodeId: ask.nodeId, tool: source, input: ask.input, version: ask.version })

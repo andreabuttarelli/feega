@@ -4,7 +4,7 @@
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
 **58 tool** — 25 in lettura, 27 in scrittura, 6 che distruggono.
-Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3474 caratteri**, circa **869 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 59.584 caratteri.
+Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3540 caratteri**, circa **885 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 59.975 caratteri.
 
 | gruppo | tool |
 |---|---:|
@@ -46,11 +46,12 @@ Deprecated, use `edit`. The canvas ops of the project chat, on one project (`pro
 ### `describe` · R
 
 
-Exact input schema of any op or tool.
+Families, op names, or exact input schemas.
 
 | campo | tipo | |
 |---|---|---|
 | `org`? | string |  |
+| `family`? | `canvas` \| `frame` \| `editor` |  |
 | `op`? | string |  |
 | `ops`? | string[] |  |
 
@@ -58,7 +59,7 @@ Exact input schema of any op or tool.
 
 *Edit the canvas and its frames*
 
-The one way to change a canvas: nodes, free elements, frames and what is inside a frame. You never pick an endpoint, the server routes by `op`. Call op "describe" first: {} lists every op (name, family canvas|frame|editor, access, one line); {op} or {ops:[...]} give strict JSON input schemas; {schemas:true} gives all of them (large). One op: {op, target?, element?, input?, version?, project_id?}. `target` = the node or frame id the op acts on (a frame op requires it); `element` = an element id inside that frame; they fill the id fields of the op's input (nodeId, frameId, elementId, clip_id, clip_ids) unless you set them. `project_id` is needed by a canvas op without a `target`. Batch: op "batch" with `ops:[{op,target?,element?,input?},...]` (up to 500), canvas and frame ops mixed, run in order. Consecutive ops on the same frame are ONE revision, all or none. Across steps nothing is atomic: it stops at the first failure and answers `applied` (steps done), `failed` (index) and each step's result; earlier steps stay. A later step cannot use an id created by an earlier one: create first, then batch. In a frame: element ids come from `view` canvas_summary/get; move or restyle with set_props/set_transform; `version` refuses a stale write. Free canvas element or node: move_node, resize_node, rename_node, update_node, delete_node. Between frames: move_frame_element. Names shared by two registries: the canvas op keeps the name, the frame tool becomes `frame_<name>`, the editor action `editor_<name>` (e.g. list_templates = canvas, frame_list_templates). Spending ops (run_node, generate_voiceover...) are marked access "spend" in describe and need credits. Errors answer the reason, with `fix` when known.
+The one way to change a canvas: nodes, free elements, frames and what is inside a frame. You never pick an endpoint, the server routes by `op`. Op "describe": {} gives the three families (canvas|frame|editor) with counts; {family} its op names, access (read|write|spend|editor) and one line; {op} or {ops:[...]} strict JSON input schemas. One op: {op, target?, element?, input?, version?, project_id?}. `target` = the node or frame id the op acts on (a frame op requires it); `element` = an element id inside that frame; they fill the id fields of the op's input (nodeId, frameId, elementId, clip_id, clip_ids) unless you set them. `project_id` is needed by a canvas op without a `target`. Batch: op "batch" with `ops:[{op,target?,element?,input?},...]` (up to 500), canvas and frame ops mixed, run in order. Consecutive ops on the same frame are ONE revision, all or none. Across steps nothing is atomic: it stops at the first failure and answers `applied` (steps done), `failed` (index) and each step's result; earlier steps stay. A later step cannot use an id created by an earlier one: create first, then batch. In a frame: element ids come from `view` canvas_summary/get; move or restyle with set_props/set_transform; `version` refuses a stale write. Free canvas element or node: move_node, resize_node, rename_node, update_node, delete_node. Between frames: move_frame_element. Names shared by two registries: the canvas op keeps the name, the frame tool becomes `frame_<name>`, the editor action `editor_<name>` (e.g. list_templates = canvas, frame_list_templates). Access in describe: read and write are free, spend costs credits (run_node, generate_voiceover), editor needs a chat turn in the app (recreate_ui, add_music). Errors answer the reason, with `fix` when known.
 
 | campo | tipo | |
 |---|---|---|
@@ -615,7 +616,7 @@ Add ONE row to any table in your org. `org_id` is filled in for you; naming a di
 
 *Query the database*
 
-READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts, ads, products, social accounts — every table, scoped to your org and nothing else. No SQL: name a table, columns and filters, and it issues one PostgREST read. Omit `table` to list every name. A project has no brand until one is attached (`projects.brand_id` is nullable, and that is the normal case). A canvas belongs to a project; nodes and their connections belong to a canvas. A post (`posts` table) is the promoted artifact — caption, media, brand — different from a node, which is raw canvas material; `post_sources` links a post back to the nodes it came from. Free.
+READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts, ads, products, social accounts — every table, scoped to your org and nothing else. No SQL: name a table, columns and `where` filters, and it issues one PostgREST read. Omit `table` to list every name. A project has no brand until one is attached (`projects.brand_id` is nullable, and that is the normal case). A canvas belongs to a project; nodes and their connections belong to a canvas. A post (`posts` table) is the promoted artifact — caption, media, brand — different from a node, which is raw canvas material; `post_sources` links a post back to the nodes it came from. Free.
 
 | campo | tipo | |
 |---|---|---|
