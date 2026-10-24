@@ -3,6 +3,7 @@ import type { Snippet } from 'svelte';
 import type { Offset } from '$lib/canvas/duplicate-plan';
 import type { FocusRequest } from '$lib/canvas/free-area';
 import type { GenPropertyType } from '$lib/canvas/common-properties';
+import type { ColourTag } from '$lib/canvas/node-colour';
 import type { Poster } from '$lib/canvas/poster-lod';
 import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
 import type { BarContext } from '$lib/canvas/bottom-bar';
@@ -22,6 +23,7 @@ import type { ImageTool } from '$lib/image-tools';
 import type { DragPhase, DropVerdict, ElementOut, PointerPoint } from '$lib/canvas/canvas-drop';
 import type { Stack } from '$lib/canvas/stacking';
 import type { DeleteMode } from '$lib/canvas/section';
+import type { SceneDrop } from '$lib/canvas/scene-drop';
 
 export type Tile = {
   id: string;
@@ -67,9 +69,11 @@ export type FlowProps = {
   ) => void;
   onDelete?: (ids: string[], mode?: DeleteMode) => void;
   onSection?: (ids: string[]) => void;
+  onColourChange?: (ids: string[], tag: ColourTag | null) => void;
   onSectionChange?: (id: string, patch: { title?: string; fill?: string }) => void;
   onCreateFormats?: (frameId: string) => void;
   onCombineScenes?: (frameIds: string[]) => void;
+  onInsertScene?: (drop: SceneDrop) => void;
   onImageTool?: (nodeId: string, tool: ImageTool) => void;
   onExport?: (frameIds: string[]) => void;
   onEdgeDelete?: (edgeId: string) => void;

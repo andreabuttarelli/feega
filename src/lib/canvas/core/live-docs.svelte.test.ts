@@ -17,4 +17,15 @@ describe('live docs', () => {
 
     expect(liveDocs.map.has('b')).toBe(false);
   });
+
+  it('counts edits of the doc, not playhead moves', () => {
+    const first = live('one');
+    liveDocs.set('c', first);
+    liveDocs.set('c', { ...first, playhead: 5 });
+    liveDocs.set('c', live('two'));
+
+    expect(liveDocs.edits.get('c')).toBe(2);
+    liveDocs.clear('c');
+    expect(liveDocs.edits.has('c')).toBe(false);
+  });
 });

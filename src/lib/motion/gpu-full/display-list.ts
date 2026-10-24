@@ -6,7 +6,8 @@ import { sampleTrack } from '../sample-track';
 import { IDENTITY, ParentOpacity, ancestorsOf, mul2d, transformAt, worldAt, type Affine } from '../parent';
 import { apply2d } from '../affine';
 import { boxOf } from '../layout';
-import { preparedDoc } from '../hyperframes/compose';
+import { junctionMovesOf, preparedDoc } from '../hyperframes/compose';
+import type { JunctionMove } from '../junctions';
 import { renderAt } from '../effects/render';
 import { effectOfKey } from '../effects/model';
 import { cssFunctions, FilterKind, unsupportedPrimitive, type Filter, type Linear } from './filters';
@@ -28,7 +29,7 @@ import { rgbaOf, type Rgba } from './rgba';
 import { FillRule, PaintKind, type Paint, type Stop } from './paint';
 import { DrawnKind, type DomRead, type Drawn } from './dom/read';
 import { sourceSeconds } from '../time-remap';
-import { edgeAt, moveAt, type Pose } from './edges';
+import { edgeAt, composePoses, junctionPoseAt, moveAt, type Pose } from './edges';
 import { stillSeconds } from '../still';
 import { counted } from '../text-counter';
 import { animatorOfKey, COLOR_VALUE, SELECTOR_KEYS, type TextAnimator } from '../text-animators/model';
@@ -110,7 +111,7 @@ export type DomReads = ReadonlyMap<string, DomRead>;
 
 export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[]; faces?: readonly FaceRule[] };
 
-export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset };
+export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset; moves: JunctionMove[] };
 
 type PathContent = Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number };
 type ImageContent = Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { stencil?: PathContent[]; filters?: Filter[]; space?: Linear };
@@ -410,6 +411,22 @@ function animatorsAt(clip: MotionClip, frame: number, colour: (v: string) => str
   });
 }
 
+const GROUP_COMPONENT = 'Precomp';
+
+function enclosingGroups(doc: MotionDoc): Map<string, string[]> {
+  const enclosing = new Map<string, string[]>();
+  doc.tracks.forEach((track, at) => {
+    for (const group of (track.clips as MotionClip[]).filter((c) => c.component === GROUP_COMPONENT && Number(c.props.span) > 0)) {
+      for (const inner of doc.tracks.slice(at + 1, at + 1 + Number(group.props.span))) {
+        for (const clip of inner.clips) {
+          enclosing.set(clip.id, [...(enclosing.get(clip.id) ?? []), group.id]);
+        }
+      }
+    }
+  });
+  return enclosing;
+}
+
 function inheritedOpacity(doc: MotionDoc, clip: MotionClip, byId: Map<string, MotionClip>, frame: number): number {
   const own = transformAt(clip, 'opacity', frame);
   if (clip.parentOpacity === ParentOpacity.Ignore) {
@@ -451,12 +468,12 @@ const scissorOf = (pose: Pose, w: number, h: number): Scissor | undefined => (po
 const scaleOf = (m: Affine) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
 
 export function prepare(doc: MotionDoc, tokens: BrandTokens, assets: Record<string, string> = {}, typeset: Typeset = NO_TYPESET): Prepared {
-  return { doc: preparedDoc({ doc, tokens, assets }), tokens, assets, typeset };
+  return { doc: preparedDoc({ doc, tokens, assets }), tokens, assets, typeset, moves: junctionMovesOf({ doc, tokens, assets }) };
 }
 
 const NO_READS: DomReads = new Map();
 
-export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: number, reads: DomReads = NO_READS): DisplayList {
+export function drawFrame({ doc, tokens, assets, typeset, moves }: Prepared, frame: number, reads: DomReads = NO_READS): DisplayList {
   const asset = (id: unknown) => (typeof id === 'string' && id ? (assets[id] ?? null) : null);
   const css = (v: string) => resolveColor(v, tokens);
   const colour = (v: string) => rgbaOf(css(v)) ?? [0, 0, 0, 1];
@@ -466,6 +483,10 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
   const sources = new Set([...pairs.values()].map((p) => p.source));
   const screens = screenFrames(doc).map((s) => s.prefix);
   const onScreen = (clip: MotionClip) => screens.some((prefix) => clip.id.startsWith(prefix));
+  const movesOf = Map.groupBy(moves, (m) => m.clip);
+  const enclosing = enclosingGroups(doc);
+  const poseOf = (clip: MotionClip) => composePoses(edgeAt(clip, frame), junctionPoseAt(movesOf.get(clip.id) ?? [], frame));
+  const effectiveEdge = (clip: MotionClip) => (enclosing.get(clip.id) ?? []).reduce((pose, id) => composePoses(pose, poseOf(byId.get(id)!)), poseOf(clip));
   const items: Item[] = [];
   const unsupported: Gap[] = [];
   const shown = (clip: MotionClip) => frame >= clip.from && frame < clip.from + clip.durationInFrames && !NO_PAINT.has(clip.component);
@@ -485,7 +506,7 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     }
     const { content, gaps } = Array.isArray(painted) ? { content: painted, gaps: [] } : painted;
     unsupported.push(...gaps.map((detail) => ({ clip: clip.id, component: clip.component, reason: Unsupported.Dom, detail })));
-    const edge = edgeAt(clip, frame);
+    const edge = effectiveEdge(clip);
     const world = mul2d(posed(edge, size.width, size.height), worldAt(doc, clip.id, frame, size));
     const masks = maskLayers(clip, frame, size, world, asset);
     const filtered = filtersOf(clip, frame, doc.fps, size, css);

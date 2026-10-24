@@ -4,6 +4,7 @@ import { pickOf, turnModel } from '$lib/server/project-agent/model-route';
 import { startProjectTurn, type BriefBrand } from '$lib/server/project-agent/turn';
 import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
+import { CAP_REACHED, capRefusal, liveCapReader } from '$lib/server/spend-caps/gate';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listCanvases } from '$lib/server/repos/canvas';
 import { findReachableProject } from '$lib/server/projects/lookup';
@@ -15,6 +16,7 @@ import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
 import { latestAnswer, readAnswer } from '$lib/reference-pick';
+import { stopTurn } from '$lib/server/repos/chat-reply';
 import type { RequestHandler } from './$types';
 
 /**
@@ -28,6 +30,8 @@ import type { RequestHandler } from './$types';
  *   POST { message }  →  stream UI messages (stessa forma della vecchia chat di brand)
  *   GET               →  { threadId, messages: [{ role, content }] }
  */
+const HTTP_FORBIDDEN = 403;
+
 export const config = { maxDuration: AGENT_MAX_DURATION_S };
 
 async function loadBriefBrand(
@@ -65,6 +69,11 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
   if (gated) return gated;
+
+  const capped = await capRefusal(await liveCapReader(db), { orgId, userId: user.id, projectId: project.id });
+  if (capped) {
+    return json({ error: CAP_REACHED, message: capped }, { status: HTTP_FORBIDDEN });
+  }
 
   const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };
   const parsedFrame = openFrameSchema.safeParse(askedFrame);
@@ -135,4 +144,25 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 
   const [messages, running] = await Promise.all([loadTurns(db, { orgId, threadId }), turnRunning(db, { orgId, threadId })]);
   return json({ threadId, messages, running });
+};
+
+export const DELETE: RequestHandler = async ({ params, locals }) => {
+  const { user } = await locals.safeGetSession();
+  if (!user) return json({ error: 'unauthenticated' }, { status: 401 });
+
+  const db = await locals.db();
+  if (!db) {
+    return json({ error: 'no_client' }, { status: 500 });
+  }
+
+  const memberships = await listMemberships(db, user.id);
+  const found = await findReachableProject(db, { projectId: params.projectId ?? '', memberships, userId: user.id });
+  if (!found) {
+    return json({ error: 'project_not_found' }, { status: 404 });
+  }
+
+  const { orgId, project } = found;
+  const threadId = await openThread(db, { orgId, projectId: project.id, userId: user.id, brandId: project.brandId });
+  await stopTurn(db, { orgId, threadId });
+  return json({ stopped: true });
 };

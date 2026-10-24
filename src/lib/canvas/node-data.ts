@@ -586,8 +586,8 @@ export function validateNodeData(type: string, data: unknown): NodeDataVerdict {
   }
 
   const schema = NODE_DATA_SCHEMAS[type];
-  const { rotation, groupId, ...own } = (data ?? {}) as Record<string, unknown>;
-  const layout = nodeLayoutSchema.safeParse({ rotation, groupId });
+  const { rotation, groupId, colorTag, ...own } = (data ?? {}) as Record<string, unknown>;
+  const layout = nodeLayoutSchema.safeParse({ rotation, groupId, colorTag });
   if (!layout.success) {
     return { ok: false, error: `${type}.data.${layout.error.issues[0].path.join('.')}: ${layout.error.issues[0].message}` };
   }

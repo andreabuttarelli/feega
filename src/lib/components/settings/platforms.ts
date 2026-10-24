@@ -59,6 +59,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     requiresBrand: false
   },
   { path: 'models', labelKey: 'app.settings.models.title', scope: 'workspace', requiresBrand: false },
+  { path: 'spend', labelKey: 'app.settings.spend.title', scope: 'workspace', requiresBrand: false },
   { path: 'team', labelKey: 'app.settings.team.title', scope: 'workspace', requiresBrand: false },
   {
     path: 'content',

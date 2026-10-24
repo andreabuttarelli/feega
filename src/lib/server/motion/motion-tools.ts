@@ -1036,9 +1036,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     edit_scenes: tool({
-      description: 'Scenes of a video frame made by combining frames: each scene is another frame on the canvas, played by reference, back to back. insert adds a frame (node_id) at the end; reorder lists every scene clip id in the new order; trim sets a scene length in seconds; remove drops one. Transitions between scenes: set_clip_transition on the arriving scene clip.',
+      description: 'Scenes of a video frame made by combining frames: each scene is another frame on the canvas, played by reference, back to back. insert adds a frame (node_id) at the end, or at the scene boundary nearest to at (seconds); reorder lists every scene clip id in the new order; trim sets a scene length in seconds; remove drops one. Transitions between scenes: set_clip_transition on the arriving scene clip.',
       inputSchema: z.discriminatedUnion('op', [
-        z.object({ op: z.literal('insert'), node_id: z.string().uuid(), duration: z.number().min(0.1).max(MAX_SECONDS).default(3) }),
+        z.object({ op: z.literal('insert'), node_id: z.string().uuid(), duration: z.number().min(0.1).max(MAX_SECONDS).default(3), at: z.number().min(0).max(MAX_SECONDS).optional() }),
         z.object({ op: z.literal('reorder'), clip_ids: z.array(z.string()).min(1) }),
         z.object({ op: z.literal('trim'), clip_id: z.string(), duration: z.number().min(0.05).max(MAX_SECONDS) }),
         z.object({ op: z.literal('remove'), clip_id: z.string() })

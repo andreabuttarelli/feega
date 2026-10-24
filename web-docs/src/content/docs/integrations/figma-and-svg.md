@@ -1,0 +1,23 @@
+---
+title: Figma and SVG
+description: Bring designs in from Figma and SVG files.
+sidebar:
+  order: 3
+---
+
+## Paste from Figma
+
+Copy layers in Figma and paste on the canvas.
+
+- Shapes, text and groups land as free elements. Frames and sections land as frames. Pasting over a frame puts everything inside it.
+- Rotation, stacked fills and strokes, gradients (including angular and diamond), and auto layout (direction, spacing, padding, alignment, sizing) come across.
+- Layers keep their Figma names in the Layers panel.
+- Anything that cannot be carried over is listed.
+
+## Figma images
+
+Add a Figma personal access token in Settings and the grey placeholders fill with the real pictures.
+
+## SVG import
+
+Drop or upload an SVG file to get editable vector layers, not a flat image. Gradients, rounded corners, clipping, text and cut-outs (holes) are kept. A pasted SVG keeps its holes too.

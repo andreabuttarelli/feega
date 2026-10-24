@@ -11,6 +11,7 @@ import { registerMotionTools } from './tools/motion.ts';
 import { registerGalleryTools } from './tools/gallery.ts';
 import { registerLayoutTools } from './tools/layouts.ts';
 import { registerModelAllowlistTools } from './tools/model-allowlist.ts';
+import { registerSpendCapsTools } from './tools/spend-caps.ts';
 import { registerAppAccountTools } from './tools/app-account.ts';
 import { registerOrgTools } from './tools/orgs.ts';
 import { registerEditTools } from './tools/edit.ts';
@@ -31,7 +32,7 @@ const MCP_INSTRUCTION_LINES = [
   '`run_node_generation` is the canvas Generate button: fills an existing node, never creates one; no `model` = default; `medium` must match the node\'s type; a video comes back `queued`. `apply_effects`/`make_effects_pair` render effects (`list_effects`; custom: `write_effect`, `patch_effect`), free. `enhance_prompt` improves a prompt. `run_node_loop` queues every combination of a node\'s inputs (`preview_node_loop` free, `cancel_node_loop` stops it); confirm >50, refused >1000.',
   'A project needs no brand; never guess one: attach one only to publish.',
   '`get_media`: show `preview_url`, give `full_url`.',
-  '`list_motion_videos`/`list_shader_effects`; `ask_motion_agent`/`get_motion_run`/`get_motion_summary`/`motion_budget`; `render_video`/`get_render`; `publish_motion_embed`/`get_motion_embed`/`share_motion_frame`; `view_motion_frames`/`list_motion_revisions`/`restore_motion_revision`; `list_motion_templates`/`add_motion_template`/`new_motion_from_template`; `get_storyboard`/`write_storyboard`/`edit_storyboard_card`; `search_gallery`/`remix_gallery_item`/`publish_to_gallery`; `write_layout`/`patch_layout`/`list_layouts`; `get_app_account`/`forget_app_account`; `list_orgs`/`list_team`/`team_op`/`model_allowlist`.',
+  '`list_motion_videos`/`list_shader_effects`; `ask_motion_agent`/`get_motion_run`/`get_motion_summary`/`motion_budget`; `render_video`/`get_render`; `publish_motion_embed`/`get_motion_embed`/`share_motion_frame`; `view_motion_frames`/`list_motion_revisions`/`restore_motion_revision`; `list_motion_templates`/`add_motion_template`/`new_motion_from_template`; `get_storyboard`/`write_storyboard`/`edit_storyboard_card`; `search_gallery`/`remix_gallery_item`/`publish_to_gallery`; `write_layout`/`patch_layout`/`list_layouts`; `get_app_account`/`forget_app_account`; `list_orgs`/`list_team`/`team_op`/`model_allowlist`/`spend_caps`.',
   'Signing in is no tool: HTTP hosts send the Bearer; locally `feega login`.'
 ];
 
@@ -149,6 +150,7 @@ export function createFeegaMcpServer(): McpServer {
 
   registerOrgDataTools(server);
   registerModelAllowlistTools(server);
+  registerSpendCapsTools(server);
   registerNodeTools(server);
   registerCanvasTools(server);
   registerPromptTools(server);

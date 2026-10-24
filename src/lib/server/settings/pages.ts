@@ -12,6 +12,7 @@ export const SETTINGS_PAGES: Record<SettingsSection, () => Promise<SettingsPage>
   [SettingsSection.Team]: () => import('./pages/team'),
   [SettingsSection.ApiKeys]: () => import('./pages/api-keys'),
   [SettingsSection.Models]: () => import('./pages/models'),
+  [SettingsSection.Spend]: () => import('./pages/spend'),
   [SettingsSection.Danger]: () => import('./pages/danger'),
   [SettingsSection.Products]: () => import('./pages/products')
 };

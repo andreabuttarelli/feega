@@ -3292,3 +3292,11 @@ Signal: a `@real` spec polls `nodes` and never finds the row it just made, right
 ## A skill doc edited in one place and red in CI
 
 **Signal:** `plugin skill mirror` fails in CI after a new tool or CLI command, or a long-running dev server does not show your new page action or tab. **Cause:** `cli/skills/feega` is mirrored byte for byte in `cli/plugins/feega/skills/feega`, and a vite dev server keeps serving the modules it loaded before a branch switch. **Move:** copy the edited skill files to the plugin dir in the same commit; restart your own dev server after switching branches.
+
+## Generating docs from app code
+
+**Signal:** a script that imports `$lib/server/...` dies on `$app/...`, `virtual:...` or a missing `.svelte-kit/tsconfig.json`; `vite-node` with the SvelteKit plugin throws "An impossible situation occurred". **Move:** run the script as a vitest file with the app's own `vite.config.ts` (`web-docs/scripts/vitest.gen.config.ts`), overriding only `test.include` and `setupFiles`. A worktree needs a `node_modules` symlink first.
+
+## An OpenRouter call that 402s with plenty of credit left
+
+Signal: `This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens` from a judge or any call that sets no `max_tokens`. Cause: OpenRouter reserves the model's maximum output against the balance before the call. Move: always pass `max_tokens` sized to the answer (a 5-axis JSON verdict needs ~1500).

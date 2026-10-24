@@ -274,6 +274,25 @@
         "adminOnly": "Only owners and admins can change this.",
         "unavailable": "Could not save. Try again later."
       },
+      "spend": {
+        "title": "Billing limits",
+        "subtitle": "Stop spending once a limit is reached. Spending is counted from your AI usage; a monthly limit starts again on the first of the month.",
+        "orgMember": "Each member, in every project",
+        "projectMember": "Each member, in this project",
+        "projectTotal": "This project, everyone together",
+        "amount": "Limit in USD",
+        "reset": "Resets",
+        "resetNone": "Never",
+        "resetMonthly": "Monthly",
+        "save": "Save",
+        "remove": "Remove",
+        "none": "No limit",
+        "saved": "Saved.",
+        "removed": "Limit removed.",
+        "adminOnly": "Only owners and admins can change this.",
+        "invalid": "Enter an amount above zero.",
+        "unavailable": "Could not save. Try again later."
+      },
       "apiKeys": {
         "title": "API Keys",
         "subtitle": "Generate long-lived keys for custom integrations. Keys have full read & write access. Use them as Bearer tokens in your scripts, CI/CD, or automation tools.",

@@ -1,4 +1,5 @@
 import { SPAWN_AGENT } from '$lib/server/agents/spawn';
+import { PLATFORM_TIMING, landingWatch } from '$lib/server/agents/turn-core';
 import { spawnAgentTool, spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
 import { createUIMessageStream, createUIMessageStreamResponse, streamText, type ModelMessage } from 'ai';
 import type { Db } from '$lib/server/db/client';
@@ -113,6 +114,16 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
 
   await ensureGatewayModels();
   const t0 = Date.now();
+  const cut = new AbortController();
+  const watch = landingWatch({
+    startedAt: t0,
+    timing: PLATFORM_TIMING,
+    stopped: () => reply.stopped(),
+    landEarly: () => {
+      watch.stop();
+      void reply.finish(finishedTurn(steps), ReplyStatus.Done).then(() => cut.abort());
+    }
+  });
   const billedScope = <T>(fn: () => T): T => (brand ? withBrandContext(brand.id, fn) : withOrgContext(orgId, fn));
 
   const result = billedScope(() => streamText({
@@ -129,6 +140,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
     messages: [...history, { role: 'user', content: opening }] as ModelMessage[],
     tools: agent.tools,
     providerOptions: reasoningProviderOptions(reasoning),
+    abortSignal: cut.signal,
     stopWhen: [agentStopWhen(t0), overTurnCap(() => spent), ({ steps }) => pickAwaits(steps)],
     onStepFinish: (step) => {
       spent += spentUsd([extractSdkUsage(step.usage)], [model], gatewayRate);
@@ -136,6 +148,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
       void reply.progress(finishedTurn(steps));
     },
     onFinish: async ({ steps: finished, totalUsage }) => {
+      watch.stop();
       await agent.close().catch((e) => console.error('[project-agent] tools not closed:', e));
 
       await reply.finish(finishedTurn(finished), ReplyStatus.Done);
@@ -162,6 +175,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
   runInBackground(
     async () => {
       await result.consumeStream({ onError: (e) => console.error('[project-agent] turn failed after client left', e) });
+      watch.stop();
       await reply.finish(finishedTurn(steps), ReplyStatus.Failed);
     },
     'project-agent-turn'

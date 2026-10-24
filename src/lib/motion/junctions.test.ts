@@ -3,7 +3,7 @@ import { JUNCTION, JUNCTION_KINDS, JunctionKind, Span, junctionPairs, junctionPr
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from './doc';
 import { addClip, addTrack, setJunction } from './timeline';
 import { TrackKind } from './components';
-import { TransitionKind } from './design';
+import { Ease, TransitionKind } from './design';
 import { flattenComps, precompose } from './precomp';
 
 function ok(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
@@ -96,5 +96,11 @@ describe('withJunctions', () => {
   it('a doc without junctions is the same doc', () => {
     const doc = cut();
     expect(withJunctions(doc)).toBe(doc);
+  });
+});
+
+describe('junction easing', () => {
+  it('no transition runs linear: every one rides the house in-out curve', () => {
+    expect(JUNCTION_KINDS.map((kind) => JUNCTION[kind].ease)).toEqual(JUNCTION_KINDS.map(() => Ease.Standard));
   });
 });

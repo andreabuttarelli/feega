@@ -1,0 +1,33 @@
+---
+title: feega docs
+description: Guides, references and architecture notes for feega.
+template: splash
+hero:
+  tagline: An infinite canvas for design and motion. People, the chat and outside agents work on it together.
+  actions:
+    - text: Get started
+      link: /getting-started/what-is-feega/
+      variant: primary
+    - text: Reference
+      link: /reference/
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <Card title="Canvas" icon="pencil">
+    Frames, free elements, components, styles, auto layout, comments. [Canvas guides](/canvas/frames-and-free-elements/)
+  </Card>
+  <Card title="Motion" icon="rocket">
+    Timeline, keyframes, scenes combined into one video, export. [Motion guides](/motion/timeline/)
+  </Card>
+  <Card title="AI" icon="star">
+    The canvas chat, generation nodes, skills, model allow-list. [AI guides](/ai/canvas-chat/)
+  </Card>
+  <Card title="Agents and API" icon="laptop">
+    MCP, CLI, edit ops, REST contracts. [Integrations](/integrations/mcp/)
+  </Card>
+</CardGrid>
+
+These docs describe what is on the `dev` branch of the repository. Pages under Reference are generated from the code on every build.
