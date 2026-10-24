@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Family, buildCatalogue } from './edit-catalogue';
 import { runEdit, type EditPorts } from './run-edit';
 import type { Answer } from './runners';
+import { Detail } from './compact-result';
 
 const OK: Answer = { status: 200, body: { ok: true } };
 
@@ -162,5 +163,29 @@ describe('a batch mixes canvas and frame ops', () => {
     });
 
     expect(answer.body).toMatchObject({ applied: 0, failed: 1, failed_at: 1, rolled_back: 1, not_run: 0 });
+  });
+});
+
+describe('a write answers ids and changed fields; verbose gives the whole document back', () => {
+  const heavy = { status: 200, body: { node: { id: 'n1', version: 3, x: 1, y: 2, type: 'text', created_at: 'now', data: { text: 'x'.repeat(5000) } } } } satisfies Answer;
+  const heavyPorts = () => ports({ canvas: async () => heavy, catalogue: buildCatalogue({ [Family.Canvas]: ['move_node', 'list_nodes'], [Family.Frame]: [], [Family.Editor]: [] }) }).made;
+
+  it('a write drops the document and keeps id, version and what was sent', async () => {
+    const answer = await runEdit(heavyPorts(), { steps: [{ op: 'move_node', target: 'n1', input: { x: 1, y: 2 } }] });
+
+    expect(JSON.stringify(answer.body).length).toBeLessThan(300);
+    expect(answer.body).toMatchObject({ node: { id: 'n1', version: 3, x: 1, y: 2 }, trimmed: true });
+  });
+
+  it('verbose returns it whole', async () => {
+    const answer = await runEdit(heavyPorts(), { steps: [{ op: 'move_node', target: 'n1', input: { x: 1, y: 2 } }], detail: Detail.Verbose });
+
+    expect(answer).toEqual(heavy);
+  });
+
+  it('a read is never compacted', async () => {
+    const answer = await runEdit(heavyPorts(), { steps: [{ op: 'list_nodes', input: { canvasId: 'c1' }, target: 'n1' }] });
+
+    expect(answer).toEqual(heavy);
   });
 });

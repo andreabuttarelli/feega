@@ -6,6 +6,7 @@ import { describeEdit, describeInput } from '$lib/server/edit/describe-edit';
 import { editPorts } from '$lib/server/edit/edit-ports';
 import { runEdit } from '$lib/server/edit/run-edit';
 import { RESERVED_OPS } from '$lib/server/edit/edit-catalogue';
+import { Detail } from '$lib/server/edit/compact-result';
 
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
@@ -15,7 +16,7 @@ const MAX_STEPS = 500;
 
 const step = z.object({ op: z.string().min(1), target: z.string().optional(), element: z.string().optional(), input: z.record(z.string(), z.unknown()).optional(), version: z.number().int().min(0).optional() });
 
-const body = z.object({ project_id: z.string().optional(), ops: z.array(step).min(1).max(MAX_STEPS).optional() }).extend(step.shape).partial({ op: true });
+const body = z.object({ project_id: z.string().optional(), verbose: z.boolean().optional(), ops: z.array(step).min(1).max(MAX_STEPS).optional() }).extend(step.shape).partial({ op: true });
 
 export const POST: RequestHandler = async ({ request, url }) => {
   const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
@@ -44,6 +45,6 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json({ error: 'invalid_input', fix: 'Pass `op` (or op "batch" with `ops`). Call op "describe" for the list.' }, { status: HTTP_BAD_REQUEST });
   }
 
-  const answer = await runEdit(editPorts(resolved.caller), { projectId: ask.project_id, target: ask.op === BATCH_OP ? ask.target : undefined, steps, batch: ask.op === BATCH_OP });
+  const answer = await runEdit(editPorts(resolved.caller), { projectId: ask.project_id, target: ask.op === BATCH_OP ? ask.target : undefined, steps, batch: ask.op === BATCH_OP, detail: ask.verbose ? Detail.Verbose : Detail.Compact });
   return json(answer.body, { status: answer.status });
 };

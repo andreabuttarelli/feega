@@ -7,6 +7,7 @@ import { chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames
 import { templateLibrary } from '$lib/server/motion/templates';
 import { toolsOf } from '$lib/server/edit/tool-row';
 import { projectRows } from '$lib/server/edit/project-rows';
+import { Detail, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
 
 /**
  * I TOOL DI PROGETTO E TELA. Sempre presenti, anche senza brand.
@@ -77,24 +78,28 @@ function fieldsOf(schema: z.ZodType): string {
 const GENERIC_DESCRIPTION = [
   'Other canvas ops of THIS project, as API/MCP: op, camelCase input.',
   `Spend credits, only if the user asked: ${GENERIC_OPS.filter((name) => CANVAS_OPS[name].access === Access.Spend).join(', ')}.`,
+  'Writes answer ids and changed fields; verbose: true gives the whole document.',
   `Ops: ${GENERIC_OPS.map((name) => `${name} {${fieldsOf(CANVAS_OPS[name].input)}}`).join(';')}.`
 ].join(' ');
+
+const shown = (name: CanvasOpName, input: unknown, result: unknown, detail: Detail = Detail.Compact) =>
+  CANVAS_OPS[name].access === Access.Write ? compactWrite(result, { touched: touchedOf(input), detail }) : result;
 
 function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
   const own = Object.entries(CHAT_TOOL_OPS).map(([name, description]) => {
     const op = CANVAS_OPS[name as CanvasOpName];
-    return [name, tool({ description, inputSchema: op.input, execute: (input: unknown) => op.run(ctx, input as never) })];
+    return [name, tool({ description, inputSchema: op.input, execute: async (input: unknown) => shown(name as CanvasOpName, input, await op.run(ctx, input as never)) })];
   });
 
   const generic = tool({
     description: GENERIC_DESCRIPTION,
-    inputSchema: z.object({ op: z.enum(GENERIC_OPS as [CanvasOpName, ...CanvasOpName[]]), input: z.record(z.string(), z.unknown()).default({}) }).strict(),
-    execute: async ({ op, input }: { op: CanvasOpName; input?: Record<string, unknown> }) => {
+    inputSchema: z.object({ op: z.enum(GENERIC_OPS as [CanvasOpName, ...CanvasOpName[]]), input: z.record(z.string(), z.unknown()).default({}), verbose: z.boolean().optional() }).strict(),
+    execute: async ({ op, input, verbose }: { op: CanvasOpName; input?: Record<string, unknown>; verbose?: boolean }) => {
       const parsed = CANVAS_OPS[op].input.safeParse(input ?? {});
       if (!parsed.success) {
         return { error: 'invalid_input', issues: parsed.error.issues };
       }
-      return CANVAS_OPS[op].run(ctx, parsed.data as never);
+      return shown(op, input, await CANVAS_OPS[op].run(ctx, parsed.data as never), verbose ? Detail.Verbose : Detail.Compact);
     }
   });
 
