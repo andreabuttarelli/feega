@@ -224,6 +224,21 @@ describe('the fill stack in Properties', () => {
     expect((sent(onchange)[0] as { adjust?: unknown }).adjust).toBeUndefined();
   });
 
+  it('the crop button hands the picture to the canvas', () => {
+    const oncrop = vi.fn();
+    app = mount(FillStack, { target: document.body, props: { fills: stack([{ type: 'image', assetId: 'pic' }]), assets: ASSETS, tokens: FEEGA_TOKENS, onchange: vi.fn(), upload: null, oncrop } });
+    flushSync();
+    click(rows()[0]);
+    click(byId('fill-crop-edit'));
+    expect(oncrop).toHaveBeenCalledOnce();
+  });
+
+  it('without a canvas to crop on there is no crop button', () => {
+    show(stack([{ type: 'image', assetId: 'pic' }]));
+    click(rows()[0]);
+    expect(document.querySelector('[data-testid="fill-crop-edit"]')).toBeNull();
+  });
+
   it('an image layer takes a link, copied into the project as a picture', async () => {
     const upload = vi.fn(async () => ({ ok: true as const, asset: { id: 'copied', kind: MediaKind.Image, label: 'b.jpg', previewUrl: '/a/copied' } }));
     const onchange = show(stack([{ type: 'image', assetId: 'pic' }]), upload);

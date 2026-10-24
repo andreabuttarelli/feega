@@ -46,6 +46,7 @@
   import CodeEditor from './CodeEditor.svelte';
   import MarkedLines from './MarkedLines.svelte';
   import FillStack from './FillStack.svelte';
+  import { cropRequest } from '$lib/canvas/crop-request.svelte';
   import { FILLED, elementFills } from '$lib/motion/fill/elements';
   import { FILL_LABEL, FILL_TYPES, addFill, type Fill } from '$lib/motion/fill/model';
   import { applyFillKeys, fillOfKey, splitFillEdit } from '$lib/motion/fill/keys';
@@ -589,7 +590,7 @@
     <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
-    <div class="stack" data-prop={field.key}><FillStack {gesture} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} onchange={commitFills} /></div>
+    <div class="stack" data-prop={field.key}><FillStack {gesture} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} /></div>
   {:else if field.control === Control.Strokes}
     <div class="stack" data-prop={field.key}><StrokeStack {gesture} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
