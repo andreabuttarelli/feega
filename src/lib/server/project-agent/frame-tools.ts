@@ -58,12 +58,39 @@ export function editorFrames(db: Db, bucket: FrameBucket, place: FramePlace, ask
   };
 }
 
-export function createFrameTools(deps: FrameToolDeps): Record<string, Tool> {
+export type FrameAsk = { node_id?: string; tool: string; input: Record<string, unknown>; verbose?: boolean };
+
+export type FrameRunner = { run: (ask: FrameAsk, callId: string) => Promise<Record<string, unknown>>; seen: Map<string, Frame[]> };
+
+export function frameRunner(deps: FrameToolDeps): FrameRunner {
   const sessions = new Map<string, MotionSession>();
   const seen = new Map<string, Frame[]>();
   const serverDraws = deps.serverDraws ?? serverFramesOpen;
   const drawable = (nodeId: string) => deps.open?.nodeId === nodeId || serverDraws();
 
+  const run = async (ask: FrameAsk, callId: string): Promise<Record<string, unknown>> => {
+    const nodeId = ask.node_id ?? deps.open?.nodeId;
+    if (!nodeId) {
+      return NO_FRAME;
+    }
+    if (PLAYER_TOOLS.has(ask.tool) && !drawable(nodeId)) {
+      return NEEDS_EDITOR;
+    }
+
+    const open = deps.open?.nodeId === nodeId ? deps.open : null;
+    const turn = { sessions, selection: open?.selection ?? [], editor: open ? deps.editor : null };
+    const ran = await runMotionTool(deps.db, { orgId: deps.orgId, userId: deps.userId, nodeId, projectId: deps.projectId, agentKey: SIDEBAR_AGENT_KEY }, { tool: ask.tool, input: ask.input, callId }, turn);
+    if (ran.outcome !== ToolRun.Done) {
+      return { error: ran.outcome, message: REFUSALS[ran.outcome], detail: ran.detail };
+    }
+    seen.set(callId, ran.frames);
+    return compactWrite({ node_id: nodeId, version: ran.version, saved: ran.saved, output: ran.output }, { surface: Surface.ChatFrame, touched: touchedOf(ask.input), detail: ask.verbose ? Detail.Verbose : Detail.Compact });
+  };
+
+  return { run, seen };
+}
+
+export function createFrameTools(deps: FrameToolDeps, runner: FrameRunner = frameRunner(deps)): Record<string, Tool> {
   const run = tool({
     description: [
       'Run one frame (motion video or still) tool on a frame of THIS project: the same tools the frame editor has, saved as a new revision the user can undo.',
@@ -72,24 +99,7 @@ export function createFrameTools(deps: FrameToolDeps): Record<string, Tool> {
       `Tools: ${motionToolList().map((t) => t.name).join(',')}.`
     ].join(' '),
     inputSchema: z.object({ node_id: z.string().optional(), tool: z.string().min(1), input: z.record(z.string(), z.unknown()).default({}), verbose: z.boolean().optional() }).strict(),
-    execute: async (input: { node_id?: string; tool: string; input: Record<string, unknown>; verbose?: boolean }, { toolCallId }) => {
-      const nodeId = input.node_id ?? deps.open?.nodeId;
-      if (!nodeId) {
-        return NO_FRAME;
-      }
-      if (PLAYER_TOOLS.has(input.tool) && !drawable(nodeId)) {
-        return NEEDS_EDITOR;
-      }
-
-      const open = deps.open?.nodeId === nodeId ? deps.open : null;
-      const turn = { sessions, selection: open?.selection ?? [], editor: open ? deps.editor : null };
-      const ran = await runMotionTool(deps.db, { orgId: deps.orgId, userId: deps.userId, nodeId, projectId: deps.projectId, agentKey: SIDEBAR_AGENT_KEY }, { tool: input.tool, input: input.input, callId: toolCallId }, turn);
-      if (ran.outcome !== ToolRun.Done) {
-        return { error: ran.outcome, message: REFUSALS[ran.outcome], detail: ran.detail };
-      }
-      seen.set(toolCallId, ran.frames);
-      return compactWrite({ node_id: nodeId, version: ran.version, saved: ran.saved, output: ran.output }, { surface: Surface.ChatFrame, touched: touchedOf(input.input), detail: input.verbose ? Detail.Verbose : Detail.Compact });
-    }
+    execute: (input: FrameAsk, { toolCallId }) => runner.run(input, toolCallId)
   });
 
   return {
@@ -105,6 +115,6 @@ export function createFrameTools(deps: FrameToolDeps): Record<string, Tool> {
       execute: async (input: { tool: string }) => (await motionToolSpec(input.tool)) ?? { error: ToolRun.Unknown, message: REFUSALS[ToolRun.Unknown] }
     }),
 
-    ...withFrames({ [FRAME_TOOL]: run }, { frames: seen })
+    ...withFrames({ [FRAME_TOOL]: run }, { frames: runner.seen })
   };
 }
