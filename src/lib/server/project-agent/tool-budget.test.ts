@@ -10,7 +10,7 @@ const SCOPE = { orgId: 'o', projectId: 'p', userId: 'u' };
 const FRAME_TOOLS_MAX_CHARS = 4_000;
 const CANVAS_CHAT_MAX_CHARS = 32_000;
 const EDITOR_TO_FRAME_TOOLS_RATIO = 35;
-const CORE_MAX_CHARS = 29_000;
+const CORE_MAX_CHARS = 30_000;
 const CATALOGUE_TO_CORE_RATIO = 6;
 
 async function promptChars(tools: Record<string, Tool>): Promise<number> {
