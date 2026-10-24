@@ -14,8 +14,8 @@ type Clip = { id: string; component: string; props: Record<string, unknown> };
 type Box = { x: number; y: number; width: number; height: number };
 
 async function freeTexts(admin: SupabaseClient, session: E2eSession) {
-  const { data } = await admin.from('nodes').select('id, width, height, data').eq('canvas_id', session.canvasId).is('deleted_at', null);
-  return (data ?? []).filter((n) => (n.data as { kind?: string }).kind === 'element');
+  const { data } = await admin.from('nodes').select('id, type, width, height, data').eq('canvas_id', session.canvasId).is('deleted_at', null);
+  return (data ?? []).filter((n) => n.type === 'element');
 }
 
 async function clipOf(admin: SupabaseClient, nodeId: string): Promise<Clip> {

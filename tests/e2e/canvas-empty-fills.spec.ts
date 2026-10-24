@@ -14,8 +14,8 @@ async function shoot(page: Page, name: string) {
 }
 
 async function elementIds(admin: SupabaseClient, canvasId: string): Promise<string[]> {
-  const { data } = await admin.from('nodes').select('id, data').eq('canvas_id', canvasId).is('deleted_at', null);
-  return (data ?? []).filter((n) => (n.data as { kind?: string }).kind === 'element').map((n) => n.id as string);
+  const { data } = await admin.from('nodes').select('id, type, data').eq('canvas_id', canvasId).is('deleted_at', null);
+  return (data ?? []).filter((n) => n.type === 'element').map((n) => n.id as string);
 }
 
 async function clipOf(admin: SupabaseClient, nodeId: string): Promise<Clip | undefined> {

@@ -21,7 +21,7 @@ test.describe('free elements on the canvas @real', () => {
     test.setTimeout(120_000);
     const elements = async () => {
       const { data } = await admin.from('nodes').select('id, type, data, width, height').eq('canvas_id', session.canvasId).is('deleted_at', null);
-      return (data ?? []).filter((n) => (n.data as { kind?: string }).kind === 'element');
+      return (data ?? []).filter((n) => n.type === 'element');
     };
     const clipsOf = async (nodeId: string): Promise<Clip[]> => {
       const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', nodeId).order('version', { ascending: false }).limit(1);

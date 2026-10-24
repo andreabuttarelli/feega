@@ -134,7 +134,7 @@ test.describe('GPU canvas: the same gestures as the DOM canvas @real', () => {
   });
 
   test('the rectangle tool draws a free element on the GPU canvas, which opens and undoes like on the DOM one', async ({ page, session, admin }) => {
-    const elements = async () => ((await admin.from('nodes').select('id, data, width, height').eq('canvas_id', session.canvasId).is('deleted_at', null)).data ?? []).filter((n) => (n.data as { kind?: string }).kind === 'element');
+    const elements = async () => ((await admin.from('nodes').select('id, type, data, width, height').eq('canvas_id', session.canvasId).is('deleted_at', null)).data ?? []).filter((n) => n.type === 'element');
     await open(page, session);
     const bar = page.getByTestId('add-bar');
     await expect(bar).toHaveAttribute('data-context', 'canvas');

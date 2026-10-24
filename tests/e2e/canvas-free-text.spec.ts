@@ -24,8 +24,8 @@ const SHOTS = process.env.CANVAS_TEXT_SHOTS;
 test.use({ video: process.env.E2E_VIDEO ? 'on' : 'off' });
 
 async function elements(admin: SupabaseClient, session: E2eSession) {
-  const { data } = await admin.from('nodes').select('id, data, width, height').eq('canvas_id', session.canvasId).is('deleted_at', null);
-  return (data ?? []).filter((n) => (n.data as { kind?: string }).kind === 'element');
+  const { data } = await admin.from('nodes').select('id, type, data, width, height').eq('canvas_id', session.canvasId).is('deleted_at', null);
+  return (data ?? []).filter((n) => n.type === 'element');
 }
 
 async function clipsOf(admin: SupabaseClient, nodeId: string): Promise<Clip[]> {

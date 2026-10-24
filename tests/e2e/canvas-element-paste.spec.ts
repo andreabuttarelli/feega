@@ -54,7 +54,7 @@ test.describe('copy and paste elements @real', () => {
     await page.keyboard.press('Escape');
     await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
     await page.keyboard.press('ControlOrMeta+v');
-    const elements = async () => (await admin.from('nodes').select('id, data').eq('canvas_id', session.canvasId).is('deleted_at', null)).data?.filter((n) => (n.data as { kind?: string }).kind === 'element') ?? [];
+    const elements = async () => (await admin.from('nodes').select('id, type, data').eq('canvas_id', session.canvasId).is('deleted_at', null)).data?.filter((n) => n.type === 'element') ?? [];
     await expect.poll(async () => (await elements()).length, { timeout: 15_000 }).toBeGreaterThan(0);
     expect(await clipCount(admin, frame.id)).toBe(2);
   });
