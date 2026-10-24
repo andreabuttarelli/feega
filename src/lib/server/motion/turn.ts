@@ -76,7 +76,7 @@ import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 import type { ChatAttachment } from '$lib/chat-attachments';
 import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
 import { breakdownReader } from '$lib/server/video-reference';
-import { Client, PLATFORM_TIMING, closedByModel, writeText, type Stop, type TurnStep, type TurnTiming } from '$lib/server/agents/turn-core';
+import { Client, PLATFORM_TIMING, closedByModel, landingWatch, writeText, type Stop, type TurnStep, type TurnTiming } from '$lib/server/agents/turn-core';
 import { CHECK_WAIT_MS, Browser, BROWSER_VISION, EDITOR_DRAWS, BROWSER_DRAWS, Round, MAX_DELIVERY_ATTEMPTS, STILL_OPEN_ID, LAST_LOOK_ID, CRITIC_ID, LOOP_SEAM_ID, CUT_REVIEW_ID, SHEET_FILE, awaitsUser, ROUND_ROLE, shotCrews, crewTools, crewBrief, RESEARCH_BRIEF, RESEARCH_DONE, SOUND_PASS, ROUND_STOPS, ROUND_CHOICE, importFollowed, BUDGET_ID, budgetTool, writeCard, cannedTurn, type MotionTurn, type TurnOutcome } from './motion-session';
 
 export { Browser, MAX_DELIVERY_ATTEMPTS, RESEARCH_BRIEF, crewBrief, crewTools, type MotionTurn, type TurnOutcome } from './motion-session';
@@ -427,14 +427,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     void land().then(settle, abandon);
     cut.abort();
   };
-  const wall = setTimeout(landEarly, Math.max(0, timing.landingMs - (Date.now() - startedAt)));
-  const watch = setInterval(() => {
-    void reply.stopped().then((stopped) => {
-      if (stopped) {
-        landEarly();
-      }
-    });
-  }, timing.stopPollMs);
+  const watch = landingWatch({ startedAt, timing, stopped: () => reply.stopped(), landEarly });
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
@@ -551,8 +544,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const labelOf = (modelId: string) => (modelId === roleModel(sideRole, model) && modelId !== model ? STUDIO_ROSTER[sideRole].label : modelId === model ? roleLabel : modelId === codeModel ? `${roleLabel}-code` : `${roleLabel}-vision`);
 
   async function finishTurn(steps: TurnStep[]): Promise<TurnOutcome> {
-    clearTimeout(wall);
-    clearInterval(watch);
+    watch.stop();
     session.doc = fitNewVideo(head.doc, session.doc);
     session.doc = { ...session.doc, assets: referencedAssets(session.doc, assets.map((a) => ({ id: a.id, kind: a.kind, name: a.label }))) };
     const write = session.edits.length ? await saveAgentDoc() : null;
