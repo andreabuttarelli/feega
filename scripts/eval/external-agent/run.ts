@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { runAgent, Stop, type RunStats } from './agent-loop';
 import { renderThroughBrowser } from './browser-render';
 import { ARM_CAP_USD, AGENT_MODEL, HARD_CAP_USD, JUDGE_FRAME_TIMES_S, JUDGE_RESERVE_USD, SITE_URL, TASK, VIDEO, outputDir } from './config';
-import { connectFeega, mintTestSession } from './feega-mcp';
+import { ToolListing, connectFeega, mintTestSession } from './feega-mcp';
 import { createThrowaway, deleteThrowaway } from './feega-project';
 import { judgeFrames, type Taste } from './judge';
 import { renderReport, type ArmResult, type Report } from './report';
@@ -29,7 +29,7 @@ Create the entry point, the root and the composition yourself. Register one comp
 Render it with: npx remotion render src/index.ts Launch out/launch.mp4
 Check your own work with view_frame before you finish. When out/launch.mp4 exists, reply with only: done`;
 
-const NOT_RUN: RunStats = { stop: Stop.Error, turns: 0, toolCalls: 0, toolCallsByName: {}, toolErrors: 0, usage: { promptTokens: 0, completionTokens: 0, cachedTokens: 0, costUsd: 0 }, finalText: '', error: 'not run' };
+const NOT_RUN: RunStats = { stop: Stop.Error, turns: 0, toolCalls: 0, toolCallsByName: {}, toolErrors: 0, usage: { promptTokens: 0, completionTokens: 0, cachedTokens: 0, costUsd: 0 }, finalText: '', error: 'not run', transcript: [] };
 
 const withinSpec = (v: VideoFacts) => v.width === VIDEO.width && v.height === VIDEO.height && Math.abs(v.seconds - VIDEO.seconds) <= DURATION_TOLERANCE_S;
 
@@ -37,16 +37,23 @@ function armResult(name: string, stats: RunStats, agentSeconds: number): ArmResu
   return { name, stop: stats.stop, error: stats.error, agentSeconds, renderSeconds: 0, turns: stats.turns, toolCalls: stats.toolCalls, toolCallsByName: stats.toolCallsByName, toolErrors: stats.toolErrors, usage: stats.usage, outputFile: null, video: null, taste: null, success: false, notes: [] };
 }
 
-async function runFeega(task: string, outDir: string, spentSoFar: number): Promise<ArmResult> {
-  const mcp = await connectFeega(await mintTestSession());
+function saveTranscript(outDir: string, arm: string, stats: RunStats): void {
+  const withoutPixels = JSON.stringify(stats.transcript, (key, value) => (key === 'url' && typeof value === 'string' && value.startsWith('data:') ? `${value.slice(0, 40)}…` : value), 2);
+  writeFileSync(join(outDir, `${arm}.transcript.json`), withoutPixels);
+}
+
+async function runFeega(task: string, outDir: string, spentSoFar: number, listing: ToolListing): Promise<ArmResult> {
+  const mcp = await connectFeega(await mintTestSession(), listing);
   const project = await createThrowaway(mcp, Date.now());
-  let result = armResult('feega MCP', NOT_RUN, 0);
+  const arm = `feega-${listing}`;
+  let result = armResult(`feega MCP (${listing})`, NOT_RUN, 0);
 
   try {
     const started = Date.now();
     const stats = await runAgent({ system: feegaSystem(mcp.instructions, project), task, tools: mcp.tools, capUsd: Math.min(ARM_CAP_USD, HARD_CAP_USD - JUDGE_RESERVE_USD - spentSoFar) });
-    result = armResult('feega MCP', stats, (Date.now() - started) / 1000);
-    result.notes.push(`${mcp.toolCount} MCP tools exposed (ask_motion_agent withheld)`);
+    result = armResult(`feega MCP (${listing})`, stats, (Date.now() - started) / 1000);
+    saveTranscript(outDir, arm, stats);
+    result.notes.push(`${mcp.toolCount} MCP tools listed at start; tool list ${listing}`);
 
     const frameId = [...stats.finalText.matchAll(UUID)].at(-1)?.[0];
     if (!frameId) {
@@ -54,7 +61,7 @@ async function runFeega(task: string, outDir: string, spentSoFar: number): Promi
       return result;
     }
 
-    const file = join(outDir, 'feega.mp4');
+    const file = join(outDir, `${arm}.mp4`);
     const rendered = await renderThroughBrowser(mcp, frameId, file);
     result.renderSeconds = rendered.seconds;
     result.notes.push(`browser render: ${rendered.detail}`);
@@ -74,6 +81,7 @@ async function runRemotion(task: string, outDir: string, spentSoFar: number): Pr
   const started = Date.now();
   const stats = await runAgent({ system: remotionSystem(), task, tools: remotionTools(project.dir), capUsd: Math.min(ARM_CAP_USD, HARD_CAP_USD - JUDGE_RESERVE_USD - spentSoFar) });
   const result = armResult('Remotion from scratch', stats, (Date.now() - started) / 1000);
+  saveTranscript(outDir, 'remotion', stats);
   result.notes.push(`project dir ${project.dir}; setup (npm install, browser) ${project.setupSeconds.toFixed(0)}s, not counted`);
 
   const video = findRenderedVideo(project.dir);
@@ -99,20 +107,35 @@ async function score(result: ArmResult, brief: string): Promise<number> {
   return judged.costUsd;
 }
 
+const LISTING_FLAG = '--listing=';
+
+function listingsAsked(): ToolListing[] {
+  const asked = process.argv.find((a) => a.startsWith(LISTING_FLAG))?.slice(LISTING_FLAG.length);
+  const all = Object.values(ToolListing);
+  return asked ? all.filter((l) => asked.split(',').includes(l)) : all;
+}
+
 async function main() {
   const day = new Date().toISOString().slice(0, 10);
-  const outDir = outputDir(day);
+  const outDir = outputDir(`${day}-${listingsAsked().join('-')}`);
   mkdirSync(outDir, { recursive: true });
 
   const task = `${TASK}\n\n${await siteFacts(SITE_URL)}`;
   writeFileSync(join(outDir, 'task.txt'), task);
 
-  const feega = await runFeega(task, outDir, 0);
-  const remotion = await runRemotion(task, outDir, feega.usage.costUsd);
+  const arms: ArmResult[] = [];
+  const spent = () => arms.reduce((sum, a) => sum + a.usage.costUsd, 0);
+  for (const listing of listingsAsked()) {
+    arms.push(await runFeega(task, outDir, spent(), listing));
+  }
+  arms.push(await runRemotion(task, outDir, spent()));
 
-  const judgeCost = (await score(feega, TASK).catch((e) => (feega.notes.push(`judge failed: ${e}`), 0))) + (await score(remotion, TASK).catch((e) => (remotion.notes.push(`judge failed: ${e}`), 0)));
+  let judgeCost = 0;
+  for (const arm of arms) {
+    judgeCost += await score(arm, TASK).catch((e) => (arm.notes.push(`judge failed: ${e}`), 0));
+  }
 
-  await finish(outDir, { model: AGENT_MODEL, day, task, arms: [feega, remotion], judgeCostUsd: judgeCost });
+  await finish(outDir, { model: AGENT_MODEL, day, task, arms, judgeCostUsd: judgeCost });
 }
 
 function finish(outDir: string, partial: Omit<Report, 'totalCostUsd'>) {

@@ -8,7 +8,7 @@ export type ToolResult = {
 };
 
 export function ok(data: unknown): ToolResult {
-  const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  const text = typeof data === 'string' ? data : JSON.stringify(data);
   const structured =
     data !== null && typeof data === 'object' && !Array.isArray(data)
       ? (data as Record<string, unknown>)

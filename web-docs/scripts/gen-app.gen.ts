@@ -7,7 +7,8 @@ import { describeEdit } from '$lib/server/edit/describe-edit';
 import { shortcutHelp } from '$lib/motion/shortcuts';
 import { FORMAT } from '$lib/motion/export-formats';
 import { BRAND_ENDPOINTS } from '../../packages/api-contracts/src/index';
-import { handleMcpFetch } from '../../cli/mcp/http-app';
+import { listAllTools } from '../../cli/mcp/server';
+import { CORE_TOOLS, TOOL_FAMILY } from '../../cli/mcp/surface';
 
 const OUT = fileURLToPath(new URL('../src/content/docs/reference/generated/', import.meta.url));
 const CHANGELOG_DIR = fileURLToPath(new URL('../../src/lib/content/changelog/', import.meta.url));
@@ -69,15 +70,12 @@ async function editOps() {
 }
 
 async function mcpTools() {
-  const post = (body: unknown) =>
-    handleMcpFetch(new Request('http://localhost/mcp', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' }, body: JSON.stringify(body) }));
-  await post({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'docs-gen', version: '0.0.1' } } });
-  const answer = await (await post({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} })).json();
-  const tools = (answer.result.tools as { name: string; title?: string; description: string; inputSchema: JsonSchema }[]).sort((a, b) => a.name.localeCompare(b.name));
+  const tools = ((await listAllTools()) as { name: string; title?: string; description: string; inputSchema: JsonSchema }[]).sort((a, b) => a.name.localeCompare(b.name));
+  const listed = (name: string) => (name in CORE_TOOLS ? 'listed' : `family \`${TOOL_FAMILY[name] ?? 'alias'}\``);
 
-  const index = tools.map((t) => `- [\`${t.name}\`](#${t.name}): ${cell(t.title ?? '')}`).join('\n');
+  const index = tools.map((t) => `- [\`${t.name}\`](#${t.name}): ${cell(t.title ?? '')} (${listed(t.name)})`).join('\n');
   const body = tools.map((t) => `## ${t.name}\n\n${t.description}\n\n${fieldsTable(t.inputSchema)}`).join('\n');
-  write('mcp-tools.md', page('MCP tools', 'Every tool the feega MCP server lists, generated from the server.', `${tools.length} tools.\n\n${index}\n\n${body}`));
+  write('mcp-tools.md', page('MCP tools', 'Every tool the feega MCP server can run, generated from the server.', `${tools.length} tools. A session lists only the ${Object.keys(CORE_TOOLS).length} core ones; the rest load with \`find_tools\` / \`load_tools\`, or run through \`edit\` {op: "<tool>", input}.\n\n${index}\n\n${body}`));
 }
 
 function restApi() {

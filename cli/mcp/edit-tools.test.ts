@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
+import { listAllTools } from './server.ts';
 import { createServer, type Server } from 'node:http';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -89,13 +90,13 @@ describe('edit: one tool for the canvas and the frames', () => {
     const result = await callTool('edit', { op: 'batch', ops: [{ op: 'x' }, { op: 'y' }] });
 
     expect(result?.isError).toBe(true);
-    expect(result?.content?.[0].text).toContain('"applied": 1');
-    expect(result?.content?.[0].text).toContain('"failed": 1');
+    expect(result?.content?.[0].text).toContain('"applied":1');
+    expect(result?.content?.[0].text).toContain('"failed":1');
   });
 
   test('teaches describe, batch and the collision names in its description', async () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'edit', version: '0.0.1' } });
-    const tools = (await rpc('tools/list', {})).result?.tools ?? [];
+    const tools = (await listAllTools());
     const description = tools.find((t) => t.name === 'edit')?.description ?? '';
 
     for (const word of ['describe', 'batch', 'target', 'element', 'frame_', 'editor_', 'all or none']) {
@@ -105,7 +106,7 @@ describe('edit: one tool for the canvas and the frames', () => {
 
   test('the three older tools say they are deprecated aliases', async () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'edit', version: '0.0.1' } });
-    const tools = (await rpc('tools/list', {})).result?.tools ?? [];
+    const tools = (await listAllTools());
 
     for (const name of ['canvas_tool', 'motion_tool', 'motion_editor_op']) {
       expect(tools.find((t) => t.name === name)?.description).toMatch(/^Deprecated, use `edit`/);

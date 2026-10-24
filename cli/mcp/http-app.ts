@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { authServerUrl, loadEnv } from '../lib/config.ts';
 import { runWithRequestAuth } from './context.ts';
 import { mcpLog } from './observability.ts';
@@ -35,6 +36,16 @@ function mcpResourceUrl(req: Request): string {
 
 function authServers(): string[] {
   return [authServerUrl()];
+}
+
+const HTTP_SESSION = 'http';
+
+function sessionKeyOf(req: Request, bearer: string | null | undefined): string {
+  const declared = req.headers.get('mcp-session-id');
+  if (declared) {
+    return `session:${declared}`;
+  }
+  return bearer ? `bearer:${createHash('sha256').update(bearer).digest('hex')}` : HTTP_SESSION;
 }
 
 /**
@@ -113,7 +124,7 @@ export async function handleMcpFetch(req: Request): Promise<Response> {
     );
     const { createFeegaMcpServer } = await import('./server.ts');
 
-    const server = createFeegaMcpServer();
+    const server = createFeegaMcpServer(sessionKeyOf(req, bearer));
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

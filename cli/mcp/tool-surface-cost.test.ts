@@ -36,7 +36,7 @@ import { handleMcpFetch } from './http-app.ts';
  * `taskSupport` — restano guardie vere: colpiscono lo spreco per tool, che è come la lista era
  * cresciuta del 30% senza che nessuno aggiungesse niente.
  */
-const REPORTED_BASELINE_CHARS = 88_948;
+const REPORTED_BASELINE_CHARS = 3_474;
 
 async function listedTools(): Promise<{ tools: Array<Record<string, unknown>>; chars: number }> {
   const post = (body: unknown) =>
