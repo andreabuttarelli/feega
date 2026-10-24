@@ -1,6 +1,6 @@
 type Point = { x: number; y: number };
 
-export type CommentPlacement = { nodeId: string | null; x: number; y: number };
+export type CommentPlacement = { nodeId: string | null; x: number; y: number; timeMs?: number };
 
 export function commentPlacement(click: Point, under: (Point & { id: string }) | null): CommentPlacement {
   if (!under) {

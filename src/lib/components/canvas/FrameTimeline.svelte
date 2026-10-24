@@ -11,6 +11,7 @@
   import { EditMode } from '$lib/motion/edit-mode';
   import { Snap } from '$lib/motion/timeline-view';
   import type { KeyRef } from '$lib/motion/timeline';
+  import type { CommentMark } from '$lib/canvas/comment-marks';
 
   let {
     doc,
@@ -21,8 +22,11 @@
     onselect,
     onmode = () => {},
     onaction = () => {},
+    marks = [],
+    onmark = () => {},
+    onpin,
     onchange
-  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; marks?: CommentMark[]; onmark?: (id: string, frame: number) => void; onpin?: () => void; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const MODE_LABEL: Record<EditMode, string> = { [EditMode.Design]: 'Design: edits set the resting state', [EditMode.Motion]: 'Animate: edits key at the playhead' };
 
@@ -87,10 +91,18 @@
     <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" data-testid="frame-timeline-play" onclick={toggle} />
     <span class="time" data-testid="frame-timeline-time">{(frame / doc.fps).toFixed(2)}s</span>
     {#each grouping as id (id)}<IconButton action={id} size={14} data-testid={`frame-timeline-${id}`} onclick={() => onaction(id)} />{/each}
+    {#if onpin}<button type="button" class="pin-here" data-testid="frame-timeline-pin" onclick={onpin}>Comment here</button>{/if}
     <span class="spacer"></span>
     <IconButton action={Action.ToggleEditMode} size={14} pressed={mode === EditMode.Motion} label={MODE_LABEL[mode]} data-testid="frame-timeline-mode" data-mode={mode} onclick={onmode} />
     <IconButton action={Action.GraphMode} size={14} pressed={graphOpen} onclick={() => (graphOpen = !graphOpen)} />
   </div>
+  {#if marks.length}
+    <div class="marks" data-testid="frame-timeline-marks">
+      {#each marks as m (m.id)}
+        <button type="button" class="mark" data-testid="frame-timeline-mark" data-thread={m.id} aria-label={`Comment ${m.number} at ${(m.frame / doc.fps).toFixed(2)}s`} style={`left:${(m.frame / Math.max(1, doc.durationInFrames - 1)) * 100}%`} onclick={() => { scrub(m.frame); onmark(m.id, m.frame); }}>{m.number}</button>
+      {/each}
+    </div>
+  {/if}
   {#if remapped}<TimeRemap {doc} clip={remapped} {frame} {onchange} />{/if}
   <div class="body">
     {#if graphOpen}
@@ -130,6 +142,42 @@
   .time {
     font-variant-numeric: tabular-nums;
     font-size: 12px;
+  }
+
+  .pin-here {
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 8px;
+    background: none;
+    color: inherit;
+    border: 1px solid var(--ui-line, #e5e5e5);
+    border-radius: var(--ui-radius-sm, 4px);
+  }
+
+  .marks {
+    position: relative;
+    height: 18px;
+    margin: 0 12px;
+  }
+
+  .mark {
+    position: absolute;
+    top: 0;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    transform: translateX(-50%);
+    display: grid;
+    place-items: center;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--paper, #fff);
+    background: #0b6bff;
+    border: 0;
+    border-radius: 9999px;
   }
 
   .body {

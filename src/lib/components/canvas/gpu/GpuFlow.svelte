@@ -81,6 +81,7 @@
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { EditMode, recalledMode, rememberMode, startMode } from '$lib/motion/edit-mode';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
+  import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
   import './flow-base.css';
@@ -193,7 +194,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -3318,6 +3319,9 @@
         onframe={(f) => scrubTo(nodeId, f)}
         onselect={(ids) => (ids.length > 1 ? pickMany(nodeId, ids) : goInside(nodeId, Gesture.Click, ids[0] ?? null))}
         onaction={(id) => void runFrameAction(id)}
+        marks={props.commentMarks?.(nodeId, timeline.doc.fps) ?? []}
+        onmark={(id) => props.onMark?.(id)}
+        onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
       />
     </div>

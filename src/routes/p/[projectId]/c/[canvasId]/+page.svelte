@@ -3,6 +3,7 @@
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
   import type { CommentThread } from '$lib/canvas/comment-threads';
+  import { marksFor } from '$lib/canvas/comment-marks';
   import { keepTextSize } from '$lib/motion/text-fit';
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
@@ -1449,7 +1450,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const pinTarget = $derived.by(() => {
     const dropped = commentsPanel.pending;
     if (dropped) {
-      return { ...dropped, label: 'the spot you clicked' };
+      return { ...dropped, label: dropped.timeMs === undefined ? 'the spot you clicked' : `the playhead, ${(dropped.timeMs / 1000).toFixed(2)}s` };
     }
     const picked = tiles.find((t) => t.id === selectedIds[0]);
     return picked ? { nodeId: picked.id, x: picked.w, y: 0, label: 'the selected node' } : { nodeId: null, x: viewCentre.cx, y: viewCentre.cy, label: 'the middle of the view' };
@@ -1457,7 +1458,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function addThread(body: string) {
     const at = pinTarget;
-    await post('addComment', { body, x: at.x, y: at.y, ...(at.nodeId ? { node_id: at.nodeId } : {}) });
+    await post('addComment', { body, x: at.x, y: at.y, ...(at.nodeId ? { node_id: at.nodeId } : {}), ...(at.timeMs === undefined ? {} : { time_ms: at.timeMs }) });
     commentsPanel.settle();
     await loadComments();
   }
@@ -3660,6 +3661,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     commenting={commentsPanel.placing}
     onCommenting={(on) => commentsPanel.place(on)}
     onComment={(at) => commentsPanel.drop(at)}
+    commentMarks={(nodeId, fps) => marksFor(commentThreads ?? [], nodeId, fps)}
+    onMark={(id) => commentsPanel.focus(id)}
+    onPinAtPlayhead={(nodeId, timeMs) => commentsPanel.drop({ nodeId, x: 0, y: 0, timeMs })}
     follow={followView}
   >
     {#snippet canvasOver()}
