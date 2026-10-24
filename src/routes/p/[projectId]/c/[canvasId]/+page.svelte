@@ -20,7 +20,7 @@
   import { svgDrawings } from '$lib/canvas/svg-drawings';
 import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { DeleteMode, SECTION_TYPE, membershipAfter, withMembers } from '$lib/canvas/section';
-  import { stackedLocally, type Stack } from '$lib/canvas/stacking';
+  import { stackedLocally, Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
   import { TEXT_BOX } from '$lib/canvas/frame-paste';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
