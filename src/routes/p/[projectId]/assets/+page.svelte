@@ -15,24 +15,45 @@
 
   let { data } = $props();
 
-  type Filter = 'all' | 'generated' | 'upload' | 'global';
+  type Filter = 'all' | 'generated' | 'upload' | 'global' | 'history';
 
   const EMPTY_HINT: Record<Filter, string> = {
     all: 'Generate or upload something and it lands here.',
     generated: 'Nothing generated yet. Run a node on the canvas to fill this in.',
     upload: 'Nothing uploaded yet. Upload a file, or drop one onto a canvas.',
-    global: 'The shared reference catalogue is empty.'
+    global: 'The shared reference catalogue is empty.',
+    history: 'No finished generations yet. Run a node on any canvas and it lands here.'
   };
 
   const FILTERS: { value: Filter; label: string }[] = [
     { value: 'all', label: 'All' },
     { value: 'generated', label: 'Generated' },
     { value: 'upload', label: 'Uploaded' },
-    { value: 'global', label: 'Global' }
+    { value: 'global', label: 'Global' },
+    { value: 'history', label: 'History' }
   ];
 
   function filterHref(value: Filter): string {
     return value === 'all' ? `/p/${data.project.id}/assets` : `/p/${data.project.id}/assets?source=${value}`;
+  }
+
+  function historyHref(change: { scope?: string; model?: string | null; before?: string | null }): string {
+    const params = new URLSearchParams({ source: 'history' });
+    const scope = change.scope ?? data.history.scope;
+    const model = change.model === undefined ? data.history.model : change.model;
+    if (scope === 'project') params.set('scope', scope);
+    if (model) params.set('model', model);
+    if (change.before) params.set('before', change.before);
+    return `/p/${data.project.id}/assets?${params}`;
+  }
+
+  function onHistoryDragStart(e: DragEvent, item: (typeof data.history.items)[number]) {
+    const drag = assetDrag({ ...item.asset, id: item.asset.id, signedUrl: item.signedUrl });
+    if (!drag || !e.dataTransfer) return;
+
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData(CANVAS_DRAG_FILLED_NODE, serializeFilledNodeDrag(drag));
+    e.dataTransfer.setData(CANVAS_DRAG_MEDIUM, drag.type);
   }
 
   function formatBytes(n: number | null): string {
@@ -116,7 +137,7 @@
       <a class="filter" class:active={data.filter === f.value} href={filterHref(f.value)}>
         {f.label}
         {#if data.filter === f.value}
-          <span class="count">{data.filter === 'global' ? data.catalogue.length : data.items.length}</span>
+          <span class="count">{data.filter === 'global' ? data.catalogue.length : data.filter === 'history' ? data.history.items.length : data.items.length}</span>
         {/if}
       </a>
     {/each}
@@ -138,7 +159,50 @@
     <Notice tone="error">{uploadError}</Notice>
   {/if}
 
-  {#if data.filter === 'global'}
+  {#if data.filter === 'history'}
+    <div class="history-filters" data-testid="history-filters">
+      <a class="filter" class:active={data.history.scope === 'org'} href={historyHref({ scope: 'org' })}>All projects</a>
+      <a class="filter" class:active={data.history.scope === 'project'} href={historyHref({ scope: 'project' })}>This project</a>
+      {#if data.history.model}
+        <a class="filter active" href={historyHref({ model: null })}>{data.history.model} ×</a>
+      {/if}
+    </div>
+
+    {#if !data.history.items.length}
+      <EmptyState title="Nothing here yet" description={EMPTY_HINT.history}>
+        {#snippet icon()}<Images />{/snippet}
+      </EmptyState>
+    {:else}
+      <div class="asset-grid" data-testid="history-grid">
+        {#each data.history.items as item (item.runId)}
+          <!-- svelte-ignore a11y_no_static_element_interactions -- same shortcut as the library tiles: the "from" link opens the node for keyboard users. -->
+          <div class="tile" data-testid="history-tile" draggable={Boolean(assetDrag({ ...item.asset, signedUrl: item.signedUrl }))} ondragstart={(e) => onHistoryDragStart(e, item)}>
+            {#if item.asset.type === 'image' && item.signedUrl}
+              <img src={item.signedUrl} alt="" loading="lazy" decoding="async" width="180" height="140" />
+            {:else if item.asset.type === 'video' && item.signedUrl}
+              <video src={item.signedUrl} muted playsinline preload="metadata"></video>
+            {:else if item.asset.type === 'text' || item.asset.type === 'document'}
+              <p class="text-preview">{(item.asset.content ?? '').slice(0, 400)}</p>
+            {:else}
+              <span class="ph">{item.asset.type}</span>
+            {/if}
+
+            <div class="meta">
+              <a class="node-link" href={historyHref({ model: item.model })}>{item.model ?? 'unknown model'}</a>
+              <span class="dim">{new Date(item.createdAt).toLocaleDateString()}</span>
+              <a class="node-link" href={`/p/${item.projectId}/c/${item.canvasId}`}>from {item.nodeName || 'node'}</a>
+            </div>
+          </div>
+        {/each}
+      </div>
+
+      {#if data.history.nextBefore}
+        <div class="history-more">
+          <a class="filter" href={historyHref({ before: data.history.nextBefore })}>Older</a>
+        </div>
+      {/if}
+    {/if}
+  {:else if data.filter === 'global'}
     {#if !data.catalogue.length}
       <EmptyState title="Nothing here yet" description={EMPTY_HINT.global}>
         {#snippet icon()}<Images />{/snippet}
@@ -219,6 +283,8 @@
   .filter.active { background: var(--paper-2); color: var(--ink); border-color: var(--line); }
   .count { margin-left: 6px; font-size: 12px; font-weight: 500; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
 
+  .history-filters { display: flex; gap: 6px; margin: 0 0 14px; flex-wrap: wrap; }
+  .history-more { margin-top: 16px; }
   .file-input { display: none; }
   .filters :global(.upload-btn) { margin-left: auto; }
 
