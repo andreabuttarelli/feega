@@ -31,4 +31,13 @@ describe('the timeline under a frame on the canvas', () => {
     expect(render(FrameTimeline, { props: { ...props, selection: [], mode: EditMode.Design } }).body).toContain('data-mode="design"');
     expect(render(FrameTimeline, { props: { ...props, selection: [] } }).body).toContain('data-mode="motion"');
   });
+
+  it('draws a marker per timed comment and a pin-at-playhead button when asked', () => {
+    const marks = [{ id: 'c1', number: 2, frame: 30 }];
+    const body = render(FrameTimeline, { props: { ...props, selection: [], marks, onpin: () => {} } }).body;
+
+    expect(body).toContain('data-testid="frame-timeline-mark"');
+    expect(body).toContain('data-testid="frame-timeline-pin"');
+    expect(render(FrameTimeline, { props: { ...props, selection: [] } }).body).not.toContain('frame-timeline-mark');
+  });
 });

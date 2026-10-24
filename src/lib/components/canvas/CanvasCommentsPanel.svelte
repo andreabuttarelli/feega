@@ -74,6 +74,7 @@
         <button type="button" class="cm-head" onclick={() => commentsPanel.focus(t.id)}>
           <span class="cm-num">{t.number}</span>
           <span class="cm-who">{who(t.authorId)}</span>
+          {#if t.timeMs !== null}<span class="cm-tag" data-testid="comment-time">{(t.timeMs / 1000).toFixed(2)}s</span>{/if}
           {#if t.resolved}<span class="cm-tag">Resolved</span>{/if}
         </button>
         <p class="cm-body">{t.body}</p>
