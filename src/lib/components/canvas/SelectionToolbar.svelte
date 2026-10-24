@@ -21,6 +21,8 @@
   import { PROVIDER_PARAM } from '$lib/canvas/model-routes';
   import NodeSettings from './NodeSettings.svelte';
   import { SECTION_TYPE } from '$lib/canvas/section';
+  import Cloud from '@lucide/svelte/icons/cloud';
+  import { CLOUD_PROVIDERS, PROVIDER_LABEL, type CloudProviderId } from '$lib/canvas/cloud-picker';
   import { COLOUR_TAGS, COLOUR_TAG_HEX, colourOf, type ColourTag } from '$lib/canvas/node-colour';
   import { SECTION_DEFAULT_FILL } from '$lib/canvas/node-data';
 
@@ -41,7 +43,8 @@
     onaction,
     onpropertychange,
     onsectionchange,
-    oncolourchange
+    oncolourchange,
+    onexportcloud
   }: {
     box: { x: number; y: number; width: number } | null;
     zoom?: number;
@@ -58,7 +61,10 @@
     onpropertychange?: (patch: SelectionPatch & { model?: string | null }) => void;
     onsectionchange?: (id: string, patch: { title?: string; fill?: string }) => void;
     oncolourchange?: (tag: ColourTag | null) => void;
+    onexportcloud?: (provider: CloudProviderId) => void;
   } = $props();
+
+  const exportable = $derived(count === 1 && !!onexportcloud && ['image', 'video'].includes(nodeSummaries[0]?.type ?? '') && (typeof nodeSummaries[0]?.data.assetId === 'string' || typeof nodeSummaries[0]?.data.refId === 'string'));
 
   const sharedColour = $derived.by(() => {
     const tags = new Set(nodeSummaries.map((node) => colourOf(node.data)));
@@ -204,6 +210,22 @@
         {#each secondary as action (action.id)}
           {@render iconAction(action, '')}
         {/each}
+        {#if exportable}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger>
+              {#snippet child({ props })}
+                <Button {...props} variant="ghost" size="icon-sm" class={ICON_BUTTON} aria-label="Export to cloud" data-testid="export-cloud-menu">
+                  <Cloud strokeWidth={1.7} />
+                </Button>
+              {/snippet}
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="end" class="w-48">
+              {#each CLOUD_PROVIDERS as provider (provider)}
+                <DropdownMenu.Item class="min-h-11 md:min-h-8" data-testid={`export-${provider}`} onSelect={() => onexportcloud?.(provider)}>Export to {PROVIDER_LABEL[provider]}</DropdownMenu.Item>
+              {/each}
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        {/if}
         {#if oncolourchange}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>

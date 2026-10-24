@@ -3,6 +3,8 @@
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
   import { withColour } from '$lib/canvas/node-colour';
+  import CloudPicker from '$lib/components/canvas/CloudPicker.svelte';
+  import { CloudMode, type CloudProviderId } from '$lib/canvas/cloud-picker';
   import NodeSearch from '$lib/components/canvas/NodeSearch.svelte';
   import { NODES_PARAM, idsFromLink, selectionLink } from '$lib/canvas/selection-link';
   import type { CommentThread } from '$lib/canvas/comment-threads';
@@ -283,6 +285,43 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let linkCopied = $state(false);
+
+  let cloud = $state<{ provider: CloudProviderId; mode: CloudMode; nodeId: string | null; at: { x: number; y: number } } | null>(null);
+
+  function openCloud(provider: CloudProviderId, mode: CloudMode, nodeId: string | null, at: { x: number; y: number }) {
+    cloud = { provider, mode, nodeId, at };
+  }
+
+  async function pickCloud(target: string, provider: CloudProviderId) {
+    if (!cloud) {
+      return;
+    }
+    const { mode, nodeId, at } = cloud;
+    const base = `/api/v1/projects/${data.projectId}/cloud/${provider}`;
+    if (mode === CloudMode.Import) {
+      const res = await fetch(`${base}/import`, { method: 'POST', body: JSON.stringify({ fileId: target, place: { canvasId: data.canvas.id, x: at.x, y: at.y } }) });
+      const body = (await res.json().catch(() => ({}))) as { node?: CanvasNodeRecord | null; error?: string };
+      if (!res.ok || !body.node) {
+        failed = body.error ?? 'Import failed';
+        return;
+      }
+      const created = body.node;
+      nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })];
+      cloud = null;
+      return;
+    }
+    const node = nodes.find((n) => n.id === nodeId);
+    const assetId = [node?.data.assetId, node?.data.refId].find((v): v is string => typeof v === 'string');
+    if (!assetId) {
+      return;
+    }
+    const res = await fetch(`${base}/export`, { method: 'POST', body: JSON.stringify({ assetId, folder: target }) });
+    if (!res.ok) {
+      failed = 'Export failed';
+      return;
+    }
+    cloud = null;
+  }
 
   async function copySelectionLink() {
     await navigator.clipboard.writeText(selectionLink(page.url, selectedIds));
@@ -3730,6 +3769,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onAddBeside={addFrameBeside}
     onSection={wrapInSection}
     onSectionChange={(id, patch) => void write(id, patch, SaveTiming.Now)}
+    onCloud={openCloud}
     onColourChange={(ids, tag) => ids.forEach((id) => void write(id, withColour(tag), SaveTiming.Now))}
     onGroup={groupElements}
     onUngroup={ungroupElements}
@@ -4077,6 +4117,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     {/key}
   {/if}
 
+
+  {#if cloud}
+    <CloudPicker provider={cloud.provider} mode={cloud.mode} projectId={data.projectId} returnTo={page.url.pathname} onpick={pickCloud} onclose={() => (cloud = null)} />
+  {/if}
 
   <NodeSearch {nodes} onjump={(id) => focusOn([id], undefined, FocusMode.Select)} />
 
