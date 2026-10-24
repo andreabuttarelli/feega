@@ -104,7 +104,7 @@ describe('strokes in layout', () => {
   const stroked = (align: string, over: Partial<AutoLayout> = {}, extra: object = {}) =>
     docOf([
       shape('a', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'c' }),
-      shape('c', { x: 0.5, y: 0.5, width: 0.5, height: 0.5, shape: 'rect', strokes: [{ paint: { type: 'solid', color: '#000' }, width: 0.01, align, ...extra }] } as never, { autoLayout: flow(over) })
+      shape('c', { x: 0.5, y: 0.5, width: 0.5, height: 0.5, shape: 'rect', strokes: [{ paint: { type: 'solid', color: '#000' }, width: 0.01, align, ...extra }] } as never, { autoLayout: flow({ strokesIncluded: true, ...over }) })
     ]);
 
   it('an inside stroke shrinks the content box of its container', () => {
@@ -118,6 +118,18 @@ describe('strokes in layout', () => {
 
   it('a hidden stroke does not count', () => {
     expect(propsOf(withAutoLayout(stroked('inside', {}, { visible: false })), 'a')).toMatchObject({ x: 0.3, y: 0.3 });
+  });
+
+  it('a document saved before strokesIncluded existed lays out as it always did', () => {
+    const { strokesIncluded: _gone, ...legacy } = flow();
+    const verdict = parseMotionDoc(
+      docOf([
+        shape('a', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'c' }),
+        shape('c', { x: 0.5, y: 0.5, width: 0.5, height: 0.5, shape: 'rect', strokes: [{ paint: { type: 'solid', color: '#000' }, width: 0.01, align: 'inside' }] } as never, { autoLayout: legacy as AutoLayout })
+      ])
+    );
+
+    expect(verdict.ok && propsOf(withAutoLayout(verdict.doc), 'a')).toMatchObject({ x: 0.3, y: 0.3 });
   });
 
   it('strokesIncluded false ignores the stroke', () => {
