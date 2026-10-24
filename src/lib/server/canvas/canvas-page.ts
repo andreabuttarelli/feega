@@ -85,6 +85,7 @@ import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
 import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
+import { INSERT_STATUS, InsertOutcome, insertAskSchema, insertScene } from '$lib/server/motion/insert-scene';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
 import { imageToolAskSchema } from '$lib/image-tools';
@@ -1236,6 +1237,17 @@ export const actions: Actions<CanvasParams> = {
     }
     const made = await combineScenes(canvasFrames(scope), ask.data);
     return made.outcome === CombineOutcome.Done ? made : fail(COMBINE_STATUS[made.outcome], { error: made.outcome });
+  },
+
+  insertScene: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = insertAskSchema.safeParse({ targetId: fd.get('target'), sourceId: fd.get('source'), at: fd.get('at') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid scene drop' });
+    }
+    const made = await insertScene(canvasFrames(scope), ask.data);
+    return made.outcome === InsertOutcome.Done ? made : fail(INSERT_STATUS[made.outcome], { error: made.outcome, detail: made.detail });
   },
 
   frameSize: async ({ request, params, locals }) => {
