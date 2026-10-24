@@ -172,6 +172,18 @@ export function bakeExpressions(doc: MotionDoc, analyses: Record<string, AudioAn
   return bake(doc, analyses).doc;
 }
 
+export type BakedTrack = { ok: true; keys: Keyframe[] } | { ok: false; error: string };
+
+export function bakedTrack(doc: MotionDoc, clipId: string, key: string, analyses: Record<string, AudioAnalysis> = {}): BakedTrack {
+  const clip = clipsOf(doc).find((c) => c.id === clipId);
+  if (!clip?.expressions[key]) {
+    return { ok: false, error: `${clipId} has no ${key} expression` };
+  }
+  const faults: ExpressionFault[] = [];
+  const baked = bakeLanes(docEvaluator(doc, analyses), clipId, [key], clip.from, clip.durationInFrames, faults);
+  return faults.length ? { ok: false, error: `${key}: ${faults[0].error}` } : { ok: true, keys: baked[key] };
+}
+
 export function expressionErrors(doc: MotionDoc, analyses: Record<string, AudioAnalysis> = {}): ExpressionFault[] {
   return bake(doc, analyses).faults;
 }

@@ -56,6 +56,8 @@ const WRITE: Record<EditMode, (doc: MotionDoc, clipId: string, frame: number, pa
   [EditMode.Motion]: writePatch
 };
 
+export const writeTransform = (mode: EditMode, doc: MotionDoc, clipId: string, frame: number, patch: Transform): OpResult => WRITE[mode](doc, clipId, frame, patch);
+
 function moveOne(doc: MotionDoc, clipId: string, frame: number, by: Pt, mode: EditMode): OpResult {
   const clip = findClip(doc, clipId)?.clip;
   if (!clip) {

@@ -164,7 +164,7 @@ import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/mo
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
 import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '$lib/motion/layout/model';
-import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
+import { expressionToKeys, setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
 import { INTERACTIVE_PRESETS, PRESET, applyInteractivePreset, setInteractive } from '$lib/motion/interactive/presets';
 import { OUTSIDES, PLAY_MODES, SCROLL_LENGTH, interactiveOf } from '$lib/motion/interactive/settings';
@@ -1770,6 +1770,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         return apply(setExpression(session.doc, input.clip_id ?? '', input.prop, input.expression), `${input.prop} expression on ${input.clip_id}`);
       }
+    }),
+
+    expression_to_keys: tool({
+      description: 'Convert one expression into plain keyframes: the property is sampled over the clip, the keys replace its track (a straight expression becomes two keys, a wiggle one per bend) and the expression is removed, so the result can be edited by hand. Other expressions of the clip keep running.',
+      inputSchema: z.object({ clip_id: z.string(), prop: z.string() }),
+      execute: async (input) => apply(expressionToKeys(session.doc, input.clip_id, input.prop), `${input.prop} expression on ${input.clip_id} converted to keys`)
     }),
 
     apply_interactive_preset: tool({

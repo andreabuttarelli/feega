@@ -83,14 +83,14 @@
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
     <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
     {#if shown.view === PropertiesView.Multiple}
-      <MultiInspector {doc} ids={session.selection} frame={FIRST_FRAME} onchange={edit} />
+      <MultiInspector {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />
     {:else if shown.view === PropertiesView.Template}
       <TemplateInspector gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
     {:else}
       {@const Presets = CLIP_PRESETS[shown.clip.component]}
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector gesture={session.live} lead={partLead} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={FIRST_FRAME} onchange={editShown} />
+      <MotionInspector gesture={session.live} lead={partLead} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} />
       {#if Presets}<Presets doc={shownDoc!} clip={shown.clip} onchange={editShown} />{/if}
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}
     {/if}

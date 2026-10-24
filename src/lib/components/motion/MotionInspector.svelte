@@ -70,7 +70,7 @@
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
   import type { CustomSource } from '$lib/motion/custom/component';
-  import { setExpression } from '$lib/motion/expression/ops';
+  import { expressionToKeys, setExpression } from '$lib/motion/expression/ops';
   import { EFFECTS, EFFECT_ALPHA, EFFECT_KINDS, editedParams, type EffectKind } from '$lib/motion/effects/registry';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
@@ -311,6 +311,10 @@
     commit(setExpression(doc, clip.id, key, source), `Edited the ${key} expression`);
   }
 
+  function bakeExpression(key: string) {
+    commit(expressionToKeys(doc, clip.id, key, analyses), `Converted the ${key} expression to keys`);
+  }
+
   function expressionNow(key: string): string {
     try {
       return String(Math.round(expressionValue(doc, clip.id, key, clip.from + Math.max(0, frame - clip.from), analyses) * 1000) / 1000);
@@ -518,6 +522,7 @@
       <div class="expr-head"><span>ƒ {key}</span><IconButton action={Action.Remove} size={14} label={`Remove the ${key} expression`} onclick={() => toggleExpression(key)} /></div>
       <textarea class="code" rows="2" spellcheck="false" aria-label={`${key} expression`} value={clip.expressions[key]} onchange={(e) => editExpression(key, e.currentTarget.value)}></textarea>
       {#if faults[key]}<p class="expr-error" role="alert">{faults[key]}</p>{:else}<output class="expr-now">= {expressionNow(key)}</output>{/if}
+      <button type="button" class="expr-bake" data-testid={`expression-to-keys-${key}`} disabled={Boolean(faults[key])} onclick={() => bakeExpression(key)}>Convert to keys</button>
     </div>
   {/if}
 {/snippet}
@@ -1567,6 +1572,23 @@
     color: var(--ui-ink-2);
     font-size: var(--ui-text-xs);
     cursor: pointer;
+  }
+
+  .expr-bake {
+    justify-self: start;
+    height: 24px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .expr-bake:hover:not(:disabled) {
+    background: var(--ui-hover);
   }
 
   .mode-warning {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
+import { addClip, moveClip, type OpResult } from './timeline';
 import { groupClips, ungroupClip } from './group';
 
 const ok = (r: OpResult): MotionDoc => {
@@ -48,6 +48,16 @@ describe('grouping inside a frame', () => {
     const back = ok(ungroupClip(moved, group.id, newId));
 
     expect(findClip(back, 'a')?.clip.transform).toMatchObject({ x: 0.1, y: -0.05 });
+  });
+
+  it('a group segment moved along the timeline moves every clip in it', () => {
+    const grouped = ok(groupClips(twoShapes(), ['a', 'b'], newId));
+    const group = grouped.tracks.flatMap((t) => t.clips)[0];
+    const moved = ok(moveClip(grouped, group.id, { from: 30 }));
+    const back = ok(ungroupClip(moved, group.id, newId));
+
+    expect(findClip(back, 'a')?.clip.from).toBe(30);
+    expect(findClip(back, 'b')?.clip.from).toBe(40);
   });
 
   it('refuses what is not a group, and a group scaled or rotated as one', () => {

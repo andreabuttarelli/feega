@@ -2,7 +2,9 @@ import { CAMERA, CAMERA_LANE, newCamera, type CameraKey } from '../camera';
 import { withParams } from '../custom/params';
 import { findClip, type MotionDoc } from '../doc';
 import type { OpResult } from '../timeline';
-import { expressionErrors } from './bake';
+import type { AudioAnalysis } from '../audio-analysis';
+import { bakedTrack, expressionErrors } from './bake';
+import { setKeyframes } from '../timeline';
 import { compileExpression } from './language';
 import { expressionProblem, type Expressions } from './schema';
 import { liveInputProblem } from '../interactive/live-props';
@@ -35,6 +37,15 @@ export function setExpression(doc: MotionDoc, clipId: string, key: string, sourc
     tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === clipId ? { ...c, expressions: withSource(c.expressions, key, source) } : c)) }))
   };
   return source === null ? { ok: true, doc: next } : checked(next, clipId, key);
+}
+
+export function expressionToKeys(doc: MotionDoc, clipId: string, key: string, analyses: Record<string, AudioAnalysis> = {}): OpResult {
+  const baked = bakedTrack(doc, clipId, key, analyses);
+  if (!baked.ok) {
+    return fail(baked.error);
+  }
+  const cleared = setExpression(doc, clipId, key, null);
+  return cleared.ok ? setKeyframes(cleared.doc, clipId, key, baked.keys) : cleared;
 }
 
 export function setCameraExpression(doc: MotionDoc, key: CameraKey, source: string | null): OpResult {
