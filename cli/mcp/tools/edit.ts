@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { editApi } from '../../lib/edit.ts';
 import type { RawAnswer } from '../../lib/api.ts';
+import type { ToolSurface } from '../tool-surface.ts';
+import { TOOL_FAMILY } from '../surface.ts';
 import { requireAuth, fail, ok, type ToolResult } from '../util.ts';
 
 const HTTP_ERROR_FROM = 400;
@@ -21,7 +23,7 @@ type Frame = { time: number; mime: string; data: string };
 function shown(answer: RawAnswer): ToolResult {
   const body = answer.body;
   if (answer.status >= HTTP_ERROR_FROM) {
-    return fail(typeof body === 'string' ? body : JSON.stringify(body, null, 2));
+    return fail(typeof body === 'string' ? body : JSON.stringify(body));
   }
   const frames = (body as { frames?: Frame[] } | null)?.frames;
   if (!Array.isArray(frames)) {
@@ -29,7 +31,7 @@ function shown(answer: RawAnswer): ToolResult {
   }
   const { frames: _drawn, ...notes } = body as { frames: Frame[] } & Record<string, unknown>;
   const text = { ...notes, times: frames.map((f) => f.time) };
-  return { content: [{ type: 'text', text: JSON.stringify(text, null, 2) }, ...frames.map((f) => ({ type: 'image' as const, data: f.data, mimeType: f.mime }))], structuredContent: text };
+  return { content: [{ type: 'text', text: JSON.stringify(text) }, ...frames.map((f) => ({ type: 'image' as const, data: f.data, mimeType: f.mime }))], structuredContent: text };
 }
 
 async function call(run: (token: string) => Promise<RawAnswer>): Promise<ToolResult> {
@@ -44,7 +46,7 @@ async function call(run: (token: string) => Promise<RawAnswer>): Promise<ToolRes
   }
 }
 
-export function registerEditTools(server: McpServer) {
+export function registerEditTools(server: McpServer, surface: ToolSurface) {
   server.registerTool(
     'edit',
     {
@@ -60,7 +62,12 @@ export function registerEditTools(server: McpServer) {
       inputSchema: z.object({ org, project_id: z.string().optional(), ops: z.array(step).max(500).optional() }).extend(step.shape).partial({ op: true }),
       annotations: { readOnlyHint: false, destructiveHint: true }
     },
-    async ({ org, ...body }) => call((token) => editApi.edit(token, body as never, org))
+    async ({ org, ...body }) => {
+      if (body.op && surface.isLocal(body.op) && body.op in TOOL_FAMILY) {
+        return surface.run(body.op, { ...(org ? { org } : {}), ...(body.input ?? {}) });
+      }
+      return call((token) => editApi.edit(token, body as never, org));
+    }
   );
 
   server.registerTool(

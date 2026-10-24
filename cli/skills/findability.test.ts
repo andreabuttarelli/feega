@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { handleMcpFetch } from '../mcp/http-app.ts';
-import { MCP_INSTRUCTIONS } from '../mcp/server.ts';
+import { MCP_INSTRUCTIONS, listAllTools } from '../mcp/server.ts';
 
 /**
  * Un tool si trova con le parole di chi lo cerca, non con le nostre.
@@ -47,25 +46,7 @@ const SKILL = readFileSync(
 ).toLowerCase();
 
 async function listedTools(): Promise<Map<string, string>> {
-  const post = (body: unknown) =>
-    handleMcpFetch(
-      new Request('http://localhost/mcp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
-        body: JSON.stringify(body)
-      })
-    );
-
-  await post({
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'initialize',
-    params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'findability', version: '0' } }
-  });
-
-  const body = await (await post({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} })).json();
-  const tools = body.result.tools as { name: string; description?: string }[];
-
+  const tools = await listAllTools();
   return new Map(tools.map((t) => [t.name, (t.description ?? '').toLowerCase()]));
 }
 

@@ -16,15 +16,18 @@ const OUT = 'docs/mcp-tools.md';
 function fetchTools() {
   const script = `
     import { handleMcpFetch } from './mcp/http-app.ts';
+    import { listAllTools } from './mcp/server.ts';
+    import { CORE_TOOLS } from './mcp/surface.ts';
     const post = (b) => handleMcpFetch(new Request('http://localhost/mcp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', 'mcp-session-id': 'inventory' },
       body: JSON.stringify(b)
     }));
     await post({ jsonrpc: '2.0', id: 1, method: 'initialize',
       params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'inventory', version: '0' } } });
-    const res = await post({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
-    process.stdout.write(JSON.stringify((await res.json()).result));
+    const listed = (await (await post({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} })).json()).result;
+    const tools = (await listAllTools()).map(({ execution, _meta, ...t }) => t);
+    process.stdout.write(JSON.stringify({ tools, listedChars: JSON.stringify(listed).length, core: Object.keys(CORE_TOOLS) }));
   `;
   writeFileSync('cli/.inventory.tmp.ts', script);
   const run = spawnSync('bun', ['run', './.inventory.tmp.ts'], { cwd: 'cli', encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -84,7 +87,7 @@ function render(result) {
   out.push('> Non si modifica a mano: il prossimo che rigenera cancella le correzioni.');
   out.push('');
   out.push(`**${tools.length} tool** — ${by.read.length} in lettura, ${by.write.length} in scrittura, ${by.destroy.length} che distruggono.`);
-  out.push(`Il payload di \`tools/list\` pesa **${bytes.toLocaleString('it-IT')} caratteri**, circa **${Math.round(bytes / 4).toLocaleString('it-IT')} token**, ed e' il costo che ogni sessione paga prima di dire una parola.`);
+  out.push(`Una sessione nuova ne lista ${result.core.length} (${result.core.map((n) => `\`${n}\``).join(', ')}): \`tools/list\` pesa **${result.listedChars.toLocaleString('it-IT')} caratteri**, circa **${Math.round(result.listedChars / 4).toLocaleString('it-IT')} token**. Gli altri si caricano con \`find_tools\`/\`load_tools\` o si chiamano via \`edit\` {op, input}; tutti insieme peserebbero ${bytes.toLocaleString('it-IT')} caratteri.`);
   out.push('');
   out.push('| gruppo | tool |');
   out.push('|---|---:|');

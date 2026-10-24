@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { z } from 'zod';
 import { asTool } from '../lib/api.ts';
 import { getRequestAuth } from './context.ts';
 import { mcpLog } from './observability.ts';
@@ -15,92 +16,73 @@ import { registerSpendCapsTools } from './tools/spend-caps.ts';
 import { registerAppAccountTools } from './tools/app-account.ts';
 import { registerOrgTools } from './tools/orgs.ts';
 import { registerEditTools } from './tools/edit.ts';
+import { registerLoadingTools } from './tools/loading.ts';
+import { STDIO_SESSION, sessionLoaded } from './surface.ts';
+import { Listing, ToolSurface, type ListedTool } from './tool-surface.ts';
+import { fail, type ToolResult } from './util.ts';
 
-/**
- * Il client la mostra da solo al handshake, una volta per sessione, PRIMA di ogni descrizione e
- * prima della skill. Quindi è la mappa del server — come è organizzato, cosa serve un brand,
- * cosa costa — non la ripetizione dei tool, che si leggono da soli poco dopo.
- *
- * `Always start with list_brands` stava qui, ed è stato eseguito alla lettera: l'agente lo
- * chiamava per qualunque cosa e poi sceglieva un brand a caso, spendendo i crediti di
- * un'organizzazione vera e scrivendo nella libreria di un cliente vero.
- */
 const MCP_INSTRUCTION_LINES = [
-  'feega is an infinite canvas of typed nodes that people, chat or MCP agents drive.',
-  'Reads cost nothing; READING IS ONE TOOL: `query`. Every table, org-scoped. Name `columns`; `offset` is the next page; `count: "exact"` when the number IS the answer; `embed` brings a related table along.',
-  'Change a canvas with `edit` only (op, `target`/`element` ids; `describe`; `batch`; replaces `canvas_tool`, `motion_tool`, `motion_editor_op`); see it with `view` (canvas_summary, get, activity, snapshot). Generic writes on every table: `insert_row`, `update_row`, `delete_row`. `describe_node_types` gives the JSON Schema `nodes.data` must match per `type` before you insert or update one.',
-  '`run_node_generation` is the canvas Generate button: fills an existing node, never creates one; no `model` = default; `medium` must match the node\'s type; a video comes back `queued`. `apply_effects`/`make_effects_pair` render effects (`list_effects`; custom: `write_effect`, `patch_effect`), free. `enhance_prompt` improves a prompt. `run_node_loop` queues every combination of a node\'s inputs (`preview_node_loop` free, `cancel_node_loop` stops it); confirm >50, refused >1000.',
-  'A project needs no brand; never guess one: attach one only to publish.',
-  '`get_media`: show `preview_url`, give `full_url`.',
-  '`list_motion_videos`/`list_shader_effects`; `ask_motion_agent`/`get_motion_run`/`get_motion_summary`/`motion_budget`; `render_video`/`get_render`; `publish_motion_embed`/`get_motion_embed`/`share_motion_frame`; `view_motion_frames`/`list_motion_revisions`/`restore_motion_revision`; `list_motion_templates`/`add_motion_template`/`new_motion_from_template`; `get_storyboard`/`write_storyboard`/`edit_storyboard_card`; `search_gallery`/`remix_gallery_item`/`publish_to_gallery`; `write_layout`/`patch_layout`/`list_layouts`; `get_app_account`/`forget_app_account`; `list_orgs`/`list_team`/`team_op`/`model_allowlist`/`spend_caps`.',
-  'Signing in is no tool: HTTP hosts send the Bearer; locally `feega login`.'
+  'feega: an infinite canvas of typed nodes; frames are motion videos and stills.',
+  'A video is a frame: `edit` op draw_frame, then frame ops inside it; check it with `view` snapshot; `render_video` exports it.',
+  'Reads cost nothing: `query` (tables, name `columns`, `offset` pages) and `view` (canvas). Change with `edit`. `describe` gives any exact schema.',
+  'Everything else: `find_tools`, then `load_tools` to list it, or call it through `edit` {op: "<tool>", input}.',
+  'A project needs no brand; never guess one. Signing in is no tool: HTTP hosts send the Bearer; locally `feega login`.'
 ];
 
 export const MCP_INSTRUCTIONS = MCP_INSTRUCTION_LINES.join(' ');
 
-type ListedTool = { inputSchema?: Record<string, unknown> };
-
-function withoutKeysNoClientReads(result: unknown): unknown {
-  const { tools } = result as { tools: ListedTool[] };
-
-  return {
-    tools: tools.map(({ inputSchema, ...tool }) => {
-      const { $schema, ...schema } = inputSchema ?? {};
-      return { ...tool, execution: undefined, inputSchema: schema };
-    }),
-  };
-}
-
-/**
- * L'SDK aggiunge a ogni tool due chiavi che nessun client legge, e le paghiamo a ogni sessione:
- * `$schema` dichiara il dialetto di uno schema che il protocollo dichiara già JSON Schema, e
- * `execution.taskSupport: 'forbidden'` è esattamente ciò che l'assenza del campo significa.
- * Erano 10.948 caratteri, l'8,5% di `tools/list`.
- *
- * Si decora l'unico punto in cui l'SDK installa il suo handler, prima che i tool lo creino.
- */
-function trimListedTools(server: McpServer): void {
-  const inner = server.server;
-  const install = inner.setRequestHandler.bind(inner);
-
-  inner.setRequestHandler = ((schema: unknown, handler: (...args: unknown[]) => unknown) => {
-    if (schema !== ListToolsRequestSchema) return install(schema as never, handler as never);
-
-    return install(schema as never, (async (...args: unknown[]) =>
-      withoutKeysNoClientReads(await handler(...args))) as never);
-  }) as typeof inner.setRequestHandler;
+function withoutKeysNoClientReads(tools: ListedTool[]): ListedTool[] {
+  return tools.map(({ inputSchema, ...tool }) => {
+    const { $schema: _dialect, ...schema } = inputSchema ?? {};
+    return { ...tool, execution: undefined, inputSchema: schema };
+  });
 }
 
 type ToolHandler = (...args: unknown[]) => unknown;
+
+type CallRequest = { params: { name: string } };
+
+async function withSchemaOnError(surface: ToolSurface, request: CallRequest, result: ToolResult): Promise<ToolResult> {
+  const text = result.isError ? result.content.find((c) => c.type === 'text')?.text : undefined;
+  if (!text) {
+    return result;
+  }
+  if (text.includes('Input validation error')) {
+    const listed = await surface.schemaOf(request.params.name);
+    return fail(`${text}\nSchema: ${JSON.stringify(listed?.inputSchema ?? {})}`);
+  }
+  if (/Tool .* not found$/.test(text)) {
+    return fail(`${text}. Use find_tools, or edit {op: "<name>", input}.`);
+  }
+  return result;
+}
+
+function shapeListedTools(server: McpServer, surface: ToolSurface): void {
+  const inner = server.server;
+  const install = inner.setRequestHandler.bind(inner);
+
+  inner.setRequestHandler = ((schema: unknown, handler: (...args: unknown[]) => Promise<unknown>) => {
+    if (schema === ListToolsRequestSchema) {
+      surface.useFullListing(async () => withoutKeysNoClientReads(((await handler({ method: 'tools/list', params: {} }, {})) as { tools: ListedTool[] }).tools));
+      return install(schema as never, (async () => ({ tools: await surface.listing(Listing.Session) })) as never);
+    }
+    if (schema === CallToolRequestSchema) {
+      return install(schema as never, (async (request: CallRequest, extra: unknown) => withSchemaOnError(surface, request, (await handler(request, extra)) as ToolResult)) as never);
+    }
+    return install(schema as never, handler as never);
+  }) as typeof inner.setRequestHandler;
+}
 
 function brandSlugOf(args: unknown[]): string | undefined {
   const input = args[0] as { slug?: unknown } | undefined;
   return typeof input?.slug === 'string' ? input.slug : undefined;
 }
 
-/**
- * LE TRE COLONNE CHE ARRIVAVANO SEMPRE VUOTE. `observability.ts` scrive `tool_name`, `user_id` e
- * `brand_slug` da sempre, e nessuno in `cli/mcp/` le passava. Il posto dove riempirle è uno solo —
- * dove un tool viene eseguito — quindi è un lavoro solo, non tre. Senza, di una richiesta finita
- * 401 non si sa dire se sia un cliente che non riesce a collegarsi o qualcuno che sta provando, e
- * quelle due vogliono risposte opposte.
- *
- * `user_id` è l'IDENTIFICATORE e si ferma lì: l'identità arriva qui con l'email accanto, e la
- * tabella la leggerà chi non ha motivo di vedere l'indirizzo di un cliente.
- *
- * Si decora `registerTool` una volta sola, prima che i quattro moduli registrino: un tool nuovo è
- * strumentato per il fatto di esistere, e la riga non dipende da chi si ricorda di scriverla.
- * Niente qui può rovesciare la chiamata che sta descrivendo: `mcpLog` non torna mai un guasto a
- * chi lo chiama, e i due campi letti dalla richiesta sono letture e basta.
- *
- * Lo stesso scope porta il nome fino alle chiamate HTTP che il tool fa (`asTool`), dove diventa
- * l'intestazione che lega la spesa in `ai_calls` al tool che l'ha causata.
- */
-function recordToolCalls(server: McpServer): void {
+function recordToolCalls(server: McpServer, surface: ToolSurface): void {
   const register = server.registerTool.bind(server);
 
-  server.registerTool = ((name: string, config: unknown, handler: ToolHandler) =>
-    register(name as never, config as never, (async (...args: unknown[]) => {
+  server.registerTool = ((name: string, config: { inputSchema?: z.ZodType }, handler: ToolHandler) => {
+    const recorded = async (...args: unknown[]) => {
       const started = Date.now();
       const common = {
         event: 'tool.call',
@@ -131,10 +113,13 @@ function recordToolCalls(server: McpServer): void {
         });
         throw e;
       }
-    }) as never)) as typeof server.registerTool;
+    };
+    surface.remember(name, config.inputSchema, recorded as never);
+    return register(name as never, config as never, recorded as never);
+  }) as typeof server.registerTool;
 }
 
-export function createFeegaMcpServer(): McpServer {
+function build(session: string): { server: McpServer; surface: ToolSurface } {
   const server = new McpServer(
     {
       name: 'feega',
@@ -145,8 +130,9 @@ export function createFeegaMcpServer(): McpServer {
     { instructions: MCP_INSTRUCTIONS },
   );
 
-  trimListedTools(server);
-  recordToolCalls(server);
+  const surface = new ToolSurface(server, sessionLoaded(session));
+  shapeListedTools(server, surface);
+  recordToolCalls(server, surface);
 
   registerOrgDataTools(server);
   registerModelAllowlistTools(server);
@@ -159,7 +145,21 @@ export function createFeegaMcpServer(): McpServer {
   registerLayoutTools(server);
   registerAppAccountTools(server);
   registerOrgTools(server);
-  registerEditTools(server);
+  registerEditTools(server, surface);
+  registerLoadingTools(server, surface);
 
-  return server;
+  return { server, surface };
+}
+
+export function createFeegaMcpServer(session: string = STDIO_SESSION): McpServer {
+  return build(session).server;
+}
+
+const CATALOGUE_SESSION = 'catalogue';
+
+export async function listAllTools(): Promise<ListedTool[]> {
+  const { server, surface } = build(CATALOGUE_SESSION);
+  const all = await surface.listing(Listing.Full);
+  await server.close();
+  return all;
 }

@@ -3,12 +3,12 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**52 tool** — 21 in lettura, 25 in scrittura, 6 che distruggono.
-Il payload di `tools/list` pesa **56.658 caratteri**, circa **14.165 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**58 tool** — 25 in lettura, 27 in scrittura, 6 che distruggono.
+Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3474 caratteri**, circa **869 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 59.584 caratteri.
 
 | gruppo | tool |
 |---|---:|
-| Altro | 24 |
+| Altro | 30 |
 | Video motion | 16 |
 | Accesso diretto al database | 5 |
 | Nodi e generazione | 4 |
@@ -42,6 +42,17 @@ Deprecated, use `edit`. The canvas ops of the project chat, on one project (`pro
 | `project_id` | string |  |
 | `op` | string |  |
 | `input`? | object |  |
+
+### `describe` · R
+
+
+Exact input schema of any op or tool.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `op`? | string |  |
+| `ops`? | string[] |  |
 
 ### `edit` · D
 
@@ -85,6 +96,17 @@ Rewrites a brief into the SHAPE the model you are about to render with wants —
 | `prompt` | string |  |
 | `model` | string |  |
 | `shot_mode`? | `hero` \| `flat-lay` \| `on-model` \| `close-up` \| `lifestyle` \| `studio` |  |
+
+### `find_tools` · R
+
+
+Search tools and ops by keywords.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `query`? | string |  |
+| `family`? | `canvas` \| `frame` \| `editor` \| `motion` \| `templates` \| `storyboard` \| `generation` \| `effects` \| `data` \| `gallery` \| `layouts` \| `team` \| `legacy` |  |
 
 ### `forget_app_account` · D
 
@@ -189,6 +211,16 @@ Members with role, pending invites and whether the invite link is on, for `org_i
 |---|---|---|
 | `org_id`? | string |  |
 
+### `load_tools` · R
+
+
+Add tools to this session list.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `names` | string[] |  |
+
 ### `make_effects_pair` · W
 
 *Make a shape cutout A/B pair*
@@ -199,6 +231,18 @@ For an `effects` node with a `shape-cutout` step: creates its twin (same shapes 
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
+
+### `model_allowlist` · W
+
+*Read or set the models an org allows*
+
+Which image, video and 3D models the org offers. Without `medium` it reads: ids per medium, an empty list meaning every model. With `medium` (image, video, model3d) and `model_ids` it replaces that medium list, admins only and only when the user asks; an empty `model_ids` allows every model again. Free.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `medium`? | `image` \| `video` \| `model3d` |  |
+| `model_ids`? | string[] |  |
 
 ### `patch_effect` · W
 
@@ -244,6 +288,20 @@ Render the saved revision of a motion video to MP4. Default `mode: "browser"`: f
 | `fps`? | number \| number \| number \| number \| number \| number | 120 renders on our servers only |
 | `gif`? | object | format gif only: loop forever (default), once or boomerang; fps 8-30 (15); width 64-1920 px (640); the video can be up to 30 s |
 
+### `spend_caps` · W
+
+*Read or set the spend caps of an org*
+
+The spend caps of the org. Without `scope` it reads them. With `scope` (org_member: each member anywhere; project_member: each member in `project_id`; project_total: the project as a whole) and `cap_usd` it sets one, admins only and only when the user asks; `cap_usd` null removes it. `reset` is none or monthly. A run refused by a cap answers with the error `cap_reached`. Free.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `scope`? | `org_member` \| `project_member` \| `project_total` |  |
+| `project_id`? | string |  |
+| `cap_usd`? | number \| null |  |
+| `reset`? | `none` \| `monthly` |  |
+
 ### `team_op` · W
 
 *Change organisations and teams*
@@ -259,6 +317,15 @@ One organisation or team change, only when the user asks; `org_id` defaults to t
 | `role`? | `admin` \| `member` \| `viewer` |  |
 | `invite_id`? | string |  |
 | `user_id`? | string |  |
+
+### `unload_tools` · R
+
+
+Drop loaded tools.
+
+| campo | tipo | |
+|---|---|---|
+| `names` | string[] |  |
 
 ### `view` · R
 

@@ -2,10 +2,16 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { createClient } from '@supabase/supabase-js';
 import { EXCLUDED_FEEGA_TOOLS, REPO_ROOT, TEST_ACCOUNT_EMAIL } from './config';
-import type { Image, ToolOutput, Tools } from './agent-loop';
+import type { Image, ToolOutput, ToolSpec, Tools } from './agent-loop';
+
+export enum ToolListing {
+  Static = 'static',
+  Dynamic = 'dynamic'
+}
 
 const APP_URL = 'https://oh.feega.app';
 const SUPABASE_URL = 'https://klnswzhhgrqvbfjzioul.supabase.co';
@@ -46,7 +52,7 @@ function textOf(result: { content?: unknown; isError?: boolean }): ToolOutput {
   return { text: result.isError ? `error: ${text}` : text, images };
 }
 
-export async function connectFeega(session: Session): Promise<FeegaMcp> {
+export async function connectFeega(session: Session, listing: ToolListing = ToolListing.Static): Promise<FeegaMcp> {
   const home = mkdtempSync(join(tmpdir(), 'feega-eval-home-'));
   mkdirSync(join(home, '.config', 'feega'), { recursive: true });
   writeFileSync(join(home, '.config', 'feega', 'session.json'), JSON.stringify(session));
@@ -60,10 +66,16 @@ export async function connectFeega(session: Session): Promise<FeegaMcp> {
   const client = new Client({ name: 'external-agent-eval', version: '1.0.0' });
   await client.connect(transport);
 
-  const listed = await client.listTools();
-  const specs = listed.tools
-    .filter((t) => !EXCLUDED_FEEGA_TOOLS.has(t.name))
-    .map((t) => ({ name: t.name, description: t.description ?? '', parameters: t.inputSchema as Record<string, unknown> }));
+  const specs: ToolSpec[] = [];
+  const refresh = async () => {
+    const listed = await client.listTools();
+    const kept = listed.tools.filter((t) => !EXCLUDED_FEEGA_TOOLS.has(t.name)).map((t) => ({ name: t.name, description: t.description ?? '', parameters: t.inputSchema as Record<string, unknown> }));
+    specs.splice(0, specs.length, ...kept);
+  };
+  await refresh();
+  if (listing === ToolListing.Dynamic) {
+    client.setNotificationHandler(ToolListChangedNotificationSchema, refresh);
+  }
 
   const call = async (name: string, args: Record<string, unknown>) => textOf((await client.callTool({ name, arguments: args })) as never);
 

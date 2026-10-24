@@ -54,6 +54,8 @@
     "eval:moderation": "vite-node --config scripts/vite-node.config.ts scripts/eval/moderation-edges.ts",
     "eval:motion": "vite-node --config scripts/vite-node.config.ts scripts/eval/motion-quality/run.ts --",
     "eval:external-agent": "vite-node --config scripts/vite-node.config.ts scripts/eval/external-agent/run.ts",
+    "eval:external-agent:static": "vite-node --config scripts/vite-node.config.ts scripts/eval/external-agent/run.ts -- --listing=static",
+    "eval:external-agent:dynamic": "vite-node --config scripts/vite-node.config.ts scripts/eval/external-agent/run.ts -- --listing=dynamic",
     "eval:people": "vite-node --config scripts/vite-node.config.ts scripts/eval/people-detector.ts",
     "docs:mcp-tools": "node scripts/mcp-inventory.mjs --write",
     "bench:export": "vite-node --config scripts/vite-node.config.ts scripts/bench/export-bench.ts --",

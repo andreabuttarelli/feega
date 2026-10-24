@@ -50,4 +50,24 @@ describe('the external agent loop', () => {
 
     expect(stats).toMatchObject({ stop: Stop.Error, error: '503' });
   });
+
+  it('keeps the transcript, tool calls and errors included', async () => {
+    const stats = await runAgent({ system: 's', task: 't', tools, capUsd: 1, chat: scripted(toolReply(0), doneReply(0)) });
+
+    expect(stats.transcript.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'tool', 'assistant']);
+    expect(stats.transcript[3]).toMatchObject({ role: 'tool', content: 'pong' });
+  });
+
+  it('sends the tool list as it is at each turn, so a loaded tool shows up', async () => {
+    const live: Tools = { specs: [...tools.specs], call: async () => (live.specs.push({ name: 'loaded', description: '', parameters: { type: 'object' } }), { text: 'ok', images: [] }) };
+    const seen: string[][] = [];
+    const chat: Chat = async (_messages, apiTools) => {
+      seen.push((apiTools as { function: { name: string } }[]).map((t) => t.function.name));
+      return seen.length === 1 ? toolReply(0) : doneReply(0);
+    };
+
+    await runAgent({ system: 's', task: 't', tools: live, capUsd: 1, chat });
+
+    expect(seen).toEqual([['ping'], ['ping', 'loaded']]);
+  });
 });

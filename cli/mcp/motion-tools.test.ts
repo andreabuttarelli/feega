@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
+import { listAllTools } from './server.ts';
 import { createServer, type Server } from 'node:http';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -297,7 +298,7 @@ describe('the motion agent over MCP', () => {
 
   test('only the motion tools are exposed, not the editor ones', async () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
-    const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
+    const names = (await listAllTools()).map((t) => t.name);
 
     expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'motion_editor_op', 'motion_tool', 'new_motion_from_template', 'publish_motion_embed', 'restore_motion_revision', 'share_motion_frame', 'view_motion_frames']);
     expect(names).toContain('render_video');
