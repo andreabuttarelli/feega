@@ -1,0 +1,83 @@
+@font-face {
+  font-family: 'BDO Grotesk';
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/bdo-grotesk-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'BDO Grotesk';
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/bdo-grotesk-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'BDO Grotesk';
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/bdo-grotesk-DemiBold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Fragment Mono';
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/fragment-mono-latin.woff2') format('woff2');
+}
+
+:root {
+  --ui-radius-xs: 2px;
+  --ui-radius-sm: 4px;
+  --ui-radius-md: 6px;
+  --ui-radius-lg: 10px;
+  --sl-font: 'BDO Grotesk', system-ui, sans-serif;
+  --sl-font-mono: 'Fragment Mono', ui-monospace, monospace;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent: #0b6bcb;
+  --sl-color-accent-high: #0b6bcb;
+  --sl-color-accent-low: #e5f2ff;
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #ffffff;
+  --sl-color-bg-sidebar: #f5f5f5;
+}
+
+:root[data-theme='dark'] {
+  --sl-color-accent: #0b6bcb;
+  --sl-color-accent-high: #66b8ff;
+  --sl-color-accent-low: #0a2a47;
+  --sl-color-bg: #121212;
+  --sl-color-bg-nav: #1f1f1f;
+  --sl-color-bg-sidebar: #1f1f1f;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  letter-spacing: -0.04em;
+}
+
+code,
+kbd {
+  border-radius: var(--ui-radius-xs);
+}
+
+.expressive-code .frame,
+.starlight-aside,
+.sl-markdown-content table {
+  border-radius: var(--ui-radius-md);
+}
+
+.sl-link-button,
+.sidebar-content a,
+button,
+input {
+  border-radius: var(--ui-radius-sm);
+}

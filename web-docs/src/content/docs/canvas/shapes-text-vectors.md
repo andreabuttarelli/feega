@@ -1,0 +1,27 @@
+---
+title: Shapes, text and vectors
+description: Drawing tools, rich text, and editing paths.
+sidebar:
+  order: 3
+---
+
+## Shapes and vector tools
+
+| Key | Tool |
+|---|---|
+| `R` / `O` | Rectangle / ellipse |
+| `L` / `Shift+L` | Line / arrow |
+| `P` | Pen: click points, drag for curves |
+| `Shift+B` | Pencil: freehand, smoothed into editable paths; hold Shift for straight segments |
+| `X` | Shape builder: merge regions of overlapping shapes, Alt-click to remove one, Enter to apply |
+| `K` | Scale tool: scales size, text, strokes and effects together |
+
+Rotate by dragging just outside a corner (Shift snaps to 15 degrees). `Alt+R` shows the rotation origin so you can move it. Gradients can be linear, radial, angular or diamond. A shape can morph into any other shape, including hand-drawn paths and shapes with holes.
+
+## Text
+
+- Select any part of a text and style it: bold, italic, size, colour, gradient, underline or strikethrough (solid, double, dotted, dashed, wavy), small caps, OpenType features.
+- Links: `Shift+Cmd+U`. Lists: `Shift+Cmd+8` bulleted, `Shift+Cmd+7` numbered, `Tab` to nest.
+- Auto width and auto height text grows as you type.
+- Turn text into editable vector shapes with `Shift+Cmd+O`.
+- Replace a missing or unwanted font in the whole video in one pick.

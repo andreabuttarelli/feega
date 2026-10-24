@@ -88,6 +88,23 @@ jobs:
       - name: Web build compiles
         run: cargo build --locked --lib --target wasm32-unknown-unknown
 
+  web-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm --prefix web-docs ci
+
+      - name: Build the docs site (generates the references from the code)
+        run: npm --prefix web-docs run build
+
   schema-drift:
     runs-on: ubuntu-latest
     continue-on-error: true
