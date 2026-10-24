@@ -5,6 +5,8 @@
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import { FILL_LABEL, FILL_TYPES, FillType, IMAGE_CONTROLS, IMAGE_FITS, IMAGE_FIT_LABEL, ImageControl, addFill, cropOf, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '$lib/motion/fill/model';
   import ColorField from './ColorField.svelte';
+  import { SliderField } from '$lib/components/ui/control';
+  import { ADJUSTMENTS, ADJUSTMENT_LABEL, isNeutral, type Adjustment } from '$lib/motion/fill/adjust';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
   import { FillField, fillKey } from '$lib/motion/fill/keys';
@@ -21,6 +23,7 @@
   let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, keys = null, onchange }: { keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
+  const setAdjust = (i: number, current: FillOf<FillType.Image>, key: Adjustment, value: number) => patch(i, { adjust: { ...current.adjust, [key]: value / PERCENT } }, 'Image adjustment');
   const CROP_SIDES = ['x', 'y', 'w', 'h'] as const;
   const ICON = cn('inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-ui-icon hover:bg-ui-wash hover:text-ui-text', FOCUS_RING);
   const LABEL = 'text-ui-label text-ui-text-2';
@@ -278,6 +281,15 @@
             {#each CROP_SIDES as side (side)}
               <label class={FIELD_ROW}><span class={LABEL}>Crop {side.toUpperCase()}</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" data-testid="fill-crop-{side}" value={pct(cropOf(fill)[side])} onchange={(e) => patch(index, { crop: { ...cropOf(fill), [side]: percentOf(e) } }, 'Image crop')} /></label>
             {/each}
+          {/if}
+          {#each ADJUSTMENTS as key (key)}
+            <div class="flex flex-col gap-1" data-testid="fill-adjust-{key}">
+              <span class={LABEL}>{ADJUSTMENT_LABEL[key]}</span>
+              <SliderField label={ADJUSTMENT_LABEL[key]} value={pct(fill.adjust?.[key] ?? 0)} min={-PERCENT} max={PERCENT} onchange={(v) => setAdjust(index, fill, key, Number(v))} />
+            </div>
+          {/each}
+          {#if !isNeutral(fill.adjust)}
+            <button type="button" class={cn(MENU_ITEM, 'justify-center')} data-testid="fill-adjust-reset" onclick={() => patch(index, { adjust: undefined }, 'Reset image adjustments')}>Reset adjustments</button>
           {/if}
         {/if}
         <label class={FIELD_ROW}

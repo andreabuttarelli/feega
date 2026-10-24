@@ -33,7 +33,9 @@ export const SCENES: { id: string; fills: (src: string) => unknown[] }[] = [
   { id: 'cover', fills: (src) => [image(src, { fit: 'cover' })] },
   { id: 'crop', fills: (src) => [image(src, { fit: 'crop', crop: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 } })] },
   { id: 'tile', fills: (src) => [image(src, { fit: 'tile', scale: 2 })] },
-  { id: 'tile-turned', fills: (src) => [image(src, { fit: 'tile', scale: 2, rotation: 30 })] }
+  { id: 'tile-turned', fills: (src) => [image(src, { fit: 'tile', scale: 2, rotation: 30 })] },
+  { id: 'tone', fills: (src) => [image(src, { fit: 'cover', adjust: { exposure: 0.4, contrast: 0.3, saturation: -0.4 } })] },
+  { id: 'balance', fills: (src) => [image(src, { fit: 'cover', adjust: { temperature: 0.6, tint: -0.4, shadows: 0.6, highlights: -0.5 } })] }
 ];
 
 const cell = (index: number) => ({ x: 0.2 + (index % 3) * 0.3, y: 0.25 + Math.floor(index / 3) * 0.4 });

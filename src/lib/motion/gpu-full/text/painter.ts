@@ -6,6 +6,7 @@ import { AUTO, leadingOf, trackingOf, type Leading } from '../../type-units';
 import { Ease } from '../../design';
 import { safeBox } from '../../fit';
 import { elementFills } from '../../fill/elements';
+import type { Adjust } from '../../fill/adjust';
 import { FillType, ImageFit, type Fill, type FillOf } from '../../fill/model';
 import { BlendMode } from '../../blend';
 import { StrokeAlign } from '../../stroke/model';
@@ -44,7 +45,7 @@ export type Painted = { inks: Ink[]; frame: Box };
 
 export type GlyphRun = { font: string; coords: [string, number][]; size: number; glyphs: [number, number, number][] };
 
-export type Picture = { src: string; fit: string; focus: [number, number]; area: Rect };
+export type Picture = { src: string; fit: string; focus: [number, number]; area: Rect; adjust?: Adjust };
 
 export type Ink = { contours: number[][]; paint: Paint; rule: FillRule; opacity: number; matrix: Affine; blur: number; picture?: Picture; run?: GlyphRun };
 
@@ -299,7 +300,7 @@ export type FillPlan =
   | { kind: PaintKind.Radial; center: [number, number]; radius: number; stops: Stop[] }
   | { kind: PaintKind.Diamond; stops: Stop[] }
   | { kind: PaintKind.Sweep; angle: number; center: [number, number]; stops: Stop[] }
-  | { kind: ClippedFill.Image; src: string; fit: string; focus: [number, number]; opacity: number };
+  | { kind: ClippedFill.Image; src: string; fit: string; focus: [number, number]; opacity: number; adjust?: Adjust };
 
 type FillKind = FillPlan['kind'];
 
@@ -311,7 +312,7 @@ const PLANS: Partial<{ [T in FillType]: (f: FillOf<T>, colour: Colour, asset: (i
   [FillType.Angular]: (f, colour) => ({ kind: PaintKind.Sweep, angle: f.angle, center: [f.center.x, f.center.y], stops: stopsOf(f, colour) }),
   [FillType.Image]: (f, _colour, asset) => {
     const src = f.src ?? asset(f.assetId);
-    return src && f.fit !== ImageFit.Tile && f.fit !== ImageFit.Crop ? { kind: ClippedFill.Image, src, fit: f.fit, focus: [f.focus.x, f.focus.y], opacity: f.opacity } : null;
+    return src && f.fit !== ImageFit.Tile && f.fit !== ImageFit.Crop ? { kind: ClippedFill.Image, src, fit: f.fit, focus: [f.focus.x, f.focus.y], opacity: f.opacity, adjust: f.adjust } : null;
   }
 };
 
@@ -333,7 +334,7 @@ const SHADES: { [K in FillKind]: (f: Extract<FillPlan, { kind: K }>, area: Rect)
   },
   [PaintKind.Diamond]: (f, [l, t, r, b]) => unclipped({ kind: PaintKind.Diamond, center: [(l + r) * HALF, (t + b) * HALF], half: [(r - l) * HALF, (b - t) * HALF], stops: f.stops }),
   [PaintKind.Sweep]: (f, [l, t, r, b]) => unclipped({ kind: PaintKind.Sweep, center: [l + f.center[0] * (r - l), t + f.center[1] * (b - t)], start: (f.angle - CSS_TURN) * DEG, stops: f.stops }),
-  [ClippedFill.Image]: (f, area) => [{ paint: { kind: PaintKind.Solid, color: faded(WHITE, f.opacity) }, squash: 1, picture: { src: f.src, fit: f.fit, focus: f.focus, area } }]
+  [ClippedFill.Image]: (f, area) => [{ paint: { kind: PaintKind.Solid, color: faded(WHITE, f.opacity) }, squash: 1, picture: { src: f.src, fit: f.fit, focus: f.focus, area, adjust: f.adjust } }]
 };
 
 const shadesOf = (f: FillPlan, area: Rect): Shade[] => (SHADES[f.kind] as (f: FillPlan, area: Rect) => Shade[])(f, area);

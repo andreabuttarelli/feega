@@ -248,6 +248,20 @@ describe('fill stack in html', () => {
     expect(html).toContain('background-size:calc(100cqw * 0.5) auto');
   });
 
+  it('an adjusted image carries an svg filter and points its layer at it', () => {
+    const html = fillLayersHtml(resolved([{ type: 'image', assetId: 'pic', adjust: { exposure: 0.5, shadows: 0.2 } }]));
+    expect(html).toMatch(/<filter id="adj-[a-z0-9]+" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="[^"]+"\/><feComponentTransfer>/);
+    expect(html).toMatch(/filter:url\(#adj-[a-z0-9]+\)/);
+  });
+
+  it('an image without adjustments draws no filter', () => {
+    expect(fillLayersHtml(resolved([{ type: 'image', assetId: 'pic', adjust: { exposure: 0 } }]))).not.toContain('filter');
+  });
+
+  it('an adjusted tile filters the tile layer', () => {
+    expect(fillLayersHtml(resolved([{ type: 'image', assetId: 'pic', fit: 'tile', adjust: { contrast: 0.4 } }]))).toMatch(/fl-tile" style="[^"]*filter:url\(#adj-/);
+  });
+
   it('escapes the picture url', () => {
     expect(fillLayersHtml(resolveFills(stack([{ type: 'image', src: 'https://x/a"b.png' }]), paint.color, () => null))).toContain('a&quot;b.png');
   });

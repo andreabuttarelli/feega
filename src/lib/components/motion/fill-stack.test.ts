@@ -196,6 +196,34 @@ describe('the fill stack in Properties', () => {
     expect(sent(onchange)[0]).toMatchObject({ fit: 'tile' });
   });
 
+  it('a tiled image edits its rotation and has no crop window', () => {
+    const onchange = show(stack([{ type: 'image', fit: 'tile' }]));
+    click(rows()[0]);
+    change(byId<HTMLInputElement>('fill-rotation'), '30');
+    expect(sent(onchange)[0]).toMatchObject({ fit: 'tile', rotation: 30 });
+    expect(document.querySelector('[data-testid="fill-crop-w"]')).toBeNull();
+  });
+
+  it('a cropped image edits its window', () => {
+    const onchange = show(stack([{ type: 'image', fit: 'crop' }]));
+    click(rows()[0]);
+    change(byId<HTMLInputElement>('fill-crop-w'), '50');
+    expect(sent(onchange)[0]).toMatchObject({ crop: { x: 0, y: 0, w: 0.5, h: 1 } });
+    expect(document.querySelector('[data-testid="fill-rotation"]')).toBeNull();
+  });
+
+  it('an image layer is adjusted by sliders and reset in one click', () => {
+    const onchange = show(stack([{ type: 'image', adjust: { exposure: 0.2 } }]));
+    click(rows()[0]);
+    const slider = byId('fill-adjust-contrast').querySelector<HTMLInputElement>('input[type="range"]')!;
+    slider.value = '40';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    expect(sent(onchange)[0]).toMatchObject({ adjust: { exposure: 0.2, contrast: 0.4 } });
+    click(byId('fill-adjust-reset'));
+    expect((sent(onchange)[0] as { adjust?: unknown }).adjust).toBeUndefined();
+  });
+
   it('an image layer takes a link, copied into the project as a picture', async () => {
     const upload = vi.fn(async () => ({ ok: true as const, asset: { id: 'copied', kind: MediaKind.Image, label: 'b.jpg', previewUrl: '/a/copied' } }));
     const onchange = show(stack([{ type: 'image', assetId: 'pic' }]), upload);
