@@ -96,6 +96,7 @@ const RESTANO = [
   'list_orgs',
   'list_team',
   'team_op',
+  'model_allowlist',
   'edit',
   'view'
 ];

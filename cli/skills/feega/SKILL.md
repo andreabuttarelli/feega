@@ -317,6 +317,9 @@ as viewer), `disable_invite_link`, `set_role`, `remove_member`, `leave`, `transf
 Viewers see everything and change nothing; free organisations have limited editor seats (a
 `seat_limit` answer carries `upgrade_path`). CLI: `feega orgs`, `feega orgs use <orgId>`,
 `feega orgs create <name>`, `feega team [invite|resend|revoke|link|link-off|role|remove|leave|transfer]`.
+`model_allowlist` reads which image, video and 3D models the org offers (an empty list means every
+model) and, for admins and only when the user asks, replaces one medium's list: `feega allowlist
+[set <medium> [ids...]]`.
 
 ## References (load on demand)
 
