@@ -66,7 +66,7 @@ test.describe('sections @real', () => {
     const section = (await rows(admin, session.canvasId)).find((n) => n.type === 'section')!;
     const title = page.locator(`[data-id="${section.id}"]`);
     const box = (await title.boundingBox())!;
-    await page.mouse.click(box.x + box.width * 0.5, box.y + 8);
+    await page.mouse.click(box.x + box.width * 0.5, box.y + box.height - 12);
     await page.keyboard.press('ControlOrMeta+Backspace');
 
     await expect.poll(async () => (await rows(admin, session.canvasId)).filter((n) => n.type === 'section' && !n.deleted_at).length, { timeout: SAVED_MS }).toBe(0);
