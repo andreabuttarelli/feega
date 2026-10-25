@@ -105,10 +105,10 @@ export async function demo(page: Page, dir: string) {
       await page.waitForTimeout(BEAT_MS);
     },
 
-    async select(target: Locator, option: string) {
+    async select(target: Locator, option: string, watch?: Rect) {
       const at = await centreOf(target);
       await moveTo(at);
-      events.push({ kind: 'click', t: now(), x: at.x, y: at.y });
+      events.push({ kind: 'click', t: now(), x: at.x, y: at.y, ...(watch ? { fit: watch } : {}) });
       await target.selectOption(option);
       await page.waitForTimeout(BEAT_MS);
     },

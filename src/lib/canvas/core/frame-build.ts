@@ -4,6 +4,7 @@ import { drawFrame, prepare, type DisplayList } from '$lib/motion/gpu-full/displ
 import { readClips } from '$lib/motion/gpu-full/dom/custom';
 import type { FaceBook } from '$lib/motion/gpu-full/text/face';
 import type { Smoothing } from '$lib/motion/gpu-full/text/painter';
+import { sceneNodeIds } from '$lib/motion/scenes';
 import { frameOfLive } from './frame-source';
 
 export type FrameDoc = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens; playhead?: number };
@@ -16,8 +17,10 @@ export type BuildAnswer = { id: number; list: DisplayList | null } | { id: numbe
 
 export type BuildWorker = { postMessage: (ask: BuildAsk) => void; onmessage: ((e: MessageEvent<BuildAnswer>) => void) | null; onerror: ((e: ErrorEvent) => void) | null };
 
+const MAIN_THREAD_ONLY: ((doc: MotionDoc) => boolean)[] = [(doc) => readClips(doc).read.length > 0, (doc) => sceneNodeIds(doc).length > 0];
+
 export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: Fonts): Promise<DisplayList | null> {
-  if (readClips(source.doc).read.length) {
+  if (MAIN_THREAD_ONLY.some((needs) => needs(source.doc))) {
     return null;
   }
   const faces = await fonts(source.doc, source.assets, source.tokens);

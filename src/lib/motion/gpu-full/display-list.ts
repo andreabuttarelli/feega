@@ -475,10 +475,8 @@ export function prepare(doc: MotionDoc, tokens: BrandTokens, assets: Record<stri
 
 const NO_READS: DomReads = new Map();
 
-export function drawFrame({ doc, tokens, assets, typeset, moves }: Prepared, frame: number, reads: DomReads = NO_READS): DisplayList {
-  const asset = (id: unknown) => (typeof id === 'string' && id ? (assets[id] ?? null) : null);
+function stageAt({ doc, tokens, moves }: Prepared, frame: number) {
   const css = (v: string) => resolveColor(v, tokens);
-  const colour = (v: string) => rgbaOf(css(v)) ?? [0, 0, 0, 1];
   const size = { width: doc.width, height: doc.height };
   const byId = new Map(doc.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
   const pairs = new Map(mattePairs(doc).map((p) => [p.target, p]));
@@ -489,9 +487,20 @@ export function drawFrame({ doc, tokens, assets, typeset, moves }: Prepared, fra
   const enclosing = enclosingGroups(doc);
   const poseOf = (clip: MotionClip) => composePoses(edgeAt(clip, frame), junctionPoseAt(movesOf.get(clip.id) ?? [], frame));
   const effectiveEdge = (clip: MotionClip) => (enclosing.get(clip.id) ?? []).reduce((pose, id) => composePoses(pose, poseOf(byId.get(id)!)), poseOf(clip));
+  const shown = (clip: MotionClip) => frame >= clip.from && frame < clip.from + clip.durationInFrames && !NO_PAINT.has(clip.component);
+  const bottomFirst = [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);
+  const drawable = bottomFirst.flatMap((t) => t.clips as MotionClip[]).filter((clip) => shown(clip) && !sources.has(clip.id) && !onScreen(clip));
+  const alphaOf = (clip: MotionClip, opacity: number, edge: Pose) => inheritedOpacity(doc, clip, byId, frame) * opacity * edge.opacity;
+  return { css, size, byId, pairs, shown, effectiveEdge, drawable, alphaOf };
+}
+
+export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = NO_READS): DisplayList {
+  const { doc, tokens, assets, typeset } = prepared;
+  const { css, size, byId, pairs, shown, effectiveEdge, drawable, alphaOf } = stageAt(prepared, frame);
+  const asset = (id: unknown) => (typeof id === 'string' && id ? (assets[id] ?? null) : null);
+  const colour = (v: string) => rgbaOf(css(v)) ?? [0, 0, 0, 1];
   const items: Item[] = [];
   const unsupported: Gap[] = [];
-  const shown = (clip: MotionClip) => frame >= clip.from && frame < clip.from + clip.durationInFrames && !NO_PAINT.has(clip.component);
 
   function clipItems(clip: MotionClip): Item[] | Unsupported {
     const limit = CLIP_LIMITS.find(([, hit]) => hit(clip));
@@ -526,7 +535,7 @@ export function drawFrame({ doc, tokens, assets, typeset, moves }: Prepared, fra
     const base = mul2d(mul2d(world, [1, 0, 0, 1, box.left, box.top]), turn);
     const moved = posed(move, box.width, box.height);
     const placed = mul2d(base, moved);
-    const alpha = inheritedOpacity(doc, clip, byId, frame) * opacity * edge.opacity;
+    const alpha = alphaOf(clip, opacity, edge);
     const blur = blurOf(clip, frame) * scaleOf(placed) + edge.blur;
     const scissor = scissorOf(edge, size.width, size.height);
     const read = pair ? MATTE_READ[pair.matte] : null;
@@ -547,11 +556,7 @@ export function drawFrame({ doc, tokens, assets, typeset, moves }: Prepared, fra
     return [{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }];
   }
 
-  const bottomFirst = [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);
-  for (const clip of bottomFirst.flatMap((t) => t.clips as MotionClip[])) {
-    if (!shown(clip) || sources.has(clip.id) || onScreen(clip)) {
-      continue;
-    }
+  for (const clip of drawable) {
     const drawn = clipItems(clip);
     if (Array.isArray(drawn)) {
       items.push(...drawn);
@@ -561,6 +566,24 @@ export function drawFrame({ doc, tokens, assets, typeset, moves }: Prepared, fra
   }
   const background = doc.background === Background.Transparent ? null : colour('brand.background');
   return { ...size, background, items, unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
+}
+
+const REST_WINDOW_SECONDS = 2;
+const PEAK_SHARE = 0.99;
+
+function shownOpacity(prepared: Prepared, frame: number): number {
+  const { css, size, drawable, effectiveEdge, alphaOf } = stageAt(prepared, frame);
+  const opacityOf = (clip: MotionClip) => PAINTERS[clip.component]?.place(propsAt(clip, frame, css), size).opacity ?? 1;
+  return drawable.reduce((sum, clip) => sum + alphaOf(clip, opacityOf(clip), effectiveEdge(clip)), 0);
+}
+
+export function restFrame(prepared: Prepared): number {
+  const { doc } = prepared;
+  const opening = stageAt(prepared, 0).drawable.map((c) => c.from + c.durationInFrames);
+  const end = Math.max(1, Math.min(doc.durationInFrames, Math.round(REST_WINDOW_SECONDS * doc.fps) + 1, ...opening));
+  const shown = Array.from({ length: end }, (_, frame) => shownOpacity(prepared, frame));
+  const peak = Math.max(...shown);
+  return Math.max(0, shown.findIndex((o) => o >= peak * PEAK_SHARE));
 }
 
 export const displayListAt = (doc: MotionDoc, frame: number, tokens: BrandTokens, typeset: Typeset = NO_TYPESET): DisplayList => drawFrame(prepare(doc, tokens, {}, typeset), frame);

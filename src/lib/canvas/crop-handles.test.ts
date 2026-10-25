@@ -75,6 +75,13 @@ describe('zooming the picture', () => {
     expect(zoomedAt({ x: 0, y: 0, w: 0.5, h: 0.5 }, box, [0, 0], 1e9).w).toBe(MIN_WINDOW);
   });
 
+  it('zooming out past the whole picture stops without stretching it', () => {
+    const cover = { x: 0, y: 0.04, w: 1, h: 0.92 };
+    const next = zoomedAt(cover, box, [0, 0], 0.5);
+    expect(next.w / next.h).toBeCloseTo(cover.w / cover.h);
+    expect(next).toEqual(cover);
+  });
+
   it('dragging a corner away from the opposite one enlarges the picture, so the window shrinks', () => {
     const start = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
     const rect = imagePlacement(start, box);

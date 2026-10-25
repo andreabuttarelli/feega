@@ -32,6 +32,16 @@ describe('demo camera', () => {
     expect(at.width).toBeLessThan(VIEW.width / 1.7);
   });
 
+  it('a pick in the side panel keeps the stage it changes in shot', () => {
+    const stage = { x: 560, y: 420, width: 520, height: 300 };
+    const keys = keyframesOf([{ kind: 'click', t: 2, x: 1500, y: 480, fit: stage }], VIEW, 8);
+    const at = cameraAt(keys, 3, VIEW, Aspect.Landscape);
+    expect(at.x).toBeLessThanOrEqual(stage.x);
+    expect(at.x + at.width).toBeGreaterThanOrEqual(1500);
+    expect(at.y).toBeLessThanOrEqual(stage.y);
+    expect(at.y + at.height).toBeGreaterThanOrEqual(stage.y + stage.height);
+  });
+
   it('keeps a portrait window inside the viewport', () => {
     const keys = keyframesOf([click(2, 1590, 10)], VIEW, 6);
     for (const t of [0, 1, 2, 3, 5]) {

@@ -8,7 +8,7 @@ export type Rect = { x: number; y: number; width: number; height: number };
 export type Size = { width: number; height: number };
 
 export type DemoEvent =
-  | { kind: 'click'; t: number; x: number; y: number }
+  | { kind: 'click'; t: number; x: number; y: number; fit?: Rect }
   | { kind: 'type'; t: number; end: number; rect: Rect }
   | { kind: 'drag'; t: number; end: number; from: Point; to: Point; fit?: Rect };
 
@@ -34,7 +34,21 @@ type Shot = { start: number; end: number; cx: number; cy: number; zoom: number }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+function fitted(fit: Rect, view: Size, start: number, end: number): Shot {
+  const zoom = clamp(Math.min((view.width * FIT_SHARE) / fit.width, (view.height * FIT_SHARE) / fit.height), 1, MAX_ZOOM);
+  return { start, end, cx: fit.x + fit.width / 2, cy: fit.y + fit.height / 2, zoom };
+}
+
+function around(fit: Rect, p: Point): Rect {
+  const x = Math.min(fit.x, p.x);
+  const y = Math.min(fit.y, p.y);
+  return { x, y, width: Math.max(fit.x + fit.width, p.x) - x, height: Math.max(fit.y + fit.height, p.y) - y };
+}
+
 function shotOf(e: DemoEvent, view: Size): Shot {
+  if (e.kind === 'click' && e.fit) {
+    return fitted(around(e.fit, e), view, e.t, e.t + CLICK_HOLD_S);
+  }
   if (e.kind === 'click') {
     return { start: e.t, end: e.t + CLICK_HOLD_S, cx: e.x, cy: e.y, zoom: CLICK_ZOOM };
   }
@@ -43,8 +57,7 @@ function shotOf(e: DemoEvent, view: Size): Shot {
     return { start: e.t, end: e.end + HOLD_S, cx: e.rect.x + e.rect.width / 2, cy: e.rect.y + e.rect.height / 2, zoom };
   }
   if (e.fit) {
-    const zoom = clamp(Math.min((view.width * FIT_SHARE) / e.fit.width, (view.height * FIT_SHARE) / e.fit.height), 1, MAX_ZOOM);
-    return { start: e.t, end: e.end + HOLD_S, cx: e.fit.x + e.fit.width / 2, cy: e.fit.y + e.fit.height / 2, zoom };
+    return fitted(e.fit, view, e.t, e.end + HOLD_S);
   }
   const span = Math.max(Math.abs(e.to.x - e.from.x), Math.abs(e.to.y - e.from.y) * (view.width / view.height), 1);
   const zoom = clamp((view.width * FIELD_SHARE) / span, DRAG_MIN_ZOOM, MAX_ZOOM - 0.3);
