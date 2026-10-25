@@ -4,10 +4,13 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { chromium } from '@playwright/test';
-import { Aspect, cameraAt, keyframesOf } from './camera';
+import { Aspect, cameraAt, keyframesOf, type Point, type Rect } from './camera';
+import { pointerAt, rippleAt } from './pointer';
 import type { Recording } from './demo';
 
-const FPS = 30;
+const FPS = 60;
+const CURSOR_PX = 22;
+const RIPPLE_PX = 26;
 const OUT: Record<Aspect, { width: number; height: number }> = {
   [Aspect.Landscape]: { width: 1920, height: 1080 },
   [Aspect.Portrait]: { width: 1080, height: 1920 }
@@ -17,7 +20,6 @@ const END_S = 1.6;
 const FADE_S = 0.4;
 const OUT_DIR = join(homedir(), 'Documents', 'feega-videos', 'demos');
 const FONT = new URL('../../static/fonts/bdo-grotesk-DemiBold.woff2', import.meta.url);
-const LOGO = new URL('../../static/icon-512.png', import.meta.url);
 
 export type DemoCut = { slug: string; title: string; date?: string };
 
@@ -29,10 +31,41 @@ function frameAt(frames: Recording['frames'], t: number, from: number): number {
   return i;
 }
 
+type Size = { width: number; height: number };
+
+async function cropFrame(file: string, cam: Rect, scale: number, meta: Size, size: Size): Promise<Buffer> {
+  const out = size.width / cam.width;
+  const left = Math.max(0, Math.floor(cam.x * scale));
+  const top = Math.max(0, Math.floor(cam.y * scale));
+  const right = Math.min(meta.width, Math.ceil((cam.x + cam.width) * scale) + 2);
+  const bottom = Math.min(meta.height, Math.ceil((cam.y + cam.height) * scale) + 2);
+  const width = Math.max(size.width, Math.round(((right - left) / scale) * out));
+  const height = Math.max(size.height, Math.round(((bottom - top) / scale) * out));
+  const ox = Math.min(width - size.width, Math.round(((cam.x * scale - left) / scale) * out));
+  const oy = Math.min(height - size.height, Math.round(((cam.y * scale - top) / scale) * out));
+  return sharp(file)
+    .extract({ left, top, width: right - left, height: bottom - top })
+    .resize(width, height, { fit: 'fill', kernel: 'lanczos3' })
+    .extract({ left: ox, top: oy, width: size.width, height: size.height })
+    .removeAlpha()
+    .raw()
+    .toBuffer();
+}
+
+function overlaySvg(size: Size, cam: Rect, at: Point, ripple: number | null): Buffer {
+  const k = size.width / cam.width;
+  const x = (at.x - cam.x) * k;
+  const y = (at.y - cam.y) * k;
+  const c = (CURSOR_PX * k) / 24;
+  const ring = ripple === null ? '' : `<circle cx="${x}" cy="${y}" r="${RIPPLE_PX * k * (0.3 + 1.2 * ripple)}" fill="rgba(59,130,246,${0.28 * (1 - ripple)})" stroke="rgba(59,130,246,${0.85 * (1 - ripple)})" stroke-width="${2 * k}"/>`;
+  const arrow = `<path transform="translate(${x - 4 * c} ${y - 2.5 * c}) scale(${c})" d="M4 2.5 L4 19.5 L8.6 15.3 L11.5 21.8 L14.6 20.4 L11.8 14 L18 14 Z" fill="#0a0a0a" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>`;
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}">${ring}${arrow}</svg>`);
+}
+
 async function renderContent(rec: Recording, aspect: Aspect, file: string): Promise<void> {
   const size = OUT[aspect];
-  const meta = await sharp(rec.frames[0].file).metadata();
-  const scale = meta.width! / rec.view.width;
+  const meta = (await sharp(rec.frames[0].file).metadata()) as Size;
+  const scale = meta.width / rec.view.width;
   const keys = keyframesOf(rec.events, rec.view, rec.duration);
   const ffmpeg = spawn('ffmpeg', ['-y', '-v', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${size.width}x${size.height}`, '-r', String(FPS), '-i', '-', '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', file], { stdio: ['pipe', 'inherit', 'inherit'] });
   const done = new Promise<void>((resolve, reject) => ffmpeg.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg ${code}`)))));
@@ -43,10 +76,9 @@ async function renderContent(rec: Recording, aspect: Aspect, file: string): Prom
     const t = n / FPS;
     source = frameAt(rec.frames, t, source);
     const cam = cameraAt(keys, t, rec.view, aspect);
-    const region = { left: Math.round(cam.x * scale), top: Math.round(cam.y * scale), width: Math.round(cam.width * scale), height: Math.round(cam.height * scale) };
-    region.width = Math.min(region.width, meta.width! - region.left);
-    region.height = Math.min(region.height, meta.height! - region.top);
-    const pixels = await sharp(rec.frames[source].file).extract(region).resize(size.width, size.height, { fit: 'fill', kernel: 'lanczos3' }).removeAlpha().raw().toBuffer();
+    const view = await cropFrame(rec.frames[source].file, cam, scale, meta, size);
+    const overlay = overlaySvg(size, cam, pointerAt(rec.pointer, t, { x: rec.view.width / 2, y: rec.view.height / 2 }), rippleAt(rec.presses, t));
+    const pixels = await sharp(view, { raw: { width: size.width, height: size.height, channels: 3 } }).composite([{ input: overlay }]).removeAlpha().raw().toBuffer();
     if (!ffmpeg.stdin.write(pixels)) {
       await new Promise((r) => ffmpeg.stdin.once('drain', r));
     }
@@ -61,14 +93,12 @@ function cardHtml(size: { width: number; height: number }, body: string): string
 @font-face{font-family:'BDO Grotesk';font-weight:600;src:url(data:font/woff2;base64,${font}) format('woff2')}
 html,body{margin:0;width:${size.width}px;height:${size.height}px;background:#111;display:flex;flex-direction:column;gap:${Math.round(size.width * 0.02)}px;align-items:center;justify-content:center}
 h1{font-family:'BDO Grotesk';font-weight:600;letter-spacing:-0.05em;line-height:0.95;color:#fff;text-transform:lowercase;text-align:center;margin:0 8%;font-size:${Math.round(size.width * 0.075)}px}
-img{width:${Math.round(Math.min(size.width, size.height) * 0.24)}px;height:auto}
-p{margin:0;font-family:'BDO Grotesk';font-weight:600;letter-spacing:-0.04em;color:#fff;font-size:${Math.round(size.width * 0.05)}px}
+p{margin:0;font-family:'BDO Grotesk';font-weight:600;letter-spacing:-0.04em;color:#fff;font-size:${Math.round(Math.min(size.width, size.height) * 0.12)}px}
 </style></head><body>${body}</body></html>`;
 }
 
 async function renderCards(cut: DemoCut, dir: string): Promise<Record<Aspect, { title: string; end: string }>> {
   const browser = await chromium.launch();
-  const logo = `data:image/png;base64,${readFileSync(LOGO).toString('base64')}`;
   const cards = {} as Record<Aspect, { title: string; end: string }>;
   for (const aspect of Object.values(Aspect)) {
     const size = OUT[aspect];
@@ -78,7 +108,7 @@ async function renderCards(cut: DemoCut, dir: string): Promise<Record<Aspect, { 
     await page.setContent(cardHtml(size, `<h1>${cut.title}</h1>`));
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: title });
-    await page.setContent(cardHtml(size, `<img src="${logo}"><p>feega</p>`));
+    await page.setContent(cardHtml(size, '<p>feega</p>'));
     await page.screenshot({ path: end });
     cards[aspect] = { title, end };
     await page.close();

@@ -3,10 +3,10 @@ import { installCursor, recordDemo } from '../record';
 import { openCanvas } from './seed';
 
 const TEXTS = [
-  { x: 0, y: 0, prompt: 'Launch headline' },
-  { x: 700, y: 0, prompt: 'Launch subtitle' },
-  { x: 1400, y: 0, prompt: 'Footer copy' },
-  { x: 3600, y: 2200, prompt: 'Pricing teaser for the newsletter' }
+  { x: 0, y: 0, prompt: 'Hero headline: Mornings, made slower.' },
+  { x: 700, y: 0, prompt: 'Subhead: Stoneware mugs glazed by hand in Porto' },
+  { x: 1400, y: 0, prompt: 'Footer: Free shipping over €60, returns in 30 days' },
+  { x: 3600, y: 2200, prompt: 'Newsletter: Spring restock is live, 15% off the Morning set' }
 ];
 
 test('search and colour tags', async ({ page, session, seedNode }) => {
@@ -34,7 +34,7 @@ test('search and colour tags', async ({ page, session, seedNode }) => {
 
     await d.key('ControlOrMeta+f', '⌘ F');
     await expect(page.getByTestId('node-search')).toBeVisible();
-    await d.type(page.getByTestId('node-search-input'), 'pricing', { click: false });
+    await d.type(page.getByTestId('node-search-input'), 'restock', { click: false });
     await d.key('Enter');
     await expect(node(ids[3])).toBeVisible();
     await d.wait(1500);

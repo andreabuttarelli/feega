@@ -25,6 +25,7 @@ const FIT_SHARE = 0.7;
 const PORTRAIT_ZOOM_SHARE = 0.5;
 const TRAVEL_S = 0.8;
 const HOLD_S = 1.1;
+const CLICK_HOLD_S = 2;
 const OUT_S = 0.9;
 const WIDE_GAP_S = 2.4;
 const WIDE = 1;
@@ -35,7 +36,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 
 function shotOf(e: DemoEvent, view: Size): Shot {
   if (e.kind === 'click') {
-    return { start: e.t, end: e.t + HOLD_S, cx: e.x, cy: e.y, zoom: CLICK_ZOOM };
+    return { start: e.t, end: e.t + CLICK_HOLD_S, cx: e.x, cy: e.y, zoom: CLICK_ZOOM };
   }
   if (e.kind === 'type') {
     const zoom = clamp((view.width * FIELD_SHARE) / Math.max(e.rect.width, 1), MIN_ZOOM, MAX_ZOOM);

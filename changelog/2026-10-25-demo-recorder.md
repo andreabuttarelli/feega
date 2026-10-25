@@ -4,9 +4,9 @@ New rule: every feature ships with a short screen-recorded demo for
 socials. `scripts/demo-record/` makes them from a Playwright script.
 
 - `demo(page, dir)` (demo.ts): `click`, `type`, `drag`, `select`, `key`,
-  `move`, `wait`. A DOM cursor (cursor.ts) follows the mouse, which moves
-  on an expo in-out path, never teleports; clicks ripple; shortcuts show a
-  key badge. Frames come from a CDP screencast at DPR 2 (headed Chromium:
+  `move`, `wait`. The mouse moves on an expo in-out path, hovers 0.9 s
+  before each click, and every position is logged; shortcuts show a key
+  badge (badge.ts). Frames come from a CDP screencast at DPR 2 (headed Chromium:
   headless screencast returns 1x frames); clicks, typed field rects and
   drags go to an event log.
 - camera.ts turns the log into keyframes: ~2.1x toward each click, fit
@@ -30,3 +30,14 @@ Playwright recordVideo (low bitrate).
 
 Raw recordings (frames, event log, contact sheets) go to
 `~/Documents/feega-videos/demos/raw/<slug>-<ts>/`, not a temp dir.
+
+Smoothness: the screencast delivers page frames only on repaint (~22 fps
+while moving, median 45 ms). The cursor, click ripple and camera are
+therefore drawn in post from the logged pointer path (pointer.ts) at
+60 fps, and each frame is cropped at sub-pixel precision (oversized
+integer crop, resize, then output-pixel crop) so camera moves don't
+jitter. No frame interpolation. End card: lowercase "feega" wordmark.
+
+Seeds are realistic (seed.ts `heroDoc`: a ceramics landing hero with
+title, subtitle, CTA, product photo from static/templates, press row;
+Figma paste builds a profile card), never plain coloured frames.
