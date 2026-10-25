@@ -50,6 +50,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   disconnect_nodes: 'Remove a line.',
   set_edge_mode: 'Set a line to fixed or iterate.',
   rename_node: 'Rename a node; empty resets it.',
+  set_node_color: 'Tag a node with a colour (red, orange, yellow, green, blue, purple, grey); null clears it.',
   resize_node: 'Set the width and height of a node.',
   duplicate_nodes: 'Duplicate nodes with the lines among them.',
   save_canvas_version: 'Save the whole canvas under a name.',
