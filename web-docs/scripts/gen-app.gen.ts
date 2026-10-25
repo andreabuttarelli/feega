@@ -2,11 +2,9 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'vitest';
-import { z } from 'zod';
 import { describeEdit } from '$lib/server/edit/describe-edit';
 import { shortcutHelp } from '$lib/motion/shortcuts';
 import { FORMAT } from '$lib/motion/export-formats';
-import { BRAND_ENDPOINTS } from '../../packages/api-contracts/src/index';
 import { listAllTools } from '../../cli/mcp/server';
 import { CORE_TOOLS, TOOL_FAMILY } from '../../cli/mcp/surface';
 
@@ -15,7 +13,6 @@ const CHANGELOG_DIR = fileURLToPath(new URL('../../src/lib/content/changelog/', 
 const DOCS_ROOT = fileURLToPath(new URL('../src/content/docs/', import.meta.url));
 const REPO_DOCS = fileURLToPath(new URL('../../docs/', import.meta.url));
 const GITHUB_BLOB = 'https://github.com/andreabuttarelli/feega/blob/main';
-const SCHEMA_OPTIONS = { io: 'input', unrepresentable: 'any' } as const;
 
 type JsonSchema = { properties?: Record<string, JsonProp>; required?: string[] };
 type JsonProp = { type?: string | string[]; enum?: unknown[]; description?: string; anyOf?: JsonProp[]; items?: JsonProp };
@@ -76,17 +73,6 @@ async function mcpTools() {
   const index = tools.map((t) => `- [\`${t.name}\`](#${t.name}): ${cell(t.title ?? '')} (${listed(t.name)})`).join('\n');
   const body = tools.map((t) => `## ${t.name}\n\n${t.description}\n\n${fieldsTable(t.inputSchema)}`).join('\n');
   write('mcp-tools.md', page('MCP tools', 'Every tool the feega MCP server can run, generated from the server.', `${tools.length} tools. A session lists only the ${Object.keys(CORE_TOOLS).length} core ones; the rest load with \`find_tools\` / \`load_tools\`, or run through \`edit\` {op: "<tool>", input}.\n\n${index}\n\n${body}`));
-}
-
-function restApi() {
-  const body = BRAND_ENDPOINTS.map((e) => {
-    const schema = z.toJSONSchema(e.input, SCHEMA_OPTIONS) as JsonSchema;
-    const failures = e.failures.map((f) => `\`${f.error}\` (${f.status})`).join(', ') || 'none declared';
-    const without = e.pathWithoutBrand ? `\n\nWithout a brand: \`${e.method} /api/v1${e.pathWithoutBrand}\`` : '';
-    return `## ${e.title}\n\nTool \`${e.tool}\`. \`${e.method} /api/v1/brands/{slug}${e.pathUnderBrand}\`${without}\n\n${e.description}\n\nDestructive: ${e.destructive ? 'yes' : 'no'}. Failures: ${failures}.\n\n${fieldsTable(schema)}`;
-  }).join('\n');
-  const intro = `These are the endpoints declared in \`packages/api-contracts\`. The app serves more routes under \`/api/v1\` (for example \`/api/v1/edit\`, \`/api/v1/canvas\`, \`/api/v1/motion\`) that have no contract in this package; they are not listed here.\n\nAuth is a Bearer token: a Supabase JWT or a \`feega_\` API key.\n\n`;
-  write('rest-api.md', page('REST API contracts', 'Endpoints declared in packages/api-contracts, generated.', intro + body));
 }
 
 function exportFormats() {
@@ -155,7 +141,6 @@ function adrs() {
 test('generate the reference pages', async () => {
   await editOps();
   await mcpTools();
-  restApi();
   shortcuts();
   exportFormats();
   await changelog();

@@ -45,14 +45,10 @@ Some Cursor builds register a `cursor://` OAuth callback that feega's registrati
 
 ## First calls
 
-1. `query` on `projects` or `brands`.
+1. `query` on `projects`.
 2. `describe` with `{}` to see every tool and op; `find_tools` to search them.
 3. `load_tools` to list the ones you need, or run any through `edit` `{op, input}`.
 
-A session lists 10 core tools (about 870 tokens); the rest load on demand. Claude Code refreshes on `tools/list_changed`; Cursor does not, so call loaded tools by name.
+A session lists 10 core tools (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`; about 900 tokens); the rest load on demand. Claude Code refreshes on `tools/list_changed`; Cursor does not, so call loaded tools by name.
 
-The whole surface: [MCP tools](/reference/generated/mcp-tools/) and [Edit ops](/reference/generated/edit-ops/). Never guess an org, brand or project id: read it with `query` first.
-
-:::caution
-Source of this page: `cli/docs/mcp.md`. That file says "12 tools total" and refers to a `feega-cli` path; both are stale. `docs/agents-quickstart.md` does not exist on `dev`.
-:::
+The whole surface: [MCP tools](/reference/generated/mcp-tools/) and [Edit ops](/reference/generated/edit-ops/). Never guess an org or project id: read it with `query` first.

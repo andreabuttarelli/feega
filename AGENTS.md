@@ -364,6 +364,35 @@ holds now. A second family — bad network, tab closed and reopened mid-work, a 
 in this repo measures it. A product that answers well and loses work when the line drops is not
 ready, so that gap is real, not a nitpick — it just isn't closed by a command you can run today.
 
+## Docs and a feature video ship with the change (a rule, not a habit)
+
+Every PR that changes a feature, an API under `/api/v1`, a CLI command, an MCP tool or
+self-hosting does two more things in the **same PR**:
+
+1. **Updates `web-docs/`** (published on https://docs.feega.app). Pages under
+   `reference/generated/`, `self-hosting/` and `architecture/adr/` are generated at build from the
+   code and `docs/`: fix the source, not the page. Every command, endpoint and tool a page names
+   must exist in the code; what leaves the product leaves the docs.
+2. **Records a feature video**, attached to the PR under *Evidence* and ready to post on X and
+   Threads: 16:9, about 10 s, two parts joined —
+   - an **intro/title made in feega's motion editor**, exported as MP4;
+   - a **real screen recording of the app** made with the demo recorder (`scripts/demo-record/`,
+     one `demos/<slug>.demo.ts` per feature, run with
+     `npx playwright test -c scripts/demo-record/playwright.config.ts <slug>`), whose camera zooms
+     on **every click and every typing moment**.
+
+   The video is always **complete** (the whole flow, start to finish, never a fragment) and uses
+   **real, realistic, well-made example content** (a landing page UI, an app UI, a graphic design
+   piece), never placeholder shapes or lorem ipsum.
+
+   Files land in `~/Documents/feega-videos/demos/`: the recorder writes
+   `<YYYY-MM-DD>-<slug>-16x9.mp4` (raw takes in `demos/raw/<slug>-<ts>/`); the intro is saved
+   next to it as `<YYYY-MM-DD>-<slug>-intro.mp4` and the joined cut as
+   `<YYYY-MM-DD>-<slug>-final.mp4`. `<slug>` is the PR branch slug. The final cut is the one
+   attached to the PR.
+
+A change that is invisible from outside (refactor, test, index) needs neither.
+
 ## Agent PRs go to `dev`, never to `main` (a rule, not a habit)
 
 `main` is the repo's default branch and what production deploys. Every merge into it is a

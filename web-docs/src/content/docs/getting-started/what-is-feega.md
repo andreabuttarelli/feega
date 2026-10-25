@@ -7,19 +7,19 @@ sidebar:
 
 feega is an infinite canvas for motion video and images. Everything on it is a typed node. A person, the chat in the sidebar, or an outside agent over MCP can create and change nodes.
 
-Node types (from the `nodes.data` schema): `text`, `image`, `video`, `doc`, `iframe`, `social_account_feed`, `social_post_mockup`, `products`, `ads`, `influencer`. Frames, the canvas unit for designs and videos, are nodes too.
+Node types include `text`, `image`, `video`, `doc` and `iframe` for material and generation; frames (designs and videos) and free elements (shapes, text, vectors placed outside a frame) are nodes too. `describe_node_types` over MCP returns the exact schema per type.
 
 ## Hierarchy
 
 ```
-org ──┬── brands            voice, palette, accounts: used to publish
-      └── projects ──┬── canvases ── nodes ── nodes_connections
-                     │                 └── node_runs (one generation)
-                     └── assets
+org ── projects ──┬── canvases ── nodes ── nodes_connections
+                  │                 └── node_runs (one generation)
+                  └── assets
 ```
 
-- A project needs no brand. You attach one only when material becomes something to publish.
+- An org holds members, projects and settings such as the [model allow-list](/ai/model-allow-list/) and [spend limits](/ai/spend-limits/).
 - Everything on a canvas is saved in the background; teammates see edits live.
+- A canvas can be saved as a [named version](/canvas/versions/) and restored later.
 
 ## Ways to work
 

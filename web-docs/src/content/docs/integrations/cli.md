@@ -29,8 +29,12 @@ Local dev servers on `localhost:5173` are auto-detected; override with `PUBLIC_A
 | `motion embed`, `share`, `still`, `frames`, `storyboard`, `revisions`, `budget` | Publish, share, inspect |
 | `motion tool`, `op`, `tools`, `move`, `place` | Editor tools and ops |
 | `gallery [query]` (`remix`, `publish`, `withdraw`) | The public gallery |
-| `effects` | Image effects |
-| `allowlist`, `allowlist set` | [Model allow-list](/ai/model-allow-list/) |
-| `brands`, `products`, `media`, `health`, `upgrade`, `update` | Brands, catalogue, media, billing, self-update |
+| `effects`, `effects write <name>`, `effects patch <effectId>` | Image effects and custom shader effects |
+| `layouts`, `layouts write <name>`, `layouts patch <layoutId>` | Custom composition layouts |
+| `allowlist`, `allowlist set <medium> [ids...]` | [Model allow-list](/ai/model-allow-list/) |
+| `caps`, `caps set <scope> <usd>` | [Spend limits](/ai/spend-limits/) |
+| `app-account <projectId>` | The test app account a project remembers |
+| `media` | Signed links to node, run or asset media |
+| `health`, `update` | API status, self-update |
 
 `feega <command> --help` shows flags. Direction of change is app, then CLI, then MCP.

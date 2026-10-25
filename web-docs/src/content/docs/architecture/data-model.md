@@ -11,18 +11,13 @@ Summary of the schema notes in `CLAUDE.md`. The full design, with the reasons fo
 |---|---|
 | Tenant | `orgs`, `orgs_members`, `orgs_invites`, `profiles`, `api_keys` |
 | Canvas | `projects`, `canvases`, `nodes`, `nodes_connections`, `node_runs`, `assets`, `canvas_events` |
-| Brand | `brands`, `products`, `social_accounts` |
-| Content | `posts`, `post_sources`, `scheduled_posts` |
-| Ads | `ad_accounts`, `ad_campaigns`, `ad_creatives`, `competitor_ads` |
-| Sources | `social_posts` |
 | Agents | `chat_threads`, `chat_messages`, `ai_calls` |
-| Influencer | `influencers`, `influencer_views` |
+
+Tables of the earlier social product (`brands`, `products`, `social_accounts`, `posts`, `post_sources`, `scheduled_posts`, the `ad_*` tables, `social_posts`, `influencers`) still exist in the schema but are not part of the canvas product and are not documented here.
 
 ## Constraints worth knowing
 
-- `org_id` is on every table except `post_sources`; row-level security uses `auth_org_ids()`. The service-role key bypasses it, so every use is declared in `src/lib/server/db/service-role-uses.ts`.
-- `influencers` and `influencer_views` have a nullable `org_id`: `null` is the global catalogue, readable by every org and written by none.
-- `projects.brand_id` is nullable. A canvas works without a brand.
+- `org_id` is on every org table; row-level security uses `auth_org_ids()`. The service-role key bypasses it, so every use is declared in `src/lib/server/db/service-role-uses.ts`.
 - `nodes.data` is `jsonb`, shaped per node type.
 - `nodes.version`: position is last-write-wins; `data` uses optimistic concurrency (`where version = expected`; zero rows is a conflict).
 - `nodes.deleted_at`: soft delete; every read filters `deleted_at is null`.
@@ -30,5 +25,3 @@ Summary of the schema notes in `CLAUDE.md`. The full design, with the reasons fo
 - `nodes_connections.target_handle`: a video with start and end frames has two inputs.
 - Realtime publishes `nodes`, `nodes_connections`, `canvases`, `node_runs` with `replica identity full`.
 - Types are generated (`npm run db:types`), never hand-written.
-
-**Unverified:** that `CLAUDE.md` still lists 26 tables; the self-hosting notes say posts, ads and calendar are gone from the product while some of their tables remain unused.
