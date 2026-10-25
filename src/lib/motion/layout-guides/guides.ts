@@ -27,12 +27,16 @@ const STARTS_AT: Record<GuideAlign, (guide: LayoutGuide, span: number, total: nu
   [GuideAlign.Center]: (_guide, span, total) => (span - total) / 2
 };
 
-function countOf(guide: LayoutGuide, span: number): number {
-  if (guide.count !== AUTO_COUNT) {
-    return guide.count;
-  }
+function sectionsThatFit(guide: LayoutGuide, span: number): number {
   const fits = Math.floor((AVAILABLE[guide.align](guide, span) + guide.gutter) / (guide.size + guide.gutter));
   return Math.max(1, Math.min(MAX_AUTO_BANDS, fits));
+}
+
+function countOf(guide: LayoutGuide, span: number): number {
+  if (guide.count === AUTO_COUNT) {
+    return sectionsThatFit(guide, span);
+  }
+  return guide.align === GuideAlign.Stretch ? guide.count : Math.min(guide.count, sectionsThatFit(guide, span));
 }
 
 function bandsAlong(guide: LayoutGuide, span: number): [number, number][] {
