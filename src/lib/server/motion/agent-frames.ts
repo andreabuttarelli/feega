@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { AssetKind } from '$lib/motion/components';
-import { blocking, docProblems, frameProblems } from '$lib/motion/direction';
+import { SHORT_FILM_S, blockingFor, docProblems, frameProblems } from '$lib/motion/direction';
 import { savedMotion } from './agent-embed';
 import { assetUrls, motionAssets, motionTokens } from './editor';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
@@ -79,7 +79,8 @@ export async function motionFrames(db: Db, scope: { orgId: string; nodeId: strin
       revision: saved.version,
       frames: frames.map((f) => ({ time: f.time, mime: 'image/jpeg', data: f.bytes.toString('base64') })),
       quality: gate.map((p) => p.detail),
-      blocking: blocking(gate).map((p) => p.detail),
+      blocking: blockingFor(gate, doc.durationInFrames / doc.fps).map((p) => p.detail),
+      ...(doc.durationInFrames / doc.fps < SHORT_FILM_S ? { advisory: `under ${SHORT_FILM_S} s: script, music, story acts and screen counts are advice, not blocking` } : {}),
       max_size: MAX_FRAME_SIZE
     }
   };
