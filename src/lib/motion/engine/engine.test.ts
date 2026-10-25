@@ -235,6 +235,17 @@ describe('a frame depends only on its time', () => {
     expect(el('a').style.opacity).toBe('0.8');
   });
 
+  it.each([
+    ['clipPath', 'circle(150% at 50% 50%)', 'circle(0% at 50% 50%)', 'circle(0% at 50% 50%)'],
+    ['filter', 'blur(18px)', 'blur(0px)', 'blur(0px)']
+  ])('an ease that settles past the mark never writes a negative %s, which the browser would drop for a stale value', (prop, from, to, landed) => {
+    const tl = timeline();
+    tl.fromTo('#a', { [prop]: from }, { [prop]: to, duration: 1, ease: 'back.out(1.7)' }, 0);
+
+    tl.totalTime(0.7, true);
+    expect((el('a').style as unknown as Record<string, string>)[prop]).toBe(landed);
+  });
+
   it.each([['none'], ['']])('a blur eases down to an unfiltered element (%j) instead of snapping off at the end', (rest) => {
     el('a').style.filter = rest;
     const tl = timeline();
