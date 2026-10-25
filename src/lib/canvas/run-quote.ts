@@ -2,6 +2,7 @@ import { effectiveModel } from './default-models';
 import { creditsForLoop, creditsForRun, textOutputTokens, tokenCount, type RunCostInput } from './gen-cost';
 import { blockedReason, canStartRun } from './gen-history';
 import { promptTooLong, runStateOf, type GenMedium, type GenNode, type GenParams, type ModelChoice } from './gen-node';
+import { AUTO_ROUTE, PROVIDER_PARAM } from './model-routes';
 import { imageStepCredits } from './model3d-run';
 import { model3dParamsOf } from '$lib/model3d-models';
 import { effectiveVariants, variantCountsFor, variantsCredits, variantsIntoOf, type RememberedVariants, type VariantInto } from './variants';
@@ -118,4 +119,24 @@ export function runLabelOf(quote: Pick<RunQuote, 'label' | 'variants'>): string 
 
 export function loopCreditsOf(quote: RunQuote, count: number, variableTextInput = false): number | null {
   return variableTextInput ? null : creditsForLoop(quote.cost, count);
+}
+
+export type ProviderQuote = { provider: string; label: string; credits: number | null; cheapest: boolean; selected: boolean };
+
+export function providerQuotesOf(input: RunQuoteInput): ProviderQuote[] {
+  const routes = runQuoteOf(input).choice?.routes ?? [];
+  const chosen = input.node.params.provider ?? AUTO_ROUTE;
+  const quotes = routes.map((route) => ({
+    provider: route.provider,
+    label: route.label,
+    credits: runQuoteOf({ ...input, node: { ...input.node, params: { ...input.node.params, [PROVIDER_PARAM]: route.provider } } }).credits,
+    cheapest: false,
+    selected: route.provider === chosen
+  }));
+  const direct = quotes.filter((quote) => quote.provider !== AUTO_ROUTE);
+  if (direct.length < 2) {
+    return [];
+  }
+  const prices = direct.flatMap((quote) => (quote.credits === null ? [] : [quote.credits]));
+  return quotes.map((quote) => ({ ...quote, cheapest: quote.provider !== AUTO_ROUTE && quote.credits !== null && quote.credits === Math.min(...prices) }));
 }
