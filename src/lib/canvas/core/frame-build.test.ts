@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { boxBook } from '$lib/motion/gpu-full/text/test-face';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { sequenceScenes } from '$lib/motion/scenes';
@@ -32,6 +33,11 @@ describe('building a frame away from the main thread', () => {
 
   it('leaves a doc that needs the DOM reader to the main thread', async () => {
     expect(await buildFrame(source(customDoc), Smoothing.Plain, fonts)).toBeNull();
+  });
+
+  it('leaves a template wrapped in a precomp to the main thread too', async () => {
+    const template = must(precompose(customDoc, ['card'], { comp: 'tpl', clip: 'pc' }, 'Template'));
+    expect(await buildFrame(source(template), Smoothing.Plain, fonts)).toBeNull();
   });
 
   it('leaves a combined video to the main thread, which resolves its scenes', async () => {

@@ -3332,3 +3332,16 @@ Signal: CI `test` fails on `query-tool.test.ts` (query-tables.ts), `write-tool.t
 ## A core frame that flashes stretched after an edit
 
 Signal: on the GPU canvas a frame or free text shows its new content squeezed or stretched for a moment, then snaps right. Cause: the doc (picture) and the node box reached `CoreFrames` at different times; `screen-uses` maps the picture's `size` onto the `box` per axis, so any gap draws one over the other. A network await between showing the doc and placing the size is enough. Move: hand the doc and the box over in the same synchronous step (`applyTextFit`); to measure, screenshot the region every ~40 ms after the commit and compare ink width/height with the settled frame.
+
+## Un frame nero sulla tela: chiedi alla display list perché, prima di guardare la rete
+
+Il contenuto dei template inseriti si vedeva nero, in locale e in cloud. Rete, font, CSP e
+origini erano puliti: il difetto stava in `readClips`, che non guardava dentro i `Precomp`.
+
+**Segnale**: un frame resta nero o vuoto, `canvas.core-frames` ha `data-partial` > 0, nessun errore
+in console.
+
+**Mossa**: nella pagina, `prepare` + `drawFrame` sul `/motion/<id>/source` del frame e leggi
+`list.unsupported`. `reason: "unread"` = la lettura DOM non è partita (guardia sul doc sbagliato);
+`reason: "dom"` = CSS che gpu-core non disegna; zero item e nessun motivo = il frame scelto è vuoto
+(controlla `stillFrame`).

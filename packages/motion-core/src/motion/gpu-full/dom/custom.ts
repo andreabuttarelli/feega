@@ -5,6 +5,7 @@ import { mountDomReader, type Compose } from './reader';
 import { NO_INDEX } from './tree';
 import { screenFrames } from '../../device-screen';
 import type { MotionDoc } from '../../doc';
+import { flattenComps } from '../../precomp';
 
 export type CustomFrame = { reads: DomReads; picture: (item: ImageItem | LayerItem) => Picture | null };
 
@@ -13,7 +14,7 @@ export type CustomReads = { readAt: (frame: number) => Promise<CustomFrame>; dis
 const READ: ReadonlySet<string> = new Set(['Custom', 'Device3D']);
 
 export function readClips(doc: MotionDoc): { read: string[]; composed: ReadonlySet<string> } {
-  const clips = doc.tracks.flatMap((t) => t.clips);
+  const clips = flattenComps(doc).tracks.flatMap((t) => t.clips);
   const screens = screenFrames(doc).map((s) => s.prefix);
   const read = clips.filter((c) => READ.has(c.component)).map((c) => c.id);
   const onScreen = clips.filter((c) => screens.some((prefix) => c.id.startsWith(prefix))).map((c) => c.id);
