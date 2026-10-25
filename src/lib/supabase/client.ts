@@ -2,8 +2,13 @@ import { createBrowserClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { env as publicEnv } from '$env/dynamic/public';
 import { bundleApiBase } from '$lib/api/bundle-fetch';
+import { createLocalBrowserClient } from './local-client';
+import { isLocalMode } from '$lib/local-user';
 
 export function createSupabaseBrowserClient() {
+  if (isLocalMode(publicEnv)) {
+    return createLocalBrowserClient() as unknown as ReturnType<typeof createBrowserClient>;
+  }
   if (!bundleApiBase()) {
     return createBrowserClient(publicEnv.PUBLIC_SUPABASE_URL, publicEnv.PUBLIC_SUPABASE_ANON_KEY);
   }

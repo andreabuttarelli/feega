@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from '
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { homedir } from 'os';
 import { join } from 'path';
-import { appUrl as resolveAppUrl } from './config.ts';
+import { LOCAL_MODE_TOKEN, appUrl as resolveAppUrl, servesLocalMode } from './config.ts';
 
 // Resolved per call, not at import time: `homedir()` reads $HOME, and a module-level
 // constant would freeze whatever $HOME was at first import — wrong under test, and
@@ -42,6 +42,24 @@ export type StoredSession = {
 // tokens — so the user never has to login again unless they explicitly logout
 // or Supabase revokes the refresh token.
 export async function loadSession(): Promise<StoredSession | null> {
+  return (await storedSession()) ?? (await localModeSession());
+}
+
+const LOCAL_SESSION_TTL_S = 3600;
+
+async function localModeSession(): Promise<StoredSession | null> {
+  if (!(await servesLocalMode(resolveAppUrl()))) {
+    return null;
+  }
+  return {
+    access_token: LOCAL_MODE_TOKEN,
+    refresh_token: '',
+    expires_at: Math.floor(Date.now() / 1000) + LOCAL_SESSION_TTL_S,
+    user: { id: LOCAL_MODE_TOKEN, email: LOCAL_MODE_TOKEN },
+  };
+}
+
+async function storedSession(): Promise<StoredSession | null> {
   try {
     migrateOldSession();
     if (!existsSync(sessionFile())) return null;

@@ -16,6 +16,8 @@
   import { openSheet } from '$lib/canvas/sheet-nav';
   import { BURGER_ENTRIES, mobileNavHref } from '$lib/shell-nav';
   import { page } from '$app/state';
+  import { env as publicEnv } from '$env/dynamic/public';
+  import { isLocalMode } from '$lib/local-user';
   import { NAV_ICONS } from './nav-icons';
   import Scale from '@lucide/svelte/icons/scale';
   import Flag from '@lucide/svelte/icons/flag';
@@ -80,16 +82,17 @@
     danger?: true;
     marketingPage?: true;
     desktopOnly?: true;
+    local?: true;
   }> = [
     { id: 'home', group: 'navigate', labelKey: 'app.shell.menu.home', icon: LayoutGrid, href: DASHBOARD_HREF },
     { id: 'settings', group: 'navigate', labelKey: 'app.shell.menu.settings', icon: Settings, sheet: '/settings/project' },
     { id: 'billing', group: 'navigate', labelKey: 'app.shell.menu.billing', icon: CreditCard, href: BILLING_PATH },
-    { id: 'shortcuts', group: 'help', labelKey: 'app.shell.menu.shortcuts', icon: Keyboard, sub: true, desktopOnly: true },
+    { id: 'shortcuts', group: 'help', labelKey: 'app.shell.menu.shortcuts', icon: Keyboard, sub: true, desktopOnly: true, local: true },
     { id: 'changelog', group: 'help', labelKey: 'app.shell.menu.changelog', icon: Sparkles, href: '/changelog', marketingPage: true },
     { id: 'report', group: 'help', labelKey: 'app.shell.menu.report', icon: Flag, href: REPORT_PATH },
     { id: 'legal', group: 'help', labelKey: 'legal.menuLabel', icon: Scale, sub: true },
     { id: 'logout', group: 'account', labelKey: 'app.shell.menu.logout', icon: LogOut, danger: true }
-  ];
+  ].filter((item) => item.local || !isLocalMode(publicEnv));
 
   const ITEMS_THE_RAIL_ALREADY_HAS: ReadonlySet<MenuAction> = new Set(['settings']);
 
@@ -239,6 +242,7 @@
     <DropdownMenu.Group>
       <DropdownMenu.GroupHeading class="menu-heading">{$_('app.shell.menu.account')}</DropdownMenu.GroupHeading>
       <div class="menu-row theme-row"><span>Theme</span><ThemeSwitch /></div>
+      {#if !isLocalMode(publicEnv)}
       <DropdownMenu.Item class="menu-row is-danger" variant="destructive">
         {#snippet child({ props })}
           <form {...props} method="POST" action="/auth/signout" use:signOutForm>
@@ -249,6 +253,7 @@
           </form>
         {/snippet}
       </DropdownMenu.Item>
+      {/if}
     </DropdownMenu.Group>
   </DropdownMenu.Content>
 </DropdownMenu.Root>

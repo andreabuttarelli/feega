@@ -41,6 +41,16 @@ program
   });
 
 program
+  .command('local [file]')
+  .description('Run feega locally on one canvas saved in a .feega file: no account, no database')
+  .option('--port <port>', 'port to listen on (default 5173)')
+  .option('--build', 'rebuild the app first')
+  .action(async (file, options) => {
+    const { cmdLocal } = await import('./commands/local.ts');
+    await cmdLocal(file ?? 'canvas.feega', options);
+  });
+
+program
   .command('brands')
   .description('Elenca tutti i brand')
   .action(async () => {

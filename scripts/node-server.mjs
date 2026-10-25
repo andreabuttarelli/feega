@@ -28,8 +28,12 @@ async function serve() {
   const host = process.env.HOST ?? '0.0.0.0';
 
   server.listen(port, host, () => console.log(`Listening on http://${host}:${port}`));
-  process.once('SIGTERM', () => server.close());
-  process.once('SIGINT', () => server.close());
+  const stop = () => {
+    server.close();
+    server.closeAllConnections();
+  };
+  process.once('SIGTERM', stop);
+  process.once('SIGINT', stop);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
