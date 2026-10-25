@@ -28,7 +28,7 @@ const DESCRIBE_HINT = 'Schema: `describe`.';
 
 export const CORE_TOOLS: Readonly<Record<string, string>> = {
   query: `Read any org table (free): {table, columns?, where?, order?, limit?, offset?, count?, embed?}. ${DESCRIBE_HINT}`,
-  view: `See a canvas (free): op canvas_summary {canvas_id} | get {id, frame_id?} | activity {canvas_id} | snapshot {node_id, time?} (an image). ${DESCRIBE_HINT}`,
+  view: `See a canvas (free), as {op, input}: canvas_summary {canvas_id} | get {id, frame_id?} | activity {canvas_id} | snapshot {node_id, time?} (an image), e.g. {op: "snapshot", input: {node_id, time: 2}}. ${DESCRIBE_HINT}`,
   edit: `Change a canvas, its nodes and frames: {op, target?, element?, input?, version?, project_id?}, or op "batch" with ops[]. Also runs any tool below by name: {op: "<tool>", input}. ${DESCRIBE_HINT}`,
   [DESCRIBE]: 'Free. {} lists the tools and the op families; {family} names its ops; {op} or {ops:[...]} give exact input schemas.',
   render_video: `Render a motion video to MP4: {node_id, mode?}. Poll get_render. ${DESCRIBE_HINT}`,

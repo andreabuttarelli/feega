@@ -74,6 +74,12 @@ describe('POST /api/v1/motion/[nodeId]/render', () => {
     expect(store.farm).toEqual([]);
   });
 
+  it('a browser link also comes as a headless url that starts the render with no click', async () => {
+    const body = await (await post({})).json();
+
+    expect(body.headless_url).toBe(`${body.render_url}?autostart=1`);
+  });
+
   it('il browser non passa dal cancello dei crediti', async () => {
     store.gate = new Response(JSON.stringify({ error: 'credits_exhausted' }), { status: 402 });
     expect((await post({})).status).toBe(201);

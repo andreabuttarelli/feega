@@ -59,6 +59,12 @@ describe('custom component ops', () => {
     expect(out.ok && out.diff).toEqual([{ file: 'css', replaced: 1, before: '.n{width:10px}', after: '.n{width:12px}' }]);
   });
 
+  it('a multi-line edit shows every line it touched, before and after', () => {
+    const out = updateComponent(withNodes(), 'NodeGraph', [{ file: 'css', find: '.n{width:10px}', replace: '.n{width:12px}\n.m{height:4px}' }]);
+
+    expect(out.ok && out.diff).toEqual([{ file: 'css', replaced: 1, before: '.n{width:10px}', after: '.n{width:12px}\n.m{height:4px}' }]);
+  });
+
   it('refuses an update whose text is missing, or ambiguous when no occurrence is named', () => {
     expect(updateComponent(withNodes(), 'NodeGraph', [{ file: 'css', find: 'height', replace: '' }]).ok).toBe(false);
     expect(updateComponent(withNodes(), 'NodeGraph', [{ file: 'html', find: 'div', replace: 'span' }]).ok).toBe(false);
