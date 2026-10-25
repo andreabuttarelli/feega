@@ -123,7 +123,7 @@
   {@const { base, alpha } = colourAlpha(value)}
   <div class="flex min-w-0 items-center gap-1">
     {#if key}{@render diamond(key)}{/if}
-    <div class="min-w-0 flex-1"><ColorField {name} {gesture} value={base} {tokens} onchange={(next) => write(recolour(next, alpha))} /></div>
+    <div class="min-w-0 flex-1"><ColorField {name} {gesture} value={base} {tokens} onchange={(next, typedAlpha) => write(recolour(next, typedAlpha ?? alpha))} /></div>
     <input class={cn(FIELD_INPUT, 'w-12')} type="number" min="0" max="100" step="1" data-testid="fill-alpha" aria-label={`${name} alpha`} title="Alpha %" value={pct(alpha)} onchange={(e) => write(recolour(base, percentOf(e)))} />
   </div>
 {/snippet}

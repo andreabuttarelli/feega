@@ -6,20 +6,61 @@ export const RECENT_MAX = 8;
 const STORAGE_KEY = 'motion-recent-colours';
 const TOKEN = /^brand\.(primary|secondary|accent|background|text)$/;
 const LONG = /^#?([0-9a-f]{6})$/i;
-const SHORT = /^#?([0-9a-f])([0-9a-f])([0-9a-f])$/i;
+const HEX_DIGITS = /^#?([0-9a-f]+)$/i;
+const NUMBER = '(\\d+(?:\\.\\d+)?%?)';
+const RGB = new RegExp(`^(?:rgba?\\(\\s*)?${NUMBER}[\\s,]+${NUMBER}[\\s,]+${NUMBER}(?:\\s*[\\s,/]\\s*${NUMBER})?\\s*\\)?$`, 'i');
 const TOKEN_PREFIX = 'brand.';
+const ALPHA_DIGITS = 1000;
 
-export function parseColour(text: string): string | null {
+export type TypedColour = { colour: string; alpha: number | null };
+
+const SIX_DIGITS: Record<number, (d: string) => string> = {
+  1: (d) => d.repeat(6),
+  2: (d) => d.repeat(3),
+  3: (d) => [...d].map((c) => c + c).join(''),
+  4: (d) => [...d].map((c) => c + c).join(''),
+  6: (d) => d,
+  8: (d) => d
+};
+
+const roundAlpha = (a: number) => Math.round(a * ALPHA_DIGITS) / ALPHA_DIGITS;
+
+function fromHex(digits: string): TypedColour | null {
+  const expand = SIX_DIGITS[digits.length];
+  if (!expand) {
+    return null;
+  }
+  const full = expand(digits.toLowerCase());
+  return { colour: `#${full.slice(0, 6)}`, alpha: full.length > 6 ? roundAlpha(parseInt(full.slice(6), 16) / BYTE) : null };
+}
+
+const byte = (text: string) => (text.endsWith('%') ? (parseFloat(text) / HUNDRED) * BYTE : parseFloat(text));
+const unit = (text: string) => (text.endsWith('%') ? parseFloat(text) / HUNDRED : parseFloat(text));
+
+function fromRgb([r, g, b, a]: string[]): TypedColour | null {
+  const channels = [r, g, b].map(byte);
+  const alpha = a === undefined ? null : unit(a);
+  if (channels.some((c) => c > BYTE) || (alpha !== null && alpha > 1)) {
+    return null;
+  }
+  return { colour: `#${channels.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}`, alpha: alpha === null ? null : roundAlpha(alpha) };
+}
+
+const READERS: [RegExp, (groups: string[]) => TypedColour | null][] = [
+  [TOKEN, ([token]) => ({ colour: token, alpha: null })],
+  [HEX_DIGITS, ([, digits]) => fromHex(digits)],
+  [RGB, ([, ...groups]) => fromRgb(groups)]
+];
+
+export function parseColour(text: string): TypedColour | null {
   const trimmed = text.trim();
-  if (TOKEN.test(trimmed)) {
-    return trimmed;
+  for (const [pattern, read] of READERS) {
+    const match = pattern.exec(trimmed);
+    if (match) {
+      return read([...match]);
+    }
   }
-  const long = LONG.exec(trimmed);
-  if (long) {
-    return `#${long[1].toLowerCase()}`;
-  }
-  const short = SHORT.exec(trimmed);
-  return short ? `#${short.slice(1).map((c) => c + c).join('').toLowerCase()}` : null;
+  return null;
 }
 
 export function colourLabel(value: string): string {
@@ -111,7 +152,7 @@ const TO_CHANNELS: Record<ColourFormat, (hex: string) => Channels> = {
 };
 
 function hexChannel(c: Channels): string | null {
-  const parsed = parseColour(String(c[0] ?? ''));
+  const parsed = parseColour(String(c[0] ?? ''))?.colour;
   return parsed?.startsWith('#') ? parsed : null;
 }
 
