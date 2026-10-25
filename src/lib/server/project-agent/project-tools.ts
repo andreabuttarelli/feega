@@ -78,7 +78,6 @@ function fieldsOf(schema: z.ZodType): string {
 const GENERIC_DESCRIPTION = [
   'Other canvas ops of THIS project, as API/MCP: op, camelCase input.',
   `Spend credits, only if the user asked: ${GENERIC_OPS.filter((name) => CANVAS_OPS[name].access === Access.Spend).join(', ')}.`,
-  'Writes answer ids and changed fields; verbose: true gives the whole document.',
   `Ops: ${GENERIC_OPS.map((name) => `${name} {${fieldsOf(CANVAS_OPS[name].input)}}`).join(';')}.`
 ].join(' ');
 
