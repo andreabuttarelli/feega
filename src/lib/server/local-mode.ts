@@ -1,5 +1,5 @@
 import { json, redirect, type RequestEvent, type ResolveOptions } from '@sveltejs/kit';
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createUserDb } from '$lib/server/db/client';
 
 export const LOCAL_MODE_TOKEN = 'local-mode';
@@ -128,7 +128,7 @@ async function signIn(event: RequestEvent, env: Env): Promise<void> {
   const client = createServerClient(env.PUBLIC_SUPABASE_URL ?? '', env.PUBLIC_SUPABASE_ANON_KEY ?? '', {
     cookies: {
       getAll: () => event.cookies.getAll(),
-      setAll: (cookies) => cookies.forEach(({ name, value, options }) => event.cookies.set(name, value, { ...options, path: ROOT }))
+      setAll: (cookies: { name: string; value: string; options: CookieOptions }[]) => cookies.forEach(({ name, value, options }) => event.cookies.set(name, value, { ...options, path: ROOT }))
     }
   });
   await client.auth.signInWithPassword(demoCredentials(env));
