@@ -38,7 +38,12 @@ git clone https://github.com/andreabuttarelli/feega && cd feega/infra/compose
 docker compose up
 ```
 
-Open http://localhost:3000 and sign in with `demo@feega.local` / `feega-demo-2026`.
+Open http://localhost:3000: you land on the canvas, no login. This is local mode
+(`FEEGA_LOCAL_MODE=1`, the compose default): one project, every visitor is the demo user, and the
+CLI and MCP server need no `feega login` or token. Any other project id gets a 403, and the app
+refuses to start in this mode unless `PUBLIC_APP_URL` is localhost. Set `FEEGA_LOCAL_MODE=0` in
+`infra/compose/.env` for the multi-user app with login. Details:
+[local mode](web-docs/src/content/docs/self-hosting/local-mode.md).
 
 ## Run it locally as an agent
 
@@ -57,7 +62,7 @@ tag that does not exist) compose builds it from source instead: about 28 minutes
 VM, and it can run out of memory if other containers hold that memory. Give Docker 8 GB or more,
 or stop other stacks. To rebuild from your checkout: `docker compose up -d --wait --build`.
 
-Step 3 needs Node 22. It signs in as the demo user, opens the demo canvas, draws a shape, animates
+Step 3 needs Node 22. It enters as the demo user (no login in local mode), opens the demo canvas, draws a shape, animates
 it and exports a PNG; screenshots land in the current directory. If the app is not on port 3000,
 set `PUBLIC_APP_URL` to match.
 
@@ -66,7 +71,7 @@ set `PUBLIC_APP_URL` to match.
 | App | http://localhost:3000 |
 | Supabase API | http://localhost:8000 |
 | Postgres | `localhost:5432`, password in `infra/compose/.env` |
-| Login | `demo@feega.local` / `feega-demo-2026` |
+| Login | none in local mode; otherwise `demo@feega.local` / `feega-demo-2026` |
 | Stop / reset | `docker compose down` / `docker compose down -v` |
 
 To work on the code instead of the image, use the Supabase CLI:
@@ -77,7 +82,7 @@ supabase start && npm ci && npm run setup && npm run dev    # http://localhost:5
 
 `npm run setup` is idempotent: it writes `.env` from the running stack, applies the schema and seeds
 the demo user. The CLI and MCP server find a dev server on port 5173 by themselves; for the Docker
-app set `PUBLIC_APP_URL=http://localhost:3000`. Connecting an agent:
+app set `PUBLIC_APP_URL=http://localhost:3000`; in local mode they skip `feega login`. Connecting an agent:
 [`docs/agents-quickstart.md`](docs/agents-quickstart.md).
 
 When something fails:
@@ -96,18 +101,6 @@ Nothing is credit-gated (`BILLING_PROVIDER=open`). Full guide, limits and timing
 
 TypeScript, SvelteKit, Supabase (Postgres, Auth, Storage, Realtime), Node.js 22, a WebGPU canvas
 with a WebGL fallback.
-
-## Run it locally as an agent
-
-`infra/compose` starts in local mode (`FEEGA_LOCAL_MODE=1`): one canvas, no login, no token. Open
-http://localhost:3000 and you are on it; the CLI and MCP server work without `feega login`:
-
-```sh
-PUBLIC_APP_URL=http://localhost:3000 feega projects
-```
-
-Any other project id gets a 403. The app refuses to start in this mode unless `PUBLIC_APP_URL` is
-localhost. Details: [local mode](web-docs/src/content/docs/self-hosting/local-mode.md).
 
 ## Contributing
 

@@ -48,8 +48,24 @@ async function login(page) {
   await page.waitForURL(/\/(app|p\/)/, { timeout: HYDRATE_MS });
 }
 
+async function servesLocalMode() {
+  const res = await fetch(`${APP_URL}/api/v1/version`).catch(() => null);
+  return (await res?.json().catch(() => null))?.localMode === true;
+}
+
+async function enterLocal(page) {
+  await page.goto(`${APP_URL}/`, { waitUntil: 'networkidle' });
+  await page.waitForURL(/\/p\/.+\/c\//, { timeout: HYDRATE_MS });
+}
+
+const ENTRY = {
+  account: { name: 'login', run: login, blank: openBlankCanvas },
+  local: { name: 'open local canvas without login', run: enterLocal, blank: async () => {} }
+};
+
 async function openDemoCanvas(page) {
-  const target = CANVAS_PATH ?? (await page.locator('a[href^="/p/"][href*="/c/"]').first().getAttribute('href'));
+  const here = new URL(page.url()).pathname;
+  const target = CANVAS_PATH ?? (/\/p\/.+\/c\//.test(here) ? here : null) ?? (await page.locator('a[href^="/p/"][href*="/c/"]').first().getAttribute('href'));
   await page.goto(`${APP_URL}${target}`, { waitUntil: 'networkidle' });
   await page.getByTestId('core-canvas').waitFor({ timeout: HYDRATE_MS });
   await page.waitForTimeout(SETTLE_MS);
@@ -160,9 +176,10 @@ async function main() {
   await page.addLocatorHandler(page.getByTestId('cookie-banner'), () => page.getByTestId('cookie-reject').click());
 
   try {
-    await step('login', () => login(page));
+    const entry = (await servesLocalMode()) ? ENTRY.local : ENTRY.account;
+    await step(entry.name, () => entry.run(page));
     await step('open demo canvas', () => openDemoCanvas(page));
-    await step('open blank canvas', () => openBlankCanvas(page));
+    await step('open blank canvas', () => entry.blank(page));
     await step('create frame', () => createFrame(page));
     await step('draw shape', () => drawShape(page));
     await page.screenshot({ path: `${SHOT_DIR}/smoke-drawn.png` });
