@@ -89,7 +89,7 @@ export const TOOL_FAMILY: Readonly<Record<string, ToolFamily>> = {
   motion_editor_op: ToolFamily.Legacy
 };
 
-export type Findable = { name: string; family: string; summary: string };
+export type Findable = { name: string; family: string; summary?: string };
 
 const NAME_WEIGHT = 3;
 
@@ -97,7 +97,7 @@ const words = (text: string) => text.toLowerCase().split(/[^a-z0-9]+/).filter(Bo
 
 function score(query: string, entry: Findable): number {
   const named = entry.name.replace(/_/g, ' ');
-  const described = entry.summary.toLowerCase();
+  const described = (entry.summary ?? '').toLowerCase();
   return words(query).reduce((sum, w) => sum + (named.includes(w) ? NAME_WEIGHT : 0) + (described.includes(w) ? 1 : 0), 0);
 }
 

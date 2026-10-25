@@ -84,5 +84,6 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   clone_voice: 'Clone a voice from a sample, with consent (spends credits).',
   delete_voice: 'Delete a custom voice.',
   read_video_reference: 'Read a video asset into transcript, scenes and style (spends on first read).',
-  withdraw_from_gallery: 'Take an item out of the gallery.'
+  withdraw_from_gallery: 'Take an item out of the gallery.',
+  styles: 'List, define, apply or rename the named styles shared by the frames of a canvas.'
 };

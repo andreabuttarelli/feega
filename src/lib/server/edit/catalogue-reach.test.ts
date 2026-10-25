@@ -17,7 +17,7 @@ const chatNames = new Set(Object.keys(projectTools));
 const canvasToolOps = String(projectTools[CANVAS_TOOL].description);
 const frameToolOps = String(frameTools[FRAME_TOOL].description);
 
-const WITHOUT_SUMMARY = ['styles'];
+const WITHOUT_SUMMARY: string[] = [];
 
 const rows = [...editCatalogue().values()];
 
