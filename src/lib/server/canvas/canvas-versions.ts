@@ -3,6 +3,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import { deleteConnection, deleteNode, listConnections, listNodes, restoreConnection, restoreNode } from '$lib/server/repos/canvas';
 import { readHead } from '$lib/server/repos/motion-revisions';
 import { saveMotionDoc } from '$lib/server/motion/editor';
+import { holdsDoc } from '$lib/canvas/motion-node';
 import { MAX_VERSION_NAME, planCanvasRestore, snapshotSchema, type CanvasSnapshot } from '$lib/canvas/canvas-version';
 
 type Scope = { orgId: string; canvasId: string };
@@ -32,8 +33,7 @@ const versions = (db: Db) => db as unknown as VersionTable;
 
 export async function versionSnapshot(db: Db, scope: Scope): Promise<CanvasSnapshot> {
   const [nodes, connections] = await Promise.all([listNodes(db, scope), listConnections(db, scope)]);
-  const motion = nodes.filter((n) => n.type === 'motion');
-  const heads = await Promise.all(motion.map(async (n) => [n.id, await readHead(db, { orgId: scope.orgId, nodeId: n.id })] as const));
+  const heads = await Promise.all(nodes.filter((n) => holdsDoc(n.type)).map(async (n) => [n.id, await readHead(db, { orgId: scope.orgId, nodeId: n.id })] as const));
   return {
     nodes: nodes.map((n) => ({ id: n.id, type: n.type, position: n.position, size: n.size, data: n.data })),
     connections: connections.map((c) => ({ id: c.id, sourceNodeId: c.sourceNodeId, targetNodeId: c.targetNodeId })),
