@@ -11,6 +11,7 @@ import { awaitFrames, framesPrefix, type FrameBucket } from '$lib/server/motion/
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import type { FramesRequest } from '$lib/motion/frames-request';
+import { Detail, Surface, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
 
 export const LIST_FRAME_TOOLS = 'list_frame_tools';
 export const DESCRIBE_FRAME_TOOL = 'describe_frame_tool';
@@ -66,12 +67,12 @@ export function createFrameTools(deps: FrameToolDeps): Record<string, Tool> {
   const run = tool({
     description: [
       'Run one frame (motion video or still) tool on a frame of THIS project: the same tools the frame editor has, saved as a new revision the user can undo.',
-      `node_id defaults to the frame open in the editor. ${DESCRIBE_FRAME_TOOL} gives one input schema: read it before the first call to a tool. ${LIST_FRAME_TOOLS} adds one line on each, only when a name is not enough.`,
+      `node_id defaults to the frame open in the editor. ${DESCRIBE_FRAME_TOOL} gives one input schema: read it before the first call to a tool. ${LIST_FRAME_TOOLS} adds one line on each.`,
       `${VIEW_FRAMES} returns the rendered frames as images.`,
       `Tools: ${motionToolList().map((t) => t.name).join(',')}.`
     ].join(' '),
-    inputSchema: z.object({ node_id: z.string().optional(), tool: z.string().min(1), input: z.record(z.string(), z.unknown()).default({}) }).strict(),
-    execute: async (input: { node_id?: string; tool: string; input: Record<string, unknown> }, { toolCallId }) => {
+    inputSchema: z.object({ node_id: z.string().optional(), tool: z.string().min(1), input: z.record(z.string(), z.unknown()).default({}), verbose: z.boolean().optional() }).strict(),
+    execute: async (input: { node_id?: string; tool: string; input: Record<string, unknown>; verbose?: boolean }, { toolCallId }) => {
       const nodeId = input.node_id ?? deps.open?.nodeId;
       if (!nodeId) {
         return NO_FRAME;
@@ -87,7 +88,7 @@ export function createFrameTools(deps: FrameToolDeps): Record<string, Tool> {
         return { error: ran.outcome, message: REFUSALS[ran.outcome], detail: ran.detail };
       }
       seen.set(toolCallId, ran.frames);
-      return { node_id: nodeId, version: ran.version, saved: ran.saved, output: ran.output };
+      return compactWrite({ node_id: nodeId, version: ran.version, saved: ran.saved, output: ran.output }, { surface: Surface.ChatFrame, touched: touchedOf(input.input), detail: input.verbose ? Detail.Verbose : Detail.Compact });
     }
   });
 

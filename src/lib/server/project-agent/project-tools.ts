@@ -7,6 +7,7 @@ import { chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames
 import { templateLibrary } from '$lib/server/motion/templates';
 import { toolsOf } from '$lib/server/edit/tool-row';
 import { projectRows } from '$lib/server/edit/project-rows';
+import { Surface, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
 
 /**
  * I TOOL DI PROGETTO E TELA. Sempre presenti, anche senza brand.
@@ -80,10 +81,13 @@ const GENERIC_DESCRIPTION = [
   `Ops: ${GENERIC_OPS.map((name) => `${name} {${fieldsOf(CANVAS_OPS[name].input)}}`).join(';')}.`
 ].join(' ');
 
+const shown = (name: CanvasOpName, input: unknown, result: unknown) =>
+  CANVAS_OPS[name].access === Access.Write ? compactWrite(result, { surface: Surface.ChatCanvas, touched: touchedOf(input) }) : result;
+
 function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
   const own = Object.entries(CHAT_TOOL_OPS).map(([name, description]) => {
     const op = CANVAS_OPS[name as CanvasOpName];
-    return [name, tool({ description, inputSchema: op.input, execute: (input: unknown) => op.run(ctx, input as never) })];
+    return [name, tool({ description, inputSchema: op.input, execute: async (input: unknown) => shown(name as CanvasOpName, input, await op.run(ctx, input as never)) })];
   });
 
   const generic = tool({
@@ -94,7 +98,7 @@ function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
       if (!parsed.success) {
         return { error: 'invalid_input', issues: parsed.error.issues };
       }
-      return CANVAS_OPS[op].run(ctx, parsed.data as never);
+      return shown(op, input, await CANVAS_OPS[op].run(ctx, parsed.data as never));
     }
   });
 
