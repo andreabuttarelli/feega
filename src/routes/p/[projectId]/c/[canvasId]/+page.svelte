@@ -2333,13 +2333,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void invalidate('app:credits');
   }
 
-  /** Ferma i biglietti non ancora reclamati da un tick — quelli già in corso finiscono, i
-   *  risultati già pronti restano nella lista di output. */
   async function cancelRunFor(id: string) {
     await post('cancel_run', { node_id: id });
     await refresh();
   }
 
+  /** Ferma i biglietti non ancora reclamati da un tick — quelli già in corso finiscono, i
+   *  risultati già pronti restano nella lista di output. */
   async function cancelLoopFor(id: string) {
     await post('cancel_loop', { node_id: id });
     await refresh();
