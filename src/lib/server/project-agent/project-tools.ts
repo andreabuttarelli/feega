@@ -92,13 +92,13 @@ function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
 
   const generic = tool({
     description: GENERIC_DESCRIPTION,
-    inputSchema: z.object({ op: z.enum(GENERIC_OPS as [CanvasOpName, ...CanvasOpName[]]), input: z.record(z.string(), z.unknown()).default({}), verbose: z.boolean().optional() }).strict(),
-    execute: async ({ op, input, verbose }: { op: CanvasOpName; input?: Record<string, unknown>; verbose?: boolean }) => {
+    inputSchema: z.object({ op: z.enum(GENERIC_OPS as [CanvasOpName, ...CanvasOpName[]]), input: z.record(z.string(), z.unknown()).default({}) }).strict(),
+    execute: async ({ op, input }: { op: CanvasOpName; input?: Record<string, unknown> }) => {
       const parsed = CANVAS_OPS[op].input.safeParse(input ?? {});
       if (!parsed.success) {
         return { error: 'invalid_input', issues: parsed.error.issues };
       }
-      return shown(op, input, await CANVAS_OPS[op].run(ctx, parsed.data as never), verbose ? Detail.Verbose : Detail.Compact);
+      return shown(op, input, await CANVAS_OPS[op].run(ctx, parsed.data as never));
     }
   });
 

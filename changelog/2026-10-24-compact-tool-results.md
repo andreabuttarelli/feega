@@ -8,7 +8,7 @@ carried that back into the model's context. `query` read 20 rows, 2k chars per v
 the fields the call sent; other columns are dropped, long values become `[N chars, ask verbose…]`,
 arrays cap at 20, signed links stay whole. Answers say `trimmed: true` when something was cut.
 `verbose: true` returns the original on `edit`, `insert_row`, `update_row`, `query` and the chat's
-`canvas_tool` / frame `run` tools.
+frame `run` tool.
 
 - Wired in: `runEdit` (MCP `edit`, writes only, not spend, not reads), `insert_row`/`update_row`,
   chat `canvas_tool` and own op tools (Access.Write only), chat frame tool.
