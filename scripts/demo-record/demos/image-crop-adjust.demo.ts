@@ -42,7 +42,7 @@ test('image crop and adjustments', async ({ page, session, admin, seedNode }) =>
     await d.wait(500);
     const grip = (await page.getByTestId('crop-grip-top-left').boundingBox())!;
     const from = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 };
-    await d.drag(from, { x: from.x + ZOOM_PX, y: from.y + ZOOM_PX * 0.56 });
+    await d.drag(from, { x: from.x - ZOOM_PX, y: from.y - ZOOM_PX * 0.56 });
     const pan = (await page.getByTestId('crop-pan').boundingBox())!;
     const middle = { x: pan.x + pan.width / 2, y: pan.y + pan.height / 2 };
     await d.drag(middle, { x: middle.x - PAN_PX, y: middle.y + PAN_PX / 2 });
