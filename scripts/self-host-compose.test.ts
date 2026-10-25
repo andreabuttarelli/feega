@@ -105,8 +105,8 @@ describe('healthcheck dell’app', () => {
 	 * nel momento in cui si accende la flag. robots.txt è sempre 200, senza sessione.
 	 */
 	it('non picchia la homepage: HIDE_MARKETING la reindirizza', () => {
-		expect(COMPOSE).toMatch(/127\.0\.0\.1:3000\/robots\.txt/);
-		expect(COMPOSE).not.toMatch(/127\.0\.0\.1:3000\/'/);
+		expect(COMPOSE).toMatch(/127\.0\.0\.1:\$\{APP_PORT:-3000\}\/robots\.txt/);
+		expect(COMPOSE).not.toMatch(/127\.0\.0\.1:\$\{APP_PORT:-3000\}\/'/);
 	});
 });
 
