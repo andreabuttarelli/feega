@@ -102,3 +102,29 @@ describe.skipIf(!HAS_BUN)('session file location — old dazero path falls back 
     }
   });
 });
+
+describe.skipIf(!HAS_BUN)('local mode — no feega login against a local instance', () => {
+  const sessionAgainst = (localMode: boolean) => {
+    const home = mkdtempSync(join(tmpdir(), 'feega-cli-home-'));
+    try {
+      return runInHome(
+        home,
+        `const server = Bun.serve({ port: 0, fetch: () => Response.json({ localMode: ${localMode} }) });
+         process.env.PUBLIC_APP_URL = 'http://127.0.0.1:' + server.port;
+         const { loadSession } = await import('./auth.ts');
+         console.log(JSON.stringify(await loadSession()));
+         server.stop(true);`,
+      );
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  };
+
+  test('a server in local mode needs no stored session', () => {
+    expect(JSON.parse(sessionAgainst(true)).access_token).toBe('local-mode');
+  });
+
+  test('a server not in local mode still asks for feega login', () => {
+    expect(sessionAgainst(false)).toBe('null');
+  });
+});

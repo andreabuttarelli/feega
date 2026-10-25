@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ensureDemoUser, ensureOrg, ensureCanvas, ensureDemoFrame, ensureCredits } from './db-seed.mjs';
+import { ensureDemoUser, ensureOrg, ensureCanvas, ensureDemoFrame, ensureCredits, seedPlace } from './db-seed.mjs';
+
+describe('seedPlace', () => {
+  it('in local mode seeds the one project the app serves, slug local', () => {
+    expect(seedPlace({ FEEGA_LOCAL_MODE: '1' })).toEqual({ project: 'Local', slug: 'local', canvas: 'Local' });
+  });
+
+  it('otherwise seeds the demo project', () => {
+    expect(seedPlace({})).toEqual({ project: 'Demo project', slug: 'demo-project', canvas: 'Hello canvas' });
+  });
+});
 
 describe('ensureDemoUser', () => {
   it('returns the id from a successful admin create', async () => {

@@ -319,6 +319,7 @@ services:
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:${APP_PORT:-3000}}
       SEED_DEMO_EMAIL: ${SEED_DEMO_EMAIL:-demo@feega.local}
       SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-feega-demo-2026}
+      FEEGA_LOCAL_MODE: ${FEEGA_LOCAL_MODE:-1}
 
   app:
     image: ${APP_IMAGE:-ghcr.io/andreabuttarelli/feega:latest}
@@ -355,6 +356,9 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
       CRON_SECRET: ${CRON_SECRET:-}
       HIDE_MARKETING: ${HIDE_MARKETING:-}
+      FEEGA_LOCAL_MODE: ${FEEGA_LOCAL_MODE:-1}
+      SEED_DEMO_EMAIL: ${SEED_DEMO_EMAIL:-demo@feega.local}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-feega-demo-2026}
 
 # The SvelteKit app image IS the `app` service above now: adapter-vercel remains the default
 # adapter (cloud deploy unchanged), and DEPLOY_TARGET=node inside infra/app/Dockerfile selects

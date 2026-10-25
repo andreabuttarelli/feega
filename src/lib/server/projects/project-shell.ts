@@ -14,6 +14,7 @@ import { UNCENSORED_LOCK_TEXT, UncensoredLock, uncensoredSectionVisible } from '
 import { uncensoredLockFor } from '$lib/server/uncensored-workspace/workspace-server';
 import type { Db } from '$lib/server/db/client';
 import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
+import { shownProjects } from '$lib/server/local-mode';
 
 const LAST_PROJECT_MAX_AGE_S = 60 * 60 * 24 * 365;
 
@@ -60,7 +61,7 @@ export const load = async ({ params, locals, depends, cookies }: Pick<ServerLoad
     loadBrandShell(db, orgId, project.brandId),
     orgCreditBalance(db, orgId)
   ]);
-  const listed = allProjects.filter((p) => p.mode === ProjectMode.Standard || uncensoredLock === UncensoredLock.Open);
+  const listed = shownProjects(allProjects.filter((p) => p.mode === ProjectMode.Standard || uncensoredLock === UncensoredLock.Open), project.id, env);
 
   rememberProject(cookies, project.id);
 

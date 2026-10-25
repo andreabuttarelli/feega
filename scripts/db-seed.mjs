@@ -5,9 +5,8 @@ const SEED_EMAIL = process.env.SEED_DEMO_EMAIL || 'demo@feega.local';
 const SEED_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'feega-demo-2026';
 const SEED_ORG_NAME = process.env.SEED_ORG_NAME || 'Demo';
 const SEED_ORG_SLUG = 'demo';
-const SEED_PROJECT_NAME = 'Demo project';
-const SEED_PROJECT_SLUG = 'demo-project';
-const SEED_CANVAS_NAME = 'Hello canvas';
+const DEMO_PLACE = { project: 'Demo project', slug: 'demo-project', canvas: 'Hello canvas' };
+const LOCAL_PLACE = { project: 'Local', slug: 'local', canvas: 'Local' };
 const SEED_FRAME_POSITION = { x: 120, y: 80 };
 const SEED_FRAME_DATA = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const SEED_CREDITS = 1000;
@@ -156,11 +155,16 @@ export async function ensureCredits(client, orgId) {
   );
 }
 
+export function seedPlace(env) {
+  return env.FEEGA_LOCAL_MODE === '1' ? LOCAL_PLACE : DEMO_PLACE;
+}
+
 export async function seed(client, userId, email) {
+  const place = seedPlace(process.env);
   await ensureProfile(client, userId, email);
   const orgId = await ensureOrg(client, userId, SEED_ORG_NAME, SEED_ORG_SLUG);
-  const projectId = await ensureProject(client, orgId, SEED_PROJECT_NAME, SEED_PROJECT_SLUG);
-  const canvasId = await ensureCanvas(client, orgId, projectId, SEED_CANVAS_NAME);
+  const projectId = await ensureProject(client, orgId, place.project, place.slug);
+  const canvasId = await ensureCanvas(client, orgId, projectId, place.canvas);
   const doc = JSON.parse(readFileSync(MOTION_DOC_PATH, 'utf8'));
   await ensureDemoFrame(client, { orgId, projectId, canvasId }, userId, doc);
   await ensureCredits(client, orgId);
@@ -187,6 +191,10 @@ async function main() {
     const place = await seed(client, user.id, SEED_EMAIL);
     const appUrl = (process.env.PUBLIC_APP_URL || 'http://localhost:5173').replace(/\/$/, '');
     console.log(`\nDemo canvas: ${appUrl}/p/${place.projectId}/c/${place.canvasId}`);
+    if (seedPlace(process.env) === LOCAL_PLACE) {
+      console.log(`Local mode: open ${appUrl}/ — no login.\n`);
+      return;
+    }
     console.log(`Log in at ${appUrl}/login\n  email:    ${SEED_EMAIL}\n  password: ${SEED_PASSWORD}\n`);
   } finally {
     await client.end();

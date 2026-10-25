@@ -97,6 +97,18 @@ Nothing is credit-gated (`BILLING_PROVIDER=open`). Full guide, limits and timing
 TypeScript, SvelteKit, Supabase (Postgres, Auth, Storage, Realtime), Node.js 22, a WebGPU canvas
 with a WebGL fallback.
 
+## Run it locally as an agent
+
+`infra/compose` starts in local mode (`FEEGA_LOCAL_MODE=1`): one canvas, no login, no token. Open
+http://localhost:3000 and you are on it; the CLI and MCP server work without `feega login`:
+
+```sh
+PUBLIC_APP_URL=http://localhost:3000 feega projects
+```
+
+Any other project id gets a 403. The app refuses to start in this mode unless `PUBLIC_APP_URL` is
+localhost. Details: [local mode](web-docs/src/content/docs/self-hosting/local-mode.md).
+
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md)

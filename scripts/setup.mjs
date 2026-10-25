@@ -74,6 +74,10 @@ function main() {
   if (!current.PUBLIC_APP_URL) {
     text = upsertEnv(text, 'PUBLIC_APP_URL', DEFAULT_APP_URL);
   }
+  if (!current.FEEGA_LOCAL_MODE) {
+    text = upsertEnv(text, 'FEEGA_LOCAL_MODE', '1');
+    console.log('FEEGA_LOCAL_MODE=1: one project, no login, agents need no token. Set it to 0 for the full multi-user app.');
+  }
   if (!current.BILLING_PROVIDER) {
     text = upsertEnv(text, 'BILLING_PROVIDER', 'open');
   }

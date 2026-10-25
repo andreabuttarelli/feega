@@ -9,7 +9,8 @@ import { markRlsScoped } from '$lib/server/rls-client';
 import { createUserDb, type Db } from '$lib/server/db/client';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env as privateEnv } from '$env/dynamic/private';
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, ServerInit } from '@sveltejs/kit';
+import { localModeOn, localModeRefusal } from '$lib/server/local-mode';
 import { withBrandContext, withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
 import { createAdminClient } from '$lib/server/supabase-admin';
@@ -172,7 +173,26 @@ async function refuseUncensoredSection(event: RequestEvent): Promise<void> {
   }
 }
 
-export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
+function appEnv() {
+  return { ...privateEnv, ...publicEnv };
+}
+
+export const init: ServerInit = () => {
+  const refusal = localModeRefusal(appEnv());
+  if (refusal) {
+    throw new Error(refusal);
+  }
+};
+
+const localMode: Handle = async ({ event, resolve }) => {
+  if (!localModeOn(privateEnv)) {
+    return resolve(event);
+  }
+  const { serveLocal } = await import('$lib/server/local-mode');
+  return serveLocal(event, resolve, appEnv());
+};
+
+export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, localMode, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
