@@ -3,7 +3,6 @@ import { Tool, type ActionId } from '$lib/motion/actions';
 import { LayerAction } from '$lib/canvas/layers';
 import { CanvasAction } from '$lib/canvas/canvas-list';
 import { ClipOp } from '$lib/motion/clip-ops';
-import { EmptyAction } from '$lib/canvas/empty-canvas';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
 import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
 import type { EditorOpName } from '$lib/server/frame-editor/editor-ops';
@@ -412,13 +411,6 @@ export const CLIP_BUTTONS: Record<ClipOp, Parity> = {
   [ClipOp.Parent]: motion('set_parent')
 };
 
-export const EMPTY_CANVAS: Record<EmptyAction, Parity> = {
-  [EmptyAction.Chat]: uiOnly('opens the project chat'),
-  [EmptyAction.Frame]: canvas('create_node'),
-  [EmptyAction.Image]: canvas('create_node'),
-  [EmptyAction.Video]: canvas('create_node')
-};
-
 export const FRAME_CONTENT: Record<string, Parity> = {
   'add text': motion('add_clip'),
   'add shape': motion('add_shape'),
@@ -460,6 +452,5 @@ export const PARITY_TABLES = {
   LAYER_PANEL,
   CANVAS_LIST,
   CLIP_BUTTONS,
-  EMPTY_CANVAS,
   FRAME_CONTENT
 } as const;

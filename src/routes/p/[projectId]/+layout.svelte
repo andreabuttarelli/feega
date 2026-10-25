@@ -28,7 +28,6 @@
   import { MOBILE_QUERY, type Viewport } from '$lib/breakpoints';
   import { readChatOpen, writeChatOpen } from '$lib/shell-prefs';
   import { guideOpenRequest } from '$lib/canvas/guide-open';
-  import { chatOpenRequest } from '$lib/canvas/empty-canvas';
   import { browser } from '$app/environment';
   import { postCanvasAction } from '$lib/canvas/canvas-api';
   import type { ShareState } from '$lib/canvas/shared-view';
@@ -101,15 +100,6 @@
       chatOpen = true;
       writeChatOpen(true);
     }
-  });
-
-  $effect(() => {
-    if (!$chatOpenRequest) {
-      return;
-    }
-    chatOpen = true;
-    writeChatOpen(true);
-    showMobile('chat');
   });
 
   function onRailPanel(entry: NavEntry) {
