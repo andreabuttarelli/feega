@@ -131,21 +131,26 @@ async function fillCanvas(db: Db, scope: CanvasScope & { actor: Actor }, canvas:
   }
 }
 
-export async function importCanvasFile(db: Db, input: { orgId: string; projectId: string; bytes: Uint8Array; actor: Actor }): Promise<FeegaImportOutcome> {
+export type ProjectFor = (canvasName: string) => Promise<string>;
+
+type ImportInput = { orgId: string; projectFor: ProjectFor; actor: Actor };
+
+export async function importCanvasFile(db: Db, input: ImportInput & { bytes: Uint8Array }): Promise<FeegaImportOutcome> {
   const opened = unpackFeega(input.bytes);
   if (!opened.ok) {
     return { outcome: FeegaImport.Refused, refusal: opened.refusal };
   }
 
   const { manifest, canvas } = opened.file;
-  const created = await createCanvas(db, { orgId: input.orgId, projectId: input.projectId, name: manifest.canvasName });
+  const projectId = await input.projectFor(manifest.canvasName);
+  const created = await createCanvas(db, { orgId: input.orgId, projectId, name: manifest.canvasName });
   try {
     const ids = new Map<string, string>([
-      [manifest.source.projectId.toLowerCase(), input.projectId],
+      [manifest.source.projectId.toLowerCase(), projectId],
       [manifest.source.canvasId.toLowerCase(), created.id]
     ]);
     for (const asset of canvas.assets) {
-      const id = await importAsset(db, input, asset, opened.blobs);
+      const id = await importAsset(db, { orgId: input.orgId, projectId }, asset, opened.blobs);
       if (id) {
         ids.set(asset.id.toLowerCase(), id);
       }
@@ -154,7 +159,7 @@ export async function importCanvasFile(db: Db, input: { orgId: string; projectId
       ids.set(item.id.toLowerCase(), crypto.randomUUID());
     }
 
-    await fillCanvas(db, { orgId: input.orgId, projectId: input.projectId, canvasId: created.id, actor: input.actor }, remapIds(canvas, ids));
+    await fillCanvas(db, { orgId: input.orgId, projectId, canvasId: created.id, actor: input.actor }, remapIds(canvas, ids));
     return { outcome: FeegaImport.Imported, canvas: created };
   } catch (error) {
     await deleteCanvas(db, { orgId: input.orgId, canvasId: created.id });
@@ -162,8 +167,17 @@ export async function importCanvasFile(db: Db, input: { orgId: string; projectId
   }
 }
 
-export async function importStoredCanvasFile(db: Db, input: { orgId: string; projectId: string; path: string; actor: Actor }): Promise<FeegaImportOutcome> {
-  if (!input.path.startsWith(canvasUploadPrefix(input.orgId, input.projectId)) || input.path.includes('..')) {
+export async function signCanvasFileUpload(db: Db, orgId: string): Promise<{ path: string; uploadUrl: string; mimeType: string }> {
+  const path = `${orgId}/imports/${crypto.randomUUID()}${FEEGA_EXTENSION}`;
+  const { data, error } = await db.storage.from(CANVAS_ASSET_BUCKET).createSignedUploadUrl(path);
+  if (error || !data) {
+    throw error ?? new Error('upload not signed');
+  }
+  return { path, uploadUrl: data.signedUrl, mimeType: FEEGA_MIME };
+}
+
+export async function importStoredCanvasFile(db: Db, input: ImportInput & { path: string }): Promise<FeegaImportOutcome> {
+  if (!input.path.startsWith(`${input.orgId}/`) || input.path.includes('..')) {
     return { outcome: FeegaImport.Refused, refusal: FeegaRefusal.NotFeega };
   }
   const bucket = db.storage.from(CANVAS_ASSET_BUCKET);

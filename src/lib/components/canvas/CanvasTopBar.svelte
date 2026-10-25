@@ -25,6 +25,9 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { matching, needsSearch, recentFirst } from '$lib/canvas/switcher-list';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import FeegaFile from './FeegaFile.svelte';
+  import Download from '@lucide/svelte/icons/download';
+  import Upload from '@lucide/svelte/icons/upload';
   import { Capability, modeAllows, modeOf, ProjectMode } from '$lib/project-mode';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string; mode?: string };
@@ -117,6 +120,8 @@
   }
   const inUncensored = $derived(projectMode === ProjectMode.Uncensored);
   const mode = $derived(modeOf(projectMode));
+
+  let feegaFile = $state<FeegaFile | null>(null);
 
   let renaming = $state(false);
   let draftName = $state('');
@@ -306,6 +311,14 @@
           <span class="sw-lead"><Plus size={ICON} /></span>
           {$_('app.shell.canvasActions.new')}
         </DropdownMenu.Item>
+        <DropdownMenu.Item class="sw-row" data-testid="canvas-import-feega" onSelect={() => feegaFile?.pick()}>
+          <span class="sw-lead"><Upload size={ICON} /></span>
+          Import .feega…
+        </DropdownMenu.Item>
+        <DropdownMenu.Item class="sw-row" data-testid="canvas-save-feega" onSelect={() => feegaFile?.save()}>
+          <span class="sw-lead"><Download size={ICON} /></span>
+          Download .feega
+        </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
     {/if}
@@ -338,6 +351,8 @@
       {/if}
     </div>
   {/snippet}
+
+  <FeegaFile bind:this={feegaFile} page={canvasHref} />
 
   <ConfirmDialog
     bind:open={confirmingDelete}

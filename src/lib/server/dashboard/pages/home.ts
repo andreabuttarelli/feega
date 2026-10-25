@@ -17,6 +17,8 @@ import { parseAttachments } from '$lib/chat-attachments';
 import { FROM_TEMPLATE_DEPS, FROM_TEMPLATE_ERROR, FROM_TEMPLATE_STATUS, FromTemplate, fromTemplateBody, startFromTemplate } from '$lib/server/motion/from-template';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefMessage, briefName } from '$lib/motion/video-brief';
+import { FeegaImport, importStoredCanvasFile, signCanvasFileUpload } from '$lib/server/canvas/feega-file';
+import { FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 
 const HTTP_SEE_OTHER = 303;
 const HTTP_BAD_REQUEST = 400;
@@ -47,6 +49,12 @@ async function attachTarget(event: Parameters<PageServerLoad>[0], recentProjectI
     return recentProjectId;
   }
   return toolScope(event).then((scope) => scope.projectId, () => null);
+}
+
+async function workspaceOf(event: Parameters<typeof signedInDb>[0] & { cookies: { get: (name: string) => string | undefined } }) {
+  const { db, user } = await signedInDb(event);
+  const membership = chooseOrg(await listMemberships(db, user.id), event.cookies.get(ORG_COOKIE) ?? null);
+  return membership ? { db, userId: user.id, orgId: membership.org.id } : null;
 }
 
 function projectSlug(): string {
@@ -98,6 +106,27 @@ export const actions: Actions = {
     const project = await createProject(db, { orgId: membership.org.id, name, slug: projectSlug() });
     const canvas = await createCanvas(db, { orgId: membership.org.id, projectId: project.id, name: DEFAULT_CANVAS_NAME });
     throw redirect(HTTP_SEE_OTHER, canvasPath(project.id, canvas.id));
+  },
+
+  request_canvas_import: async (event) => {
+    const workspace = await workspaceOf(event);
+    return workspace ? signCanvasFileUpload(workspace.db, workspace.orgId) : fail(HTTP_NOT_FOUND, { error: 'No workspace' });
+  },
+
+  import_canvas_file: async (event) => {
+    const workspace = await workspaceOf(event);
+    if (!workspace) {
+      return fail(HTTP_NOT_FOUND, { error: 'No workspace' });
+    }
+
+    const { db, orgId, userId } = workspace;
+    const path = String((await event.request.formData()).get('path') ?? '');
+    const projectFor = async (name: string) => (await createProject(db, { orgId, name: name.trim() || DEFAULT_PROJECT_NAME, slug: projectSlug() })).id;
+    const out = await importStoredCanvasFile(db, { orgId, projectFor, path, actor: { kind: 'user', id: userId } });
+    if (out.outcome === FeegaImport.Refused) {
+      return fail(HTTP_BAD_REQUEST, { error: FEEGA_REFUSAL_MESSAGE[out.refusal] });
+    }
+    throw redirect(HTTP_SEE_OTHER, canvasPath(out.canvas.projectId, out.canvas.id));
   },
 
   workspace: async (event) => {

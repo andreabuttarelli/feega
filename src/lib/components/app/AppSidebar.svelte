@@ -6,6 +6,9 @@
   import { _ } from 'svelte-i18n';
   import Folder from '@lucide/svelte/icons/folder';
   import Plus from '@lucide/svelte/icons/plus';
+  import Upload from '@lucide/svelte/icons/upload';
+  import FeegaFile from '$lib/components/canvas/FeegaFile.svelte';
+  import { DashboardPage, PAGE_PATH } from '$lib/dashboard/pages';
   import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { tourDialog } from '$lib/onboarding/tour-dialog.svelte';
@@ -87,6 +90,8 @@
     await chooseWorkspace(orgId);
     await goto('/app', { invalidateAll: true });
   }
+
+  let feegaFile = $state<FeegaFile | null>(null);
 </script>
 
 {#snippet link(item: NavItem)}
@@ -165,6 +170,11 @@
         <span class="label">New project</span>
       </button>
     </form>
+    <button type="button" class="row new-project" data-testid="app-sidebar-import-feega" onclick={() => feegaFile?.pick()}>
+      <Upload size={ICON} strokeWidth={STROKE} />
+      <span class="label">Import .feega</span>
+    </button>
+    <FeegaFile bind:this={feegaFile} page={PAGE_PATH[DashboardPage.Home]} />
   </div>
 
   <div class="foot" bind:this={foot} onfocusout={left}>

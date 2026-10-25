@@ -11,7 +11,7 @@ const EDGE = '55555555-5555-4555-8555-555555555555';
 const ASSET = '66666666-6666-4666-8666-666666666666';
 
 const user = { kind: 'user' as const, id: 'u' };
-const target = { orgId: 'org', projectId: 'p2', actor: user };
+const target = { orgId: 'org', projectFor: async () => 'p2', actor: user };
 
 const file: FeegaFile = {
   manifest: { format: 'feega', version: FEEGA_VERSION, exportedAt: '2026-10-25T00:00:00.000Z', canvasName: 'Launch', source: { projectId: OLD_PROJECT, canvasId: OLD_CANVAS } },
@@ -69,13 +69,13 @@ describe('importing a .feega file', () => {
     expect(fake.calls.some((c) => c.op === 'insert')).toBe(false);
   });
 
-  it('reads only a file uploaded into the target project, and removes it after', async () => {
-    const fake = fakeDb({ canvases: [], nodes: [], nodes_connections: [], assets: [], canvas_events: [] }, { store: true, filter: true, files: { 'other-org/p9/x.feega': packed, 'org/p2/imports/x.feega': packed } });
+  it('reads only a file uploaded into the importing org, and removes it after', async () => {
+    const fake = fakeDb({ canvases: [], nodes: [], nodes_connections: [], assets: [], canvas_events: [] }, { store: true, filter: true, files: { 'other-org/p9/x.feega': packed, 'org/imports/x.feega': packed } });
 
     expect(await importStoredCanvasFile(fake.db, { ...target, path: 'other-org/p9/x.feega' })).toEqual({ outcome: FeegaImport.Refused, refusal: FeegaRefusal.NotFeega });
     expect(fake.calls.some((c) => c.op === 'download')).toBe(false);
 
-    expect((await importStoredCanvasFile(fake.db, { ...target, path: 'org/p2/imports/x.feega' })).outcome).toBe(FeegaImport.Imported);
-    expect(fake.calls.some((c) => c.op === 'remove' && JSON.stringify(c.filters).includes('org/p2/imports/x.feega'))).toBe(true);
+    expect((await importStoredCanvasFile(fake.db, { ...target, path: 'org/imports/x.feega' })).outcome).toBe(FeegaImport.Imported);
+    expect(fake.calls.some((c) => c.op === 'remove' && JSON.stringify(c.filters).includes('org/imports/x.feega'))).toBe(true);
   });
 });
