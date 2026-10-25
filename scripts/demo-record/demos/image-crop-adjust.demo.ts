@@ -4,17 +4,18 @@ import type { Locator } from '@playwright/test';
 import { test, expect } from '../../../tests/e2e/fixtures/session';
 import { installCursor, recordDemo } from '../record';
 import type { Demo } from '../demo';
+import type { Rect } from '../camera';
 import { frameDoc, frameHost, openCanvas, seedFrame } from './seed';
 
 const PHOTO = `${process.env.E2E_BASE_URL ?? 'http://localhost:5173'}/login-visual.webp`;
 const ZOOM_PX = 90;
 const PAN_PX = 50;
 
-async function slide(d: Demo, slider: Locator, share: number) {
+async function slide(d: Demo, slider: Locator, share: number, photo: Rect) {
   await slider.scrollIntoViewIfNeeded();
   const b = (await slider.boundingBox())!;
   const y = b.y + b.height / 2;
-  await d.drag({ x: b.x + b.width / 2, y }, { x: b.x + b.width * share, y });
+  await d.drag({ x: b.x + b.width / 2, y }, { x: b.x + b.width * share, y }, undefined, photo);
 }
 
 test('image crop and adjustments', async ({ page, session, admin, seedNode }) => {
@@ -43,9 +44,9 @@ test('image crop and adjustments', async ({ page, session, admin, seedNode }) =>
 
     const stack = page.getByTestId('motion-inspector').getByTestId('fill-stack').first();
     await d.click(stack.getByTestId('fill-row').first());
-    await slide(d, page.getByTestId('fill-adjust-saturation').locator('input[type="range"]'), 0.85);
-    await slide(d, page.getByTestId('fill-adjust-temperature').locator('input[type="range"]'), 0.25);
-    await slide(d, page.getByTestId('fill-adjust-contrast').locator('input[type="range"]'), 0.75);
+    await slide(d, page.getByTestId('fill-adjust-saturation').locator('input[type="range"]'), 0.85, stage);
+    await slide(d, page.getByTestId('fill-adjust-temperature').locator('input[type="range"]'), 0.25, stage);
+    await slide(d, page.getByTestId('fill-adjust-contrast').locator('input[type="range"]'), 0.75, stage);
     await d.move(centre);
     await d.wait(1800);
   });

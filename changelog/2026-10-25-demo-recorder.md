@@ -27,3 +27,6 @@ scripts/demo-record/playwright.config.ts [name]`. Re-render a recording:
 
 Discarded: ffmpeg zoompan/sendcmd camera (integer jitter, hard to test),
 Playwright recordVideo (low bitrate).
+
+Raw recordings (frames, event log, contact sheets) go to
+`~/Documents/feega-videos/demos/raw/<slug>-<ts>/`, not a temp dir.
