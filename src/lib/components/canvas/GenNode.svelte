@@ -15,7 +15,7 @@
   import { runStateOf, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
   import { shownIndex } from '$lib/canvas/gen-history';
   import { PROMPT_PLACEHOLDER, RUN_LABEL, hasGenBody } from '$lib/canvas/gen-tile-view';
-  import { loopCreditsOf, runLabelOf, runQuoteOf } from '$lib/canvas/run-quote';
+  import { loopCreditsOf, providerQuotesOf, runLabelOf, runQuoteOf } from '$lib/canvas/run-quote';
   import { effectiveModel } from '$lib/canvas/default-models';
   import type { RememberedVariants } from '$lib/canvas/variants';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
@@ -172,6 +172,9 @@
   const resolvedModel = $derived(effectiveModel(node.medium, node.model, choices));
   const quote = $derived(
     runQuoteOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens, remembered })
+  );
+  const providerQuotes = $derived(
+    providerQuotesOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens, remembered })
   );
   const choice = $derived(quote.choice);
   const upstream = $derived({ hasUpstreamText });
@@ -399,9 +402,22 @@
           Loop ×{loopCombinationCount}{#if loopCredits !== null} · <CreditAmount amount={loopCredits} approx />{:else if quote.variable} · variable cost{/if}
         </button>
       {/if}
-      <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
-        {runLabelOf(quote)}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
-      </button>
+      <span class="gen-run">
+        <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
+          {runLabelOf(quote)}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
+        </button>
+        {#if providerQuotes.length && !variableTextInput}
+          <ul class="gen-providers" data-testid="provider-quotes">
+            {#each providerQuotes as providerQuote (providerQuote.provider)}
+              <li class:is-selected={providerQuote.selected} class:is-cheapest={providerQuote.cheapest}>
+                <span>{providerQuote.label}</span>
+                {#if providerQuote.credits !== null}<CreditAmount amount={providerQuote.credits} approx />{/if}
+                {#if providerQuote.cheapest}<em>cheapest</em>{/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </span>
     </div>
   </footer>
 </div>
@@ -777,6 +793,42 @@
     cursor: default;
   }
   /* Secondario a "Genera": stesso posto, meno peso — il loop è l'azione meno frequente delle due. */
+  .gen-run {
+    position: relative;
+    display: inline-flex;
+  }
+  .gen-providers {
+    display: none;
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    margin: 0 0 6px;
+    padding: 6px;
+    list-style: none;
+    min-width: 220px;
+    background: var(--paper, #fff);
+    border: 1px solid var(--line-2, #d2d2d7);
+    font-size: 12px;
+    z-index: 5;
+  }
+  .gen-run:hover .gen-providers,
+  .gen-run:focus-within .gen-providers {
+    display: block;
+  }
+  .gen-providers li {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 4px;
+  }
+  .gen-providers li.is-selected {
+    font-weight: 600;
+  }
+  .gen-providers li.is-cheapest em {
+    font-style: normal;
+    color: var(--accent, #c485fe);
+  }
   .gen-loop {
     background: var(--paper, #fff);
     color: var(--ink, #1d1d1f);
