@@ -343,9 +343,28 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
     return a.slots.length === b.slots.length && a.slots.every((s, i) => s.color === b.slots[i].color);
   }
 
+  const FILTER_IDENTITY: Record<string, string> = { blur: '0px', brightness: '1', contrast: '1', grayscale: '0', 'hue-rotate': '0deg', invert: '0', opacity: '1', saturate: '1', sepia: '0' };
+  const FILTER_FN = /([a-z-]+)\(([^)]*)\)/g;
+  const UNFILTERED = new Set(['none', '']);
+
+  function identityOf(list: string): string | null {
+    const fns = [...list.matchAll(FILTER_FN)].map(([, fn]) => fn);
+    if (!fns.length || fns.some((fn) => !(fn in FILTER_IDENTITY))) {
+      return null;
+    }
+    return fns.map((fn) => `${fn}(${FILTER_IDENTITY[fn]})`).join(' ');
+  }
+
+  function filledIn(v: unknown, other: unknown): unknown {
+    if (typeof v !== 'string' || !UNFILTERED.has(v.trim()) || typeof other !== 'string') {
+      return v;
+    }
+    return identityOf(other) ?? v;
+  }
+
   function interpolate(a: unknown, b: unknown, p: number): unknown {
-    const from = valueOf(a);
-    const to = valueOf(b);
+    const from = valueOf(filledIn(a, b));
+    const to = valueOf(filledIn(b, a));
     if (from.kind === 'number' && to.kind === 'number') {
       const n = round(from.n + (to.n - from.n) * p);
       return typeof b === 'number' ? n : `${n}${to.unit || from.unit}`;

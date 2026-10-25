@@ -62,10 +62,14 @@ export function guideLines(guide: LayoutGuide, frame: Size): GuideLine[] {
   return [...every(guide.size, frame.width).map((at) => ({ axis: 'x' as const, at })), ...every(guide.size, frame.height).map((at) => ({ axis: 'y' as const, at }))];
 }
 
+const lineBounds = (line: GuideLine, frame: Size): Bounds =>
+  line.axis === 'x' ? { left: line.at, top: 0, right: line.at, bottom: frame.height } : { left: 0, top: line.at, right: frame.width, bottom: line.at };
+
 export function guideSnapBounds(doc: Pick<MotionDoc, 'layoutGuides' | 'width' | 'height'>): Bounds[] {
-  return (doc.layoutGuides ?? [])
-    .flatMap((g) => guideBands(g, doc))
-    .map((b) => ({ left: b.left, top: b.top, right: b.left + b.width, bottom: b.top + b.height }));
+  const guides = doc.layoutGuides ?? [];
+  const bands = guides.flatMap((g) => guideBands(g, doc)).map((b) => ({ left: b.left, top: b.top, right: b.left + b.width, bottom: b.top + b.height }));
+  const lines = guides.flatMap((g) => guideLines(g, doc)).map((l) => lineBounds(l, doc));
+  return [...bands, ...lines];
 }
 
 export function setLayoutGuides(doc: MotionDoc, guides: readonly LayoutGuide[]): OpResult {

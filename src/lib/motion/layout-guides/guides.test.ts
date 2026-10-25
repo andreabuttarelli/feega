@@ -30,6 +30,16 @@ describe('layout guides', () => {
     expect(guideLines(guide, FRAME).filter((l) => l.axis === 'y')).toHaveLength(4);
   });
 
+  it('the lines of a grid are snap targets', () => {
+    const doc = setLayoutGuides({ ...newMotionDoc(MotionFormat.Landscape), width: 300, height: 200 }, [{ ...newGuide(GuideKind.Grid), size: 100 }]);
+
+    expect(doc.ok && guideSnapBounds(doc.doc)).toEqual([
+      { left: 100, top: 0, right: 100, bottom: 200 },
+      { left: 200, top: 0, right: 200, bottom: 200 },
+      { left: 0, top: 100, right: 300, bottom: 100 }
+    ]);
+  });
+
   it('the band edges are snap targets', () => {
     const doc = setLayoutGuides({ ...newMotionDoc(MotionFormat.Landscape), width: 1000, height: 500 }, [{ ...newGuide(GuideKind.Columns), count: 2, gutter: 0, margin: 0 }]);
 

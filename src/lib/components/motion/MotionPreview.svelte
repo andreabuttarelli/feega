@@ -128,9 +128,22 @@
     }
   }
 
+  let crisp = () => {};
+  const sharpen = () => (crisp = shown ? crispFor(engineOf(navigator.userAgent), shown) : () => {});
+
+  async function atFullSize<T>(work: () => Promise<T>): Promise<T> {
+    crisp();
+    crisp = () => {};
+    try {
+      return await work();
+    } finally {
+      crisp();
+      sharpen();
+    }
+  }
+
   onMount(() => {
     let disposed = false;
-    let crisp = () => {};
     void import('@hyperframes/player').then(() => {
       if (disposed || !host) {
         return;
@@ -148,7 +161,7 @@
       el.addEventListener('ready', () => {
         crisp();
         shown = el.iframeElement;
-        crisp = shown ? crispFor(engineOf(navigator.userAgent), shown) : () => {};
+        sharpen();
         ready = true;
         const waiting = readyWaiters;
         readyWaiters = [];
@@ -396,7 +409,7 @@
     }
     exportedOn = RenderEngine.Html;
     const request = { format: FrameFormat.Bitmap, settle, layering: exportLayering(), ...size };
-    return borrowed(source, async () => {
+    return borrowed(source, () => atFullSize(async () => {
       const extra = host ? await Promise.all(Array.from({ length: lanesWithin(lanes(), webglPerLane(source)) - 1 }, () => mountCapturePlayer(host!, source))) : [];
       const sharedWait = CAPTURE_TIMEOUT_MS * (extra.length + 1);
       try {
@@ -405,7 +418,7 @@
       } finally {
         extra.forEach((p) => p.dispose());
       }
-    });
+    }));
   }
 
   $effect(() => {
