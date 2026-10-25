@@ -180,7 +180,7 @@ export async function importCanvasLink(db: Db, input: { orgId: string; projectId
 
 export type CanvasPlace = { canvasId: string; x: number; y: number };
 
-export async function importCanvasBytes(db: Db, input: { orgId: string; projectId: string; fileName: string; mime: string; bytes: Uint8Array; place?: CanvasPlace }): Promise<{ asset: Awaited<ReturnType<typeof registerUploadedAsset>>['asset']; node?: Awaited<ReturnType<typeof registerCanvasUpload>>['node'] }> {
+export async function importCanvasBytes(db: Db, input: { orgId: string; projectId: string; fileName: string; mime: string; bytes: Uint8Array; place?: CanvasPlace }) {
   const fileName = input.fileName.replace(UNSAFE_NAME, '_');
   const verdict = verdictForUpload(input.mime, fileName, input.bytes.length);
   if (!verdict.ok || !LINK_MEDIA.has(verdict.kind)) {
@@ -196,10 +196,9 @@ export async function importCanvasBytes(db: Db, input: { orgId: string; projectI
   const registered = { orgId: input.orgId, projectId: input.projectId, path, fileName, mimeType: input.mime, bytes: input.bytes.length };
   if (input.place) {
     const { asset, node } = await registerCanvasUpload(db, { ...registered, ...input.place });
-    return { asset, node };
+    return { asset, node, kind: verdict.kind };
   }
-  const { asset } = await registerUploadedAsset(db, registered);
-  return { asset };
+  return registerUploadedAsset(db, registered);
 }
 
 export async function discardCanvasUpload(db: Db, input: { path: string }): Promise<void> {
