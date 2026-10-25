@@ -421,7 +421,6 @@ touches the database; it exits 1 if it finds something.
 
 - Let the reader of the code breathe. Add empty lines between logical blocks of code.
 
-- Add a small, to the point, comment to explain *what* the block does and *why*. Use examples when possible. Propose ASCII drawings to explain complete systems.
 
 - Treat member visibility changes as a breaking design shift. Keep all fields and functions private unless external access is strictly required by the design. Prompt the user for explicit approval before changing any access modifier from private to internal or public.
 
