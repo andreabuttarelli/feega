@@ -21,7 +21,7 @@ const doc = {
 };
 
 async function shot(page: Page, name: string) {
-  await page.screenshot({ path: `${SHOT_PREFIX.replace(/shot$/, 'r7')}-${name}.png` });
+  await page.screenshot({ path: `${SHOT_PREFIX.replace(/shot$/, 'grid')}-${name}.png` });
 }
 
 test.describe('layout guides on the canvas @real', () => {
@@ -53,5 +53,13 @@ test.describe('layout guides on the canvas @real', () => {
     await first.getByLabel('Count').dispatchEvent('change');
     await page.waitForTimeout(SETTLE_MS);
     await shot(page, 'guides-center');
+
+    await page.getByRole('button', { name: 'Add layout grid' }).click();
+    await expect(page.getByTestId('layout-guide')).toHaveCount(3);
+    const added = page.getByTestId('layout-guide').nth(2);
+    await added.getByLabel('Grid kind').selectOption('grid');
+    await expect(added.getByLabel('Cell size')).toBeVisible();
+    await page.waitForTimeout(SETTLE_MS);
+    await shot(page, 'guides-added-grid');
   });
 });
