@@ -3,6 +3,7 @@
   import Sparkles from '@lucide/svelte/icons/sparkles';
   import Maximize2 from '@lucide/svelte/icons/maximize-2';
   import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
+  import Square from '@lucide/svelte/icons/square';
   import { isFrameDialogAction } from '$lib/canvas/frame-dialogs';
   import { actionsIn, enabledFor, shownFor, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
@@ -51,7 +52,8 @@
     onpropertychange,
     onsectionchange,
     oncolourchange,
-    onview
+    onview,
+    onstop
   }: {
     box: { x: number; y: number; width: number } | null;
     zoom?: number;
@@ -72,9 +74,12 @@
     onsectionchange?: (id: string, patch: { title?: string; fill?: string }) => void;
     oncolourchange?: (tag: ColourTag | null) => void;
     onview?: () => void;
+    onstop?: () => void;
   } = $props();
 
   const viewable = $derived(count === 1 && !!nodeSummaries[0] && nodeSummaries[0].type in OUTPUT_KIND_OF && typeof nodeSummaries[0].data.refId === 'string');
+
+  const running = $derived(count === 1 && nodeSummaries[0]?.data.running === true);
 
   const sharedColour = $derived.by(() => {
     const tags = new Set(nodeSummaries.map((node) => colourOf(node.data)));
@@ -179,6 +184,15 @@
         <div class="group" role="group" aria-label="Section">
           <input class="section-title" aria-label="Section title" value={sectionTitle} onchange={(e) => onsectionchange?.(section.id, { title: e.currentTarget.value.trim() || 'Section' })} onkeydown={(e) => e.stopPropagation()} />
           <input class="section-fill" type="color" aria-label="Section fill" value={sectionFill} onchange={(e) => onsectionchange?.(section.id, { fill: e.currentTarget.value })} />
+        </div>
+      {/if}
+
+      {#if running}
+        <div class="group" role="group" aria-label="Stop">
+          <Button size="sm" variant="secondary" class="h-11 md:h-8" data-testid="stop-run" onclick={() => onstop?.()}>
+            <Square strokeWidth={1.8} />
+            Stop
+          </Button>
         </div>
       {/if}
 

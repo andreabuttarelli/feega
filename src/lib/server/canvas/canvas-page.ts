@@ -44,7 +44,7 @@ const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number
   voice_not_yours: 403,
   cloning_not_in_this_project: 403
 };
-import { runsOf } from '$lib/server/canvas/generate';
+import { cancelNodeRun, runsOf } from '$lib/server/canvas/generate';
 import { planLoop, enqueueLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { cancelBatch } from '$lib/server/canvas/cancel-batch';
 import { runGeneration } from '$lib/server/canvas/variants';
@@ -702,6 +702,18 @@ export const actions: Actions<CanvasParams> = {
     }
 
     return await cancelBatch(scope.db, { orgId: scope.orgId, nodeId });
+  },
+
+  cancel_run: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+
+    const nodeId = String(fd.get('node_id') ?? '');
+    if (!nodeId) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    return await cancelNodeRun(scope.db, { orgId: scope.orgId, nodeId });
   },
 
   /**

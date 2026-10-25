@@ -1361,6 +1361,26 @@ function isQueuedLoopTicket(run: { params: Record<string, unknown> }): boolean {
   return Boolean(loop && typeof loop === 'object' && (loop as { phase?: unknown }).phase === 'queued');
 }
 
+export const RUN_CANCELLED = 'cancelled';
+
+export async function cancelNodeRun(db: Db, scope: { orgId: string; nodeId: string; actor?: Actor }): Promise<{ cancelled: number }> {
+  const mine = (await listNodeRuns(db, scope)).filter((run) => run.status === 'running' && !isQueuedLoopTicket(run));
+  const node = mine.length ? await findNode(db, scope).catch(() => null) : null;
+
+  let cancelled = 0;
+  for (const run of mine) {
+    const claimed = await claimRun(db, { orgId: run.orgId, runId: run.id });
+    if (!claimed) continue;
+
+    await failRun(db, { orgId: run.orgId, runId: run.id, error: RUN_CANCELLED });
+    await ON_EXPIRE[jobKindOf(run, node?.type ?? null)]?.(run);
+    await showRunState(db, scope, { running: false, runId: run.id, error: null });
+    cancelled += 1;
+  }
+
+  return { cancelled };
+}
+
 const EXPIRE_SWEEP_LIMIT = 2000;
 
 /**
