@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '$lib/server/db/connect';
 import { env as publicEnv } from '$env/dynamic/public';
 import { json } from '@sveltejs/kit';
 import type { Cookies } from '@sveltejs/kit';

@@ -1,5 +1,4 @@
-import { createServerClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, createServerClient } from '$lib/server/db/connect';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env } from '$env/dynamic/private';
 import { json } from '@sveltejs/kit';
