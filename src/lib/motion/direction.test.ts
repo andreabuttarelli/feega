@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { Side, addClip, removeClips, setTransition } from './timeline';
 import { precompose } from './precomp';
-import { Quality, SEVERITY, Severity, blocking, docProblems, frameProblems } from './direction';
+import { writeComponent } from './custom/ops';
+import { Quality, SEVERITY, Severity, blocking, blockingFor, docProblems, frameProblems, type QualityProblem } from './direction';
 import { Forbidden, STYLES, Script } from './style';
 import supasitoV1 from './fixtures/supasito-v1.json';
 import { Ease, TransitionKind } from './design';
@@ -73,6 +74,17 @@ describe('the quality gate reads the direction of the video', () => {
     const twice = place(place(newMotionDoc(MotionFormat.Landscape), 'scene-hero-title', 0), 'scene-hero-title', 90);
 
     expect(kinds(fitted(varied))).toEqual([]);
+    expect(kinds(twice)).toContain(Quality.RepeatedLayout);
+  });
+
+  it('two different code components in a row are two layouts, the same one twice repeats', () => {
+    const custom = (doc: MotionDoc, id: string, name: string, at: number) => must(addClip(doc, { component: 'Custom', from: at, durationInFrames: 90, props: { name } }, id));
+    const piece = (doc: MotionDoc, name: string) => must(writeComponent(doc, name, { source: { html: '<div></div>', css: '', js: '' }, propsSchema: { type: 'object', properties: {} } }));
+    const empty = piece(piece(newMotionDoc(MotionFormat.Landscape), 'HeroTitle'), 'CanvasMoment');
+    const varied = custom(custom(empty, 'a', 'HeroTitle', 0), 'b', 'CanvasMoment', 90);
+    const twice = custom(custom(empty, 'a', 'HeroTitle', 0), 'b', 'HeroTitle', 90);
+
+    expect(kinds(varied)).not.toContain(Quality.RepeatedLayout);
     expect(kinds(twice)).toContain(Quality.RepeatedLayout);
   });
 
@@ -529,5 +541,21 @@ describe('transitions that cannot play', () => {
 
   it('a transition at a real cut plays', () => {
     expect(dead(pair(90))).toEqual([]);
+  });
+});
+
+describe('what blocks scales with the length of the video', () => {
+  const story: QualityProblem[] = [
+    { kind: Quality.NoScript, detail: 'no script' },
+    { kind: Quality.Silent, detail: 'no music' },
+    { kind: Quality.BlankFrame, detail: 'blank' }
+  ];
+
+  it('under 15 s, script and music are advice; a blank frame still blocks', () => {
+    expect(blockingFor(story, 9).map((p) => p.detail)).toEqual(['blank']);
+  });
+
+  it('a film of 15 s or more is held to the whole list', () => {
+    expect(blockingFor(story, 20)).toHaveLength(3);
   });
 });

@@ -150,6 +150,12 @@ export const severityOf = (p: QualityProblem) => SEVERITY[p.effect ?? p.kind];
 
 export const blocking = (problems: readonly QualityProblem[]) => problems.filter((p) => severityOf(p) === Severity.Blocking);
 
+export const SHORT_FILM_S = 15;
+
+const FILM_SCALE: ReadonlySet<Check> = new Set([Quality.Silent, Quality.NoScript, Quality.ScriptDrift, Quality.OneScreen, Quality.LittleUi, Quality.NoProductUi, Forbidden.MissingStoryBeat]);
+
+export const blockingFor = (problems: readonly QualityProblem[], seconds: number) => blocking(problems).filter((p) => seconds >= SHORT_FILM_S || !FILM_SCALE.has(p.effect ?? p.kind));
+
 export type FrameStat = { time: number; luma: number; lumaStd: number; whiteShare: number };
 
 const SCENE_JOIN_S = 0.5;
@@ -180,7 +186,9 @@ const side = (x: number) => (x < LEFT ? 'L' : x > RIGHT ? 'R' : 'C');
 
 const templateOf = (doc: MotionDoc, clip: Clip) => doc.comps[String(clip.props.comp)]?.template?.id;
 
-const role = (doc: MotionDoc, clip: Clip) => (MEDIA.has(clip.component) ? 'media' : (templateOf(doc, clip) ?? clip.component));
+const componentRole = (clip: Clip) => (clip.component === 'Custom' ? `Custom:${String(clip.props.name ?? '')}` : clip.component);
+
+const role = (doc: MotionDoc, clip: Clip) => (MEDIA.has(clip.component) ? 'media' : (templateOf(doc, clip) ?? componentRole(clip)));
 
 function scenes(doc: MotionDoc): Clip[][] {
   const join = SCENE_JOIN_S * doc.fps;
