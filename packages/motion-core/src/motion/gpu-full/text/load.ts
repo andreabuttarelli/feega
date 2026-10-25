@@ -1,11 +1,11 @@
-import { preparedDoc } from '@feega/motion-core/motion/hyperframes/compose';
-import type { BrandTokens } from '@feega/motion-core/motion/brand';
-import { googleFontsUrl, uploadFaceCss, usedFaces } from '@feega/motion-core/motion/fonts/model';
-import type { MotionDoc } from '@feega/motion-core/motion/doc';
-import type { FaceBook } from '@feega/motion-core/motion/gpu-full/text/face';
-import { SYMBOL_FALLBACKS, faceBook, faceRules, type FaceRule, type Source } from '@feega/motion-core/motion/gpu-full/text/fonts';
+import { preparedDoc } from '../../hyperframes/compose';
+import type { BrandTokens } from '../../brand';
+import { googleFontsUrl, uploadFaceCss, usedFaces } from '../../fonts/model';
+import type { MotionDoc } from '../../doc';
+import type { FaceBook } from './face';
+import { SYMBOL_FALLBACKS, faceBook, faceRules, type FaceRule, type Source } from './fonts';
 import { fontkitSource } from './fontkit-face';
-import { TEXT_COMPONENTS } from '@feega/motion-core/motion/gpu-full/text/painter';
+import { TEXT_COMPONENTS } from './painter';
 
 export const BUILTIN_FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
 

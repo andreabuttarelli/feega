@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Use } from '$lib/motion/gpu-full/core-web';
+import type { Use } from '@feega/motion-core/motion/gpu-full/core-web';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { SentOverlay, SentUses } from './use-diff';
 

@@ -9,11 +9,11 @@ import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
-import { createMedia } from '$lib/motion/gpu-full/media';
-import { faceEngineOf, loadFontsWith } from '$lib/motion/gpu-full/text/engines';
-import { mountCustomReads } from '$lib/motion/gpu-full/dom/custom';
+import { createMedia } from '@feega/motion-core/motion/gpu-full/media';
+import { faceEngineOf, loadFontsWith } from '@feega/motion-core/motion/gpu-full/text/engines';
+import { mountCustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
 import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
-import { BACKENDS, FullBackend } from '$lib/motion/gpu-full/backends';
+import { BACKENDS, FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
 import { renderOnCore } from '$lib/motion/gpu-full/core-export';
 import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
 

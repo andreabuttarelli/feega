@@ -1,4 +1,4 @@
-import { Op, type Command } from '@feega/motion-core/motion/gpu-full/text/face';
+import { Op, type Command } from './face';
 
 export type TruePoint = { x: number; y: number; onCurve: boolean; endContour: boolean };
 

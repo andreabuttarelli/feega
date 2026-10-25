@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, ItemKind, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
-import { fontLoader, type Reader } from '$lib/motion/gpu-full/text/load';
+import { fontLoader, type Reader } from '@feega/motion-core/motion/gpu-full/text/load';
 import { smoothingOf, TextOutput } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { VIDEO_ASSET, placeholder, placeholderVideo } from './gpu-parity/assets';
 

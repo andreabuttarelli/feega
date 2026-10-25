@@ -1,5 +1,5 @@
 import { domProbeScript } from './probe';
-import { DOM_READ_REPLY, DOM_READ_REQUEST, type DomReadReply, type DomReadRequest } from '@feega/motion-core/motion/gpu-full/dom/tree';
+import { DOM_READ_REPLY, DOM_READ_REQUEST, type DomReadReply, type DomReadRequest } from './tree';
 
 export type Compose = (only?: ReadonlySet<string>) => string;
 

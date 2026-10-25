@@ -1,16 +1,16 @@
 <script lang="ts">
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
-  import { loadFonts } from '$lib/motion/gpu-full/text/load';
-  import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
-  import { createMedia, Readiness, VideoPreload } from '$lib/motion/gpu-full/media';
+  import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
+  import { createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+  import { createMedia, Readiness, VideoPreload } from '@feega/motion-core/motion/gpu-full/media';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
-  import { Outcome } from '$lib/motion/gpu-full/core-outcome';
+  import { Outcome } from '@feega/motion-core/motion/gpu-full/core-outcome';
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
   import { ItemKind } from '@feega/motion-core/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
-  import { spliceOf } from '$lib/canvas/core/group-diff';
+  import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { cached, uncached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
@@ -22,8 +22,8 @@
   import { readPool } from '$lib/canvas/core/read-pool';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
-  import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
-  import type { Pictures } from '$lib/motion/gpu-full/raster';
+  import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
+  import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
@@ -65,7 +65,7 @@
     if (!host || !readClips(source.doc).read.length) {
       return null;
     }
-    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('$lib/motion/gpu-full/dom/custom'), import('@feega/motion-core/motion/hyperframes/compose'), import('@feega/motion-core/motion/interactive/settings')]);
+    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('@feega/motion-core/motion/gpu-full/dom/custom'), import('@feega/motion-core/motion/hyperframes/compose'), import('@feega/motion-core/motion/interactive/settings')]);
     await whenQuiet(() => gesture.active() || edited.size > 0);
     return domRead(fromView(f), async (signal) => {
       const mounting = mountCustomReads(host, (only) => composeHtml({ doc: source.doc, tokens: source.tokens, assets: source.assets, liveness: Liveness.Baked, target: Target.Screen, only }), prepared);

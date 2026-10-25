@@ -1,4 +1,4 @@
-import { loadFonts } from '$lib/motion/gpu-full/text/load';
+import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
 import { buildFrame, type BuildAnswer, type BuildAsk, type FrameDoc } from './frame-build';
 
 self.onmessage = async (e: MessageEvent<BuildAsk>) => {

@@ -1,8 +1,8 @@
-import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item, type LayerItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item, type LayerItem } from './display-list';
 import type { Picture, Pictures, Raster } from './raster';
-import type { Affine } from '@feega/motion-core/motion/affine';
+import type { Affine } from '../affine';
 import type { Outcome } from './core-outcome';
-import type { Splice } from '$lib/canvas/core/group-diff';
+import type { Splice } from '../../canvas/core/group-diff';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
 

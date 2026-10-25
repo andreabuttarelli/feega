@@ -2,7 +2,7 @@ import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
-import { fontLoader } from '$lib/motion/gpu-full/text/load';
+import { fontLoader } from '@feega/motion-core/motion/gpu-full/text/load';
 import { stillSeconds } from '@feega/motion-core/motion/still';
 import { imageSources } from '$lib/motion/export-svg';
 

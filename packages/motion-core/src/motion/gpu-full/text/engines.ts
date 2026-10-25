@@ -1,6 +1,6 @@
-import type { FaceBook } from '@feega/motion-core/motion/gpu-full/text/face';
-import type { MotionDoc } from '@feega/motion-core/motion/doc';
-import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { FaceBook } from './face';
+import type { MotionDoc } from '../../doc';
+import type { BrandTokens } from '../../brand';
 import { fontkitEngine, fontLoader } from './load';
 import { rustEngine } from './text-core-web';
 

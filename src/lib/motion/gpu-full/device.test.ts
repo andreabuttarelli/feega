@@ -6,7 +6,7 @@ import { addClip, removeClips, setKeyframes, type OpResult } from '@feega/motion
 import { Ease } from '@feega/motion-core/motion/design';
 import { drawFrame, ItemKind, prepare, SCREEN_GAP, Unsupported } from '@feega/motion-core/motion/gpu-full/display-list';
 import { DrawnKind, type DomRead } from '@feega/motion-core/motion/gpu-full/dom/read';
-import { readClips } from './dom/custom';
+import { readClips } from '@feega/motion-core/motion/gpu-full/dom/custom';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

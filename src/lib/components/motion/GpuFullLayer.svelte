@@ -4,12 +4,12 @@
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { drawFrame, prepare, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { NO_TYPESET, smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
-  import { FACES_PARAM, faceEngineOf, loadFontsWith } from '$lib/motion/gpu-full/text/engines';
-  import type { Raster } from '$lib/motion/gpu-full/raster';
-  import { BACKENDS, type FullBackend } from '$lib/motion/gpu-full/backends';
-  import { createMedia } from '$lib/motion/gpu-full/media';
-  import { mountCustomReads, type CustomReads } from '$lib/motion/gpu-full/dom/custom';
-  import type { Compose } from '$lib/motion/gpu-full/dom/reader';
+  import { FACES_PARAM, faceEngineOf, loadFontsWith } from '@feega/motion-core/motion/gpu-full/text/engines';
+  import type { Raster } from '@feega/motion-core/motion/gpu-full/raster';
+  import { BACKENDS, type FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
+  import { createMedia } from '@feega/motion-core/motion/gpu-full/media';
+  import { mountCustomReads, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
+  import type { Compose } from '@feega/motion-core/motion/gpu-full/dom/reader';
 
   let { backend, doc, tokens, assets, compose, time, onfallback }: { backend: FullBackend; doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; compose: Compose; time: () => number; onfallback: (reason: unknown) => void } = $props();
 

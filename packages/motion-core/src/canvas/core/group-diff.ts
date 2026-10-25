@@ -1,4 +1,4 @@
-import type { DisplayList, Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import type { DisplayList, Item } from '../../motion/gpu-full/display-list';
 
 export type Splice = { head: number; tail: number; items: Item[] };
 

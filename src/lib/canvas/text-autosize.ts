@@ -1,7 +1,7 @@
 import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { prepare, textBoxesAt, type TextBox } from '@feega/motion-core/motion/gpu-full/display-list';
-import { loadFonts } from '$lib/motion/gpu-full/text/load';
+import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { fitTexts, freeTextFit, hostFit } from '$lib/motion/text-fit';
 import { FrameKind } from './motion-node';

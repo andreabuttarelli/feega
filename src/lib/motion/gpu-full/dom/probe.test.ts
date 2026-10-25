@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { domProbe } from './probe';
+import { domProbe } from '@feega/motion-core/motion/gpu-full/dom/probe';
 import { CUSTOM_ROOT_PREFIX, DOM_READ_REPLY, DOM_READ_REQUEST, NO_INDEX, READ_ATTRS, READ_STYLES, TEXT_PAD } from '@feega/motion-core/motion/gpu-full/dom/tree';
 
 const CLIP = 'poster';

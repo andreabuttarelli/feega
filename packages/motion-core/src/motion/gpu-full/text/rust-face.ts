@@ -1,5 +1,5 @@
-import { Ligatures, Op, type Command, type Face, type Shaped } from '@feega/motion-core/motion/gpu-full/text/face';
-import type { Axes, Source } from '@feega/motion-core/motion/gpu-full/text/fonts';
+import { Ligatures, Op, type Command, type Face, type Shaped } from './face';
+import type { Axes, Source } from './fonts';
 
 export type TextCore = {
   addFont: (family: string, bytes: Uint8Array) => number;

@@ -1,4 +1,4 @@
-import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item } from './display-list';
 import type { Picture, Pictures } from './raster';
 
 const SEEK_SLACK_S = 0.001;
