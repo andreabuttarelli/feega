@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
+import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { RestoreOutcome, listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from './canvas-versions';
 
 const scope = { orgId: 'org', canvasId: 'c' };
@@ -31,6 +32,16 @@ describe('canvas versions', () => {
     expect(updates.some((u) => (u.payload as { x?: number }).x === 10)).toBe(true);
     expect(updates.some((u) => (u.payload as { deleted_at?: string }).deleted_at && u.filters.some(([k, v]) => k === 'id' && v === 'b'))).toBe(true);
     expect(fake.calls.filter((c) => c.table === 'canvas_versions' && c.op === 'insert').map((c) => (c.payload as { name: string }).name)).toEqual(['Before restoring Start']);
+  });
+
+  it('saves the document of free elements as well as frames', async () => {
+    const doc = (nodeId: string) => ({ org_id: 'org', node_id: nodeId, version: 1, doc: newMotionDoc(MotionFormat.Square), summary: null, actor_kind: 'user' });
+    const fake = fakeDb({ nodes: [{ ...row('m', 0), type: 'motion', data: { docHeadRevision: 1 } }, { ...row('e', 0), type: 'element', data: { docHeadRevision: 1 } }], nodes_connections: [], motion_revisions: [doc('m'), doc('e')], canvas_versions: [] }, { filter: true, store: true });
+
+    await saveCanvasVersion(fake.db, { ...scope, name: 'v', actor: user });
+
+    const insert = fake.calls.find((c) => c.table === 'canvas_versions' && c.op === 'insert');
+    expect(Object.keys((insert?.payload as { snapshot: { heads: object } }).snapshot.heads).sort()).toEqual(['e', 'm']);
   });
 
   it('a version that is not there is refused', async () => {
