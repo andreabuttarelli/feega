@@ -186,6 +186,7 @@ and its session. Free.
 |-----|-----|
 | `edit` | (none: `feega canvas`, `feega motion tool` and `feega motion op` reach the same ops) |
 | `view` | (none: `feega motion frames` draws a frame) |
+| `canvas_file` | `feega canvas save` / `feega canvas import` (local server only) |
 
 `edit({ org, op, target?, element?, input?, version?, project_id?, ops? })` runs one op or, with op
 `batch`, up to 500 `ops` mixing canvas ops, frame tools and frame editor actions. Op `describe`
@@ -199,6 +200,7 @@ lists them all and gives strict schemas. `view({ org, op, input })` reads: `canv
 | `canvas_tool` | `feega canvas <projectId> <op> --input <json>` |
 | `canvas_tool` `request_upload` + `register_upload` | `feega canvas upload <projectId> <file> [--canvas <id>]` |
 | `canvas_tool` `list_models` | `feega canvas models <projectId> [--medium image]` |
+| `canvas_file` | save or open a canvas as a `.feega` file on the local disk |
 
 `canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
 through the same code (op `describe` `{}` lists them all, `{ op }` gives one input schema; `draw_frame` `{ canvasId, x, y, w, format?, still? }` makes a frame or still): `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`, `list_models` (models this project can run, with provider, credits, uncensored flag and `routes[]` — one row per provider that serves the model; pass its `provider` to `run_node`),
