@@ -1,4 +1,4 @@
-use gpu_core::compositor::{Compositor, Painter};
+use gpu_core::compositor::{render_tile, Compositor, Painter};
 use gpu_core::display_list::{parse, Item};
 use gpu_core::groups::{Library, Limits, Plan};
 use gpu_core::retained::{Camera, Lookup, Outcome, Quality};
@@ -204,4 +204,21 @@ fn a_cached_frame_that_is_still_building_when_the_zoom_settles_ends_up_drawn() {
     }
 
     assert!(drawn, "the finished cache was never drawn into the screen");
+}
+
+#[test]
+fn a_big_refine_is_rendered_in_tiles_of_at_most_1024_pixels() {
+    assert_eq!(render_tile(16_384), (1024, 1024));
+    assert_eq!(render_tile(512), (512, 512));
+
+    let (mut c, mut lib) = tall_scene();
+    c = Compositor::new(2400, 2000);
+    let patch = parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0] }], "drop": [] }"#).unwrap();
+    c.patch(patch, &lib);
+    let mut fake = Fake { tile: Some(render_tile(16_384)), ..Fake::default() };
+
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+
+    assert_eq!(fake.painted.len(), 9);
+    assert!(fake.painted.iter().all(|(r, _, _)| r.width() <= 1024.0 && r.height() <= 1024.0));
 }
