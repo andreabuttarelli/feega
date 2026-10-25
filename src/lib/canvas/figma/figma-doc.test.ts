@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { cardOverElements, elementsOnly } from '../../../../tests/fixtures/figma/elements';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { parseMotionDoc, type MotionClip } from '$lib/motion/doc';
+import { stillFrame } from '$lib/canvas/core/frame-source';
+import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
+import { boxBook } from '$lib/motion/gpu-full/text/test-face';
+import { Smoothing } from '$lib/motion/gpu-full/text/painter';
 import { figmaPlan, planOf } from './figma-doc';
 import { Destination } from './scene';
 
@@ -39,6 +44,13 @@ describe('a Figma paste of one frame', () => {
     expect(shapes.filter((s) => fill(s) === '#fd5e29' && s.props.fillRule === 'evenodd')).toHaveLength(3);
     expect(shapes.some((s) => fill(s) === '#000000')).toBe(true);
     expect(clips.some((c) => c.component === 'Precomp')).toBe(true);
+  });
+
+  it('draws its text on the canvas instead of resting before the text fades in', () => {
+    const doc = figmaPlan(clip, newId)!.items[0].doc;
+    const text = clipsOf(doc).find((c) => c.component === 'Text')!;
+    const list = drawFrame(prepare(doc, FEEGA_TOKENS, {}, { fonts: boxBook(), smoothing: Smoothing.Plain }), stillFrame(doc));
+    expect(list.items.some((i) => 'clip' in i && i.clip === text.id)).toBe(true);
   });
 
   it('returns null for html without Figma data', () => {

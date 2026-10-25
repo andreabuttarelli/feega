@@ -1,5 +1,5 @@
 import { FrameKind } from '$lib/canvas/motion-node';
-import { compOf, type MotionDoc } from '$lib/motion/doc';
+import { compOf, MotionFormat, type MotionDoc } from '$lib/motion/doc';
 import { blankElement, canvasReady, drawClip, drawnFrame, penClip } from '$lib/motion/draw-create';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { EffectKind } from '$lib/motion/effects/registry';
@@ -304,7 +304,7 @@ const wholeSize = (size: Size): Size => ({ width: Math.max(1, Math.round(size.wi
 
 function frameItem(layer: FrameLayer, centre: Unit, newId: NewId, skipped: Set<string>): PlanItem {
   const size = wholeSize(layer.box);
-  const blank = drawnFrame({ left: 0, top: 0, ...size });
+  const blank = drawnFrame({ left: 0, top: 0, ...size }, MotionFormat.Custom, 0);
   const images: FigmaImage[] = [];
   const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images };
   const built = layersOf(blank, layer, place);
