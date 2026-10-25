@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Boxes } from '$lib/motion/custom/reflow';
   import { Background } from '$lib/motion/doc';
   import { onMount, type Snippet } from 'svelte';
   import { FPS } from '$lib/motion/design';
@@ -28,7 +29,7 @@
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
-  export type CapturedFrame = { time: number; data: string; layout: string; errors: ClipError[] };
+  export type CapturedFrame = { time: number; data: string; layout: string; boxes?: Boxes; errors: ClipError[] };
   export type FrameSize = { width: number; height: number };
 
   const CAPTURE_WIDTH = 640;
@@ -256,13 +257,13 @@
     if (!host) {
       throw new Error('the preview is still loading');
     }
-    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
+    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY, boxes: true };
     const aside = await mountCapturePlayer(host, source);
     try {
       const frames: CapturedFrame[] = [];
       for (const time of times) {
         const reply = await aside.shoot(time, request);
-        frames.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', errors: reply.errors ?? [] });
+        frames.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', boxes: reply.boxes, errors: reply.errors ?? [] });
       }
       return frames;
     } finally {

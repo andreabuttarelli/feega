@@ -1,9 +1,10 @@
 import type { MotionDoc } from '../doc';
 import type { ClipError } from '../hyperframes/capture';
 import { CheckState, sourceHash, type ComponentCheck } from './component';
+import type { Boxes } from './reflow';
 import { checkDoc, seekPlan, verdictOf, type Luma, type Shot } from './determinism';
 
-export type CheckShot = { time: number; data: string; layout: string; errors: ClipError[] };
+export type CheckShot = { time: number; data: string; layout: string; boxes?: Boxes; errors: ClipError[] };
 
 export type CheckPorts = {
   compose: (doc: MotionDoc) => string;
@@ -21,7 +22,7 @@ export async function runCheck(doc: MotionDoc, name: string, ports: CheckPorts):
   let shots: Shot[];
   try {
     const captured = await ports.capture(times, ports.compose(alone));
-    shots = await Promise.all(captured.map(async (s) => ({ time: s.time, image: s.data, luma: await ports.luma(s.data), layout: s.layout, errors: s.errors })));
+    shots = await Promise.all(captured.map(async (s) => ({ time: s.time, image: s.data, luma: await ports.luma(s.data), layout: s.layout, boxes: s.boxes, errors: s.errors })));
   } catch (e) {
     return { check: { hash, state: CheckState.Failed, problems: [`the preview could not render it: ${e instanceof Error ? e.message : String(e)}`] }, offending: [] };
   }

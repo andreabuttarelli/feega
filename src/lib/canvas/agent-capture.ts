@@ -22,12 +22,12 @@ async function drawDoc(html: string, doc: MotionDoc, times: number[], width: num
   document.body.appendChild(host);
 
   const player = await mountCapturePlayer(host, html);
-  const request = { format: FrameFormat.Jpeg, width, height: Math.round((width * doc.height) / doc.width), quality: JPEG_QUALITY };
+  const request = { format: FrameFormat.Jpeg, width, height: Math.round((width * doc.height) / doc.width), quality: JPEG_QUALITY, boxes: true };
   try {
     const shots: CheckShot[] = [];
     for (const time of times) {
       const reply = await player.shoot(time, request);
-      shots.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', errors: reply.errors ?? [] });
+      shots.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', boxes: reply.boxes, errors: reply.errors ?? [] });
     }
     return shots;
   } finally {
