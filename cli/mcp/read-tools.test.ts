@@ -50,6 +50,7 @@ const RESTANO = [
   'preview_node_loop',
   'cancel_node_loop',
   'canvas_tool',
+  'canvas_file',
   'get_media',
   'ask_motion_agent',
   'get_motion_run',

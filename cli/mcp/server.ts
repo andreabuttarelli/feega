@@ -7,6 +7,7 @@ import { mcpLog } from './observability.ts';
 import { registerOrgDataTools } from './tools/org-data.ts';
 import { registerNodeTools } from './tools/nodes.ts';
 import { registerCanvasTools } from './tools/canvas.ts';
+import { registerCanvasFileTools } from './tools/canvas-file.ts';
 import { registerPromptTools } from './tools/prompts.ts';
 import { registerMotionTools } from './tools/motion.ts';
 import { registerGalleryTools } from './tools/gallery.ts';
@@ -139,6 +140,7 @@ function build(session: string): { server: McpServer; surface: ToolSurface } {
   registerSpendCapsTools(server);
   registerNodeTools(server);
   registerCanvasTools(server);
+  registerCanvasFileTools(server);
   registerPromptTools(server);
   registerMotionTools(server);
   registerGalleryTools(server);

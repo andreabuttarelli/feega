@@ -356,6 +356,7 @@ export async function createNode(
     type: string;
     x: number;
     y: number;
+    z?: number;
     displayName?: string | null;
     data?: Record<string, unknown>;
     width?: number;
@@ -377,6 +378,7 @@ export async function createNode(
     display_name: input.displayName ?? null,
     x: input.x,
     y: input.y,
+    ...(input.z === undefined ? {} : { z: input.z }),
     data: input.data ?? {},
     ...(input.width === undefined ? {} : { width: input.width }),
     ...(input.height === undefined ? {} : { height: input.height }),

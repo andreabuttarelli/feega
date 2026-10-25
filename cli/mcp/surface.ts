@@ -85,6 +85,7 @@ export const TOOL_FAMILY: Readonly<Record<string, ToolFamily>> = {
   get_app_account: ToolFamily.Team,
   forget_app_account: ToolFamily.Team,
   canvas_tool: ToolFamily.Legacy,
+  canvas_file: ToolFamily.Canvas,
   motion_tool: ToolFamily.Legacy,
   motion_editor_op: ToolFamily.Legacy
 };
