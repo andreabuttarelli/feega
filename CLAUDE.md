@@ -378,6 +378,10 @@ self-hosting does two more things in the **same PR**:
      `npx playwright test -c scripts/demo-record/playwright.config.ts <slug>`), whose camera zooms
      on **every click and every typing moment**.
 
+   The video is always **complete** (the whole flow, start to finish, never a fragment) and uses
+   **real, realistic, well-made example content** (a landing page UI, an app UI, a graphic design
+   piece), never placeholder shapes or lorem ipsum.
+
    Files land in `~/Documents/feega-videos/demos/`: the recorder writes
    `<YYYY-MM-DD>-<slug>-16x9.mp4` (raw takes in `demos/raw/<slug>-<ts>/`); the intro is saved
    next to it as `<YYYY-MM-DD>-<slug>-intro.mp4` and the joined cut as
