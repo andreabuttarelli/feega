@@ -7,6 +7,7 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, type OpResult } from '$lib/motion/timeline';
 import { boxBook } from '$lib/motion/gpu-full/text/test-face';
 import { Smoothing } from '$lib/motion/gpu-full/text/painter';
+import { sequenceScenes } from '$lib/motion/scenes';
 import { buildFrame, frameBuilder, type BuildAsk, type BuildWorker } from './frame-build';
 
 function must(r: OpResult): MotionDoc {
@@ -31,6 +32,11 @@ describe('building a frame away from the main thread', () => {
 
   it('leaves a doc that needs the DOM reader to the main thread', async () => {
     expect(await buildFrame(source(customDoc), Smoothing.Plain, fonts)).toBeNull();
+  });
+
+  it('leaves a combined video to the main thread, which resolves its scenes', async () => {
+    const combined = sequenceScenes(blank, [{ nodeId: '00000000-0000-4000-8000-000000000001', durationInFrames: 60 }]);
+    expect(await buildFrame(source(combined), Smoothing.Plain, fonts)).toBeNull();
   });
 
   it('the list survives the trip between threads unchanged', async () => {

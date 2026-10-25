@@ -58,7 +58,10 @@ function frame(x: Ctx): Item[] {
   const { c } = x;
   const stage = { x: 0, y: 0, w: c.w, h: Math.max(1, c.h - MOTION_NODE_BAR_H) };
   const media = c.face.live ? { url: c.face.live, video: true } : c.face.media;
-  return [...panel(x, false), solid(x.clip(CardPart.Stage), at(c, [rect(stage.x, stage.y, stage.w, stage.h)]), STAGE), ...(media ? [image(x, CardPart.Media, media, stage, Fit.Contain)] : [])];
+  if (!media) {
+    return panel(x, false);
+  }
+  return [...panel(x, false), solid(x.clip(CardPart.Stage), at(c, [rect(stage.x, stage.y, stage.w, stage.h)]), STAGE), image(x, CardPart.Media, media, stage, Fit.Contain)];
 }
 
 const markdownText = (md: string) => md.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/^#{1,6}\s+/gm, '').replace(/^\s*[-*]\s+/gm, '• ').replace(/[*_`>]/g, '');
