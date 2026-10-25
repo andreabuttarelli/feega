@@ -33,6 +33,27 @@ describe('run_node_generation names what it produced', () => {
     expect(view.media).toEqual([expect.objectContaining({ preview_url: image.previewUrl, full_url: image.fullUrl })]);
   });
 
+  test('variants carry every asset of the batch, in one lookup', async () => {
+    const outcome = {
+      kind: 'variants',
+      into: 'nodes',
+      nodeIds: ['n2', 'n3'],
+      runs: [
+        { kind: 'done', run: { id: 'r1' }, asset: { id: 'a1', type: 'image' } },
+        { kind: 'refused', error: 'render_failed' },
+        { kind: 'done', run: { id: 'r3' }, asset: { id: 'a3', type: 'image' } }
+      ]
+    };
+
+    const view = await generationView(outcome, async (ids) => {
+      expect(ids).toEqual(['a1', 'a3']);
+      return { items: [image, { ...image, assetId: 'a3' }], missing: [] } as Media;
+    });
+
+    expect(view).toMatchObject({ kind: 'variants', nodeIds: ['n2', 'n3'], asset_ids: ['a1', 'a3'] });
+    expect(view.media).toHaveLength(2);
+  });
+
   test('a queued video has no asset yet and asks for nothing', async () => {
     let asked = false;
     const view = await generationView({ kind: 'queued', run: { id: 'r1' } }, async () => {

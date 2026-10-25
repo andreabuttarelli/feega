@@ -5,13 +5,15 @@ import { audioInputPorts, audioOutputPorts, audioOperationOf, type AudioInputKin
 export enum InputRule {
   Model = 'model',
   List = 'list',
-  Audio = 'audio'
+  Audio = 'audio',
+  Technique = 'technique'
 }
 
 export enum OutputRule {
   Item = 'item',
   Media = 'media',
-  Audio = 'audio'
+  Audio = 'audio',
+  Technique = 'technique'
 }
 
 type Ports = {
@@ -26,6 +28,7 @@ export type PortContext = {
   mediaKind: () => 'image' | 'video';
   audioOperation?: () => AudioOperationId;
   audioInput?: () => AudioInputKind;
+  techniquePorts?: () => { inputs: ConnectorType[]; output: ConnectorType | null };
 };
 
 const NONE: readonly ConnectorType[] = [];
@@ -51,19 +54,25 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   motion: { inputs: NONE, output: 'motions' },
   element: { inputs: NONE, output: null },
   studio_batch: { inputs: NONE, output: 'images' },
-  section: { inputs: NONE, output: null }
+  section: { inputs: NONE, output: null },
+  technique: { inputs: InputRule.Technique, output: OutputRule.Technique }
 };
 
 const DEFAULT_AUDIO_OPERATION_CTX = (): AudioOperationId => audioOperationOf({});
 const DEFAULT_AUDIO_INPUT_CTX = (): AudioInputKind => 'text';
 
+const NO_TECHNIQUE_PORTS = { inputs: [] as ConnectorType[], output: null };
+const techniquePortsOf = (ctx: PortContext) => (ctx.techniquePorts ?? (() => NO_TECHNIQUE_PORTS))();
+
 const INPUTS: Record<InputRule, (ctx: PortContext) => ConnectorType[]> = {
+  [InputRule.Technique]: (ctx) => techniquePortsOf(ctx).inputs,
   [InputRule.Model]: (ctx) => ctx.modelPorts(),
   [InputRule.List]: (ctx) => ctx.listPorts(),
   [InputRule.Audio]: (ctx) => audioInputPorts((ctx.audioOperation ?? DEFAULT_AUDIO_OPERATION_CTX)())
 };
 
-const OUTPUTS: Record<OutputRule, (ctx: PortContext) => ConnectorType> = {
+const OUTPUTS: Record<OutputRule, (ctx: PortContext) => ConnectorType | null> = {
+  [OutputRule.Technique]: (ctx) => techniquePortsOf(ctx).output,
   [OutputRule.Item]: (ctx) => ctx.itemPort(),
   [OutputRule.Media]: (ctx) => (ctx.mediaKind() === 'video' ? 'videos' : 'images'),
   [OutputRule.Audio]: (ctx) =>

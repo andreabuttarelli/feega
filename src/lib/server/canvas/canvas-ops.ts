@@ -2,6 +2,7 @@ import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupE
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { wrapInSection } from './section';
 import { z } from 'zod';
+import { COLOUR_TAGS, withColour } from '$lib/canvas/node-colour';
 import type { Db } from '$lib/server/db/client';
 import {
   createConnection,
@@ -17,7 +18,10 @@ import {
   DataCheck,
   type PatchWrite
 } from '$lib/server/repos/canvas';
-import { runGenNode, runsOf, type RunOutcome } from '$lib/server/canvas/generate';
+import { runsOf } from '$lib/server/canvas/generate';
+import { runGeneration, type GenerationOutcome } from '$lib/server/canvas/variants';
+import { cancelBatch } from '$lib/server/canvas/cancel-batch';
+import { parseVariantsAsk } from '$lib/canvas/variants';
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
 import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-frame';
 import { imageToolAskSchema } from '$lib/image-tools';
@@ -26,7 +30,7 @@ import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
-import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
+import { enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
 import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles';
 import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-variables';
@@ -46,6 +50,9 @@ import { listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$li
 import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
 import { combineScenes, MAX_SCENES } from '$lib/server/motion/combine-scenes';
 import { insertTemplate } from '$lib/server/canvas/templates';
+import { runTechnique, saveFromSelection, TechniqueRun } from '$lib/server/canvas/techniques';
+import { detachInstance, openDefinition, placeInstance, runInstance } from '$lib/server/canvas/technique-instance';
+import { deleteTechnique, listTechniques, TechniqueOutcome } from '$lib/server/repos/techniques';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
@@ -114,7 +121,10 @@ export const AGENT_PATCH_ANSWERS: Record<PatchWrite['outcome'], (written: PatchW
 
 const BAD_MEDIUM = { error: 'bad_medium', message: `medium must be one of: ${GEN_MEDIUMS.join(', ')}.` };
 
-export function outcomeOf(out: RunOutcome): Record<string, unknown> {
+export function outcomeOf(out: GenerationOutcome): Record<string, unknown> {
+  if (out.kind === 'variants') {
+    return { outcome: 'variants', into: out.into, group: out.group, nodeIds: out.nodeIds, credits: out.credits, runs: out.runs.map(outcomeOf) };
+  }
   if (out.kind === 'done') {
     return { outcome: 'done', runId: out.run.id, assetId: out.asset.id, assetType: out.asset.type };
   }
@@ -246,6 +256,8 @@ const runNodeInput = z
     model: z.string().optional().describe('Omit to keep the model already on the node.'),
     params: z.record(z.string(), z.unknown()).optional().describe('e.g. { aspectRatio: "1:1", duration: 8 }.'),
     provider: z.string().optional().describe('A provider id from list_models routes (e.g. "kie", "openrouter"); omit or "auto" for the cheapest healthy one.'),
+    variants: z.number().int().optional().describe('1, 2, 4 or 8 results; omit for one.'),
+    into: z.enum(['nodes', 'history']).optional().describe('With variants: new nodes (default) or this node\'s history.'),
     expectedVersion: z.number().int()
   })
   .strict();
@@ -282,6 +294,7 @@ const renameProjectInput = z.object({ name: z.string().min(1) }).strict();
 const connectionIdInput = z.object({ connectionId: z.string().describe('from list_connections') }).strict();
 const edgeModeInput = z.object({ connectionId: z.string(), mode: z.enum(WIRE_MODES).describe('iterate makes the line a loop axis') }).strict();
 const renameNodeInput = z.object({ nodeId: z.string(), name: z.string() }).strict();
+const setNodeColorInput = z.object({ nodeId: z.string(), color: z.enum(COLOUR_TAGS).nullable().describe('null removes the tag') }).strict();
 const resizeNodeInput = z.object({ nodeId: z.string(), width: z.number().positive(), height: z.number().positive() }).strict();
 const nodeIdsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1) }).strict();
 const duplicateInput = nodeIdsInput
@@ -290,6 +303,21 @@ const duplicateInput = nodeIdsInput
 const shareCanvasInput = z.object({ canvasId: z.string(), on: z.boolean().describe('true mints a view-only link; false revokes it') }).strict();
 const shareDocInput = z.object({ nodeId: z.string().describe('a doc node'), on: z.boolean() }).strict();
 const insertTemplateInput = z.object({ canvasId: z.string(), templateId: z.string().describe('from list_templates'), x: z.number(), y: z.number() }).strict();
+const saveTechniqueInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2), name: z.string().describe('kebab-case, at most 48 characters') }).strict();
+const runTechniqueInput = z
+  .object({
+    canvasId: z.string(),
+    techniqueId: z.string().describe('from list_techniques'),
+    x: z.number(),
+    y: z.number(),
+    inputs: z.array(z.object({ node: z.number().int(), value: z.string().max(4000) }).strict()).optional().describe('one value per input slot of the technique: the prompt of that node'),
+    run: z.boolean().optional().describe('default true: run the inner graph (spends credits); false only places it')
+  })
+  .strict();
+const techniqueIdInput = z.object({ techniqueId: z.string() }).strict();
+const placeTechniqueInput = z.object({ canvasId: z.string(), techniqueId: z.string(), x: z.number(), y: z.number() }).strict();
+const techniqueNodeInput = z.object({ nodeId: z.string() }).strict();
+const detachTechniqueInput = z.object({ canvasId: z.string(), nodeId: z.string() }).strict();
 const addFrameInput = z
   .object({
     canvasId: z.string(),
@@ -502,6 +530,21 @@ export const CANVAS_OPS = {
         orgId: ctx.orgId,
         nodeId: input.nodeId,
         patch: input.data,
+        check: DataCheck.Schema,
+        actor: ctx.actor
+      });
+      return AGENT_PATCH_ANSWERS[written.outcome](written);
+    }
+  }),
+
+  set_node_color: op({
+    access: Access.Write,
+    input: setNodeColorInput,
+    run: async (ctx, input) => {
+      const written = await patchNodeData(ctx.db, {
+        orgId: ctx.orgId,
+        nodeId: input.nodeId,
+        patch: withColour(input.color),
         check: DataCheck.Schema,
         actor: ctx.actor
       });
@@ -784,9 +827,14 @@ export const CANVAS_OPS = {
         return NODE_NOT_FOUND;
       }
 
+      const asked = parseVariantsAsk({ variants: input.variants, into: input.into });
+      if (!asked.ok) {
+        return { outcome: 'refused', error: asked.error };
+      }
+
       const data = node.data as { prompt?: string; model?: string; params?: GenParams };
       const out = await ctx.billed(() =>
-        runGenNode(ctx.db, {
+        runGeneration(ctx.db, {
           orgId: ctx.orgId,
           projectId: ctx.projectId,
           canvasId: node.canvasId,
@@ -797,7 +845,9 @@ export const CANVAS_OPS = {
           model: input.model ?? data.model ?? null,
           params: { ...(input.params ?? data.params ?? {}), ...(input.provider ? { provider: input.provider } : {}) } as GenParams,
           expectedVersion: input.expectedVersion,
-          actor: ctx.actor
+          actor: ctx.actor,
+          count: asked.count,
+          into: asked.into
         })
       );
 
@@ -883,7 +933,7 @@ export const CANVAS_OPS = {
   cancel_node_loop: op({
     access: Access.Write,
     input: nodeIdInput,
-    run: async (ctx, input) => cancelLoop(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId })
+    run: async (ctx, input) => cancelBatch(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId })
   }),
 
   preview_run_graph: op({
@@ -1103,6 +1153,83 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => {
       const out = await insertTemplate(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, templateId: input.templateId, at: { x: input.x, y: input.y }, actor: ctx.actor });
       return out ?? { error: 'unknown_template' };
+    }
+  }),
+
+  list_techniques: op({
+    access: Access.Read,
+    input: listCanvasesInput,
+    run: async (ctx) => {
+      const techniques = await listTechniques(ctx.db, ctx.orgId);
+      return { techniques: (techniques ?? []).map((t) => ({ id: t.id, name: t.name, nodes: t.plan.nodes.length, version: t.version, inputs: t.inputs, outputs: t.outputs })), available: techniques !== null };
+    }
+  }),
+
+  save_technique: op({
+    access: Access.Write,
+    input: saveTechniqueInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const saved = await saveFromSelection(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, nodeIds: input.nodeIds, name: input.name, actor: ctx.actor });
+      return saved.outcome === 'saved' ? { outcome: 'saved', techniqueId: saved.technique.id, name: saved.technique.name, inputs: saved.technique.inputs, outputs: saved.technique.outputs } : saved;
+    }
+  }),
+
+  run_technique: op({
+    access: Access.Spend,
+    input: runTechniqueInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const then = input.run === false ? TechniqueRun.Place : TechniqueRun.Run;
+      const ask = { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, userId: ctx.userId, techniqueId: input.techniqueId, at: { x: input.x, y: input.y }, inputs: input.inputs ?? [], then, actor: ctx.actor };
+      return then === TechniqueRun.Run ? ctx.billed(() => runTechnique(ctx.db, ask)) : runTechnique(ctx.db, ask);
+    }
+  }),
+
+  place_technique: op({
+    access: Access.Write,
+    input: placeTechniqueInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return placeInstance(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, userId: ctx.userId, techniqueId: input.techniqueId, at: { x: input.x, y: input.y }, actor: ctx.actor });
+    }
+  }),
+
+  run_technique_node: op({
+    access: Access.Spend,
+    input: techniqueNodeInput,
+    run: async (ctx, input) => ctx.billed(() => runInstance(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, nodeId: input.nodeId, actor: ctx.actor }))
+  }),
+
+  detach_technique: op({
+    access: Access.Write,
+    input: detachTechniqueInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return detachInstance(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, nodeId: input.nodeId, actor: ctx.actor });
+    }
+  }),
+
+  open_technique: op({
+    access: Access.Write,
+    input: techniqueIdInput,
+    run: async (ctx, input) => openDefinition(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, techniqueId: input.techniqueId, actor: ctx.actor })
+  }),
+
+  delete_technique: op({
+    access: Access.Write,
+    input: techniqueIdInput,
+    run: async (ctx, input) => {
+      const outcome = await deleteTechnique(ctx.db, ctx.orgId, input.techniqueId);
+      return outcome === TechniqueOutcome.Ok ? { deleted: true } : { error: outcome };
     }
   }),
 

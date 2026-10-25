@@ -4,6 +4,7 @@ import { blockedReason, canStartRun } from './gen-history';
 import { promptTooLong, runStateOf, type GenMedium, type GenNode, type GenParams, type ModelChoice } from './gen-node';
 import { imageStepCredits } from './model3d-run';
 import { model3dParamsOf } from '$lib/model3d-models';
+import { effectiveVariants, variantCountsFor, variantsCredits, variantsIntoOf, type RememberedVariants, type VariantInto } from './variants';
 
 export const TOO_LONG_REASON = 'Prompt troppo lungo';
 
@@ -17,11 +18,15 @@ export type RunQuoteInput = {
   estimatedTextOutputTokens?: number;
   hasUpstreamImage?: boolean;
   imageChoices?: ModelChoice[];
+  remembered?: RememberedVariants | null;
 };
+
+export type VariantsQuote = { count: number; into: VariantInto; counts: number[] };
 
 export type RunQuote = {
   label: 'Generate' | 'Redo';
   credits: number | null;
+  variants: VariantsQuote | null;
   variable: boolean;
   enabled: boolean;
   reason: string | null;
@@ -89,9 +94,15 @@ export function runQuoteOf(input: RunQuoteInput): RunQuote {
     enhanceUnitCredits: input.enhanceUnitCredits
   };
 
+  const counts = variantCountsFor(node.medium, choice);
+  const remembered = input.remembered ?? null;
+  const count = effectiveVariants(node.medium, node.params, remembered, choice);
+  const variants = counts.length > 1 ? { count, into: variantsIntoOf(node.params, remembered), counts } : null;
+
   return {
     label: runStateOf(node, upstream) === 'done' ? 'Redo' : 'Generate',
-    credits: input.variableTextInput ? null : creditsOf(input, cost),
+    credits: input.variableTextInput ? null : variantsCredits(creditsOf(input, cost), count),
+    variants,
     variable: Boolean(priced?.variableCredits),
     enabled: canStartRun(node, choices, upstream) && !tooLong,
     reason: tooLong && choice?.maxPromptChars ? TOO_LONG_REASON : blockedReason(node, choices, upstream),
@@ -99,6 +110,10 @@ export function runQuoteOf(input: RunQuoteInput): RunQuote {
     choice,
     cost
   };
+}
+
+export function runLabelOf(quote: Pick<RunQuote, 'label' | 'variants'>): string {
+  return quote.variants && quote.variants.count > 1 ? `${quote.label} ×${quote.variants.count}` : quote.label;
 }
 
 export function loopCreditsOf(quote: RunQuote, count: number, variableTextInput = false): number | null {

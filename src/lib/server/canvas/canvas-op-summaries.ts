@@ -50,6 +50,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   disconnect_nodes: 'Remove a line.',
   set_edge_mode: 'Set a line to fixed or iterate.',
   rename_node: 'Rename a node; empty resets it.',
+  set_node_color: 'Tag a node with a colour (red, orange, yellow, green, blue, purple, grey); null clears it.',
   resize_node: 'Set the width and height of a node.',
   duplicate_nodes: 'Duplicate nodes with the lines among them.',
   save_canvas_version: 'Save the whole canvas under a name.',
@@ -64,6 +65,14 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   share_doc: 'Turn the share link of a doc node on or off.',
   list_templates: 'Canvas templates that can be inserted.',
   insert_template: 'Insert a template at x,y.',
+  list_techniques: 'Saved techniques of the workspace: packaged flows with their input and output slots.',
+  save_technique: 'Package a connected selection of nodes as a reusable technique with input and output slots.',
+  place_technique: 'Place a live technique node at x,y; editing the technique updates it.',
+  run_technique_node: 'Run a technique node on the texts wired into it (spends credits).',
+  detach_technique: 'Swap a technique node for a copy of its graph.',
+  open_technique: 'Write a technique graph on its own canvas to edit; save_technique under the same name bumps the version.',
+  run_technique: 'Place a copy of a technique at x,y, fill its input slots and run its inner graph (spends credits; run:false only places it).',
+  delete_technique: 'Delete a saved technique.',
   add_frame_from_template: 'Add a frame made from a template, in a format, at x,y.',
   show_run: 'Show an older result of a node.',
   sync_node: 'Re-sync a products or social feed node.',
@@ -83,5 +92,6 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   clone_voice: 'Clone a voice from a sample, with consent (spends credits).',
   delete_voice: 'Delete a custom voice.',
   read_video_reference: 'Read a video asset into transcript, scenes and style (spends on first read).',
-  withdraw_from_gallery: 'Take an item out of the gallery.'
+  withdraw_from_gallery: 'Take an item out of the gallery.',
+  styles: 'List, define, apply or rename the named styles shared by the frames of a canvas.'
 };

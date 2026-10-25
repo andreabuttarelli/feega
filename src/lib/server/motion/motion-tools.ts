@@ -135,6 +135,7 @@ import { DESCRIBE_ASK, describeFramesTool, gateBlock, lookFirst, type Looks, typ
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { Quality, blocking, docProblems, frameProblems, softPictures, uiRecolour, uiShrink, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '$lib/motion/custom/component';
+import { PARAM_GUIDE } from '$lib/motion/custom/params';
 import { Occurrence, recordCheck, removeComponent, updateComponent, writeComponent } from '$lib/motion/custom/ops';
 import { CaptureSession, FIDELITY_MIN, offersSignIn, type UiCapture } from '$lib/server/web/vector-capture';
 import { StoreKind } from '$lib/server/web/store';
@@ -2731,7 +2732,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     [WRITE_COMPONENT]: tool({
-      description: `Create or replace a custom component written in code. The editor runs it in a sandbox and checks that seeking gives the same frame from any direction (a live component: its video still); a failing check comes back as an error with the offending frames. Use it in clips with add_clip component "Custom", props { name, ...props }.`,
+      description: `Create or replace a custom component written in code. The editor runs it in a sandbox and checks that seeking gives the same frame from any direction (a live component: its video still); a failing check comes back as an error with the offending frames. Use it in clips with add_clip component "Custom", props { name, ...props }. ${PARAM_GUIDE}`,
       inputSchema: z.object({
         mode: z.enum(ComponentMode).optional().describe('deterministic (default): every frame from tl, seekable, exact in the video. live: for games, generative pieces that differ on every view and interactive heroes meant for the website embed; runs its own loop (requestAnimationFrame, timers, Math.random) and reads input.x, input.y, input.down, input.keys, input.tiltX/Y, input.vars (the runtime variables by name, as the embedding site sets them), with onPause, onResume, onDestroy; gets the game engines LittleJS (LittleJS.engineInit(init, update, updatePost, render, renderPost)) and kaplay (const k = kaplay({ background: [0, 0, 0] })), and p5 loops on its own. The video shows a still of a live component: its first frame, seeded, or what it returns as { still(t) {} }'),
         name: z.string().describe('PascalCase, e.g. NodeGraph'),

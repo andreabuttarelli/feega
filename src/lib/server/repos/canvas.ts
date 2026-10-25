@@ -202,6 +202,14 @@ export async function renameCanvas(
   return data ? toCanvas(data) : null;
 }
 
+export async function canvasProject(db: Db, input: { orgId: string; canvasId: string }): Promise<string | null> {
+  const { data, error } = await db.from('canvases').select('project_id').eq('id', input.canvasId).eq('org_id', input.orgId).is('deleted_at', null).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return data?.project_id ?? null;
+}
+
 /** Soft delete: nodi, archi e post_sources sopravvivono — un post pubblicato tiene la sua origine. */
 export async function deleteCanvas(db: Db, input: { orgId: string; canvasId: string }): Promise<void> {
   const { error } = await db

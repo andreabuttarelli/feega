@@ -145,6 +145,13 @@ deposits the asset. Poll the node (`query`) rather than expecting a file now. Sp
 `credits_exhausted` failure means the org is out. A finished image or text comes back with
 `asset_ids` and `media` (the `get_media` links for it).
 
+`variants` (1, 2, 4 or 8; a video up to 4) makes several results in one call and spends that many
+times the price of one run. `into: "nodes"` (default) creates new output nodes next to the source,
+wired from the same inputs, and returns their `nodeIds`; `into: "history"` lands every result in
+the node's own history (the canvas shows a grid to pick the current one). The model allow-list and
+the spend caps apply to the whole batch, which is refused before anything is spent when either
+blocks it; `cancel_node_loop` stops the runs of a batch that are still pending.
+
 `get_media({ org, node_ids?, run_ids?, asset_ids? })` resolves nodes (their current output), runs
 (what that run produced) and assets to: type, mime, width/height, duration, and two signed links
 — `preview_url` (images only, 1024px long edge, valid 5 minutes: fetch it to see the image)
@@ -199,7 +206,7 @@ through the same code (op `describe` `{}` lists them all, `{ op }` gives one inp
 `write_nodes`, `paste_nodes`,
 `connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,
 `rename_canvas`, `delete_canvas`, `rename_project`, `share_canvas`, `share_doc`,
-`insert_template`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
+`insert_template`, `list_techniques`, `save_technique`, `place_technique`, `run_technique_node`, `detach_technique`, `open_technique`, `run_technique`, `delete_technique`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
 `show_run`, `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
 `retry_loop_combination`, `preview_workflow`, `run_workflow`, `cancel_workflow`,
 `preview_run_graph`, `run_graph`, `cancel_render`, `withdraw_from_gallery`, `request_upload`,

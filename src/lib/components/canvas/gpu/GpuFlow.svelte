@@ -88,6 +88,7 @@
   import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
+  import { COLOUR_TAG_HEX, colourOf } from '$lib/canvas/node-colour';
   import SelectionToolbar from '../SelectionToolbar.svelte';
   import NextStepChips from '../NextStepChips.svelte';
   import CanvasContextMenu from '../CanvasContextMenu.svelte';
@@ -337,6 +338,10 @@
     }
   });
   const coreLook = $derived(wrap ? themeOf(wrap) : null);
+  const tagHexOf = (id: string) => {
+    const tag = colourOf(summaries.get(id)?.data ?? {});
+    return tag ? COLOUR_TAG_HEX[tag] : null;
+  };
   const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
   const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
   const coreCards = $derived.by(() => {
@@ -352,7 +357,8 @@
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.viewOf?.(t.id) ?? null, props.genViewFor?.(t.id) ?? null),
         ...portMarks(t),
         label: labelOf(t),
-        icon: text.icons.get(t.kind as NodeType) ?? null
+        icon: text.icons.get(t.kind as NodeType) ?? null,
+        tag: tagHexOf(t.id)
       };
       const poster = holdsDoc(t.kind ?? '');
       return [{ key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
@@ -377,7 +383,7 @@
         return [];
       }
       const marks = portMarks(t);
-      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null } : { label: null, icon: null };
+      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id) } : { label: null, icon: null };
       return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, turn: turnOf(t), layers }];
     });
   });
@@ -3115,6 +3121,10 @@
       targeting = ids;
     },
     'run-workflow': (ids) => props.onRunWorkflow?.(ids),
+    'save-technique': (ids) => props.onSaveTechnique?.(ids),
+    'run-technique': (ids) => props.onRunTechnique?.(ids),
+    'edit-technique': (ids) => props.onEditTechnique?.(ids),
+    'detach-technique': (ids) => props.onDetachTechnique?.(ids),
     'run-downstream': (ids) => props.onRunGraph?.(GraphScope.Downstream, ids),
     'run-stale': (ids) => props.onRunGraph?.(GraphScope.Stale, ids),
     'copy-id': (ids) => void navigator.clipboard?.writeText(ids.join('\n')),
@@ -3560,6 +3570,8 @@
       onpick={addAtCentre}
       onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) ? viewCentre() : undefined) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
+      techniques={props.techniques}
+      ontechnique={props.onTechnique ? (id) => props.onTechnique?.(id, viewCentre()) : undefined}
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
       onimage={insertImageInFrame}
@@ -3584,6 +3596,9 @@
       runQuote={props.runQuoteFor?.(selected) ?? null}
       frameTools
       onrun={() => props.onRunNode?.(selected[0])}
+      variantsInFlight={selected.length === 1 ? (props.variantsInFlightFor?.(selected[0]) ?? 0) : 0}
+      oncancelvariants={() => props.onCancelVariants?.(selected[0])}
+      history={selected.length === 1 ? (props.historyFor?.(selected[0]) ?? null) : null}
       onaction={runSelectionAction}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
       onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}

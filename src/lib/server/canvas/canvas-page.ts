@@ -44,8 +44,11 @@ const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number
   voice_not_yours: 403,
   cloning_not_in_this_project: 403
 };
-import { runGenNode, runsOf } from '$lib/server/canvas/generate';
-import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/canvas/loop';
+import { runsOf } from '$lib/server/canvas/generate';
+import { planLoop, enqueueLoop, retryLoopCombo } from '$lib/server/canvas/loop';
+import { cancelBatch } from '$lib/server/canvas/cancel-batch';
+import { runGeneration } from '$lib/server/canvas/variants';
+import { parseVariantsAsk } from '$lib/canvas/variants';
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
@@ -58,6 +61,8 @@ import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
+import { saveFromSelection } from '$lib/server/canvas/techniques';
+import { detachInstance, openDefinition, placeInstance, runInstance } from '$lib/server/canvas/technique-instance';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
@@ -604,7 +609,12 @@ export const actions: Actions<CanvasParams> = {
       return fail(denied.status, denied.data);
     }
 
-    const out = await runGenNode(scope.db, {
+    const asked = parseVariantsAsk({ variants: paramsIn.variants, into: paramsIn.variantsInto });
+    if (!asked.ok) {
+      return fail(400, { error: asked.error });
+    }
+
+    const out = await runGeneration(scope.db, {
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
@@ -614,7 +624,9 @@ export const actions: Actions<CanvasParams> = {
       prompt,
       model,
       params: paramsIn as never,
-      expectedVersion: version
+      expectedVersion: version,
+      count: asked.count,
+      into: asked.into
     });
 
     if (out.kind === 'refused') { return fail(400, { error: out.error }); }
@@ -689,7 +701,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid request' });
     }
 
-    return await cancelLoop(scope.db, { orgId: scope.orgId, nodeId });
+    return await cancelBatch(scope.db, { orgId: scope.orgId, nodeId });
   },
 
   /**
@@ -1726,6 +1738,78 @@ export const actions: Actions<CanvasParams> = {
     }
 
     return out;
+  },
+
+  save_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ids = z.array(z.string().min(1)).min(2).max(50).safeParse(jsonField(fd, 'ids'));
+    if (!ids.success) {
+      return fail(400, { error: 'invalid selection' });
+    }
+
+    const saved = await saveFromSelection(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds: ids.data, name: String(fd.get('name') ?? ''), actor: userActor(scope) });
+    return saved.outcome === 'saved' ? { technique: { id: saved.technique.id, name: saved.technique.name } } : fail(400, { error: saved.error });
+  },
+
+  insert_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
+    if (!Number.isFinite(at.x) || !Number.isFinite(at.y)) {
+      return fail(400, { error: 'invalid position' });
+    }
+
+    const placed = await placeInstance(scope.db, {
+      orgId: scope.orgId,
+      projectId: scope.canvas.projectId,
+      canvasId: scope.canvasId,
+      userId: scope.userId,
+      techniqueId: String(fd.get('technique_id') ?? ''),
+      at,
+      actor: userActor(scope)
+    });
+    if (placed.outcome === 'refused') {
+      return fail(400, { error: placed.error });
+    }
+
+    const scopeIds = { orgId: scope.orgId, canvasId: scope.canvasId };
+    const ids = new Set(placed.nodeIds);
+    const [nodes, connections] = await Promise.all([listNodes(scope.db, scopeIds), listConnections(scope.db, scopeIds)]);
+    return { nodes: nodes.filter((n) => ids.has(n.id)), connections: connections.filter((c) => ids.has(c.sourceNodeId) && ids.has(c.targetNodeId)), message: placed.message };
+  },
+
+  run_technique_node: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    if (denied) {
+      return fail(denied.status, denied.data);
+    }
+
+    const out = await runInstance(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, nodeId: String(fd.get('node_id') ?? ''), actor: userActor(scope) });
+    return out.outcome === 'queued' ? out : fail(400, { error: out.error });
+  },
+
+  detach_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const out = await detachInstance(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId, nodeId: String(fd.get('node_id') ?? ''), actor: userActor(scope) });
+    if (out.outcome === 'refused') {
+      return fail(400, { error: out.error });
+    }
+
+    const scopeIds = { orgId: scope.orgId, canvasId: scope.canvasId };
+    const ids = new Set(out.nodeIds);
+    const [nodes, connections] = await Promise.all([listNodes(scope.db, scopeIds), listConnections(scope.db, scopeIds)]);
+    return { removedId: out.removedId, nodes: nodes.filter((n) => ids.has(n.id)), connections: connections.filter((c) => ids.has(c.sourceNodeId) && ids.has(c.targetNodeId)) };
+  },
+
+  open_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const out = await openDefinition(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, techniqueId: String(fd.get('technique_id') ?? ''), actor: userActor(scope) });
+    return out.outcome === 'opened' ? out : fail(400, { error: out.error });
   },
 
   /**

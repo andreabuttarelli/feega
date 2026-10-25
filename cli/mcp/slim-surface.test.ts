@@ -87,6 +87,22 @@ describe('nothing is lost: every tool stays reachable', () => {
     expect(local.sort()).toEqual(Object.keys(TOOL_FAMILY).sort());
   });
 
+  test('view says its call shape: the op arguments go inside input', async () => {
+    const c = client();
+    await c.init();
+    const view = (await c.list()).find((t) => t.name === 'view');
+
+    expect(view?.description).toContain('{op: "snapshot", input: {node_id');
+  });
+
+  test('describe answers its JSON once, as text, not again as structuredContent', async () => {
+    const c = client();
+    await c.init();
+    const described = (await c.call('describe', {})) as { structuredContent?: unknown } | undefined;
+
+    expect(described?.structuredContent).toBeUndefined();
+  });
+
   test('a hidden tool is still callable by its old name', async () => {
     const c = client();
     await c.init();

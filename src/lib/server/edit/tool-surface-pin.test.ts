@@ -32,11 +32,10 @@ describe('the tool surfaces do not move while their code is reorganised (changed
   });
 
   it('the edit catalogue lists the same ops, summaries and schemas', async () => {
-    const listing = (await describeEdit({})) as { ops: { name: string }[] };
-    const schemas = (await describeEdit({ schemas: true })) as { schemas: { op: string }[] };
+    const schemas = (await describeEdit({ schemas: true })) as { schemas: { op: string; name: string; family: string; access: string; summary: string }[] };
 
-    for (const entry of listing.ops) {
-      expect(fingerprint(entry)).toMatchSnapshot(`edit op ${entry.name}`);
+    for (const { name, family, access, summary } of schemas.schemas) {
+      expect(fingerprint({ name, family, access, summary })).toMatchSnapshot(`edit op ${name}`);
     }
     for (const detail of schemas.schemas) {
       expect(fingerprint(detail)).toMatchSnapshot(`edit op schema ${detail.op}`);

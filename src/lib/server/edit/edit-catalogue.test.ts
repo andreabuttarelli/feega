@@ -34,4 +34,8 @@ describe('one name for every op the edit tool reaches', () => {
     expect([...SHOWCASE_CANVAS_OPS].filter((n) => catalogue.get(n)?.family !== Family.Canvas)).toEqual([]);
     expect([...SHOWCASE_MOTION_TOOLS].filter((n) => catalogue.get(n)?.family !== Family.Frame)).toEqual([]);
   });
+
+  it('every op carries a one-line summary, or find_tools cannot rank it', () => {
+    expect([...editCatalogue().values()].filter((o) => !o.summary).map((o) => o.name)).toEqual([]);
+  });
 });

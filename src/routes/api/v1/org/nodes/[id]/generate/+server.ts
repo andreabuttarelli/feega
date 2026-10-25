@@ -3,7 +3,8 @@ import type { RequestHandler } from './$types';
 import { reachableCaller } from '$lib/server/org-data/reach';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { findNode } from '$lib/server/repos/canvas';
-import { runGenNode } from '$lib/server/canvas/generate';
+import { runGeneration } from '$lib/server/canvas/variants';
+import { parseVariantsAsk } from '$lib/canvas/variants';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { modelAdvice } from '$lib/canvas/recommended-models';
 import { PROVIDER_PARAM } from '$lib/canvas/model-routes';
@@ -44,10 +45,17 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     version?: number;
     provider?: string;
     params?: Record<string, unknown>;
+    variants?: unknown;
+    into?: unknown;
   };
 
   if (body.medium !== node.type) {
     return json({ error: 'medium_mismatch' }, { status: 400 });
+  }
+
+  const asked = parseVariantsAsk({ variants: body.variants, into: body.into });
+  if (!asked.ok) {
+    return json({ error: asked.error }, { status: 400 });
   }
 
   const gate = await gateOrgAiAction(orgId, apiKeyId ? { id: apiKeyId, name: '', user_id: userId, org_id: orgId, scopes: ['write'] } : undefined);
@@ -55,7 +63,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
 
   const model = body.model || savedModel(node.data);
   const warning = await modelWarning(body.medium as GenMedium, model);
-  const outcome = await runGenNode(db, {
+  const outcome = await runGeneration(db, {
     orgId,
     projectId: node.projectId,
     canvasId: node.canvasId,
@@ -65,7 +73,9 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     prompt: body.prompt ?? '',
     model,
     params: { ...(body.params ?? {}), ...(body.provider ? { [PROVIDER_PARAM]: body.provider } : {}) } as never,
-    expectedVersion: body.version ?? node.version
+    expectedVersion: body.version ?? node.version,
+    count: asked.count,
+    into: asked.into
   });
 
   if (outcome.kind === 'refused') return json({ error: outcome.error }, { status: 400 });

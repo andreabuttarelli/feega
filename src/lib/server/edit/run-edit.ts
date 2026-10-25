@@ -3,12 +3,13 @@ import type { Answer } from './runners';
 
 export type EditStep = { op: string; target?: string; element?: string; input?: Record<string, unknown>; version?: number };
 
-export type EditAsk = { projectId?: string; steps: EditStep[]; batch?: boolean };
+export type EditAsk = { projectId?: string; target?: string; steps: EditStep[]; batch?: boolean };
 
 export type EditPorts = Runners & {
   catalogue: Map<string, EditOp>;
   inputKeys: (op: EditOp) => Promise<string[]>;
   projectOf: (nodeId: string) => Promise<string | null>;
+  projectOfCanvas: (canvasId: string) => Promise<string | null>;
 };
 
 const HTTP_OK = 200;
@@ -70,7 +71,14 @@ async function resolved(ports: EditPorts, step: EditStep): Promise<Resolved | An
 const isAnswer = (r: Resolved | Answer): r is Answer => 'status' in r;
 
 async function projectFor(ports: EditPorts, ask: EditAsk, r: Resolved): Promise<string | null> {
-  return ask.projectId ?? (r.step.target ? await ports.projectOf(r.step.target) : null);
+  if (ask.projectId) {
+    return ask.projectId;
+  }
+  if (r.step.target) {
+    return ports.projectOf(r.step.target);
+  }
+  const canvasId = r.input.canvasId;
+  return typeof canvasId === 'string' ? ports.projectOfCanvas(canvasId) : null;
 }
 
 const runOne = (ports: EditPorts, ask: EditAsk, r: Resolved): Promise<Answer> =>
@@ -113,7 +121,8 @@ function resultsOf(group: Group, answer: Answer) {
 export async function runEdit(ports: EditPorts, ask: EditAsk): Promise<Answer> {
   const isBatch = (ask.batch ?? ask.steps.length > 1);
   const all: Resolved[] = [];
-  for (const [index, step] of ask.steps.entries()) {
+  for (const [index, given] of ask.steps.entries()) {
+    const step = given.target || !ask.target ? given : { ...given, target: ask.target };
     const r = await resolved(ports, step);
     if (isAnswer(r)) {
       return { ...r, body: { ...(r.body as object), index } };
@@ -129,7 +138,9 @@ export async function runEdit(ports: EditPorts, ask: EditAsk): Promise<Answer> {
     const answer = await runGroup(ports, ask, group);
     if (!succeeded(answer)) {
       const inside = (answer.body as { index?: number }).index ?? 0;
-      return { status: httpOk(answer) ? HTTP_UNPROCESSABLE : answer.status, body: { applied: results.length, failed: group.first + inside, error: answer.body, results } };
+      const failedAt = group.first + inside;
+      const tally = { applied: results.length, failed: 1, failed_at: failedAt, rolled_back: inside, not_run: all.length - failedAt - 1 };
+      return { status: httpOk(answer) ? HTTP_UNPROCESSABLE : answer.status, body: { ...tally, error: answer.body, results } };
     }
     results.push(...resultsOf(group, answer));
   }

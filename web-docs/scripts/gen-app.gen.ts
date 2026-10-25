@@ -53,12 +53,12 @@ function write(name: string, content: string) {
 }
 
 async function editOps() {
-  const listed = (await describeEdit({})) as { ops: { name: string; family: string; access: string; summary: string }[] };
-  const detailed = (await describeEdit({ schemas: true })) as { schemas: { op: string; input_schema: JsonSchema | null }[] };
+  const detailed = (await describeEdit({ schemas: true })) as { schemas: { op: string; name: string; family: string; access: string; summary: string; input_schema: JsonSchema | null }[] };
+  const listed = { ops: detailed.schemas };
   const schemaOf = new Map(detailed.schemas.map((s) => [s.op, s.input_schema]));
 
   const families = ['canvas', 'frame', 'editor'];
-  const intro = `The \`edit\` MCP tool (and \`POST /api/v1/edit\`) changes a canvas through one catalogue of ops. ${listed.ops.length} ops today. Call op \`describe\` for the live list.\n\n- **canvas**: nodes and free elements on the canvas.\n- **frame**: what is inside a frame (elements, props, keyframes, clips).\n- **editor**: editor actions.\n\nAccess \`spend\` means the op uses credits.\n\n`;
+  const intro = `The \`edit\` MCP tool (and \`POST /api/v1/edit\`) changes a canvas through one catalogue of ops. ${listed.ops.length} ops today. Call op \`describe\` for the live list.\n\n- **canvas**: nodes and free elements on the canvas.\n- **frame**: what is inside a frame (elements, props, keyframes, clips).\n- **editor**: editor actions.\n\nAccess \`read\` and \`write\` are free, \`spend\` uses credits, \`editor\` needs a chat turn in the app.\n\n`;
   const body = families
     .map((family) => {
       const ops = listed.ops.filter((o) => o.family === family);

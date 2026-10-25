@@ -25,7 +25,9 @@ export enum BatchState {
 
 export type BatchView = { state: BatchState; thumbs: string[]; approved: string; rest: string; options: boolean | null };
 
-export type NodeView = { source?: SourceView; media?: MediaView; select?: SelectView; batch?: BatchView };
+export type TechniqueView = { name: string; version: number | null; inputs: number; outputs: number; ranVersion: number | null };
+
+export type NodeView = { source?: SourceView; media?: MediaView; select?: SelectView; batch?: BatchView; technique?: TechniqueView };
 
 const PREVIEW_CHARS = 60;
 const NOTHING = '—';

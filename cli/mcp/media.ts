@@ -23,10 +23,16 @@ export function mediaView(media: Media) {
   return { items: media.items.map(describeItem), missing: media.missing };
 }
 
-type Outcome = { asset?: { id?: string } } & Record<string, unknown>;
+type SingleOutcome = { asset?: { id?: string } };
+
+type Outcome = SingleOutcome & { runs?: SingleOutcome[] } & Record<string, unknown>;
+
+function assetIdsOf(outcome: Outcome): string[] {
+  return [outcome, ...(outcome.runs ?? [])].flatMap((part) => (part.asset?.id ? [part.asset.id] : []));
+}
 
 export async function generationView(outcome: Outcome, loadMedia: LoadMedia) {
-  const assetIds = outcome.asset?.id ? [outcome.asset.id] : [];
+  const assetIds = assetIdsOf(outcome);
   const media = assetIds.length ? (await loadMedia(assetIds)).items.map(describeItem) : [];
 
   return { ...outcome, asset_ids: assetIds, media };

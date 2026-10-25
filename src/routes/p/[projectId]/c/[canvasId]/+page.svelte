@@ -197,19 +197,22 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { cleanNodeName } from '$lib/canvas/node-name';
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
+  import { reloadTechniques, techniquesOf } from '$lib/canvas/techniques.svelte';
   import { promptSkillsOf, saveSkill } from '$lib/canvas/prompt-skills.svelte';
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
-  import { producedRuns } from '$lib/canvas/gen-history';
+  import { historyItemsOf, producedRuns } from '$lib/canvas/gen-history';
   import { genTileView, type GenTileView } from '$lib/canvas/gen-tile-view';
   import { runQuoteOf, type RunQuote } from '$lib/canvas/run-quote';
+  import { DEFAULT_INTO, DEFAULT_VARIANTS, VariantInto, browserVariantsStorage, effectiveVariants, readRemembered, variantsIntoOf, writeRemembered, type RememberedVariants } from '$lib/canvas/variants';
   import { type Addable } from '$lib/canvas/addable';
   import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
   import { tileNode } from '$lib/canvas/connect-rules';
   import { planDelete } from '$lib/canvas/delete-plan';
   import { connectorsFor, orphanedByModelChange, type ConnectorType, type GenerativeNodeKind, connectorsForNode } from '$lib/canvas/connectors';
   import { portsOf } from '$lib/canvas/node-ports';
+  import { TECHNIQUE_NODE, TECHNIQUE_EDIT_PREFIX, instancePorts } from '$lib/canvas/technique-instance';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
@@ -260,6 +263,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const LINK_COPIED_MS = 1500;
 
   let { data } = $props();
+  const techniqueShelf = techniquesOf(untrack(() => data.projectId));
   const skillShelf = promptSkillsOf(untrack(() => data.projectId));
 
   function announceWelcome() {
@@ -1131,8 +1135,27 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       itemPort: () => itemPortOf(n.type === 'list' ? listValuesByNode[n.id]?.itemKind : upstreamListOf(n.id)?.itemKind),
       mediaKind: () => upstreamEffectsMediaOf(n.id)?.kind ?? (n.data.mediaKind === 'video' ? 'video' : 'image'),
       audioOperation: () => audioOperationOfTile(n),
-      audioInput: () => audioInputOfTile(n)
+      audioInput: () => audioInputOfTile(n),
+      techniquePorts: () => {
+        const technique = techniqueOfTile(n);
+        return technique ? instancePorts(technique) : { inputs: [], output: null };
+      }
     });
+  }
+
+  function techniqueOfTile(n: Tile) {
+    return techniqueShelf.list.find((t) => t.id === n.data.techniqueId) ?? null;
+  }
+
+  function techniqueView(n: Tile): NodeView | null {
+    if (n.type !== TECHNIQUE_NODE) {
+      return null;
+    }
+    const technique = techniqueOfTile(n);
+    if (!technique) {
+      return null;
+    }
+    return { technique: { name: technique.name, version: technique.version, inputs: technique.inputs.length, outputs: technique.outputs.length, ranVersion: typeof n.data.ranVersion === 'number' ? n.data.ranVersion : null } };
   }
 
   /**
@@ -1250,7 +1273,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!row) {
       return null;
     }
-    return mediaView(row) ?? selectedView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
+    return mediaView(row) ?? selectedView(row) ?? techniqueView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
   }
 
   let Flow = $state<typeof GpuFlow | null>(null);
@@ -1271,6 +1294,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let failed = $state<string | null>(null);
   let fontAdded = $state<string | null>(null);
+  let techniqueNotice = $state<string | null>(null);
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
   let topPeers = $state<HTMLElement | null>(null);
@@ -2160,8 +2184,42 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       estimatedTextInputTokens: estimate?.inputTokens,
       estimatedTextOutputTokens: estimate?.outputTokens,
       hasUpstreamImage: edges.some((e) => e.target === row.id && e.targetHandle === 'images'),
-      imageChoices: catalogue.image
+      imageChoices: catalogue.image,
+      remembered: rememberedVariants
     });
+  }
+
+  const variantsUserId = data.session?.user?.id ?? '';
+  let rememberedVariants = $state<RememberedVariants | null>(null);
+  let variantsRunning = $state<Record<string, number>>({});
+
+  onMount(() => {
+    rememberedVariants = readRemembered(browserVariantsStorage(), variantsUserId);
+  });
+
+  function rememberVariants(patch: { variants?: number; variantsInto?: VariantInto }) {
+    const base = rememberedVariants ?? { count: DEFAULT_VARIANTS, into: DEFAULT_INTO };
+    rememberedVariants = { count: patch.variants ?? base.count, into: patch.variantsInto ?? base.into };
+    writeRemembered(browserVariantsStorage(), variantsUserId, rememberedVariants);
+  }
+
+  function variantsPlanFor(gen: GenNodeState): { count: number; into: VariantInto } {
+    const choice = catalogue[gen.medium]?.find((c) => c.id === effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []));
+    return { count: effectiveVariants(gen.medium, gen.params, rememberedVariants, choice), into: variantsIntoOf(gen.params, rememberedVariants) };
+  }
+
+  function historyFor(id: string) {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const items = gen ? historyItemsOf({ ...gen, runs: runsByNode[id] ?? [] }) : [];
+    return gen && items.length ? { items, urlOf: assetUrl, onshow: (runId: string) => void restore(id, gen, runId) } : null;
+  }
+
+  function variantsInFlightFor(id: string): number {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const historyBatch = gen?.running ? variantsPlanFor(gen) : null;
+    return variantsRunning[id] ?? (historyBatch && historyBatch.count > 1 && historyBatch.into === VariantInto.History ? historyBatch.count : 0);
   }
 
   function genViewFor(id: string): GenTileView | null {
@@ -2177,9 +2235,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const variableTextInput = estimate?.variableInput ?? (gen.medium === 'text' && revision !== '[]');
     const entry = mediumCatalogue[gen.medium];
     const hasUpstreamText = hasUpstreamTextByNode[id] ?? false;
-    const quote = runQuoteOf({ node, choices: entry.choices, hasUpstreamText, variableTextInput, enhanceUnitCredits: entry.enhanceUnitCredits, estimatedTextInputTokens: estimate?.inputTokens, estimatedTextOutputTokens: estimate?.outputTokens });
+    const quote = runQuoteOf({ node, choices: entry.choices, hasUpstreamText, variableTextInput, enhanceUnitCredits: entry.enhanceUnitCredits, estimatedTextInputTokens: estimate?.inputTokens, estimatedTextOutputTokens: estimate?.outputTokens, remembered: rememberedVariants });
 
-    return genTileView(node, quote, { hasUpstreamText, variableTextInput, loopQueued: loopQueuedByNode[id] ?? 0, loopVisible: loopAffordanceByNode[id]?.visible ?? false, loopCombinationCount: loopAffordanceByNode[id]?.combinationCount ?? 0 });
+    return genTileView(node, quote, { hasUpstreamText, variableTextInput, loopQueued: loopQueuedByNode[id] ?? 0, loopVisible: loopAffordanceByNode[id]?.visible ?? false, loopCombinationCount: loopAffordanceByNode[id]?.combinationCount ?? 0, variantsInFlight: variantsInFlightFor(id) });
   }
 
   function runNode(id: string) {
@@ -2199,16 +2257,29 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
-    nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
+    const variants = variantsPlanFor(gen);
+    const batched = variants.count > 1;
+    const params = batched || gen.params.variants !== undefined ? { ...gen.params, variants: variants.count, variantsInto: variants.into } : gen.params;
+    const spawnsNodes = batched && variants.into === VariantInto.Nodes;
+
+    if (!spawnsNodes) {
+      nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
+    }
+    if (batched) {
+      variantsRunning = { ...variantsRunning, [id]: variants.count };
+    }
 
     pending += 1;
     const result = await postAtVersion('run', id, {
       medium: gen.medium,
       prompt: gen.prompt,
       model: effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []) ?? '',
-      params: JSON.stringify(gen.params)
+      params: JSON.stringify(params)
     });
     pending -= 1;
+
+    const { [id]: _settled, ...stillRunning } = variantsRunning;
+    variantsRunning = stillRunning;
 
     if (!result) {
       // Il motivo VERO sta già scritto su `nodes.data` — `giveUp()` lo mette lì prima di
@@ -2981,6 +3052,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       audio?: boolean;
       enhancePrompt?: boolean;
       repeat?: number;
+      variants?: number;
+      variantsInto?: VariantInto;
       /** I campi dichiarati da `ai_models.param_schema` che il toolbar generico scrive — un solo
        *  bucket dinamico, invece di un campo esplicito per ogni nome di parametro possibile. */
       dynamicParams?: Record<string, unknown>;
@@ -2988,6 +3061,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   ) {
     const chosen = nodes.filter((n) => ids.includes(n.id));
     if (!chosen.length) { return; }
+
+    if (patch.variants !== undefined || patch.variantsInto !== undefined) { rememberVariants(patch); }
 
     const droppedEdges: UndoItem[] = [];
     const clearedReferenceIds: string[] = [];
@@ -3480,6 +3555,63 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (created.length) { pushGesture(createManyGesture(created, connected)); }
   }
 
+  async function saveTechnique(ids: string[]) {
+    const editing = data.canvas.name.startsWith(TECHNIQUE_EDIT_PREFIX) ? data.canvas.name.slice(TECHNIQUE_EDIT_PREFIX.length) : '';
+    const name = prompt('Technique name (lowercase words with dashes)', editing)?.trim();
+    if (!name) {
+      return;
+    }
+
+    const saved = await post('save_technique', { ids: JSON.stringify(ids), name });
+    if (saved) {
+      void reloadTechniques(data.projectId, techniqueShelf);
+    }
+  }
+
+  const techniqueNodeIn = (ids: string[]) => nodes.find((n) => ids.includes(n.id) && n.type === TECHNIQUE_NODE);
+
+  async function runTechniqueNode(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const queued = node ? await post('run_technique_node', { node_id: node.id }) : null;
+    if (queued) {
+      techniqueNotice = 'Running. Results land on the Technique runs canvas.';
+      void refresh();
+    }
+  }
+
+  async function editTechnique(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const opened = node ? await post('open_technique', { technique_id: String(node.data.techniqueId) }) : null;
+    if (opened) {
+      leave(`/p/${data.projectId}/c/${String(opened.canvasId)}`, null);
+    }
+  }
+
+  async function detachTechnique(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const detached = node ? await post('detach_technique', { node_id: node.id }) : null;
+    if (!node || !detached) {
+      return;
+    }
+    const created = (detached.nodes ?? []) as CanvasNodeRecord[];
+    const connected = (detached.connections ?? []) as Connection[];
+    nodes = [...nodes.filter((n) => n.id !== node.id), ...created.map((n) => toTile(n, { select: true }))];
+    edges = [...edges, ...connected.map(toEdge)];
+  }
+
+  async function insertTechnique(id: string, at: { x: number; y: number }) {
+    const result = await post('insert_technique', { technique_id: id, x: at.x, y: at.y });
+    const created = (result?.nodes ?? []) as CanvasNodeRecord[];
+    const connected = (result?.connections ?? []) as Connection[];
+    if (!created.length) {
+      return;
+    }
+    techniqueNotice = typeof result?.message === 'string' ? result.message : null;
+    nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))];
+    edges = [...edges, ...connected.map(toEdge)];
+    pushGesture(createManyGesture(created, connected));
+  }
+
   async function insertTemplate(id: string, at: { x: number; y: number }) {
     const result = await post('template', { template_id: id, x: at.x, y: at.y });
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
@@ -3679,6 +3811,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       <a href="/p/{data.projectId}/settings/profile">Open settings</a>
     </p>
   {/if}
+  {#if techniqueNotice}
+    <p class="warning" role="status" data-testid="technique-notice">{techniqueNotice}</p>
+  {/if}
   {#if fontAdded}
     <p class="warning" role="status" data-testid="font-added">{fontAdded}</p>
   {/if}
@@ -3791,6 +3926,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onFigmaImages={figmaImagesAnswered}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
+    techniques={techniqueShelf.list}
+    onTechnique={insertTechnique}
+    onSaveTechnique={saveTechnique}
+    onRunTechnique={runTechniqueNode}
+    onEditTechnique={editTechnique}
+    onDetachTechnique={detachTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
@@ -3804,6 +3945,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     {runQuoteFor}
     {genViewFor}
     onRunNode={runNode}
+    {variantsInFlightFor}
+    {historyFor}
+    onCancelVariants={cancelLoopFor}
     {nodeSummaries}
     {modelChoicesFor}
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
@@ -3895,6 +4039,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             loopQueued={loopQueuedByNode[row.id] ?? 0}
             loopVisible={loopAffordanceByNode[row.id]?.visible ?? false}
             loopCombinationCount={loopAffordanceByNode[row.id]?.combinationCount ?? 0}
+            variantsInFlight={variantsInFlightFor(row.id)}
+            remembered={rememberedVariants}
             onchange={(patch) => changeGen(id, gen, patch)}
             onestimate={(prompt, model, revision) => void estimateTextCost(id, prompt, model ?? '', revision)}
             onrun={() => run(id, gen)}
