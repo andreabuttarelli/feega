@@ -133,6 +133,12 @@ describe('local mode: un agente usa feega senza login', () => {
     expect(answer.seen.authorization).toBeNull();
   });
 
+  it('una tela diversa dentro l’input dell’op è rifiutata con 403', async () => {
+    const answer = await serve('/api/v1/org/canvas', { body: { project_id: LOCAL.projectId, op: 'create_node', input: { canvasId: 'other' } } });
+
+    expect(answer.status).toBe(403);
+  });
+
   it('una tela diversa nella rotta è rifiutata con 403', async () => {
     const answer = await serve(`/api/v1/projects/${LOCAL.projectId}/canvases/other`, { params: { projectId: LOCAL.projectId, canvasId: 'other' } });
 

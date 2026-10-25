@@ -54,23 +54,28 @@ function redirected(pathname: string): boolean {
   return pathname === ROOT || REDIRECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-function foreignPlace(asked: Record<string, unknown>, place: LocalPlace): boolean {
+function foreignPlace(asked: unknown, place: LocalPlace): boolean {
+  if (Array.isArray(asked)) {
+    return asked.some((item) => foreignPlace(item, place));
+  }
+  if (!asked || typeof asked !== 'object') {
+    return false;
+  }
   return Object.entries(asked).some(([key, value]) => {
     const field = PLACE_KEYS[key];
-    return field !== undefined && typeof value === 'string' && value !== place[field];
+    return typeof value === 'string' ? field !== undefined && value !== place[field] : foreignPlace(value, place);
   });
 }
 
-async function bodyOf(request: Request): Promise<Record<string, unknown>> {
+async function bodyOf(request: Request): Promise<unknown> {
   if (!request.headers.get('content-type')?.includes('json')) {
-    return {};
+    return null;
   }
-  const body: unknown = await request.clone().json().catch(() => null);
-  return body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
+  return request.clone().json().catch(() => null);
 }
 
-async function askedPlace(event: RequestEvent): Promise<Record<string, unknown>> {
-  return { ...(await bodyOf(event.request)), ...Object.fromEntries(event.url.searchParams), ...event.params };
+async function askedPlace(event: RequestEvent): Promise<unknown[]> {
+  return [await bodyOf(event.request), Object.fromEntries(event.url.searchParams), event.params];
 }
 
 function demoCredentials(env: Env) {
