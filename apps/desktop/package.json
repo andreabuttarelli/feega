@@ -1,0 +1,60 @@
+{
+  "name": "feega-desktop",
+  "productName": "feega",
+  "private": true,
+  "version": "0.1.0",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "build": "electron-builder --publish never",
+    "build:mac": "electron-builder --mac dir --publish never"
+  },
+  "build": {
+    "appId": "app.feega.desktop",
+    "productName": "feega",
+    "files": [
+      "main.cjs",
+      "routing.cjs"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "protocols": [
+      {
+        "name": "feega",
+        "schemes": [
+          "feega"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "identity": null
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Graphics"
+    }
+  },
+  "devDependencies": {
+    "electron": "38.2.0",
+    "electron-builder": "26.0.12"
+  },
+  "author": "feega <hello@feega.app>",
+  "homepage": "https://feega.app",
+  "description": "feega desktop"
+}

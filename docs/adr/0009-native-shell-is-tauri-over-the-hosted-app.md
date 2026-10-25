@@ -1,5 +1,7 @@
 # The native app is one Tauri 2 shell that loads the hosted app, over a PWA baseline
 
+Status: superseded by ADR 0021 (2026-10-25) for desktop.
+
 Context: feega must be installable on macOS, Windows, iOS and Android. The app is SvelteKit with
 server routes (form actions, `/api/v1`, `/auth/callback`, SSR pages) deployed on Vercel: there is
 no static build to bundle, and none is planned. Whatever the shell, it shows `oh.feega.app` in a

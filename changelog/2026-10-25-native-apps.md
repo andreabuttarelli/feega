@@ -1,9 +1,15 @@
-# Native shells: build them in CI, document them
+# Desktop moves to Electron; native shells build in CI
 
-The Capacitor (iOS/Android, ADR 0018) and Tauri (desktop, ADR 0009) shells already existed but no
-CI built them, so a broken shell was found only by hand. `.github/workflows/native-apps.yml` builds
-the unsigned iOS simulator app, the Android debug APK and the Tauri desktop bundle on macOS,
-Windows and Linux on every change under `apps/`. Docs gain an "Apps" page.
+ADR 0021 replaces the Tauri desktop shell (ADR 0009) with Electron in `apps/desktop`: same
+routing (hosted URL, `FeegaNative/` user agent, external links to the browser, `feega://auth`
+deep link, single instance), now in `routing.cjs` with `node:test` cases ported from the Rust
+ones. Reason: one Chromium engine on every desktop, and the canvas will move to native gpu-core
+anyway. Cost: ~265 MB app, ~3x memory.
 
-Rejected: Electron for desktop (ADR 0009); a separate native UI (ADR 0018). Running gpu-core
-natively under a transparent WebView is planned in the PR, not built here.
+Android gets the user agent and `feega://auth` deep link iOS already had, so OAuth returns into
+the app. `.github/workflows/native-apps.yml` builds desktop (macOS, Windows, Linux), the iOS
+simulator app and the Android debug APK, unsigned, on changes under `apps/`. Docs gain "Apps".
+
+Removed: the Tauri project, its shell benchmark and the static `bundle` mode on desktop.
+Left for later: the Tauri branch of `src/lib/native-bridge.ts` and `tauri://localhost` in
+`api-cors.ts` are now unused.
