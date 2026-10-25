@@ -61,6 +61,35 @@ describe('layout guides', () => {
   });
 });
 
+describe.each([GuideKind.Columns, GuideKind.Rows])('%s stay inside the frame', (kind) => {
+  const span = kind === GuideKind.Columns ? FRAME.width : FRAME.height;
+  const edges = (b: { left: number; top: number; width: number; height: number }) => (kind === GuideKind.Columns ? [b.left, b.left + b.width] : [b.top, b.top + b.height]);
+
+  it.each([GuideAlign.Stretch, GuideAlign.Center])('%s: equal margins on both sides', (align) => {
+    const guide = { ...newGuide(kind), align, count: 4, gutter: 20, margin: 30, size: 100 };
+    const bands = guideBands(guide, FRAME).map(edges);
+
+    expect(bands[0][0]).toBeCloseTo(span - bands[bands.length - 1][1]);
+    expect(bands[0][0]).toBeGreaterThanOrEqual(0);
+  });
+
+  it.each([GuideAlign.Stretch, GuideAlign.Min, GuideAlign.Max, GuideAlign.Center])('%s with auto count never leaves the frame', (align) => {
+    const guide = { ...newGuide(kind), align, count: 'auto' as const, gutter: 20, margin: 30, size: 110, offset: 70 };
+    const bands = guideBands(guide, FRAME).map(edges);
+
+    expect(Math.min(...bands.map((b) => b[0]))).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...bands.map((b) => b[1]))).toBeLessThanOrEqual(span);
+  });
+
+  it.each([GuideAlign.Min, GuideAlign.Max, GuideAlign.Center])('%s with a fixed count too wide for the frame keeps only what fits', (align) => {
+    const guide = { ...newGuide(kind), align, count: 12, gutter: 20, size: 200, offset: 0 };
+    const bands = guideBands(guide, FRAME).map(edges);
+
+    expect(Math.min(...bands.map((b) => b[0]))).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...bands.map((b) => b[1]))).toBeLessThanOrEqual(span);
+  });
+});
+
 describe('layout guide count and alignment', () => {
   const columns = (change: object) => ({ ...newGuide(GuideKind.Columns), ...change });
 
