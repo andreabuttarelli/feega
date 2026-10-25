@@ -3328,3 +3328,7 @@ Signal: an `@real` spec with `E2E_FAKE_IMAGES=1` runs a canvas node and every ru
 ## A migration-only PR leaves derived files stale and `dev` red
 
 Signal: CI `test` fails on `query-tool.test.ts` (query-tables.ts), `write-tool.test.ts` (write-rules.ts) and `cli/lib/contracts.test.ts` right after a PR that only adds a migration. Cause: those files are generated from the migrations and the PR never regenerated them. Move: `node scripts/query-tables-from-migrations.mjs --write && bash cli/scripts/sync-contracts.sh`, commit the four files with the migration.
+
+## A core frame that flashes stretched after an edit
+
+Signal: on the GPU canvas a frame or free text shows its new content squeezed or stretched for a moment, then snaps right. Cause: the doc (picture) and the node box reached `CoreFrames` at different times; `screen-uses` maps the picture's `size` onto the `box` per axis, so any gap draws one over the other. A network await between showing the doc and placing the size is enough. Move: hand the doc and the box over in the same synchronous step (`applyTextFit`); to measure, screenshot the region every ~40 ms after the commit and compare ink width/height with the settled frame.

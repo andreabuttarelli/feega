@@ -33,3 +33,15 @@ export async function measuredTexts(doc: MotionDoc, tokens: BrandTokens, assets:
   const boxes = textBoxesAt(prepare(doc, tokens, assets, { fonts, smoothing: Smoothing.Plain }), stillFrame(doc));
   return textAutosize(doc, boxes, kind, node);
 }
+
+export type FitTargets = { amend: (doc: MotionDoc) => void; show: (doc: MotionDoc) => void; place: (node: NodeSize) => void };
+
+export function applyTextFit(fit: TextFit, to: FitTargets): void {
+  if (fit.doc) {
+    to.amend(fit.doc);
+    to.show(fit.doc);
+  }
+  if (fit.node) {
+    to.place(fit.node);
+  }
+}
