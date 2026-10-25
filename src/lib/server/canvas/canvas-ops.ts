@@ -2,6 +2,7 @@ import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupE
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { wrapInSection } from './section';
 import { z } from 'zod';
+import { COLOUR_TAGS, withColour } from '$lib/canvas/node-colour';
 import type { Db } from '$lib/server/db/client';
 import {
   createConnection,
@@ -293,6 +294,7 @@ const renameProjectInput = z.object({ name: z.string().min(1) }).strict();
 const connectionIdInput = z.object({ connectionId: z.string().describe('from list_connections') }).strict();
 const edgeModeInput = z.object({ connectionId: z.string(), mode: z.enum(WIRE_MODES).describe('iterate makes the line a loop axis') }).strict();
 const renameNodeInput = z.object({ nodeId: z.string(), name: z.string() }).strict();
+const setNodeColorInput = z.object({ nodeId: z.string(), color: z.enum(COLOUR_TAGS).nullable().describe('null removes the tag') }).strict();
 const resizeNodeInput = z.object({ nodeId: z.string(), width: z.number().positive(), height: z.number().positive() }).strict();
 const nodeIdsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1) }).strict();
 const duplicateInput = nodeIdsInput
@@ -528,6 +530,21 @@ export const CANVAS_OPS = {
         orgId: ctx.orgId,
         nodeId: input.nodeId,
         patch: input.data,
+        check: DataCheck.Schema,
+        actor: ctx.actor
+      });
+      return AGENT_PATCH_ANSWERS[written.outcome](written);
+    }
+  }),
+
+  set_node_color: op({
+    access: Access.Write,
+    input: setNodeColorInput,
+    run: async (ctx, input) => {
+      const written = await patchNodeData(ctx.db, {
+        orgId: ctx.orgId,
+        nodeId: input.nodeId,
+        patch: withColour(input.color),
         check: DataCheck.Schema,
         actor: ctx.actor
       });
