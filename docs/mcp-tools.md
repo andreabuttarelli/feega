@@ -3,12 +3,12 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**58 tool** — 25 in lettura, 27 in scrittura, 6 che distruggono.
-Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3605 caratteri**, circa **901 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 62.074 caratteri.
+**59 tool** — 25 in lettura, 28 in scrittura, 6 che distruggono.
+Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3690 caratteri**, circa **923 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 63.167 caratteri.
 
 | gruppo | tool |
 |---|---:|
-| Altro | 30 |
+| Altro | 31 |
 | Video motion | 16 |
 | Accesso diretto al database | 5 |
 | Nodi e generazione | 4 |
@@ -29,6 +29,20 @@ Applies one effect or a chain (`list_effects`) and lands the result as a new ass
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
 | `effects`? | object[] |  |
+
+### `canvas_file` · W
+
+*Save a canvas to a .feega file, or import one*
+
+A canvas as a local .feega file, to carry work from a local feega to feega.app. save {project_id, canvas_id, path}: writes it (path = file or folder). import {project_id, path}: opens it as a new canvas. Free.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `action` | `save` \| `import` |  |
+| `project_id` | string |  |
+| `canvas_id`? | string | The canvas to save; required for save. |
+| `path` | string | Where to write the file (save) or the file to read (import). |
 
 ### `canvas_tool` · D
 
@@ -65,6 +79,7 @@ The one way to change a canvas: nodes, free elements, frames and what is inside 
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. |
 | `project_id`? | string |  |
+| `verbose`? | boolean | Whole documents back, not ids and changed fields. |
 | `ops`? | object[] |  |
 | `op`? | string | An op name from `describe`. |
 | `target`? | string | Id of the node or frame the op acts on. |
@@ -611,6 +626,7 @@ Add ONE row to any table in your org. `org_id` is filled in for you; naming a di
 | `org`? | string | Which org, if you belong to more than one. Omit to use the default. |
 | `table` | string |  |
 | `values` | object |  |
+| `verbose`? | boolean | Whole row back, not id and changed fields. |
 
 ### `query` · R
 
@@ -627,6 +643,8 @@ READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts
 | `order`? | object \| array |  |
 | `embed`? | object[] |  |
 | `offset`? | integer |  |
+| `cursor`? | string | `next_cursor` of the previous page. |
+| `verbose`? | boolean | Long values whole, bigger page. |
 | `count`? | `estimated` \| `exact` |  |
 | `limit`? | integer |  |
 
@@ -642,6 +660,7 @@ Change columns on rows that already exist in your org. Only the columns you send
 | `table` | string |  |
 | `where` | object[] |  |
 | `values` | object |  |
+| `verbose`? | boolean | Whole rows back, not ids and changed fields. |
 
 ## Nodi e generazione
 

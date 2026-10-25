@@ -25,6 +25,18 @@ export async function cmdCanvasUpload(project: string, file: string, opts: { can
   console.log(JSON.stringify(result, null, 2));
 }
 
+export async function cmdCanvasSave(project: string, canvasId: string, opts: { out?: string; org?: string }) {
+  const file = await canvasApi.saveFile(await token(), { project, canvasId }, opts.org);
+  const out = opts.out ?? file.name;
+  await writeFile(out, file.bytes);
+  console.log(out);
+}
+
+export async function cmdCanvasImport(project: string, file: string, opts: { org?: string }) {
+  const result = await canvasApi.importFile(await token(), { project, bytes: new Uint8Array(await readFile(file)) }, opts.org);
+  console.log(JSON.stringify(result, null, 2));
+}
+
 type FrameOpts = { canvas: string; x: number; y: number; w: number; h?: number; format?: string; org?: string };
 
 export async function cmdCanvasFrame(project: string, opts: FrameOpts) {

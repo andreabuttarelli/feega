@@ -184,6 +184,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     type WiredListSource
   } from '$lib/canvas/list-node';
   import { verdictForUpload, canvasUploadPrefix } from '$lib/canvas/upload-kind';
+  import { isFeegaFile } from '$lib/canvas/feega-file';
+  import { importFeega } from '$lib/canvas/feega-transfer';
   import { FONT_FILE } from '$lib/motion/fonts/library';
   import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
   import { isUploadedNodeRow, uploadedNodeOf } from '$lib/canvas/uploaded-node';
@@ -1925,6 +1927,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function upload(file: File, at = { x: 0, y: 0 }, hold: FrameHold | null = null) {
+    if (isFeegaFile(file)) {
+      failed = (await importFeega(`/p/${data.projectId}/c/${data.canvas.id}`, file)) ?? failed;
+      return;
+    }
     if (FONT_FILE.test(file.name)) {
       await uploadFontFile(file);
       return;

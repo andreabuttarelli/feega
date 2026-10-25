@@ -53,6 +53,8 @@ import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } 
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { RestoreOutcome, listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
+import { FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 import { answerMention } from '$lib/server/canvas/comment-agent';
 import { httpAgent } from '$lib/server/canvas/comment-agent-http';
 import { runInBackground } from '$lib/server/background-work';
@@ -1567,6 +1569,29 @@ export const actions: Actions<CanvasParams> = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
     return { version: await saveCanvasVersion(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, name: String(fd.get('name') ?? ''), actor: userActor(scope) }) };
+  },
+
+  export_canvas_file: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const at = { orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId };
+    const file = await exportCanvasFile(scope.db, at);
+    return file ? { name: file.name, url: await storeCanvasFile(scope.db, at, file) } : fail(404, { error: 'This canvas does not exist' });
+  },
+
+  request_canvas_import: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    return signCanvasFileUpload(scope.db, scope.orgId);
+  },
+
+  import_canvas_file: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const projectId = scope.canvas.projectId;
+    const path = String((await request.formData()).get('path') ?? '');
+    const out = await importStoredCanvasFile(scope.db, { orgId: scope.orgId, projectFor: async () => projectId, path, actor: userActor(scope) });
+    if (out.outcome === FeegaImport.Refused) {
+      return fail(400, { error: FEEGA_REFUSAL_MESSAGE[out.refusal] });
+    }
+    throw redirect(303, canvasPath(projectId, out.canvas.id));
   },
 
   canvasVersions: async ({ params, locals }) => {

@@ -163,7 +163,11 @@ element in full), `activity { canvas_id, since? }` (recent events and running ru
 readable from the server), `snapshot { node_id, time?, width? }` (the frame as an image; needs the
 server renderer and says `server_frames_unavailable` when it is closed).
 
+`canvas_file` saves a canvas to a `.feega` file or imports one (local MCP only; `feega canvas save` / `feega canvas import`).
+
 ## Work a canvas with the chat's checks
+
+`canvas_file` saves a canvas to a `.feega` file on the local disk or opens one back as a new canvas.
 
 `canvas_tool` runs the project chat's own canvas ops on one `project_id`: `op` names it, `input`
 carries its fields in camelCase. List canvases, nodes and runs; create, update, move, connect and

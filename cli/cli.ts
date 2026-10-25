@@ -476,6 +476,25 @@ canvas
   });
 
 canvas
+  .command('save <projectId> <canvasId>')
+  .description('Save a whole canvas as a .feega file: nodes, lines, frames and their media (free)')
+  .option('--out <file>', 'Where to save it (default: <canvas name>.feega)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, canvasId: string, opts) => {
+    const { cmdCanvasSave } = await import('./commands/canvas.ts');
+    await cmdCanvasSave(projectId, canvasId, opts);
+  });
+
+canvas
+  .command('import <projectId> <file>')
+  .description('Open a .feega file as a new canvas in a project, e.g. one saved from a local instance')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, file: string, opts) => {
+    const { cmdCanvasImport } = await import('./commands/canvas.ts');
+    await cmdCanvasImport(projectId, file, opts);
+  });
+
+canvas
   .command('frame <projectId>')
   .description('Draw an empty frame on a canvas, like the frame tool: a box in canvas units, or a width and a preset format')
   .requiredOption('--canvas <id>', 'The canvas')

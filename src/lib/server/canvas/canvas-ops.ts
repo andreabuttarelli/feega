@@ -47,6 +47,9 @@ import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-exp
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { canvasPath } from '$lib/server/tenancy/entry';
+import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
+import { FEEGA_MAX_BYTES, FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
 import { combineScenes, MAX_SCENES } from '$lib/server/motion/combine-scenes';
 import { insertTemplate } from '$lib/server/canvas/templates';
@@ -1070,6 +1073,34 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ canvasId: z.string(), name: z.string().max(60).describe('e.g. "Client review"') }).strict(),
     run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? saveCanvasVersion(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, name: input.name, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  export_canvas_file: op({
+    access: Access.Read,
+    audience: Audience.BytesSenders,
+    input: z.object({ canvasId: z.string() }).strict(),
+    run: async (ctx, input) => {
+      const scope = { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId };
+      const file = (await inProject(ctx, input.canvasId)) ? await exportCanvasFile(ctx.db, scope) : null;
+      return file ? { name: file.name, bytes: file.bytes.byteLength, url: await storeCanvasFile(ctx.db, scope, file) } : NOT_IN_PROJECT;
+    }
+  }),
+
+  request_canvas_import: op({
+    access: Access.Write,
+    audience: Audience.BytesSenders,
+    input: z.object({ bytes: z.number().int().positive().max(FEEGA_MAX_BYTES) }).strict(),
+    run: async (ctx) => ({ ...(await signCanvasFileUpload(ctx.db, ctx.orgId)), then: 'PUT the file to uploadUrl, then import_canvas_file with this path.' })
+  }),
+
+  import_canvas_file: op({
+    access: Access.Write,
+    audience: Audience.BytesSenders,
+    input: z.object({ path: z.string().describe('from request_canvas_import') }).strict(),
+    run: async (ctx, input) => {
+      const out = await importStoredCanvasFile(ctx.db, { orgId: ctx.orgId, projectFor: async () => ctx.projectId, path: input.path, actor: ctx.actor });
+      return out.outcome === FeegaImport.Imported ? { canvas: out.canvas, path: canvasPath(ctx.projectId, out.canvas.id) } : { error: out.refusal, message: FEEGA_REFUSAL_MESSAGE[out.refusal] };
+    }
   }),
 
   list_canvas_versions: op({
