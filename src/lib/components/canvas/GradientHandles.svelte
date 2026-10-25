@@ -1,6 +1,6 @@
 <script lang="ts">
   import { GradientGrip, draggedFill, gradientHandles, type Grab, type Pt } from '$lib/canvas/gradient-handles';
-  import type { Fill } from '$lib/motion/fill/model';
+  import type { Fill } from '@feega/motion-core/motion/fill/model';
 
   type Rect = { left: number; top: number; width: number; height: number };
 

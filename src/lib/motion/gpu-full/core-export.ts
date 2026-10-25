@@ -1,5 +1,5 @@
 import { BACKENDS, type FullBackend } from './backends';
-import { drawFrame, type Prepared } from './display-list';
+import { drawFrame, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
 import { createMedia } from './media';
 import { readClips, type CustomReads } from './dom/custom';
 import type { CoreRaster } from './core-web';

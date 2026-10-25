@@ -1,10 +1,10 @@
-import { Background, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+import { Background, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { CANVAS_INK, CanvasTheme, drawClip, penClip, penPaint } from '$lib/motion/draw-create';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { groupClips } from '$lib/motion/group';
-import { mapOutline, parsePath, type Pt } from '$lib/motion/shape/geometry';
+import { mapOutline, parsePath, type Pt } from '@feega/motion-core/motion/shape/geometry';
 import { svgShapes, type SvgText } from '$lib/motion/shape/svg-import';
-import { NEW_TEXT_SIZING } from '$lib/motion/text-sizing';
+import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
 import { figmaIntoFrame, type FigmaImage } from './figma/figma-doc';
 
 export type FramePaste = { svg: string } | { text: string } | { figma: string };

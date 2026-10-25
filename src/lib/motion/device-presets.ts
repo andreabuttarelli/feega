@@ -1,8 +1,8 @@
-import { Ease, FPS } from './design';
-import { findClip, type MotionDoc } from './doc';
-import { Device, DEVICE, DeviceKind } from './devices';
-import type { Keyframe } from './keyframes';
-import { addClip, setKeyframes, type OpResult } from './timeline';
+import { Ease, FPS } from '@feega/motion-core/motion/design';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Device, DEVICE, DeviceKind } from '@feega/motion-core/motion/devices';
+import type { Keyframe } from '@feega/motion-core/motion/keyframes';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum DevicePreset {
   SpinIn = 'spin-in',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ItemKind, type Item, type PathItem, type ImageItem } from '$lib/motion/gpu-full/display-list';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
+import { ItemKind, type Item, type PathItem, type ImageItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import { faceOf } from '$lib/canvas/gpu/card-face';
 import { NODE_PORTS } from '$lib/canvas/node-ports';
 import { CardPart, cardItems, type CoreCard } from './cards';

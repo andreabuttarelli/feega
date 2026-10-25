@@ -1,11 +1,11 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FORMATS, MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { FORMATS, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { BUILTIN_TEMPLATES, builtinTemplate } from './builtins';
 import { PROMPT_TEMPLATE_ID } from './prompt-input/template';
 import { SectionRole } from './card';
 import { ComponentKind, FORMATS_OF_MODE, POSTER_FORMATS, byShape, catalogue, libraryFormat, componentKind, matching, metaLine, posterShelf, previewOf, rolesIn, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
-import { DocMode } from '$lib/motion/still';
+import { DocMode } from '@feega/motion-core/motion/still';
 import PREVIEWED from './previews.json';
 
 const entry = (id: string) => {

@@ -1,10 +1,10 @@
-import { TrackKind, type ComponentId } from './components';
-import { Ease, FPS, TransitionKind, type Edge } from './design';
-import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
-import type { EaseSpec, KeyValue, Transform } from './keyframes';
-import type { MaskInput } from './mask';
-import type { FontFace } from './fonts/model';
-import { addClip } from './timeline';
+import { TrackKind, type ComponentId } from '@feega/motion-core/motion/components';
+import { Ease, FPS, TransitionKind, type Edge } from '@feega/motion-core/motion/design';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { EaseSpec, KeyValue, Transform } from '@feega/motion-core/motion/keyframes';
+import type { MaskInput } from '@feega/motion-core/motion/mask';
+import type { FontFace } from '@feega/motion-core/motion/fonts/model';
+import { addClip } from '@feega/motion-core/motion/timeline';
 
 export const s = (seconds: number) => Math.round(seconds * FPS);
 

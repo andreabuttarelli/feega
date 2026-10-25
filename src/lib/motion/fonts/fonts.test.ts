@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setProps, type OpResult } from '../timeline';
-import { FEEGA_TOKENS } from '../brand';
-import { composeHtml } from '../hyperframes/compose';
-import { cspPolicy } from '../hyperframes/csp';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { cspPolicy } from '@feega/motion-core/motion/hyperframes/csp';
 import { writeComponent } from '../custom/ops';
-import { extractParams } from '../custom/params';
-import { BuiltinFont, fontStack, fontsFrom, googleFontsUrl, searchFonts, usedFaces, type CatalogueFont } from './model';
+import { extractParams } from '@feega/motion-core/motion/custom/params';
+import { BuiltinFont, fontStack, fontsFrom, googleFontsUrl, searchFonts, usedFaces, type CatalogueFont } from '@feega/motion-core/motion/fonts/model';
 import { registerUpload, removeFont, setFont } from './ops';
 import { familyFromFileName, fontFamilies, fontFileOf, missingUploads } from './library';
 

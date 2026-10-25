@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, addTrack, setTrackMatte, type OpResult } from '../timeline';
-import { TrackKind } from '../components';
-import { Matte } from '../mask';
-import { composeHtml } from '../hyperframes/compose';
-import { LIVE_GLOBAL } from './runtime';
-import { Liveness, PlayMode } from './settings';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, addTrack, setTrackMatte, type OpResult } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { Matte } from '@feega/motion-core/motion/mask';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { LIVE_GLOBAL } from '@feega/motion-core/motion/interactive/runtime';
+import { Liveness, PlayMode } from '@feega/motion-core/motion/interactive/settings';
 import { InteractivePreset, applyInteractivePreset } from './presets';
 import { SELF_SCROLL, STANDALONE_MS, embedSettings, interactiveBundle, livePage, upgradePlayer } from './bundle';
 import { LIVE_MESSAGE } from './live-bridge';
 import { HOST_MESSAGE } from './host';
-import { HOSTED, MOTION_LIBS_ROUTE, Script, scriptUrl } from '../libs/catalog';
+import { HOSTED, MOTION_LIBS_ROUTE, Script, scriptUrl } from '@feega/motion-core/motion/libs/catalog';
 import { writeComponent } from '../custom/ops';
-import { ComponentMode } from '../custom/component';
-import { EVENT_MESSAGE } from '../custom/runtime';
+import { ComponentMode } from '@feega/motion-core/motion/custom/component';
+import { EVENT_MESSAGE } from '@feega/motion-core/motion/custom/runtime';
 
 function ok(result: OpResult): MotionDoc {
   if (!result.ok) {

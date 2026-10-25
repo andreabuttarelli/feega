@@ -13,10 +13,10 @@ import { FORMAT_OF_ASPECT } from '$lib/canvas/composition-template';
 import type { CompositionNode } from '$lib/canvas/composition-node';
 import { saveMotionDoc } from './editor';
 import { applyDraft, composeEditorPath, draftFromDoc, draftFromNode, slotsOf, withEmbeds, type ComposeDraft, type ComposeMedia, type MotionSources } from '$lib/motion/composition-draft';
-import type { MotionDoc } from '$lib/motion/doc';
-import { COMPOSITION_MEDIA_KINDS } from '$lib/motion/components';
-import { newMotionDoc } from '$lib/motion/doc';
-import type { CompositionLayout } from '$lib/canvas/composition/index';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { COMPOSITION_MEDIA_KINDS } from '@feega/motion-core/motion/components';
+import { newMotionDoc } from '@feega/motion-core/motion/doc';
+import type { CompositionLayout } from '@feega/motion-core/canvas/composition';
 
 export type ComposeDeps = FromTemplateDeps & {
   saveMotionDoc: typeof saveMotionDoc;

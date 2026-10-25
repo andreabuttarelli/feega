@@ -1,4 +1,4 @@
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { GOOGLE_FONTS } from '../fonts/catalogue';
 import { BUILTIN_PREFIX } from '../template/design-kit';
 import { exposeField, FieldType } from '../template/fields';

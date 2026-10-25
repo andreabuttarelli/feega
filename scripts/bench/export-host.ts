@@ -1,5 +1,5 @@
 import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
-import { FrameFormat, Layering, Settle } from '$lib/motion/hyperframes/capture';
+import { FrameFormat, Layering, Settle } from '@feega/motion-core/motion/hyperframes/capture';
 import { shootInLanes } from '$lib/motion/export/lanes';
 import { encodeMp4 } from '$lib/motion/export/encode';
 import { frameOf } from '$lib/motion/export/webgl-device';

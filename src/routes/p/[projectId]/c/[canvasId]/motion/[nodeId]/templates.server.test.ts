@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
-import { precompose } from '$lib/motion/precomp';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { exposeField, FieldType } from '$lib/motion/template/fields';
 import { templatesDb } from '$lib/server/motion/templates-testing';
-import { TrackKind } from '$lib/motion/components';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { insertTemplate } from '$lib/motion/template/library';
 import { PROMPT_INPUT_TEMPLATE } from '$lib/motion/template/prompt-input/template';
 

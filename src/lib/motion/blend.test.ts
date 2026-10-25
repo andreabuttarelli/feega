@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { FEEGA_TOKENS } from './brand';
-import { composeHtml } from './hyperframes/compose';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { setParent } from './parent-ops';
-import { setCamera } from './camera-ops';
-import { cameraMath, stageSpec } from './camera';
-import { sampleTrack } from './keyframes';
-import { BLEND_MODES, BlendMode } from './blend';
+import { setCamera } from '@feega/motion-core/motion/camera-ops';
+import { cameraMath, stageSpec } from '@feega/motion-core/motion/camera';
+import { sampleTrack } from '@feega/motion-core/motion/keyframes';
+import { BLEND_MODES, BlendMode } from '@feega/motion-core/motion/blend';
 import { setBlendMode } from './blend-ops';
 
 function ok(r: OpResult): MotionDoc {

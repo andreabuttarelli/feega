@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { flattenComps, precompose } from '../precomp';
-import { addClip, setProps, type OpResult } from '../timeline';
-import { RING_NUMBERS, ringSliceId, slicesFor } from '../ring/model';
-import { baseValue, isAnimatable } from '../keyframes';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { flattenComps, precompose } from '@feega/motion-core/motion/precomp';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { RING_NUMBERS, ringSliceId, slicesFor } from '@feega/motion-core/motion/ring/model';
+import { baseValue, isAnimatable } from '@feega/motion-core/motion/keyframes';
 import { Unit, unitOf } from '../units';
-import { composeHtml } from './compose';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

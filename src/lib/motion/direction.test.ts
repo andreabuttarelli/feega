@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { Side, addClip, removeClips, setTransition } from './timeline';
-import { precompose } from './precomp';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Side, addClip, removeClips, setTransition } from '@feega/motion-core/motion/timeline';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { writeComponent } from './custom/ops';
 import { Quality, SEVERITY, Severity, blocking, blockingFor, docProblems, frameProblems, type QualityProblem } from './direction';
 import { Forbidden, STYLES, Script } from './style';
 import supasitoV1 from './fixtures/supasito-v1.json';
-import { Ease, TransitionKind } from './design';
+import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
-import { MOTION_STYLES, MotionStyle } from './style-model';
+import { MOTION_STYLES, MotionStyle } from '@feega/motion-core/motion/style-model';
 import { UI_KIT, UiKind } from './ui-kit/kit';
 import { writeComponent } from './custom/ops';
-import { ComponentMode } from './custom/component';
+import { ComponentMode } from '@feega/motion-core/motion/custom/component';
 import { Isolate, focusUi } from './ui-focus';
-import { JunctionKind } from './junctions';
+import { JunctionKind } from '@feega/motion-core/motion/junctions';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {

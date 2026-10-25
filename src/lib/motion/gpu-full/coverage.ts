@@ -1,4 +1,4 @@
-import type { Affine } from '../affine';
+import type { Affine } from '@feega/motion-core/motion/affine';
 import { program } from './gl-kit';
 
 export type Box = [x0: number, y0: number, x1: number, y1: number];

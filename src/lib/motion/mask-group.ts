@@ -1,7 +1,7 @@
-import type { MotionClip, MotionDoc } from './doc';
-import { Matte } from './mask';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { Matte } from '@feega/motion-core/motion/mask';
 import { layerOrder } from './siblings';
-import type { OpResult } from './timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 type Membership = { matte: Matte; matteFrom: string | null };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { StyleKind } from '$lib/motion/styles-model';
+import { StyleKind } from '@feega/motion-core/motion/styles-model';
 import { StyleLibrary } from './style-library.svelte';
 
 const HEADLINE = { kind: StyleKind.Text, size: 0.2, weight: 600 } as const;

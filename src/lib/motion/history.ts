@@ -1,5 +1,5 @@
-import type { MotionDoc } from './doc';
-import type { CustomSource } from './custom/component';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { CustomSource } from '@feega/motion-core/motion/custom/component';
 import { applyOps, diffDoc } from './doc-ops';
 import { Agent } from './agent-state';
 

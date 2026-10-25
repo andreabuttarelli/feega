@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { defineStyle } from '$lib/motion/styles';
-import { StyleKind } from '$lib/motion/styles-model';
+import { StyleKind } from '@feega/motion-core/motion/styles-model';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { canvasStyle, type StyleFrames } from './canvas-styles';
 

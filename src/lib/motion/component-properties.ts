@@ -1,8 +1,8 @@
-import type { MotionClip, MotionDoc } from './doc';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { componentOf, innerClips, instanceOf } from './main-component';
-import { PropertyKind, type PropertyDef, type PropertyValue, type PropertyValues } from './property-resolve';
-import { setProps, type OpResult } from './timeline';
-import { compOf } from './doc';
+import { PropertyKind, type PropertyDef, type PropertyValue, type PropertyValues } from '@feega/motion-core/motion/property-resolve';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { compOf } from '@feega/motion-core/motion/doc';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 

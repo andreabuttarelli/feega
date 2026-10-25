@@ -1,4 +1,4 @@
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { OutputKind, mediaElement, placeElement, type Placed } from '$lib/motion/move-element';
 
 const FRAME_CENTRE = { x: 0.5, y: 0.5 };

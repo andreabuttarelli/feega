@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { exportRowsSchema } from '$lib/motion/export-rows';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { addClip } from '$lib/motion/timeline';
-import { displayListAt } from '$lib/motion/gpu-full/display-list';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { displayListAt } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { ExportPage, ExportPort, PageBox, Viewport } from './server-frames';
 import { drawTargets } from './selection-draw';
 import type { DrawTarget } from './selection-export';

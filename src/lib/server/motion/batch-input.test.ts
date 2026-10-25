@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { batchInput, rowRequests } from './batch-input';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { exposeField, FieldType } from '$lib/motion/template/fields';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { Preset, settingsOf } from '$lib/motion/export-formats';
 import { MAX_BATCH_ROWS } from '$lib/motion/template/batch';
 import { insertTemplate, templateFromDoc } from '$lib/motion/template/library';

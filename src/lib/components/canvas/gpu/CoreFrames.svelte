@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { drawFrame, prepare, type DisplayList, type Prepared } from '$lib/motion/gpu-full/display-list';
-  import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
+  import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+  import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { loadFonts } from '$lib/motion/gpu-full/text/load';
   import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
   import { createMedia, Readiness, VideoPreload } from '$lib/motion/gpu-full/media';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Outcome } from '$lib/motion/gpu-full/core-outcome';
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
-  import { ItemKind } from '$lib/motion/gpu-full/display-list';
+  import { ItemKind } from '@feega/motion-core/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '$lib/canvas/core/group-diff';
@@ -15,7 +15,7 @@
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentOverlay, SentUses } from '$lib/canvas/core/use-diff';
-  import type { PathItem } from '$lib/motion/gpu-full/display-list';
+  import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
   import { drawsWhole, frameOfLive, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
@@ -65,7 +65,7 @@
     if (!host || !readClips(source.doc).read.length) {
       return null;
     }
-    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('$lib/motion/gpu-full/dom/custom'), import('$lib/motion/hyperframes/compose'), import('$lib/motion/interactive/settings')]);
+    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('$lib/motion/gpu-full/dom/custom'), import('@feega/motion-core/motion/hyperframes/compose'), import('@feega/motion-core/motion/interactive/settings')]);
     await whenQuiet(() => gesture.active() || edited.size > 0);
     return domRead(fromView(f), async (signal) => {
       const mounting = mountCustomReads(host, (only) => composeHtml({ doc: source.doc, tokens: source.tokens, assets: source.assets, liveness: Liveness.Baked, target: Target.Screen, only }), prepared);

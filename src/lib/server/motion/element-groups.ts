@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import { FrameKind, elementNodeOf, frameChrome } from '$lib/canvas/motion-node';
 import { rotateGroup, scaleGroup, translateGroup, type Placed } from '$lib/canvas/node-layout';
-import { Background, type MotionDoc } from '$lib/motion/doc';
+import { Background, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { blankElement, type CanvasBox } from '$lib/motion/draw-create';
 import { clipCentre, elementBox, frameOf, liftElement, placeElement, type Element } from '$lib/motion/move-element';
-import { docMode } from '$lib/motion/still';
+import { docMode } from '@feega/motion-core/motion/still';
 import { elementName } from '$lib/motion/element-name';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import { MoveOutcome, created, deleted, refused, type FrameStore, type Moved, type Place, type StoredFrame } from './move-element';

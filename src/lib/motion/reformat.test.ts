@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { reformat } from './reformat';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { DEFAULT_AUTO_LAYOUT } from './layout/model';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {

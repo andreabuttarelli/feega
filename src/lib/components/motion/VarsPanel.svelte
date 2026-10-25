@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import type { OpResult } from '$lib/motion/timeline';
-  import { interactiveOf } from '$lib/motion/interactive/settings';
-  import { VAR_KINDS, VarKind, bindTargets, bindVar, declareVar, removeVar, starterVar, type VarDecl, type VarValue, type VarValues } from '$lib/motion/interactive/vars';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { interactiveOf } from '@feega/motion-core/motion/interactive/settings';
+  import { VAR_KINDS, VarKind, bindTargets, bindVar, declareVar, removeVar, starterVar, type VarDecl, type VarValue, type VarValues } from '@feega/motion-core/motion/interactive/vars';
 
   let {
     doc,

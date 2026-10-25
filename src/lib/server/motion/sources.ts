@@ -1,6 +1,6 @@
 import { readHead } from '$lib/server/repos/motion-revisions';
 import { assetUrls, motionAssets, namedAssets, type AssetSigner, type MotionScope } from './editor';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { mayUseAssets, mentionedIds, referencedAssets } from '$lib/motion/doc-assets';
 
 export type MotionSource = { revision: number; doc: MotionDoc; assets: Record<string, string> };

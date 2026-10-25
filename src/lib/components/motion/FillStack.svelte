@@ -1,15 +1,15 @@
 <script lang="ts">
   import { cn } from '$lib/utils.js';
   import { FIELD_INPUT, FOCUS_RING, MENU_CONTENT, MENU_ITEM, SECTION_LABEL } from '$lib/components/ui/shell/styles';
-  import { BLEND_MODES } from '$lib/motion/blend';
-  import { resolveColor, type BrandTokens } from '$lib/motion/brand';
-  import { FILL_LABEL, FILL_TYPES, FillType, IMAGE_CONTROLS, IMAGE_FITS, IMAGE_FIT_LABEL, ImageControl, addFill, cropOf, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '$lib/motion/fill/model';
+  import { BLEND_MODES } from '@feega/motion-core/motion/blend';
+  import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
+  import { FILL_LABEL, FILL_TYPES, FillType, IMAGE_CONTROLS, IMAGE_FITS, IMAGE_FIT_LABEL, ImageControl, addFill, cropOf, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '@feega/motion-core/motion/fill/model';
   import ColorField from './ColorField.svelte';
   import { SliderField } from '$lib/components/ui/control';
-  import { ADJUSTMENTS, ADJUSTMENT_LABEL, isNeutral, type Adjustment } from '$lib/motion/fill/adjust';
+  import { ADJUSTMENTS, ADJUSTMENT_LABEL, isNeutral, type Adjustment } from '@feega/motion-core/motion/fill/adjust';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
-  import { FillField, fillKey } from '$lib/motion/fill/keys';
+  import { FillField, fillKey } from '@feega/motion-core/motion/fill/keys';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import { stopCss, swatchOf } from '$lib/motion/fill/swatch';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { LAYOUTS } from '$lib/canvas/composition/index';
-import { MotionFormat, newMotionDoc, parseMotionDoc } from '$lib/motion/doc';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { composeHtml } from '$lib/motion/hyperframes/compose';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
+import { MotionFormat, newMotionDoc, parseMotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { BUILTIN_TEMPLATES, builtinTemplate } from './builtins';
 import { insertTemplate, setTemplateValues, templateFields } from './library';
-import { FieldType } from './field-model';
+import { FieldType } from '@feega/motion-core/motion/template/field-model';
 
 const ids = () => {
   let n = 0;

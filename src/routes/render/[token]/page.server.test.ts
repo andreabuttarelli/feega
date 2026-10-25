@@ -39,7 +39,7 @@ vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/motion-revisions')>()),
   readCheckpoint: async (_db: unknown, input: { version: number }) => {
     store.revisions.push(input.version);
-    const { newMotionDoc, MotionFormat } = await import('$lib/motion/doc');
+    const { newMotionDoc, MotionFormat } = await import('@feega/motion-core/motion/doc');
     return { version: input.version, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actorKind: 'user' };
   }
 }));

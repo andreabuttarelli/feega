@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import MotionPreview from './MotionPreview.svelte';
-import { Background } from '$lib/motion/doc';
+import { Background } from '@feega/motion-core/motion/doc';
 
 const body = (background?: Background) => render(MotionPreview, { props: { html: '<div></div>', width: 100, height: 100, ...(background ? { background } : {}) } }).body;
 

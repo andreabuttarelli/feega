@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newClip, newMotionDoc, type MotionDoc } from '../doc';
-import { COMPONENTS } from '../components';
-import { composeHtml } from './compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 
 function docWith(props: Record<string, unknown>): MotionDoc {
   const doc = newMotionDoc(MotionFormat.Square);

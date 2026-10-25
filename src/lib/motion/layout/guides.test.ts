@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { Direction } from './auto-layout';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { StripKind, dragStrip, layoutStrips, reorderAt } from './guides';
-import { DEFAULT_AUTO_LAYOUT } from './model';
+import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
 import { setAutoLayout, wrapInAutoLayout } from './ops';
 
 function must(r: OpResult | null): MotionDoc {

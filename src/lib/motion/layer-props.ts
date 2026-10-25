@@ -1,5 +1,5 @@
-import { findClip, type MotionDoc } from './doc';
-import { setKeyframes, setTransform, type OpResult } from './timeline';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setKeyframes, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum Flip {
   Horizontal = 'horizontal',

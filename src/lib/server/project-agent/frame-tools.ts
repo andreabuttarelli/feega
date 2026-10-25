@@ -2,7 +2,7 @@ import { tool, type Tool } from 'ai';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import { SIDEBAR_AGENT_KEY, agentActor } from '$lib/server/repos/actor';
-import { DocMode } from '$lib/motion/still';
+import { DocMode } from '@feega/motion-core/motion/still';
 import { DESCRIBE_FRAMES, VIEW_FRAMES, docTexts, withFrames, type Frame } from '$lib/server/motion/frames';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { ToolRun, motionToolList, motionToolSpec, runMotionTool, type EditorFrames } from '$lib/server/motion/tool-run';

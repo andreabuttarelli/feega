@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { installEngine, type TestTimeline } from '../engine/testing';
-import { FEEGA_TOKENS } from '../brand';
-import { BlendMode } from '../blend';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { EffectKind } from '../effects/registry';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { addEffect } from '../effects/ops';
-import { addAdjustment, precompose } from '../precomp';
+import { addAdjustment, precompose } from '@feega/motion-core/motion/precomp';
 import { setBlendMode } from '../blend-ops';
-import { addClip, setProps, type OpResult } from '../timeline';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { audioPlan } from '../audio-plan';
 import { seekPlan } from '../custom/determinism';
-import { composeHtml } from './compose';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

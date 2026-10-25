@@ -1,12 +1,12 @@
 import type { z } from 'zod';
-import { findClip, type MotionClip, type MotionDoc } from './doc';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { fieldsOf } from './inspector';
-import { FillType } from './fill/model';
-import { FILLED, elementFills } from './fill/elements';
-import { effectOfKey, effectsProblem, type Effect } from './effects/model';
-import { editClip, setProps, type OpResult } from './timeline';
-import { COMPONENTS, TrackKind, type ComponentId } from './components';
-import { STYLE_NAME, StyleKind, styleSchema, stylesSchema, type Style, type textStyleSchema, type colourStyleSchema } from './styles-model';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { FILLED, elementFills } from '@feega/motion-core/motion/fill/elements';
+import { effectOfKey, effectsProblem, type Effect } from '@feega/motion-core/motion/effects/model';
+import { editClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { COMPONENTS, TrackKind, type ComponentId } from '@feega/motion-core/motion/components';
+import { STYLE_NAME, StyleKind, styleSchema, stylesSchema, type Style, type textStyleSchema, type colourStyleSchema } from '@feega/motion-core/motion/styles-model';
 
 export { StyleKind };
 

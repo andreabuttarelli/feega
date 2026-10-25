@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { cursorPlan } from './cursor-plan';
-import { springSource } from '../spring';
+import { springSource } from '@feega/motion-core/motion/spring';
 
 export enum UiKind {
   LinkShortener = 'link-shortener',

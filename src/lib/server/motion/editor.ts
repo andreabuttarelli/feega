@@ -1,4 +1,4 @@
-import { isInteractive } from '$lib/motion/interactive/settings';
+import { isInteractive } from '@feega/motion-core/motion/interactive/settings';
 import type { Db } from '$lib/server/db/client';
 import { findAssets, listFontAssets, listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
 import { findBrandLook } from '$lib/server/repos/brands';
@@ -7,11 +7,11 @@ import { appendRevision, readHead, RevisionOutcome, type Checkpoint, type Motion
 import type { Actor } from '$lib/server/repos/actor';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { docNodeSize, motionOf, type MotionNode } from '$lib/canvas/motion-node';
-import { formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { AssetKind } from '$lib/motion/components';
-import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '$lib/motion/brand';
+import { formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { AssetKind } from '@feega/motion-core/motion/components';
+import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '@feega/motion-core/motion/brand';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
-import { fontsFrom } from '$lib/motion/fonts/model';
+import { fontsFrom } from '@feega/motion-core/motion/fonts/model';
 import { fontFileOf } from '$lib/motion/fonts/library';
 
 export type MotionAsset = { id: string; kind: AssetKind; label: string; previewUrl: string; url: string | null; seconds?: number | null; width?: number | null; height?: number | null };

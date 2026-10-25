@@ -2,7 +2,7 @@ import type { AudioEntry } from '$lib/motion/audio-plan';
 import { chunkPlan, type ChunkPlan } from '$lib/motion/server-render';
 import { FLAT_FRAME_MS, frameCosts, type CostSpan } from '$lib/motion/render-cost';
 import { CHUNK_VCPUS, RenderClass, WHOLE_VCPUS } from '$lib/motion/render-quote';
-import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from '$lib/motion/hyperframes/csp';
+import { FONT_CSS_ORIGIN, FONT_FILE_ORIGIN } from '@feega/motion-core/motion/hyperframes/csp';
 import { ExportFormat, FORMAT, Master, Quality, type GifOptions } from '$lib/motion/export-formats';
 import { assembleArgs, audioMixArgs, concatList, zipArgs } from './render-commands';
 import { FARM_JOB_DIR, FARM_RUNTIME_DIR, type FarmWorker, type RenderFarm } from './render-farm';

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { LIVE_ENTRY, bundleSource } from './motion-bundles';
-import { GENERATIVE_ENTRY } from '../src/lib/motion/custom/generative';
-import { TWGL_ENTRY } from '../src/lib/motion/custom/twgl';
-import { FX_ENTRY } from '../src/lib/motion/custom/fx';
-import { SPLITTING_ENTRY } from '../src/lib/motion/custom/splitting';
-import { OPEN_PROPS_ENTRY } from '../src/lib/motion/custom/open-props';
+import { GENERATIVE_ENTRY } from '@feega/motion-core/motion/custom/generative';
+import { TWGL_ENTRY } from '@feega/motion-core/motion/custom/twgl';
+import { FX_ENTRY } from '@feega/motion-core/motion/custom/fx';
+import { SPLITTING_ENTRY } from '@feega/motion-core/motion/custom/splitting';
+import { OPEN_PROPS_ENTRY } from '@feega/motion-core/motion/custom/open-props';
 
 const MAX_RUNTIME_BYTES = 40 * 1024;
 const MAX_GENERATIVE_BYTES = 200 * 1024;

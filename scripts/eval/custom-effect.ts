@@ -6,9 +6,9 @@ import { createE2eSession, teardownE2eSession, type E2eSession } from '../../tes
 import { askMotion, askStatus } from '$lib/server/motion/ask';
 import { chromiumFrames } from '$lib/server/motion/chromium-frames';
 import { drawFrames } from '$lib/server/motion/server-frames';
-import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, setProps } from '$lib/motion/timeline';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 
 const MODEL = env.CUSTOM_EFFECT_EVAL_MODEL ?? 'anthropic/claude-sonnet-5.5';
 const PROMPT = 'make a VHS effect and put it on clip 1';

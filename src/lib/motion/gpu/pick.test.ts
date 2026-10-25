@@ -1,18 +1,18 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { TransitionKind } from '../design';
-import { addClip, setTransform, setTransition, Side, type OpResult } from '../timeline';
-import { composeHtml } from '../hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { TransitionKind } from '@feega/motion-core/motion/design';
+import { addClip, setTransform, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { compileScene } from './scene';
 import { leafRectsAt, pickAt, pickOwnersAt, pickStackAt, quadOf, rectOf } from './pick';
 import { groupClips } from '../group';
 import { drawClip } from '../draw-create';
 import { DrawTool } from '../draw-tool';
-import { TextSizing } from '../text-sizing';
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { addEffect } from '../effects/ops';
-import { EffectKind } from '../effects/registry';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

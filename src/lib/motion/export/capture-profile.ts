@@ -1,7 +1,7 @@
-import { Settle } from '../hyperframes/capture';
+import { Settle } from '@feega/motion-core/motion/hyperframes/capture';
 import { laneCount } from './lanes';
 import { deviceInfo } from '../render-place';
-import { engineOf } from '../engine';
+import { engineOf } from '@feega/motion-core/motion/engine';
 
 export enum CaptureProfile {
   Fast = 'fast',

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { pivotOf } from '$lib/motion/parent';
-  import { pathAt, pathHandles, type PathHandle } from '$lib/motion/path';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { pivotOf } from '@feega/motion-core/motion/parent';
+  import { pathAt, pathHandles, type PathHandle } from '@feega/motion-core/motion/path';
   import { setPathTangent } from '$lib/motion/path-ops';
-  import { KeyEnd as Side } from '$lib/motion/graph';
+  import { KeyEnd as Side } from '@feega/motion-core/motion/graph';
   import { hostFraction } from '$lib/motion/host-point';
 
   let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();

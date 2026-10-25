@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { applyTextFit, textAutosize } from './text-autosize';
 

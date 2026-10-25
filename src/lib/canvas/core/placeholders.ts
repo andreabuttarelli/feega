@@ -1,7 +1,7 @@
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Screen } from '$lib/canvas/gpu/camera';
-import { ItemKind, type DisplayList, type ImageItem, type Item } from '$lib/motion/gpu-full/display-list';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
+import { ItemKind, type DisplayList, type ImageItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import type { Box } from './canvas-scene';
 import { line, rect, solid } from './shapes';
 

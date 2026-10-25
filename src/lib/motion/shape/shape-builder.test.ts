@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
-import { TrackKind } from '../components';
-import { addClip, addTrack, type OpResult } from '../timeline';
-import { flatten, parsePath } from './geometry';
-import { polygonArea } from './boolean';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { addClip, addTrack, type OpResult } from '@feega/motion-core/motion/timeline';
+import { flatten, parsePath } from '@feega/motion-core/motion/shape/geometry';
+import { polygonArea } from '@feega/motion-core/motion/shape/boolean';
 import { buildShapes, regionAt, shapeRegions } from './shape-builder';
 
 const ok = (r: OpResult): MotionDoc => {

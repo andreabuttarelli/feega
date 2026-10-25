@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { scenesOf, sequenceScenes } from '$lib/motion/scenes';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { insertScene, InsertOutcome } from './insert-scene';

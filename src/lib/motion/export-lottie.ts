@@ -1,11 +1,11 @@
 import { zipSync } from 'fflate';
-import { IDENTITY, apply2d, mul2d, type Affine } from './affine';
+import { IDENTITY, apply2d, mul2d, type Affine } from '@feega/motion-core/motion/affine';
 import { commonGap } from './export-gaps';
-import { MaskMode } from './mask';
-import { CoverKind } from './gpu-full/mask-layers';
-import { ItemKind, PaintKind, type DisplayList, type Item, type MaskLayer, type Paint, type PathItem } from './gpu-full/display-list';
-import { FillRule } from './gpu-full/paint';
-import type { Rgba } from './gpu-full/rgba';
+import { MaskMode } from '@feega/motion-core/motion/mask';
+import { CoverKind } from '@feega/motion-core/motion/gpu-full/mask-layers';
+import { ItemKind, PaintKind, type DisplayList, type Item, type MaskLayer, type Paint, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
+import type { Rgba } from '@feega/motion-core/motion/gpu-full/rgba';
 
 export type LottieMeta = { width: number; height: number; fps: number };
 

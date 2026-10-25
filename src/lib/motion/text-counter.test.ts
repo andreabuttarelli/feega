@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { newMotionDoc, MotionFormat } from './doc';
-import { addClip, setProps, type OpResult } from './timeline';
-import { CounterFormat, counterAt, counterSchema, counted, formatCounter, type Counter } from './text-counter';
+import { Ease } from '@feega/motion-core/motion/design';
+import { newMotionDoc, MotionFormat } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { CounterFormat, counterAt, counterSchema, counted, formatCounter, type Counter } from '@feega/motion-core/motion/text-counter';
 import { setTextCounter } from './text-counter-ops';
 
 const counter = (over: Partial<Counter> = {}): Counter => counterSchema.parse({ from: 0, to: 1000, start: 0, duration: 30, ease: Ease.Linear, ...over });

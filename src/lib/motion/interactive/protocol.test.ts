@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import * as react from '../../../../packages/feega-motion-react/src/protocol';
 import { EMBED_ROUTE, HOST_MESSAGE } from './host';
 import { Fit } from './fit';
-import { PlayMode } from './settings';
-import { VarKind } from './var-model';
+import { PlayMode } from '@feega/motion-core/motion/interactive/settings';
+import { VarKind } from '@feega/motion-core/motion/interactive/var-model';
 import { HostCommand, NATIVE_BRIDGE, PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEvent } from './protocol';
 
 const dart = readFileSync(new URL('../../../../packages/feega_motion_flutter/lib/src/protocol.dart', import.meta.url), 'utf8');

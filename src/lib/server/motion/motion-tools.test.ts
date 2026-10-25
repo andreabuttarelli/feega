@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { AssetKind } from '$lib/motion/components';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import { createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { MAX_VIEWS_PER_TURN } from './frames';
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip } from './timeline';
-import { MotionStyle } from './style-model';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
 import { contentEnd, fitDuration, fitNewVideo } from './fit-duration';
 import { docProblems, Quality } from './direction';
 

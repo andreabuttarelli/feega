@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from './brand';
-import { Ease } from './design';
-import { MotionFormat, findClip, newMotionDoc, type MotionClip, type MotionDoc } from './doc';
-import { addClip, setKeyframes, setProps, type OpResult } from './timeline';
-import { composeHtml } from './hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { audioPlan } from './audio-plan';
-import { keyframesProblem } from './keyframes';
-import { REMAP_KEY, clearTimeRemap, enableTimeRemap, freezeFrame, isRemapped, mediaSegments, sourceSeconds } from './time-remap';
+import { keyframesProblem } from '@feega/motion-core/motion/keyframes';
+import { REMAP_KEY, clearTimeRemap, enableTimeRemap, freezeFrame, isRemapped, mediaSegments, sourceSeconds } from '@feega/motion-core/motion/time-remap';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

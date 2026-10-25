@@ -1,8 +1,8 @@
-import { Ease } from '../design';
-import { findClip, type MotionDoc } from '../doc';
-import { setKeyframes, setProps, type OpResult } from '../timeline';
-import { ModifierKind, type Values } from './modifiers';
-import { modifierKey, type Modifier } from './schema';
+import { Ease } from '@feega/motion-core/motion/design';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setKeyframes, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { ModifierKind, type Values } from '@feega/motion-core/motion/shape/modifiers';
+import { modifierKey, type Modifier } from '@feega/motion-core/motion/shape/schema';
 import { removeModifier } from './ops';
 
 export enum ShapePreset {

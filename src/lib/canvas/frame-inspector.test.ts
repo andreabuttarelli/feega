@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Action } from '$lib/motion/actions';
 import { Command } from '$lib/motion/shortcuts';
 import { aabb, quadOf } from '$lib/motion/scene-select';
 import { propBoxes } from '$lib/motion/space';
 import { PropertiesView } from '$lib/motion/properties-view';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { FieldType, exposeField } from '$lib/motion/template/fields';
 import { insertTemplate, templateFromComp } from '$lib/motion/template/library';
-import { precompose } from '$lib/motion/precomp';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor } from './frame-inspector';
-import { findClip } from '$lib/motion/doc';
+import { findClip } from '@feega/motion-core/motion/doc';
 import { copyElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
-import { addTrack } from '$lib/motion/timeline';
-import { TrackKind } from '$lib/motion/components';
+import { addTrack } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {

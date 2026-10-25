@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { COMPONENTS, type ComponentId } from './components';
-import type { MotionClip, MotionDoc } from './doc';
-import { editClip, setProps, type OpResult } from './timeline';
+import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/components';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { editClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const STYLE_PROPS = ['fills', 'strokes', 'color', 'background', 'font', 'weight', 'italic', 'size', 'tracking', 'leading', 'textCase', 'stretch', 'slant', 'axes', 'radius'] as const;
 

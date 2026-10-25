@@ -1,7 +1,7 @@
-import { FillType, type Fill, type FillOf } from '$lib/motion/fill/model';
-import { elementFills } from '$lib/motion/fill/elements';
-import { findClip, type MotionDoc } from '$lib/motion/doc';
-import { setProps, type OpResult } from '$lib/motion/timeline';
+import { FillType, type Fill, type FillOf } from '@feega/motion-core/motion/fill/model';
+import { elementFills } from '@feega/motion-core/motion/fill/elements';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export type Pt = [number, number];
 export type Size = { width: number; height: number };

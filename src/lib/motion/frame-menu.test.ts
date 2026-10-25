@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { CANVAS_MENU, menuFor } from '$lib/canvas/selection-actions';
 import { FRAME_MENU_IDS, frameMenuRun, frameLayers, frameSummaries } from './frame-menu';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { groupClips } from './group';
 import { Command } from './shortcuts';
 import { Edge } from './space';

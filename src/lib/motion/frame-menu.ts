@@ -1,6 +1,6 @@
 import { ALIGN_ACTIONS, ALIGN_EDGE, type SelectionActionId } from '$lib/canvas/selection-actions';
 import { DocNodeType, FrameKind } from '$lib/canvas/motion-node';
-import { compOf, findClip, type MotionDoc } from './doc';
+import { compOf, findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { elementName } from './element-name';
 import { Command } from './shortcuts';
 import type { Edge } from './space';

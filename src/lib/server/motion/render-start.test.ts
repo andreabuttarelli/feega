@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newMotionDoc, MotionFormat } from '$lib/motion/doc';
+import { newMotionDoc, MotionFormat } from '@feega/motion-core/motion/doc';
 import { Preset, settingsOf } from '$lib/motion/export-formats';
 import { SERVER_RENDER_UNAVAILABLE } from '$lib/motion/server-render';
 import { RenderRefusal } from './render-run';

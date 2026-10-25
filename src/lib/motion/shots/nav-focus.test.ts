@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { writeComponent } from '../custom/ops';
 import { vectorPiece } from '../vector-ui/piece';
 import type { VectorUi } from '../vector-ui/model';

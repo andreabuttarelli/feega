@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import { PARTICLE_PRESETS, PRESET_PROPS, applyParticlePreset, type ParticlePreset } from '$lib/motion/particles/presets';
 
   let { doc, clip, onchange }: { doc: MotionDoc; clip: MotionClip; onchange: (doc: MotionDoc, summary: string) => void } = $props();

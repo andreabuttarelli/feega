@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FillType, fillsSchema } from './model';
+import { FillType, fillsSchema } from '@feega/motion-core/motion/fill/model';
 import { swatchOf } from './swatch';
 
 const paints = { color: (v: string) => v, picture: () => undefined };

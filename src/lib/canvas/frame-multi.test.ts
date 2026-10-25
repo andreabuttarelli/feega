@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { record, startHistory } from '$lib/motion/history';
 import { marqueeIds, primaryOf, spanOf, toggleId } from './frame-multi';
 

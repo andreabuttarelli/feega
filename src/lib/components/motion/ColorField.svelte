@@ -2,8 +2,8 @@
   import { localStore } from '$lib/browser-storage';
   import { onMount } from 'svelte';
   import { colourDrag, type LiveGesture } from '$lib/motion/live-edit';
-  import { BRAND_COLORS } from '$lib/motion/components';
-  import { resolveColor, type BrandTokens } from '$lib/motion/brand';
+  import { BRAND_COLORS } from '@feega/motion-core/motion/components';
+  import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
   import { COLOUR_FORMATS, ColourFormat, channelsOf, colourLabel, fromChannels, parseColour, readRecent, remember, type Channels } from '$lib/motion/colour-field';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';

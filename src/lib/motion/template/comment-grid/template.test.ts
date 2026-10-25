@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc } from '$lib/motion/doc';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { composeHtml } from '$lib/motion/hyperframes/compose';
-import { customValues, Strictness } from '$lib/motion/custom/component';
+import { MotionFormat, newMotionDoc, parseMotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { customValues, Strictness } from '@feega/motion-core/motion/custom/component';
 import { lintSource } from '$lib/motion/custom/lint';
-import { interactiveOf } from '$lib/motion/interactive/settings';
+import { interactiveOf } from '@feega/motion-core/motion/interactive/settings';
 import { builtinTemplate } from '../builtins';
 import { insertTemplate, setTemplateValues, templateFields } from '../library';
-import { FieldType } from '../field-model';
+import { FieldType } from '@feega/motion-core/motion/template/field-model';
 import { COMMENTS_COMPONENT, COMMENTS_PROPS } from './component';
 import { COMMENT_GRID_TEMPLATE, COMMENTS_KEY_FIELDS, COMMENTS_TEMPLATE_ID } from './template';
 

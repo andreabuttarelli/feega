@@ -1,11 +1,11 @@
-import { COMPONENTS, TrackKind, type ComponentId } from './components';
-import { MAX_SHORT_SIDE, MAX_SIDE, MAX_TRACKS, MotionFormat, cloneDoc, compsOf, findClip, newClip, newMotionDoc, type AssetRef, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
-import { FPS, maxFrames } from './design';
+import { COMPONENTS, TrackKind, type ComponentId } from '@feega/motion-core/motion/components';
+import { MAX_SHORT_SIDE, MAX_SIDE, MAX_TRACKS, MotionFormat, cloneDoc, compsOf, findClip, newClip, newMotionDoc, type AssetRef, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { FPS, maxFrames } from '@feega/motion-core/motion/design';
 import { fieldsOf } from './inspector';
 import { retimer } from './frame-rate';
-import { DocMode } from './still';
-import { removeClips, type OpResult } from './timeline';
-import { TRANSFORM } from './keyframes';
+import { DocMode } from '@feega/motion-core/motion/still';
+import { removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
+import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
 
 export type Point = { x: number; y: number };
 export type Size = { width: number; height: number };

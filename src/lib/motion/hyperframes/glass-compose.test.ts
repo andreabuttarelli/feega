@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, addTrack, setKeyframes, type OpResult } from '../timeline';
-import { Ease } from '../design';
-import { TrackKind } from '../components';
-import { composeHtml } from './compose';
-import { POSE_ATTR } from './raster-key';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, addTrack, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Ease } from '@feega/motion-core/motion/design';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { POSE_ATTR } from '@feega/motion-core/motion/hyperframes/raster-key';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

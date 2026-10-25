@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { THREE_D_COMPONENTS } from '$lib/motion/components';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { THREE_D_COMPONENTS } from '@feega/motion-core/motion/components';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 type Run = (name: string, input: unknown) => Promise<Record<string, unknown>>;

@@ -2,8 +2,8 @@
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
   import { postPageAction } from '$lib/api/page-action';
-  import type { MotionDoc } from '$lib/motion/doc';
-  import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, attachmentUrl, stillExport } from '$lib/motion/still-model';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, attachmentUrl, stillExport } from '@feega/motion-core/motion/still-model';
 
   type Made = { url: string; width: number; height: number };
 

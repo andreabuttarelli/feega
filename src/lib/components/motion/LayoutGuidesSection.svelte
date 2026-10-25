@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { GuideAlign, GuideKind, newGuide, setLayoutGuides, type LayoutGuide } from '$lib/motion/layout-guides/guides';
-  import { AUTO_COUNT, DEFAULT_AUTO_SIZE, DEFAULT_GUIDE_SIZE, MAX_LAYOUT_GUIDES } from '$lib/motion/layout-guides/model';
+  import { AUTO_COUNT, DEFAULT_AUTO_SIZE, DEFAULT_GUIDE_SIZE, MAX_LAYOUT_GUIDES } from '@feega/motion-core/motion/layout-guides/model';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
 

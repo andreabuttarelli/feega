@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parsePath } from './geometry';
+import { parsePath } from '@feega/motion-core/motion/shape/geometry';
 import { svgShapes } from './svg-import';
 
 const box = (d: string) => {

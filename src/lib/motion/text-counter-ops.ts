@@ -1,6 +1,6 @@
-import { findClip, type MotionDoc } from './doc';
-import { setProps, type OpResult } from './timeline';
-import { COUNTER_COMPONENT, counterSchema, type Counter } from './text-counter';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { COUNTER_COMPONENT, counterSchema, type Counter } from '@feega/motion-core/motion/text-counter';
 
 export type CounterInput = Partial<Counter> & Pick<Counter, 'from' | 'to'>;
 

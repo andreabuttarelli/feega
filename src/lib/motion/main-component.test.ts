@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from './brand';
-import { findClip, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from './doc';
-import { addClip, setProps, type OpResult } from './timeline';
-import { flattenComps } from './precomp';
-import { composeHtml } from './hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { findClip, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { componentOf, createComponent, detachInstance, instanceOf, instanceElements, instanceTexts, Paint, pushOverrides, recolorInstance, overrideInstance, resetOverride, resetOverrides } from './main-component';
 
 const must = (r: OpResult): MotionDoc => {

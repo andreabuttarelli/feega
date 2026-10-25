@@ -1,10 +1,10 @@
 <script lang="ts">
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
-  import type { MotionDoc } from '$lib/motion/doc';
-  import { Interp, type Keyframe } from '$lib/motion/keyframes';
-  import { EASE_PRESETS, EASE_PRESET_IDS, EasePreset, GraphMode, KeyEnd, curvePoints, dragHandle, easeHandles, fitView, handlePoints, type GraphPoint, type GraphView } from '$lib/motion/graph';
-  import { applyEasePreset, copyEase, pasteEase, setKeyEase, type EaseBoard, type KeyRef } from '$lib/motion/timeline';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { Interp, type Keyframe } from '@feega/motion-core/motion/keyframes';
+  import { EASE_PRESETS, EASE_PRESET_IDS, EasePreset, GraphMode, KeyEnd, curvePoints, dragHandle, easeHandles, fitView, handlePoints, type GraphPoint, type GraphView } from '@feega/motion-core/motion/graph';
+  import { applyEasePreset, copyEase, pasteEase, setKeyEase, type EaseBoard, type KeyRef } from '@feega/motion-core/motion/timeline';
   import { graphLanes, type GraphLane } from '$lib/motion/timeline-view';
 
   const CURVE_STEPS = 240;

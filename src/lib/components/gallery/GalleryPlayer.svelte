@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
-  import { FORMATS, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { FORMATS, type MotionDoc, type MotionFormat } from '@feega/motion-core/motion/doc';
   import { Playback } from '$lib/gallery/model';
 
   type Source = { doc: MotionDoc; assets: Record<string, string> };

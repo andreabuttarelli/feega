@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, type OpResult } from '$lib/motion/timeline';
-import { VarType } from '$lib/motion/variables-model';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { VarType } from '@feega/motion-core/motion/variables-model';
 import { bindVariable, defineVariable } from '$lib/motion/variables';
 import VariablesSection from './VariablesSection.svelte';
 import VariablesLibrarySection from './VariablesLibrarySection.svelte';

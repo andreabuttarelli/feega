@@ -1,8 +1,8 @@
-import { TrackKind } from './components';
-import { findClip, type MotionClip, type MotionDoc } from './doc';
-import type { Keyframe, TransformKey } from './keyframes';
-import { IDENTITY, decomposeLocal, invert2d, mul2d, parentProblem, pivotBox, pivotOf, transformAt, worldAt, type ParentOpacity, type Pose2d, type Size } from './parent';
-import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { Keyframe, TransformKey } from '@feega/motion-core/motion/keyframes';
+import { IDENTITY, decomposeLocal, invert2d, mul2d, parentProblem, pivotBox, pivotOf, transformAt, worldAt, type ParentOpacity, type Pose2d, type Size } from '@feega/motion-core/motion/parent';
+import { addClip, setKeyframes, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum KeepWorld {
   Yes = 'yes',

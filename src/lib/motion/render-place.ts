@@ -1,4 +1,4 @@
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { ExportFormat, FORMAT, type RenderSettings } from './export-formats';
 import type { Capabilities } from './export-plan';
 import { Resolution } from './render-quote';

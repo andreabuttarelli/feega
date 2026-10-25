@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db/client';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { CHECKPOINT_IDLE_MS, Checkpoint, RevisionOutcome, appendRevision, headCache, listRevisions, readCheckpoint, readHead, readRevision, sealRevision } from './motion-revisions';
 
 type Row = Record<string, unknown>;

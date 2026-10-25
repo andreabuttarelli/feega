@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
-import { clipsOf, type MotionDoc } from '$lib/motion/doc';
+import { clipsOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { RenderSettings } from '$lib/motion/export-formats';
 import { SERVER_RENDER_UNAVAILABLE, serverRenderOpen } from '$lib/motion/server-render';
 import { assetUrls, motionAssets, motionTokens } from './editor';

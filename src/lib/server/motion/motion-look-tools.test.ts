@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { z } from 'zod';
-import { ENV_PRESETS, EnvPreset } from '$lib/motion/look';
+import { ENV_PRESETS, EnvPreset } from '@feega/motion-core/motion/look';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 function setup() {

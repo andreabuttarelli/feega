@@ -4,7 +4,7 @@
   import Download from '@lucide/svelte/icons/download';
   import Share2 from '@lucide/svelte/icons/share-2';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
-  import { composeHtml } from '$lib/motion/hyperframes/compose';
+  import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
   import { audioPlan } from '$lib/motion/audio-plan';
   import { BROWSER_RESOLUTIONS, eta, exportSize, type Capabilities } from '$lib/motion/export-plan';
   import { capabilities } from '$lib/motion/export/encode';

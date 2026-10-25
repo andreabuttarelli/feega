@@ -1,9 +1,9 @@
 <script lang="ts">
   import Unlink from '@lucide/svelte/icons/unlink';
-  import type { AssetKind } from '$lib/motion/components';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+  import type { AssetKind } from '@feega/motion-core/motion/components';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import { detachTemplate, instanceComp, keyFieldsOf, setTemplateValues, templateFields, type TemplateFieldValue } from '$lib/motion/template/library';
-  import { FieldLayout, splitFields } from '$lib/motion/template/key-fields';
+  import { FieldLayout, splitFields } from '@feega/motion-core/motion/template/key-fields';
   import FieldForm from './FieldForm.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import type { MediaUploader } from './media-upload';

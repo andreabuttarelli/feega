@@ -1,4 +1,4 @@
-import { cubicAt, distance, segmentsOf, type Outline, type Pt, type Vertex, corner } from './geometry';
+import { cubicAt, distance, segmentsOf, type Outline, type Pt, type Vertex, corner } from '@feega/motion-core/motion/shape/geometry';
 
 export type PointRef = { contour: number; index: number };
 

@@ -1,4 +1,4 @@
-import { Engine } from '$lib/motion/engine';
+import { Engine } from '@feega/motion-core/motion/engine';
 
 const SCALE = /scale\(([\d.]+)\)/;
 

@@ -1,9 +1,9 @@
-import { Ease } from './design';
-import { findClip, type MotionDoc } from './doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { valueAt } from './inspector';
-import { withParams } from './custom/params';
-import { animProp, type EaseSpec, type KeyValue, type Keyframe, type TransformKey } from './keyframes';
-import { setKeyframes, type OpResult } from './timeline';
+import { withParams } from '@feega/motion-core/motion/custom/params';
+import { animProp, type EaseSpec, type KeyValue, type Keyframe, type TransformKey } from '@feega/motion-core/motion/keyframes';
+import { setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export const ANIMATE_TO_KEYS = ['opacity', 'x', 'y', 'scale', 'rotateZ', 'blur'] as const satisfies readonly TransformKey[];
 

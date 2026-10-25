@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { initSync, TextCore } from '../../../../../static/gpu-text/gpu_text.js';
-import { Ligatures, Op } from './face';
+import { Ligatures, Op } from '@feega/motion-core/motion/gpu-full/text/face';
 import { fontkitSource } from './fontkit-face';
 import { rustSource } from './rust-face';
 

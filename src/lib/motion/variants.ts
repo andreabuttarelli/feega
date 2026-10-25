@@ -1,6 +1,6 @@
-import type { MotionComp, MotionDoc } from './doc';
+import type { MotionComp, MotionDoc } from '@feega/motion-core/motion/doc';
 import { innerClips, instanceOf, type MainComponent, type NewId } from './main-component';
-import { setProps, type OpResult } from './timeline';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export type Variant = Record<string, string>;
 

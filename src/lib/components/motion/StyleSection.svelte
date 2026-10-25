@@ -1,11 +1,11 @@
 <script lang="ts">
   import { FIELD_INPUT, Field, Section } from '$lib/components/ui/shell';
   import { cn } from '$lib/utils.js';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { StyleKind, StyleSlot, applyStyle, detachStyle, saveAsStyle, slotOf } from '$lib/motion/styles';
   import { adoptStyle, offeredStyles } from '$lib/motion/style-library';
-  import { FILLED } from '$lib/motion/fill/elements';
+  import { FILLED } from '@feega/motion-core/motion/fill/elements';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();

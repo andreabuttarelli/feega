@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { checkDoc, liveComponents, stillStandIns, seekPlan, unverified, verdictOf, type Shot } from './determinism';
-import { MotionFormat, clipsOf, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { composeHtml } from '../hyperframes/compose';
-import { FEEGA_TOKENS } from '../brand';
-import { addClip, type OpResult } from '../timeline';
-import { CheckState, ComponentMode, sourceHash } from './component';
+import { MotionFormat, clipsOf, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { CheckState, ComponentMode, sourceHash } from '@feega/motion-core/motion/custom/component';
 import { recordCheck, writeComponent } from './ops';
 
 function must(r: OpResult): MotionDoc {

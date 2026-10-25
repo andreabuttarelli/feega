@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FillType } from './fill/model';
-import { MIXED } from './text-runs';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { MIXED } from '@feega/motion-core/motion/text-runs';
 import { RunPaint, asGradient, gradientPatched, paintOf } from './run-fill';
 
 describe('run fill', () => {

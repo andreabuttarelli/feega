@@ -3,7 +3,7 @@ import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { SIGNED_URL_TTL_S, signAssetFiles } from '$lib/server/repos/asset-storage';
 import { signKnowledgePaths } from '$lib/server/media-archive';
-import { parseMotionDoc } from '$lib/motion/doc';
+import { parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { modeOf } from '$lib/project-mode';
 import { assetUrls, motionAssets, motionTokens, type AssetSigner } from './editor';
 import { EMBED_BUCKET, storeEmbed } from './embed';

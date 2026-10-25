@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { embedSource, hostedPage, isSourceEmbed } from '$lib/motion/interactive/bundle';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { ProjectMode } from '$lib/project-mode';
 import { RebuildOutcome, rebuildEmbed, type EmbedPlace, type RebuildPorts } from './embed-rebuild';
 

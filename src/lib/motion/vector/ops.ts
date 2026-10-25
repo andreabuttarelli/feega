@@ -1,10 +1,10 @@
-import { findClip, type MotionDoc } from '../doc';
-import { setProps, type OpResult } from '../timeline';
-import { COMPONENTS } from '../components';
-import { baseOutline, type ShapeLook } from '../shape/render';
-import { ShapeKind } from '../shape/schema';
-import { Winding, networkSchema, type VectorNetwork } from './model';
-import { outlineToNetwork } from './outline';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { baseOutline, type ShapeLook } from '@feega/motion-core/motion/shape/render';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
+import { Winding, networkSchema, type VectorNetwork } from '@feega/motion-core/motion/vector/model';
+import { outlineToNetwork } from '@feega/motion-core/motion/vector/outline';
 
 const UNIT_BOX = { w: 1, h: 1 };
 

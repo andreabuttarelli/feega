@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, setKeyframes, type OpResult } from './timeline';
-import { parsePath } from './shape/geometry';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { parsePath } from '@feega/motion-core/motion/shape/geometry';
 import { textToPath } from './text-outline';
 import type { Outliner } from './fonts/outliner';
 

@@ -1,4 +1,4 @@
-import type { Spring, SpringMath, Step } from '../spring';
+import type { Spring, SpringMath, Step } from '@feega/motion-core/motion/spring';
 
 export const MORPH_KINDS = ['button', 'loader', 'check', 'island', 'player', 'slider', 'toggle', 'tabs', 'chart', 'palette', 'toast'] as const;
 export type MorphKind = (typeof MORPH_KINDS)[number];

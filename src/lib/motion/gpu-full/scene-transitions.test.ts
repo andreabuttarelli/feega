@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { JunctionKind } from '../junction-model';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { JunctionKind } from '@feega/motion-core/motion/junction-model';
 import { appendScene, resolveScenes, sceneTransition } from '../scenes';
-import { addClip, type OpResult } from '../timeline';
-import { displayListAt, type PathItem } from './display-list';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { displayListAt, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';

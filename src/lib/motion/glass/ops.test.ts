@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { expressionValue } from '../expression/bake';
-import { SPRINGS } from '../spring';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { expressionValue } from '@feega/motion-core/motion/expression/bake';
+import { SPRINGS } from '@feega/motion-core/motion/spring';
 import { Lens, addLens } from './ops';
 
 function must(r: OpResult): MotionDoc {

@@ -1,7 +1,7 @@
-import { findClip, type MotionClip, type MotionDoc } from '../doc';
-import type { OpResult } from '../timeline';
-import { EFFECTS, defaultValues, type EffectKind, type Values } from './registry';
-import { EFFECT_PREFIX, MAX_EFFECTS, effectProblem, type Effect } from './model';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { EFFECTS, defaultValues, type EffectKind, type Values } from '@feega/motion-core/motion/effects/registry';
+import { EFFECT_PREFIX, MAX_EFFECTS, effectProblem, type Effect } from '@feega/motion-core/motion/effects/model';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 

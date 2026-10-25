@@ -1,6 +1,6 @@
 import { untrack } from 'svelte';
-import type { MotionDoc } from '$lib/motion/doc';
-import type { BrandTokens } from '$lib/motion/brand';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
 
 export type LiveDoc = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; playhead?: number };
 

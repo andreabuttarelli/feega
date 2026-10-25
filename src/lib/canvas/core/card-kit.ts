@@ -1,6 +1,6 @@
-import { ItemKind, type ImageItem, type Item } from '$lib/motion/gpu-full/display-list';
-import { BlendMode } from '$lib/motion/blend';
-import { IDENTITY, type Affine } from '$lib/motion/parent';
+import { ItemKind, type ImageItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { IDENTITY, type Affine } from '@feega/motion-core/motion/parent';
 import type { CardFace, Media } from '$lib/canvas/gpu/card-face';
 import type { Box } from '$lib/canvas/gpu/geometry';
 import type { Glyphs } from './chrome';

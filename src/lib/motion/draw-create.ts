@@ -1,14 +1,14 @@
-import { COMPONENTS, TYPE_SIZE, type ComponentId } from './components';
-import { NEW_TEXT_SIZING, TextSizing } from './text-sizing';
-import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
+import { COMPONENTS, TYPE_SIZE, type ComponentId } from '@feega/motion-core/motion/components';
+import { NEW_TEXT_SIZING, TextSizing } from '@feega/motion-core/motion/text-sizing';
+import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool, type DragPoint, type DrawBox } from './draw-tool';
-import { corner, mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
-import { FillKind, ShapeKind, StrokeKind } from './shape/schema';
+import { corner, mapOutline, parsePath, pathData, type Outline, type Pt } from '@feega/motion-core/motion/shape/geometry';
+import { FillKind, ShapeKind, StrokeKind } from '@feega/motion-core/motion/shape/schema';
 import type { SvgFillRule, SvgGradient } from './shape/svg-import';
-import { FillType } from './fill/model';
-import { setClipFlags } from './organize';
-import { DocMode, docMode, setStill, settledStill } from './still';
-import { TOP_LEFT_START, addClip, type OpResult } from './timeline';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { setClipFlags } from '@feega/motion-core/motion/organize';
+import { DocMode, docMode, setStill, settledStill } from '@feega/motion-core/motion/still';
+import { TOP_LEFT_START, addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star | DrawTool.Frame;
 

@@ -1,7 +1,7 @@
-import { compsOf, type MotionClip, type MotionComp, type MotionDoc } from './doc';
+import { compsOf, type MotionClip, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { NewId } from './main-component';
 import { setMembers, type Variant } from './variants';
-import { addClip, setTransform, type OpResult } from './timeline';
+import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export type FrameDoc = { id: string; doc: MotionDoc };
 export type ComponentVariant = { compId: string; variant: Variant };

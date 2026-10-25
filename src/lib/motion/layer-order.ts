@@ -1,7 +1,7 @@
-import { TrackKind } from './components';
-import { findClip, type MotionDoc, type MotionTrack } from './doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { findClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
 import { layerOrder } from './siblings';
-import { moveTrack, type OpResult } from './timeline';
+import { moveTrack, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum Arrange {
   Front = 'front',

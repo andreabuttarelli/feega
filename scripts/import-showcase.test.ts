@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { newMotionDoc, MotionFormat, parseMotionDoc } from '$lib/motion/doc';
+import { newMotionDoc, MotionFormat, parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { assetPath, docHash, remapAssets, showcaseNode, showcasePlan, SHOWCASE_SOURCES, SHOWCASE_KEY, type ShowcaseSource } from './import-showcase';
 
 const ORG = '82813960-3537-4ec8-8524-b966b46105f1';

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { composeHtml } from '$lib/motion/hyperframes/compose';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { PHYSICS_PRESETS } from '$lib/motion/physics/model';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { PHYSICS_PRESETS } from '@feega/motion-core/motion/physics/model';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession } from './motion-tools';

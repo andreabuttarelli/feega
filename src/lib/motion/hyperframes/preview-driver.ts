@@ -1,6 +1,6 @@
-import { hotPatch, type HotPatch } from './hot';
-import { CAPTURE_REQUEST, stampOf, type CaptureReply, type CaptureRequest } from './capture';
-import { exactSeek, type ExactSeek } from './exact-seek';
+import { hotPatch, type HotPatch } from '@feega/motion-core/motion/hyperframes/hot';
+import { CAPTURE_REQUEST, stampOf, type CaptureReply, type CaptureRequest } from '@feega/motion-core/motion/hyperframes/capture';
+import { exactSeek, type ExactSeek } from '@feega/motion-core/motion/hyperframes/exact-seek';
 
 export const CAPTURE_TIMEOUT_MS = 15_000;
 export const STALE_RETRY_MS = 50;

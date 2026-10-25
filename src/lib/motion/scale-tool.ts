@@ -1,11 +1,11 @@
-import { findClip, type MotionDoc } from './doc';
-import type { Transform } from './keyframes';
-import { transformAt } from './parent';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { Transform } from '@feega/motion-core/motion/keyframes';
+import { transformAt } from '@feega/motion-core/motion/parent';
 import { anchorOf, type Pt } from './scene-select';
-import { setProps, type OpResult } from './timeline';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { setEffect } from './effects/ops';
-import { EFFECTS, EffectKind } from './effects/registry';
-import type { Effect } from './effects/model';
+import { EFFECTS, EffectKind } from '@feega/motion-core/motion/effects/registry';
+import type { Effect } from '@feega/motion-core/motion/effects/model';
 
 export enum ScaleMode {
   Resize = 'resize',

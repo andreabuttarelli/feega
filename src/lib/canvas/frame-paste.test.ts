@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { Background, MotionFormat, compOf, newMotionDoc, type MotionClip } from '$lib/motion/doc';
-import { FEEGA_TOKENS, resolveColor } from '$lib/motion/brand';
-import { TextSizing } from '$lib/motion/text-sizing';
+import { Background, MotionFormat, compOf, newMotionDoc, type MotionClip } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS, resolveColor } from '@feega/motion-core/motion/brand';
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { pastedInFrame } from './frame-paste';
 
 const SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50" viewBox="0 0 100 50">

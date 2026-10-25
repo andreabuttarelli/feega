@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { POSTER_DEBOUNCE_MS, posterFormat, posterJob, posterSecond } from './poster-capture';
-import { Background, MotionFormat, newMotionDoc } from './doc';
-import { FrameFormat } from './hyperframes/capture';
+import { Background, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { FrameFormat } from '@feega/motion-core/motion/hyperframes/capture';
 
 describe('the poster of a composition', () => {
   beforeEach(() => vi.useFakeTimers());

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, setCanvas, setTransform } from './timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setCanvas, setTransform } from '@feega/motion-core/motion/timeline';
 import { writeComponent } from './custom/ops';
 import { addEffect } from './effects/ops';
-import { EffectKind } from './effects/registry';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { StoryBeat, markStory } from './story';
 import { vectorPiece } from './vector-ui/piece';
 import { VectorKind, VectorRole } from './vector-ui/model';

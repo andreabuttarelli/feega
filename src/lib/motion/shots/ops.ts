@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { MotionDoc } from '../doc';
-import { addClip, addTrack, type OpResult } from '../timeline';
-import { TrackKind } from '../components';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, addTrack, type OpResult } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { SFX_LIBRARY, ShotSound, cursorCues, type Sfx, type SfxCue } from '../sfx';
 import { writeComponent } from '../custom/ops';
 import { VECTOR_TOKEN } from '../vector-ui/piece';

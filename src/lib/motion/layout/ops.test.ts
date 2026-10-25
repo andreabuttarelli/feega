@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { Align, Direction, Sizing, TrackType } from './auto-layout';
-import { autoLayoutPatchSchema, layoutItemPatchSchema } from './model';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Align, Direction, Sizing, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
+import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
 import { addAutoLayout, leaveAutoLayout, reorderChild, removeAutoLayout, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from './ops';
-import { withAutoLayout } from './resolve';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { layerOrder } from '../siblings';
 
 function must(r: OpResult): MotionDoc {

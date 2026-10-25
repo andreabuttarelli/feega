@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACTS, MAX_LINE_WORDS, scriptProblems, type LaunchScript } from '$lib/motion/script';
+import { ACTS, MAX_LINE_WORDS, scriptProblems, type LaunchScript } from '@feega/motion-core/motion/script';
 
 const LINES = z.object({ acts: z.array(z.object({ act: z.enum(ACTS), on_screen: z.array(z.string().trim().min(1)).min(1).max(4) })).length(ACTS.length) });
 

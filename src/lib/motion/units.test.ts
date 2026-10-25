@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { ANIMATABLE } from './keyframes';
-import { COMPONENT_IDS } from './components';
+import { ANIMATABLE } from '@feega/motion-core/motion/keyframes';
+import { COMPONENT_IDS } from '@feega/motion-core/motion/components';
 import { fieldsOf } from './inspector';
-import { CAMERA, CAMERA_KEYS, CAMERA_LANE } from './camera';
+import { CAMERA, CAMERA_KEYS, CAMERA_LANE } from '@feega/motion-core/motion/camera';
 import { Unit, propsOwner, sliderOf, toShown, toStored, unitOf } from './units';
 
 const PORTRAIT = { width: 1080, height: 1920 };

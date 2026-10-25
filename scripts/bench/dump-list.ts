@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { parseMotionDoc } from '$lib/motion/doc';
-import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { parseMotionDoc } from '@feega/motion-core/motion/doc';
+import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 
 const [docPath, out, ...frames] = process.argv.slice(2);
 const verdict = parseMotionDoc(JSON.parse(readFileSync(docPath, 'utf8')));

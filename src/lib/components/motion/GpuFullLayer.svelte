@@ -1,9 +1,9 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import type { BrandTokens } from '$lib/motion/brand';
-  import type { MotionDoc } from '$lib/motion/doc';
-  import { drawFrame, prepare, type Prepared } from '$lib/motion/gpu-full/display-list';
-  import { NO_TYPESET, smoothingOf } from '$lib/motion/gpu-full/text/painter';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { drawFrame, prepare, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+  import { NO_TYPESET, smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { FACES_PARAM, faceEngineOf, loadFontsWith } from '$lib/motion/gpu-full/text/engines';
   import type { Raster } from '$lib/motion/gpu-full/raster';
   import { BACKENDS, type FullBackend } from '$lib/motion/gpu-full/backends';

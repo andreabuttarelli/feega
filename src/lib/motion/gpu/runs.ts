@@ -1,4 +1,4 @@
-import { WEBGL_CONTEXT_BUDGET, WEBGL_PAGE_CONTEXTS } from '../export/webgl-budget';
+import { WEBGL_CONTEXT_BUDGET, WEBGL_PAGE_CONTEXTS } from '@feega/motion-core/motion/export/webgl-budget';
 import { PaintKind } from './paint-of';
 
 export type Span = [number, number];

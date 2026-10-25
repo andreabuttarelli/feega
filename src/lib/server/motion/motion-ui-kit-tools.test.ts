@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { writeComponent } from '$lib/motion/custom/ops';
 import { UI_KINDS, UI_KIT, UI_SAFE, UiKind, uiScale } from '$lib/motion/ui-kit/kit';
-import { FORMATS } from '$lib/motion/doc';
+import { FORMATS } from '@feega/motion-core/motion/doc';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession } from './motion-tools';

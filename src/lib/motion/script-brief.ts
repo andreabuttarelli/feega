@@ -1,4 +1,4 @@
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { OutlinePoint } from './storyboard';
 
 export const WRITE_SCRIPT = 'write_script';

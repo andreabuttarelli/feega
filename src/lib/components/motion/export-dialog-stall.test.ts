@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import ExportDialog from './ExportDialog.svelte';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { RenderQueue, RenderStage, type RenderView } from '$lib/motion/server-render';
 
 const running: RenderView = { id: 'r', status: 'running', progress: { stage: RenderStage.Rendering, chunksDone: 0, chunks: 1, totalFrames: 450 }, error: null, assetId: null, credits: 10 };

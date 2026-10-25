@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
-import { JunctionKind } from '../../src/lib/motion/junction-model';
-import { newMotionDoc, MotionFormat } from '../../src/lib/motion/doc';
+import { JunctionKind } from '@feega/motion-core/motion/junction-model';
+import { newMotionDoc, MotionFormat } from '@feega/motion-core/motion/doc';
 import { sceneTransition, sequenceScenes } from '../../src/lib/motion/scenes';
 
 const SHOTS = process.env.FIG_SHOTS ?? `${homedir()}/Documents/feega-videos/e2e`;

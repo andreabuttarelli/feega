@@ -2,11 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { parseMotionDoc } from '$lib/motion/doc';
-import { drawFrame, ItemKind, prepare } from '$lib/motion/gpu-full/display-list';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { parseMotionDoc } from '@feega/motion-core/motion/doc';
+import { drawFrame, ItemKind, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { fontLoader, type Reader } from '$lib/motion/gpu-full/text/load';
-import { smoothingOf, TextOutput } from '$lib/motion/gpu-full/text/painter';
+import { smoothingOf, TextOutput } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { VIDEO_ASSET, placeholder, placeholderVideo } from './gpu-parity/assets';
 
 const ROOT = resolve(import.meta.dirname, '..');

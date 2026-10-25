@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from './brand';
-import { Background, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { FillType } from './fill/model';
-import { BlendMode } from './blend';
-import { IDENTITY } from './affine';
-import { ItemKind, displayListAt, type ImageItem } from './gpu-full/display-list';
-import { Smoothing } from './gpu-full/text/painter';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { Background, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { IDENTITY } from '@feega/motion-core/motion/affine';
+import { ItemKind, displayListAt, type ImageItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { boxBook } from './gpu-full/text/test-face';
 import { boundsOfClips, imageSources, svgOf } from './export-svg';
 

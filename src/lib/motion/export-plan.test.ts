@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from './doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { Resolution } from './render-quote';
 import { AudioMode, BROWSER_RESOLUTIONS, Support, eta, exportSize, exportSupport, frameTimes, outputSize, samplesPerFrame } from './export-plan';
-import { BROWSER_SAMPLES } from './motion-blur';
-import { addClip } from './timeline';
-import type { MotionDoc } from './doc';
+import { BROWSER_SAMPLES } from '@feega/motion-core/motion/motion-blur';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 describe('export plan', () => {
   it('1080p keeps the doc size, 720p scales it to an even size', () => {

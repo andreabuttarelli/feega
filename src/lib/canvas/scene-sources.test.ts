@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
-import { flattenComps } from '$lib/motion/precomp';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { sequenceScenes } from '$lib/motion/scenes';
 import { loadOnce, sceneRevision, sceneStamp, withScenes, type SceneSource } from './scene-sources';
 

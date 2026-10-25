@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { vectorJson, vectorRuntime, VECTOR_CSS } from '../vector-ui/piece';
 import { withinBudget, type VectorUi } from '../vector-ui/model';
-import { MAX_JS } from '../custom/component';
+import { MAX_JS } from '@feega/motion-core/motion/custom/component';
 import { CURSOR_SLOT, CursorAction, NODE_ID, cursorSource, type CursorStep } from './cursor';
 
 export enum ShotId {

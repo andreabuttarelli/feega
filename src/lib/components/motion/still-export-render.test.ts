@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import StillExport from './StillExport.svelte';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 
 const props = (saved: boolean) => ({ doc: { ...newMotionDoc(MotionFormat.Portrait), still: { frame: 0 } }, editorUrl: '/p/p1/c/c1/motion/n1', fileName: 'poster', saved, onclose: () => {} });
 

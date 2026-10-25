@@ -1,5 +1,5 @@
-import TABLE from './template/part-usage.json';
-import { parsePart } from './poster-parts';
+import TABLE from '@feega/motion-core/motion/template/part-usage.json';
+import { parsePart } from '@feega/motion-core/motion/poster-parts';
 
 export const PAGE = '@page';
 

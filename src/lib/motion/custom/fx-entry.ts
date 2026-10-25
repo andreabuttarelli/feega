@@ -1,4 +1,4 @@
-import { FX_GLOBAL } from './fx';
+import { FX_GLOBAL } from '@feega/motion-core/motion/custom/fx';
 
 type Timeline = { fromTo: (target: object, from: object, to: object, at: number) => void };
 type Clip = { tl: Timeline; length: number; seed: number };

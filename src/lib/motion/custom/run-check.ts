@@ -1,7 +1,7 @@
-import type { MotionDoc } from '../doc';
-import type { ClipError } from '../hyperframes/capture';
-import { CheckState, sourceHash, type ComponentCheck } from './component';
-import type { Boxes } from './reflow';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { ClipError } from '@feega/motion-core/motion/hyperframes/capture';
+import { CheckState, sourceHash, type ComponentCheck } from '@feega/motion-core/motion/custom/component';
+import type { Boxes } from '@feega/motion-core/motion/custom/reflow';
 import { checkDoc, seekPlan, verdictOf, type Luma, type Shot } from './determinism';
 
 export type CheckShot = { time: number; data: string; layout: string; boxes?: Boxes; errors: ClipError[] };

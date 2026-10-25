@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 import { TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
 import { TYPE_GRID_COMPONENT } from '$lib/motion/template/type-grid-poster/component';
-import { PartEdit, editablePart } from '$lib/motion/poster-parts';
+import { PartEdit, editablePart } from '@feega/motion-core/motion/poster-parts';
 import { partFocus } from '$lib/motion/inspector';
 import { PAGE, type PartUsage } from '$lib/motion/part-usage';
-import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { derivePartUsage } from './derive-part-usage';
 import { PART_ATTR, staticParts } from './static-parts';
 

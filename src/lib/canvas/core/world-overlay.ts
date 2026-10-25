@@ -1,5 +1,5 @@
-import { mul2d } from '$lib/motion/affine';
-import type { PathItem } from '$lib/motion/gpu-full/display-list';
+import { mul2d } from '@feega/motion-core/motion/affine';
+import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import { EdgeLook, edgeItems, ghostItems, guideItems, hoverItems, marqueeItems, runningItems, peerItems, type CorePeer, type CoreTheme } from './overlay';

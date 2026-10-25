@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { flattenComps } from './precomp';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { appendScene, insertSceneAt, insertableScenes, reorderScenes, sceneEdit, resolveScenes, sceneNodeIds, scenesLeftToRight, scenesOf, sceneTransition, sequenceScenes, trimScene } from './scenes';
-import { JunctionKind } from './junction-model';
+import { JunctionKind } from '@feega/motion-core/motion/junction-model';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';

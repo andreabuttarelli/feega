@@ -68,7 +68,7 @@ import { detachInstance, openDefinition, placeInstance, runInstance } from '$lib
 import { templateLibrary } from '$lib/server/motion/templates';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
-import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';

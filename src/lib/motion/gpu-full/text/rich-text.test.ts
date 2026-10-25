@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENTS } from '../../components';
-import { boxOf } from '../../layout';
-import { paintText, Smoothing, type Ink, type TextEnv } from './painter';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { boxOf } from '@feega/motion-core/motion/layout';
+import { paintText, Smoothing, type Ink, type TextEnv } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { boxFace } from './test-face';
-import type { FaceBook, Request } from './face';
-import { PaintKind } from '../paint';
+import type { FaceBook, Request } from '@feega/motion-core/motion/gpu-full/text/face';
+import { PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
 
 const stage = { width: 1920, height: 1080 };
 

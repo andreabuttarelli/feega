@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { flattenComps } from './precomp';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { createComponent, instanceOf } from './main-component';
 import { addVariant } from './variants';
 import { componentGroups, placeInstance } from './canvas-components';

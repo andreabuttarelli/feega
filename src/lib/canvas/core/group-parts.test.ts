@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DisplayList, Item } from '$lib/motion/gpu-full/display-list';
+import type { DisplayList, Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { parts } from './group-parts';
 
 const list = (n: number) => ({ width: 10, height: 20, background: null, items: Array.from({ length: n }, (_, i) => ({ clip: `c${i}` }) as unknown as Item) }) as DisplayList;

@@ -1,4 +1,4 @@
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { sceneNodeIds } from '$lib/motion/scenes';
 import type { FrameTarget } from './canvas-drop';
 

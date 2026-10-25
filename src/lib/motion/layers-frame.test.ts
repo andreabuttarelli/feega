@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { layersFrame } from './layers-frame';
 import { OutputKind, type Output } from './move-element';
-import { DocMode, docMode } from './still';
-import { parseMotionDoc } from './doc';
+import { DocMode, docMode } from '@feega/motion-core/motion/still';
+import { parseMotionDoc } from '@feega/motion-core/motion/doc';
 
 const BASE_ID = '11111111-2222-4333-8444-555555555555';
 const TITLE_ID = '22222222-2222-4333-8444-555555555555';

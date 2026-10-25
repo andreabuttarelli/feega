@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, setCanvas } from '$lib/motion/timeline';
-import { Horizontal, Vertical } from '$lib/motion/constraints/model';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setCanvas } from '@feega/motion-core/motion/timeline';
+import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
 import { setConstraints } from '$lib/motion/constraints/constraints';
 
 const SOURCE = '44444444-4444-4444-4444-444444444444';

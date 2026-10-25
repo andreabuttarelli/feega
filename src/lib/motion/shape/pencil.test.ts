@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flatten, type Pt } from './geometry';
+import { flatten, type Pt } from '@feega/motion-core/motion/shape/geometry';
 import { smoothStroke, straightStroke } from './pencil';
 
 const wave = (n: number): Pt[] => Array.from({ length: n }, (_, i) => [i * 2, Math.sin(i / 8) * 40] as Pt);

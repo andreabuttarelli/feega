@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { ItemKind } from '$lib/motion/gpu-full/display-list';
-import { addClip } from '$lib/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { ItemKind } from '@feega/motion-core/motion/gpu-full/display-list';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { LOTTIE_MAX_SECONDS, Span, inlineImages, vectorOf, type Fetcher } from './vector-list';
 
 const png = (bytes: number[], type = 'image/png'): ReturnType<Fetcher> => Promise.resolve({ ok: true, headers: { get: () => type }, arrayBuffer: async () => new Uint8Array(bytes).buffer });

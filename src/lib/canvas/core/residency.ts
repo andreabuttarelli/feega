@@ -1,6 +1,6 @@
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Screen } from '$lib/canvas/gpu/camera';
-import { ItemKind, type Item } from '$lib/motion/gpu-full/display-list';
+import { ItemKind, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { PutFrame } from './screen-uses';
 import { textured } from './texture-budget';
 

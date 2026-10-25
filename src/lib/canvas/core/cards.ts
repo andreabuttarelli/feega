@@ -1,4 +1,4 @@
-import type { Item } from '$lib/motion/gpu-full/display-list';
+import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
 import { Surface, type CardFace } from '$lib/canvas/gpu/card-face';
 import type { Glyphs } from './chrome';

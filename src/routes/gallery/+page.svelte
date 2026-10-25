@@ -7,7 +7,7 @@
   import KindGlyph from '$lib/components/gallery/KindGlyph.svelte';
   import DurationRange from '$lib/components/gallery/DurationRange.svelte';
   import { FILTER_GROUPS, filterHref, GALLERY_PATH, itemPath, KIND_LABEL, rangeHref, resultCount, SLIDER_MAX, type GalleryKind, type SearchParams } from '$lib/gallery/model';
-  import type { MotionFormat } from '$lib/motion/doc';
+  import type { MotionFormat } from '@feega/motion-core/motion/doc';
 
   let { data } = $props();
 

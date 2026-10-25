@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { installEngine, testTimeline } from '../engine/testing';
-import { FEEGA_TOKENS } from '../brand';
-import { Space, cameraMath, stageSpec } from '../camera';
-import { CameraPreset, applyPreset, setCamera, setClipDepth } from '../camera-ops';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { sampleTrack } from '../keyframes';
-import { addClip, type OpResult } from '../timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { Space, cameraMath, stageSpec } from '@feega/motion-core/motion/camera';
+import { CameraPreset, applyPreset, setCamera, setClipDepth } from '@feega/motion-core/motion/camera-ops';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { sampleTrack } from '@feega/motion-core/motion/keyframes';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { seekPlan } from '../custom/determinism';
-import { composeHtml } from './compose';
-import { STAGE_TIMELINE, seekDriver, stageScript } from './stage';
-import { THREE_TIMELINE, onScreen } from './three';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { STAGE_TIMELINE, seekDriver, stageScript } from '@feega/motion-core/motion/hyperframes/stage';
+import { THREE_TIMELINE, onScreen } from '@feega/motion-core/motion/hyperframes/three';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

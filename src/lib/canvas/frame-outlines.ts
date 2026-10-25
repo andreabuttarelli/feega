@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { CUSTOM_CLIP, partBoxes } from '$lib/motion/poster-parts';
-import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+import { CUSTOM_CLIP, partBoxes } from '@feega/motion-core/motion/poster-parts';
+import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
 import { LayerKind, type FrameOutlines, type LayerRow } from './layers';
 
 export const HEADS_PARAM = 'heads';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { sceneNodeIds } from '$lib/motion/scenes';
 import { combineScenes, CombineOutcome } from './combine-scenes';
 import type { FrameStore, StoredFrame } from './move-element';

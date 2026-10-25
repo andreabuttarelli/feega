@@ -8,8 +8,8 @@ import type { Tool } from 'ai';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { createProjectTools } from './project-tools';
 import { SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const PROJECT = '22222222-2222-2222-2222-222222222222';

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { ModelMessage, Tool } from 'ai';
-import { COMPONENTS, Control, TrackKind } from '$lib/motion/components';
+import { COMPONENTS, Control, TrackKind } from '@feega/motion-core/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { blocking, type QualityProblem } from '$lib/motion/direction';
 import { REFERENCE_TOOLS } from '$lib/server/web/web-tools';
 

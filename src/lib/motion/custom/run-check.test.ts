@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import type { OpResult } from '../timeline';
-import { CheckState, sourceHash } from './component';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { CheckState, sourceHash } from '@feega/motion-core/motion/custom/component';
 import { writeComponent } from './ops';
 import { runCheck } from './run-check';
 import { seekPlan } from './determinism';

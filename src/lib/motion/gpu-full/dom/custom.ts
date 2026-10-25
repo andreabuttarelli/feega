@@ -1,10 +1,10 @@
-import type { Prepared, DomReads, ImageItem, LayerItem } from '../display-list';
+import type { Prepared, DomReads, ImageItem, LayerItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { Picture } from '../raster';
-import { readTree } from './read';
+import { readTree } from '@feega/motion-core/motion/gpu-full/dom/read';
 import { mountDomReader, type Compose } from './reader';
-import { NO_INDEX } from './tree';
-import { screenFrames } from '../../device-screen';
-import type { MotionDoc } from '../../doc';
+import { NO_INDEX } from '@feega/motion-core/motion/gpu-full/dom/tree';
+import { screenFrames } from '@feega/motion-core/motion/device-screen';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 export type CustomFrame = { reads: DomReads; picture: (item: ImageItem | LayerItem) => Picture | null };
 

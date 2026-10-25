@@ -1,5 +1,5 @@
 import { WEB_GUIDANCE } from '$lib/server/web/web-tools';
-import { DocMode } from '$lib/motion/still';
+import { DocMode } from '@feega/motion-core/motion/still';
 import type { OpenFrame } from './frame-tools';
 import { PROXY_GUIDANCE } from './tool-loading';
 

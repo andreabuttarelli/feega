@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { AssetKind } from '$lib/motion/components';
-  import { FORMATS, type MotionFormat } from '$lib/motion/doc';
+  import type { AssetKind } from '@feega/motion-core/motion/components';
+  import { FORMATS, type MotionFormat } from '@feega/motion-core/motion/doc';
   import { Action } from '$lib/motion/actions';
-  import { interactiveOf } from '$lib/motion/interactive/settings';
+  import { interactiveOf } from '@feega/motion-core/motion/interactive/settings';
   import { ADD_TARGET, AddTarget, Edits, FORMATS_OF_MODE, draftToAdd, libraryFormat, type CatalogueItem } from '$lib/motion/template/catalogue';
   import { carryEdits, keyFieldsOf, setTemplateValues, templateFields, type Instance, type TemplateFieldValue } from '$lib/motion/template/library';
-  import { FieldLayout, splitFields } from '$lib/motion/template/key-fields';
+  import { FieldLayout, splitFields } from '@feega/motion-core/motion/template/key-fields';
   import ComponentPreview from './ComponentPreview.svelte';
   import FieldForm from './FieldForm.svelte';
   import type { MediaUploader } from './media-upload';

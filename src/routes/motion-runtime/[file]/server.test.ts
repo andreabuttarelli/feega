@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Chunk, chunkCode, chunkUrl } from '$lib/motion/hyperframes/runtime-chunks';
+import { Chunk, chunkCode, chunkUrl } from '@feega/motion-core/motion/hyperframes/runtime-chunks';
 
 const { GET } = await import('./+server');
 

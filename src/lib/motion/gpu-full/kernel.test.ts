@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { gaussianKernel, MAX_TAPS } from './kernel';
-import { rgbaOf } from './rgba';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 
 describe('gaussianKernel', () => {
   it('sums to one so a blur keeps the layer brightness', () => {

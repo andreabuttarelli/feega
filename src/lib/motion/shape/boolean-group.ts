@@ -1,8 +1,8 @@
-import { compOf, findClip, type MotionClip, type MotionDoc } from '../doc';
+import { compOf, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { groupClips, ungroupClip } from '../group';
-import { setProps, type OpResult } from '../timeline';
-import { combineShapes, shapesOf } from './boolean';
-import { BooleanOp } from './boolean-op';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { combineShapes, shapesOf } from '@feega/motion-core/motion/shape/boolean';
+import { BooleanOp } from '@feega/motion-core/motion/shape/boolean-op';
 
 type NewId = () => string;
 

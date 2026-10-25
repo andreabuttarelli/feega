@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { Ease } from '../design';
-import { ModifierKind } from './modifiers';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Ease } from '@feega/motion-core/motion/design';
+import { ModifierKind } from '@feega/motion-core/motion/shape/modifiers';
 import { addModifier, morphToClip, morphTo, removeModifier, setModifier, setPath, shapePath } from './ops';
-import { ShapeKind } from './schema';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ANALYSIS_VERSION } from '$lib/motion/audio-analysis';
-import { AssetKind } from '$lib/motion/components';
+import { ANALYSIS_VERSION } from '@feega/motion-core/motion/audio-analysis';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import { analysisFor, analysisPath, analyzeSounds, type AnalysisDeps } from './audio-analysis';
 
 const RATE = 22_050;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { bentoGridPatch, cellSpanPatch, type BentoGridKey, type CompositionNode, type SpanKey, type UpstreamCard } from '$lib/canvas/composition-node';
-  import { BENTO_GRID, params } from '$lib/canvas/composition/bento';
-  import { clampParams } from '$lib/canvas/composition/clamp';
+  import { BENTO_GRID, params } from '@feega/motion-core/canvas/composition/bento';
+  import { clampParams } from '@feega/motion-core/canvas/composition/clamp';
 
   let { node, cards, onpatch }: { node: CompositionNode; cards: UpstreamCard[]; onpatch: (patch: Partial<CompositionNode>) => void } = $props();
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { canvasScene, type FrameOnCanvas, type SceneLook } from './canvas-scene';
-import { ItemKind, Unsupported, type DisplayList, type PathItem } from '$lib/motion/gpu-full/display-list';
-import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
-import { BlendMode } from '$lib/motion/blend';
-import type { ComponentId } from '$lib/motion/components';
+import { ItemKind, Unsupported, type DisplayList, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import type { ComponentId } from '@feega/motion-core/motion/components';
 
 const LOOK: SceneLook = { background: [1, 1, 1, 1], selection: [0, 0.4, 1, 1], selectionWidth: 2 };
 const SCREEN = { width: 800, height: 600 };

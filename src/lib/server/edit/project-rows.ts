@@ -12,7 +12,7 @@ import { describeNodeType, describeNodeTypes, isNodeType } from '$lib/canvas/nod
 import { listGallery } from '$lib/server/repos/gallery';
 import { cardView, publishNode, remixInto } from '$lib/server/gallery/service';
 import { DurationBand, GalleryKind, gallerySearchSchema, itemPath } from '$lib/gallery/model';
-import { MOTION_FORMATS } from '$lib/motion/doc';
+import { MOTION_FORMATS } from '@feega/motion-core/motion/doc';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { componentKind } from '$lib/motion/template/catalogue';
 import { compositionOf } from '$lib/canvas-node-data';

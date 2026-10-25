@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat } from '$lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { builtinTemplate } from '$lib/motion/template/builtins';
 import { Edits, draftToAdd, starterDoc } from '$lib/motion/template/catalogue';
 

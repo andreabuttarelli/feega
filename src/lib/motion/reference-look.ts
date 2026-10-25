@@ -1,6 +1,6 @@
-import type { ComponentId } from './components';
-import type { MotionDoc } from './doc';
-import { LookMiss, SmallText, type ReferenceLook } from './reference-look-model';
+import type { ComponentId } from '@feega/motion-core/motion/components';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { LookMiss, SmallText, type ReferenceLook } from '@feega/motion-core/motion/reference-look-model';
 import { typeProblems } from './reference-type';
 
 export { LookMiss };

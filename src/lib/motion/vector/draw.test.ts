@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addVertex, connect, fillClosed, moveVertex, setTangent } from './draw';
 import { Tangent } from './edit';
-import { Mirroring, Winding, type VectorNetwork } from './model';
+import { Mirroring, Winding, type VectorNetwork } from '@feega/motion-core/motion/vector/model';
 
 const zero = { x: 0, y: 0 };
 const line = (start: number, end: number) => ({ start, end, tangentStart: zero, tangentEnd: zero });

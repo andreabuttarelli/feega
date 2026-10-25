@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, motionDocSchema, newMotionDoc, type MotionDoc } from '../doc';
+import { MotionFormat, motionDocSchema, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { fileSnippet } from './bundle';
-import { DEFAULT_INTERACTIVE, Outside, PlayMode, SCROLL_LENGTH, interactiveOf } from './settings';
-import { interactiveSchema } from './schema';
+import { DEFAULT_INTERACTIVE, Outside, PlayMode, SCROLL_LENGTH, interactiveOf } from '@feega/motion-core/motion/interactive/settings';
+import { interactiveSchema } from '@feega/motion-core/motion/interactive/schema';
 
 const URL = 'https://feega.app/e/c76b6d3b-8262-4b68-ad58-3cb51a6190a9';
 const saturn = { ...newMotionDoc(MotionFormat.Landscape), interactive: { loop: false, outside: Outside.Fallback, playback: PlayMode.Scrub } } as MotionDoc;

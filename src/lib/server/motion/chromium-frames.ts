@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import type { Browser, Page } from 'puppeteer-core';
 import shaderRuntime from 'virtual:motion-shader-fx';
 import type { ExportPage, ExportPort, PageBox, StillPage, StillPort, Viewport } from './server-frames';
-import { Pose, kindsOf, measureClips } from '$lib/motion/hyperframes/measure';
+import { Pose, kindsOf, measureClips } from '@feega/motion-core/motion/hyperframes/measure';
 import type { GlPage } from '$lib/server/effects/check';
 import { extraChromiumArgs } from './chromium-args';
 

@@ -1,4 +1,4 @@
-import { FillType } from '../fill/model';
+import { FillType } from '@feega/motion-core/motion/fill/model';
 
 type Matrix = [a: number, b: number, c: number, d: number, e: number, f: number];
 type Pt = [number, number];

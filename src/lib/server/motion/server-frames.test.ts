@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MAX_FRAME_SIZE, drawFrames, firstFrames, type BrowserPort, type Viewport } from './server-frames';
 
 type Log = { viewport?: Viewport; html?: string; seeks: number[]; closed: boolean };

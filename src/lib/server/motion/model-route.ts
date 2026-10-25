@@ -1,4 +1,4 @@
-import { findClip, type MotionDoc } from '$lib/motion/doc';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { TokenUsage } from './frames';
 import { ToolForcing } from '$lib/server/chat-model/catalogue';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from './doc';
-import { VideoControl, controlShown } from './still';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { VideoControl, controlShown } from '@feega/motion-core/motion/still';
 import { EditMode, startMode } from './edit-mode';
 
 const video = newMotionDoc(MotionFormat.Landscape);

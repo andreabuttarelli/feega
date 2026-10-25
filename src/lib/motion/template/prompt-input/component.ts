@@ -1,4 +1,4 @@
-import { ComponentMode, PropFormat, VAR_PREFIX, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
+import { ComponentMode, PropFormat, VAR_PREFIX, type CustomComponent, type PropSpec } from '@feega/motion-core/motion/custom/component';
 import { PROMPT_MODEL } from './model';
 import { PROMPT_VIEW } from './view';
 import { PROMPT_CSS } from './style';

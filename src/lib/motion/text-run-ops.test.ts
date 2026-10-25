@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip } from './timeline';
-import { RunToggle } from './text-runs';
-import type { ComponentId } from './components';
+import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { RunToggle } from '@feega/motion-core/motion/text-runs';
+import type { ComponentId } from '@feega/motion-core/motion/components';
 import { clearTextRuns, listTextRange, styleTextRange } from './text-run-ops';
-import { ListChange } from './text-lists';
+import { ListChange } from '@feega/motion-core/motion/text-lists';
 
 function withText(component: ComponentId = 'Text'): MotionDoc {
   const added = addClip(newMotionDoc(MotionFormat.Landscape), { component, from: 0, durationInFrames: 90, props: { text: 'Hello world' } }, 't');

@@ -1,4 +1,4 @@
-import { findClip, type MotionDoc } from './doc';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { DocOp } from './doc-ops';
 import { EditMode, nextMode } from './edit-mode';
 import { SaveState } from './editor-bar';
@@ -6,8 +6,8 @@ import { landed, outgoing, remote, type Revision, type Synced } from './frame-sy
 import { adoptHead, amend, followHead, record, redo, startHistory, undo, type History } from './history';
 import { liveEdits, type LiveEdits } from './live-edit';
 import { settleGroups } from './light-group';
-import { mergeView } from './precomp';
-import type { OpResult } from './timeline';
+import { mergeView } from '@feega/motion-core/motion/precomp';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 const SAVE_DEBOUNCE_MS = 250;
 const COALESCE_MS = 800;

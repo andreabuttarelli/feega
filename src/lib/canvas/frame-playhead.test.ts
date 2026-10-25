@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { frameOfLive } from '$lib/canvas/core/frame-source';
 import { advance, withPlayhead } from './frame-playhead';
 

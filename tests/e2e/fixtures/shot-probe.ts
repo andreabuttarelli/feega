@@ -1,7 +1,7 @@
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../../../src/lib/motion/doc';
-import { FEEGA_TOKENS } from '../../../src/lib/motion/brand';
-import { composeHtml } from '../../../src/lib/motion/hyperframes/compose';
-import { FrameFormat, Settle } from '../../../src/lib/motion/hyperframes/capture';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { FrameFormat, Settle } from '@feega/motion-core/motion/hyperframes/capture';
 import { mountCapturePlayer } from '../../../src/lib/motion/hyperframes/capture-player';
 import { exportLayering, frameOf } from '../../../src/lib/motion/export/webgl-device';
 import { runCheck } from '../../../src/lib/motion/custom/run-check';

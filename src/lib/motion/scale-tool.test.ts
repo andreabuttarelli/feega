@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ScaleMode, bakeScale, flipScale, scaleClips } from './scale-tool';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, setTransform, type OpResult } from './timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { addEffect } from './effects/ops';
-import { EffectKind } from './effects/registry';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {

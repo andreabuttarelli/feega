@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { LAYOUTS } from '$lib/canvas/composition/index';
-import { instancesOf, poseAt } from '$lib/canvas/composition/pose';
-import type { LayoutId } from '$lib/canvas/composition/types';
+import { LAYOUTS } from '../../canvas/composition';
+import { instancesOf, poseAt } from '../../canvas/composition/pose';
+import type { LayoutId } from '../../canvas/composition/types';
 import { FEEGA_TOKENS } from '../brand';
 import { CellFit } from '../bento/model';
 import { FPS } from '../design';

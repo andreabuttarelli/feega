@@ -1,6 +1,6 @@
-import { findClip, type MotionClip, type MotionDoc } from './doc';
-import { pathProblem, type MotionPath, type PathTangent } from './path';
-import type { OpResult } from './timeline';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { pathProblem, type MotionPath, type PathTangent } from '@feega/motion-core/motion/path';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 

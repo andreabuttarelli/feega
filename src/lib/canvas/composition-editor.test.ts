@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { controlFor, setLayoutParam } from './composition-editor';
-import type { LayoutParam } from './composition/types';
+import type { LayoutParam } from '@feega/motion-core/canvas/composition/types';
 
 describe('controlFor', () => {
   it('builds a slider for a range param, falling back to its default', () => {

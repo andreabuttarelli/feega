@@ -1,6 +1,6 @@
 import type { gestureScrub, readHost, selfScroll } from './host';
 import type { fitBox } from './fit';
-import type { VarDecl, VarRules, VarValues, coerceVars } from './var-model';
+import type { VarDecl, VarRules, VarValues, coerceVars } from '@feega/motion-core/motion/interactive/var-model';
 
 export type PlayerConfig = {
   html: string;

@@ -1,10 +1,10 @@
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { applyStyle, defineStyle, stylesFor } from './styles';
-import type { ComponentId } from './components';
-import { StyleKind, type Style } from './styles-model';
-import { EFFECTS } from './effects/registry';
-import { FILL_LABEL } from './fill/model';
-import type { OpResult } from './timeline';
+import type { ComponentId } from '@feega/motion-core/motion/components';
+import { StyleKind, type Style } from '@feega/motion-core/motion/styles-model';
+import { EFFECTS } from '@feega/motion-core/motion/effects/registry';
+import { FILL_LABEL } from '@feega/motion-core/motion/fill/model';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 export type Library = Record<string, Style>;
 

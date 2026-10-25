@@ -1,8 +1,8 @@
 <script lang="ts">
   import MotionPreview from './MotionPreview.svelte';
-  import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
-  import { FEEGA_TOKENS, type BrandTokens } from '$lib/motion/brand';
-  import type { MotionDoc } from '$lib/motion/doc';
+  import { Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+  import { FEEGA_TOKENS, type BrandTokens } from '@feega/motion-core/motion/brand';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
   let { doc, assets, tokens = FEEGA_TOKENS, active = true, restFrame = 0 }: { doc: MotionDoc; assets: Record<string, string>; tokens?: BrandTokens; active?: boolean; restFrame?: number } = $props();
 

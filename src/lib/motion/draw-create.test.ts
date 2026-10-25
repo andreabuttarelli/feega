@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { setStill } from './still';
-import { COMPONENTS } from './components';
+import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setStill } from '@feega/motion-core/motion/still';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { DrawTool } from './draw-tool';
 import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
-import { parsePath, type Outline } from './shape/geometry';
-import type { OpResult } from './timeline';
-import { TextSizing } from './text-sizing';
-import { FillType } from './fill/model';
+import { parsePath, type Outline } from '@feega/motion-core/motion/shape/geometry';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
+import { FillType } from '@feega/motion-core/motion/fill/model';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {

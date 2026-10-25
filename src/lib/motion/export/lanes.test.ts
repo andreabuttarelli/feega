@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { laneCount, laneVisibility, shootInLanes, type Shooter } from './lanes';
-import { Engine } from '../engine';
+import { Engine } from '@feega/motion-core/motion/engine';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 

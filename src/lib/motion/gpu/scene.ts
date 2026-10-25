@@ -1,5 +1,5 @@
-import { ENGINE_GLOBAL, motionEngine } from '../engine/engine';
-import { COMPOSITION_ID } from '../hyperframes/capture';
+import { ENGINE_GLOBAL, motionEngine } from '@feega/motion-core/motion/engine/engine';
+import { COMPOSITION_ID } from '@feega/motion-core/motion/hyperframes/capture';
 import { IDENTITY_3D, cssTransform, multiply, perspective, project, scaleOf, translation, type Mat4, type Size } from './matrix';
 import { PaintKind } from './paint-of';
 

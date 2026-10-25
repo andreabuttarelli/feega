@@ -1,19 +1,19 @@
 import { FrameKind } from '$lib/canvas/motion-node';
-import { compOf, MotionFormat, type MotionDoc } from '$lib/motion/doc';
+import { compOf, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { blankElement, canvasReady, drawClip, drawnFrame, penClip } from '$lib/motion/draw-create';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { EffectKind } from '$lib/motion/effects/registry';
-import type { Effect } from '$lib/motion/effects/model';
-import { FillType } from '$lib/motion/fill/model';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
+import type { Effect } from '@feega/motion-core/motion/effects/model';
+import { FillType } from '@feega/motion-core/motion/fill/model';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { registerFont } from '$lib/motion/fonts/ops';
 import { groupClips } from '$lib/motion/group';
-import { Align, Direction, Justify as MotionJustify, Sizing } from '$lib/motion/layout/auto-layout';
+import { Align, Direction, Justify as MotionJustify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
 import { setParent } from '$lib/motion/parent-ops';
-import { mapOutline, parsePath, type Pt } from '$lib/motion/shape/geometry';
-import { TextSizing } from '$lib/motion/text-sizing';
-import { editClip, setProps, type OpResult } from '$lib/motion/timeline';
+import { mapOutline, parsePath, type Pt } from '@feega/motion-core/motion/shape/geometry';
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
+import { editClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { figmaMessage, type FigmaMessage } from './archive';
 import { Clip, Cross, Destination, Fit, FillKind, Flow, Justify, LayerKind, figmaScene, type AutoLayout, type Fill, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
 

@@ -6,7 +6,7 @@ import { readHead } from '$lib/server/repos/motion-revisions';
 import { motionOf, type MotionNode } from '$lib/canvas/motion-node';
 import { embedUrl, interactiveBundle, BUNDLE_FILE } from '$lib/motion/interactive/bundle';
 import { embedSnippets } from '$lib/motion/interactive/loader';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { assetUrls, newHead, motionAssets, motionTokens, type AssetSigner } from './editor';
 import { embedPublished, isRefused, publishEmbed, removeEmbed } from './embed';
 import { libsOrigin } from './libs-origin';

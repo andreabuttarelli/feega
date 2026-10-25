@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
+import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { defineStyle } from './styles';
-import { StyleKind, type Style } from './styles-model';
-import { EffectKind } from './effects/registry';
-import { FillType } from './fill/model';
-import { BlendMode } from './blend';
+import { StyleKind, type Style } from '@feega/motion-core/motion/styles-model';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { BlendMode } from '@feega/motion-core/motion/blend';
 import { adoptStyle, libraryOf, offeredStyles, styleLabel, syncedDoc } from './style-library';
 
 const must = (r: OpResult): MotionDoc => {

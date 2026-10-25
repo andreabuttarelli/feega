@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { unzipSync } from 'fflate';
 import { exportFiles, exportRowsSchema } from '$lib/motion/export-rows';
 import { ExportOutcome, exportSelection, packExport, type DrawTarget, type SelectionPorts } from './selection-export';
-import { Background, MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { Background, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 
 const rows = exportRowsSchema.parse([{ format: 'png', by: 'scale', value: 1 }]);
 const draw = async (file: { name: string }) => Buffer.from(file.name);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { installEngine, testTimeline } from '../engine/testing';
-import { DEFAULT_MOTION_BLUR, sampleTimes } from '../motion-blur';
-import { holdStill } from './blur';
+import { DEFAULT_MOTION_BLUR, sampleTimes } from '@feega/motion-core/motion/motion-blur';
+import { holdStill } from '@feega/motion-core/motion/hyperframes/blur';
 
 const blur = { ...DEFAULT_MOTION_BLUR, enabled: true };
 const FPS = 30;

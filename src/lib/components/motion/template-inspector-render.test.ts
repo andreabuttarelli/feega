@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import TemplateInspector from './TemplateInspector.svelte';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { insertTemplate } from '$lib/motion/template/library';
 import { locateClip } from '$lib/motion/template/fields';
 import { PROMPT_INPUT_TEMPLATE } from '$lib/motion/template/prompt-input/template';

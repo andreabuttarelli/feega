@@ -1,7 +1,7 @@
-import { AssetKind, TrackKind } from './components';
-import { FPS, TransitionKind } from './design';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, addTrack, setCanvas, type NewClip, type OpResult } from './timeline';
+import { AssetKind, TrackKind } from '@feega/motion-core/motion/components';
+import { FPS, TransitionKind } from '@feega/motion-core/motion/design';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, addTrack, setCanvas, type NewClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export type TrailerAssets = { modelId: string | null; imageId: string | null };
 

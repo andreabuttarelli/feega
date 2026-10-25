@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { setAutoLayout } from '../layout/ops';
 import { setParent } from '../parent-ops';
-import { addClip, type OpResult } from '../timeline';
-import { Align, Direction, Justify, TrackType } from '../layout/auto-layout';
-import { composeHtml } from './compose';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Align, Direction, Justify, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

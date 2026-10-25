@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import MotionInspector from './MotionInspector.svelte';
 import MultiInspector from './MultiInspector.svelte';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, setTransform } from '$lib/motion/timeline';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setTransform } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { EditMode } from '$lib/motion/edit-mode';
-import type { ComponentId } from '$lib/motion/components';
+import type { ComponentId } from '@feega/motion-core/motion/components';
 
 function withClip(component: ComponentId, id: string, doc: MotionDoc = newMotionDoc(MotionFormat.Landscape)): MotionDoc {
   const added = addClip(doc, { component, from: 0 }, id);

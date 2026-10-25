@@ -1,6 +1,6 @@
-import { clipsOf, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { exposeField } from '$lib/motion/template/fields';
-import { FieldType, type ExposedField } from '$lib/motion/template/field-model';
+import { FieldType, type ExposedField } from '@feega/motion-core/motion/template/field-model';
 
 type Slot = { type: FieldType; prop: string; key: string; label: (clip: MotionClip, n: number) => string; quota: number };
 

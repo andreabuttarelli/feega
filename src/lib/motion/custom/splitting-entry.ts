@@ -1,5 +1,5 @@
 import Splitting from 'splitting';
-import { SPLITTING_GLOBAL } from './splitting';
+import { SPLITTING_GLOBAL } from '@feega/motion-core/motion/custom/splitting';
 
 const NOTICE = 'Splitting 1.1.0, Copyright (c) 2018 Stephen Shaw, MIT licence';
 

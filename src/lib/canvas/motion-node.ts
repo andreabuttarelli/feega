@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { versionNamesSchema, type VersionNames } from '$lib/motion/version-names';
-import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat, type MotionDoc } from '$lib/motion/doc';
+import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { presetOf } from '$lib/motion/frame-presets';
 import { NodeMode, Opening } from './inline-motion';
-import { FrameFormat } from '$lib/motion/hyperframes/capture';
+import { FrameFormat } from '@feega/motion-core/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
 import { FramePress } from '$lib/motion/drill';
 import { grantedPath } from './asset-url';

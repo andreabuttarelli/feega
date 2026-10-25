@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { RenderSettings } from '$lib/motion/export-formats';
-import type { ComposeInput } from '$lib/motion/hyperframes/compose';
+import type { ComposeInput } from '@feega/motion-core/motion/hyperframes/compose';
 import { applyValues } from '$lib/motion/template/fields';
 import { MAX_BATCH_ROWS } from '$lib/motion/template/batch';
 import { renderRequest, type BatchRow } from './render-run';

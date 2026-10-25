@@ -28,7 +28,7 @@
 
 /** Cosa una cosa È. I tre primitivi, e nient'altro. */
 import { videoRefCapacity } from '$lib/video-models';
-import { MAX_COMPOSITION_MEDIA } from '$lib/motion/components';
+import { MAX_COMPOSITION_MEDIA } from '@feega/motion-core/motion/components';
 import { imageModelSpec } from '$lib/image-models';
 import { SELECTABLE_SOURCE_TYPES } from './select-node';
 import { audioInputMediums, audioOperationOf, type AudioOperationId } from './audio-operations';

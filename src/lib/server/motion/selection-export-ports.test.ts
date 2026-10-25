@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionClip } from '$lib/motion/doc';
-import { flattenComps } from '$lib/motion/precomp';
+import { MotionFormat, newMotionDoc, type MotionClip } from '@feega/motion-core/motion/doc';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { sequenceScenes } from '$lib/motion/scenes';
 import { playedDoc } from './selection-export-ports';
 import type { FrameStore } from './move-element';

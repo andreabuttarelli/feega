@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseMotionDoc, clipsOf } from './doc';
+import { parseMotionDoc, clipsOf } from '@feega/motion-core/motion/doc';
 import { feegaTrailer, trailerFrom } from './trailer';
-import { AssetKind } from './components';
+import { AssetKind } from '@feega/motion-core/motion/components';
 
 describe('feega trailer', () => {
   it('is a valid 18 second landscape doc', () => {

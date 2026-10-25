@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
 import { DOC_EDITED } from '$lib/motion/frames-request';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 
 const world = vi.hoisted(() => ({ db: null as unknown, stored: new Map<string, string>() }));
 

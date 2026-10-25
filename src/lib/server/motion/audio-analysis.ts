@@ -3,9 +3,9 @@ import { promisify } from 'node:util';
 import type { Db } from '$lib/server/db/client';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { ensureFfmpegPath } from '$lib/server/ffmpeg-bin';
-import { FPS } from '$lib/motion/design';
-import { ANALYSIS_VERSION, analyzeAudio, type AudioAnalysis } from '$lib/motion/audio-analysis';
-import { AssetKind } from '$lib/motion/components';
+import { FPS } from '@feega/motion-core/motion/design';
+import { ANALYSIS_VERSION, analyzeAudio, type AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import type { MotionAsset } from './editor';
 
 export type AssetRef = { orgId: string; projectId: string; assetId: string; url: string };

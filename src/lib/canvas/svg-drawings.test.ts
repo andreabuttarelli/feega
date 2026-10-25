@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { TextSizing } from '$lib/motion/text-sizing';
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { svgDrawings } from './svg-drawings';
 
 const CARD = `<svg viewBox="0 0 100 50"><defs><linearGradient id="g" x2="0" y2="1"><stop offset="0" stop-color="#f00"/><stop offset="1" stop-color="#00f"/></linearGradient></defs><rect width="100" height="50" fill="url(#g)"/><text x="10" y="30" font-size="20" font-weight="700" fill="#336699">Hi</text></svg>`;

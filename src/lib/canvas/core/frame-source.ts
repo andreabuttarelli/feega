@@ -1,9 +1,9 @@
 import { FrameKind, MOTION_NODE_BAR_H, docKindOf, frameChrome, holdsDoc } from '$lib/canvas/motion-node';
 import { restFrameOf } from '$lib/motion/poster-time';
-import { stillFrame as docStill } from '$lib/motion/still';
-import type { MotionDoc } from '$lib/motion/doc';
-import type { DisplayList } from '$lib/motion/gpu-full/display-list';
-import type { Rgba } from '$lib/motion/gpu-full/rgba';
+import { stillFrame as docStill } from '@feega/motion-core/motion/still';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
+import type { Rgba } from '@feega/motion-core/motion/gpu-full/rgba';
 import type { Box } from './canvas-scene';
 
 export type FrameTile = { id: string; kind?: string | null; x: number; y: number; w: number; h: number; rotation?: number };

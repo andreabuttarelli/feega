@@ -1,8 +1,8 @@
 import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { mapOutline, parsePath, pathData } from '$lib/motion/shape/geometry';
+import { mapOutline, parsePath, pathData } from '@feega/motion-core/motion/shape/geometry';
 import { svgShapes } from '$lib/motion/shape/svg-import';
-import { NEW_TEXT_SIZING } from '$lib/motion/text-sizing';
+import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
 import { MAX_PASTED_SHAPES, MAX_PASTED_TEXTS, svgTextBox } from '$lib/canvas/frame-paste';
 
 type Point = { x: number; y: number };

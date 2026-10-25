@@ -2,11 +2,11 @@
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 import { WHITE_SHAPES_POSTER_TEMPLATE } from '$lib/motion/template/white-shapes-poster/template';
-import { PartKind, partIcon, partKind } from '$lib/motion/poster-parts';
+import { PartKind, partIcon, partKind } from '@feega/motion-core/motion/poster-parts';
 import { setPartFills } from '$lib/motion/part-style';
-import { partStyleCss } from '$lib/motion/hyperframes/part-styles';
-import { FillType, fillsSchema } from '$lib/motion/fill/model';
-import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+import { partStyleCss } from '@feega/motion-core/motion/hyperframes/part-styles';
+import { FillType, fillsSchema } from '@feega/motion-core/motion/fill/model';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { PART_ATTR, defaultsOf, renderRoot, staticParts, type Schema } from './static-parts';
 
 const GEOMETRY = 'path,rect,circle,ellipse,polygon,polyline,line';

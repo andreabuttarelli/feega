@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { parseMotionDoc, type MotionDoc } from '../doc';
-import { setExpression } from '../expression/ops';
-import { Liveness } from '../interactive/settings';
-import { ROW } from '../blob/shape';
-import { CAPTURE_REQUEST } from './capture';
-import { composeHtml } from './compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
+import { Liveness } from '@feega/motion-core/motion/interactive/settings';
+import { ROW } from '@feega/motion-core/motion/blob/shape';
+import { CAPTURE_REQUEST } from '@feega/motion-core/motion/hyperframes/capture';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import fixture from '../fixtures/liquid-glass-title.json';
 
 const DROP = '918f44bd';

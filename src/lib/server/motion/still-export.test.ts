@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { setStill } from '$lib/motion/still';
-import { ImageFormat, ImageScale, stillExport } from '$lib/motion/still-model';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { setStill } from '@feega/motion-core/motion/still';
+import { ImageFormat, ImageScale, stillExport } from '@feega/motion-core/motion/still-model';
 import { drawStill, exportStill } from './still-export';
 import type { StillPort, Viewport } from './server-frames';
 

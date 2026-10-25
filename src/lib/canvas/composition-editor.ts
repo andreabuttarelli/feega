@@ -1,4 +1,4 @@
-import type { LayoutParam, LayoutParams } from './composition/types';
+import type { LayoutParam, LayoutParams } from '@feega/motion-core/canvas/composition/types';
 
 export type Control =
 	| { kind: 'slider'; min: number; max: number; step: number; value: number }

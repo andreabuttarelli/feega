@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { installEngine, testTimeline } from '../engine/testing';
-import { FEEGA_TOKENS } from '../brand';
-import { TrackKind } from '../components';
-import { Ease } from '../design';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { sampleTrack } from '../keyframes';
-import { MaskKind, MaskMode, Matte, combineMasks, type MaskInput } from '../mask';
-import { addClip, addTrack, setKeyframes, setMask, setMaskStack, setTrackMatte, type OpResult } from '../timeline';
-import { CssComposite, stackLayers } from './masks';
-import { MATTE_RUNTIME } from './mattes';
-import { keyframeTweens } from './animate';
-import { composeHtml } from './compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { sampleTrack } from '@feega/motion-core/motion/keyframes';
+import { MaskKind, MaskMode, Matte, combineMasks, type MaskInput } from '@feega/motion-core/motion/mask';
+import { addClip, addTrack, setKeyframes, setMask, setMaskStack, setTrackMatte, type OpResult } from '@feega/motion-core/motion/timeline';
+import { CssComposite, stackLayers } from '@feega/motion-core/motion/hyperframes/masks';
+import { MATTE_RUNTIME } from '@feega/motion-core/motion/hyperframes/mattes';
+import { keyframeTweens } from '@feega/motion-core/motion/hyperframes/animate';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { useAsMask } from '../mask-group';
-import { setClipFlags } from '../organize';
+import { setClipFlags } from '@feega/motion-core/motion/organize';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

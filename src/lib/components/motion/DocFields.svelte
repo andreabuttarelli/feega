@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { AssetKind } from '$lib/motion/components';
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { AssetKind } from '@feega/motion-core/motion/components';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { applyValues, fieldValues } from '$lib/motion/template/fields';
   import type { TemplateFieldValue } from '$lib/motion/template/library';
   import FieldForm from './FieldForm.svelte';

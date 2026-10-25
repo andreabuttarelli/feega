@@ -1,4 +1,4 @@
-import type { DisplayList } from '$lib/motion/gpu-full/display-list';
+import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 
 export const PART_ITEMS = 32;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from './doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { SAVE_TONE, SaveState, SaveTone, TimeDisplay, clockLabel, compositionLabel, compositionShort, DISPLAY_NAME, isTap } from './editor-bar';
 
 describe('editor bar', () => {

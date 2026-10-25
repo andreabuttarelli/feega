@@ -1,15 +1,15 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { Ease } from '$lib/motion/design';
-import { addClip, setKeyframes, type OpResult } from '$lib/motion/timeline';
-import { FillType } from '$lib/motion/fill/model';
-import { maskSchema } from '$lib/motion/mask';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { maskSchema } from '@feega/motion-core/motion/mask';
 import { registerFont } from '$lib/motion/fonts/ops';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
-import { addAnimator, applyPreset, TextPreset } from '$lib/motion/text-animators/ops';
-import { setTextPath } from '$lib/motion/text-path/ops';
-import { PathPreset, PathSourceKind } from '$lib/motion/text-path/model';
+import { addAnimator, applyPreset, TextPreset } from '@feega/motion-core/motion/text-animators/ops';
+import { setTextPath } from '@feega/motion-core/motion/text-path/ops';
+import { PathPreset, PathSourceKind } from '@feega/motion-core/motion/text-path/model';
 
 const SECONDS = 60;
 const out = process.argv[2];

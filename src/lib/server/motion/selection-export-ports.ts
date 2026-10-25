@@ -5,13 +5,13 @@ import { findNode } from '$lib/server/repos/canvas';
 import { insertAsset } from '$lib/server/repos/assets';
 import { SIGNED_URL_TTL_S, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
 import { withScenes } from '$lib/canvas/scene-sources';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { frameStore, type FrameStore } from './move-element';
 import { chromiumExport } from './chromium-frames';
 import { drawTargets } from './selection-draw';
 import { vectorOf, type Span } from './vector-list';
 import { libsOrigin } from './libs-origin';
-import { composeHtml } from '$lib/motion/hyperframes/compose';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { assetUrls, motionAssets, motionTokens } from './editor';
 import type { DrawTarget, SelectionPorts } from './selection-export';
 

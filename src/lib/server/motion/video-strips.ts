@@ -1,5 +1,5 @@
 import type { Step } from './farm-render';
-import { THREE_REDRAW } from '$lib/motion/hyperframes/three';
+import { THREE_REDRAW } from '@feega/motion-core/motion/hyperframes/three';
 
 export const STRIP_FPS = 60;
 

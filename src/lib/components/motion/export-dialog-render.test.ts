@@ -3,14 +3,14 @@ import { render } from 'svelte/server';
 import ExportDialog from './ExportDialog.svelte';
 import EmbedView from './EmbedView.svelte';
 import { ExportMode } from './export-mode';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { RenderQueue } from '$lib/motion/server-render';
 import { Reaction } from '$lib/motion/interactive/summary';
-import { DEFAULT_INTERACTIVE, PlayMode } from '$lib/motion/interactive/settings';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { DEFAULT_INTERACTIVE, PlayMode } from '@feega/motion-core/motion/interactive/settings';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
-import { ComponentMode } from '$lib/motion/custom/component';
+import { ComponentMode } from '@feega/motion-core/motion/custom/component';
 
 const doc = newMotionDoc(MotionFormat.Landscape);
 

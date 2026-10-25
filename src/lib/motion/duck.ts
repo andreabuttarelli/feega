@@ -1,8 +1,8 @@
-import { findClip, type MotionDoc } from './doc';
-import { Ease } from './design';
-import type { Keyframe } from './keyframes';
-import type { Region } from './audio-analysis';
-import { setKeyframes, type OpResult } from './timeline';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import type { Keyframe } from '@feega/motion-core/motion/keyframes';
+import type { Region } from '@feega/motion-core/motion/audio-analysis';
+import { setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export type DuckOptions = { depth: number; attack: number; release: number };
 

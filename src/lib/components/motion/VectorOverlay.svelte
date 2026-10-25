@@ -1,12 +1,12 @@
 <script lang="ts">
   import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { pathData, type Pt } from '$lib/motion/shape/geometry';
-  import { pathSpace } from '$lib/motion/shape/space';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { pathData, type Pt } from '@feega/motion-core/motion/shape/geometry';
+  import { pathSpace } from '@feega/motion-core/motion/shape/space';
   import { isTyping } from '$lib/motion/shortcuts';
-  import { EMPTY_NETWORK, networkSchema, type Vector, type VectorNetwork } from '$lib/motion/vector/model';
-  import { networkStroke } from '$lib/motion/vector/outline';
-  import { nearestOnNetwork } from '$lib/motion/vector/curve-math';
+  import { EMPTY_NETWORK, networkSchema, type Vector, type VectorNetwork } from '@feega/motion-core/motion/vector/model';
+  import { networkStroke } from '@feega/motion-core/motion/vector/outline';
+  import { nearestOnNetwork } from '@feega/motion-core/motion/vector/curve-math';
   import { Tangent, breakAtVertex, deleteVertex, handlesAt, removeVertex, splitSegmentAt, toggleSmoothVertex, type Handle } from '$lib/motion/vector/edit';
   import { addVertex, connect, fillClosed, moveVertex, setTangent } from '$lib/motion/vector/draw';
   import { setNetwork } from '$lib/motion/vector/ops';

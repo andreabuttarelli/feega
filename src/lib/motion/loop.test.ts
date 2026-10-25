@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Ending, LOOP_RULE, LOOP_SEAM_LUMA, endingOf, loopJump } from './loop';
-import { HOUSE_LOOP, MotionStyle } from './style-model';
-import { DEFAULT_INTERACTIVE, PlayMode, interactiveOf } from './interactive/settings';
+import { HOUSE_LOOP, MotionStyle } from '@feega/motion-core/motion/style-model';
+import { DEFAULT_INTERACTIVE, PlayMode, interactiveOf } from '@feega/motion-core/motion/interactive/settings';
 import { SEVERITY, Quality, Severity } from './direction';
 
 const doc = newMotionDoc(MotionFormat.Vertical);

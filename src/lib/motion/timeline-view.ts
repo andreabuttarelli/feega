@@ -1,12 +1,12 @@
-import type { AnimProp } from './keyframes';
-import { FPS } from './design';
-import { snapFrame, snapTargets } from './timeline';
-import type { MotionClip, MotionDoc } from './doc';
-import { ANIMATABLE, Source, sampleTrack, type EaseSpec, type Keyframe } from './keyframes';
-import { CAMERA_LANE } from './camera';
-import { cameraLanes } from './camera-ops';
-import { withParams } from './custom/params';
-import type { KeyRef } from './timeline';
+import type { AnimProp } from '@feega/motion-core/motion/keyframes';
+import { FPS } from '@feega/motion-core/motion/design';
+import { snapFrame, snapTargets } from '@feega/motion-core/motion/timeline';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { ANIMATABLE, Source, sampleTrack, type EaseSpec, type Keyframe } from '@feega/motion-core/motion/keyframes';
+import { CAMERA_LANE } from '@feega/motion-core/motion/camera';
+import { cameraLanes } from '@feega/motion-core/motion/camera-ops';
+import { withParams } from '@feega/motion-core/motion/custom/params';
+import type { KeyRef } from '@feega/motion-core/motion/timeline';
 
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 16;

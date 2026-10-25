@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CellFit } from '$lib/motion/bento/model';
+import { CellFit } from '../../motion/bento/model';
 import { CARD_ASPECTS, ORIGINAL, aspectValue, cardBox, cardParams, lookOf } from './card-look';
 
 describe('card aspect', () => {

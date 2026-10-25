@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { outlinePaths } from './outline-view';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { setClipFlags } from './organize';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { setClipFlags } from '@feega/motion-core/motion/organize';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {

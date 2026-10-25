@@ -5,12 +5,12 @@
   import TimeRemap from '$lib/components/motion/TimeRemap.svelte';
   import { advance } from '$lib/canvas/frame-playhead';
   import { Action, type ActionId } from '$lib/motion/actions';
-  import { findClip, type MotionDoc } from '$lib/motion/doc';
+  import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { frameBarActions } from '$lib/canvas/frame-inspector';
   import { EditMode } from '$lib/motion/edit-mode';
   import { Snap } from '$lib/motion/timeline-view';
-  import type { KeyRef } from '$lib/motion/timeline';
+  import type { KeyRef } from '@feega/motion-core/motion/timeline';
   import type { CommentMark } from '$lib/canvas/comment-marks';
 
   let {

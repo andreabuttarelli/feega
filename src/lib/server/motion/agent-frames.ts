@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import { AssetKind } from '$lib/motion/components';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import { SHORT_FILM_S, blockingFor, docProblems, frameProblems } from '$lib/motion/direction';
 import { savedMotion } from './agent-embed';
 import { assetUrls, motionAssets, motionTokens } from './editor';

@@ -1,8 +1,8 @@
-import { FASTEST_RATE, FRAME_RATES, maxFrames, type FrameRate } from './design';
-import { byFrame, type Marker, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from './doc';
-import type { Keyframes } from './keyframes';
-import { MAX_JUNCTION_FRAMES } from './junction-model';
-import type { OpResult } from './timeline';
+import { FASTEST_RATE, FRAME_RATES, maxFrames, type FrameRate } from '@feega/motion-core/motion/design';
+import { byFrame, type Marker, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import type { Keyframes } from '@feega/motion-core/motion/keyframes';
+import { MAX_JUNCTION_FRAMES } from '@feega/motion-core/motion/junction-model';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 export { FRAME_RATES, maxFrames, type FrameRate };
 

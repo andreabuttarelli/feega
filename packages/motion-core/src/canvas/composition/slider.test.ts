@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { STYLE_EASES } from '$lib/motion/style-model';
+import { STYLE_EASES } from '../../motion/style-model';
 import { LAYOUTS } from './index';
-import { easeCurve } from '$lib/motion/keyframes';
+import { easeCurve } from '../../motion/keyframes';
 import { SLIDER_VARIANTS, instances, transforms } from './slider';
 import type { LayoutParams } from './types';
 

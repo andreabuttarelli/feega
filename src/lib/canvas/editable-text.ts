@@ -1,4 +1,4 @@
-import { MARKER_ATTR } from '$lib/motion/hyperframes/text-body';
+import { MARKER_ATTR } from '@feega/motion-core/motion/hyperframes/text-body';
 
 export type Span = { start: number; end: number };
 type Point = { node: Node; offset: number };

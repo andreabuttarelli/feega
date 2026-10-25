@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Script, scriptUrl } from '../libs/catalog';
+import { Script, scriptUrl } from '@feega/motion-core/motion/libs/catalog';
 import { playerWarmer, whenIdle } from './warm-player';
 
 const ORIGIN = 'https://feega.app';

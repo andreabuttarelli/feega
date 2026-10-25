@@ -3,8 +3,8 @@ import { render } from 'svelte/server';
 import CompositionNode from './CompositionNode.svelte';
 import { BUILTIN_TEMPLATES, builtinTemplate } from '$lib/motion/template/builtins';
 import { FORMAT_OF_ASPECT, composedTemplate, sequentialIds } from '$lib/canvas/composition-template';
-import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { STRIP_TEMPLATE_ID } from '$lib/motion/template/photo-strip/template';
 import { newCompositionNodeAt, type CompositionNode as Node, type UpstreamCard } from '$lib/canvas/composition-node';
 

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { FLAT_FRAME_MS, costSpans, frameCosts } from './render-cost';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip } from './timeline';
-import type { ComponentId } from './components';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import type { ComponentId } from '@feega/motion-core/motion/components';
 import { addEffect } from './effects/ops';
-import { EffectKind } from './effects/registry';
-import { Matte } from './mask';
-import { precompose } from './precomp';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
+import { Matte } from '@feega/motion-core/motion/mask';
+import { precompose } from '@feega/motion-core/motion/precomp';
 
 function withClip(doc: MotionDoc, component: ComponentId, from: number, durationInFrames: number): MotionDoc {
   const added = addClip(doc, { component, from, durationInFrames }, `${component}-${from}`);

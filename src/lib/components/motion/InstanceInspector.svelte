@@ -1,10 +1,10 @@
 <script lang="ts">
   import Diamond from '@lucide/svelte/icons/diamond';
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { Paint, instanceElements, instanceOf, instanceTexts, overrideInstance, recolorInstance, resetOverride } from '$lib/motion/main-component';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { defineProperty, exposable, instanceProperties, removeProperty, resetProperty, setProperty, type Exposure } from '$lib/motion/component-properties';
-  import { PropertyKind, type PropertyDef } from '$lib/motion/property-resolve';
+  import { PropertyKind, type PropertyDef } from '@feega/motion-core/motion/property-resolve';
   import { addVariant, pickVariant, swapInstance, variantProps } from '$lib/motion/variants';
 
   let { doc, clipId, onchange, onrun }: { doc: MotionDoc; clipId: string; onchange: (doc: MotionDoc, summary: string) => void; onrun: (id: ActionId) => void } = $props();

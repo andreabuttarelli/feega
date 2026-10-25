@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { Engine } from '$lib/motion/engine';
+import { Engine } from '@feega/motion-core/motion/engine';
 import { centredAt, crispFor, crispScale, keepCrisp } from './crisp-scale';
 
 describe('crisp scale', () => {

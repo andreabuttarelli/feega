@@ -1,5 +1,5 @@
-import { MotionFormat } from '$lib/motion/doc';
-import { FieldType } from '$lib/motion/template/field-model';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
+import { FieldType } from '@feega/motion-core/motion/template/field-model';
 import { starterDoc, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
 import { setTemplateValues, templateFields, type Inserted, type Instance, type TemplateEntry } from '$lib/motion/template/library';
 import type { CompositionAspect, UpstreamCard } from './composition-node';

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
-import { DEFAULT_SECONDS, MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { MotionStyle } from '$lib/motion/style-model';
+import { DEFAULT_SECONDS, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
 
 const usage = { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } };
 

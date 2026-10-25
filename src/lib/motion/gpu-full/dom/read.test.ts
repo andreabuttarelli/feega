@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { apply2d } from '../../affine';
-import { FillRule, PaintKind } from '../paint';
-import { DomGap, DrawnKind, readTree, type DrawnPath } from './read';
-import { NO_INDEX, type RawNode, type RawTree } from './tree';
+import { apply2d } from '@feega/motion-core/motion/affine';
+import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
+import { DomGap, DrawnKind, readTree, type DrawnPath } from '@feega/motion-core/motion/gpu-full/dom/read';
+import { NO_INDEX, type RawNode, type RawTree } from '@feega/motion-core/motion/gpu-full/dom/tree';
 import { boxBook } from '../text/test-face';
-import { Smoothing } from '../text/painter';
-import { BlendMode } from '../../blend';
-import { MaskMode } from '../../mask';
-import { CoverKind } from '../mask-layers';
-import { FilterKind } from '../filters';
-import type { SvgNode } from '../../effects/registry';
+import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { MaskMode } from '@feega/motion-core/motion/mask';
+import { CoverKind } from '@feega/motion-core/motion/gpu-full/mask-layers';
+import { FilterKind } from '@feega/motion-core/motion/gpu-full/filters';
+import type { SvgNode } from '@feega/motion-core/motion/effects/registry';
 
 const FRAME = { width: 400, height: 300 };
 

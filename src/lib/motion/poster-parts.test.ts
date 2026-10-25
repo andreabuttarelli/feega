@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CLIP_TEXT, PART_ACTIONS, PartAction, PartEdit, PartKind, runPart, componentLabel, drawnTexts, editablePart, partAt, partBoxes, partKind, partLabel, partText, writePartText } from './poster-parts';
+import { CLIP_TEXT, PART_ACTIONS, PartAction, PartEdit, PartKind, runPart, componentLabel, drawnTexts, editablePart, partAt, partBoxes, partKind, partLabel, partText, writePartText } from '@feega/motion-core/motion/poster-parts';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from './template/type-grid-poster/template';
-import { MotionFormat, findClip, newMotionDoc } from './doc';
-import { addClip } from './timeline';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 
 const doc = TYPE_GRID_POSTER_TEMPLATE.template.doc;
 const clip = findClip(doc, TYPE_GRID_CLIP)!.clip;

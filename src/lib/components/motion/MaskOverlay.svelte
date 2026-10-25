@@ -1,9 +1,9 @@
 <script lang="ts">
   import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { MaskKind } from '$lib/motion/mask';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { MaskKind } from '@feega/motion-core/motion/mask';
   import { CORNERS, Grab, cornerAt, dragBox, dragPoint, editMaskAt, maskBox, pointAt, type MaskBox } from '$lib/motion/mask-handles';
-  import { setMask, type OpResult } from '$lib/motion/timeline';
+  import { setMask, type OpResult } from '@feega/motion-core/motion/timeline';
 
   let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 

@@ -1,8 +1,8 @@
-import { clipsOf, type MotionDoc } from '../doc';
-import { InputKey } from '../expression/inputs';
-import { flattenComps } from '../precomp';
-import { liveLanes } from './spec';
-import { PlayMode, interactiveOf } from './settings';
+import { clipsOf, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { InputKey } from '@feega/motion-core/motion/expression/inputs';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
+import { liveLanes } from '@feega/motion-core/motion/interactive/spec';
+import { PlayMode, interactiveOf } from '@feega/motion-core/motion/interactive/settings';
 
 export enum Reaction {
   Cursor = 'cursor',

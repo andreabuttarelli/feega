@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { MotionFormat } from '../../src/lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { ShotId } from '../../src/lib/motion/shots/library';
 import { VectorKind, VectorRole, type VectorUi } from '../../src/lib/motion/vector-ui/model';
 import type { ShotCase } from './fixtures/shot-probe';

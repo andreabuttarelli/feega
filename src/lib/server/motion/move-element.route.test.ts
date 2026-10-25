@@ -4,8 +4,8 @@ import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server
 import { fakeDb } from '$lib/server/db/fake-db';
 import { listConnections, listNodes } from '$lib/server/repos/canvas';
 import { canvasFrameInputs } from './move-element';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { FIGMA_FILE_KEY, figmaClipWithImage } from '../../../../tests/fixtures/figma/image-clip';
 
 const SOURCE = '44444444-4444-4444-4444-444444444444';

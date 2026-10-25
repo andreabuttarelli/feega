@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { DocVerdict, MotionDoc } from '$lib/motion/doc';
-  import { ENVIRONMENT, ENV_PRESETS, LIGHT, LIGHT_KINDS, LightKind, MAX_LIGHTS, type Light } from '$lib/motion/look';
+  import type { DocVerdict, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { ENVIRONMENT, ENV_PRESETS, LIGHT, LIGHT_KINDS, LightKind, MAX_LIGHTS, type Light } from '@feega/motion-core/motion/look';
   import { removeLight, removeLook, setLight, setLook } from '$lib/motion/look-ops';
   import NumberField from './NumberField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';

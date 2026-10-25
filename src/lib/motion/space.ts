@@ -1,10 +1,10 @@
-import { findClip, type MotionDoc } from './doc';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { EditMode } from './edit-mode';
-import type { Transform, TransformKey } from './keyframes';
-import { isLocked } from './organize';
-import { pivotBox, transformAt } from './parent';
+import type { Transform, TransformKey } from '@feega/motion-core/motion/keyframes';
+import { isLocked } from '@feega/motion-core/motion/organize';
+import { pivotBox, transformAt } from '@feega/motion-core/motion/parent';
 import { Grip, aabb, dragPatch, quadOf, writePatch, type Bounds, type Boxes, type Pt } from './scene-select';
-import { setKeyframes, setTransform, type OpResult } from './timeline';
+import { setKeyframes, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { tidyMoves } from './tidy';
 
 export enum Edge {
