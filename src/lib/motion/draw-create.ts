@@ -134,9 +134,16 @@ type BoxDrawn = { tool: BoxTool; box: CanvasBox; theme?: CanvasTheme; sizing?: T
 
 export type Drawn = BoxDrawn | ({ tool: DrawTool.Pen; outline: Outline } & PenPaint);
 
-export type DrawnWire = BoxDrawn | ({ tool: DrawTool.Pen; path: string } & PenPaint);
+export type LineWire = { tool: LineTool; from: DragPoint; to: DragPoint; stroke?: string; theme?: CanvasTheme };
+
+export type DrawnWire = BoxDrawn | ({ tool: DrawTool.Pen; path: string } & PenPaint) | LineWire;
+
+const isLine = (wire: DrawnWire): wire is LineWire => wire.tool === DrawTool.Line || wire.tool === DrawTool.Arrow;
 
 export function drawnOf(wire: DrawnWire): Drawn | string {
+  if (isLine(wire)) {
+    return { tool: DrawTool.Pen, outline: lineOutline(wire.from, wire.to, wire.tool), ...LINE_PAINT[wire.tool](wire.stroke ?? CANVAS_INK[wire.theme ?? CanvasTheme.Light]) };
+  }
   if (wire.tool !== DrawTool.Pen) {
     return wire;
   }

@@ -199,7 +199,7 @@ const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame
 const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
 
 const drawElementInput = z
-  .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse|polygon|star, box:{left,top,width,height}}, or {tool:pen, path:SVG d}, in canvas units') })
+  .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse|polygon|star, box:{left,top,width,height}}, {tool:line|arrow, from:{x,y}, to:{x,y}, stroke?:#hex}, or {tool:pen, path:SVG d}, in canvas units') })
   .strict();
 
 const drawFrameInput = z
@@ -704,7 +704,6 @@ export const CANVAS_OPS = {
 
   styles: op({
     access: Access.Write,
-    audience: Audience.Mcp,
     input: canvasStyleInput,
     run: async (ctx, input) => {
       const frames = framesOf(ctx);
@@ -721,7 +720,6 @@ export const CANVAS_OPS = {
 
   variables: op({
     access: Access.Write,
-    audience: Audience.Mcp,
     input: canvasVariableInput,
     run: async (ctx, input) => {
       const frames = framesOf(ctx);
