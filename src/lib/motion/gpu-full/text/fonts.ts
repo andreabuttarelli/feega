@@ -71,6 +71,8 @@ function coordsFor(source: Source, weight: number, request: Request): Record<str
 
 export const resolvedRequest = <R extends Omit<Request, 'size'>>(request: R, registry: readonly FontFace[]): R => ({ ...request, family: familyName(request.family, registry), weight: loadedWeight(request.family, request.weight, registry) });
 
+export const SYMBOL_FALLBACKS = ['Noto Sans Symbols 2', 'Noto Sans Math'];
+
 export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string, Source>, registry: readonly FontFace[]): FaceBook {
   const keyed = new Map<string, Face>();
   const stamped = (font: string, coords: Record<string, number>): Face => {
@@ -79,20 +81,22 @@ export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string
     keyed.set(name, face);
     return face;
   };
-  return (request, codePoint): Resolved | null => {
-    const { family, weight: desired } = resolvedRequest(request, registry);
+  const ruleFor = (family: string, request: Parameters<FaceBook>[0], desired: number, codePoint: number) => {
     const own = rules.filter((r) => r.family === family && sources.has(r.url));
     const styled = own.filter((r) => r.italic === request.italic);
     const pool = styled.length ? styled : own;
-    const skew = request.italic && !styled.length ? SYNTHETIC_OBLIQUE : 0;
     const group = nearest([...new Map(pool.map((r) => [r.weight.join('-'), r.weight])).values()], desired);
-    if (!group) {
+    const rule = group && pool.find((r) => r.weight[0] === group[0] && r.weight[1] === group[1] && r.ranges.some(([lo, hi]) => lo <= codePoint && codePoint <= hi) && sources.get(r.url)!.covers(codePoint));
+    return rule && group ? { rule, group, skew: request.italic && !styled.length ? SYNTHETIC_OBLIQUE : 0 } : null;
+  };
+
+  return (request, codePoint): Resolved | null => {
+    const { family, weight: desired } = resolvedRequest(request, registry);
+    const found = [family, ...SYMBOL_FALLBACKS].reduce<ReturnType<typeof ruleFor>>((hit, f) => hit ?? ruleFor(f, request, desired, codePoint), null);
+    if (!found) {
       return null;
     }
-    const rule = pool.find((r) => r.weight[0] === group[0] && r.weight[1] === group[1] && r.ranges.some(([lo, hi]) => lo <= codePoint && codePoint <= hi) && sources.get(r.url)!.covers(codePoint));
-    if (!rule) {
-      return null;
-    }
+    const { rule, group, skew } = found;
     const source = sources.get(rule.url)!;
     return { face: stamped(rule.url, coordsFor(source, clamp(desired, group), request)), skew };
   };

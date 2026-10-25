@@ -3,7 +3,7 @@ import type { BrandTokens } from '../../brand';
 import { googleFontsUrl, uploadFaceCss, usedFaces } from '../../fonts/model';
 import type { MotionDoc } from '../../doc';
 import type { FaceBook } from './face';
-import { faceBook, faceRules, type FaceRule, type Source } from './fonts';
+import { SYMBOL_FALLBACKS, faceBook, faceRules, type FaceRule, type Source } from './fonts';
 import { fontkitSource } from './fontkit-face';
 import { TEXT_COMPONENTS } from './painter';
 
@@ -21,6 +21,13 @@ const web: Reader = {
 };
 
 const SPACE = 0x20;
+const FIRST_SYMBOL = 0x2000;
+
+function symbolsUrl(points: readonly number[]): string | null {
+  const symbols = String.fromCodePoint(...points.filter((cp) => cp >= FIRST_SYMBOL));
+  const families = SYMBOL_FALLBACKS.map((f) => `family=${f.replaceAll(' ', '+')}`).join('&');
+  return symbols ? `https://fonts.googleapis.com/css2?${families}&text=${encodeURIComponent(symbols)}&display=block` : null;
+}
 const CUSTOM = 'Custom';
 
 function codePointsOf(doc: MotionDoc): number[] {
@@ -50,9 +57,10 @@ export function fontLoader(read: Reader = web, engine: Engine = fontkitEngine): 
   return async (raw, assets, tokens) => {
     const doc = preparedDoc({ doc: raw, tokens, assets });
     const google = googleFontsUrl(usedFaces(doc), doc.fonts);
-    const css = await Promise.all([BUILTIN_FONTS_URL, ...(google ? [google] : [])].map(sheet));
-    const rules = [...css, uploadFaceCss(doc.fonts, assets)].flatMap(faceRules);
     const points = codePointsOf(doc);
+    const symbols = symbolsUrl(points);
+    const css = await Promise.all([BUILTIN_FONTS_URL, ...(google ? [google] : []), ...(symbols ? [symbols] : [])].map(sheet));
+    const rules = [...css, uploadFaceCss(doc.fonts, assets)].flatMap(faceRules);
     const urls = [...new Set(rules.filter((r) => needed(r, points)).map((r) => r.url))];
     const loaded = await Promise.all(urls.map(source));
     return faceBook(rules, new Map(loaded.filter((l): l is [string, Source] => l !== null)), doc.fonts);

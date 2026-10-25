@@ -3206,6 +3206,13 @@ backdrop), so a rebuilt atlas recopies it; once per frame is not enough. Guarded
 `a_picture_mask_survives_frames_that_grow_the_image_atlas` and
 `a_picture_under_a_backdrop_stays_drawn_frame_after_frame`.
 
+## A core frame that draws nothing after a text edit: look for a missing glyph
+
+**Signal:** a frame or instance draws on the canvas until a text gets a symbol (→, ✓), then
+shows nothing or a black box; the HTML engine draws it fine. **Move:** one glyph no loaded face
+covers makes the text a `Glyph` gap and the whole list undrawable (`drawsWhole`). Check the
+code point against the loaded faces before suspecting the feature that changed the text.
+
 ## A GPU parity gap that both backends share is usually the reference
 
 **Signal:** two independent renderers score the same SSIM against the HTML capture (video 0.96,

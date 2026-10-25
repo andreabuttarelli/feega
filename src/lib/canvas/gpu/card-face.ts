@@ -1,4 +1,4 @@
-import { FrameKind } from '../motion-node';
+import { DocNodeType, FrameKind, docKindOf } from '../motion-node';
 import { NODE_KIND_LABEL, NameTag } from '../node-label';
 import { NODE_EMPTY_HINT } from '../node-empty';
 import { isNodeType, type NodeType } from '../node-data';
@@ -146,8 +146,8 @@ const listFace: Draw = (d, asset) => {
   };
 };
 
-const motion: Draw = (d, asset, t) => {
-  const kind = str(d.kind) || FrameKind.Frame;
+const docFace = (type: DocNodeType): Draw => (d, asset, t) => {
+  const kind = docKindOf(type, d.kind);
   const live = str(d.lastRenderAssetId);
   const rev = typeof d.docHeadRevision === 'number' && d.docHeadRevision ? `Rev ${d.docHeadRevision}` : 'Empty';
   return {
@@ -164,8 +164,8 @@ const FACES: Record<NodeType, Draw> = {
   video: generate(true),
   audio: textGenerate,
   model3d: (d, asset, t) => ({ ...generate(false)(d, asset, t), media: str(d.posterRefId) ? { url: asset(str(d.posterRefId)), video: false } : null }),
-  motion,
-  element: motion,
+  motion: docFace(DocNodeType.Motion),
+  element: docFace(DocNodeType.Element),
   doc: (d) => ({ surface: Surface.Doc, text: str(d.content), pills: ['Read', 'Write'], count: d.public === true ? 'Revoke' : 'Public link' }),
   iframe: embedFace,
   social_account_feed: preview(feedTitle, 'Select the node to choose the account.', 'No posts yet. Select the node to sync.', (d) => str(d.handle).trim() !== ''),
