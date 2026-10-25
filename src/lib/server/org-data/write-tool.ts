@@ -19,7 +19,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { logAiCall } from '$lib/server/ai-log';
 import type { OrgQueryAuthority } from './query-tool';
 import { announcePresence } from './presence';
-import { Detail, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
+import { Detail, Surface, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
 import type { Actor } from '$lib/server/repos/actor';
 import { validateNewNodeData, validateNodeDataUpdate } from '$lib/canvas/node-data';
 import { mergeNodeData, type NodeData } from '$lib/canvas/node-patch';
@@ -133,7 +133,7 @@ type InsertInput = { table: string; values: Record<string, unknown>; verbose?: b
 type UpdateInput = { table: string; where: Filter[]; values: Record<string, unknown>; verbose?: boolean };
 
 const shownAs = (verbose: boolean | undefined, values: Record<string, unknown>, out: Record<string, unknown>) =>
-  compactWrite(out, { touched: touchedOf({ values }), detail: verbose ? Detail.Verbose : Detail.Compact }) as Record<string, unknown>;
+  compactWrite(out, { surface: Surface.Rows, touched: touchedOf({ values }), detail: verbose ? Detail.Verbose : Detail.Compact }) as Record<string, unknown>;
 type DeleteInput = { table: string; where: Filter[] };
 
 type Refusal = { error: string; message: string; fix?: string };

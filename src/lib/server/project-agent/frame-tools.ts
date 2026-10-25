@@ -11,7 +11,7 @@ import { awaitFrames, framesPrefix, type FrameBucket } from '$lib/server/motion/
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import type { FramesRequest } from '$lib/motion/frames-request';
-import { Detail, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
+import { Detail, Surface, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
 
 export const LIST_FRAME_TOOLS = 'list_frame_tools';
 export const DESCRIBE_FRAME_TOOL = 'describe_frame_tool';
@@ -88,7 +88,7 @@ export function createFrameTools(deps: FrameToolDeps): Record<string, Tool> {
         return { error: ran.outcome, message: REFUSALS[ran.outcome], detail: ran.detail };
       }
       seen.set(toolCallId, ran.frames);
-      return compactWrite({ node_id: nodeId, version: ran.version, saved: ran.saved, output: ran.output }, { touched: touchedOf(input.input), detail: input.verbose ? Detail.Verbose : Detail.Compact });
+      return compactWrite({ node_id: nodeId, version: ran.version, saved: ran.saved, output: ran.output }, { surface: Surface.ChatFrame, touched: touchedOf(input.input), detail: input.verbose ? Detail.Verbose : Detail.Compact });
     }
   });
 

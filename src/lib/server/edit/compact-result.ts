@@ -3,7 +3,23 @@ export enum Detail {
   Verbose = 'verbose'
 }
 
-export type CompactAsk = { touched: string[]; detail?: Detail };
+export enum Surface {
+  Edit = 'edit',
+  Rows = 'rows',
+  ChatCanvas = 'chat_canvas',
+  ChatFrame = 'chat_frame'
+}
+
+type FullPath = { hint: string; tools: string[]; option?: string };
+
+export const FULL_PATH: Readonly<Record<Surface, FullPath>> = {
+  [Surface.Edit]: { hint: 'edit again with verbose:true', tools: ['edit'], option: 'verbose' },
+  [Surface.Rows]: { hint: 'repeat the call with verbose:true', tools: ['insert_row', 'update_row'], option: 'verbose' },
+  [Surface.ChatCanvas]: { hint: 'list_nodes {canvasId} returns whole nodes', tools: ['list_nodes'] },
+  [Surface.ChatFrame]: { hint: 'frame_tool again with verbose:true', tools: ['frame_tool'], option: 'verbose' }
+};
+
+export type CompactAsk = { touched: string[]; surface: Surface; detail?: Detail };
 
 const STRING_CAP = 300;
 const VALUE_CAP = 300;
@@ -19,6 +35,8 @@ type Plain = Record<string, unknown>;
 
 class Cuts {
   count = 0;
+
+  constructor(readonly hint: string) {}
 }
 
 const isPlain = (value: unknown): value is Plain => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -29,7 +47,7 @@ const REFUSING_OUTCOMES = ['invalid', 'conflict', 'not_found', 'refused'];
 
 const isRefusal = (value: unknown) => isPlain(value) && (typeof value.error === 'string' || (typeof value.outcome === 'string' && REFUSING_OUTCOMES.includes(value.outcome)));
 
-const marker = (chars: number) => `[${chars} chars, ask verbose for the whole value]`;
+const marker = (chars: number, cuts: Cuts) => `[${chars} chars, whole: ${cuts.hint}]`;
 
 function shrunk(value: unknown, cuts: Cuts, cap: number): unknown {
   if (typeof value === 'string') {
@@ -37,7 +55,7 @@ function shrunk(value: unknown, cuts: Cuts, cap: number): unknown {
       return value;
     }
     cuts.count++;
-    return marker(value.length);
+    return marker(value.length, cuts);
   }
   if (value === null || typeof value !== 'object') {
     return value;
@@ -45,7 +63,7 @@ function shrunk(value: unknown, cuts: Cuts, cap: number): unknown {
   const chars = Array.isArray(value) ? 0 : JSON.stringify(value).length;
   if (chars > BLOCK_CAP) {
     cuts.count++;
-    return marker(chars);
+    return marker(chars, cuts);
   }
   if (Array.isArray(value)) {
     const kept = value.slice(0, ARRAY_CAP).map((item) => shrunk(item, cuts, cap));
@@ -65,7 +83,7 @@ function trimmedValue(value: unknown, cuts: Cuts): unknown {
   const chars = JSON.stringify(value).length;
   if (chars > VALUE_CAP) {
     cuts.count++;
-    return marker(chars);
+    return marker(chars, cuts);
   }
   return value;
 }
@@ -106,17 +124,17 @@ function collapsed(value: unknown, touched: string[], cuts: Cuts): unknown {
 const insideRoot = (root: unknown, cuts: Cuts): unknown =>
   isPlain(root) ? Object.fromEntries(Object.entries(root).map(([key, item]) => [key, shrunk(item, cuts, STRING_CAP)])) : shrunk(root, cuts, STRING_CAP);
 
-export function trimBlobs(value: unknown): unknown {
-  return insideRoot(value, new Cuts());
+export function trimBlobs(value: unknown, hint: string): unknown {
+  return insideRoot(value, new Cuts(hint));
 }
 
-export function compactWrite(body: unknown, { touched, detail = Detail.Compact }: CompactAsk): unknown {
+export function compactWrite(body: unknown, { touched, surface, detail = Detail.Compact }: CompactAsk): unknown {
   if (detail === Detail.Verbose || isRefusal(body) || !isPlain(body)) {
     return body;
   }
-  const cuts = new Cuts();
+  const cuts = new Cuts(FULL_PATH[surface].hint);
   const compact = insideRoot(collapsed(body, touched, cuts), cuts) as Plain;
-  return cuts.count > 0 ? { ...compact, trimmed: true } : compact;
+  return cuts.count > 0 ? { ...compact, trimmed: true, whole: cuts.hint } : compact;
 }
 
 export const touchedOf = (input: unknown): string[] => {

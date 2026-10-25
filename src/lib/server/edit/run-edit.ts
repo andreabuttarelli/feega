@@ -1,6 +1,6 @@
 import { Family, type EditOp, type Runners } from './edit-catalogue';
 import type { Answer } from './runners';
-import { Detail, compactWrite, touchedOf } from './compact-result';
+import { Detail, Surface, compactWrite, touchedOf } from './compact-result';
 
 export type EditStep = { op: string; target?: string; element?: string; input?: Record<string, unknown>; version?: number };
 
@@ -159,5 +159,5 @@ export async function runEdit(ports: EditPorts, ask: EditAsk): Promise<Answer> {
   if (ask.detail === Detail.Verbose || !writesOnly(ports, ask.steps)) {
     return answer;
   }
-  return { ...answer, body: compactWrite(answer.body, { touched: [...new Set(ask.steps.flatMap((step) => touchedOf(step.input)))] }) };
+  return { ...answer, body: compactWrite(answer.body, { surface: Surface.Edit, touched: [...new Set(ask.steps.flatMap((step) => touchedOf(step.input)))] }) };
 }

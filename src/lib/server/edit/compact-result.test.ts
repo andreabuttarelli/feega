@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Detail, compactWrite, trimBlobs } from './compact-result';
+import { Detail, FULL_PATH, Surface, compactWrite, trimBlobs } from './compact-result';
 
 const BASE64 = `data:image/png;base64,${'A'.repeat(40_000)}`;
 const LONG_TEXT = 'lorem ipsum dolor sit amet '.repeat(120);
@@ -27,7 +27,7 @@ const CASES: Case[] = [
 
 describe('a write answers ids and changed fields, not the whole document', () => {
   it('every typical edit answer stays under the budget, and the table of before and after is printed', () => {
-    const lines = CASES.map(({ name, before, touched, single }) => ({ name, single, before: size(before), after: size(compactWrite(before, { touched })) }));
+    const lines = CASES.map(({ name, before, touched, single }) => ({ name, single, before: size(before), after: size(compactWrite(before, { touched, surface: Surface.Edit })) }));
     console.table(lines.map(({ name, before, after }) => ({ name, before, after })));
 
     for (const line of lines.filter((l) => l.single)) {
@@ -39,7 +39,7 @@ describe('a write answers ids and changed fields, not the whole document', () =>
   });
 
   it('keeps the id, the new version and the fields that were written', () => {
-    const out = compactWrite({ outcome: 'written', node: node({ text: 'hi' }) }, { touched: ['x'] }) as { node: Record<string, unknown> };
+    const out = compactWrite({ outcome: 'written', node: node({ text: 'hi' }) }, { touched: ['x'], surface: Surface.Edit }) as { node: Record<string, unknown> };
 
     expect(out.node).toMatchObject({ id: 'n-1', version: 4, x: 10 });
     expect(out.node).not.toHaveProperty('created_at');
@@ -47,7 +47,7 @@ describe('a write answers ids and changed fields, not the whole document', () =>
   });
 
   it('says it trimmed, so the agent knows to ask for verbose', () => {
-    const out = compactWrite({ node: node({ doc: DOC }) }, { touched: ['data'] }) as { trimmed?: boolean };
+    const out = compactWrite({ node: node({ doc: DOC }) }, { touched: ['data'], surface: Surface.Edit }) as { trimmed?: boolean };
 
     expect(out.trimmed).toBe(true);
   });
@@ -55,19 +55,19 @@ describe('a write answers ids and changed fields, not the whole document', () =>
   it('verbose returns the answer untouched', () => {
     const body = { node: node({ doc: DOC }) };
 
-    expect(compactWrite(body, { touched: ['data'], detail: Detail.Verbose })).toBe(body);
+    expect(compactWrite(body, { touched: ['data'], surface: Surface.Edit, detail: Detail.Verbose })).toBe(body);
   });
 
   it('a refusal keeps its message and fix whole', () => {
     const refusal = { error: 'invalid_node_data', message: LONG_TEXT.slice(0, 280), fix: 'Call describe_node_types.' };
 
-    expect(compactWrite(refusal, { touched: [] })).toEqual(refusal);
+    expect(compactWrite(refusal, { touched: [], surface: Surface.Edit })).toEqual(refusal);
   });
 });
 
 describe('big blobs are trimmed from any answer unless asked', () => {
   it('replaces a base64 string and a long string with their size', () => {
-    const out = trimBlobs({ a: BASE64, b: LONG_TEXT, c: 'short' }) as Record<string, string>;
+    const out = trimBlobs({ a: BASE64, b: LONG_TEXT, c: 'short' }, 'x') as Record<string, string>;
 
     expect(out.a).toMatch(/^\[\d+ chars/);
     expect(out.b).toMatch(/^\[\d+ chars/);
@@ -77,11 +77,11 @@ describe('big blobs are trimmed from any answer unless asked', () => {
   it('keeps a long signed link whole, the agent has to use it', () => {
     const link = `https://storage.example.com/upload?token=${'t'.repeat(600)}`;
 
-    expect((trimBlobs({ uploadUrl: link }) as { uploadUrl: string }).uploadUrl).toBe(link);
+    expect((trimBlobs({ uploadUrl: link }, 'x') as { uploadUrl: string }).uploadUrl).toBe(link);
   });
 
   it('caps a long array and says how many are missing', () => {
-    const out = trimBlobs({ items: Array.from({ length: 80 }, (_, i) => i) }) as { items: unknown[] };
+    const out = trimBlobs({ items: Array.from({ length: 80 }, (_, i) => i) }, 'x') as { items: unknown[] };
 
     expect(out.items.length).toBeLessThan(80);
     expect(out.items.at(-1)).toMatch(/more/);
