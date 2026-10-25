@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { FEEGA_VERSION, FeegaRefusal, packFeega, type FeegaFile } from '$lib/canvas/feega-file';
-import { FeegaImport, importCanvasFile, importStoredCanvasFile } from './feega-file';
+import { unpackFeega } from '$lib/canvas/feega-file';
+import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { FeegaImport, exportCanvasFile, importCanvasFile, importStoredCanvasFile } from './feega-file';
 
 const OLD_PROJECT = '11111111-1111-4111-8111-111111111111';
 const OLD_CANVAS = '22222222-2222-4222-8222-222222222222';
@@ -77,5 +79,21 @@ describe('importing a .feega file', () => {
 
     expect((await importStoredCanvasFile(fake.db, { ...target, path: 'org/imports/x.feega' })).outcome).toBe(FeegaImport.Imported);
     expect(fake.calls.some((c) => c.op === 'remove' && JSON.stringify(c.filters).includes('org/imports/x.feega'))).toBe(true);
+  });
+});
+
+describe('exporting a canvas as a .feega file', () => {
+  it('carries the document of every node that holds one: frames and free elements alike', async () => {
+    const node = (id: string, type: string) => ({ id, org_id: 'org', canvas_id: 'c', project_id: 'p', type, display_name: null, x: 0, y: 0, z: 0, width: 10, height: 10, data: { docHeadRevision: 1 }, version: 1, deleted_at: null });
+    const revision = (nodeId: string) => ({ org_id: 'org', node_id: nodeId, version: 1, doc: newMotionDoc(MotionFormat.Square), summary: null, actor_kind: 'user' });
+    const fake = fakeDb(
+      { canvases: [{ id: 'c', org_id: 'org', project_id: 'p', name: 'Launch', viewport: null, deleted_at: null }], nodes: [node(TEXT, 'motion'), node(IMAGE, 'element')], nodes_connections: [], assets: [], motion_revisions: [revision(TEXT), revision(IMAGE)] },
+      { filter: true }
+    );
+
+    const file = await exportCanvasFile(fake.db, { orgId: 'org', projectId: 'p', canvasId: 'c' });
+    const opened = unpackFeega(file!.bytes);
+
+    expect(opened.ok && Object.keys(opened.file.canvas.heads).sort()).toEqual([TEXT, IMAGE].sort());
   });
 });

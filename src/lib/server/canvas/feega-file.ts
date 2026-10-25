@@ -7,6 +7,7 @@ import { saveMotionDoc } from '$lib/server/motion/editor';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
+import { holdsDoc } from '$lib/canvas/motion-node';
 import { FEEGA_EXTENSION, FEEGA_MIME, FEEGA_VERSION, FeegaRefusal, idsIn, packFeega, remapIds, unpackFeega, type FeegaAsset, type FeegaBlobs, type FeegaCanvas } from '$lib/canvas/feega-file';
 
 type CanvasScope = { orgId: string; projectId: string; canvasId: string };
@@ -18,7 +19,6 @@ export enum FeegaImport {
 
 export type FeegaImportOutcome = { outcome: FeegaImport.Imported; canvas: Canvas } | { outcome: FeegaImport.Refused; refusal: FeegaRefusal };
 
-const MOTION_TYPE = 'motion';
 const ABSOLUTE_URL = /^https?:\/\//;
 const UNSAFE_NAME = /[^\w.-]+/g;
 const TEXT_ONLY = 'text';
@@ -28,6 +28,9 @@ const assetFileName = (index: number, asset: Asset) => `assets/${index}-${(asset
 
 async function assetBytes(db: Db, assets: Asset[]): Promise<Map<string, Uint8Array>> {
   const stored = assets.filter((a) => a.url && !ABSOLUTE_URL.test(a.url));
+  if (!stored.length) {
+    return new Map();
+  }
   const signed = await signAssetPaths(db, createAssetSigningDb(), {
     generated: stored.filter((a) => a.source === 'generated').map((a) => a.url as string),
     uploaded: stored.filter((a) => a.source !== 'generated').map((a) => a.url as string)
@@ -48,7 +51,7 @@ export async function exportCanvasFile(db: Db, scope: CanvasScope): Promise<{ na
   }
 
   const [nodes, connections] = await Promise.all([listNodes(db, scope), listConnections(db, scope)]);
-  const heads = await Promise.all(nodes.filter((n) => n.type === MOTION_TYPE).map(async (n) => [n.id, await readHead(db, { orgId: scope.orgId, nodeId: n.id })] as const));
+  const heads = await Promise.all(nodes.filter((n) => holdsDoc(n.type)).map(async (n) => [n.id, await readHead(db, { orgId: scope.orgId, nodeId: n.id })] as const));
   const body = {
     nodes: nodes.map((n) => ({ id: n.id, type: n.type, displayName: n.displayName, position: n.position, size: n.size, data: n.data })),
     connections: connections.map((c) => ({ id: c.id, sourceNodeId: c.sourceNodeId, targetNodeId: c.targetNodeId, sourceHandle: c.sourceHandle, targetHandle: c.targetHandle, mode: c.mode })),
