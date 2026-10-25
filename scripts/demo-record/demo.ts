@@ -4,8 +4,9 @@ import type { CDPSession, Locator, Page } from '@playwright/test';
 import { easeInOutExpo, type DemoEvent, type Point, type Rect } from './camera';
 import { BADGE_SCRIPT } from './badge';
 import type { Sample } from './pointer';
+import type { Warp } from './timewarp';
 
-export type Recording = { dir: string; view: { width: number; height: number }; frames: { file: string; t: number }[]; events: DemoEvent[]; pointer: Sample[]; presses: number[]; duration: number };
+export type Recording = { dir: string; view: { width: number; height: number }; frames: { file: string; t: number }[]; events: DemoEvent[]; pointer: Sample[]; presses: number[]; warps?: Warp[]; paints?: number[]; duration: number };
 
 const FRAME_QUALITY = 92;
 const MOVE_HZ = 60;
@@ -17,6 +18,8 @@ const BEAT_MS = 700;
 const PRESS_MS = 90;
 const DWELL_MS = 900;
 const BADGE_LEAD_MS = 250;
+const DRAG_STEPS = 72;
+const DRAG_PLAY_S = 0.8;
 const LOCATE_MS = 15_000;
 
 type ScreencastFrame = { data: string; sessionId: number; metadata: { timestamp?: number } };
@@ -32,6 +35,7 @@ export async function demo(page: Page, dir: string) {
   const frames: Recording['frames'] = [];
   const pointer: Sample[] = [];
   const presses: number[] = [];
+  const warps: Warp[] = [];
   const cdp: CDPSession = await page.context().newCDPSession(page);
   const scale = await page.evaluate(() => window.devicePixelRatio);
   let origin = 0;
@@ -138,13 +142,14 @@ export async function demo(page: Page, dir: string) {
       await page.waitForTimeout(DWELL_MS / 2);
       presses.push(now());
       await page.mouse.down();
-      const steps = Math.round(MOVE_HZ * 1.2);
+      const moving = now();
+      const steps = DRAG_STEPS;
       for (let i = 1; i <= steps; i++) {
         const p = easeInOutExpo(i / steps);
         const at = path ? path(p) : { x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p };
         await point(at);
-        await page.waitForTimeout(1000 / MOVE_HZ);
       }
+      warps.push({ t: moving, end: now(), play: DRAG_PLAY_S });
       await page.mouse.up();
       events.push({ kind: 'drag', t, end: now(), from: a, to: mouse, fit });
       await page.waitForTimeout(BEAT_MS);
@@ -171,7 +176,8 @@ export async function demo(page: Page, dir: string) {
     async finish(): Promise<Recording> {
       await page.waitForTimeout(BEAT_MS);
       await cdp.send('Page.stopScreencast');
-      const recording: Recording = { dir, view, frames, events, pointer, presses, duration: now() };
+      const paints = await page.evaluate((start) => ((window as unknown as { demoPaints?: number[] }).demoPaints ?? []).map((p) => (performance.timeOrigin + p - start) / 1000), origin);
+      const recording: Recording = { dir, view, frames, events, pointer, presses, warps, paints, duration: now() };
       writeFileSync(join(dir, 'recording.json'), JSON.stringify(recording, null, 1));
       return recording;
     }

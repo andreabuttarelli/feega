@@ -45,3 +45,14 @@ Figma paste builds a profile card), never plain coloured frames.
 `look(rect, ms)` holds the camera on an area without moving the mouse
 (used while a combined video plays). The combine demo seeds the three
 Orbit launch scenes from tests/e2e/canvas-scenes-scrub.spec.ts.
+
+Drags (2026-10-25): measured on the demo seeds, the app paints at a
+steady rAF p50 17 ms / p95 18 ms during marquee, rotate and crop
+drags, same as idle. The slowness was the recorder: each
+`page.mouse.move` round-trips ~33 ms, so a 72-step drag took 1.3-2.5 s
+(up to 7 s before). Drags now log a time warp (timewarp.ts) and play in
+0.8 s; no per-step wait. rAF timestamps are logged as `paints`.
+
+Seeds are packed together (seed.ts `packGrid`, 60 px gap, sizes of the
+default frame and text node) and `openCanvas` fits the view, so the
+camera barely travels.

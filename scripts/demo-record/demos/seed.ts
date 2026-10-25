@@ -31,9 +31,26 @@ export async function seedFrame(seedNode: SeedNode, admin: SupabaseClient, sessi
   return frame.id;
 }
 
+export const PACK_GAP = 60;
+
+type Cell = { w: number; h: number };
+
+export const FRAME_CELL: Cell = { w: 420, h: 236 };
+export const TEXT_CELL: Cell = { w: 360, h: 220 };
+
+export async function packGrid(admin: SupabaseClient, ids: string[], cell: Cell, columns = ids.length, gap = PACK_GAP): Promise<void> {
+  for (const [i, id] of ids.entries()) {
+    const at = { x: (i % columns) * (cell.w + gap), y: Math.floor(i / columns) * (cell.h + gap) };
+    const { error } = await admin.from('nodes').update(at).eq('id', id);
+    expect(error).toBeNull();
+  }
+}
+
 export async function openCanvas(page: Page, session: E2eSession, query = ''): Promise<void> {
   await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}${query}`);
   await expect(page.locator('[data-canvas-surface]')).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(SETTLE_MS);
+  await page.keyboard.press('Shift+Digit1');
   await page.waitForTimeout(SETTLE_MS);
 }
 

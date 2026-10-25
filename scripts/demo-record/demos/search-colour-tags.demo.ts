@@ -1,6 +1,6 @@
 import { test, expect } from '../../../tests/e2e/fixtures/session';
 import { installCursor, recordDemo } from '../record';
-import { openCanvas } from './seed';
+import { TEXT_CELL, openCanvas, packGrid } from './seed';
 
 const TEXTS = [
   { x: 0, y: 0, prompt: 'Hero headline: Mornings, made slower.' },
@@ -9,11 +9,12 @@ const TEXTS = [
   { x: 3600, y: 2200, prompt: 'Newsletter: Spring restock is live, 15% off the Morning set' }
 ];
 
-test('search and colour tags', async ({ page, session, seedNode }) => {
+test('search and colour tags', async ({ page, session, admin, seedNode }) => {
   const ids: string[] = [];
   for (const t of TEXTS) {
     ids.push((await seedNode({ type: 'text', x: t.x, y: t.y, data: { prompt: t.prompt } })).id);
   }
+  await packGrid(admin, ids, TEXT_CELL, 2);
   await installCursor(page);
   await openCanvas(page, session);
   await expect(page.locator('[data-canvas-surface]')).toHaveAttribute('data-renderer', 'core', { timeout: 30_000 });

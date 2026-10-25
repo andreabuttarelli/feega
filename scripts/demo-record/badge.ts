@@ -1,5 +1,8 @@
 export const BADGE_SCRIPT = `(() => {
   if (window.self !== window.top) return;
+  window.demoPaints = [];
+  const paint = (t) => { window.demoPaints.push(t); requestAnimationFrame(paint); };
+  requestAnimationFrame(paint);
   window.demoBadge = (label) => {
     const badge = document.createElement('div');
     badge.textContent = label;
