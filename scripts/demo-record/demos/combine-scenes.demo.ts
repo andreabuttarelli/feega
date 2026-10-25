@@ -1,18 +1,17 @@
 import { test, expect } from '../../../tests/e2e/fixtures/session';
 import { installCursor, recordDemo } from '../record';
-import { LAUNCH, frameHost, launchScene, openCanvas, seedFrame } from './seed';
+import { LAUNCH, frameHost, launchScene, FRAME_CELL, openCanvas, packGrid, seedFrame } from './seed';
 
 const PLAY_MS = 6500;
 
 test('combine scenes into one video', async ({ page, session, admin, seedNode }) => {
   const ids: string[] = [];
   for (const s of LAUNCH) {
-    ids.push(await seedFrame(seedNode, admin, session, { x: s.x, y: 80 }, launchScene(s)));
+    ids.push(await seedFrame(seedNode, admin, session, { x: 0, y: 80 }, launchScene(s)));
   }
+  await packGrid(admin, ids, FRAME_CELL);
   await installCursor(page);
   await openCanvas(page, session);
-  await page.keyboard.press('Shift+Digit1');
-  await page.waitForTimeout(2500);
   const boxes = await Promise.all(ids.map(async (id) => (await frameHost(page, id).boundingBox())!));
   const left = Math.min(...boxes.map((b) => b.x)) - 24;
   const top = Math.min(...boxes.map((b) => b.y)) - 36;

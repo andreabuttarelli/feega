@@ -6,6 +6,7 @@ import sharp from 'sharp';
 import { chromium } from '@playwright/test';
 import { Aspect, cameraAt, keyframesOf, type Point, type Rect } from './camera';
 import { pointerAt, rippleAt } from './pointer';
+import { playedDuration, recordedAt } from './timewarp';
 import type { Recording } from './demo';
 
 const FPS = 60;
@@ -70,10 +71,11 @@ async function renderContent(rec: Recording, aspect: Aspect, file: string): Prom
   const ffmpeg = spawn('ffmpeg', ['-y', '-v', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${size.width}x${size.height}`, '-r', String(FPS), '-i', '-', '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', file], { stdio: ['pipe', 'inherit', 'inherit'] });
   const done = new Promise<void>((resolve, reject) => ffmpeg.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg ${code}`)))));
 
-  const total = Math.floor(rec.duration * FPS);
+  const warps = rec.warps ?? [];
+  const total = Math.floor(playedDuration(rec.duration, warps) * FPS);
   let source = 0;
   for (let n = 0; n < total; n++) {
-    const t = n / FPS;
+    const t = recordedAt(n / FPS, warps);
     source = frameAt(rec.frames, t, source);
     const cam = cameraAt(keys, t, rec.view, aspect);
     const view = await cropFrame(rec.frames[source].file, cam, scale, meta, size);
@@ -138,7 +140,7 @@ export async function renderDemo(rec: Recording, cut: DemoCut): Promise<string[]
     const content = join(rec.dir, `content-${aspect}.mp4`);
     await renderContent(rec, aspect, content);
     const file = join(OUT_DIR, `${date}-${cut.slug}-${aspect}.mp4`);
-    assemble(cards[aspect].title, content, cards[aspect].end, Math.floor(rec.duration * FPS) / FPS, OUT[aspect], file);
+    assemble(cards[aspect].title, content, cards[aspect].end, Math.floor(playedDuration(rec.duration, rec.warps ?? []) * FPS) / FPS, OUT[aspect], file);
     files.push(file);
   }
   return files;
