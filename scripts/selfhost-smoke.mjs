@@ -93,7 +93,10 @@ async function drawShape(page) {
 }
 
 async function animateShape(page) {
-  const animation = page.getByRole('button', { name: 'Animation', exact: true });
+  const animation = page.locator('[data-section="animate"] .section-head');
+  if ((await animation.count()) === 0) {
+    await page.getByTestId('frame-timeline-mode').click();
+  }
   await animation.scrollIntoViewIfNeeded();
   if ((await animation.getAttribute('aria-expanded')) === 'false') {
     await animation.click();
