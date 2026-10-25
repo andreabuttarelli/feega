@@ -92,6 +92,7 @@ export class FrameEditSession {
     const root = settleGroups(mergeView(this.history.present, this.port.viewPath(), next));
     const typedOn = summary === this.lastEdit.summary && now - this.lastEdit.at < COALESCE_MS;
     this.history = typedOn ? amend(this.history, root) : record(this.history, root);
+    this.port.show(this.history.present);
     if (!typedOn) {
       this.port.stepped();
     }

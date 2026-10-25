@@ -111,6 +111,15 @@ describe('applying an op result', () => {
     expect(port.recorded).toHaveBeenCalled();
   });
 
+  it('an edit outside a gesture is shown on the canvas before it is saved', () => {
+    const { session, port } = open();
+
+    session.apply({ ok: true, doc: longer(60) }, 'Image adjustment');
+
+    expect(port.show).toHaveBeenLastCalledWith(session.history.present);
+    expect(port.send).not.toHaveBeenCalled();
+  });
+
   it('the same summary within the coalesce window is one undo step', () => {
     const { session } = open();
 
