@@ -307,7 +307,23 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
     return { parts, slots };
   }
 
+  const SIZE_ONLY_BEFORE_AT: Record<string, boolean> = { blur: false, brightness: false, contrast: false, grayscale: false, invert: false, saturate: false, sepia: false, circle: true, ellipse: true };
+  const SIZED_FN = new RegExp(`\\b(${Object.keys(SIZE_ONLY_BEFORE_AT).join('|')})\\(([^)]*)\\)`, 'g');
+  const NEGATIVE = /-(?=\d*\.?\d)(\d*\.?\d+(?:e[-+]?\d+)?)/g;
+
+  function withoutNegativeSizes(css: string): string {
+    return css.replace(SIZED_FN, (_, fn: string, args: string) => {
+      const at = SIZE_ONLY_BEFORE_AT[fn] ? args.indexOf(' at ') : -1;
+      const size = at < 0 ? args : args.slice(0, at);
+      return `${fn}(${size.replace(NEGATIVE, '0')}${at < 0 ? '' : args.slice(at)})`;
+    });
+  }
+
   function joinComplex(c: Complex, values: number[]): string {
+    return withoutNegativeSizes(joinedComplex(c, values));
+  }
+
+  function joinedComplex(c: Complex, values: number[]): string {
     let out = c.parts[0];
     let i = 0;
     while (i < c.slots.length) {
