@@ -96,6 +96,7 @@
       input.value = colourLabel(raw);
       return;
     }
+    input.value = colourLabel(parsed.colour);
     pick(parsed.colour, parsed.alpha ?? undefined);
   }
 

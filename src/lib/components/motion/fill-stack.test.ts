@@ -254,4 +254,19 @@ describe('the fill stack in Properties', () => {
     await vi.waitFor(() => expect(sent(onchange)[0]).toMatchObject({ type: 'image', assetId: 'copied' }));
     expect(upload).toHaveBeenCalledWith(new URL('https://cdn.test/b.jpg'), expect.any(Function));
   });
+
+  it('a typed shorthand of the same colour still shows the full hex', () => {
+    show(stack([{ type: 'solid', color: '#ffffff' }]));
+    click(inRow(0, 'fill-swatch'));
+    const hex = byId('fill-editor').querySelector<HTMLInputElement>('input.hex')!;
+    change(hex, 'ff');
+    expect(hex.value).toBe('FFFFFF');
+  });
+
+  it('a typed rgba sets colour and opacity in one change', () => {
+    const onchange = show(stack([{ type: 'solid', color: '#111111' }]));
+    click(inRow(0, 'fill-swatch'));
+    change(byId('fill-editor').querySelector<HTMLInputElement>('input.hex')!, 'rgba(255, 0, 0, 0.5)');
+    expect(sent(onchange)[0]).toMatchObject({ type: 'solid', color: '#ff000080' });
+  });
 });
