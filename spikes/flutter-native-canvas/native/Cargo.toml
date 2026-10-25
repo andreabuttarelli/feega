@@ -1,0 +1,23 @@
+[package]
+name = "feega_canvas_native"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+gpu-core = { path = "../../../packages/gpu-core" }
+vello = "0.11.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+pollster = "0.4"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+objc2 = "0.6"
+objc2-metal = { version = "0.3.2", features = ["MTLDevice", "MTLTexture", "MTLPixelFormat", "MTLResource", "objc2-io-surface"] }
+objc2-io-surface = "0.3.2"
+
+[profile.release]
+opt-level = 3
+lto = "thin"

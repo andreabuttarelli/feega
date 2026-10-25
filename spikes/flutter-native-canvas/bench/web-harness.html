@@ -1,0 +1,61 @@
+<!doctype html><meta charset="utf-8"><title>web gpu-core bench</title>
+<style>body{margin:0;background:#121212;color:#aaa;font:12px Menlo}canvas{width:1012px;height:817px;display:block}</style>
+<canvas id="c"></canvas><pre id="out">loading…</pre>
+<script type="module">
+// Same document + same script as native-bench/METHOD.md, through the web canvas engine (gpu-core wasm, WebCore = WebGPU).
+import init, { WebCore } from './gpu-core/gpu_core.js';
+const t0 = performance.now(), out = document.getElementById('out');
+const W = 2024, H = 1634, VIEW = { width: 1012, height: 817 }, DPR = 2;
+await init();
+const scene = await (await fetch('scene.json')).json();
+const core = await WebCore.attach(document.getElementById('c'), W, H);
+for (const [k, g] of Object.entries(scene.groups)) core.put_group(k, JSON.stringify(g));
+const files = {};
+await Promise.all(Object.entries(scene.images).map(async ([clip, src]) => {
+  files[src] ??= createImageBitmap(await (await fetch(src)).blob());
+  const bmp = await files[src];
+  core.picture(clip, bmp, bmp.width, bmp.height);
+}));
+core.patch_uses(JSON.stringify({ put: scene.uses, drop: [] }));
+const frames = scene.uses.map(u => ({ name: u.group, x: u.matrix[4], y: u.matrix[5], w: scene.groups[u.group].width, h: scene.groups[u.group].height }));
+const bounds = frames.reduce((b, f) => ({ l: Math.min(b.l, f.x), t: Math.min(b.t, f.y), r: Math.max(b.r, f.x + f.w), b: Math.max(b.b, f.y + f.h) }), { l: 1e9, t: 1e9, r: -1e9, b: -1e9 });
+const cam = { zoom: 0.06, x: 0, y: 0 };
+const centre = (wx, wy, z) => { cam.zoom = z; cam.x = VIEW.width / 2 - wx * z; cam.y = VIEW.height / 2 - wy * z; };
+const first = p => frames.find(f => f.name.startsWith(p));
+const moving = new Map((scene.motion || []).map(m => [m.clip, m]));
+const motionPatch = t => ({ put: scene.uses.filter(u => moving.has(u.clip)).map(u => { const m = moving.get(u.clip), ph = t / m.period * 2 * Math.PI;
+  const mat = m.anim === 'orbit' ? [1,0,0,1,m.x + m.amp*Math.cos(ph), m.y + m.amp*Math.sin(ph)] : m.anim === 'pulse' ? (s => [s,0,0,s,m.x,m.y])(1 + 0.25*Math.sin(ph)) : [1,0,0,1,m.x + m.amp*Math.sin(ph), m.y];
+  return { ...u, group: m.group, matrix: mat }; }), drop: [] });
+const phases = [
+  ['overview', 2, t => centre((bounds.l + bounds.r) / 2, (bounds.t + bounds.b) / 2, Math.min(VIEW.width / (bounds.r - bounds.l), VIEW.height / (bounds.b - bounds.t)))],
+  ['pan', 10, t => { const l = first('landing'); centre(l.x + 3000 + 1600 * Math.sin(2 * Math.PI * t / 4), l.y + 2000 + 900 * Math.sin(2 * Math.PI * t / 6), 0.25); }],
+  ['zoom', 10, t => { const l = first('landing'); centre(l.x + l.w / 2, l.y + 500, 0.05 * Math.pow(80, (1 - Math.cos(2 * Math.PI * t / 5)) / 2)); }],
+  ['motion', 5, t => { const m = first('motion'); centre(m.x + m.w / 2, m.y + m.h / 2, 0.5); }],
+];
+const pct = (v, p) => { const s = [...v].sort((a, b) => a - b); return s.length ? s[Math.min(s.length - 1, Math.floor(s.length * p))] : 0; };
+let firstFrame = null, idx = -1, start = 0, last = 0, ticks = [], work = [];
+const results = { phases: [] };
+const params = new URLSearchParams(location.search);
+function frame(now) {
+  if (idx >= 0) {
+    const t = (now - start) / 1000, [name, secs, drive] = phases[idx];
+    ticks.push(now - last);
+    if (t >= secs) {
+      results.phases.push({ name, seconds: t, frames: ticks.length, fps: ticks.length / t, intervalP50: pct(ticks, .5), intervalP95: pct(ticks, .95), intervalMax: pct(ticks, 1), over16ms: ticks.filter(x => x > 16.7).length / ticks.length, renderP50: pct(work, .5), renderP95: pct(work, .95) });
+      ticks = []; work = []; start = now; idx++;
+      if (idx === phases.length) { results.firstFrameMs = firstFrame; window.results = results; out.textContent = JSON.stringify(results, null, 1); return; }
+    }
+    phases[idx][2](t >= secs ? 0 : t);
+  }
+  last = now;
+  const w0 = performance.now();
+  core.patch_uses(JSON.stringify(motionPatch(now)));
+  core.set_camera(cam.x * DPR, cam.y * DPR, cam.zoom * DPR);
+  core.frame(now);
+  work.push(performance.now() - w0);
+  if (firstFrame === null) { firstFrame = performance.now() - t0; out.textContent = `first frame ${firstFrame.toFixed(0)} ms`; if (params.has('bench')) setTimeout(() => { idx = 0; start = last = performance.now(); }, 2000); }
+  requestAnimationFrame(frame);
+}
+centre((bounds.l + bounds.r) / 2, (bounds.t + bounds.b) / 2, 0.06);
+requestAnimationFrame(frame);
+</script>

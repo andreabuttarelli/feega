@@ -1,0 +1,70 @@
+{
+  "phases": [
+    {
+      "name": "overview",
+      "seconds": 2.004136,
+      "frames": 23,
+      "fps": 11.476267079679223,
+      "intervalP50": 99.998,
+      "intervalP95": 199.996,
+      "intervalMax": 208.332,
+      "over16ms": 0.5217391304347826,
+      "renderP50": 80.101167,
+      "renderP95": 106.94325,
+      "rasterP50": 0.566,
+      "rasterP95": 0.676
+    },
+    {
+      "name": "pan",
+      "seconds": 10.087348,
+      "frames": 1065,
+      "fps": 105.57779904093722,
+      "intervalP50": 8.333,
+      "intervalP95": 8.334,
+      "intervalMax": 391.661,
+      "over16ms": 0.007511737089201878,
+      "renderP50": 3.0304580000000003,
+      "renderP95": 5.584833,
+      "rasterP50": 0.485,
+      "rasterP95": 0.978
+    },
+    {
+      "name": "zoom",
+      "seconds": 10.174849,
+      "frames": 433,
+      "fps": 42.555914097594965,
+      "intervalP50": 8.334,
+      "intervalP95": 66.665,
+      "intervalMax": 666.657,
+      "over16ms": 0.371824480369515,
+      "renderP50": 12.959041,
+      "renderP95": 46.030666,
+      "rasterP50": 0.523,
+      "rasterP95": 0.973
+    },
+    {
+      "name": "motion",
+      "seconds": 5.008256,
+      "frames": 581,
+      "fps": 116.00844685255706,
+      "intervalP50": 8.333,
+      "intervalP95": 8.334,
+      "intervalMax": 66.666,
+      "over16ms": 0.0068846815834767644,
+      "renderP50": 3.4024170000000002,
+      "renderP95": 6.258125,
+      "rasterP50": 0.512,
+      "rasterP95": 0.948
+    }
+  ],
+  "boot": {
+    "loadMs": 1546,
+    "firstFrameMs": 0,
+    "firstFrameEpochMs": 1792939784231
+  },
+  "canvasPx": [
+    2024,
+    1634
+  ],
+  "dpr": 2.0
+}
