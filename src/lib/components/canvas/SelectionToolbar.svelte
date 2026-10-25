@@ -74,10 +74,11 @@
     onsectionchange?: (id: string, patch: { title?: string; fill?: string }) => void;
     oncolourchange?: (tag: ColourTag | null) => void;
     onview?: () => void;
+    onstop?: () => void;
   } = $props();
 
   const viewable = $derived(count === 1 && !!nodeSummaries[0] && nodeSummaries[0].type in OUTPUT_KIND_OF && typeof nodeSummaries[0].data.refId === 'string');
-    onstop?: () => void;
+
   const running = $derived(count === 1 && nodeSummaries[0]?.data.running === true);
 
   const sharedColour = $derived.by(() => {
