@@ -148,8 +148,8 @@ describe('audio cost', () => {
   });
 
   it('turns dollars into credit units at the subscription list rate', () => {
-    expect(audioCreditsFor('text_to_speech', 'eleven_multilingual_v2', { characters: 1000 })).toBe(16);
-    expect(audioCreditsFor('sound_effects', 'eleven_text_to_sound_v2', { seconds: 5 })).toBe(2);
+    expect(audioCreditsFor('text_to_speech', 'eleven_multilingual_v2', { characters: 1000 })).toBe(10);
+    expect(audioCreditsFor('sound_effects', 'eleven_text_to_sound_v2', { seconds: 5 })).toBe(1);
   });
 });
 

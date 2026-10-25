@@ -21,9 +21,9 @@ describe('credit ladder never falls below the margin floor', () => {
     });
   }
 
-  it('every rung is a flat 50% margin', () => {
+  it('every rung earns the markup share of its price, markup / (1 + markup)', () => {
     for (const rung of CREDIT_LADDER) {
-      expect(marginForRung(rung.price, rung.credits)).toBeCloseTo(0.5, 5);
+      expect(marginForRung(rung.price, rung.credits)).toBeCloseTo(AI_MARKUP / (1 + AI_MARKUP), 5);
     }
   });
 });
@@ -57,13 +57,13 @@ describe('the plans feega.app sells', () => {
 });
 
 describe('billedCreditsFor', () => {
-  it('matches the anchor: $1 of provider cost bills 200 credits at 100% markup', () => {
-    expect(AI_MARKUP).toBe(1.0);
-    expect(billedCreditsFor(1)).toBe(200);
+  it('matches the anchor: $1 of provider cost bills 120 credits at 20% markup', () => {
+    expect(AI_MARKUP).toBe(0.2);
+    expect(billedCreditsFor(1)).toBe(120);
   });
 
-  it('$8 of credits cost us $4 of provider spend', () => {
-    expect(rungFor(8)!.credits / 200).toBeCloseTo(4, 5);
+  it('$8 of credits cost us $6.67 of provider spend', () => {
+    expect(rungFor(8)!.credits / 120).toBeCloseTo(6.667, 3);
   });
 });
 
@@ -94,7 +94,7 @@ describe('nessun secondo cambio credito/dollaro fuori da credit-ladder.ts', () =
     'credit-ladder.ts',
     'credit-ladder.test.ts',
     // Tasso di ACQUISTO (100 crediti = $1 di listino, PLANS[].credits) — un concetto diverso
-    // dal cambio di FATTURAZIONE (billedCreditsFor, 200 crediti = $1 di costo provider). Le due
+    // dal cambio di FATTURAZIONE (billedCreditsFor, 120 crediti = $1 di costo provider). Le due
     // costanti coesistono per costruzione (vedi il commento in testa a credit-ladder.ts); qui
     // ereditano il nome canonico invece di un numero riscritto.
     'server/plan-budget.ts',
@@ -132,13 +132,17 @@ describe('nessun secondo cambio credito/dollaro fuori da credit-ladder.ts', () =
 });
 
 describe('multipliers on our cost', () => {
-	it('no multiplier billed to users drops under the floor of four', async () => {
+	it('a render never bills under the floor of four', async () => {
 		const { RENDER_MULTIPLIER } = await import('$lib/motion/render-quote');
-		const { CHAT_MULTIPLIER, MULTIPLIER_FLOOR } = await import('./credit-ladder');
+		const { MULTIPLIER_FLOOR } = await import('./credit-ladder');
 
 		expect(MULTIPLIER_FLOOR).toBe(4);
 		expect(RENDER_MULTIPLIER).toBeGreaterThanOrEqual(MULTIPLIER_FLOOR);
-		expect(CHAT_MULTIPLIER).toBeGreaterThanOrEqual(MULTIPLIER_FLOOR);
+	});
+
+	it('a chat turn bills 1.2 times its cost, a decision outside the render floor', async () => {
+		const { CHAT_MULTIPLIER } = await import('./credit-ladder');
+
+		expect(CHAT_MULTIPLIER).toBe(1.2);
 	});
 });
-

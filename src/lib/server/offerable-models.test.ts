@@ -185,7 +185,7 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
     const out = await offerableModels(admin, 'image');
 
     const choice = out.choices.find((c) => c.id === GPT_IMAGE_2_MODEL);
-    expect(choice?.unitCredits).toBe(6);
+    expect(choice?.unitCredits).toBe(4);
   });
 
   it('un modello nuovo a prezzo fisso mostra la preview senza uno spec locale', async () => {
@@ -201,7 +201,7 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
 
     const out = await offerableModels(admin, 'image');
 
-    expect(out.choices.find((choice) => choice.id === 'meta/muse-image')?.unitCredits).toBe(7);
+    expect(out.choices.find((choice) => choice.id === 'meta/muse-image')?.unitCredits).toBe(4);
   });
 
   it('più provider usano il prezzo minimo senza fissare il provider', async () => {
@@ -222,7 +222,7 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
 
     const out = await offerableModels(admin, 'image');
 
-    expect(out.choices.find((choice) => choice.id === 'meta/muse-image')?.unitCredits).toBe(6);
+    expect(out.choices.find((choice) => choice.id === 'meta/muse-image')?.unitCredits).toBe(4);
   });
 
   it('un prezzo a consumo è dichiarato variabile invece di sparire', async () => {
@@ -315,8 +315,8 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
     const out = await offerableModels(admin, 'image');
     const choice = out.choices.find((candidate) => candidate.id === 'seedream-5-pro');
 
-    expect(choice?.unitCredits).toBe(9);
-    expect(choice?.creditOverrides).toEqual({ resolution: { '2K': 18 } });
+    expect(choice?.unitCredits).toBe(5);
+    expect(choice?.creditOverrides).toEqual({ resolution: { '2K': 11 } });
   });
 
   it('una variante usa il provider meno caro senza fissarlo', async () => {
@@ -352,8 +352,8 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
       (candidate) => candidate.id === 'seedream-5-pro'
     );
 
-    expect(choice?.unitCredits).toBe(6);
-    expect(choice?.creditOverrides).toEqual({ resolution: { '2K': 16 } });
+    expect(choice?.unitCredits).toBe(4);
+    expect(choice?.creditOverrides).toEqual({ resolution: { '2K': 10 } });
   });
 
   it('il minimo per risoluzione considera solo provider che la supportano', async () => {
@@ -385,7 +385,7 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
       (candidate) => candidate.id === 'seedream-5-pro'
     );
 
-    expect(choice?.creditOverrides).toEqual({ resolution: { '1K': 6, '2K': 16 } });
+    expect(choice?.creditOverrides).toEqual({ resolution: { '1K': 4, '2K': 10 } });
   });
 
   it('un modello sincronizzato SENZA una riga di integrazione nostra è offerto comunque, con la resa prudente', async () => {
