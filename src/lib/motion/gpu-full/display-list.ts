@@ -568,6 +568,24 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
   return { ...size, background, items, unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
 }
 
+const REST_WINDOW_SECONDS = 2;
+const PEAK_SHARE = 0.99;
+
+function shownOpacity(prepared: Prepared, frame: number): number {
+  const { css, size, drawable, effectiveEdge, alphaOf } = stageAt(prepared, frame);
+  const opacityOf = (clip: MotionClip) => PAINTERS[clip.component]?.place(propsAt(clip, frame, css), size).opacity ?? 1;
+  return drawable.reduce((sum, clip) => sum + alphaOf(clip, opacityOf(clip), effectiveEdge(clip)), 0);
+}
+
+export function restFrame(prepared: Prepared): number {
+  const { doc } = prepared;
+  const opening = stageAt(prepared, 0).drawable.map((c) => c.from + c.durationInFrames);
+  const end = Math.max(1, Math.min(doc.durationInFrames, Math.round(REST_WINDOW_SECONDS * doc.fps) + 1, ...opening));
+  const shown = Array.from({ length: end }, (_, frame) => shownOpacity(prepared, frame));
+  const peak = Math.max(...shown);
+  return Math.max(0, shown.findIndex((o) => o >= peak * PEAK_SHARE));
+}
+
 export const displayListAt = (doc: MotionDoc, frame: number, tokens: BrandTokens, typeset: Typeset = NO_TYPESET): DisplayList => drawFrame(prepare(doc, tokens, {}, typeset), frame);
 
 export type TextCaret = { lines: CaretLine[]; matrix: Affine; text: string; paragraphs: string[]; flow: Flow; width: number; height: number; size: number; vertical: number };

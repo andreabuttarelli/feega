@@ -3,7 +3,8 @@ import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
 import { drawsWhole, framesOnCanvas, onStage, stillFrame } from './frame-source';
 import instance from '../../../../tests/e2e/fixtures/motion-doc-template-instance.json';
-import type { MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { TransitionKind } from '$lib/motion/design';
 
 const tile = (id: string, kind = 'motion') => ({ id, kind, x: 10, y: 20, w: 300, h: 200 });
 
@@ -43,11 +44,11 @@ describe('handing a frame to the core', () => {
 
 describe('still frame', () => {
   it('a frame rests at time 0', () => {
-    expect(stillFrame({ fps: 30, durationInFrames: 90, tracks: [], comps: {} })).toBe(0);
+    expect(stillFrame(newMotionDoc(MotionFormat.Landscape))).toBe(0);
   });
 
   it('a still doc rests on its own still frame', () => {
-    expect(stillFrame({ fps: 30, durationInFrames: 60, still: { frame: 0 }, tracks: [], comps: {} })).toBe(0);
+    expect(stillFrame({ ...newMotionDoc(MotionFormat.Landscape), still: { frame: 7 } })).toBe(7);
   });
 
   it('a doc longer than its content still rests at time 0', () => {
@@ -59,6 +60,32 @@ describe('still frame', () => {
     const clip = { from: 0, durationInFrames: 30 };
     const at = stillFrame(doc);
     expect(at >= clip.from && at < clip.from + clip.durationInFrames).toBe(true);
+  });
+});
+
+describe('the frame a video rests on', () => {
+  const blank = newMotionDoc(MotionFormat.Landscape);
+  const words = (id: string, frames: number, fadeIn: number) => ({ id, component: 'Text', from: 0, durationInFrames: frames, props: { text: id, x: 0.5, y: 0.5, width: 0.5, height: 0.2 }, transitionIn: { kind: fadeIn ? TransitionKind.Fade : TransitionKind.None, durationInFrames: fadeIn } });
+  const video = (...clips: object[]): MotionDoc => {
+    const verdict = parseMotionDoc({ ...blank, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips }] });
+    if (!verdict.ok) {
+      throw new Error(verdict.error);
+    }
+    return verdict.doc;
+  };
+
+  it('a title that fades in rests once it is fully shown, never invisible at time 0', () => {
+    const at = stillFrame(video(words('title', 150, 15)));
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThanOrEqual(15);
+  });
+
+  it('never rests past a clip that is on screen at time 0', () => {
+    expect(stillFrame(video(words('title', 150, 45), words('flash', 10, 0)))).toBeLessThan(10);
+  });
+
+  it('a frame with nothing fading in still rests at time 0', () => {
+    expect(stillFrame(video(words('title', 150, 0)))).toBe(0);
   });
 });
 

@@ -1,5 +1,5 @@
 import { FrameKind, MOTION_NODE_BAR_H, docKindOf, frameChrome, holdsDoc } from '$lib/canvas/motion-node';
-import { REST_SECOND } from '$lib/motion/poster-time';
+import { restFrameOf } from '$lib/motion/poster-time';
 import { stillFrame as docStill } from '$lib/motion/still';
 import type { MotionDoc } from '$lib/motion/doc';
 import type { DisplayList } from '$lib/motion/gpu-full/display-list';
@@ -29,9 +29,7 @@ export function framesOnCanvas(tiles: readonly FrameTile[], dataOf: (id: string)
   });
 }
 
-type StillDoc = Pick<MotionDoc, 'fps' | 'durationInFrames' | 'still' | 'tracks' | 'comps'>;
-
-export const stillFrame = (doc: StillDoc): number => docStill(doc) ?? Math.round(REST_SECOND * doc.fps);
+export const stillFrame = (doc: MotionDoc): number => docStill(doc) ?? restFrameOf(doc);
 
 export const frameOfLive = (live: { doc: Parameters<typeof stillFrame>[0]; playhead?: number }): number => live.playhead ?? stillFrame(live.doc);
 

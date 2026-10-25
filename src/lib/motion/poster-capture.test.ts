@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { POSTER_DEBOUNCE_MS, posterFormat, posterJob, posterSecond } from './poster-capture';
-import { Background } from './doc';
+import { Background, MotionFormat, newMotionDoc } from './doc';
 import { FrameFormat } from './hyperframes/capture';
 
 describe('the poster of a composition', () => {
@@ -8,7 +8,7 @@ describe('the poster of a composition', () => {
   afterEach(() => vi.useRealTimers());
 
   it('is taken at time 0, where every clip of a frame is on screen', () => {
-    expect(posterSecond({ durationInFrames: 300, fps: 30 })).toBe(0);
+    expect(posterSecond(newMotionDoc(MotionFormat.Landscape))).toBe(0);
   });
 
   it('a burst of saves uploads one poster, after the edits settle', async () => {
