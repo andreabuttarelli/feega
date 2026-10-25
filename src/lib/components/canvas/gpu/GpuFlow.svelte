@@ -45,7 +45,7 @@
   import type { Fill } from '$lib/motion/fill/model';
   import { baseStyle, commitText, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
-  import { measuredTexts } from '$lib/canvas/text-autosize';
+  import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
   import type { TextCaret } from '$lib/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '$lib/motion/text-runs';
   import type { ListItem } from '$lib/motion/text-lists';
@@ -2053,14 +2053,7 @@
     if (!fit || saver.history.present !== doc) {
       return;
     }
-    if (fit.doc) {
-      saver.amendRoot(fit.doc, 'Fitted text');
-      liveDocs.set(nodeId, { ...live, doc: fit.doc });
-    }
-    if (fit.node) {
-      await saver.flushPending();
-      props.onPlace?.(nodeId, fit.node.w, fit.node.h);
-    }
+    applyTextFit(fit, { amend: (fitted) => saver.amendRoot(fitted, 'Fitted text'), show: (fitted) => liveDocs.set(nodeId, { ...live, doc: fitted }), place: (node) => props.onPlace?.(nodeId, node.w, node.h) });
   }
 
   let frameGuides = $state<{ nodeId: string; guides: Guide[]; gaps: Gap[] } | null>(null);
