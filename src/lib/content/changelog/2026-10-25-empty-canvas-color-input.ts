@@ -6,6 +6,7 @@ export default {
   items: [
     'A new canvas opens empty, without the starting-point overlay.',
     'Colour fields accept short hex like f, ff or fff, and 4 or 8 digits with opacity.',
-    'Colour fields accept rgb(), rgba() or bare numbers like 255 0 0 50%, with alpha setting opacity.'
+    'Colour fields accept rgb(), rgba() or bare numbers like 255 0 0 50%, with alpha setting opacity.',
+    'Typing numbers in a property field inside a frame no longer changes the selected layer’s opacity.'
   ]
 } satisfies ChangelogEntry;

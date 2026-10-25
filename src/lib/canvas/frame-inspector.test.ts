@@ -218,6 +218,13 @@ describe('frameKeyAction', () => {
   const press = (key: string, mods: { meta?: boolean; shift?: boolean; alt?: boolean } = {}) =>
     ({ key, code: `Key${key.toUpperCase()}`, metaKey: !!mods.meta, ctrlKey: false, shiftKey: !!mods.shift, altKey: !!mods.alt }) as KeyboardEvent;
 
+  it('a digit typed in a field stays in the field instead of setting opacity', () => {
+    const digit = { key: '2', code: 'Digit2', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false };
+    const field = { closest: (selector: string) => (selector.includes('input') ? {} : null) };
+    expect(frameKeyAction(digit as KeyboardEvent)).not.toBeNull();
+    expect(frameKeyAction({ ...digit, target: field } as unknown as KeyboardEvent)).toBeNull();
+  });
+
   it('⇧⌘R replaces the selection with the copied element, selecting the result', () => {
     const doc = fixture();
     elementClipboard.copyElements('frame', ['a'], copyElements(doc, ['a']));

@@ -15,3 +15,10 @@ with or without `#` (1 and 2 digits repeat to six, like `f` → `#ffffff`);
 its old value. `ColorField` passes the alpha to `onchange`; fill and stroke
 apply it as opacity in the same write (two writes raced on stale props).
 The brand wizard colour inputs normalise through the same parser.
+
+**Digits typed in a field.** The browser check found that with an element
+selected inside a frame, typing a digit (or `(`, `)`, ⌘A) in any inspector
+field ran the frame shortcut (opacity 10–100%, select all) instead of
+typing. `frameKeyAction` had no typing guard, unlike `matchCanvasShortcut`;
+it now returns null for typing targets. The field also writes the
+normalised hex back after a shorthand (`ff` on white kept showing `ff`).
