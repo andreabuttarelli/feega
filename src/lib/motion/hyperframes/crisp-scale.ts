@@ -9,9 +9,12 @@ export const crispScale = (transform: string): string | null => SCALE.exec(trans
 export const centredAt = (host: Size, frame: Size) => ({ left: Math.round((host.width - frame.width) / 2), top: Math.round((host.height - frame.height) / 2) });
 
 export function keepCrisp(frame: HTMLElement): () => void {
+  const { left: playerLeft, top: playerTop } = frame.style;
+  let scaled = frame.style.transform;
   const convert = () => {
     const zoom = crispScale(frame.style.transform);
     if (zoom) {
+      scaled = frame.style.transform;
       Object.assign(frame.style, { transform: 'none', zoom });
     }
     const host = frame.parentElement?.getBoundingClientRect();
@@ -28,7 +31,10 @@ export function keepCrisp(frame: HTMLElement): () => void {
   const watcher = new MutationObserver(convert);
   convert();
   watcher.observe(frame, { attributes: true, attributeFilter: ['style'] });
-  return () => watcher.disconnect();
+  return () => {
+    watcher.disconnect();
+    Object.assign(frame.style, { transform: scaled, zoom: '', left: playerLeft, top: playerTop });
+  };
 }
 
 const SCALED_BY: Record<Engine, (frame: HTMLElement) => () => void> = {

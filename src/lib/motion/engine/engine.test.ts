@@ -235,6 +235,15 @@ describe('a frame depends only on its time', () => {
     expect(el('a').style.opacity).toBe('0.8');
   });
 
+  it.each([['none'], ['']])('a blur eases down to an unfiltered element (%j) instead of snapping off at the end', (rest) => {
+    el('a').style.filter = rest;
+    const tl = timeline();
+    tl.from('#a', { filter: 'blur(18px) brightness(2)', duration: 1, ease: 'none' }, 0);
+
+    tl.totalTime(0.5, true);
+    expect(el('a').style.filter).toBe('blur(9px) brightness(1.5)');
+  });
+
   it('a relative value counts from where the previous tween left it', () => {
     const tl = timeline();
     tl.set('#a', { x: 10 }, 0);
