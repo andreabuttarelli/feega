@@ -167,3 +167,16 @@ describe('fill stack model', () => {
     expect((layer as { stops: { color: string }[] }).stops[0].color).toBe('#123456');
   });
 });
+
+describe('image fill source', () => {
+  it('keeps a picture embedded as a large data URL, which the canvas draws and crops', () => {
+    const src = `data:image/png;base64,${'A'.repeat(200_000)}`;
+    const parsed = fillsSchema.safeParse([{ type: FillType.Image, src }]);
+    expect(parsed.success).toBe(true);
+    expect((parsed.data?.[0] as FillOf<FillType.Image>).src).toBe(src);
+  });
+
+  it('still refuses a link longer than any real address', () => {
+    expect(fillsSchema.safeParse([{ type: FillType.Image, src: `https://cdn.example.com/${'a'.repeat(5000)}` }]).success).toBe(false);
+  });
+});

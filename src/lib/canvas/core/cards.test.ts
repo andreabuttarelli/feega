@@ -194,8 +194,12 @@ describe('cardItems', () => {
     expect(box(paper.contours)).toEqual([50, 70, 250, 170]);
   });
 
-  it.each(Object.keys(NODE_PORTS))('draws something for a %s card', (kind) => {
+  it.each(Object.keys(NODE_PORTS).filter((kind) => kind !== 'element'))('draws something for a %s card', (kind) => {
     expect(cardItems(card(kind, {}), theme, glyphs).length).toBeGreaterThan(0);
+  });
+
+  it('draws nothing for a free element without a picture, never a black stage', () => {
+    expect(cardItems(card('element', {}), theme, glyphs)).toEqual([]);
   });
 
   it('sets a title in the bold face', () => {

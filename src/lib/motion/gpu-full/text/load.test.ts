@@ -80,4 +80,16 @@ describe('loadFonts', () => {
 
     expect(fetched.sort()).toEqual(['https://g.test/euro.woff2', 'https://g.test/ext.woff2', 'https://g.test/latin.woff2']);
   });
+
+  it('asks the symbol fallback only for the characters past the alphabets, a check or an arrow', async () => {
+    const asked: string[] = [];
+    const read = { text: async (url: string) => (asked.push(url), CSS), bytes: async () => new Uint8Array() };
+    await fontLoader(read)(titled, {}, FEEGA_TOKENS);
+    expect(asked.some((url) => url.includes('Symbols'))).toBe(false);
+
+    const ticked = must(addClip(titled, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Added ✓' } }, 'tick'));
+    await fontLoader(read)(ticked, {}, FEEGA_TOKENS);
+    expect(asked.find((url) => url.includes('Symbols'))).toContain(`text=${encodeURIComponent('✓')}`);
+  });
 });
+

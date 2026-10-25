@@ -80,6 +80,11 @@ const cropWindow = z
   .optional();
 const stops = z.array(stop).min(2).max(MAX_STOPS);
 
+const MAX_LINK_CHARS = 4000;
+const MAX_DATA_URL_CHARS = 16_000_000;
+const DATA_URL = /^data:/;
+const pictureSrc = z.string().refine((src) => src.length <= (DATA_URL.test(src) ? MAX_DATA_URL_CHARS : MAX_LINK_CHARS), 'image source too long');
+
 const base = {
   opacity: unit.default(1),
   visible: z.boolean().default(true),
@@ -126,7 +131,7 @@ export const fillSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(FillType.Image),
     assetId: z.string().max(200).default(''),
-    src: z.string().max(4000).optional(),
+    src: pictureSrc.optional(),
     fit: z.enum(IMAGE_FITS).default(ImageFit.Cover),
     focus: point.default({ x: CENTRE, y: CENTRE }),
     scale: z.number().min(0.1).max(10).default(1),

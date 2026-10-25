@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FontSource, type FontFace } from '../../fonts/model';
-import { faceBook, faceRules, type Source } from './fonts';
+import { SYMBOL_FALLBACKS, faceBook, faceRules, type Source } from './fonts';
 import { boxFace } from './test-face';
 
 const GOOGLE = `
@@ -91,4 +91,12 @@ describe('faceBook', () => {
     expect(ask('Inter', 700, 65, { size: 120 }).resolved?.face.key).toEqual({ font: 'https://fonts.gstatic.com/inter.woff2', coords: [['wght', 700], ['opsz', 120]] });
     expect(ask('Inter', 700, 65, { size: 120 }).resolved?.face).toBe(ask('Inter', 700, 65, { size: 120 }).resolved?.face);
   });
+
+  it('draws a character its family lacks, a check or an arrow, from the symbol fallback', () => {
+    const symbols = faceRules(`@font-face { font-family: '${SYMBOL_FALLBACKS[0]}'; font-weight: 400; src: url(https://fonts.gstatic.com/symbols.woff2); unicode-range: U+2190-21FF, U+2713; }`);
+    const withSymbols = faceBook([...rules, ...symbols], new Map([...sources, ['https://fonts.gstatic.com/symbols.woff2', source('symbols')]]), registry);
+    const tick = withSymbols({ family: 'Inter', weight: 400, italic: false, size: 20, axes: {} }, 0x2713);
+    expect(tick?.face.key?.font).toBe('https://fonts.gstatic.com/symbols.woff2');
+  });
 });
+
