@@ -41,6 +41,16 @@ const PARAM_TYPES: Record<string, (fallback: unknown, o: Options) => PropSpec> =
   ease: (d, o) => spec({ type: 'string', enum: [...PARAM_EASES], default: String(d ?? PARAM_EASES[0]) }, o)
 };
 
+export const PARAM_GUIDE =
+  'Editable props: param(name, default, { type, label, group, min, max, step, options }) with literal arguments, type one of ' +
+  `${Object.keys(PARAM_TYPES).join('|')}; it returns the value and becomes an inspector field (group Content|Style|Motion). ` +
+  'Every number or string param is also the css var --param-<name> on the root. ' +
+  'Example js: const title = param("title", "make it move", { type: "text", group: "Content" }); ' +
+  'const accent = param("accent", "#ff5a1f", { type: "color", group: "Style" }); ' +
+  'const h = root.querySelector("h1"); h.textContent = title; h.style.color = accent; ' +
+  'tl.from(h, { y: 60, opacity: 0, duration: 0.8, ease: "feega.out" }); tl.to(h, { opacity: 0, duration: 0.4, ease: "feega.in" }, duration - 0.4); ' +
+  'with html <h1></h1> and css h1 { font-size: 160px; letter-spacing: -0.05em; }.';
+
 const TYPE_OF_VALUE: Record<string, string> = { number: 'number', boolean: 'boolean', string: 'text' };
 
 function literal(node: AnyNode | undefined): unknown {

@@ -54,7 +54,7 @@ const fake: Server = createServer((req, res) => {
       return;
     }
     if (route === '/api/v1/motion/renders/render-1') {
-      send(200, { run_id: 'render-1', mode: 'browser', status: 'done', asset_id: 'a1', file_url: 'https://files/a1.mp4' });
+      send(200, { run_id: 'render-1', mode: 'browser', status: 'done', asset_id: 'a1', file_url: 'https://files/a1.mp4', render_url: `https://feega.app/render/${'x'.repeat(900)}`, settings: { quality: 'high', fps: 30, notes: 'y'.repeat(900) } });
       return;
     }
     if (route === '/api/v1/motion/shader-effects') {
@@ -294,6 +294,13 @@ describe('the motion agent over MCP', () => {
     const result = await callTool('get_render', { run_id: 'render-1' });
     expect(calls[0].path).toBe('/api/v1/motion/renders/render-1');
     expect(JSON.stringify(result)).toContain('https://files/a1.mp4');
+  });
+
+  test('a get_render poll answers status and file only, under 300 chars', async () => {
+    const result = (await callTool('get_render', { run_id: 'render-1' })) as { content?: { text?: string }[]; structuredContent?: unknown };
+
+    expect(result.content?.[0]?.text?.length ?? 0).toBeLessThan(300);
+    expect(result.structuredContent).toBeUndefined();
   });
 
   test('only the motion tools are exposed, not the editor ones', async () => {

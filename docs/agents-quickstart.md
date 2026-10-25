@@ -264,6 +264,16 @@ device: the MP4 renders there and is saved to the project. Poll the file with `g
 `{ "run_id": "<run_id>" }`; when `done` it holds `asset_id` and a signed `file_url`. `mode: "server"`
 answers 403 `server_render_unavailable` while server rendering is closed.
 
+No user to open the link? The same answer carries `headless_url` (`render_url?autostart=1`): it
+starts rendering on load, no click. Any headless Chromium does it, for free:
+
+```bash
+npx -y playwright@1.48.2 install chromium
+node -e "const{chromium}=require('playwright');(async()=>{const b=await chromium.launch();const p=await b.newPage();await p.goto(process.argv[1]);await p.waitForSelector('[data-testid=render-saved]',{timeout:600000});await b.close()})()" "<headless_url>"
+```
+
+Then poll `get_render` until `done` for `file_url`.
+
 Lottie is a canvas export, not a render (`edit`; up to 30 s, text becomes shapes, no browser needed):
 
 ```json
@@ -290,6 +300,34 @@ Share the whole canvas read-only instead (`edit`, answers `{ "shared": true, "pa
 ```
 
 Turn it off with `"on": false`; that also kills every frame link.
+
+### Flow 6: custom visuals in code (free)
+
+Kits and shots are generic. For a product-specific scene (a node graph, a dashboard, a hero with your
+own type) write a component: html, css and js that draw it, animated on a seekable timeline. No
+credits, and every `param()` becomes a field a person edits later without code.
+
+1. `describe {op: "write_component"}` for the schema; its description carries the `param()`
+   signature and a full example.
+2. Write it on the frame (`edit`, `target` = the frame):
+
+```json
+{ "op": "write_component", "target": "<frame>", "input": {
+  "name": "HeroTitle",
+  "html": "<h1></h1>",
+  "css": "h1 { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: 160px; letter-spacing: -0.05em; }",
+  "js": "const title = param('title', 'make it move', { type: 'text', group: 'Content' }); const accent = param('accent', '#ff5a1f', { type: 'color', group: 'Style' }); const h = root.querySelector('h1'); h.textContent = title; h.style.color = accent; tl.from(h, { y: 60, opacity: 0, duration: 0.8, ease: 'feega.out' }); tl.to(h, { opacity: 0, duration: 0.4, ease: 'feega.in' }, duration - 0.4);"
+} }
+```
+
+3. Place it: `add_clip {component: "Custom", start, duration, props: {name: "HeroTitle", title: "..."}}`.
+4. Change it: `set_props` on the clip for any param, `update_components` for small code edits.
+5. Check it: `view {op: "snapshot", input: {node_id: "<frame>", time: 1}}`.
+
+The js receives `root, props, tl, duration, fps, assets, brand, rand` and libraries (d3, three, p5,
+PIXI...). Build every animation on `tl` with `feega.out` / `feega.in` / `feega.inOut`; never timers
+or `Math.random` (use `rand`) in a deterministic component. Each number or string param is also the
+css var `--param-<name>` on the root.
 
 ## 6. Limits worth knowing
 

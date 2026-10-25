@@ -17,3 +17,9 @@ export const REFUSAL_TEXT: Record<LinkRefusal, string> = {
 };
 
 export const renderPagePath = (token: string) => `${RENDER_PAGE}/${token}`;
+
+export const AUTOSTART_PARAM = 'autostart';
+
+export const headlessUrl = (renderUrl: string) => `${renderUrl}?${AUTOSTART_PARAM}=1`;
+
+export const autostarts = (params: URLSearchParams) => params.get(AUTOSTART_PARAM) === '1';

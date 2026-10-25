@@ -44,3 +44,14 @@ describe('the motion agent prefers the house curves', () => {
     expect(tools()[name].description).toContain('never a visible bounce');
   });
 });
+
+describe('write_component teaches how a component is written, without reading the source', () => {
+  it('names the param() signature, its types, the css vars and shows a whole example', () => {
+    const { description } = tools().write_component;
+
+    expect(description).toContain('param(name, default, { type');
+    for (const word of ['textarea', 'select', 'color', '--param-', 'feega.out', 'tl.from']) {
+      expect(description, word).toContain(word);
+    }
+  });
+});

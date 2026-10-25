@@ -47,15 +47,15 @@ export type SourceEdit = { file: SourceFile; find: string; replace: string; occu
 export type EditDiff = { file: SourceFile; replaced: number; before: string; after: string };
 export type UpdateResult = { ok: true; doc: MotionDoc; diff: EditDiff[] } | { ok: false; error: string };
 
-const DIFF_CHARS = 160;
+const DIFF_CHARS = 600;
 
 function occurrences(text: string, find: string): number {
   return find ? text.split(find).length - 1 : 0;
 }
 
-function lineAround(text: string, at: number): string {
+function linesAround(text: string, at: number, length: number): string {
   const start = text.lastIndexOf('\n', at - 1) + 1;
-  const end = text.indexOf('\n', at);
+  const end = text.indexOf('\n', at + length);
   return text.slice(start, end === -1 ? text.length : end).trim().slice(0, DIFF_CHARS);
 }
 
@@ -86,7 +86,7 @@ export function updateComponent(doc: MotionDoc, name: string, edits: SourceEdit[
     }
     const at = edit.occurrence === Occurrence.Last ? text.lastIndexOf(edit.find) : text.indexOf(edit.find);
     source[edit.file] = replaced(text, edit);
-    diff.push({ file: edit.file, replaced: edit.occurrence === Occurrence.All ? count : 1, before: lineAround(text, at), after: lineAround(source[edit.file], at) });
+    diff.push({ file: edit.file, replaced: edit.occurrence === Occurrence.All ? count : 1, before: linesAround(text, at, edit.find.length), after: linesAround(source[edit.file], at, edit.replace.length) });
   }
   const written = writeComponent(doc, name, { source, propsSchema: component.propsSchema, mode: component.mode });
   return written.ok ? { ...written, diff } : written;
