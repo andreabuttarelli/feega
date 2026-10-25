@@ -64,7 +64,8 @@ export const NODE_TYPES = [
   'motion',
   'element',
   'studio_batch',
-  'section'
+  'section',
+  'technique'
 ] as const;
 
 function syncStatusOf(v: unknown): SyncStatus {

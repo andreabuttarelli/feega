@@ -197,6 +197,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { cleanNodeName } from '$lib/canvas/node-name';
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
+  import { reloadTechniques, techniquesOf } from '$lib/canvas/techniques.svelte';
   import { promptSkillsOf, saveSkill } from '$lib/canvas/prompt-skills.svelte';
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
@@ -211,6 +212,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { planDelete } from '$lib/canvas/delete-plan';
   import { connectorsFor, orphanedByModelChange, type ConnectorType, type GenerativeNodeKind, connectorsForNode } from '$lib/canvas/connectors';
   import { portsOf } from '$lib/canvas/node-ports';
+  import { TECHNIQUE_NODE, TECHNIQUE_EDIT_PREFIX, instancePorts } from '$lib/canvas/technique-instance';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
@@ -261,6 +263,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const LINK_COPIED_MS = 1500;
 
   let { data } = $props();
+  const techniqueShelf = techniquesOf(untrack(() => data.projectId));
   const skillShelf = promptSkillsOf(untrack(() => data.projectId));
 
   function announceWelcome() {
@@ -1132,8 +1135,27 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       itemPort: () => itemPortOf(n.type === 'list' ? listValuesByNode[n.id]?.itemKind : upstreamListOf(n.id)?.itemKind),
       mediaKind: () => upstreamEffectsMediaOf(n.id)?.kind ?? (n.data.mediaKind === 'video' ? 'video' : 'image'),
       audioOperation: () => audioOperationOfTile(n),
-      audioInput: () => audioInputOfTile(n)
+      audioInput: () => audioInputOfTile(n),
+      techniquePorts: () => {
+        const technique = techniqueOfTile(n);
+        return technique ? instancePorts(technique) : { inputs: [], output: null };
+      }
     });
+  }
+
+  function techniqueOfTile(n: Tile) {
+    return techniqueShelf.list.find((t) => t.id === n.data.techniqueId) ?? null;
+  }
+
+  function techniqueView(n: Tile): NodeView | null {
+    if (n.type !== TECHNIQUE_NODE) {
+      return null;
+    }
+    const technique = techniqueOfTile(n);
+    if (!technique) {
+      return null;
+    }
+    return { technique: { name: technique.name, version: technique.version, inputs: technique.inputs.length, outputs: technique.outputs.length, ranVersion: typeof n.data.ranVersion === 'number' ? n.data.ranVersion : null } };
   }
 
   /**
@@ -1251,7 +1273,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!row) {
       return null;
     }
-    return mediaView(row) ?? selectedView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
+    return mediaView(row) ?? selectedView(row) ?? techniqueView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
   }
 
   let Flow = $state<typeof GpuFlow | null>(null);
@@ -1272,6 +1294,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let failed = $state<string | null>(null);
   let fontAdded = $state<string | null>(null);
+  let techniqueNotice = $state<string | null>(null);
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
   let topPeers = $state<HTMLElement | null>(null);
@@ -3532,6 +3555,63 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (created.length) { pushGesture(createManyGesture(created, connected)); }
   }
 
+  async function saveTechnique(ids: string[]) {
+    const editing = data.canvas.name.startsWith(TECHNIQUE_EDIT_PREFIX) ? data.canvas.name.slice(TECHNIQUE_EDIT_PREFIX.length) : '';
+    const name = prompt('Technique name (lowercase words with dashes)', editing)?.trim();
+    if (!name) {
+      return;
+    }
+
+    const saved = await post('save_technique', { ids: JSON.stringify(ids), name });
+    if (saved) {
+      void reloadTechniques(data.projectId, techniqueShelf);
+    }
+  }
+
+  const techniqueNodeIn = (ids: string[]) => nodes.find((n) => ids.includes(n.id) && n.type === TECHNIQUE_NODE);
+
+  async function runTechniqueNode(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const queued = node ? await post('run_technique_node', { node_id: node.id }) : null;
+    if (queued) {
+      techniqueNotice = 'Running. Results land on the Technique runs canvas.';
+      void refresh();
+    }
+  }
+
+  async function editTechnique(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const opened = node ? await post('open_technique', { technique_id: String(node.data.techniqueId) }) : null;
+    if (opened) {
+      leave(`/p/${data.projectId}/c/${String(opened.canvasId)}`, null);
+    }
+  }
+
+  async function detachTechnique(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const detached = node ? await post('detach_technique', { node_id: node.id }) : null;
+    if (!node || !detached) {
+      return;
+    }
+    const created = (detached.nodes ?? []) as CanvasNodeRecord[];
+    const connected = (detached.connections ?? []) as Connection[];
+    nodes = [...nodes.filter((n) => n.id !== node.id), ...created.map((n) => toTile(n, { select: true }))];
+    edges = [...edges, ...connected.map(toEdge)];
+  }
+
+  async function insertTechnique(id: string, at: { x: number; y: number }) {
+    const result = await post('insert_technique', { technique_id: id, x: at.x, y: at.y });
+    const created = (result?.nodes ?? []) as CanvasNodeRecord[];
+    const connected = (result?.connections ?? []) as Connection[];
+    if (!created.length) {
+      return;
+    }
+    techniqueNotice = typeof result?.message === 'string' ? result.message : null;
+    nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))];
+    edges = [...edges, ...connected.map(toEdge)];
+    pushGesture(createManyGesture(created, connected));
+  }
+
   async function insertTemplate(id: string, at: { x: number; y: number }) {
     const result = await post('template', { template_id: id, x: at.x, y: at.y });
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
@@ -3731,6 +3811,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       <a href="/p/{data.projectId}/settings/profile">Open settings</a>
     </p>
   {/if}
+  {#if techniqueNotice}
+    <p class="warning" role="status" data-testid="technique-notice">{techniqueNotice}</p>
+  {/if}
   {#if fontAdded}
     <p class="warning" role="status" data-testid="font-added">{fontAdded}</p>
   {/if}
@@ -3843,6 +3926,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onFigmaImages={figmaImagesAnswered}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
+    techniques={techniqueShelf.list}
+    onTechnique={insertTechnique}
+    onSaveTechnique={saveTechnique}
+    onRunTechnique={runTechniqueNode}
+    onEditTechnique={editTechnique}
+    onDetachTechnique={detachTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
