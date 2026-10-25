@@ -28,10 +28,36 @@ together.** You draw frames, animate them on a timeline and export them; the cha
 
 ## Run it locally
 
-Everything runs on your machine: no hosted service, no account, no key. Design, animation and export
-work as they are; AI features say which key to add.
+One canvas saved in one file: no account, no database, no Docker. You need Node 22.
 
-You need Docker (or OrbStack).
+```sh
+git clone https://github.com/andreabuttarelli/feega && cd feega && npm install
+npm run local -- my-canvas.feega        # http://localhost:5173
+```
+
+The first run builds the app (a few minutes). The file is created if it does not exist and saved
+as you work. To continue in the cloud, import it at [feega.app](https://feega.app) with
+**Import .feega**. Sharing, comments, saved versions and AI generation need the cloud and say so.
+
+## Run it locally as an agent
+
+The same command, then the [`feega` CLI or MCP server](cli/) against it. No `feega login`: they find
+the server on port 5173 and it answers as the local user. Every edit appears live in the open
+browser tab.
+
+```sh
+npm run local -- work.feega &                      # 1. server on http://localhost:5173
+curl -s localhost:5173/api/v1/version              # 2. {"localMode":true,…}
+feega projects && feega canvases <projectId>       # 3. the one project and its one canvas
+```
+
+From the MCP server, `edit` and `view` work on that canvas; `canvas_file` with `action: "save"`
+writes a copy wherever you ask. Stopping the server (Ctrl-C) saves the file. The server listens on
+127.0.0.1 only and refuses to start otherwise.
+
+## Self-host the full app (Docker)
+
+Accounts, organisations, realtime multiplayer, every project. You need Docker (or OrbStack).
 
 ```sh
 git clone https://github.com/andreabuttarelli/feega && cd feega/infra/compose
@@ -40,9 +66,7 @@ docker compose up
 
 Open http://localhost:3000 and sign in with `demo@feega.local` / `feega-demo-2026`.
 
-## Run it locally as an agent
-
-The same path, non-interactive, with a check at the end. Run from the repository root.
+Non-interactive, with a check at the end, from the repository root:
 
 ```sh
 docker info > /dev/null                                   # 1. Docker is running, or stop here

@@ -19,6 +19,20 @@ export function appUrl(): string {
 
 const isLocal = (url: string) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/.test(url);
 
+export const LOCAL_MODE_TOKEN = 'local';
+
+export async function servesLocalMode(url: string): Promise<boolean> {
+  if (!isLocal(url)) {
+    return false;
+  }
+  try {
+    const res = await fetch(`${url}/api/v1/version`, { signal: AbortSignal.timeout(1000) });
+    return ((await res.json()) as { localMode?: boolean }).localMode === true;
+  } catch {
+    return false;
+  }
+}
+
 export function authServerUrl(): string {
   const app = appUrl();
   return isLocal(app) ? app : PRODUCTION_URL;
