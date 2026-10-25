@@ -41,3 +41,7 @@ jitter. No frame interpolation. End card: lowercase "feega" wordmark.
 Seeds are realistic (seed.ts `heroDoc`: a ceramics landing hero with
 title, subtitle, CTA, product photo from static/templates, press row;
 Figma paste builds a profile card), never plain coloured frames.
+
+`look(rect, ms)` holds the camera on an area without moving the mouse
+(used while a combined video plays). The combine demo seeds the three
+Orbit launch scenes from tests/e2e/canvas-scenes-scrub.spec.ts.

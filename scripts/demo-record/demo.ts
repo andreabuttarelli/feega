@@ -150,6 +150,13 @@ export async function demo(page: Page, dir: string) {
       await page.waitForTimeout(BEAT_MS);
     },
 
+    async look(fit: Rect, ms: number) {
+      const centre = { x: fit.x + fit.width / 2, y: fit.y + fit.height / 2 };
+      const t = now();
+      await page.waitForTimeout(ms);
+      events.push({ kind: 'drag', t, end: now(), from: centre, to: centre, fit });
+    },
+
     async key(combo: string, badge?: string) {
       if (badge) {
         await page.evaluate((label) => (window as unknown as { demoBadge: (l: string) => void }).demoBadge(label), badge);
