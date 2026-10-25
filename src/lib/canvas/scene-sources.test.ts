@@ -4,7 +4,7 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '$li
 import { addClip } from '$lib/motion/timeline';
 import { flattenComps } from '$lib/motion/precomp';
 import { sequenceScenes } from '$lib/motion/scenes';
-import { sceneRevision, sceneStamp, withScenes, type SceneSource } from './scene-sources';
+import { loadOnce, sceneRevision, sceneStamp, withScenes, type SceneSource } from './scene-sources';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -39,6 +39,26 @@ describe('scene sources', () => {
     expect(asked).toEqual([A, B]);
     expect(texts(drawn.doc)).toEqual(['one', 'two']);
     expect(Object.keys(drawn.assets).sort()).toEqual(['a1', 'b1', 'own']);
+  });
+
+  it('fetches each scene once however many playhead redraws resolve the parent', async () => {
+    const asked: string[] = [];
+    const load = loadOnce(async (id: string) => (asked.push(id), id === A ? scene('one', 'a1') : scene('two', 'b1')));
+
+    const redraws = await Promise.all([0, 1, 2, 3].map((playhead) => withScenes({ doc: parent, assets: {}, playhead }, load)));
+
+    expect(asked).toEqual([A, B]);
+    expect(redraws.map((r) => texts(r.doc))).toEqual(Array(4).fill(['one', 'two']));
+  });
+
+  it('asks a missing scene again on the next redraw', async () => {
+    let calls = 0;
+    const load = loadOnce(async () => (calls++, null));
+
+    await withScenes({ doc: parent, assets: {} }, load);
+    await withScenes({ doc: parent, assets: {} }, load);
+
+    expect(calls).toBe(4);
   });
 
   it('a doc with no scenes loads nothing and comes back as it was', async () => {

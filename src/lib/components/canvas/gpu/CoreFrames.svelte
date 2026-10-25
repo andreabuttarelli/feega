@@ -27,7 +27,7 @@
   import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
-  import { withScenes } from '$lib/canvas/scene-sources';
+  import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
@@ -85,17 +85,23 @@
     return buildSource(f, (await res.json()) as FrameDoc);
   }
 
-  async function sceneSource(id: string): Promise<FrameDoc | null> {
-    const held = live.get(id);
-    if (held) {
-      return { revision: 0, ...held };
-    }
+  async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);
     return res.ok ? ((await res.json()) as FrameDoc) : null;
   }
 
+  const fetchedScenes = new Map<string, LoadScene>();
+  const fetchedAt = (stamp: string) => fetchedScenes.get(stamp) ?? fetchedScenes.set(stamp, loadOnce(fetchScene)).get(stamp)!;
+
+  const sceneSource =
+    (stamp: string): LoadScene =>
+    async (id) => {
+      const held = live.get(id);
+      return held ? { revision: 0, ...held } : fetchedAt(stamp)(id);
+    };
+
   async function buildSource(f: FrameAt, given: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
-    const source = await withScenes(given, sceneSource);
+    const source = await withScenes(given, sceneSource(f.scenes ?? ''));
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
     const still = frameOfLive(source);

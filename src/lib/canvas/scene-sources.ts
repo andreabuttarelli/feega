@@ -4,6 +4,20 @@ import { resolveScenes, sceneNodeIds } from '$lib/motion/scenes';
 export type SceneSource = { doc: MotionDoc; assets: Record<string, string> };
 export type LoadScene = (nodeId: string) => Promise<SceneSource | null>;
 
+export function loadOnce(load: LoadScene): LoadScene {
+  const held = new Map<string, Promise<SceneSource | null>>();
+  return (nodeId) => {
+    const known = held.get(nodeId);
+    if (known) {
+      return known;
+    }
+    const loading = load(nodeId).catch(() => null);
+    held.set(nodeId, loading);
+    void loading.then((s) => s ?? held.delete(nodeId));
+    return loading;
+  };
+}
+
 const uniqueScenes = (doc: MotionDoc) => [...new Set(sceneNodeIds(doc))];
 
 export type LoadedScenes = { docs: Record<string, MotionDoc>; assets: Record<string, string> };
