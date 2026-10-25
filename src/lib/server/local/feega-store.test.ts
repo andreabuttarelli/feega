@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createConnection, createNode, listConnections, listNodes } from '$lib/server/repos/canvas';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '../../motion/doc';
 import { unpackFeega } from '$lib/canvas/feega-file';
 import { snapshotSchema } from '$lib/canvas/canvas-version';
 import { LOCAL_ORG_ID, openFeegaStore, writeAtomically, type FeegaStore } from './feega-store';
