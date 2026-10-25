@@ -41,6 +41,7 @@ export type ModelChoice = {
   provider: string;
   providerLabel: string;
   maxRefs?: number;
+  maxVariants?: number;
   minDuration?: number;
   maxDuration?: number;
   /** I gradini che il selettore di durata offre — assente per l'immagine, che non ha durata. */
@@ -98,6 +99,8 @@ export type GenParams = Omit<AudioParams, 'duration'> & {
    *  CLAUDE.md — "repeat N"). Con degli assi collegati non conta: le combinazioni le dettano i
    *  valori, non questo numero. */
   repeat?: number;
+  variants?: number;
+  variantsInto?: 'nodes' | 'history';
   /** Cartesiano (default, assente) o accoppiato indice-per-indice — `loop-plan.ts::LoopCombine`. */
   combine?: 'product' | 'zip';
   /** The provider the user picked for this model; absent or `auto` = cheapest healthy. */

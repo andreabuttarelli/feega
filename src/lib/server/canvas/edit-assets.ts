@@ -3,6 +3,9 @@ import type { Db } from '$lib/server/db/client';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
 import { signMediaPaths } from './sign-media';
 import type { PixelSize } from '$lib/server/image-mask';
+import type { OutpaintPlan } from '$lib/outpaint';
+
+const NEUTRAL_FILL = '#808080';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
 const PNG = 'image/png';
@@ -44,4 +47,16 @@ export async function pixelSizeOf(db: Db, scope: { orgId: string; assetId: strin
     return null;
   }
   return asset.width && asset.height ? { width: asset.width, height: asset.height } : measured(db, asset);
+}
+
+export async function paddedPng(db: Db, scope: { orgId: string; assetId: string }, size: PixelSize, plan: OutpaintPlan): Promise<Buffer> {
+  const asset = await findAsset(db, scope);
+  const [url] = asset?.url ? await signMediaPaths(db, [asset.url]) : [];
+  if (!url) {
+    throw new Error('source_unreadable');
+  }
+  const source = Buffer.from(await (await fetch(url)).arrayBuffer());
+  const picture = await sharp(source).resize(size.width, size.height, { fit: 'fill' }).png().toBuffer();
+  const base = sharp({ create: { width: plan.padded.width, height: plan.padded.height, channels: 3, background: NEUTRAL_FILL } });
+  return base.composite([{ input: picture, left: plan.offset.left, top: plan.offset.top }]).png().toBuffer();
 }

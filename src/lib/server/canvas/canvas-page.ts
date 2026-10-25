@@ -44,8 +44,11 @@ const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number
   voice_not_yours: 403,
   cloning_not_in_this_project: 403
 };
-import { runGenNode, runsOf } from '$lib/server/canvas/generate';
-import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/canvas/loop';
+import { runsOf } from '$lib/server/canvas/generate';
+import { planLoop, enqueueLoop, retryLoopCombo } from '$lib/server/canvas/loop';
+import { cancelBatch } from '$lib/server/canvas/cancel-batch';
+import { runGeneration } from '$lib/server/canvas/variants';
+import { parseVariantsAsk } from '$lib/canvas/variants';
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
@@ -606,7 +609,12 @@ export const actions: Actions<CanvasParams> = {
       return fail(denied.status, denied.data);
     }
 
-    const out = await runGenNode(scope.db, {
+    const asked = parseVariantsAsk({ variants: paramsIn.variants, into: paramsIn.variantsInto });
+    if (!asked.ok) {
+      return fail(400, { error: asked.error });
+    }
+
+    const out = await runGeneration(scope.db, {
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
@@ -616,7 +624,9 @@ export const actions: Actions<CanvasParams> = {
       prompt,
       model,
       params: paramsIn as never,
-      expectedVersion: version
+      expectedVersion: version,
+      count: asked.count,
+      into: asked.into
     });
 
     if (out.kind === 'refused') { return fail(400, { error: out.error }); }
@@ -691,7 +701,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid request' });
     }
 
-    return await cancelLoop(scope.db, { orgId: scope.orgId, nodeId });
+    return await cancelBatch(scope.db, { orgId: scope.orgId, nodeId });
   },
 
   /**
@@ -1206,7 +1216,7 @@ export const actions: Actions<CanvasParams> = {
   imageTool: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = imageToolAskSchema.safeParse({ nodeId: fd.get('node_id'), tool: fd.get('tool'), factor: fd.get('factor') ?? undefined, prompt: fd.get('prompt') ?? undefined, mask: jsonField(fd, 'mask') });
+    const ask = imageToolAskSchema.safeParse({ nodeId: fd.get('node_id'), tool: fd.get('tool'), factor: fd.get('factor') ?? undefined, prompt: fd.get('prompt') ?? undefined, mask: jsonField(fd, 'mask'), extend: jsonField(fd, 'extend') });
     if (!ask.success) {
       return fail(400, { error: 'invalid request' });
     }
@@ -1216,7 +1226,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(denied.status, denied.data);
     }
 
-    const started = await startImageTool(scope.db, IMAGE_TOOL_DEPS, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, sourceNodeId: ask.data.nodeId, tool: ask.data.tool, factor: ask.data.factor, prompt: ask.data.prompt, mask: ask.data.mask });
+    const started = await startImageTool(scope.db, IMAGE_TOOL_DEPS, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, sourceNodeId: ask.data.nodeId, tool: ask.data.tool, factor: ask.data.factor, prompt: ask.data.prompt, mask: ask.data.mask, extend: ask.data.extend });
     return started.ok ? { outcome: 'done', nodeId: started.nodeId } : fail(400, { error: started.error });
   },
 

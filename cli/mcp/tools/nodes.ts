@@ -56,10 +56,17 @@ export function registerNodeTools(server: McpServer) {
         'org owner turned them on in Settings; minors and real, identifiable people are refused regardless. ' +
         'An uncensored model takes NO input of any kind — no upstream connections, no picked references, ' +
         'no image/mask/init params — and the call is refused before anything is spent if any are present. ' +
-        'Spends credits; a `credits_exhausted` failure means the org is out.',
+        'Spends credits; a `credits_exhausted` failure means the org is out. ' +
+        '`variants` (1, 2, 4 or 8; video up to 4) makes several results in one call and spends that many times the price of one run: ' +
+        '`into: "nodes"` (default) creates new output nodes next to this one, wired from the same inputs, and returns their `nodeIds`; ' +
+        '`into: "history"` lands every result in this node\'s own history, the last one shown. ' +
+        'The org\'s model allow-list and spend caps apply to the whole batch, which is refused before anything is spent if either blocks it. ' +
+        '`cancel_node_loop` also stops a variant batch still running on this node.',
       inputSchema: z.object({
         org,
         node_id: z.string(),
+        variants: z.number().int().optional().describe('1, 2, 4 or 8 (video up to 4). Omit for one result.'),
+        into: z.enum(['nodes', 'history']).optional().describe('With variants > 1: "nodes" (default) or "history".'),
         medium: z.enum(['text', 'image', 'video', 'audio', 'model3d']),
         prompt: z.string(),
         model: z.string().optional(),
@@ -253,11 +260,12 @@ export function registerNodeTools(server: McpServer) {
   server.registerTool(
     'cancel_node_loop',
     {
-      title: 'Cancel a queued loop',
+      title: 'Cancel a queued loop or variant batch',
       description:
         'Stops the combinations still queued for this node — the ones a tick has already claimed ' +
-        'finish regardless, and anything already produced stays in the output list. Returns how ' +
-        'many combinations it actually stopped.',
+        'finish regardless, and anything already produced stays in the output list. It also stops the ' +
+        'runs still pending of a `run_node_generation` variant batch started from this node. Returns how ' +
+        'many runs it actually stopped.',
       inputSchema: z.object({ org, node_id: z.string() }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },

@@ -65,8 +65,7 @@ import { canvasModeOf, projectModeOf } from '$lib/server/uncensored-workspace/wo
 import { resolvedListValues, upstreamInputsFor } from './upstream';
 import { syncedSourceItems } from './synced-items';
 import type { Connection } from '$lib/server/repos/canvas';
-import { orgCreditBalance } from '$lib/server/credits';
-import { createAdminClient } from '$lib/server/supabase-admin';
+import { creditsCover } from './credits-cover';
 import type { Actor } from '$lib/server/repos/actor';
 import type { GenMedium } from '$lib/canvas/gen-node';
 
@@ -236,17 +235,7 @@ export async function planLoop(db: Db, input: LoopPlanInput): Promise<LoopPlanRe
  * al saldo del ledger. Leggerne una diversa qui darebbe un preventivo che il gate vero smentisce.
  */
 async function wholeLoopCreditsAvailable(orgId: string, cost: LoopCostPreview): Promise<boolean> {
-  if (cost.total === null) {
-    return true;
-  }
-  try {
-    const balance = await orgCreditBalance(createAdminClient(), orgId);
-    return balance >= cost.total;
-  } catch {
-    // Fail-open, come `gateOrgCreditsCore`: un saldo illeggibile non deve bloccare un loop che
-    // altrimenti sarebbe legittimo — la stessa scelta, per lo stesso motivo, di `reportFailOpen`.
-    return true;
-  }
+  return creditsCover(orgId, cost.total);
 }
 
 export type LoopEnqueueInput = {
