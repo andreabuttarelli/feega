@@ -9,6 +9,7 @@ export default defineConfig({
     starlight({
       title: 'feega docs',
       description: 'Guides, references and architecture notes for feega, the infinite canvas for design and motion.',
+      favicon: '/favicon.png',
       customCss: ['./src/styles/feega.css'],
       editLink: { baseUrl: 'https://github.com/andreabuttarelli/feega/edit/dev/web-docs/' },
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/andreabuttarelli/feega' }],
