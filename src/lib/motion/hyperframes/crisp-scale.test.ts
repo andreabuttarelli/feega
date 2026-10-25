@@ -51,4 +51,16 @@ describe('crisp scale', () => {
     expect([frame.style.transform, frame.style.zoom]).toEqual(['none', '0.5']);
     stop();
   });
+
+  it('gives the frame its transform back when released, so a capture lays out at full size like the other lanes', () => {
+    const host = document.createElement('div');
+    const frame = document.createElement('iframe');
+    host.append(frame);
+    frame.style.transform = 'translate(-50%, -50%) scale(0.5)';
+    const stop = keepCrisp(frame);
+
+    stop();
+
+    expect([frame.style.transform, frame.style.zoom, frame.style.left, frame.style.top]).toEqual(['translate(-50%, -50%) scale(0.5)', '', '', '']);
+  });
 });

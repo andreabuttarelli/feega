@@ -7,11 +7,12 @@
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
 
   const guides = $derived(doc.layoutGuides ?? []);
+  const ADD_TITLE = 'Add a layout grid: columns, rows or grid. Elements snap to it. ⇧G shows or hides all grids';
   const KINDS = Object.values(GuideKind);
   const ALIGNS = Object.values(GuideAlign);
 
   const write = (next: LayoutGuide[], summary: string) => onchange(setLayoutGuides(doc, next), summary);
-  const patch = (index: number, change: Partial<LayoutGuide>) => write(guides.map((g, i) => (i === index ? { ...g, ...change } : g)), 'Changed a layout guide');
+  const patch = (index: number, change: Partial<LayoutGuide>) => write(guides.map((g, i) => (i === index ? { ...g, ...change } : g)), 'Changed a layout grid');
 
   const countOf = (text: string) => (text.trim().toLowerCase() === AUTO_COUNT ? AUTO_COUNT : Number(text));
 
@@ -37,12 +38,12 @@
 
 <div class="guides" data-testid="layout-guides-section">
   <header>
-    <span>Layout guides</span>
-    <button type="button" class="add" disabled={guides.length >= MAX_LAYOUT_GUIDES} onclick={() => write([...guides, newGuide(GuideKind.Columns)], 'Added a layout guide')} data-testid="add-layout-guide">Add</button>
+    <span>Layout grid</span>
+    <button type="button" class="add" aria-label="Add layout grid" title={ADD_TITLE} disabled={guides.length >= MAX_LAYOUT_GUIDES} onclick={() => write([...guides, newGuide(GuideKind.Columns)], 'Added a layout grid')} data-testid="add-layout-guide">+</button>
   </header>
   {#each guides as guide, i (i)}
     <div class="guide" data-testid="layout-guide">
-      <select aria-label="Guide kind" value={guide.kind} onchange={(e) => patch(i, { kind: e.currentTarget.value as GuideKind })}>
+      <select aria-label="Grid kind" value={guide.kind} onchange={(e) => patch(i, { kind: e.currentTarget.value as GuideKind })}>
         {#each KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
       </select>
       {#if guide.kind === GuideKind.Grid}
@@ -64,8 +65,8 @@
       {/if}
       <input type="color" aria-label="Guide colour" title="Colour" value={guide.color} onchange={(e) => patch(i, { color: e.currentTarget.value })} />
       <input type="number" min="0" max="100" step="5" aria-label="Guide opacity" title="Opacity %" value={Math.round(guide.opacity * 100)} onchange={(e) => patch(i, { opacity: Math.min(1, Math.max(0, Number(e.currentTarget.value) / 100)) })} />
-      <label class="toggle" title="Show this guide"><input type="checkbox" checked={!guide.hidden} onchange={(e) => patch(i, { hidden: !e.currentTarget.checked })} /></label>
-      <button type="button" class="remove" aria-label="Remove guide" onclick={() => write(guides.filter((_, j) => j !== i), 'Removed a layout guide')}>Remove</button>
+      <label class="toggle" title="Show this grid"><input type="checkbox" checked={!guide.hidden} onchange={(e) => patch(i, { hidden: !e.currentTarget.checked })} /></label>
+      <button type="button" class="remove" aria-label="Remove grid" onclick={() => write(guides.filter((_, j) => j !== i), 'Removed a layout grid')}>Remove</button>
     </div>
   {/each}
 </div>
