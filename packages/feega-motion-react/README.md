@@ -1,8 +1,9 @@
 # @feega/motion-react
 
-Embed an interactive [feega](https://feega.app) motion video in a React app. It runs the same
-hosted player as the web embed, so pointer, tilt, keys, taps and scroll scrubbing behave exactly
-as on the web.
+Embed a [feega](https://feega.app) motion video in a React app. A plain video is drawn inline,
+in your page, by feega's GPU engine (gpu-core: WebGPU, WebGL fallback), loaded from `origin`. A
+video that reads live input (pointer, tilt, keys, variables) runs in the hosted player in an
+iframe, so it behaves exactly as on the web. Props, callbacks and the ref are the same either way.
 
 ```bash
 npm i @feega/motion-react
@@ -32,7 +33,7 @@ story (the saved number of screens, pinned while you scroll), as the web embed d
 | `ref` | `play()`, `pause()`, `seek(seconds)`, `setVars(values)` |
 
 SSR-safe (Next.js app and pages router, Remix): nothing touches `window` until mounted, and the
-module is marked `'use client'`. React 18 and 19. No dependencies.
+module is marked `'use client'`. The server renders an empty stage; the player appears once mounted. React 18 and 19. No dependencies.
 
 Protocol: [`docs/embed-protocol.md`](../../docs/embed-protocol.md).
 

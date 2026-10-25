@@ -20,6 +20,12 @@ function frameOf(container: HTMLElement) {
   return { frame, posted, child, last: () => posted.filter((m) => 'progress' in m).at(-1) };
 }
 
+async function mount(props: Parameters<typeof FeegaMotion>[0] & { ref?: unknown }) {
+  const result = render(createElement(FeegaMotion, props as never));
+  await act(async () => undefined);
+  return result;
+}
+
 const fromPlayer = (source: unknown, event: PlayerEvent, data: Posted = {}) =>
   act(() => {
     window.dispatchEvent(new MessageEvent('message', { data: { type: PLAYER_MESSAGE, v: PROTOCOL_VERSION, event, ...data }, source: source as never }));
@@ -42,8 +48,8 @@ afterEach(() => {
 });
 
 describe('<FeegaMotion>', () => {
-  it('renders the hosted player in an iframe that fills its parent', () => {
-    const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, fit: 'contain' }));
+  it('renders the hosted player in an iframe that fills its parent', async () => {
+    const { container } = await mount({ id: ID, origin: ORIGIN, fit: 'contain' });
     const frame = container.querySelector('iframe')!;
 
     expect(frame.src).toBe(`${ORIGIN}/e/${ID}?fit=contain`);
@@ -52,12 +58,12 @@ describe('<FeegaMotion>', () => {
     expect(frame.style.width).toBe('100%');
   });
 
-  it('renders on the server without touching window', () => {
-    expect(renderToString(createElement(FeegaMotion, { id: ID, origin: ORIGIN }))).toContain(`${ORIGIN}/e/${ID}?fit=cover`);
+  it('renders on the server without touching window', async () => {
+    expect(renderToString(createElement(FeegaMotion, { id: ID, origin: ORIGIN }))).toContain('data-feega-stage');
   });
 
   it('posts its travel through the page as progress on scroll', async () => {
-    const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, scrollLength: 0 }));
+    const { container } = await mount({ id: ID, origin: ORIGIN, scrollLength: 0 });
     const f = frameOf(container);
     boxAt(container.firstElementChild!, 250, 500);
 
@@ -73,7 +79,7 @@ describe('<FeegaMotion>', () => {
     document.body.appendChild(scroller);
     boxAt(scroller, 100, 400);
     const ref = { current: scroller };
-    const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, scrollLength: 0, scrollContainer: ref }));
+    const { container } = await mount({ id: ID, origin: ORIGIN, scrollLength: 0, scrollContainer: ref });
     const f = frameOf(container);
     boxAt(container.firstElementChild!, 200, 200);
 
@@ -86,7 +92,7 @@ describe('<FeegaMotion>', () => {
 
   it('builds a scroll story for a scrub video, as the web loader does', async () => {
     vi.stubGlobal('fetch', settings('scrub', 4));
-    const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN }));
+    const { container } = await mount({ id: ID, origin: ORIGIN });
 
     await act(async () => undefined);
 
@@ -94,12 +100,12 @@ describe('<FeegaMotion>', () => {
     expect(container.querySelector<HTMLElement>('[data-feega-stage]')!.style.position).toBe('sticky');
   });
 
-  it('calls back on ready, end, time and errors from its own player only', () => {
+  it('calls back on ready, end, time and errors from its own player only', async () => {
     const onReady = vi.fn();
     const onEnded = vi.fn();
     const onTimeUpdate = vi.fn();
     const onError = vi.fn();
-    const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, onReady, onEnded, onTimeUpdate, onError }));
+    const { container } = await mount({ id: ID, origin: ORIGIN, onReady, onEnded, onTimeUpdate, onError });
     const f = frameOf(container);
 
     fromPlayer({}, PlayerEvent.Ready, { duration: 9 });
@@ -116,9 +122,9 @@ describe('<FeegaMotion>', () => {
     expect(onError).toHaveBeenCalledWith('boom');
   });
 
-  it('claims links when it has onLinkClick and hands them over', () => {
+  it('claims links when it has onLinkClick and hands them over', async () => {
     const onLinkClick = vi.fn();
-    const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, onLinkClick }));
+    const { container } = await mount({ id: ID, origin: ORIGIN, onLinkClick });
     const f = frameOf(container);
 
     fromPlayer(f.child, PlayerEvent.Size, { width: 16, height: 9, aspect: 16 / 9 });
@@ -128,9 +134,9 @@ describe('<FeegaMotion>', () => {
     expect(onLinkClick).toHaveBeenCalledWith('https://feega.app/');
   });
 
-  it('tells the player about reduced motion', () => {
+  it('tells the player about reduced motion', async () => {
     Object.assign(window, { matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) });
-    const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN }));
+    const { container } = await mount({ id: ID, origin: ORIGIN });
     const f = frameOf(container);
 
     fromPlayer(f.child, PlayerEvent.Size, { width: 16, height: 9, aspect: 16 / 9 });
@@ -138,8 +144,8 @@ describe('<FeegaMotion>', () => {
     expect(f.posted).toContainEqual(expect.objectContaining({ reducedMotion: true }));
   });
 
-  it('sends its vars once the player listens, then only what changed, in the same iframe', () => {
-    const { container, rerender } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, vars: { speed: 1, label: 'Hi' } }));
+  it('sends its vars once the player listens, then only what changed, in the same iframe', async () => {
+    const { container, rerender } = await mount({ id: ID, origin: ORIGIN, vars: { speed: 1, label: 'Hi' } });
     const f = frameOf(container);
     const varsSent = () => f.posted.filter((m) => 'vars' in m).map((m) => m.vars);
 
@@ -153,11 +159,11 @@ describe('<FeegaMotion>', () => {
     expect(container.querySelector('iframe')).toBe(f.frame);
   });
 
-  it('sets vars through its ref and reports the schema and the values the player kept', () => {
+  it('sets vars through its ref and reports the schema and the values the player kept', async () => {
     const ref = createRef<FeegaMotionHandle>();
     const onReady = vi.fn();
     const onVarsChange = vi.fn();
-    const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, ref, onReady, onVarsChange }));
+    const { container } = await mount({ id: ID, origin: ORIGIN, ref, onReady, onVarsChange });
     const f = frameOf(container);
     const schema = [{ name: 'speed', kind: 'number', default: 1, min: 0, max: 4 }];
 
@@ -170,9 +176,9 @@ describe('<FeegaMotion>', () => {
     expect(onVarsChange).toHaveBeenCalledWith({ speed: 4 });
   });
 
-  it('plays, pauses and seeks through its ref', () => {
+  it('plays, pauses and seeks through its ref', async () => {
     const ref = createRef<FeegaMotionHandle>();
-    const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, ref }));
+    const { container } = await mount({ id: ID, origin: ORIGIN, ref });
     const f = frameOf(container);
 
     ref.current!.play();
@@ -184,5 +190,26 @@ describe('<FeegaMotion>', () => {
       { type: HOST_MESSAGE, command: 'pause' },
       { type: HOST_MESSAGE, command: 'seek', time: 1.5 }
     ]);
+  });
+  it('draws a plain video inline with gpu-core, no iframe, and drives it like the embed', async () => {
+    const doc = { width: 1080, height: 1080, fps: 30, durationInFrames: 90 };
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith('/source.json') ? { doc, playback: 'scrub', loop: false, scrollLength: 0 } : { width: 1080, height: 1080, playback: 'scrub', scrollLength: 0 }))));
+    const ref = createRef<FeegaMotionHandle>();
+    const onReady = vi.fn();
+    const { container } = await mount({ id: ID, origin: ORIGIN, scrollLength: 0, ref, onReady });
+    const el = container.querySelector('feega-gpu-player') as HTMLElement & Record<string, unknown>;
+    const seeks: number[] = [];
+    Object.assign(el, { seek: (t: number) => seeks.push(t), play: vi.fn(), pause: vi.fn() });
+
+    expect(container.querySelector('iframe')).toBeNull();
+    boxAt(container.firstElementChild!, 250, 500);
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+      el.dispatchEvent(new Event('ready'));
+    });
+    ref.current!.seek(1);
+
+    expect(onReady).toHaveBeenCalledWith(expect.objectContaining({ width: 1080, duration: 3, playback: 'scrub' }));
+    expect(seeks).toEqual([1.5, 1.5, 1]);
   });
 });

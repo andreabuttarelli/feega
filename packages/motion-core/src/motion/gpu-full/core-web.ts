@@ -40,7 +40,7 @@ const moving = (picture: Picture) => (typeof HTMLVideoElement !== 'undefined' &&
 let loading: Promise<CoreModule> | null = null;
 
 async function loadCore(): Promise<CoreModule> {
-  const core = (await import(/* @vite-ignore */ CORE_URL)) as CoreModule;
+  const core = (await import(/* @vite-ignore */ new URL(CORE_URL, import.meta.url).href)) as CoreModule;
   await core.default();
   return core;
 }
