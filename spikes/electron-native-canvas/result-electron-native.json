@@ -1,0 +1,96 @@
+{
+  "mode": "native",
+  "label": "electron-native",
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) feega-electron-native-canvas/0.0.0 Chrome/140.0.7339.133 Electron/38.2.0 Safari/537.36",
+  "viewport": [
+    992,
+    849,
+    2
+  ],
+  "phases": [
+    {
+      "name": "overview",
+      "fps": 1,
+      "intervalP50": 871.11,
+      "intervalP95": 871.11,
+      "intervalMax": 871.11,
+      "over16_7Pct": 100,
+      "over8_3Pct": 100,
+      "workP50": 871.11,
+      "workP95": 871.11
+    },
+    {
+      "name": "pan",
+      "fps": 73,
+      "intervalP50": 8.28,
+      "intervalP95": 51.66,
+      "intervalMax": 307.19,
+      "over16_7Pct": 9.7,
+      "over8_3Pct": 45.7,
+      "workP50": 1.97,
+      "workP95": 50.93
+    },
+    {
+      "name": "zoom",
+      "fps": 85.5,
+      "intervalP50": 8.36,
+      "intervalP95": 13.13,
+      "intervalMax": 953.34,
+      "over16_7Pct": 2.9,
+      "over8_3Pct": 48.6,
+      "workP50": 3.73,
+      "workP95": 9.47
+    },
+    {
+      "name": "motion",
+      "fps": 50,
+      "intervalP50": 11.49,
+      "intervalP95": 47.08,
+      "intervalMax": 369.52,
+      "over16_7Pct": 26.9,
+      "over8_3Pct": 74.7,
+      "workP50": 11.41,
+      "workP95": 50.06
+    }
+  ],
+  "firstFrameMs": 3400.419875,
+  "loadMs": 2484.9204999999997,
+  "system": {
+    "phases": [
+      {
+        "name": "overview",
+        "cpuPct": 3.6,
+        "memMB": 440.7,
+        "gpuUtilPct": 46.7,
+        "peakMemMB": 517
+      },
+      {
+        "name": "pan",
+        "cpuPct": 4.1,
+        "memMB": 231.1,
+        "gpuUtilPct": 75.8,
+        "peakMemMB": 308
+      },
+      {
+        "name": "zoom",
+        "cpuPct": 4.7,
+        "memMB": 163.3,
+        "gpuUtilPct": 74,
+        "peakMemMB": 314
+      },
+      {
+        "name": "motion",
+        "cpuPct": 5.9,
+        "memMB": 197,
+        "gpuUtilPct": 66.9,
+        "peakMemMB": 210
+      }
+    ],
+    "lastByProcessMB": {
+      "Browser:2489": 139,
+      "GPU:2553": 18,
+      "Utility:2556": 13,
+      "Tab:2586": 34
+    }
+  }
+}

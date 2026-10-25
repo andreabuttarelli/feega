@@ -1,0 +1,59 @@
+{
+  "mode": "web",
+  "label": "chrome-web",
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+  "viewport": [
+    992,
+    761,
+    2
+  ],
+  "phases": [
+    {
+      "name": "overview",
+      "fps": 0.5,
+      "intervalP50": null,
+      "intervalP95": null,
+      "intervalMax": null,
+      "over16_7Pct": null,
+      "over8_3Pct": null,
+      "workP50": 4737.1,
+      "workP95": 4737.1
+    },
+    {
+      "name": "pan",
+      "fps": 82.5,
+      "intervalP50": 8.3,
+      "intervalP95": 25.9,
+      "intervalMax": 602.7,
+      "over16_7Pct": 6.9,
+      "over8_3Pct": 46.4,
+      "workP50": 0.3,
+      "workP95": 18.8
+    },
+    {
+      "name": "zoom",
+      "fps": 107.8,
+      "intervalP50": 8.3,
+      "intervalP95": 10.2,
+      "intervalMax": 301.9,
+      "over16_7Pct": 0.4,
+      "over8_3Pct": 44.4,
+      "workP50": 0.3,
+      "workP95": 0.6
+    },
+    {
+      "name": "motion",
+      "fps": 56,
+      "intervalP50": 8.5,
+      "intervalP95": 57.6,
+      "intervalMax": 235.1,
+      "over16_7Pct": 12.2,
+      "over8_3Pct": 52.3,
+      "workP50": 1.5,
+      "workP95": 18.4
+    }
+  ],
+  "firstFrameMs": 5317.799999952316,
+  "loadMs": 4671.5,
+  "system": null
+}

@@ -1,0 +1,4 @@
+node_modules/
+native/target/
+feega_native.node
+gpu-core-wasm/

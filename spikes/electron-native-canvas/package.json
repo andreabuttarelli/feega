@@ -1,0 +1,15 @@
+{
+  "name": "feega-electron-native-canvas",
+  "private": true,
+  "version": "0.0.0",
+  "main": "main.cjs",
+  "scripts": {
+    "gen": "node gen-scene.mjs $NATIVE_BENCH",
+    "build:native": "cd native && cargo build --release && cp target/release/libfeega_native_canvas.dylib ../feega_native.node",
+    "start": "electron .",
+    "web": "node server.mjs"
+  },
+  "devDependencies": {
+    "electron": "38.2.0"
+  }
+}

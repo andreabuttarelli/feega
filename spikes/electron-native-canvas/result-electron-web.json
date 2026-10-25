@@ -1,0 +1,96 @@
+{
+  "mode": "web",
+  "label": "electron-web",
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) feega-electron-native-canvas/0.0.0 Chrome/140.0.7339.133 Electron/38.2.0 Safari/537.36",
+  "viewport": [
+    992,
+    848,
+    2
+  ],
+  "phases": [
+    {
+      "name": "overview",
+      "fps": 8,
+      "intervalP50": 131.3,
+      "intervalP95": 171.4,
+      "intervalMax": 171.4,
+      "over16_7Pct": 100,
+      "over8_3Pct": 100,
+      "workP50": 131.8,
+      "workP95": 171
+    },
+    {
+      "name": "pan",
+      "fps": 99.5,
+      "intervalP50": 8.3,
+      "intervalP95": 15.5,
+      "intervalMax": 289.4,
+      "over16_7Pct": 4.5,
+      "over8_3Pct": 47.2,
+      "workP50": 0.3,
+      "workP95": 6.2
+    },
+    {
+      "name": "zoom",
+      "fps": 118.2,
+      "intervalP50": 8.3,
+      "intervalP95": 10.1,
+      "intervalMax": 22.3,
+      "over16_7Pct": 0.2,
+      "over8_3Pct": 45.6,
+      "workP50": 0.3,
+      "workP95": 0.5
+    },
+    {
+      "name": "motion",
+      "fps": 80.6,
+      "intervalP50": 8.4,
+      "intervalP95": 22.7,
+      "intervalMax": 230.6,
+      "over16_7Pct": 7.5,
+      "over8_3Pct": 48.3,
+      "workP50": 1.4,
+      "workP95": 10.7
+    }
+  ],
+  "firstFrameMs": 3060.5,
+  "loadMs": 2218.5,
+  "system": {
+    "phases": [
+      {
+        "name": "overview",
+        "cpuPct": 7.4,
+        "memMB": 446,
+        "gpuUtilPct": 44.8,
+        "peakMemMB": 466
+      },
+      {
+        "name": "pan",
+        "cpuPct": 4.8,
+        "memMB": 210.1,
+        "gpuUtilPct": 67.3,
+        "peakMemMB": 459
+      },
+      {
+        "name": "zoom",
+        "cpuPct": 3.5,
+        "memMB": 157.4,
+        "gpuUtilPct": 71.2,
+        "peakMemMB": 213
+      },
+      {
+        "name": "motion",
+        "cpuPct": 6.8,
+        "memMB": 197.4,
+        "gpuUtilPct": 68.6,
+        "peakMemMB": 214
+      }
+    ],
+    "lastByProcessMB": {
+      "Browser:4521": 46,
+      "GPU:4558": 55,
+      "Utility:4559": 15,
+      "Tab:4577": 89
+    }
+  }
+}
