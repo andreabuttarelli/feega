@@ -11,7 +11,7 @@ function warmRenderer(url: URL) {
     return;
   }
   void import('$lib/components/canvas/gpu/GpuFlow.svelte');
-  void import('$lib/motion/gpu-full/core-web').then((m) => m.warmCore()).catch(() => undefined);
+  void import('@feega/motion-core/motion/gpu-full/core-web').then((m) => m.warmCore()).catch(() => undefined);
 }
 
 export const load: PageLoad = ({ url }) => {

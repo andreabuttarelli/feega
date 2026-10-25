@@ -9,7 +9,7 @@ import { addAnimator } from '@feega/motion-core/motion/text-animators/ops';
 import { AnimatorUnit, SelectorShape } from '@feega/motion-core/motion/text-animators/model';
 import { displayListAt, ItemKind, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 import { faceBook, type FaceRule, type Source } from '@feega/motion-core/motion/gpu-full/text/fonts';
-import { fontkitSource } from './fontkit-face';
+import { fontkitSource } from '@feega/motion-core/motion/gpu-full/text/fontkit-face';
 import { Smoothing, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
 
 const FIXTURE = '../../../../../packages/gpu-core/tests/fixtures/text-parity.json';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gaussianKernel, MAX_TAPS } from './kernel';
+import { gaussianKernel, MAX_TAPS } from '@feega/motion-core/motion/gpu-full/kernel';
 import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 
 describe('gaussianKernel', () => {

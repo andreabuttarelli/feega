@@ -1,10 +1,10 @@
-import type { SvgNode } from '@feega/motion-core/motion/effects/registry';
-import { BlendMode } from '@feega/motion-core/motion/blend';
-import { FilterKind, type Filter, type Linear } from '@feega/motion-core/motion/gpu-full/filters';
-import { cssMatrix, IDENTITY_MATRIX, type CssFunction } from '@feega/motion-core/motion/gpu-full/filters';
+import type { SvgNode } from '../effects/registry';
+import { BlendMode } from '../blend';
+import { FilterKind, type Filter, type Linear } from './filters';
+import { cssMatrix, IDENTITY_MATRIX, type CssFunction } from './filters';
 import { BLEND_FS, BLUR_FS, QUAD_VS, plain, program } from './gl-kit';
 import { gaussianKernel, MAX_TAPS } from './kernel';
-import { rgbaOf, type Rgba } from '@feega/motion-core/motion/gpu-full/rgba';
+import { rgbaOf, type Rgba } from './rgba';
 import { LATTICE, latticeOf, stitchedFrequency } from './turbulence';
 
 const MAX_TABLE = 32;

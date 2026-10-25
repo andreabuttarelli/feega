@@ -1,4 +1,4 @@
-import type { Use, UsePatch } from '$lib/motion/gpu-full/core-web';
+import type { Use, UsePatch } from '@feega/motion-core/motion/gpu-full/core-web';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 
 const same = (a: Use, b: Use) => a.group === b.group && Boolean(a.cache) === Boolean(b.cache) && Boolean(a.hold) === Boolean(b.hold) && a.matrix.every((v, i) => v === b.matrix[i]);

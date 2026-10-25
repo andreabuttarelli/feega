@@ -1,6 +1,6 @@
 import { create } from 'fontkit';
-import { Ligatures, Op, type Command, type Face, type Shaped } from '@feega/motion-core/motion/gpu-full/text/face';
-import type { Axes, Source } from '@feega/motion-core/motion/gpu-full/text/fonts';
+import { Ligatures, Op, type Command, type Face, type Shaped } from './face';
+import type { Axes, Source } from './fonts';
 import { quadraticPath, type TruePoint } from './quadratic';
 
 type KitPoint = TruePoint & { copy: () => KitPoint };

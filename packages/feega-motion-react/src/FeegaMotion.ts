@@ -2,6 +2,7 @@
 import { createElement, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { DEFAULT_ORIGIN, Fit, HOST_MESSAGE, HostCommand, PlayerEvent, SCRUB_PLAYBACK, changedVars, embedSrc, readPlayer, settingsUrl, type EmbedSettings, type HostMessage, type PlayerMessage, type ReadyInfo, type VarValues } from './protocol.js';
 import { isVisible, storyProgress, travelProgress, type Span } from './progress.js';
+import { GPU_PLAYER_TAG, driveInline, durationOf, isGpuSource, loopsAfterEnd, playerModuleUrl, readyOf, sourceUrl, startsAlone, type GpuElement, type GpuSource } from './inline.js';
 
 export type FeegaMotionProps = {
   id: string;
@@ -47,6 +48,11 @@ export const FeegaMotion = forwardRef<FeegaMotionHandle, FeegaMotionProps>(funct
   const { id, fit = Fit.Cover, scrollLength, scrollContainer, origin = DEFAULT_ORIGIN, title = 'Interactive video', className, style, vars } = props;
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
+  const gpu = useRef<GpuElement>(null);
+  const measured = useRef<() => void>(() => undefined);
+  const [source, setSource] = useState<GpuSource | null | undefined>(undefined);
+  const inline = useRef<GpuSource | null>(null);
+  inline.current = source ?? null;
   const callbacks = useRef<Callbacks>(props);
   const wanted = useRef<VarValues | undefined>(vars);
   const sent = useRef<VarValues | null>(null);
@@ -57,7 +63,60 @@ export const FeegaMotion = forwardRef<FeegaMotionHandle, FeegaMotionProps>(funct
 
   const story = scrollLength ?? (settings?.playback === SCRUB_PLAYBACK ? settings.scrollLength : 0);
 
-  const post = useCallback((message: Omit<HostMessage, 'type'>) => frame.current?.contentWindow?.postMessage({ type: HOST_MESSAGE, ...message }, '*'), []);
+  const post = useCallback((message: Omit<HostMessage, 'type'>) => {
+    const el = gpu.current;
+    if (el && inline.current) {
+      driveInline(el, inline.current, message);
+      return;
+    }
+    frame.current?.contentWindow?.postMessage({ type: HOST_MESSAGE, ...message }, '*');
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    fetch(sourceUrl(origin, id))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: unknown) => live && setSource(isGpuSource(s) ? s : null))
+      .catch(() => live && setSource(null));
+    return () => {
+      live = false;
+    };
+  }, [origin, id]);
+
+  useEffect(() => {
+    const el = gpu.current;
+    if (!source || !el) {
+      return;
+    }
+    let live = true;
+    const reduced = window.matchMedia(REDUCED_MOTION).matches;
+    const ready = () => {
+      callbacks.current.onReady?.(readyOf(source));
+      if (startsAlone(source, reduced)) {
+        el.play();
+      }
+      measured.current();
+    };
+    const time = (e: Event) => callbacks.current.onTimeUpdate?.((e as CustomEvent<{ currentTime: number }>).detail.currentTime, durationOf(source));
+    const ended = () => {
+      callbacks.current.onEnded?.();
+      if (loopsAfterEnd(source)) {
+        el.seek(0);
+        el.play();
+      }
+    };
+    const failed = (e: Event) => callbacks.current.onError?.(String((e as CustomEvent<{ error?: { message?: string } }>).detail?.error?.message ?? 'playback failed'));
+    const events: [string, (e: Event) => void][] = [['ready', ready], ['timeupdate', time], ['ended', ended], ['playbackerror', failed]];
+    events.forEach(([name, fn]) => el.addEventListener(name, fn));
+    import(/* webpackIgnore: true */ /* @vite-ignore */ playerModuleUrl(origin)).then(
+      () => live && el.load(source),
+      (e: unknown) => live && callbacks.current.onError?.(String(e))
+    );
+    return () => {
+      live = false;
+      events.forEach(([name, fn]) => el.removeEventListener(name, fn));
+    };
+  }, [source, origin]);
 
   useImperativeHandle(ref, () => ({
     play: () => post({ command: HostCommand.Play }),
@@ -111,6 +170,7 @@ export const FeegaMotion = forwardRef<FeegaMotionHandle, FeegaMotionProps>(funct
       const progress = story > 0 ? storyProgress(own, view.height, view) : travelProgress(own, view);
       post({ progress, visible: isVisible(own, view) });
     };
+    measured.current = measure;
     const resize = () => {
       setViewportHeight(viewport().height);
       measure();
@@ -146,7 +206,7 @@ export const FeegaMotion = forwardRef<FeegaMotionHandle, FeegaMotionProps>(funct
       window.removeEventListener('message', hear);
       frame.current?.removeEventListener('load', greet);
     };
-  }, [scrollContainer, story, post, sendVars]);
+  }, [scrollContainer, story, post, sendVars, source]);
 
   const storyHeight = story > 0 && viewportHeight > 0 ? `${story * viewportHeight}px` : '100%';
   const stageStyle: CSSProperties = story > 0 ? { position: 'sticky', top: 0, width: '100%', height: viewportHeight || '100vh', overflow: 'hidden' } : { position: 'absolute', inset: 0 };
@@ -157,7 +217,7 @@ export const FeegaMotion = forwardRef<FeegaMotionHandle, FeegaMotionProps>(funct
     createElement(
       'div',
       { 'data-feega-stage': '', style: stageStyle },
-      createElement('iframe', { ref: frame, src: embedSrc(origin, id, fit as Fit), title, allow: 'accelerometer; gyroscope', style: FILL })
+      source === undefined ? null : source ? createElement(GPU_PLAYER_TAG, { ref: gpu, fit, title, style: FILL }) : createElement('iframe', { ref: frame, src: embedSrc(origin, id, fit as Fit), title, allow: 'accelerometer; gyroscope', style: FILL })
     )
   );
 });

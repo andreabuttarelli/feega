@@ -64,3 +64,8 @@ declare module 'virtual:motion-libs' {
 	const integrity: Record<import('@feega/motion-core/motion/libs/catalog').Script, string>;
 	export default integrity;
 }
+
+declare module 'virtual:motion-player' {
+	const source: string;
+	export default source;
+}

@@ -1,5 +1,5 @@
 import { FillType, ImageFit, WHOLE_PICTURE, type FillOf } from '@feega/motion-core/motion/fill/model';
-import { imageRect } from '$lib/motion/gpu-full/image-rect';
+import { imageRect } from '@feega/motion-core/motion/gpu-full/image-rect';
 import { elementFills } from '@feega/motion-core/motion/fill/elements';
 import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { editsText } from './frame-text-edit';

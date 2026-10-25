@@ -8,7 +8,7 @@ import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { LIVE_GLOBAL } from '@feega/motion-core/motion/interactive/runtime';
 import { Liveness, PlayMode } from '@feega/motion-core/motion/interactive/settings';
 import { InteractivePreset, applyInteractivePreset } from './presets';
-import { SELF_SCROLL, STANDALONE_MS, embedSettings, interactiveBundle, livePage, upgradePlayer } from './bundle';
+import { SELF_SCROLL, STANDALONE_MS, embedSettings, hostedPage, interactiveBundle, livePage, upgradePlayer } from './bundle';
 import { LIVE_MESSAGE } from './live-bridge';
 import { HOST_MESSAGE } from './host';
 import { HOSTED, MOTION_LIBS_ROUTE, Script, scriptUrl } from '@feega/motion-core/motion/libs/catalog';
@@ -200,5 +200,25 @@ describe('a frame running live on the canvas', () => {
     expect(page).toContain('<hyperframes-player id="player"');
     expect(page).toContain('(function playerMain(');
     expect(page).toContain(LIVE_MESSAGE);
+  });
+});
+
+describe('the hosted embed page', () => {
+  const sourcePage = async (doc: MotionDoc) => (await import('./bundle')).embedSource({ doc, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Clip', fetchBlob, origin: ORIGIN });
+
+  it('plays a plain video with gpu-core, loading the player from the app', async () => {
+    const page = hostedPage(await sourcePage(newMotionDoc(MotionFormat.Square)), ORIGIN) ?? '';
+
+    expect(page).toContain(`<feega-gpu-player id="player" source="feega-source">`);
+    expect(page).toContain(`<script type="module" src="${ORIGIN}/motion-player.js">`);
+    expect(page).toContain('"durationInFrames"');
+    expect(page).not.toContain('<hyperframes-player');
+  });
+
+  it('keeps the HTML player for an interactive video, which reads live input', async () => {
+    const page = hostedPage(await sourcePage(card()), ORIGIN) ?? '';
+
+    expect(page).toContain('<hyperframes-player id="player"');
+    expect(page).not.toContain('<feega-gpu-player');
   });
 });

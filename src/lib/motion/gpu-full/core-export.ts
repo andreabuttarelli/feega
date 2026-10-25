@@ -1,8 +1,8 @@
-import { BACKENDS, type FullBackend } from './backends';
+import { BACKENDS, type FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
 import { drawFrame, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
-import { createMedia } from './media';
-import { readClips, type CustomReads } from './dom/custom';
-import type { CoreRaster } from './core-web';
+import { createMedia } from '@feega/motion-core/motion/gpu-full/media';
+import { readClips, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
+import type { CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
 
 export type FrameSink = (bitmap: ImageBitmap, index: number) => Promise<void>;
 

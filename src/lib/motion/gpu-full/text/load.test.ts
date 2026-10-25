@@ -3,7 +3,7 @@ import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
-import { BUILTIN_FONTS_URL, fontLoader } from './load';
+import { BUILTIN_FONTS_URL, fontLoader } from '@feega/motion-core/motion/gpu-full/text/load';
 import { boxFace } from './test-face';
 import { bindVar, declareVar } from '@feega/motion-core/motion/interactive/vars';
 import { VarKind } from '@feega/motion-core/motion/interactive/var-model';

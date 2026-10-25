@@ -21,7 +21,7 @@
   import { EditEnd, TEXT_EDIT, type TextEditMessage } from '@feega/motion-core/motion/hyperframes/text-edit';
   import GpuLayer from './GpuLayer.svelte';
   import GpuFullLayer from './GpuFullLayer.svelte';
-  import { FullBackend } from '$lib/motion/gpu-full/backends';
+  import { FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
   import type { BrandTokens } from '@feega/motion-core/motion/brand';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { previewHtml } from '$lib/canvas/gpu/memory-budget';
@@ -387,7 +387,7 @@
   }
 
   async function renderOnCoreOf(spec: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> }, backend: FullBackend, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<boolean> {
-    const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }, { mountCustomReads }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('@feega/motion-core/motion/gpu-full/display-list'), import('$lib/motion/gpu-full/text/load'), import('@feega/motion-core/motion/gpu-full/text/painter'), import('$lib/motion/gpu-full/dom/custom')]);
+    const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }, { mountCustomReads }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('@feega/motion-core/motion/gpu-full/display-list'), import('@feega/motion-core/motion/gpu-full/text/load'), import('@feega/motion-core/motion/gpu-full/text/painter'), import('@feega/motion-core/motion/gpu-full/dom/custom')]);
     const prepared = prepare(spec.doc, spec.tokens, spec.assets, { fonts: await loadFonts(spec.doc, spec.assets, spec.tokens), smoothing: smoothingOf(navigator.userAgent) });
     const custom = await mountCustomReads(host ?? document.body, gpuCompose ?? (() => html), prepared);
     try {

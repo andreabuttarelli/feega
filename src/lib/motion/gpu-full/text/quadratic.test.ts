@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Op } from '@feega/motion-core/motion/gpu-full/text/face';
-import { quadraticPath } from './quadratic';
+import { quadraticPath } from '@feega/motion-core/motion/gpu-full/text/quadratic';
 
 const pt = (x: number, y: number, onCurve = true, endContour = false) => ({ x, y, onCurve, endContour });
 
