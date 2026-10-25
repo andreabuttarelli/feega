@@ -169,8 +169,8 @@ describe('/app/credits — the workspace credits page', () => {
 		);
 
 		expect(data.brands).toEqual([
-			{ id: 'b1', name: 'One', slug: 'one', credits: 600 },
-			{ id: 'b2', name: 'Two', slug: 'two', credits: 200 }
+			{ id: 'b1', name: 'One', slug: 'one', credits: 360 },
+			{ id: 'b2', name: 'Two', slug: 'two', credits: 120 }
 		]);
 	});
 

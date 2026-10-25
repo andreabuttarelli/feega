@@ -35,7 +35,7 @@ describe('orgCreditsUsage reads spend from ai_calls (no RPC)', () => {
       brandIds: []
     });
 
-    expect(usage.used).toBe(700); // (1.5 + 2) USD billed at 200 credits/USD (billedCreditsFor)
+    expect(usage.used).toBe(420); // (1.5 + 2) USD billed at 120 credits/USD (billedCreditsFor)
   });
 
   it('never grants more than the free quota — plan has no home in the new schema', async () => {
