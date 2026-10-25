@@ -1361,22 +1361,6 @@ function isQueuedLoopTicket(run: { params: Record<string, unknown> }): boolean {
   return Boolean(loop && typeof loop === 'object' && (loop as { phase?: unknown }).phase === 'queued');
 }
 
-const EXPIRE_SWEEP_LIMIT = 2000;
-
-/**
- * UN GIRO SENZA VIA D'USCITA VIENE CHIUSO A MANO, DA FUORI — ma solo quando ha superato IL PROPRIO
- * tetto (`JOB_TIMEOUTS_MS`), non quello sincrono. Un giro asincrono ancora in coda presso il
- * fornitore non è mai "perso per età" sotto quel tetto: il poll che lo riporta a `running`
- * (`releaseClaim`/`retryClaim`, nei riconciliatori dedicati) è la prova che il fornitore lo dice
- * ancora in corso, e quel poll è quanto di più recente questa riga sa.
- *
- * `claimRun` prima di ogni scrittura: due tick sovrapposti — o questo tick e la richiesta
- * originale che in realtà sta ancora rispondendo — non devono chiudere la stessa riga due volte.
- * Zero righe dal claim vuol dire che è già stata presa, e si passa oltre senza toccare nulla.
- *
- * Il nodo torna a `running: false` con l'errore scritto: senza, la riga in `node_runs` direbbe la
- * verità e lo schermo continuerebbe a mentire — esattamente il difetto segnalato.
- */
 export const RUN_CANCELLED = 'cancelled';
 
 export async function cancelNodeRun(db: Db, scope: { orgId: string; nodeId: string; actor?: Actor }): Promise<{ cancelled: number }> {
@@ -1397,6 +1381,22 @@ export async function cancelNodeRun(db: Db, scope: { orgId: string; nodeId: stri
   return { cancelled };
 }
 
+const EXPIRE_SWEEP_LIMIT = 2000;
+
+/**
+ * UN GIRO SENZA VIA D'USCITA VIENE CHIUSO A MANO, DA FUORI — ma solo quando ha superato IL PROPRIO
+ * tetto (`JOB_TIMEOUTS_MS`), non quello sincrono. Un giro asincrono ancora in coda presso il
+ * fornitore non è mai "perso per età" sotto quel tetto: il poll che lo riporta a `running`
+ * (`releaseClaim`/`retryClaim`, nei riconciliatori dedicati) è la prova che il fornitore lo dice
+ * ancora in corso, e quel poll è quanto di più recente questa riga sa.
+ *
+ * `claimRun` prima di ogni scrittura: due tick sovrapposti — o questo tick e la richiesta
+ * originale che in realtà sta ancora rispondendo — non devono chiudere la stessa riga due volte.
+ * Zero righe dal claim vuol dire che è già stata presa, e si passa oltre senza toccare nulla.
+ *
+ * Il nodo torna a `running: false` con l'errore scritto: senza, la riga in `node_runs` direbbe la
+ * verità e lo schermo continuerebbe a mentire — esattamente il difetto segnalato.
+ */
 export async function expireStuckRuns(db: Db): Promise<ExpireOutcome> {
   const now = Date.now();
   const running = (await runningRuns(db, { limit: EXPIRE_SWEEP_LIMIT })).filter((run) => !isQueuedLoopTicket(run));
