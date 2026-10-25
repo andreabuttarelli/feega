@@ -3324,3 +3324,7 @@ Signal: `This request requires more credits, or fewer max_tokens. You requested 
 ## A mocked canvas generation refused `moderation_unavailable`
 
 Signal: an `@real` spec with `E2E_FAKE_IMAGES=1` runs a canvas node and every run comes back `moderation_unavailable: the safety review could not run`, though the image mock is up. Cause: the prompt is screened first by an LLM judge that calls `LLM_BASE_URL/responses` (and `/chat/completions`), which the mock did not serve. Move: `fixtures/mock-images.ts` answers both with a safe verdict; start your own dev server with `LLM_BASE_URL` on the mock and `KIE_API_KEY=` blank so no discount route can reach a real provider.
+
+## A migration-only PR leaves derived files stale and `dev` red
+
+Signal: CI `test` fails on `query-tool.test.ts` (query-tables.ts), `write-tool.test.ts` (write-rules.ts) and `cli/lib/contracts.test.ts` right after a PR that only adds a migration. Cause: those files are generated from the migrations and the PR never regenerated them. Move: `node scripts/query-tables-from-migrations.mjs --write && bash cli/scripts/sync-contracts.sh`, commit the four files with the migration.

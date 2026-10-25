@@ -77,6 +77,7 @@ export const TABLE_CHECKS: Record<string, string> = {
   "moderation_checks_stage_check": "stage in ('rules', 'jev', 'llm', 'identifiability')",
   "nodes_type_check": "type in ( 'text', 'image', 'video', 'doc', 'iframe', 'social_account_feed', 'social_post_mockup', 'products', 'ads', 'influencer', 'list', 'select', 'effects', 'composition', 'calendar', 'audio', 'model3d', 'motion', 'element', 'studio_batch', 'section', 'technique' )",
   "onboarding_step_jobs_kind_check": "kind in ('competitors', 'research', 'plan_posts', 'preview_images')",
+  "org_spend_caps_scope_project": "(scope = 'org_member') = (project_id is null)",
   "orgs_invites_role_check": "role in ('owner', 'admin', 'member', 'viewer')",
   "orgs_members_role_check": "role in ('owner', 'admin', 'member', 'viewer')",
   "people_consent_source_check": "consent_source in ('owner_attested', 'ai_generated', 'legacy_assumed', 'import_unattested')",
