@@ -138,3 +138,13 @@ export function producedRuns(runs: GenRun[]): GenRun[] {
     return true;
   });
 }
+
+export type HistoryItem = { runId: string; mediaId: string; shown: boolean; position: number };
+
+export function historyItemsOf(node: GenNode): HistoryItem[] {
+  const produced = producedRuns(node.runs);
+  if (produced.length < 2) {
+    return [];
+  }
+  return produced.map((run, i) => ({ runId: run.id, mediaId: run.mediaId!, shown: run.mediaId === node.refId, position: i + 1 }));
+}

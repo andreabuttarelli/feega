@@ -2,7 +2,7 @@ import { formatCredits } from '$lib/components/credit-amount-format';
 import { audioFormOf, type AudioField } from './audio-form';
 import { shownIndex } from './gen-history';
 import { runStateOf, type GenMedium, type GenNode, type RunState } from './gen-node';
-import { loopCreditsOf, type RunQuote } from './run-quote';
+import { loopCreditsOf, runLabelOf, type RunQuote } from './run-quote';
 
 export type GenTileExtras = {
   hasUpstreamText: boolean;
@@ -10,6 +10,7 @@ export type GenTileExtras = {
   loopQueued: number;
   loopVisible: boolean;
   loopCombinationCount: number;
+  variantsInFlight: number;
 };
 
 export type GenButton = { label: string; credits: string | null; variable: boolean; enabled: boolean };
@@ -50,6 +51,9 @@ export const RUN_LABEL: Record<RunState, string> = {
 const approx = (credits: number | null) => (credits === null ? null : formatCredits(credits, { approx: true }));
 
 function loopOf(quote: RunQuote, x: GenTileExtras): GenTileView['loop'] {
+  if (x.variantsInFlight > 0) {
+    return { label: `Cancel all (${x.variantsInFlight})`, credits: null, variable: false, enabled: true, cancel: true };
+  }
   if (x.loopQueued > 0) {
     return { label: `Annulla loop (${x.loopQueued})`, credits: null, variable: false, enabled: true, cancel: true };
   }
@@ -76,7 +80,7 @@ export function genTileView(node: GenNode, quote: RunQuote, x: GenTileExtras): G
     output: node.runs.find((r) => r.mediaId === node.refId)?.text ?? null,
     error: node.error ?? null,
     warn: quote.reason ? { text: `${quote.reason}${tooLong}`, soft: !quote.tooLong } : null,
-    run: { label: quote.label, credits: approx(quote.credits), variable: quote.variable, enabled: quote.enabled },
+    run: { label: runLabelOf(quote), credits: approx(quote.credits), variable: quote.variable, enabled: quote.enabled },
     loop: loopOf(quote, x),
     runs: node.runs.length,
     shown: shownIndex(node),

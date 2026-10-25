@@ -15,8 +15,9 @@
   import { runStateOf, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
   import { shownIndex } from '$lib/canvas/gen-history';
   import { PROMPT_PLACEHOLDER, RUN_LABEL, hasGenBody } from '$lib/canvas/gen-tile-view';
-  import { loopCreditsOf, runQuoteOf } from '$lib/canvas/run-quote';
+  import { loopCreditsOf, runLabelOf, runQuoteOf } from '$lib/canvas/run-quote';
   import { effectiveModel } from '$lib/canvas/default-models';
+  import type { RememberedVariants } from '$lib/canvas/variants';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
   import { filterSkills, insertSkill, slashQueryAt, type PromptSkill, type SlashQuery } from '$lib/canvas/prompt-skills';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
@@ -37,6 +38,8 @@
     loopQueued = 0,
     loopVisible = false,
     loopCombinationCount = 0,
+    variantsInFlight = 0,
+    remembered = null,
     onchange,
     onrun,
     onrunloop,
@@ -90,6 +93,8 @@
      *  prima, poi `run_loop`, che METTE IN CODA — il cron gira le combinazioni nei minuti
      *  successivi, non questa chiamata). */
     onrunloop?: () => void;
+    variantsInFlight?: number;
+    remembered?: RememberedVariants | null;
     /** Ferma i biglietti non ancora reclamati — quelli già in corso finiscono comunque. */
     oncancelloop?: () => void;
     /** Rimettere in vetrina un giro di prima. Il nodo non sa scrivere: chiede a chi lo usa. */
@@ -166,7 +171,7 @@
    */
   const resolvedModel = $derived(effectiveModel(node.medium, node.model, choices));
   const quote = $derived(
-    runQuoteOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens })
+    runQuoteOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens, remembered })
   );
   const choice = $derived(quote.choice);
   const upstream = $derived({ hasUpstreamText });
@@ -381,7 +386,11 @@
             ({node.prompt.length}/{choice.maxPromptChars}){/if}
         </span>
       {/if}
-      {#if loopQueued > 0 && oncancelloop}
+      {#if variantsInFlight > 0 && oncancelloop}
+        <button type="button" class="gen-loop" onclick={() => oncancelloop?.()}>
+          Cancel all ({variantsInFlight})
+        </button>
+      {:else if loopQueued > 0 && oncancelloop}
         <button type="button" class="gen-loop" onclick={() => oncancelloop?.()}>
           Annulla loop ({loopQueued})
         </button>
@@ -391,7 +400,7 @@
         </button>
       {/if}
       <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
-        {runState === 'done' ? 'Redo' : 'Generate'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
+        {runLabelOf(quote)}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
       </button>
     </div>
   </footer>

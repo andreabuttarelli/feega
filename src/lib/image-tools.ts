@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import { maskSchema } from '$lib/image-mask';
+import { extendSchema } from '$lib/outpaint';
 
 export enum ImageTool {
   RemoveBackground = 'remove_background',
   Upscale = 'upscale',
   SplitLayers = 'split_layers',
-  Inpaint = 'inpaint'
+  Inpaint = 'inpaint',
+  Outpaint = 'outpaint'
 }
 
 export const IMAGE_TOOLS_GROUP = 'Image tools';
@@ -14,7 +16,8 @@ export const IMAGE_TOOL_MODEL: Readonly<Record<ImageTool, string>> = {
   [ImageTool.RemoveBackground]: 'kie/recraft/remove-background',
   [ImageTool.Upscale]: 'kie/topaz/image-upscale',
   [ImageTool.SplitLayers]: 'kie/seedream/5-flash-layer-decomposition',
-  [ImageTool.Inpaint]: 'kie/ideogram/v3-edit'
+  [ImageTool.Inpaint]: 'kie/ideogram/v3-edit',
+  [ImageTool.Outpaint]: 'kie/ideogram/v3-edit'
 };
 
 export const UPSCALE_FACTORS = ['2', '4'] as const;
@@ -33,6 +36,7 @@ const askShape = z
     tool: z.nativeEnum(ImageTool),
     factor: z.enum(UPSCALE_FACTORS).optional().describe('upscale only: 2 or 4 (default 2).'),
     prompt: z.string().trim().min(1).max(5000).optional().describe('inpaint: what to paint in the masked area.'),
+    extend: extendSchema.optional().describe('outpaint: how far to grow each side, as a fraction (0-1) of the image width (left/right) or height (top/bottom).'),
     mask: maskSchema.optional().describe('inpaint: the area to repaint, as brush strokes {points:[[x,y]...],width} and/or regions {left,top,width,height}, all fractions 0-1 of the image; width is a fraction of its shorter side.')
   })
   .strict();
@@ -40,7 +44,8 @@ const askShape = z
 type Ask = z.infer<typeof askShape>;
 
 const MISSING: Partial<Record<ImageTool, (ask: Ask) => string | null>> = {
-  [ImageTool.Inpaint]: (ask) => (!ask.prompt ? 'prompt' : !ask.mask ? 'mask' : null)
+  [ImageTool.Inpaint]: (ask) => (!ask.prompt ? 'prompt' : !ask.mask ? 'mask' : null),
+  [ImageTool.Outpaint]: (ask) => (!ask.prompt ? 'prompt' : !ask.extend ? 'extend' : null)
 };
 
 export const imageToolAskSchema = askShape.superRefine((ask, context) => {
@@ -66,6 +71,7 @@ const PARAMS: Record<ImageTool, (factor: string | undefined) => Record<string, s
   [ImageTool.RemoveBackground]: () => ({}),
   [ImageTool.SplitLayers]: () => ({}),
   [ImageTool.Inpaint]: () => ({ rendering_speed: DEFAULT_RENDERING_SPEED }),
+  [ImageTool.Outpaint]: () => ({ rendering_speed: DEFAULT_RENDERING_SPEED }),
   [ImageTool.Upscale]: (factor) => ({ upscale_factor: (UPSCALE_FACTORS as readonly string[]).includes(factor ?? '') ? factor! : DEFAULT_UPSCALE_FACTOR })
 };
 

@@ -10,7 +10,7 @@
   import { commonPropertiesOf, dynamicParamsOf, type GenPropertyType } from '$lib/canvas/common-properties';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nodeControlsOf, type SelectionPatch } from '$lib/canvas/node-controls';
-  import type { RunQuote } from '$lib/canvas/run-quote';
+  import { runLabelOf, type RunQuote } from '$lib/canvas/run-quote';
   import { TOOLBAR_HIDE_BELOW_ZOOM, toolbarScale } from '$lib/canvas/toolbar-scale';
   import { TOOLBAR_GAP, toolbarAnchor } from '$lib/canvas/toolbar-position';
   import type { ModelChoice } from '$lib/canvas/gen-node';
@@ -20,6 +20,10 @@
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { cn } from '$lib/utils.js';
   import ModelMenu from './ModelMenu.svelte';
+  import VariantsMenu from './VariantsMenu.svelte';
+  import HistoryMenu from './HistoryMenu.svelte';
+  import type { HistoryItem } from '$lib/canvas/gen-history';
+  import type { VariantInto } from '$lib/canvas/variants';
   import { PROVIDER_PARAM } from '$lib/canvas/model-routes';
   import NodeSettings from './NodeSettings.svelte';
   import { SECTION_TYPE } from '$lib/canvas/section';
@@ -40,6 +44,9 @@
     runQuote = null,
     frameTools = false,
     onrun,
+    oncancelvariants,
+    variantsInFlight = 0,
+    history = null,
     onaction,
     onpropertychange,
     onsectionchange,
@@ -57,8 +64,11 @@
     runQuote?: RunQuote | null;
     frameTools?: boolean;
     onrun?: () => void;
+    oncancelvariants?: () => void;
+    variantsInFlight?: number;
+    history?: { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void } | null;
     onaction?: (id: SelectionActionId) => void;
-    onpropertychange?: (patch: SelectionPatch & { model?: string | null }) => void;
+    onpropertychange?: (patch: SelectionPatch & { model?: string | null; variants?: number; variantsInto?: VariantInto }) => void;
     onsectionchange?: (id: string, patch: { title?: string; fill?: string }) => void;
     oncolourchange?: (tag: ColourTag | null) => void;
     onview?: () => void;
@@ -174,13 +184,19 @@
 
       {#if runQuote || primary.length}
         <div class="group" role="group" aria-label="Run">
+          {#if history && properties.type && runQuote}
+            <HistoryMenu items={history.items} medium={properties.type} urlOf={history.urlOf} onshow={history.onshow} />
+          {/if}
+          {#if runQuote?.variants}
+            <VariantsMenu quote={runQuote.variants} onchange={(patch) => onpropertychange?.(patch)} />
+          {/if}
           {#if runQuote}
             <Tooltip.Root>
               <Tooltip.Trigger>
                 {#snippet child({ props })}
                   <Button {...props} size="sm" class="h-11 md:h-8" data-control="run" disabled={!runQuote.enabled} onclick={() => onrun?.()}>
                     <Sparkles strokeWidth={1.8} />
-                    {runQuote.label}
+                    {runLabelOf(runQuote)}
                     {#if runQuote.credits !== null}
                       <span class="opacity-70">· <CreditAmount amount={runQuote.credits} approx /></span>
                     {:else if runQuote.variable}
@@ -191,6 +207,11 @@
               </Tooltip.Trigger>
               <Tooltip.Content side="top">{runQuote.reason ?? 'Run this node'}</Tooltip.Content>
             </Tooltip.Root>
+            {#if variantsInFlight > 0}
+              <Button size="sm" variant="secondary" class="h-11 md:h-8" data-control="cancel-variants" onclick={() => oncancelvariants?.()}>
+                Cancel all ({variantsInFlight})
+              </Button>
+            {/if}
           {/if}
           {#each primary as action (action.id)}
             {@const Icon = SELECTION_ACTION_ICON[action.id]}

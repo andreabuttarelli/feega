@@ -28,6 +28,13 @@ describe('image tools', () => {
     expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.RemoveBackground }).success).toBe(true);
   });
 
+  it('outpaint reuses the edit model, and needs a prompt and an extension', () => {
+    expect(IMAGE_TOOL_MODEL[ImageTool.Outpaint]).toBe(IMAGE_TOOL_MODEL[ImageTool.Inpaint]);
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Outpaint, prompt: 'more sky', extend: { top: 0.3 } }).success).toBe(true);
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Outpaint, extend: { top: 0.3 } }).success).toBe(false);
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Outpaint, prompt: 'more sky' }).success).toBe(false);
+  });
+
   it('recognises a tool model and nothing else', () => {
     expect(isImageToolModel('kie/recraft/remove-background')).toBe(true);
     expect(isImageToolModel('kie/nano-banana-2')).toBe(false);

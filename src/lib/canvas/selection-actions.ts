@@ -30,6 +30,7 @@ export type SelectionActionId =
   | 'remove-background'
   | 'upscale-image'
   | 'inpaint'
+  | 'outpaint'
   | 'split-layers'
   | 'layers-to-frame'
   | 'copy-id'
@@ -100,6 +101,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'remove-background', label: 'Remove background', group: 'secondary', minNodes: 1 },
   { id: 'upscale-image', label: 'Upscale 2×', group: 'secondary', minNodes: 1 },
   { id: 'inpaint', label: 'Inpaint…', group: 'secondary', minNodes: 1 },
+  { id: 'outpaint', label: 'Outpaint…', group: 'secondary', minNodes: 1 },
   { id: 'split-layers', label: 'Split into layers', group: 'secondary', minNodes: 1 },
   { id: 'layers-to-frame', label: 'Layers to frame', group: 'secondary', minNodes: 1 },
   { id: 'copy', label: 'Copy', group: 'menu', minNodes: 1, shortcut: 'Mod+C' },
@@ -194,6 +196,7 @@ const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) =
   'remove-background': isOneFinishedImage,
   'upscale-image': isOneFinishedImage,
   inpaint: isOneFinishedImage,
+  outpaint: isOneFinishedImage,
   'split-layers': isOneFinishedImage,
   'layers-to-frame': (summaries) => isOneFinishedImage(summaries) && Array.isArray(summaries[0].data.layerRefIds) && summaries[0].data.layerRefIds.length > 0,
   ungroup: (summaries) => summaries.some(isGroup),

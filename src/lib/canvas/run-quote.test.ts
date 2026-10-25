@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GenNode, ModelChoice } from './gen-node';
 import { runQuoteOf } from './run-quote';
+import { VariantInto } from './variants';
 
 const image: ModelChoice = { id: 'img', label: 'Img', provider: 'x', providerLabel: 'X', aspectRatios: ['1:1'], unitCredits: 12, maxPromptChars: 10 };
 
@@ -43,6 +44,37 @@ describe('il preventivo di un giro, lo stesso per il nodo e per la barra', () =>
     const quote = runQuoteOf({ node: node({ medium: 'text' }), choices: [], variableTextInput: true });
 
     expect(quote.credits).toBeNull();
+  });
+});
+
+describe('the quote of variants', () => {
+  it('multiplies the price of one run by the variants the node asks for', () => {
+    const quote = runQuoteOf({ node: node({ params: { variants: 4 } }), choices: [image] });
+
+    expect(quote.credits).toBe(48);
+    expect(quote.variants).toEqual({ count: 4, into: 'nodes', counts: [1, 2, 4, 8] });
+  });
+
+  it('falls back to the choice this user made last', () => {
+    const quote = runQuoteOf({ node: node(), choices: [image], remembered: { count: 2, into: VariantInto.History } });
+
+    expect(quote.credits).toBe(24);
+    expect(quote.variants).toMatchObject({ count: 2, into: 'history' });
+  });
+
+  it('stays unknown when the price of one run is', () => {
+    const quote = runQuoteOf({ node: node({ medium: 'text', params: { variants: 4 } }), choices: [], variableTextInput: true });
+
+    expect(quote.credits).toBeNull();
+  });
+
+  it('is one run on a medium that has no variants', () => {
+    const choices = [{ ...image, id: 'txt' }];
+    const plain = runQuoteOf({ node: node({ medium: 'text', model: 'txt' }), choices });
+    const asked = runQuoteOf({ node: node({ medium: 'text', model: 'txt', params: { variants: 4 } }), choices, remembered: { count: 4, into: VariantInto.Nodes } });
+
+    expect(asked.variants).toBeNull();
+    expect(asked.credits).toBe(plain.credits);
   });
 });
 

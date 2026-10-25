@@ -201,9 +201,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
-  import { producedRuns } from '$lib/canvas/gen-history';
+  import { historyItemsOf, producedRuns } from '$lib/canvas/gen-history';
   import { genTileView, type GenTileView } from '$lib/canvas/gen-tile-view';
   import { runQuoteOf, type RunQuote } from '$lib/canvas/run-quote';
+  import { DEFAULT_INTO, DEFAULT_VARIANTS, VariantInto, browserVariantsStorage, effectiveVariants, readRemembered, variantsIntoOf, writeRemembered, type RememberedVariants } from '$lib/canvas/variants';
   import { type Addable } from '$lib/canvas/addable';
   import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
   import { tileNode } from '$lib/canvas/connect-rules';
@@ -214,6 +215,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
+  import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
+  import type { Extend } from '$lib/outpaint';
   import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
@@ -2158,8 +2161,42 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       estimatedTextInputTokens: estimate?.inputTokens,
       estimatedTextOutputTokens: estimate?.outputTokens,
       hasUpstreamImage: edges.some((e) => e.target === row.id && e.targetHandle === 'images'),
-      imageChoices: catalogue.image
+      imageChoices: catalogue.image,
+      remembered: rememberedVariants
     });
+  }
+
+  const variantsUserId = data.session?.user?.id ?? '';
+  let rememberedVariants = $state<RememberedVariants | null>(null);
+  let variantsRunning = $state<Record<string, number>>({});
+
+  onMount(() => {
+    rememberedVariants = readRemembered(browserVariantsStorage(), variantsUserId);
+  });
+
+  function rememberVariants(patch: { variants?: number; variantsInto?: VariantInto }) {
+    const base = rememberedVariants ?? { count: DEFAULT_VARIANTS, into: DEFAULT_INTO };
+    rememberedVariants = { count: patch.variants ?? base.count, into: patch.variantsInto ?? base.into };
+    writeRemembered(browserVariantsStorage(), variantsUserId, rememberedVariants);
+  }
+
+  function variantsPlanFor(gen: GenNodeState): { count: number; into: VariantInto } {
+    const choice = catalogue[gen.medium]?.find((c) => c.id === effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []));
+    return { count: effectiveVariants(gen.medium, gen.params, rememberedVariants, choice), into: variantsIntoOf(gen.params, rememberedVariants) };
+  }
+
+  function historyFor(id: string) {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const items = gen ? historyItemsOf({ ...gen, runs: runsByNode[id] ?? [] }) : [];
+    return gen && items.length ? { items, urlOf: assetUrl, onshow: (runId: string) => void restore(id, gen, runId) } : null;
+  }
+
+  function variantsInFlightFor(id: string): number {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const historyBatch = gen?.running ? variantsPlanFor(gen) : null;
+    return variantsRunning[id] ?? (historyBatch && historyBatch.count > 1 && historyBatch.into === VariantInto.History ? historyBatch.count : 0);
   }
 
   function genViewFor(id: string): GenTileView | null {
@@ -2175,9 +2212,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const variableTextInput = estimate?.variableInput ?? (gen.medium === 'text' && revision !== '[]');
     const entry = mediumCatalogue[gen.medium];
     const hasUpstreamText = hasUpstreamTextByNode[id] ?? false;
-    const quote = runQuoteOf({ node, choices: entry.choices, hasUpstreamText, variableTextInput, enhanceUnitCredits: entry.enhanceUnitCredits, estimatedTextInputTokens: estimate?.inputTokens, estimatedTextOutputTokens: estimate?.outputTokens });
+    const quote = runQuoteOf({ node, choices: entry.choices, hasUpstreamText, variableTextInput, enhanceUnitCredits: entry.enhanceUnitCredits, estimatedTextInputTokens: estimate?.inputTokens, estimatedTextOutputTokens: estimate?.outputTokens, remembered: rememberedVariants });
 
-    return genTileView(node, quote, { hasUpstreamText, variableTextInput, loopQueued: loopQueuedByNode[id] ?? 0, loopVisible: loopAffordanceByNode[id]?.visible ?? false, loopCombinationCount: loopAffordanceByNode[id]?.combinationCount ?? 0 });
+    return genTileView(node, quote, { hasUpstreamText, variableTextInput, loopQueued: loopQueuedByNode[id] ?? 0, loopVisible: loopAffordanceByNode[id]?.visible ?? false, loopCombinationCount: loopAffordanceByNode[id]?.combinationCount ?? 0, variantsInFlight: variantsInFlightFor(id) });
   }
 
   function runNode(id: string) {
@@ -2197,16 +2234,29 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
-    nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
+    const variants = variantsPlanFor(gen);
+    const batched = variants.count > 1;
+    const params = batched || gen.params.variants !== undefined ? { ...gen.params, variants: variants.count, variantsInto: variants.into } : gen.params;
+    const spawnsNodes = batched && variants.into === VariantInto.Nodes;
+
+    if (!spawnsNodes) {
+      nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
+    }
+    if (batched) {
+      variantsRunning = { ...variantsRunning, [id]: variants.count };
+    }
 
     pending += 1;
     const result = await postAtVersion('run', id, {
       medium: gen.medium,
       prompt: gen.prompt,
       model: effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []) ?? '',
-      params: JSON.stringify(gen.params)
+      params: JSON.stringify(params)
     });
     pending -= 1;
+
+    const { [id]: _settled, ...stillRunning } = variantsRunning;
+    variantsRunning = stillRunning;
 
     if (!result) {
       // Il motivo VERO sta già scritto su `nodes.data` — `giveUp()` lo mette lì prima di
@@ -2979,6 +3029,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       audio?: boolean;
       enhancePrompt?: boolean;
       repeat?: number;
+      variants?: number;
+      variantsInto?: VariantInto;
       /** I campi dichiarati da `ai_models.param_schema` che il toolbar generico scrive — un solo
        *  bucket dinamico, invece di un campo esplicito per ogni nome di parametro possibile. */
       dynamicParams?: Record<string, unknown>;
@@ -2986,6 +3038,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   ) {
     const chosen = nodes.filter((n) => ids.includes(n.id));
     if (!chosen.length) { return; }
+
+    if (patch.variants !== undefined || patch.variantsInto !== undefined) { rememberVariants(patch); }
 
     const droppedEdges: UndoItem[] = [];
     const clearedReferenceIds: string[] = [];
@@ -3233,6 +3287,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let formatsFor = $state<string | null>(null);
   let inpaintFor = $state<string | null>(null);
+  let outpaintFor = $state<string | null>(null);
   let exportFor = $state<string[] | null>(null);
   let exportElements = $state<{ frameId: string; elementIds: string[] } | null>(null);
 
@@ -3265,6 +3320,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function inpaint(nodeId: string, prompt: string, mask: Mask) {
     landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Inpaint, prompt, mask: JSON.stringify(mask) }));
+    void invalidate('app:credits');
+  }
+
+  async function outpaint(nodeId: string, prompt: string, extend: Extend) {
+    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
     void invalidate('app:credits');
   }
 
@@ -3702,6 +3762,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if versionsPanel.open}
     <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
   {/if}
+  {#if outpaintFor}
+    <OutpaintDialog onapply={(prompt, extend) => outpaint(outpaintFor!, prompt, extend)} onclose={() => (outpaintFor = null)} />
+  {/if}
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(String(nodes.find((n) => n.id === inpaintFor)?.data?.refId ?? '')) ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
   {/if}
@@ -3747,6 +3810,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onImageTool={imageTool}
     onLayersToFrame={layersToFrame}
     onInpaint={(id) => (inpaintFor = id)}
+    onOutpaint={(id) => (outpaintFor = id)}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}
     onEdgeDelete={disconnect}
@@ -3792,6 +3856,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     {runQuoteFor}
     {genViewFor}
     onRunNode={runNode}
+    {variantsInFlightFor}
+    {historyFor}
+    onCancelVariants={cancelLoopFor}
     {nodeSummaries}
     {modelChoicesFor}
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
@@ -3883,6 +3950,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             loopQueued={loopQueuedByNode[row.id] ?? 0}
             loopVisible={loopAffordanceByNode[row.id]?.visible ?? false}
             loopCombinationCount={loopAffordanceByNode[row.id]?.combinationCount ?? 0}
+            variantsInFlight={variantsInFlightFor(row.id)}
+            remembered={rememberedVariants}
             onchange={(patch) => changeGen(id, gen, patch)}
             onestimate={(prompt, model, revision) => void estimateTextCost(id, prompt, model ?? '', revision)}
             onrun={() => run(id, gen)}
