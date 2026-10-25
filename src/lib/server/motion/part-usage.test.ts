@@ -39,7 +39,7 @@ const textParts: TextPart[] = posters.flatMap((entry) => {
 
 describe('the part usage table is derived from the templates', () => {
   it('matches what each poster renders (regenerate with vitest -u)', async () => {
-    await expect(`${JSON.stringify(table, null, 2)}\n`).toMatchFileSnapshot('../../motion/template/part-usage.json');
+    await expect(`${JSON.stringify(table, null, 2)}\n`).toMatchFileSnapshot('../../../../packages/motion-core/src/motion/template/part-usage.json');
   });
 
   it('type grid: the poster colour is the page, the type colour reaches its lines', () => {
