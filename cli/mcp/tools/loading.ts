@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { editApi } from '../../lib/edit.ts';
 import { DESCRIBE, FIND_TOOLS, LOAD_TOOLS, LOADED_CAP, TOOL_FAMILY, UNLOAD_TOOLS, ToolFamily, rank, type Findable, type RemoteTool } from '../surface.ts';
 import { Listing, firstSentence, type ToolSurface } from '../tool-surface.ts';
-import { fail, ok, requireAuth, type ToolResult } from '../util.ts';
+import { fail, ok, okText, requireAuth, type ToolResult } from '../util.ts';
 
 const HTTP_ERROR_FROM = 400;
 
@@ -29,9 +29,17 @@ async function editDescribe(input: Record<string, unknown>, orgId?: string): Pro
   }
 }
 
-async function editEntries(orgId?: string): Promise<EditEntry[]> {
-  const described = await editDescribe({}, orgId);
-  return described.ok ? ((described.body as { ops?: EditEntry[] }).ops ?? []) : [];
+const EDIT_OP_FAMILIES = [ToolFamily.Canvas, ToolFamily.Frame, ToolFamily.Editor];
+
+async function familyEntries(family: string, orgId?: string): Promise<EditEntry[]> {
+  const described = await editDescribe({ family }, orgId);
+  const ops = described.ok ? ((described.body as { ops?: Omit<EditEntry, 'family'>[] }).ops ?? []) : [];
+  return ops.map((o) => ({ ...o, family }));
+}
+
+async function editEntries(orgId?: string, family?: string): Promise<EditEntry[]> {
+  const families = family ? EDIT_OP_FAMILIES.filter((f) => f === family) : EDIT_OP_FAMILIES;
+  return (await Promise.all(families.map((f) => familyEntries(f, orgId)))).flat();
 }
 
 async function localEntries(surface: ToolSurface): Promise<Findable[]> {
@@ -68,27 +76,31 @@ export function registerLoadingTools(server: McpServer, surface: ToolSurface) {
   server.registerTool(
     DESCRIBE,
     {
-      description: 'Exact input schema of any op or tool.',
-      inputSchema: z.object({ org, op: z.string().optional(), ops: z.array(z.string()).max(LOADED_CAP).optional() }).strict(),
+      description: 'Families, op names, or exact input schemas.',
+      inputSchema: z.object({ org, family: z.enum(EDIT_OP_FAMILIES as [string, ...string[]]).optional(), op: z.string().optional(), ops: z.array(z.string()).max(LOADED_CAP).optional() }).strict(),
       annotations: { readOnlyHint: true }
     },
-    async ({ org: orgId, op, ops }) => {
+    async ({ org: orgId, family, op, ops }) => {
       const names = ops ?? (op ? [op] : []);
+      if (family) {
+        return okText({ family, ops: await familyEntries(family, orgId) });
+      }
       if (names.length === 0) {
-        const local = await localEntries(surface);
-        return ok({ tools: local, edit_ops: await editEntries(orgId), fix: 'Pass {op} for one schema.' });
+        const local = (await localEntries(surface)).map(({ name, family: f }) => ({ name, family: f }));
+        const edit = await editDescribe({}, orgId);
+        return okText({ tools: local, edit_ops: edit.ok ? edit.body : null, fix: 'Pass {family} for op names, {op} for one schema.' });
       }
       const full = await surface.listing(Listing.Full);
       const local = names.flatMap((name) => full.filter((t) => t.name === name).map((t) => ({ op: t.name, family: TOOL_FAMILY[t.name] ?? 'core', description: t.description, input_schema: t.inputSchema })));
       const rest = names.filter((name) => !local.some((l) => l.op === name));
       if (rest.length === 0) {
-        return ok({ schemas: local });
+        return okText({ schemas: local });
       }
       const remote = await editDescribe({ ops: rest }, orgId);
       if (!remote.ok) {
         return remote.result;
       }
-      return ok({ schemas: [...local, ...((remote.body as { schemas?: unknown[] }).schemas ?? [remote.body])] });
+      return okText({ schemas: [...local, ...((remote.body as { schemas?: unknown[] }).schemas ?? [remote.body])] });
     }
   );
 
@@ -100,9 +112,9 @@ export function registerLoadingTools(server: McpServer, surface: ToolSurface) {
       annotations: { readOnlyHint: true }
     },
     async ({ org: orgId, query, family }) => {
-      const entries = [...(await localEntries(surface)), ...(await editEntries(orgId))];
+      const entries = [...(await localEntries(surface)), ...(await editEntries(orgId, family))];
       const found = rank(entries, query, family);
-      return ok({ tools: found.map((e) => ({ ...e, loaded: surface.loaded.has(e.name) })), fix: `${LOAD_TOOLS} {names} lists them; or call any via edit {op, input}.` });
+      return okText({ tools: found.map((e) => ({ ...e, loaded: surface.loaded.has(e.name) })), fix: `${LOAD_TOOLS} {names} lists them; or call any via edit {op, input}.` });
     }
   );
 

@@ -19,6 +19,10 @@ export function ok(data: unknown): ToolResult {
   };
 }
 
+export function okText(data: unknown): ToolResult {
+  return { content: [{ type: 'text', text: JSON.stringify(data) }] };
+}
+
 export function fail(message: string): ToolResult {
   return {
     content: [{ type: 'text', text: message }],

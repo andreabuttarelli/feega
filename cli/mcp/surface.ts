@@ -27,10 +27,10 @@ export const EDIT_FAMILIES: ReadonlySet<string> = new Set([ToolFamily.Canvas, To
 const DESCRIBE_HINT = 'Schema: `describe`.';
 
 export const CORE_TOOLS: Readonly<Record<string, string>> = {
-  query: `Read any org table (free): {table, columns?, filters?, order?, limit?, offset?, count?, embed?}. ${DESCRIBE_HINT}`,
+  query: `Read any org table (free): {table, columns?, where?, order?, limit?, offset?, count?, embed?}. ${DESCRIBE_HINT}`,
   view: `See a canvas (free): op canvas_summary {canvas_id} | get {id, frame_id?} | activity {canvas_id} | snapshot {node_id, time?} (an image). ${DESCRIBE_HINT}`,
   edit: `Change a canvas, its nodes and frames: {op, target?, element?, input?, version?, project_id?}, or op "batch" with ops[]. Also runs any tool below by name: {op: "<tool>", input}. ${DESCRIBE_HINT}`,
-  [DESCRIBE]: 'Exact input schema of any op or tool: {op} or {ops:[...]}; {} lists every op by family. Free.',
+  [DESCRIBE]: 'Free. {} lists the tools and the op families; {family} names its ops; {op} or {ops:[...]} give exact input schemas.',
   render_video: `Render a motion video to MP4: {node_id, mode?}. Poll get_render. ${DESCRIBE_HINT}`,
   get_render: 'State of a render: {run_id}; done carries file_url.',
   list_orgs: 'Your orgs; pass `org` to other tools when you have several.',
@@ -89,7 +89,7 @@ export const TOOL_FAMILY: Readonly<Record<string, ToolFamily>> = {
   motion_editor_op: ToolFamily.Legacy
 };
 
-export type Findable = { name: string; family: string; summary: string };
+export type Findable = { name: string; family: string; summary?: string };
 
 const NAME_WEIGHT = 3;
 
@@ -97,7 +97,7 @@ const words = (text: string) => text.toLowerCase().split(/[^a-z0-9]+/).filter(Bo
 
 function score(query: string, entry: Findable): number {
   const named = entry.name.replace(/_/g, ' ');
-  const described = entry.summary.toLowerCase();
+  const described = (entry.summary ?? '').toLowerCase();
   return words(query).reduce((sum, w) => sum + (named.includes(w) ? NAME_WEIGHT : 0) + (described.includes(w) ? 1 : 0), 0);
 }
 

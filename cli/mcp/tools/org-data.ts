@@ -43,7 +43,7 @@ export function registerOrgDataTools(server: McpServer) {
       description:
         'READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts, ads, ' +
         'products, social accounts — every table, scoped to your org and nothing else. No SQL: name ' +
-        'a table, columns and filters, and it issues one PostgREST read. Omit `table` to list every ' +
+        'a table, columns and `where` filters, and it issues one PostgREST read. Omit `table` to list every ' +
         'name. A project has no brand until one is attached (`projects.brand_id` is nullable, and ' +
         'that is the normal case). A canvas belongs to a project; nodes and their connections belong ' +
         'to a canvas. A post (`posts` table) is the promoted artifact — caption, media, brand — ' +

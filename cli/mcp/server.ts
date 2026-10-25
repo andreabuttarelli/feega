@@ -24,7 +24,7 @@ import { fail, type ToolResult } from './util.ts';
 const MCP_INSTRUCTION_LINES = [
   'feega: an infinite canvas of typed nodes; frames are motion videos and stills.',
   'A video is a frame: `edit` op draw_frame, then frame ops inside it; check it with `view` snapshot; `render_video` exports it.',
-  'Reads cost nothing: `query` (tables, name `columns`, `offset` pages) and `view` (canvas). Change with `edit`. `describe` gives any exact schema.',
+  'Reads cost nothing: `query` (tables, name `columns`, `offset` pages) and `view` (canvas). Change with `edit`. `describe` {op} gives one exact schema; never call it bare to browse: `find_tools` searches.',
   'Everything else: `find_tools`, then `load_tools` to list it, or call it through `edit` {op: "<tool>", input}.',
   'A project needs no brand; never guess one. Signing in is no tool: HTTP hosts send the Bearer; locally `feega login`.'
 ];
