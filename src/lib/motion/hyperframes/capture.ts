@@ -1,4 +1,5 @@
 import { freezeMasks } from './masks';
+import type { Boxes } from '../custom/reflow';
 import { inlineMedia, shrinkImage } from './inline-media';
 import { js } from './html';
 import { paintSvg } from './svg-paint';
@@ -36,9 +37,9 @@ export enum Settle {
   Seek = 'seek'
 }
 
-export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format: FrameFormat; width: number; height: number; quality?: number; settle?: Settle; layering?: Layering };
+export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format: FrameFormat; width: number; height: number; quality?: number; settle?: Settle; layering?: Layering; boxes?: boolean };
 export type ClipError = { clip: string; component: string; message: string };
-export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; time?: number; url?: string; bitmap?: ImageBitmap; tree?: LayerTree; sheets?: ImageBitmap[]; error?: string; layout?: string; errors?: ClipError[] };
+export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; time?: number; url?: string; bitmap?: ImageBitmap; tree?: LayerTree; sheets?: ImageBitmap[]; error?: string; layout?: string; boxes?: Boxes; errors?: ClipError[] };
 
 type RuntimeConfig = { timeline: string; request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle; grainTile: number; grainOffset: number; webkitUa: string; notWebkitUa: string; particleState: string; poseAttr: string };
 type Shot = { body: Record<string, unknown>; transfer: Transferable[] };
@@ -876,6 +877,34 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     }
   };
 
+  const LAYOUT_PROPS = ['display', 'position', 'top', 'left', 'right', 'bottom', 'width', 'height', 'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right', 'padding', 'padding-top', 'padding-bottom', 'font-size', 'line-height', 'flex', 'flex-basis', 'gap'];
+  const ownLayout = (el: HTMLElement) => LAYOUT_PROPS.map((p) => el.style.getPropertyValue(p)).join(',');
+  const offsetTopOf = (el: HTMLElement) => {
+    let top = 0;
+    for (let at: HTMLElement | null = el; at; at = at.offsetParent as HTMLElement | null) {
+      top += at.offsetTop;
+    }
+    return top;
+  };
+  const boxesOf = (root: HTMLElement) => {
+    const boxes: Record<string, { top: number; own: string }> = {};
+    const seen = new Map<string, number>();
+    const base = offsetTopOf(root);
+    for (const el of root.querySelectorAll('*')) {
+      if (!(el instanceof HTMLElement) || getComputedStyle(el).display.startsWith('inline') || getComputedStyle(el).display === 'none') {
+        continue;
+      }
+      const name = `${el.tagName.toLowerCase()}${[...el.classList].map((c) => `.${c}`).join('')}`;
+      const nth = (seen.get(name) ?? 0) + 1;
+      seen.set(name, nth);
+      let own = '';
+      for (let at: HTMLElement | null = el; at && at !== root; at = at.parentElement) {
+        own += `${ownLayout(at)};`;
+      }
+      boxes[nth > 1 ? `${name}:${nth}` : name] = { top: offsetTopOf(el) - base, own };
+    }
+    return boxes;
+  };
   const layout = (root: HTMLElement) => {
     let hash = 0x811c9dc5;
     const base = root.getBoundingClientRect();
@@ -909,7 +938,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
       .then(() => (fonts ??= tool().getFontEmbedCSS(root)))
       .then((embed) => freeze().then((thaw) => output[m.format](root, m, embed).finally(thaw)))
       .then(
-        (shot) => reply({ ...shot.body, time: drawnAt(), layout: layout(root), errors: errors() }, shot.transfer),
+        (shot) => reply({ ...shot.body, time: drawnAt(), layout: layout(root), ...(m.boxes ? { boxes: boxesOf(root) } : {}), errors: errors() }, shot.transfer),
         (err) => reply({ error: reason(err) }, [])
       );
   });

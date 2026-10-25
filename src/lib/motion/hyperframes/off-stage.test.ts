@@ -19,7 +19,13 @@ describe('unseen', () => {
   });
 
   it('a box faded to zero opacity is skipped, so a silent music clip does not hold every frame waiting for a picture nobody sees', () => {
-    expect(unseen(clip('opacity:0', 'box'))).toBe(true);
-    expect(unseen(clip('opacity:0.01', 'box'))).toBe(false);
+    expect(unseen(clip('opacity:0;position:absolute', 'box'))).toBe(true);
+    expect(unseen(clip('opacity:0.01;position:absolute', 'box'))).toBe(false);
+  });
+
+  it('a faded box still in the flow is drawn, so the boxes it pushes do not jump when it fades in', () => {
+    expect(unseen(clip('opacity:0;position:static', 'btn'))).toBe(false);
+    expect(unseen(clip('opacity:0;position:relative', 'btn'))).toBe(false);
+    expect(unseen(clip('opacity:0;position:absolute', 'box'))).toBe(true);
   });
 });

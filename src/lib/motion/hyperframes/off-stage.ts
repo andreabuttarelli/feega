@@ -3,5 +3,6 @@ export function unseen(node: Node): boolean {
     return false;
   }
   const style = getComputedStyle(node);
-  return style.opacity === '0' || (node.classList.contains('clip') && style.visibility === 'hidden');
+  const outOfFlow = style.position === 'absolute' || style.position === 'fixed';
+  return (style.opacity === '0' && outOfFlow) || (node.classList.contains('clip') && style.visibility === 'hidden');
 }
