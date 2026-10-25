@@ -29,9 +29,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { stackedLocally, Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
   import { TEXT_BOX } from '$lib/canvas/frame-paste';
-  import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
-  import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
   /**
    * LA TELA.
@@ -3821,19 +3819,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * «Genera» resta spento finché non c'è chi esegue il giro (fase 3).
    */
 
-  const EMPTY_ORIGIN = { x: 0, y: 0 };
-  const CHAT_INPUT = 'chat-composer-input';
-
-  const EMPTY_STARTS: Record<EmptyAction, () => void> = {
-    [EmptyAction.Chat]: () => {
-      requestChat();
-      requestAnimationFrame(() => document.getElementById(CHAT_INPUT)?.focus());
-    },
-    [EmptyAction.Frame]: () => (frameLibraryAt = EMPTY_ORIGIN),
-    [EmptyAction.Image]: () => void create('image', EMPTY_ORIGIN),
-    [EmptyAction.Video]: () => void create('video', EMPTY_ORIGIN)
-  };
-
   const canvasMode = $derived(canvasModeFor(data.org.role));
   const viewOnly = $derived(canvasMode === CanvasMode.View);
 </script>
@@ -4285,9 +4270,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {/if}
     {/snippet}
   </Flow>
-  {/if}
-  {#if !viewOnly && showsEmptyState(nodes.length)}
-    <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
   {/if}
   {#if componentPicking}
     {@const pickingId = componentPicking.id}

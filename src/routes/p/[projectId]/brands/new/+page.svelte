@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { parseColour } from '$lib/motion/colour-field';
   import { Button } from '$lib/components/ui/button';
   /**
    * IL WIZARD, UN PASSO ALLA VOLTA — sito → analisi → prodotti → target →
@@ -389,7 +390,7 @@
                   oninput={(e) => (draft.colours[i] = (e.currentTarget as HTMLInputElement).value)}
                 />
               </label>
-              <input type="text" bind:value={draft.colours[i]} placeholder="#rrggbb" />
+              <input type="text" value={c} placeholder="#rrggbb" onchange={(e) => (e.currentTarget.value = draft.colours[i] = parseColour(e.currentTarget.value)?.colour ?? c)} />
               <Button variant="ghost" size="sm" onclick={() => (draft.colours = draft.colours.filter((_, idx) => idx !== i))}>Remove</Button>
             </div>
           {/each}

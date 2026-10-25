@@ -7,17 +7,31 @@ function memory() {
 }
 
 describe('colour field', () => {
-  it('reads a typed hex with or without #, short or long, and a brand token', () => {
-    expect(parseColour('FF00AA')).toBe('#ff00aa');
-    expect(parseColour('#f0a')).toBe('#ff00aa');
-    expect(parseColour(' #161616 ')).toBe('#161616');
-    expect(parseColour('brand.text')).toBe('brand.text');
+  const typed: [string, { colour: string; alpha: number | null }][] = [
+    ['f', { colour: '#ffffff', alpha: null }],
+    ['ff', { colour: '#ffffff', alpha: null }],
+    ['fff', { colour: '#ffffff', alpha: null }],
+    ['ffffff', { colour: '#ffffff', alpha: null }],
+    ['#abc', { colour: '#aabbcc', alpha: null }],
+    ['#3a', { colour: '#3a3a3a', alpha: null }],
+    ['FF00AA', { colour: '#ff00aa', alpha: null }],
+    [' #161616 ', { colour: '#161616', alpha: null }],
+    ['f008', { colour: '#ff0000', alpha: 0.533 }],
+    ['#ff000080', { colour: '#ff0000', alpha: 0.502 }],
+    ['rgba(255, 0, 0, 0.5)', { colour: '#ff0000', alpha: 0.5 }],
+    ['rgb(255 0 0)', { colour: '#ff0000', alpha: null }],
+    ['rgb(0 128 255 / 25%)', { colour: '#0080ff', alpha: 0.25 }],
+    ['255, 0, 0', { colour: '#ff0000', alpha: null }],
+    ['255 0 0 50%', { colour: '#ff0000', alpha: 0.5 }],
+    ['brand.text', { colour: 'brand.text', alpha: null }]
+  ];
+
+  it.each(typed)('reads %j as a colour', (text, expected) => {
+    expect(parseColour(text)).toEqual(expected);
   });
 
-  it('refuses anything that is not a colour, so the field puts the old value back', () => {
-    expect(parseColour('red-ish')).toBeNull();
-    expect(parseColour('#12345')).toBeNull();
-    expect(parseColour('')).toBeNull();
+  it.each(['red-ish', '#12345', '', 'ggg', 'rgb(256, 0, 0)', '255, 0', 'rgba(1, 2, 3, 2)', '1 2 3 4 5'])('refuses %j, so the field puts the old value back', (text) => {
+    expect(parseColour(text)).toBeNull();
   });
 
   it('shows a hex as six capitals and a token by its name', () => {

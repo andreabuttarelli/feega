@@ -15,7 +15,7 @@ import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
 import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
-import { Command, OPACITY_KEYS, commandFor } from '$lib/motion/shortcuts';
+import { Command, OPACITY_KEYS, commandFor, isTyping } from '$lib/motion/shortcuts';
 import { Same, matchingLayers, sameLayers } from '$lib/motion/select-matching';
 import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
 import type { SelectionActionId } from './selection-actions';
@@ -272,6 +272,9 @@ export const FRAME_ELEMENT_MENU: ReadonlySet<SelectionActionId> = new Set(
 const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.PasteOver, Command.TidyUp, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
 
 export function frameKeyAction(e: KeyboardEvent): ActionId | null {
+  if (isTyping(e.target as Parameters<typeof isTyping>[0])) {
+    return null;
+  }
   const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, EditMode.Design);
   return command && FRAME_KEYS.has(command) ? command : null;
 }
