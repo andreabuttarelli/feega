@@ -1,4 +1,4 @@
-import type { CustomSource } from '$lib/motion/custom/component';
+import type { CustomSource } from '@feega/motion-core/motion/custom/component';
 
 export enum GuideTopic {
   ThreePerformance = '3d-performance',

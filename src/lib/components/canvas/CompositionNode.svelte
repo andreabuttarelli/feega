@@ -8,9 +8,9 @@
   import NodeDownload from './NodeDownload.svelte';
   import BentoPanel from './BentoPanel.svelte';
   import CardsPanel from './CardsPanel.svelte';
-  import { LAYOUTS } from '$lib/canvas/composition/index';
+  import { LAYOUTS } from '@feega/motion-core/canvas/composition';
   import { nodeDoc } from '$lib/motion/composition-draft';
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import type { TemplateEntry } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, composedTemplate, sequentialIds } from '$lib/canvas/composition-template';
   import TemplateTextFields from './TemplateTextFields.svelte';

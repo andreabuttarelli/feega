@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AssetKind } from '$lib/motion/components';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import { uiReader } from './ui-read';
 
 const ASSET = { id: 'a', kind: AssetKind.Image, label: 'capture', previewUrl: '', url: 'https://x/a.png' };

@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import { formatOf, type MotionDoc } from '$lib/motion/doc';
+import { formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { MotionNode } from '$lib/canvas/motion-node';
 import { applyOps, diffDoc, type DocOp } from '$lib/motion/doc-ops';
 import { RevisionOutcome, readRevision, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';

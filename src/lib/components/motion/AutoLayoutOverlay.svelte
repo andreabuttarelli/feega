@@ -1,11 +1,11 @@
 <script lang="ts">
   import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import type { Box } from '$lib/motion/layout';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { Box } from '@feega/motion-core/motion/layout';
   import { StripKind, dragStrip, layoutStrips, type Pt, type Strip } from '$lib/motion/layout/guides';
   import { setAutoLayout } from '$lib/motion/layout/ops';
-  import type { AutoLayout } from '$lib/motion/layout/model';
-  import { Direction } from '$lib/motion/layout/auto-layout';
+  import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
+  import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 
   let { doc, clip, onchange }: { doc: MotionDoc; clip: MotionClip & { autoLayout: AutoLayout }; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 

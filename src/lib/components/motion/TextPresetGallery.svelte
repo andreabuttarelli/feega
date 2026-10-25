@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import { parseDecimal } from '$lib/motion/inspector';
-  import { AnimatorUnit, SelectorShape } from '$lib/motion/text-animators/model';
-  import { PRESETS, PRESET_LABEL, TEXT_PRESETS, applyPreset, type TextPreset } from '$lib/motion/text-animators/ops';
+  import { AnimatorUnit, SelectorShape } from '@feega/motion-core/motion/text-animators/model';
+  import { PRESETS, PRESET_LABEL, TEXT_PRESETS, applyPreset, type TextPreset } from '@feega/motion-core/motion/text-animators/ops';
   import { startLook } from '$lib/motion/text-animators/preset-preview';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
 
   let { doc, clip, frame, commit }: { doc: MotionDoc; clip: MotionClip; frame: number; commit: (result: OpResult, summary: string) => void } = $props();
 

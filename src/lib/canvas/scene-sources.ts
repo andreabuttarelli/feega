@@ -1,4 +1,4 @@
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { resolveScenes, sceneNodeIds } from '$lib/motion/scenes';
 
 export type SceneSource = { doc: MotionDoc; assets: Record<string, string> };

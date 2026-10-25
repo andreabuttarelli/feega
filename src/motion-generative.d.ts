@@ -61,6 +61,6 @@ declare module 'clipper-lib' {
 }
 
 declare module 'virtual:motion-libs' {
-	const integrity: Record<import('$lib/motion/libs/catalog').Script, string>;
+	const integrity: Record<import('@feega/motion-core/motion/libs/catalog').Script, string>;
 	export default integrity;
 }

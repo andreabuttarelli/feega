@@ -1,10 +1,10 @@
 import { composite, type Device, type Rect } from './compositor';
-import { EffectKind, MaskComposite, PaintKind, type Affine, type Effect, type GlassEffect, type LayerTree, type Paint, type Rgba } from '../hyperframes/layer-tree';
-import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
-import { GRAIN_TILE } from '../effects/registry';
-import { Layering } from '../hyperframes/capture';
-import { MAX_GLOW_PX, MIN_GLOW_PX, PARTICLE_STRIDE } from '../particles/simulate';
-import { ParticleShape } from '../particles/model';
+import { EffectKind, MaskComposite, PaintKind, type Affine, type Effect, type GlassEffect, type LayerTree, type Paint, type Rgba } from '@feega/motion-core/motion/hyperframes/layer-tree';
+import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '@feega/motion-core/motion/effects/turbulence';
+import { GRAIN_TILE } from '@feega/motion-core/motion/effects/registry';
+import { Layering } from '@feega/motion-core/motion/hyperframes/capture';
+import { MAX_GLOW_PX, MIN_GLOW_PX, PARTICLE_STRIDE } from '@feega/motion-core/motion/particles/simulate';
+import { ParticleShape } from '@feega/motion-core/motion/particles/model';
 
 const MAX_GRAINS = 4;
 const SCRATCH_UNIT = MAX_GRAINS + 2;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { setCamera, setClipDepth } from './camera-ops';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
+import { setCamera, setClipDepth } from '@feega/motion-core/motion/camera-ops';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { sceneMap } from './scene-map';
 
 function must(r: OpResult): MotionDoc {

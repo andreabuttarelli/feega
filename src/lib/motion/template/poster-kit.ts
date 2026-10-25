@@ -1,9 +1,9 @@
-import { FORMATS, MotionFormat, type MotionDoc } from '$lib/motion/doc';
-import { ComponentMode, PropFormat, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
-import { EffectKind } from '$lib/motion/effects/registry';
+import { FORMATS, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { ComponentMode, PropFormat, type CustomComponent, type PropSpec } from '@feega/motion-core/motion/custom/component';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { addEffect } from '$lib/motion/effects/ops';
-import { setStill } from '$lib/motion/still';
-import type { OpResult } from '$lib/motion/timeline';
+import { setStill } from '@feega/motion-core/motion/still';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { customTemplateDoc, type CustomTemplateSpec } from './custom-template';
 import { MEDIA_LIST } from './media-list';
 

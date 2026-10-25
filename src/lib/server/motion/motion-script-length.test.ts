@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { Act, scriptSchema } from '$lib/motion/script';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { Act, scriptSchema } from '@feega/motion-core/motion/script';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 const SITE = 'https://supasito.com/';

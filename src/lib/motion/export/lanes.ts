@@ -1,5 +1,5 @@
 import { Device, deviceOf, type DeviceInfo } from '../render-place';
-import { Engine } from '../engine';
+import { Engine } from '@feega/motion-core/motion/engine';
 
 export type Shooter<F> = (time: number, index: number) => Promise<F>;
 

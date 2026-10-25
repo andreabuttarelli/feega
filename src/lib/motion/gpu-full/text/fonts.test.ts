@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FontSource, type FontFace } from '../../fonts/model';
-import { SYMBOL_FALLBACKS, faceBook, faceRules, type Source } from './fonts';
+import { FontSource, type FontFace } from '@feega/motion-core/motion/fonts/model';
+import { SYMBOL_FALLBACKS, faceBook, faceRules, type Source } from '@feega/motion-core/motion/gpu-full/text/fonts';
 import { boxFace } from './test-face';
 
 const GOOGLE = `

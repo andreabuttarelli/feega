@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FPS } from './design';
-import { FORMATS, clipsOf, formatOf, parseMotionDoc } from './doc';
-import { TrackKind } from './components';
+import { FPS } from '@feega/motion-core/motion/design';
+import { FORMATS, clipsOf, formatOf, parseMotionDoc } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { AD_TEMPLATES, AD_TEMPLATE_IDS, AdTemplate, templateAssets, type TemplateAssets } from './ad-templates';
-import { AssetKind } from './components';
-import { composeHtml } from './hyperframes/compose';
-import { FEEGA_TOKENS } from './brand';
+import { AssetKind } from '@feega/motion-core/motion/components';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 
 const FULL: TemplateAssets = { imageId: 'img', secondImageId: 'img2', videoId: 'vid', modelId: 'glb', musicId: 'mus', voiceId: 'vo' };
 const NONE: TemplateAssets = { imageId: null, secondImageId: null, videoId: null, modelId: null, musicId: null, voiceId: null };

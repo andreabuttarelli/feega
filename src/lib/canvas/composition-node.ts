@@ -1,8 +1,8 @@
-import type { LayoutId } from './composition/types';
-import type { CameraPresetId } from './composition/camera';
-import type { CellSpec } from '$lib/motion/components';
+import type { LayoutId } from '@feega/motion-core/canvas/composition/types';
+import type { CameraPresetId } from '@feega/motion-core/canvas/composition/camera';
+import type { CellSpec } from '@feega/motion-core/motion/components';
 import { z } from 'zod';
-import { FIELD_KEY } from '$lib/motion/template/field-model';
+import { FIELD_KEY } from '@feega/motion-core/motion/template/field-model';
 
 export type CompositionAspect = '9:16' | '1:1' | '16:9';
 

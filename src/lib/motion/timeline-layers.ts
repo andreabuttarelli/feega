@@ -1,7 +1,7 @@
-import { compOf, type MotionClip, type MotionTrack } from './doc';
-import { COMPONENTS } from './components';
-import { FPS } from './design';
-import { Interp, sampleTrack, type Keyframe } from './keyframes';
+import { compOf, type MotionClip, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { FPS } from '@feega/motion-core/motion/design';
+import { Interp, sampleTrack, type Keyframe } from '@feega/motion-core/motion/keyframes';
 import { clampZoom, pxPerFrame } from './timeline-view';
 
 export enum RowKind {

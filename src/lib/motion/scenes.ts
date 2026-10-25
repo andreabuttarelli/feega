@@ -1,8 +1,8 @@
-import { TrackKind } from './components';
-import { newClip, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { newClip, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
 import { embedMotion, motionCompId } from './embed';
-import type { Junction } from './junction-model';
-import type { OpResult } from './timeline';
+import type { Junction } from '@feega/motion-core/motion/junction-model';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 export const SCENES_TRACK = 'scenes';
 

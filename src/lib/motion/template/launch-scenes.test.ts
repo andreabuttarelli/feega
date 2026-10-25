@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Forbidden, STYLES, styleProblems } from '$lib/motion/style';
-import { MotionStyle } from '$lib/motion/style-model';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
 import { BUILTIN_TEMPLATES } from './builtins';
 import { insertTemplate } from './library';
 import { LAUNCH_SCENES } from './launch-scenes';
 import { Quality, docProblems } from '$lib/motion/direction';
-import { sampleTrack } from '$lib/motion/sample-track';
+import { sampleTrack } from '@feega/motion-core/motion/sample-track';
 import { motionJolts } from '$lib/motion/smoothness';
 
 const LINE_OVER_SCENE: ReadonlySet<string> = new Set(['builtin:launch-device-fly', 'builtin:launch-device-orbit']);

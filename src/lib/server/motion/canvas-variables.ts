@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { adoptCollection, syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
 import { bindVariable, defineVariable, setActiveMode } from '$lib/motion/variables';
-import { VARIABLE_NAME, VarType, keyOf, type Collection, type VarInput, type Variables } from '$lib/motion/variables-model';
+import { VARIABLE_NAME, VarType, keyOf, type Collection, type VarInput, type Variables } from '@feega/motion-core/motion/variables-model';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 
 const ELEMENT_SEP = ':';

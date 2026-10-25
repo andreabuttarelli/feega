@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip } from './timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { applyOps, diffDoc } from './doc-ops';
 import { landed, outgoing, remote } from './frame-sync';
 

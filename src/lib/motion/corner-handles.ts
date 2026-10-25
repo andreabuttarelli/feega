@@ -1,8 +1,8 @@
-import type { MotionClip, MotionDoc } from './doc';
-import { boxOf } from './layout';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { boxOf } from '@feega/motion-core/motion/layout';
 import { cornerAt, cornerInward } from './draw-tool';
-import { apply2d, invert2d, worldAt } from './parent';
-import type { Corners, Pt } from './shape/geometry';
+import { apply2d, invert2d, worldAt } from '@feega/motion-core/motion/parent';
+import type { Corners, Pt } from '@feega/motion-core/motion/shape/geometry';
 
 const HANDLE_GAP = 0.08;
 

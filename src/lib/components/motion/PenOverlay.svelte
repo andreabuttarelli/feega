@@ -1,10 +1,10 @@
 <script lang="ts">
   import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { mapOutline, parsePath, pathData, type Outline, type Pt } from '$lib/motion/shape/geometry';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { mapOutline, parsePath, pathData, type Outline, type Pt } from '@feega/motion-core/motion/shape/geometry';
   import { Handle, Mirror, addPoint, deletePoint, dragHandle, insertPoint, movePoint, segmentHit, toggleClosed, toggleSmooth, type PointRef } from '$lib/motion/shape/pen';
   import { setPath } from '$lib/motion/shape/ops';
-  import { pathSpace } from '$lib/motion/shape/space';
+  import { pathSpace } from '@feega/motion-core/motion/shape/space';
   import { isTyping } from '$lib/motion/shortcuts';
   import type { Guide } from '$lib/motion/scene-select';
   import { pointBounds, snapPoint, snapReach, snapTargets } from '$lib/motion/shape/vector-edit';

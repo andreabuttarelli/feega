@@ -1,6 +1,6 @@
-import { TrackKind } from './components';
-import type { MotionClip, MotionComp, MotionDoc, MotionTrack } from './doc';
-import { COMP_CARD, COMP_CARD_LAYOUTS } from './card-layouts';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import type { MotionClip, MotionComp, MotionDoc, MotionTrack } from '@feega/motion-core/motion/doc';
+import { COMP_CARD, COMP_CARD_LAYOUTS } from '@feega/motion-core/motion/card-layouts';
 
 const SCOPE = '.';
 

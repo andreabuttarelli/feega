@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
 import { FrameEditSession, type SessionPort, type SendResult } from './frame-edit-session.svelte';

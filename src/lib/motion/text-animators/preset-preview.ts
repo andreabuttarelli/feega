@@ -1,4 +1,4 @@
-import { VALUES, type TextAnimator, type ValueKey } from './model';
+import { VALUES, type TextAnimator, type ValueKey } from '@feega/motion-core/motion/text-animators/model';
 
 export type PreviewLook = { opacity: number; transform: string; filter: string };
 

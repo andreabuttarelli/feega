@@ -1,6 +1,6 @@
-import { findClip, type MotionDoc } from './doc';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Action, type ActionId } from './actions';
-import { clipName } from './organize';
+import { clipName } from '@feega/motion-core/motion/organize';
 
 const PRECOMP = 'Precomp';
 

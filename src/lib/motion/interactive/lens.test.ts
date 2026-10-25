@@ -1,19 +1,19 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { setExpression } from '../expression/ops';
-import { InputKey } from '../expression/inputs';
-import { GLASS_NUMBER_KEYS } from '../glass/model';
-import { BLOB_NUMBER_KEYS } from '../blob/model';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
+import { InputKey } from '@feega/motion-core/motion/expression/inputs';
+import { GLASS_NUMBER_KEYS } from '@feega/motion-core/motion/glass/model';
+import { BLOB_NUMBER_KEYS } from '@feega/motion-core/motion/blob/model';
 import { Lens, addLens } from '../glass/ops';
-import { composeHtml } from '../hyperframes/compose';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { installEngine } from '../engine/testing';
-import { BLOB_LIVE } from '../hyperframes/blob-live';
-import { INPUT_MESSAGE } from './runtime';
-import { Liveness } from './settings';
-import { liveLanes } from './spec';
+import { BLOB_LIVE } from '@feega/motion-core/motion/hyperframes/blob-live';
+import { INPUT_MESSAGE } from '@feega/motion-core/motion/interactive/runtime';
+import { Liveness } from '@feega/motion-core/motion/interactive/settings';
+import { liveLanes } from '@feega/motion-core/motion/interactive/spec';
 
 function ok(result: OpResult): MotionDoc {
   if (!result.ok) {

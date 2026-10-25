@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENTS } from '../components';
-import { ellipseOutline, flatten, type Outline } from './geometry';
-import { IDENTITY, MODIFIERS, ModifierKind, applyModifiers, movesOverTime, type Layer } from './modifiers';
-import { shapeMarkup, type Paint, type ShapeLook } from './render';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { ellipseOutline, flatten, type Outline } from '@feega/motion-core/motion/shape/geometry';
+import { IDENTITY, MODIFIERS, ModifierKind, applyModifiers, movesOverTime, type Layer } from '@feega/motion-core/motion/shape/modifiers';
+import { shapeMarkup, type Paint, type ShapeLook } from '@feega/motion-core/motion/shape/render';
 
 const size = { w: 200, h: 200 };
 const circle = (): Layer[] => [{ outline: ellipseOutline(size), opacity: 1, matrix: IDENTITY }];

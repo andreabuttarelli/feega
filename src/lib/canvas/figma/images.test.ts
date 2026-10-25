@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseMotionDoc, type MotionClip } from '$lib/motion/doc';
+import { parseMotionDoc, type MotionClip } from '@feega/motion-core/motion/doc';
 import { FIGMA_FILE_KEY, figmaClipWithImage } from '../../../../tests/fixtures/figma/image-clip';
 import { figmaPlan } from './figma-doc';
 import { imagesFilled } from './images';

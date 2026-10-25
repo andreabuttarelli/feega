@@ -1,10 +1,10 @@
-import { Ease } from '../design';
-import { findClip, type MotionDoc } from '../doc';
-import { setKeyframes, setProps, type OpResult } from '../timeline';
-import { pathData } from './geometry';
-import type { ModifierKind } from './modifiers';
-import { baseOutline, type ShapeLook } from './render';
-import { MAX_MODIFIERS, MAX_MORPHS, MODIFIER_PREFIX, ShapeKind, type Modifier } from './schema';
+import { Ease } from '@feega/motion-core/motion/design';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setKeyframes, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { pathData } from '@feega/motion-core/motion/shape/geometry';
+import type { ModifierKind } from '@feega/motion-core/motion/shape/modifiers';
+import { baseOutline, type ShapeLook } from '@feega/motion-core/motion/shape/render';
+import { MAX_MODIFIERS, MAX_MORPHS, MODIFIER_PREFIX, ShapeKind, type Modifier } from '@feega/motion-core/motion/shape/schema';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 const UNIT_BOX = { w: 1, h: 1 };

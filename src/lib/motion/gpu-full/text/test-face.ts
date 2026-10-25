@@ -1,4 +1,4 @@
-import { Ligatures, Op, type Face, type Features, type FaceBook, type Resolved } from './face';
+import { Ligatures, Op, type Face, type Features, type FaceBook, type Resolved } from '@feega/motion-core/motion/gpu-full/text/face';
 
 export const UPM = 1000;
 export const WIDE = 500;

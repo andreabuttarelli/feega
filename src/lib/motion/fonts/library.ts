@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { FONT_NAME, FontSource, variantsOf, type FontFace, type FontVariant } from './model';
+import { FONT_NAME, FontSource, variantsOf, type FontFace, type FontVariant } from '@feega/motion-core/motion/fonts/model';
 
 const MIN_WEIGHT = 1;
 const MAX_WEIGHT = 1000;

@@ -1,8 +1,8 @@
-import type { MotionDoc } from '../doc';
-import type { Box } from '../layout';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { Box } from '@feega/motion-core/motion/layout';
 import type { Bounds } from '../scene-select';
-import type { OpResult } from '../timeline';
-import { AUTO_COUNT, GuideAlign, GuideKind, MAX_LAYOUT_GUIDES, layoutGuideSchema, type LayoutGuide } from './model';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { AUTO_COUNT, GuideAlign, GuideKind, MAX_LAYOUT_GUIDES, layoutGuideSchema, type LayoutGuide } from '@feega/motion-core/motion/layout-guides/model';
 
 export { GuideAlign, GuideKind, type LayoutGuide };
 

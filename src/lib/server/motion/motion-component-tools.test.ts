@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { CheckState, ComponentMode } from '$lib/motion/custom/component';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { CheckState, ComponentMode } from '@feega/motion-core/motion/custom/component';
 import { createMotionTools, MAX_CODE_WRITES_PER_TURN, type CheckResult, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { motionAgentPrompt } from './motion-prompt';

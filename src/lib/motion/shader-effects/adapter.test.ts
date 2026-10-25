@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mountShader, type Core, type Library } from './adapter';
-import { shaderTree } from './preset';
-import { ShaderEffectId } from './catalogue';
+import { shaderTree } from '@feega/motion-core/motion/shader-effects/preset';
+import { ShaderEffectId } from '@feega/motion-core/motion/shader-effects/catalogue';
 
 type Call = [string, ...unknown[]];
 

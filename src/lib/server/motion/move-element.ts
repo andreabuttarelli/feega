@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { TEXT_SIZINGS } from '$lib/motion/text-sizing';
-import { Background, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+import { TEXT_SIZINGS } from '@feega/motion-core/motion/text-sizing';
+import { Background, formatOf, type MotionDoc, type MotionFormat } from '@feega/motion-core/motion/doc';
 import type { Db } from '$lib/server/db/client';
 import { createNode, deleteConnection, deleteNode, findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
@@ -9,15 +9,15 @@ import { DocNodeType, FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeO
 import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { gradientFillSchema } from '$lib/motion/fill/model';
-import { FILL_RULES } from '$lib/motion/shape/schema';
+import { gradientFillSchema } from '@feega/motion-core/motion/fill/model';
+import { FILL_RULES } from '@feega/motion-core/motion/shape/schema';
 import { frameShape } from './start';
 import { figmaPlan, type FigmaImage, type PlanItem } from '$lib/canvas/figma/figma-doc';
 import { Destination } from '$lib/canvas/figma/scene';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
 import { commitOnto } from './frame-ops';
-import { DocMode, docMode } from '$lib/motion/still';
+import { DocMode, docMode } from '@feega/motion-core/motion/still';
 import { DropOn, OutputKind, clipCentre, elementBox, frameOf, liftElement, linkOutput, mediaElement, placeElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
 import { RevisionOutcome, appendRevision, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { UndoItem } from '$lib/canvas/undo-plan';

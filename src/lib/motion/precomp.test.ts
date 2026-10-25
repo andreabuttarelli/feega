@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { MotionFormat, clipsOf, findClip, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from './doc';
-import { addClip, setKeyframes, setProps, type OpResult } from './timeline';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, clipsOf, findClip, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { setParent } from './parent-ops';
-import { addAdjustment, flattenComps, mergeView, precompose, viewOf } from './precomp';
+import { addAdjustment, flattenComps, mergeView, precompose, viewOf } from '@feega/motion-core/motion/precomp';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

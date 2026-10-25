@@ -2,7 +2,7 @@ import { orgFontFamilies } from './font-upload';
 import { asSchema, type Tool } from 'ai';
 import { nameVersion, namedRevisions } from './version-names';
 import type { Db } from '$lib/server/db/client';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { agentActor } from '$lib/server/repos/actor';
 import { Checkpoint, readRevision } from '$lib/server/repos/motion-revisions';
 import { screenModelInput } from '$lib/server/moderation/model-input';
@@ -22,7 +22,7 @@ import { drawFrames, firstFrames } from './server-frames';
 import { fontAdvance } from './font-advance';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
 import type { Frame } from './frames';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 export enum ToolRun {
   Done = 'done',

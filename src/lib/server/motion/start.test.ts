@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MOTION_CANVAS_NAME, startMotion, type MotionStartDeps } from './start';
 import { frameNodeOf, newMotionData } from '$lib/canvas/motion-node';
-import { MotionFormat } from '$lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { nodeSize } from '$lib/canvas/node-size';
 import type { Db } from '$lib/server/db/client';
 

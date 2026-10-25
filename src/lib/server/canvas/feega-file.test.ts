@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { FEEGA_VERSION, FeegaRefusal, packFeega, type FeegaFile } from '$lib/canvas/feega-file';
 import { unpackFeega } from '$lib/canvas/feega-file';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { FeegaImport, exportCanvasFile, importCanvasFile, importStoredCanvasFile } from './feega-file';
 
 const OLD_PROJECT = '11111111-1111-4111-8111-111111111111';

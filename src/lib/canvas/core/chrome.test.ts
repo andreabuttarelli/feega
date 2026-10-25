@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
-import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
+import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
 import { stateChrome, tileChrome, ChromePart, PortState, type StateTile, type Glyphs } from './chrome';
 import type { ConnectorType } from '$lib/canvas/connectors';
 

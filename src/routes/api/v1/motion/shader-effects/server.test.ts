@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SHADER_EFFECT_IDS } from '$lib/motion/shader-effects/catalogue';
+import { SHADER_EFFECT_IDS } from '@feega/motion-core/motion/shader-effects/catalogue';
 
 const resolveOrgCaller = vi.fn();
 

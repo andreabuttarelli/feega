@@ -1,4 +1,4 @@
-import { esc } from './hyperframes/html';
+import { esc } from '@feega/motion-core/motion/hyperframes/html';
 
 export type Crop = { left: number; top: number; width: number; height: number };
 

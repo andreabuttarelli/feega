@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ModelMessage } from 'ai';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import { finalReply } from './frames';
 import { FrameUpload, MAX_SELF_CHECK_REFS, checkMessage, viewedReferences, MAX_FRAME_BYTES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, decodeFrame, docTexts, keyFrameTimes, selfCheckDue, usageByModel, Vision, visionStep } from './frames';

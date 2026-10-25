@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { VarType } from './variables-model';
+import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { VarType } from '@feega/motion-core/motion/variables-model';
 import { bindVariable, defineVariable, setActiveMode } from './variables';
 import { adoptCollection, syncedCollection, variableLibraryOf } from './variable-library';
 

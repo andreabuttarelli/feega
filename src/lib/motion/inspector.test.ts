@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENTS, COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
-import { Ease } from './design';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
+import { COMPONENTS, COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from '@feega/motion-core/motion/components';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, partFields, partFocus, partShared, secondsLabel, toggleKey, valueAt } from './inspector';
-import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
+import { addClip, setKeyframes, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { writeComponent } from './custom/ops';
-import { PropFormat } from './custom/component';
+import { PropFormat } from '@feega/motion-core/motion/custom/component';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from './template/type-grid-poster/template';
 
 function must(r: OpResult): MotionDoc {

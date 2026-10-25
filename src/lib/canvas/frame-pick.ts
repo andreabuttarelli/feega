@@ -1,6 +1,6 @@
-import { composeHtml } from '$lib/motion/hyperframes/compose';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { leafRectsAt, pickOwnersAt, pickStackAt, quadOf, rectOf } from '$lib/motion/gpu/pick';
-import { findClip } from '$lib/motion/doc';
+import { findClip } from '@feega/motion-core/motion/doc';
 import { compileScene, type Scene } from '$lib/motion/gpu/scene';
 import { frameOfLive } from '$lib/canvas/core/frame-source';
 import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';

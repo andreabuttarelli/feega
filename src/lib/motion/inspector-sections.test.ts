@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ClipFamily } from './track-style';
 import { Part, SECTION_ORDER, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection } from './inspector-sections';
-import { Control, Group } from './components';
+import { Control, Group } from '@feega/motion-core/motion/components';
 import { FieldFill } from './number-field';
-import { Source } from './keyframes';
+import { Source } from '@feega/motion-core/motion/keyframes';
 
 function memory() {
   const items = new Map<string, string>();

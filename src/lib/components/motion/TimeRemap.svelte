@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { REMAP_KEY, clearTimeRemap, enableTimeRemap, freezeFrame, isRemapped, sourceSeconds } from '$lib/motion/time-remap';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { REMAP_KEY, clearTimeRemap, enableTimeRemap, freezeFrame, isRemapped, sourceSeconds } from '@feega/motion-core/motion/time-remap';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
 
   let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 

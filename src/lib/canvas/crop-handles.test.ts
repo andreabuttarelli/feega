@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { FillType, fillsSchema, type FillOf } from '$lib/motion/fill/model';
-import { addClip } from '$lib/motion/timeline';
-import { findClip, MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { FillType, fillsSchema, type FillOf } from '@feega/motion-core/motion/fill/model';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { findClip, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { withFill } from './gradient-handles';
 import { Corner, MIN_WINDOW, appliedCrop, cornerZoom, imagePlacement, imageTarget, panned, windowOfFit, zoomedAt } from './crop-handles';
 

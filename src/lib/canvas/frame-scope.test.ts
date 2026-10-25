@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, setProps, setTransform, type OpResult } from '$lib/motion/timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { groupClips } from '$lib/motion/group';
 import { createComponent, innerClips, instanceOf } from '$lib/motion/main-component';
 import { Reach } from './frame-select';

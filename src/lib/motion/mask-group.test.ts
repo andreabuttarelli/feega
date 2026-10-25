@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { TrackKind } from './components';
-import { Ease } from './design';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { Matte } from './mask';
-import { hiddenMattes, mattePairs } from './matte';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Matte } from '@feega/motion-core/motion/mask';
+import { hiddenMattes, mattePairs } from '@feega/motion-core/motion/matte';
 import { joinMask, leaveMask, maskMembers, releaseMask, releaseMasks, useAsMask } from './mask-group';
-import { withoutHidden, setClipFlags } from './organize';
-import { addClip, addTrack, setKeyframes, setTrackMatte, type OpResult } from './timeline';
-import { ShapeKind } from './shape/schema';
+import { withoutHidden, setClipFlags } from '@feega/motion-core/motion/organize';
+import { addClip, addTrack, setKeyframes, setTrackMatte, type OpResult } from '@feega/motion-core/motion/timeline';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

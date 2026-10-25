@@ -1,10 +1,10 @@
-import type { MotionClip, MotionDoc } from './doc';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { editAt, valueAt } from './inspector';
-import { withParams } from './custom/params';
-import type { KeyValue } from './keyframes';
-import { setKeyframes, type OpResult } from './timeline';
-import { VideoControl, controlShown } from './still';
-import { timelineFits } from './editor-mount';
+import { withParams } from '@feega/motion-core/motion/custom/params';
+import type { KeyValue } from '@feega/motion-core/motion/keyframes';
+import { setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { VideoControl, controlShown } from '@feega/motion-core/motion/still';
+import { timelineFits } from '@feega/motion-core/motion/editor-mount';
 
 export enum EditMode {
   Design = 'design',

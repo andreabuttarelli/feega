@@ -14,14 +14,14 @@
   import SpaceEvenly from '@lucide/svelte/icons/align-horizontal-distribute-center';
   import { FIELD_INPUT, FOCUS_RING, Field, IconButton, IconSize, Section, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
   import { cn } from '$lib/utils.js';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import type { OpResult } from '$lib/motion/timeline';
-  import { Align, AlignContent, AutoFlow, Direction, Justify, Sizing } from '$lib/motion/layout/auto-layout';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { Align, AlignContent, AutoFlow, Direction, Justify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
   import { formatPadding, parsePadding } from '$lib/motion/layout/padding-text';
   import { formatTracks, parseTracks } from '$lib/motion/layout/tracks-text';
-  import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '$lib/motion/layout/model';
+  import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '@feega/motion-core/motion/layout/model';
   import { hasBox, layoutParent, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
-  import { childrenInOrder } from '$lib/motion/layout/resolve';
+  import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
   import { Answer, YES_NO, answerOf } from '$lib/motion/segments';
   import SegmentedField from './SegmentedField.svelte';
 

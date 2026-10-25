@@ -1,7 +1,7 @@
-import type { MotionDoc } from './doc';
-import type { OpResult } from './timeline';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { setCollection } from './variables';
-import type { Collection, Variables } from './variables-model';
+import type { Collection, Variables } from '@feega/motion-core/motion/variables-model';
 
 export function variableLibraryOf(docs: readonly MotionDoc[]): Variables {
   const library: Variables = {};

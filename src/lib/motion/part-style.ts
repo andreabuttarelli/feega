@@ -1,11 +1,11 @@
-import { BlendMode } from './blend';
-import { PropFormat } from './custom/component';
-import { FillType, fillsSchema, type Fill } from './fill/model';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { PropFormat } from '@feega/motion-core/motion/custom/component';
+import { FillType, fillsSchema, type Fill } from '@feega/motion-core/motion/fill/model';
 import { partFields, partFocus, partShared } from './inspector';
 import { partUsage, sharedCount } from './part-usage';
-import { PartKind, parsePart, partKind } from './poster-parts';
-import { findClip, type MotionClip, type MotionDoc } from './doc';
-import { setPartStyle, setProps, type OpResult } from './timeline';
+import { PartKind, parsePart, partKind } from '@feega/motion-core/motion/poster-parts';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setPartStyle, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const FALLBACK_COLOUR = '#000000';
 const TEXT_COLOUR_SUFFIXES = ['Color', 'Colour', 'TextColor'];

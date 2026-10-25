@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { createCanvas, createNode, listCanvases, listNodes, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { DocNodeType, frameNodeOf, newMotionData } from '$lib/canvas/motion-node';
-import type { MotionFormat } from '$lib/motion/doc';
+import type { MotionFormat } from '@feega/motion-core/motion/doc';
 import { nodeSize } from '$lib/canvas/node-size';
 import { placeBeside, type Rect } from '$lib/canvas/placement';
 import type { Actor } from '$lib/server/repos/actor';

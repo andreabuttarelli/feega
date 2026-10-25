@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { CutAnswer, cutAnswer } from '$lib/motion/cut-review';
 import { OPUS, REVIEWED, STUDIO_ROSTER, StudioRole, WritesCode, roleBudgetUsd, roleModel, roleTools, turnRole } from './studio-roster';
 import { DESCRIBE_FRAMES, VIEW_FRAMES } from './frames';

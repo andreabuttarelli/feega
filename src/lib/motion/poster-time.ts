@@ -1,6 +1,6 @@
-import { FEEGA_TOKENS } from './brand';
-import type { MotionDoc } from './doc';
-import { prepare, restFrame } from './gpu-full/display-list';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { prepare, restFrame } from '@feega/motion-core/motion/gpu-full/display-list';
 
 const rested = new WeakMap<MotionDoc, number>();
 

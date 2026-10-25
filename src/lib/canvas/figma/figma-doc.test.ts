@@ -2,12 +2,12 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { cardOverElements, elementsOnly } from '../../../../tests/fixtures/figma/elements';
 import { FrameKind } from '$lib/canvas/motion-node';
-import { parseMotionDoc, type MotionClip } from '$lib/motion/doc';
+import { parseMotionDoc, type MotionClip } from '@feega/motion-core/motion/doc';
 import { stillFrame } from '$lib/canvas/core/frame-source';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { boxBook } from '$lib/motion/gpu-full/text/test-face';
-import { Smoothing } from '$lib/motion/gpu-full/text/painter';
+import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { figmaPlan, planOf } from './figma-doc';
 import { Destination } from './scene';
 

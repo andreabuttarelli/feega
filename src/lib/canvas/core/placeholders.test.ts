@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ItemKind, type DisplayList, type Item } from '$lib/motion/gpu-full/display-list';
-import { BlendMode } from '$lib/motion/blend';
+import { ItemKind, type DisplayList, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import { BlendMode } from '@feega/motion-core/motion/blend';
 import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from './placeholders';
 
 const LOOK: Look = { paper: '#ffffff', line: '#e5e5e5' };

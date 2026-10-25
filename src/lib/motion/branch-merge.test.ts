@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip } from './timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { Side, branchDiff, mergeBranch } from './branch-merge';
 
 function must(result: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {

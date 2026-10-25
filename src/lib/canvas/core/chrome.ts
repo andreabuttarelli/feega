@@ -1,8 +1,8 @@
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
-import type { PathItem } from '$lib/motion/gpu-full/display-list';
-import { dashes } from '$lib/motion/gpu-full/stroke';
-import { FillRule } from '$lib/motion/gpu-full/paint';
+import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
+import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
 import { circle, line, rect, solid } from './shapes';
 
 export enum ChromePart {

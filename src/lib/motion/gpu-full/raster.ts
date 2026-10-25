@@ -1,17 +1,17 @@
-import { FillRule, ItemKind, PaintKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem, type LensItem, type Paint, type PathItem } from './display-list';
-import { BLOB_FRAGMENT } from '../hyperframes/blob';
+import { FillRule, ItemKind, PaintKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem, type LensItem, type Paint, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { BLOB_FRAGMENT } from '@feega/motion-core/motion/hyperframes/blob';
 import { cropRect, imageRect, type Size } from './image-rect';
 import { tileCells } from './image-tile';
-import { mul2d, type Affine } from '../affine';
+import { mul2d, type Affine } from '@feega/motion-core/motion/affine';
 import { gaussianKernel, MAX_TAPS } from './kernel';
 import { BLEND_FS, BLUR_FS, QUAD_VS, plain, program, texture } from './gl-kit';
 import { createFilters } from './filters-gpu';
 import { createCoverage } from './coverage';
-import { invert2d } from '../parent';
-import { BlendMode } from '../blend';
-import { MaskMode } from '../mask';
-import { CoverKind, RampKind, type MaskLayer } from './mask-layers';
-import { MAX_STOPS } from './paint';
+import { invert2d } from '@feega/motion-core/motion/parent';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { MaskMode } from '@feega/motion-core/motion/mask';
+import { CoverKind, RampKind, type MaskLayer } from '@feega/motion-core/motion/gpu-full/mask-layers';
+import { MAX_STOPS } from '@feega/motion-core/motion/gpu-full/paint';
 
 const MSAA = 8;
 const LENS_VS = 'attribute vec2 a_pos;void main(){gl_Position=vec4(a_pos,0.0,1.0);}';

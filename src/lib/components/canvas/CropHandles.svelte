@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Corner, appliedCrop, cornerZoom, imagePlacement, panned, windowOfFit, zoomedAt, type Pt, type Window } from '$lib/canvas/crop-handles';
-  import type { FillOf, FillType } from '$lib/motion/fill/model';
+  import type { FillOf, FillType } from '@feega/motion-core/motion/fill/model';
 
   type Rect = { left: number; top: number; width: number; height: number };
   type ImageFill = FillOf<FillType.Image>;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Depth, Gesture } from '$lib/motion/drill';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { Reach, clickTarget, frameLevel, ownClipToPick, siblingsOf, stepInside, videoSide } from './frame-select';
 
 const FRAME = frameLevel();

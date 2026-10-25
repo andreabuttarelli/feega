@@ -1,25 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { TransitionKind } from '../design';
-import { Background, MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { TransitionKind } from '@feega/motion-core/motion/design';
+import { Background, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { installEngine, testTimeline } from '../engine/testing';
-import { engineScript } from '../engine/engine';
-import { TOP_LEFT_ANCHOR, addClip, setJunction, setKeyframes, setTransform, setTransition, Side, type OpResult } from '../timeline';
-import { JunctionKind } from '../junctions';
-import { LIBRARY_IDS } from '../components';
-import { Ease } from '../design';
-import { findClip } from '../doc';
-import { Interp, easeName, sampleTrack } from '../keyframes';
-import { keyframeTweens } from './animate';
-import { CAPTURE_REPLY, CAPTURE_REQUEST, Target, composeHtml } from './compose';
-import { GPU_GLOBAL, SCREEN_GPU, VIDEO_GPU, gpuScript } from './gpu';
-import { Module, Script, moduleUrl, scriptUrl } from '../libs/catalog';
+import { engineScript } from '@feega/motion-core/motion/engine/engine';
+import { TOP_LEFT_ANCHOR, addClip, setJunction, setKeyframes, setTransform, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
+import { JunctionKind } from '@feega/motion-core/motion/junctions';
+import { LIBRARY_IDS } from '@feega/motion-core/motion/components';
+import { Ease } from '@feega/motion-core/motion/design';
+import { findClip } from '@feega/motion-core/motion/doc';
+import { Interp, easeName, sampleTrack } from '@feega/motion-core/motion/keyframes';
+import { keyframeTweens } from '@feega/motion-core/motion/hyperframes/animate';
+import { CAPTURE_REPLY, CAPTURE_REQUEST, Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { GPU_GLOBAL, SCREEN_GPU, VIDEO_GPU, gpuScript } from '@feega/motion-core/motion/hyperframes/gpu';
+import { Module, Script, moduleUrl, scriptUrl } from '@feega/motion-core/motion/libs/catalog';
 import integrity from 'virtual:motion-libs';
-import { MEASURE_REQUEST } from './measure';
+import { MEASURE_REQUEST } from '@feega/motion-core/motion/hyperframes/measure';
 import { writeComponent } from '../custom/ops';
-import { ComponentMode, PropFormat } from '../custom/component';
-import { setExpression } from '../expression/ops';
-import { bakeExpressions, expressionValue } from '../expression/bake';
+import { ComponentMode, PropFormat } from '@feega/motion-core/motion/custom/component';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
+import { bakeExpressions, expressionValue } from '@feega/motion-core/motion/expression/bake';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

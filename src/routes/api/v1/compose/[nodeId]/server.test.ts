@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { applyDraft, newDraft } from '$lib/motion/composition-draft';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { ProjectMode } from '$lib/project-mode';
 
 const { USER } = vi.hoisted(() => ({ USER: { id: 'u1', email: 'ada@x.it' } }));

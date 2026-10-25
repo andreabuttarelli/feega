@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AD_TEMPLATES, AdTemplate, templateAssets } from './ad-templates';
-import { clipsOf, parseMotionDoc, type MotionClip } from './doc';
-import type { RingCard } from './ring/model';
+import { clipsOf, parseMotionDoc, type MotionClip } from '@feega/motion-core/motion/doc';
+import type { RingCard } from '@feega/motion-core/motion/ring/model';
 
 const doc = AD_TEMPLATES[AdTemplate.UiRing].build(templateAssets([]));
 const ring = clipsOf(doc).find((c) => c.component === 'Composition') as MotionClip;

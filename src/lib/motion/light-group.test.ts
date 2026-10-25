@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { groupLight, settleGroups, ungroupLight } from './light-group';
-import { pivotBox } from './parent';
-import { addClip, removeClips, setProps, type OpResult } from './timeline';
+import { pivotBox } from '@feega/motion-core/motion/parent';
+import { addClip, removeClips, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENTS } from '../../components';
-import { apply2d } from '../../affine';
-import { animatorSchema, AnimatorUnit, SelectorShape } from '../../text-animators/model';
-import type { Placement } from '../../text-path/layout';
-import { paintOnPath, type PathEnv } from './on-path';
-import { Smoothing, TextGap, type Ink } from './painter';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { apply2d } from '@feega/motion-core/motion/affine';
+import { animatorSchema, AnimatorUnit, SelectorShape } from '@feega/motion-core/motion/text-animators/model';
+import type { Placement } from '@feega/motion-core/motion/text-path/layout';
+import { paintOnPath, type PathEnv } from '@feega/motion-core/motion/gpu-full/text/on-path';
+import { Smoothing, TextGap, type Ink } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { boxBook } from './test-face';
 
 const stage = { width: 1920, height: 1080 };

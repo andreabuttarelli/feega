@@ -1,11 +1,11 @@
 import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
-import { FrameFormat } from '$lib/motion/hyperframes/capture';
-import { composeHtml } from '$lib/motion/hyperframes/compose';
+import { FrameFormat } from '@feega/motion-core/motion/hyperframes/capture';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { runCheck, type CheckShot } from '$lib/motion/custom/run-check';
 import { decodeLuma } from '$lib/motion/custom/luma-decode';
-import type { BrandTokens } from '$lib/motion/brand';
-import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { framesUrl, type RequestPorts } from './agent-requests';
 
 const FRAME_WIDTH = 640;

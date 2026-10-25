@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { caretLines, caretRect, charUnder, codePointsOf, dragged, Grain, hitTest, laidAsTyped, lineEdge, lineRange, nextLine, pressed, selectionBoxes, Step, unitsOf, wordRange } from './caret';
-import { layOut, Shaping, Spaces, type Flow, type Type } from './layout';
+import { caretLines, caretRect, charUnder, codePointsOf, dragged, Grain, hitTest, laidAsTyped, lineEdge, lineRange, nextLine, pressed, selectionBoxes, Step, unitsOf, wordRange } from '@feega/motion-core/motion/gpu-full/text/caret';
+import { layOut, Shaping, Spaces, type Flow, type Type } from '@feega/motion-core/motion/gpu-full/text/layout';
 import { boxBook } from './test-face';
 
 const SIZE = 100;

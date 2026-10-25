@@ -1,12 +1,12 @@
 <script lang="ts" module>
-  import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
 
   const measured = new Map<string, Record<string, MeasuredBox>>();
 </script>
 
 <script lang="ts">
   import PartsProbe from './PartsProbe.svelte';
-  import { Pose } from '$lib/motion/hyperframes/measure';
+  import { Pose } from '@feega/motion-core/motion/hyperframes/measure';
   import { Depth, Gesture } from '$lib/motion/drill';
   import { closedHover, containFit } from '$lib/canvas/frame-hover';
   import { frameDrill, type FramePoint } from '$lib/canvas/frame-drill';

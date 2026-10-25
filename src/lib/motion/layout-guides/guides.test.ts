@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GuideAlign, GuideKind, guideBands, guideLines, guideSnapBounds, newGuide, setLayoutGuides } from './guides';
-import { MotionFormat, newMotionDoc, parseMotionDoc } from '../doc';
+import { MotionFormat, newMotionDoc, parseMotionDoc } from '@feega/motion-core/motion/doc';
 
 const FRAME = { width: 1000, height: 500 };
 

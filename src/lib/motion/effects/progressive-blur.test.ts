@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EFFECTS, EffectKind, defaultValues, type SvgNode } from './registry';
+import { EFFECTS, EffectKind, defaultValues, type SvgNode } from '@feega/motion-core/motion/effects/registry';
 
 const FRAME = { width: 200, height: 100, frame: 0, fps: 30 };
 const blur = (extra: Record<string, number>) => EFFECTS[EffectKind.ProgressiveBlur].render({ ...defaultValues(EffectKind.ProgressiveBlur), ...extra }, FRAME, 'f', null);

@@ -1,6 +1,6 @@
 import { mirrorHandle, oppositeHandle, Tangent } from './edit';
-import { Mirroring, Winding, ZERO, type Vector, type VectorNetwork } from './model';
-import { strokeRuns } from './path-sink';
+import { Mirroring, Winding, ZERO, type Vector, type VectorNetwork } from '@feega/motion-core/motion/vector/model';
+import { strokeRuns } from '@feega/motion-core/motion/vector/path-sink';
 
 const straight = (start: number, end: number) => ({ start, end, tangentStart: { ...ZERO }, tangentEnd: { ...ZERO } });
 

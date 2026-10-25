@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyDraft, newDraft } from '$lib/motion/composition-draft';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { ProjectMode } from '$lib/project-mode';
 
 const toolScope = vi.fn(async () => ({ db: {}, orgId: 'org', projectId: 'p1', userId: 'u1' }));

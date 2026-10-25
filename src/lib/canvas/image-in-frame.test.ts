@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { imageInFrame, withAssetSwapped } from './image-in-frame';
 
 const EMPTY = newMotionDoc(MotionFormat.Landscape);

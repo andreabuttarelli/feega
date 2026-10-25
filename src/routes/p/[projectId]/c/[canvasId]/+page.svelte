@@ -130,9 +130,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
-  import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
-  import { FEEGA_TOKENS } from '$lib/motion/brand';
-  import { AssetKind } from '$lib/motion/components';
+  import { Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+  import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+  import { AssetKind } from '@feega/motion-core/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import FrameHover from '$lib/components/canvas/FrameHover.svelte';
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
@@ -141,11 +141,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { DrawTool } from '$lib/motion/draw-tool';
-  import { NEW_TEXT_SIZING } from '$lib/motion/text-sizing';
+  import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
   import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
-  import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
+  import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
   import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
   import { decoded, painted } from '$lib/canvas/paint-wait';

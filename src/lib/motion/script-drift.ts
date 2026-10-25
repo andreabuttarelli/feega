@@ -1,5 +1,5 @@
-import type { MotionDoc } from './doc';
-import { Act, durationProblem, type LaunchScript } from './script';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { Act, durationProblem, type LaunchScript } from '@feega/motion-core/motion/script';
 import { storyLabel, StoryBeat } from './story';
 import { UI_KIT } from './ui-kit/kit';
 import { contentParams, kitKind } from './ui-kit/content';

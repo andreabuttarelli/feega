@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { drawnElement } from '$lib/motion/draw-create';
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { EASING_RULE } from '$lib/motion/style';
-import { MOTION_STYLES } from '$lib/motion/style-model';
+import { MOTION_STYLES } from '@feega/motion-core/motion/style-model';
 import { Vision } from './frames';
 import { motionAgentPrompt } from './motion-prompt';
 import { createMotionTools, type MotionSession } from './motion-tools';

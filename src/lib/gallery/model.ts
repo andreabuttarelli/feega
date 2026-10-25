@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { GALLERY_PATH } from './paths';
-import { everyClip, formatOf, FORMATS, MOTION_FORMATS, MotionFormat as MotionFormatEnum, type AssetRef, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+import { everyClip, formatOf, FORMATS, MOTION_FORMATS, MotionFormat as MotionFormatEnum, type AssetRef, type MotionDoc, type MotionFormat } from '@feega/motion-core/motion/doc';
 
 export { GALLERY_PATH, itemPath } from './paths';
 

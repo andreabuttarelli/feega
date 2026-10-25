@@ -1,6 +1,6 @@
 import { postPageAction } from '$lib/api/page-action';
-import { Background } from './doc';
-import { FrameFormat } from './hyperframes/capture';
+import { Background } from '@feega/motion-core/motion/doc';
+import { FrameFormat } from '@feega/motion-core/motion/hyperframes/capture';
 import { posterSecond } from './poster-time';
 
 export { posterSecond };

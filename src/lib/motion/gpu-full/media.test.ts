@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { drawFrame, ItemKind, prepare, Unsupported, type ImageItem } from './display-list';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { drawFrame, ItemKind, prepare, Unsupported, type ImageItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { imageRect } from './image-rect';
 import { createMedia, Readiness, VideoPreload } from './media';
 

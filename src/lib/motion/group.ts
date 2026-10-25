@@ -1,7 +1,7 @@
-import { compOf, findClip, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
-import { TRANSFORM, TRANSFORM_KEYS, type TransformKey } from './keyframes';
-import { precompose } from './precomp';
-import type { OpResult } from './timeline';
+import { compOf, findClip, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { TRANSFORM, TRANSFORM_KEYS, type TransformKey } from '@feega/motion-core/motion/keyframes';
+import { precompose } from '@feega/motion-core/motion/precomp';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 type NewId = () => string;
 

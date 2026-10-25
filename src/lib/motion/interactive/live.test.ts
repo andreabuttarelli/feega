@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setProps, setTransform, type OpResult } from '../timeline';
-import { bentoSlotAt } from '../hyperframes/bento';
-import { clipsOf, type MotionClip } from '../doc';
-import { precompose, flattenComps } from '../precomp';
-import { setExpression } from '../expression/ops';
-import { InputKey, fallbackPort } from '../expression/inputs';
-import { liveScene } from './live';
-import { liveSpec } from './spec';
-import { bakeExpressions } from '../expression/bake';
-import { Outside } from './settings';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+import { bentoSlotAt } from '@feega/motion-core/motion/hyperframes/bento';
+import { clipsOf, type MotionClip } from '@feega/motion-core/motion/doc';
+import { precompose, flattenComps } from '@feega/motion-core/motion/precomp';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
+import { InputKey, fallbackPort } from '@feega/motion-core/motion/expression/inputs';
+import { liveScene } from '@feega/motion-core/motion/interactive/live';
+import { liveSpec } from '@feega/motion-core/motion/interactive/spec';
+import { bakeExpressions } from '@feega/motion-core/motion/expression/bake';
+import { Outside } from '@feega/motion-core/motion/interactive/settings';
 import { embedMotion, motionCompId } from '../embed';
 
 const sceneOf = (doc: MotionDoc, outside: Outside) => liveScene(liveSpec({ live: doc, baked: bakeExpressions(doc), outside, parents: [], color: (v) => v }));

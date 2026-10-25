@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { textPathOutline } from '$lib/motion/hyperframes/text-path';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { textPathOutline } from '@feega/motion-core/motion/hyperframes/text-path';
 
   let { doc, clip, frame }: { doc: MotionDoc; clip: MotionClip; frame: number } = $props();
 

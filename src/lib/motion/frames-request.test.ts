@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { AssetKind } from './components';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import { adoptAgentAssets, agentDraft, landTurn, ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, Head, Landing, type AgentAsset, type AgentDraft } from './frames-request';
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 const asset = (id: string, url: string): AgentAsset => ({ id, kind: AssetKind.Image, label: id, previewUrl: '', url });
 

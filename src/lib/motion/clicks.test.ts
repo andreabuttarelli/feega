@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc } from './doc';
+import { MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { anchorBox, cursorMisses, reelMisses, CURSOR_PIECE } from './clicks';
 import { pieceAnchors, type Rect } from './ui-kit/anchors';
 import { UI_KIT, UiKind } from './ui-kit/kit';

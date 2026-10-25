@@ -1,9 +1,9 @@
 <script lang="ts">
   import Pipette from '@lucide/svelte/icons/pipette';
-  import { COMPONENTS } from '$lib/motion/components';
-  import { clipsOf, type DocVerdict, type MotionDoc } from '$lib/motion/doc';
-  import { CAMERA, CAMERA_LANE, Space, type CameraKey } from '$lib/motion/camera';
-  import { CAMERA_PRESETS, CameraPreset, PRESETS, applyPreset, cameraEditAt, cameraKeyToggle, cameraValueAt, focusOn, removeCamera, setCamera } from '$lib/motion/camera-ops';
+  import { COMPONENTS } from '@feega/motion-core/motion/components';
+  import { clipsOf, type DocVerdict, type MotionDoc } from '@feega/motion-core/motion/doc';
+  import { CAMERA, CAMERA_LANE, Space, type CameraKey } from '@feega/motion-core/motion/camera';
+  import { CAMERA_PRESETS, CameraPreset, PRESETS, applyPreset, cameraEditAt, cameraKeyToggle, cameraValueAt, focusOn, removeCamera, setCamera } from '@feega/motion-core/motion/camera-ops';
   import { parseDecimal } from '$lib/motion/inspector';
   import { sliderOf, toShown, toStored } from '$lib/motion/units';
   import NumberField from './NumberField.svelte';
@@ -11,8 +11,8 @@
   import { fieldLook } from '$lib/motion/inspector-sections';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import SceneMap from './SceneMap.svelte';
-  import { setCameraExpression } from '$lib/motion/expression/ops';
-  import { expressionErrors } from '$lib/motion/expression/bake';
+  import { setCameraExpression } from '@feega/motion-core/motion/expression/ops';
+  import { expressionErrors } from '@feega/motion-core/motion/expression/bake';
 
   let { doc, frame, onchange }: { doc: MotionDoc; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 

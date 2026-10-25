@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, compOf, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
-import { TrackKind } from '../components';
-import { flattenComps } from '../precomp';
-import { addClip, addTrack, setProps, type OpResult } from '../timeline';
-import { flatten, parsePath } from './geometry';
-import { BooleanOp } from './boolean-op';
-import { polygonArea } from './boolean';
+import { MotionFormat, compOf, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
+import { addClip, addTrack, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { flatten, parsePath } from '@feega/motion-core/motion/shape/geometry';
+import { BooleanOp } from '@feega/motion-core/motion/shape/boolean-op';
+import { polygonArea } from '@feega/motion-core/motion/shape/boolean';
 import { bakeBooleanGroup, isBooleanGroup, liveCombine } from './boolean-group';
 
 const ok = (r: OpResult): MotionDoc => {

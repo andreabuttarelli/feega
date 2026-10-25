@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { build } from 'esbuild';
 import type { Connect, Plugin } from 'vite';
 import { allowOpaqueFrames } from './node-server.mjs';
-import { HOSTED, MODULES, MODULE_EXTERNAL, MOTION_LIBS_ROUTE, OPENTYPE, Packing, folderOf, type Hosted, type HostedModule, type Script } from '../src/lib/motion/libs/catalog';
+import { HOSTED, MODULES, MODULE_EXTERNAL, MOTION_LIBS_ROUTE, OPENTYPE, Packing, folderOf, type Hosted, type HostedModule, type Script } from '../packages/motion-core/src/motion/libs/catalog';
 
 export const MOTION_LIBS_MODULE = 'virtual:motion-libs';
 export const MOTION_LIBS_DIR = 'static/motion-libs';

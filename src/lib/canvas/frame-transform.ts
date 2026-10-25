@@ -1,4 +1,4 @@
-import { findClip, type MotionDoc } from '$lib/motion/doc';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { EditMode } from '$lib/motion/edit-mode';
 import { groupDrag, lockedTo, type Keys } from '$lib/motion/element-gesture';
 import { guideSnapBounds } from '$lib/motion/layout-guides/guides';
@@ -6,7 +6,7 @@ import { measureGaps } from '$lib/motion/measure-gaps';
 import { unionBounds } from '$lib/motion/multi-select';
 import { Grip, aabb, dragPatch, quadOf, spacing, type Bounds, type Boxes, type Gap, type Guide, type Pt } from '$lib/motion/scene-select';
 import { moveBy, writeTransform } from '$lib/motion/space';
-import type { OpResult } from '$lib/motion/timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum SelectionKind {
   Element = 'element',

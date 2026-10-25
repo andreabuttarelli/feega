@@ -1,4 +1,4 @@
-import type { MotionDoc, MotionTrack } from './doc';
+import type { MotionDoc, MotionTrack } from '@feega/motion-core/motion/doc';
 import { CREDITS_PER_USD_GRANT } from '$lib/credit-ladder';
 import { chunkPlan } from './server-render';
 import { FLAT_FRAME_MS, Weigh, costSpans, frameCosts } from './render-cost';

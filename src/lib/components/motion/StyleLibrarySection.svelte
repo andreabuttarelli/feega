@@ -1,9 +1,9 @@
 <script lang="ts">
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
-  import { StyleKind, styleSchema, type Style } from '$lib/motion/styles-model';
+  import { StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
   import { styleLabel } from '$lib/motion/style-library';
   import { swatchOf } from '$lib/motion/fill/swatch';
-  import { resolveColor, type BrandTokens } from '$lib/motion/brand';
+  import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
 
   let { tokens }: { tokens: BrandTokens } = $props();
 

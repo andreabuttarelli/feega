@@ -2,9 +2,9 @@ import { Drawing, FILE, FileFormat, rowSize, type ExportRow } from '$lib/motion/
 import { printDocument, type Crop } from '$lib/motion/export-vector';
 import { boundsOfClips, svgOf } from '$lib/motion/export-svg';
 import { dotLottieOf, lottieOf } from '$lib/motion/export-lottie';
-import { ancestorsOf } from '$lib/motion/parent';
-import type { MotionDoc } from '$lib/motion/doc';
-import { stillSeconds } from '$lib/motion/still';
+import { ancestorsOf } from '@feega/motion-core/motion/parent';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { stillSeconds } from '@feega/motion-core/motion/still';
 import type { ExportPage, ExportPort } from './server-frames';
 import type { DrawTarget, Drawn } from './selection-export';
 import { Span, type Vector } from './vector-list';

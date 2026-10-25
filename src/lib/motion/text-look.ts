@@ -1,4 +1,4 @@
-import type { ComponentId } from './components';
+import type { ComponentId } from '@feega/motion-core/motion/components';
 import type { TextLook } from './text-measure';
 
 const WRAPS: Partial<Record<ComponentId, (p: Record<string, unknown>) => boolean>> = { Text: (p) => p.sizing !== 'auto' };

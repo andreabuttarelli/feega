@@ -1,4 +1,4 @@
-import { Script, scriptUrl } from '../libs/catalog';
+import { Script, scriptUrl } from '@feega/motion-core/motion/libs/catalog';
 
 type WarmPorts = { fetch: (url: string, init: RequestInit) => Promise<Response>; load: () => Promise<unknown> };
 

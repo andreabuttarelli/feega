@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
-  import type { OpResult } from '$lib/motion/timeline';
-  import { JUNCTION, JUNCTION_KINDS, type JunctionKind } from '$lib/motion/junction-model';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { JUNCTION, JUNCTION_KINDS, type JunctionKind } from '@feega/motion-core/motion/junction-model';
   import { appendScene, insertableScenes, removeScene, reorderScenes, sceneTransition, scenesOf, trimScene } from '$lib/motion/scenes';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
 

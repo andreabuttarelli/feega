@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setProps, type OpResult } from '../timeline';
-import type { CatalogueFont } from './model';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import type { CatalogueFont } from '@feega/motion-core/motion/fonts/model';
 import { replaceFont, setFont } from './ops';
 
 const CATALOGUE: CatalogueFont[] = [

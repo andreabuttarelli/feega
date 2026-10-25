@@ -1,11 +1,11 @@
-import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-import { mergeView, viewOf, type CompPath } from '$lib/motion/precomp';
-import { setProps, type OpResult } from '$lib/motion/timeline';
-import { CARD_ASPECTS, RATIO_RANGE, type CardAspect } from '$lib/canvas/composition/card-look';
-import { CELL_FITS, type CellFit } from '$lib/motion/bento/model';
-import { FIELD_KEY, FieldType, type ExposedField } from './field-model';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { mergeView, viewOf, type CompPath } from '@feega/motion-core/motion/precomp';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { CARD_ASPECTS, RATIO_RANGE, type CardAspect } from '@feega/motion-core/canvas/composition/card-look';
+import { CELL_FITS, type CellFit } from '@feega/motion-core/motion/bento/model';
+import { FIELD_KEY, FieldType, type ExposedField } from '@feega/motion-core/motion/template/field-model';
 
-export { FieldType, type ExposedField } from './field-model';
+export { FieldType, type ExposedField } from '@feega/motion-core/motion/template/field-model';
 
 export type FieldInput = Omit<ExposedField, 'default'> & { default?: unknown };
 export type FieldValue = ExposedField & { value: unknown; missing: boolean };

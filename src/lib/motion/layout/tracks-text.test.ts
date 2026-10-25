@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TrackType } from './auto-layout';
+import { TrackType } from '@feega/motion-core/motion/layout/auto-layout';
 import { formatTracks, parseTracks } from './tracks-text';
 
 describe('track text', () => {

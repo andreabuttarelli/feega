@@ -1,6 +1,6 @@
 import { compile, createRuntime, draw, type Compiled, type Runtime } from '@feega/shader-fx/gl';
 import { measure } from '@feega/shader-fx/measure';
-import type { ShaderBake } from './compose';
+import type { ShaderBake } from '@feega/motion-core/motion/shaders/compose';
 
 type Media = HTMLImageElement | HTMLVideoElement;
 

@@ -1,4 +1,4 @@
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { answersCut } from '$lib/motion/cut-review';
 import { WEB_TOOLS } from '$lib/server/web/web-tools';
 import { DESCRIBE_FRAMES } from './frames';

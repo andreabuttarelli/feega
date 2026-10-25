@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { BlendMode } from '../blend';
-import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
-import { Ease, TransitionKind } from '../design';
-import { motionEngine } from '../engine/engine';
-import { addClip, setKeyframes, setTransition, Side, type OpResult } from '../timeline';
-import { composeHtml } from '../hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
+import { motionEngine } from '@feega/motion-core/motion/engine/engine';
+import { addClip, setKeyframes, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { PaintKind } from './paint-of';
 import { compileScene, frameAt, resolved, strokePad, type Drawn } from './scene';
 

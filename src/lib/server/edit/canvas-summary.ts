@@ -1,4 +1,4 @@
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { elementName } from '$lib/motion/element-name';
 import { pxRead } from '$lib/motion/px-fields';
 import type { CanvasNodeRecord, Connection } from '$lib/server/repos/canvas';

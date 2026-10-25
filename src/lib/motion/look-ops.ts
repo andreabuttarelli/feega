@@ -1,6 +1,6 @@
-import { byFrame, type DocVerdict, type MotionDoc } from './doc';
-import type { Keyframe } from './keyframes';
-import { lightSchema, lookSchema, newLook, type Light, type LightKey, type Look } from './look';
+import { byFrame, type DocVerdict, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { Keyframe } from '@feega/motion-core/motion/keyframes';
+import { lightSchema, lookSchema, newLook, type Light, type LightKey, type Look } from '@feega/motion-core/motion/look';
 
 export type LightPatch = Partial<Omit<Light, 'id' | 'keyframes'>>;
 export type LookPatch = Partial<Pick<Look, 'softShadows' | 'contactShadow'>> & { environment?: Partial<Look['environment']> };

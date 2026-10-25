@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import FrameInspectorPanel from './FrameInspectorPanel.svelte';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {

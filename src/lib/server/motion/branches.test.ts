@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { Side } from '$lib/motion/branch-merge';
 import { BranchOutcome, createBranch, dropBranch, listBranches, mergeBranchBack, reviewBranch, type BranchStore, type Fork } from './branches';
 

@@ -1,4 +1,4 @@
-import { ComponentMode, PropFormat, VAR_PREFIX, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
+import { ComponentMode, PropFormat, VAR_PREFIX, type CustomComponent, type PropSpec } from '@feega/motion-core/motion/custom/component';
 import { POSTER_GLASS_MODEL } from './model';
 import { POSTER_GLASS_VIEW } from './view';
 import { POSTER_GLASS_CSS } from './style';

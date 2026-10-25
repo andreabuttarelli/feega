@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import { parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { actorCols, type Actor } from './actor';
 
 export type MotionHead = { version: number; doc: MotionDoc; summary: string | null; actorKind: string };

@@ -1,4 +1,4 @@
-import { TrackType, type TrackSize } from './auto-layout';
+import { TrackType, type TrackSize } from '@feega/motion-core/motion/layout/auto-layout';
 
 const HUG_WORD = 'hug';
 const AUTO_WORD = 'auto';

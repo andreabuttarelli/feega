@@ -1,5 +1,5 @@
-import { MotionFormat, type MotionClip, type MotionDoc } from './doc';
-import { setCanvas, type CanvasSize, type OpResult } from './timeline';
+import { MotionFormat, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setCanvas, type CanvasSize, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export const CREATE_FORMATS = [MotionFormat.Square, MotionFormat.Portrait, MotionFormat.Vertical, MotionFormat.Landscape] as const;
 

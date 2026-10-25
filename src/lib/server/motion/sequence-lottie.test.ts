@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { JunctionKind } from '$lib/motion/junction-model';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { JunctionKind } from '@feega/motion-core/motion/junction-model';
 import { lottieOf } from '$lib/motion/export-lottie';
 import { sequenceScenes, sceneTransition } from '$lib/motion/scenes';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { withScenes } from '$lib/canvas/scene-sources';
 import { Span, vectorOf } from './vector-list';
 

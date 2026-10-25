@@ -1,9 +1,9 @@
-import type { ClipError } from '../hyperframes/capture';
-import { TrackKind } from '../components';
-import { TransitionKind } from '../design';
-import { clipsOf, newClip, type MotionDoc } from '../doc';
-import { CheckState, ComponentMode, checkState } from './component';
-import { reflowProblems, type Boxes } from './reflow';
+import type { ClipError } from '@feega/motion-core/motion/hyperframes/capture';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { TransitionKind } from '@feega/motion-core/motion/design';
+import { clipsOf, newClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { CheckState, ComponentMode, checkState } from '@feega/motion-core/motion/custom/component';
+import { reflowProblems, type Boxes } from '@feega/motion-core/motion/custom/reflow';
 
 export const CHECK_POINTS = 5;
 const SPREAD = [0.1, 0.3, 0.5, 0.7, 0.92];

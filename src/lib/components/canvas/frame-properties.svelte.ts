@@ -1,7 +1,7 @@
 import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
-import type { BrandTokens } from '$lib/motion/brand';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import type { FrameExtras } from '$lib/canvas/frame-extras.svelte';
-import { docMode, type DocMode } from '$lib/motion/doc';
+import { docMode, type DocMode } from '@feega/motion-core/motion/doc';
 
 const BAR_SELECTOR = '[data-testid="right-bar"]';
 const TEXT_FIELDS = new Set(['TEXTAREA', 'INPUT']);

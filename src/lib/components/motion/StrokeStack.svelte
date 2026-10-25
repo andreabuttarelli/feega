@@ -1,11 +1,11 @@
 <script lang="ts">
   import { cn } from '$lib/utils.js';
   import { FIELD_INPUT, FOCUS_RING, SECTION_LABEL } from '$lib/components/ui/shell/styles';
-  import { resolveColor, type BrandTokens } from '$lib/motion/brand';
-  import { FILL_TYPES, FillType, PAINTED_AS, PaintedAs, colourAlpha, retypeFill, withAlpha, type Fill, type Stop } from '$lib/motion/fill/model';
-  import { CAPS, JOINS } from '$lib/motion/shape/schema';
-  import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, patternPx, removeStroke, setStroke, type Stroke, type StrokePatch } from '$lib/motion/stroke/model';
-  import { ARROW_CAPS } from '$lib/motion/stroke/arrows';
+  import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
+  import { FILL_TYPES, FillType, PAINTED_AS, PaintedAs, colourAlpha, retypeFill, withAlpha, type Fill, type Stop } from '@feega/motion-core/motion/fill/model';
+  import { CAPS, JOINS } from '@feega/motion-core/motion/shape/schema';
+  import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, patternPx, removeStroke, setStroke, type Stroke, type StrokePatch } from '@feega/motion-core/motion/stroke/model';
+  import { ARROW_CAPS } from '@feega/motion-core/motion/stroke/arrows';
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';

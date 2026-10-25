@@ -1,4 +1,4 @@
-import { PlayMode } from '$lib/motion/interactive/settings';
+import { PlayMode } from '@feega/motion-core/motion/interactive/settings';
 import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';

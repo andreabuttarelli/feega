@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { breakAtVertex, deleteVertex, handlesAt, mirrorHandle, removeVertex, splitSegmentAt, toggleSmoothVertex, Tangent } from './edit';
-import { Mirroring, Winding, type VectorNetwork } from './model';
-import { evalCubic, nearestOnNetwork, networkBounds, segmentCubic } from './curve-math';
+import { Mirroring, Winding, type VectorNetwork } from '@feega/motion-core/motion/vector/model';
+import { evalCubic, nearestOnNetwork, networkBounds, segmentCubic } from '@feega/motion-core/motion/vector/curve-math';
 
 const zero = { x: 0, y: 0 };
 const line = (start: number, end: number) => ({ start, end, tangentStart: zero, tangentEnd: zero });

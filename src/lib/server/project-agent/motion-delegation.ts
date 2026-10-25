@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
-import { MOTION_FORMATS, type MotionFormat } from '$lib/motion/doc';
+import { MOTION_FORMATS, type MotionFormat } from '@feega/motion-core/motion/doc';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { Preset, settingsOf } from '$lib/motion/export-formats';
 import { findMotionNode } from '$lib/server/motion/editor';

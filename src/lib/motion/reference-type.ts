@@ -1,7 +1,7 @@
-import type { ComponentId } from './components';
-import type { MotionDoc } from './doc';
-import { BuiltinFont, FontCategory } from './fonts/model';
-import { FontClass, LetterCase, LookMiss, TypeRole, type ReferenceLook, type TypeSpec } from './reference-look-model';
+import type { ComponentId } from '@feega/motion-core/motion/components';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { BuiltinFont, FontCategory } from '@feega/motion-core/motion/fonts/model';
+import { FontClass, LetterCase, LookMiss, TypeRole, type ReferenceLook, type TypeSpec } from '@feega/motion-core/motion/reference-look-model';
 
 export type TypeProblem = { miss: LookMiss; detail: string };
 

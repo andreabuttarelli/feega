@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { FEEGA_TOKENS } from '../brand';
-import { Ease } from '../design';
-import { composeHtml } from '../hyperframes/compose';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { Ease } from '@feega/motion-core/motion/design';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { addShader, removeShader, setShader } from './ops';
-import { shaderBakes } from './compose';
-import type { ShaderSnapshot } from './model';
+import { shaderBakes } from '@feega/motion-core/motion/shaders/compose';
+import type { ShaderSnapshot } from '@feega/motion-core/motion/shaders/model';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {

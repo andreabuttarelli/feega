@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { precompose } from '../precomp';
-import { addClip, removeClips, setKeyframes, type OpResult } from '../timeline';
-import { Ease } from '../design';
-import { drawFrame, ItemKind, prepare, SCREEN_GAP, Unsupported } from './display-list';
-import { DrawnKind, type DomRead } from './dom/read';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { precompose } from '@feega/motion-core/motion/precomp';
+import { addClip, removeClips, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Ease } from '@feega/motion-core/motion/design';
+import { drawFrame, ItemKind, prepare, SCREEN_GAP, Unsupported } from '@feega/motion-core/motion/gpu-full/display-list';
+import { DrawnKind, type DomRead } from '@feega/motion-core/motion/gpu-full/dom/read';
 import { readClips } from './dom/custom';
 
 function must(r: OpResult): MotionDoc {

@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { newMotionDoc, MotionFormat, type MotionClip, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { flattenComps } from './precomp';
+import { newMotionDoc, MotionFormat, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { createComponent, instanceOf } from './main-component';
 import { defineProperty, removeProperty, resetProperty, setProperty } from './component-properties';
-import { PropertyKind } from './property-resolve';
+import { PropertyKind } from '@feega/motion-core/motion/property-resolve';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {

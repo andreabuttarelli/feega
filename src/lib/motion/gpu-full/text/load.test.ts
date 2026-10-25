@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../../doc';
-import { composeHtml } from '../../hyperframes/compose';
-import { addClip, type OpResult } from '../../timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { BUILTIN_FONTS_URL, fontLoader } from './load';
 import { boxFace } from './test-face';
-import { bindVar, declareVar } from '../../interactive/vars';
-import { VarKind } from '../../interactive/var-model';
+import { bindVar, declareVar } from '@feega/motion-core/motion/interactive/vars';
+import { VarKind } from '@feega/motion-core/motion/interactive/var-model';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

@@ -1,6 +1,6 @@
-import { findClip, type MotionClip, type MotionDoc } from '../doc';
-import { setCanvas, type CanvasSize, type OpResult } from '../timeline';
-import { Horizontal, Vertical, constraintsSchema, type Constraints } from './model';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setCanvas, type CanvasSize, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Horizontal, Vertical, constraintsSchema, type Constraints } from '@feega/motion-core/motion/constraints/model';
 
 export { Horizontal, Vertical, type Constraints };
 

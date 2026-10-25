@@ -1,4 +1,4 @@
-import { AVERAGE_ADVANCE, CAPITAL_ADVANCE } from './layout/text-extent';
+import { AVERAGE_ADVANCE, CAPITAL_ADVANCE } from '@feega/motion-core/motion/layout/text-extent';
 
 export type Advance = (run: string) => number;
 

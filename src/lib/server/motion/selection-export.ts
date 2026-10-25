@@ -1,6 +1,6 @@
 import { zipSync } from 'fflate';
 import { Bundle, FILE, bundleOf, exportFiles, type ExportFile, type ExportRow } from '$lib/motion/export-rows';
-import { Background, findClip, type MotionDoc } from '$lib/motion/doc';
+import { Background, findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { elementName } from '$lib/motion/element-name';
 
 export type Packed = { name: string; mime: string; bytes: Uint8Array };

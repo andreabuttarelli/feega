@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
-  import type { Effect } from '$lib/motion/effects/model';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { Effect } from '@feega/motion-core/motion/effects/model';
   import { LUT_PRESETS, LUT_PRESET_IDS, applyLut, compileLut, lutFromCube, type LutPreset } from '$lib/motion/effects/lut';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
 
   let { doc, clipId, effect, onchange }: { doc: MotionDoc; clipId: string; effect: Effect; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, motionDocSchema, newMotionDoc, type MotionDoc } from './doc';
-import { addClip } from './timeline';
+import { MotionFormat, motionDocSchema, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { Quality, Severity, docProblems, severityOf } from './direction';
 import { LookMiss } from './reference-look';
-import { FontClass, Imagery, LetterCase, SmallText, TypeRole, type ReferenceLook, type TypeSpec } from './reference-look-model';
-import { MotionStyle } from './style-model';
-import { FontCategory, FontSource } from './fonts/model';
+import { FontClass, Imagery, LetterCase, SmallText, TypeRole, type ReferenceLook, type TypeSpec } from '@feega/motion-core/motion/reference-look-model';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
+import { FontCategory, FontSource } from '@feega/motion-core/motion/fonts/model';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {

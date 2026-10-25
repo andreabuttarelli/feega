@@ -1,9 +1,9 @@
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { EditMode } from './edit-mode';
 import { resizeFactors, rotateAround, scaleAroundXY, snappedHandle, turnedBy } from './group-transform';
 import { groupMove } from './multi-select';
 import { Grip, handlesOf, type Bounds, type Guide, type Pt, type Quad } from './scene-select';
-import type { OpResult } from './timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 export type Keys = { shift: boolean; alt: boolean; ctrl?: boolean };
 

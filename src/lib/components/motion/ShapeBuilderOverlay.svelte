@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { hostFraction } from '$lib/motion/overlay-point';
-  import { pathData, polyline, type Pt } from '$lib/motion/shape/geometry';
+  import { pathData, polyline, type Pt } from '@feega/motion-core/motion/shape/geometry';
   import { buildShapes, regionAt, shapeRegions } from '$lib/motion/shape/shape-builder';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
 
   let {
     doc,

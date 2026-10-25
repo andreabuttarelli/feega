@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { MotionFormat, motionDocSchema, newMotionDoc } from '$lib/motion/doc';
-import { cameraSchema } from '$lib/motion/camera';
+import { MotionFormat, motionDocSchema, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { cameraSchema } from '@feega/motion-core/motion/camera';
 import { createMotionTools, type MotionSession } from './motion-tools';
-import { LAYOUTS } from '$lib/canvas/composition/index';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
 type Access = { write: string[]; read: string } | { fixed: string };

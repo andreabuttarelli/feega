@@ -1,5 +1,5 @@
-import type { MotionDoc } from './doc';
-import { DocMode } from './still';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { DocMode } from '@feega/motion-core/motion/still';
 import { frameOf, mediaElement, placeElement, type NewId, type Output } from './move-element';
 import type { Fraction } from '$lib/layer-boxes';
 

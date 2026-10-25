@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { EditMode } from './edit-mode';
 import { anchorOf, type Pt } from './scene-select';
-import { transformAt } from './parent';
-import { addClip, type OpResult } from './timeline';
+import { transformAt } from '@feega/motion-core/motion/parent';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { pullFactor, resizeFactors, rotateAround, scaleAround, scaleAroundXY, snappedHandle, turnedBy } from './group-transform';
 
 const must = (r: OpResult): MotionDoc => {

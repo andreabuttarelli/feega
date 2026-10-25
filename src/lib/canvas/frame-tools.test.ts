@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { FRAME_VIEW_DEFAULT, FrameView, flipView } from './frame-view';
 import { AlignSide, FrameOverlay, activeAt, alignSide, shownOverlays } from './frame-tools';

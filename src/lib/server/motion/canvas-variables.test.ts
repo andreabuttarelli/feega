@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
-import { VarType } from '$lib/motion/variables-model';
+import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { VarType } from '@feega/motion-core/motion/variables-model';
 import { bindVariable, defineVariable } from '$lib/motion/variables';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { canvasVariable, type VariableFrames } from './canvas-variables';

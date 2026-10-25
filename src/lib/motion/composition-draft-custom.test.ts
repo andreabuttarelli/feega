@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyDraft, draftFromDoc, newDraft, withCustomLayout, withLayout } from './composition-draft';
-import { MotionFormat, newMotionDoc } from './doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 
 const ORBIT = { id: 'lay-1', name: 'orbit', spec: { kind: 'spec' as const, slots: 6, place: { kind: 'ring' as const, radius: 3 } } };
 

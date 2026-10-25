@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { springMath, springSource } from '../spring';
+import { springMath, springSource } from '@feega/motion-core/motion/spring';
 import { DEFAULT_REEL, reelMath, type ReelInput } from './reel';
 import { reelSource, seamProblems } from './seam';
 

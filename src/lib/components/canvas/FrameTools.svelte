@@ -12,15 +12,15 @@
   import OutlineOverlay from '$lib/components/motion/OutlineOverlay.svelte';
   import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
-  import { findClip, type MotionDoc } from '$lib/motion/doc';
+  import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { EditMode } from '$lib/motion/edit-mode';
   import { Axis, Edge, alignSpace, distributeSpace, propBoxes } from '$lib/motion/space';
   import { canEditPoints, enterPointEdit } from '$lib/motion/shape/vector-edit';
   import { isTyping } from '$lib/motion/shortcuts';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { containFit } from '$lib/canvas/frame-hover';
-  import { withAutoLayout } from '$lib/motion/layout/resolve';
+  import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import type { Boxes } from '$lib/motion/scene-select';
   import { GridToggle } from '$lib/motion/pixel-grid';
   import { FRAME_VIEW_DEFAULT, FrameView, shows, type FrameViews } from '$lib/canvas/frame-view';

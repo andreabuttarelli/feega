@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { DocMode } from '$lib/motion/still';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { DocMode } from '@feega/motion-core/motion/still';
 import { appendRevision, listRevisions, readHead } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
 import type { EditorFrames } from '$lib/server/motion/tool-run';

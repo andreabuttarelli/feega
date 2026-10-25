@@ -3,9 +3,9 @@
   import Copy from '@lucide/svelte/icons/copy';
   import Download from '@lucide/svelte/icons/download';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { BUNDLE_FILE, type InteractiveBundle } from '$lib/motion/interactive/bundle';
-  import { OUTSIDES, PLAY_MODES, PLAY_MODE_LABEL, Outside, PlayMode, SCROLL_LENGTH, type Interactive } from '$lib/motion/interactive/settings';
+  import { OUTSIDES, PLAY_MODES, PLAY_MODE_LABEL, Outside, PlayMode, SCROLL_LENGTH, type Interactive } from '@feega/motion-core/motion/interactive/settings';
   import { REACTION_LABEL, type Reaction } from '$lib/motion/interactive/summary';
 
   type Hosted = { published: boolean; url: string };

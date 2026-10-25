@@ -2,8 +2,8 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { fillsSchema, type Fill } from '$lib/motion/fill/model';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { fillsSchema, type Fill } from '@feega/motion-core/motion/fill/model';
 import { MediaKind } from '$lib/motion/media/pick';
 import type { MediaUploader } from './media-upload';
 import FillStack from './FillStack.svelte';

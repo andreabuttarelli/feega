@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { setClipFlags } from './organize';
-import { addClip, setProps, type OpResult } from './timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setClipFlags } from '@feega/motion-core/motion/organize';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {

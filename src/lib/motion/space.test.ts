@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, setKeyframe, type OpResult } from './timeline';
-import { setClipFlags } from './organize';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframe, type OpResult } from '@feega/motion-core/motion/timeline';
+import { setClipFlags } from '@feega/motion-core/motion/organize';
 import { EditMode } from './edit-mode';
 import { aabb, quadOf } from './scene-select';
 import { Axis, Edge, alignSpace, distributeSpace, gapOf, moveBy, propBoxes, tidySpace } from './space';

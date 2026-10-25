@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, parseMotionDoc } from '$lib/motion/doc';
-import { customValues, PropFormat, Strictness } from '$lib/motion/custom/component';
+import { MotionFormat, parseMotionDoc } from '@feega/motion-core/motion/doc';
+import { customValues, PropFormat, Strictness } from '@feega/motion-core/motion/custom/component';
 import { lintAdvice, lintSource } from '$lib/motion/custom/lint';
-import { EffectKind } from '$lib/motion/effects/registry';
-import { DocMode, docMode } from '$lib/motion/still';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
+import { DocMode, docMode } from '@feega/motion-core/motion/still';
 import { builtinTemplate } from './builtins';
 import { catalogue, matching, starterDoc } from './catalogue';
 import type { TemplateEntry } from './library';

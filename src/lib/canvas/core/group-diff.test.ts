@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DisplayList, Item } from '$lib/motion/gpu-full/display-list';
+import type { DisplayList, Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { spliceOf } from './group-diff';
 
 const bar = (n: number, red = 1) => ({ kind: 'path', clip: `bar${n}`, contours: [[n, 0, n + 5, 0, n + 5, 5]], paint: { kind: 'solid', color: [red, 0, 0, 1] } }) as unknown as Item;

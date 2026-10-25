@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { clipsOf, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-  import { Source, type AnimProp } from '$lib/motion/keyframes';
-  import type { OpResult } from '$lib/motion/timeline';
-  import { PATH_PRESETS, PathSourceKind, type PathSource } from '$lib/motion/text-path/model';
-  import { SHAPE_SOURCE, removeTextPath, setTextPath } from '$lib/motion/text-path/ops';
+  import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+  import { Source, type AnimProp } from '@feega/motion-core/motion/keyframes';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { PATH_PRESETS, PathSourceKind, type PathSource } from '@feega/motion-core/motion/text-path/model';
+  import { SHAPE_SOURCE, removeTextPath, setTextPath } from '@feega/motion-core/motion/text-path/ops';
 
   let { doc, clip, params, row, commit }: { doc: MotionDoc; clip: MotionClip; params: readonly AnimProp[]; row: Snippet<[AnimProp]>; commit: (result: OpResult, summary: string) => void } = $props();
 

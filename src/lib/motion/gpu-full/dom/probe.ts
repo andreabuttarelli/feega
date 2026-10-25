@@ -1,7 +1,7 @@
-import { js } from '../../hyperframes/html';
-import { COMPOSITION_ID } from '../../hyperframes/capture';
-import { CUSTOM_ROOT_PREFIX, DOM_READ_REPLY, DOM_READ_REQUEST, NO_INDEX, TEXT_PAD, READ_ATTRS, READ_STYLES, type DomReadRequest, type RawNode, type RawTree, type TextLine, type TextRaster } from './tree';
-import type { SvgNode } from '../../effects/registry';
+import { js } from '@feega/motion-core/motion/hyperframes/html';
+import { COMPOSITION_ID } from '@feega/motion-core/motion/hyperframes/capture';
+import { CUSTOM_ROOT_PREFIX, DOM_READ_REPLY, DOM_READ_REQUEST, NO_INDEX, TEXT_PAD, READ_ATTRS, READ_STYLES, type DomReadRequest, type RawNode, type RawTree, type TextLine, type TextRaster } from '@feega/motion-core/motion/gpu-full/dom/tree';
+import type { SvgNode } from '@feega/motion-core/motion/effects/registry';
 
 type ProbeConfig = { request: string; reply: string; timeline: string; prefix: string; none: number; pad: number; styles: readonly string[]; attrs: readonly string[] };
 

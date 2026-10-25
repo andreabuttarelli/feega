@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { composite, type Device } from './compositor';
-import { EffectKind, IDENTITY, MaskComposite, PaintKind, node, type Effect, type LayerTree, type Paint } from '../hyperframes/layer-tree';
+import { EffectKind, IDENTITY, MaskComposite, PaintKind, node, type Effect, type LayerTree, type Paint } from '@feega/motion-core/motion/hyperframes/layer-tree';
 
 const clip: Paint = { kind: PaintKind.Fill, color: [1, 1, 1, 1], width: 5, height: 5, at: IDENTITY };
 const sheet = (n: number): Paint => ({ kind: PaintKind.Sheet, sheet: n, width: 10, height: 10, at: IDENTITY });

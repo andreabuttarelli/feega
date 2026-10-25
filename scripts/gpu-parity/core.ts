@@ -3,9 +3,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import sharp from 'sharp';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { parseMotionDoc } from '$lib/motion/doc';
-import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { parseMotionDoc } from '@feega/motion-core/motion/doc';
+import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { differing, luma, ssim } from './metrics';
 
 const ROOT = resolve(import.meta.dirname, '../..');

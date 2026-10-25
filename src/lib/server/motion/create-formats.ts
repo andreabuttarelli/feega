@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MOTION_FORMATS, formatOf, type MotionDoc } from '$lib/motion/doc';
+import { MOTION_FORMATS, formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { reformat, type FormatTarget } from '$lib/motion/reformat';
 import { motionNodeSize } from '$lib/canvas/motion-node';
 import type { UndoItem } from '$lib/canvas/undo-plan';

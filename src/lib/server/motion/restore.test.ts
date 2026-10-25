@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import type { Db } from '$lib/server/db/client';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';

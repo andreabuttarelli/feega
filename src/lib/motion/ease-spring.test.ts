@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
+import { Ease } from '@feega/motion-core/motion/design';
 import { easeCss } from './ease-css';
-import { sampleTrack } from './keyframes';
+import { sampleTrack } from '@feega/motion-core/motion/keyframes';
 
 const STEPS = 200;
 

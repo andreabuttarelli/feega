@@ -1,7 +1,7 @@
-import { springSource } from '../spring';
+import { springSource } from '@feega/motion-core/motion/spring';
 import { UI_SAFE, type UiPiece, type UiSize } from '../ui-kit/kit';
 import { withinBudget, type VectorUi } from './model';
-import { MAX_JS } from '../custom/component';
+import { MAX_JS } from '@feega/motion-core/motion/custom/component';
 
 const JS_MARGIN = 200;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENTS, type ComponentId } from './components';
+import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/components';
 import { CLIP_FAMILIES, ClipFamily, Preview, familyOf, tileFrames } from './track-style';
 
 describe('track-style', () => {

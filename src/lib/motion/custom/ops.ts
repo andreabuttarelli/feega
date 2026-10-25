@@ -1,9 +1,9 @@
-import { CUSTOM_NAME } from '../components';
-import { clipsOf, parseMotionDoc, type MotionDoc } from '../doc';
-import type { OpResult } from '../timeline';
+import { CUSTOM_NAME } from '@feega/motion-core/motion/components';
+import { clipsOf, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { lintReport, lintSource } from './lint';
-import { extractParams } from './params';
-import { ComponentMode, parseComponent, type ComponentCheck, type CustomSource, type PropsSchema, type SourceFile } from './component';
+import { extractParams } from '@feega/motion-core/motion/custom/params';
+import { ComponentMode, parseComponent, type ComponentCheck, type CustomSource, type PropsSchema, type SourceFile } from '@feega/motion-core/motion/custom/component';
 
 export type ComponentDraft = { source: CustomSource; propsSchema: PropsSchema; mode?: ComponentMode };
 

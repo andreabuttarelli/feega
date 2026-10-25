@@ -18,15 +18,15 @@
   import FramePresetSection from '$lib/components/motion/FramePresetSection.svelte';
   import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
-  import type { BrandTokens } from '$lib/motion/brand';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
   import type { ComponentProps } from 'svelte';
-  import { THREE_D_COMPONENTS } from '$lib/motion/components';
+  import { THREE_D_COMPONENTS } from '@feega/motion-core/motion/components';
   import { PickMode } from '$lib/motion/clip-bar';
   import { PropertiesView } from '$lib/motion/properties-view';
   import { barActionLater, frameBarActions, inspectorOf } from '$lib/canvas/frame-inspector';
   import { loadOutliner } from '$lib/motion/fonts/outliner';
   import type { ActionId } from '$lib/motion/actions';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { mergeScope, scopeView } from '$lib/motion/instance-view';
 
   const FIRST_FRAME = 0;

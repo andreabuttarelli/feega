@@ -17,8 +17,8 @@ vi.mock('$lib/server/repos/motion-revisions', () => ({ readHead: async (_db: unk
 vi.mock('./embed', () => ({ publishEmbed, embedPublished: async () => true, isRefused: () => false, removeEmbed: async () => ({ ok: true }) }));
 
 const { publishMotionEmbed } = await import('./agent-embed');
-const { MotionFormat, newMotionDoc } = await import('$lib/motion/doc');
-const { addClip } = await import('$lib/motion/timeline');
+const { MotionFormat, newMotionDoc } = await import('@feega/motion-core/motion/doc');
+const { addClip } = await import('@feega/motion-core/motion/timeline');
 const { sequenceScenes } = await import('$lib/motion/scenes');
 const { motionCompId } = await import('$lib/motion/embed');
 

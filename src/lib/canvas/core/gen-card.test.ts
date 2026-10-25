@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { PathItem } from '$lib/motion/gpu-full/display-list';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
+import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import { mix } from '$lib/canvas/gpu/theme';
 import type { GenTileView } from '$lib/canvas/gen-tile-view';
 import type { Glyphs } from './chrome';

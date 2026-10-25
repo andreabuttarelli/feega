@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { TrackKind } from '$lib/motion/components';
-import { precompose } from '$lib/motion/precomp';
-import { addClip, addTrack, type OpResult } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { precompose } from '@feega/motion-core/motion/precomp';
+import { addClip, addTrack, type OpResult } from '@feega/motion-core/motion/timeline';
 import { exposeField, FieldType } from './fields';
 import { carryEdits, detachTemplate, insertTemplate, keyFieldsOf, isLockedComp, setTemplateValues, templateFields, templateFromComp, templateFromDoc, type MotionTemplate } from './library';
 

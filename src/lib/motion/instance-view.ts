@@ -1,7 +1,7 @@
-import type { MotionClip, MotionComp, MotionDoc } from './doc';
+import type { MotionClip, MotionComp, MotionDoc } from '@feega/motion-core/motion/doc';
 import { instanceOf, innerClips, type Overrides } from './main-component';
-import { CLIP_LEVEL_OVERRIDES, mergeView, overridden, viewOf, type CompPath } from './precomp';
-import { setProps } from './timeline';
+import { CLIP_LEVEL_OVERRIDES, mergeView, overridden, viewOf, type CompPath } from '@feega/motion-core/motion/precomp';
+import { setProps } from '@feega/motion-core/motion/timeline';
 
 export type Hosted = { path: CompPath; hosts: readonly string[] };
 

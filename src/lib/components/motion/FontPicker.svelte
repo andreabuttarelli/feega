@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { BuiltinFont, fontStack, nearestWeight, searchFonts, type CatalogueFont, type FontFace } from '$lib/motion/fonts/model';
+  import { BuiltinFont, fontStack, nearestWeight, searchFonts, type CatalogueFont, type FontFace } from '@feega/motion-core/motion/fonts/model';
   import { MAX_FONT_MB, type FontLibrary } from '$lib/motion/fonts/library';
 
   let {

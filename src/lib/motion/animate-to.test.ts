@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { animateTo } from './animate-to';
-import { addClip, setKeyframes, type OpResult } from './timeline';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {

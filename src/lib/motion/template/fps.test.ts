@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { setFrameRate } from '$lib/motion/frame-rate';
-import type { OpResult } from '$lib/motion/timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { insertTemplate, type Inserted } from './library';
 import { starterDoc } from './catalogue';
 import { builtinTemplate } from './builtins';

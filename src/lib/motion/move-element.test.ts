@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
-import { addClip, setKeyframes, setTransform } from './timeline';
-import { Ease } from './design';
-import { DocMode, docMode, setStill } from './still';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, setTransform } from '@feega/motion-core/motion/timeline';
+import { Ease } from '@feega/motion-core/motion/design';
+import { DocMode, docMode, setStill } from '@feega/motion-core/motion/still';
 import { copyElements, frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, pasteElements, placeElement, pasteOverElements, replaceElements, OutputKind } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';

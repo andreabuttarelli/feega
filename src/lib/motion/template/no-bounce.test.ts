@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from '$lib/motion/design';
+import { Ease } from '@feega/motion-core/motion/design';
 import { uiRing } from '$lib/motion/ui-ring';
 import { PRESET } from '$lib/motion/device-presets';
 import { BUILTIN_TEMPLATES } from './builtins';

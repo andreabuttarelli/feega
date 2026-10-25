@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Unsupported, type Gap } from '$lib/motion/gpu-full/display-list';
+import { Unsupported, type Gap } from '@feega/motion-core/motion/gpu-full/display-list';
 import { histogram } from './histogram';
 
 const gap = (reason: Unsupported, component = 'Shape', detail?: string): Gap => ({ clip: 'c', component: component as Gap['component'], reason, ...(detail ? { detail } : {}) });

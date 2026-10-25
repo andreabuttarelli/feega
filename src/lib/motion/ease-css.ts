@@ -1,6 +1,6 @@
-import { Ease } from './design';
-import { bezierOf } from './graph';
-import { isSpring, sampleTrack, type EaseSpec } from './keyframes';
+import { Ease } from '@feega/motion-core/motion/design';
+import { bezierOf } from '@feega/motion-core/motion/graph';
+import { isSpring, sampleTrack, type EaseSpec } from '@feega/motion-core/motion/keyframes';
 
 const LINEAR_STOPS = 40;
 const DECIMALS = 1000;

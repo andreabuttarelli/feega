@@ -1,7 +1,7 @@
 import { parseHTML } from 'linkedom';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
-import { CUSTOM_CLIP } from '$lib/motion/poster-parts';
-import type { MotionDoc } from '$lib/motion/doc';
+import { CUSTOM_CLIP } from '@feega/motion-core/motion/poster-parts';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 type Parts = Record<string, string[]>;
 export type Schema = { properties?: Record<string, { default?: unknown }> };

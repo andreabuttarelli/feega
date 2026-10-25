@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import { wireCurve } from '$lib/canvas/gpu/geometry';
 import { EdgeLook, OverlayPart, edgeItems, guideItems, marqueeItems, peerItems, type CoreTheme } from './overlay';
 import type { Glyphs } from './chrome';

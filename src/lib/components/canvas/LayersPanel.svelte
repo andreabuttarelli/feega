@@ -26,9 +26,9 @@
   import { readFolds, toggleFold } from '$lib/canvas/layer-folds';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { untrack } from 'svelte';
-  import { PART_SEP } from '$lib/motion/poster-parts';
+  import { PART_SEP } from '@feega/motion-core/motion/poster-parts';
   import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
-  import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
   import { rowWindow } from '$lib/canvas/row-window';
   import { IconButton, IconSize, Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';

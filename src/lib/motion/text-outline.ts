@@ -1,15 +1,15 @@
-import { COMPONENTS } from './components';
-import { findClip, type MotionClip, type MotionDoc } from './doc';
-import { elementFills } from './fill/elements';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { elementFills } from '@feega/motion-core/motion/fill/elements';
 import type { Outliner, PathStep } from './fonts/outliner';
-import { TRANSFORM_KEYS } from './keyframes';
-import { pivotBox } from './parent';
-import { MAX_PATH, ShapeKind } from './shape/schema';
-import { strokesOf } from './stroke/model';
+import { TRANSFORM_KEYS } from '@feega/motion-core/motion/keyframes';
+import { pivotBox } from '@feega/motion-core/motion/parent';
+import { MAX_PATH, ShapeKind } from '@feega/motion-core/motion/shape/schema';
+import { strokesOf } from '@feega/motion-core/motion/stroke/model';
 import { textLook } from './text-look';
 import { measureText } from './text-measure';
-import { editClip, type OpResult } from './timeline';
-import { isText } from './layout/text-extent';
+import { editClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { propsOwner, shownRecord } from './units';
 
 const PRECISION = 1000;

@@ -7,9 +7,9 @@ import './twgl-entry';
 import './fx-entry';
 import './splitting-entry';
 import './open-props-entry';
-import { INPUT_MESSAGE } from '../interactive/runtime';
+import { INPUT_MESSAGE } from '@feega/motion-core/motion/interactive/runtime';
 import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
-import { ERRORS, EVENT_MESSAGE, LIVE_RUNS, Play, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
+import { ERRORS, EVENT_MESSAGE, LIVE_RUNS, Play, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from '@feega/motion-core/motion/custom/runtime';
 
 const ENV = { assets: {}, brand: { name: 'feega', colors: { accent: '#0099ff' }, logoUrl: null }, vars: { speed: 1 } };
 

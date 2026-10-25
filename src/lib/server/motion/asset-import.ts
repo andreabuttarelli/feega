@@ -6,7 +6,7 @@ import { insertAsset } from '$lib/server/repos/assets';
 import { removeAssetFile, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
 import type { ScreenOutcome } from '$lib/server/moderation/screen';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
-import { AssetKind } from '$lib/motion/components';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import type { AssetImport } from './motion-tools';
 
 export const IMPORT_MAX_BYTES = 12_000_000;

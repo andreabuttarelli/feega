@@ -1,5 +1,5 @@
 import { toCanvas } from 'html-to-image';
-import { fitSize } from '../hyperframes/fit-runtime';
+import { fitSize } from '@feega/motion-core/motion/hyperframes/fit-runtime';
 import { PaintKind } from './paint-of';
 import type { Scene, SceneLayer } from './scene';
 

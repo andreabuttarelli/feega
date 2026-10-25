@@ -1,26 +1,26 @@
-import { PartKind, parsePart, partKind } from './poster-parts';
+import { PartKind, parsePart, partKind } from '@feega/motion-core/motion/poster-parts';
 import { Reach, partUsage, reach } from './part-usage';
-import { withModifierParam } from './shape/model';
-import { fillReplaces } from './fill/elements';
-import { strokeReplaces } from './stroke/elements';
-import { modifierOfKey, shapeFieldShown, type Modifier, type ShapeKind } from './shape/schema';
+import { withModifierParam } from '@feega/motion-core/motion/shape/model';
+import { fillReplaces } from '@feega/motion-core/motion/fill/elements';
+import { strokeReplaces } from '@feega/motion-core/motion/stroke/elements';
+import { modifierOfKey, shapeFieldShown, type Modifier, type ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { z } from 'zod';
-import { AssetKind, COMPONENTS, Control, Group, type ComponentId } from './components';
-import { FPS } from './design';
-import { Source, ValueKind, animProp, baseValue, sampleColor, sampleTrack, type AnimProp, type Animated, type KeyValue } from './keyframes';
-import type { MotionClip, MotionDoc } from './doc';
-import { MASK_PROPS, type MaskKey } from './mask';
-import { removeKeyframes, setKeyframe, setMask, setProps, setTransform, type OpResult } from './timeline';
-import { PropFormat, type PropSpec, type PropsSchema } from './custom/component';
-import { withParams } from './custom/params';
-import { effectOfKey } from './effects/model';
-import { applyFillKeys } from './fill/keys';
-import { fillsOf } from './fill/model';
+import { AssetKind, COMPONENTS, Control, Group, type ComponentId } from '@feega/motion-core/motion/components';
+import { FPS } from '@feega/motion-core/motion/design';
+import { Source, ValueKind, animProp, baseValue, sampleColor, sampleTrack, type AnimProp, type Animated, type KeyValue } from '@feega/motion-core/motion/keyframes';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { MASK_PROPS, type MaskKey } from '@feega/motion-core/motion/mask';
+import { removeKeyframes, setKeyframe, setMask, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+import { PropFormat, type PropSpec, type PropsSchema } from '@feega/motion-core/motion/custom/component';
+import { withParams } from '@feega/motion-core/motion/custom/params';
+import { effectOfKey } from '@feega/motion-core/motion/effects/model';
+import { applyFillKeys } from '@feega/motion-core/motion/fill/keys';
+import { fillsOf } from '@feega/motion-core/motion/fill/model';
 import { setEffect } from './effects/ops';
-import { SELECTOR, animatorOfKey } from './text-animators/model';
-import { setAnimator } from './text-animators/ops';
-import { textPathPatch } from './text-path/model';
-import { setTextPath } from './text-path/ops';
+import { SELECTOR, animatorOfKey } from '@feega/motion-core/motion/text-animators/model';
+import { setAnimator } from '@feega/motion-core/motion/text-animators/ops';
+import { textPathPatch } from '@feega/motion-core/motion/text-path/model';
+import { setTextPath } from '@feega/motion-core/motion/text-path/ops';
 
 export enum InspectorTab {
   Properties = 'properties',

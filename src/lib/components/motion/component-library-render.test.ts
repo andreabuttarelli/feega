@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import ComponentLibrary from './ComponentLibrary.svelte';
 import ComponentDetail from './ComponentDetail.svelte';
-import { MotionFormat } from '$lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { BUILTIN_TEMPLATES, builtinTemplate } from '$lib/motion/template/builtins';
 import { AddTarget, catalogue, starterDoc, type StarterFormat } from '$lib/motion/template/catalogue';
 import { PROMPT_TEMPLATE_ID } from '$lib/motion/template/prompt-input/template';
 import { PROMPT_VAR_PREFIX } from '$lib/motion/template/prompt-input/component';
-import { paramVar } from '$lib/motion/custom/component';
+import { paramVar } from '@feega/motion-core/motion/custom/component';
 
 const items = catalogue(BUILTIN_TEMPLATES);
 

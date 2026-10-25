@@ -1,7 +1,7 @@
 import { DrawTool } from '$lib/motion/draw-tool';
-import { TEXT_SIZINGS } from '$lib/motion/text-sizing';
+import { TEXT_SIZINGS } from '@feega/motion-core/motion/text-sizing';
 import { CANVAS_INK, CanvasTheme, type CanvasBox, type DrawnWire, type PenPaint } from '$lib/motion/draw-create';
-import { mapOutline, parsePath, pathData } from '$lib/motion/shape/geometry';
+import { mapOutline, parsePath, pathData } from '@feega/motion-core/motion/shape/geometry';
 
 type Point = { x: number; y: number };
 type DrawnClip = { component: string; props: Record<string, unknown> };

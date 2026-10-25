@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Horizontal, Vertical, resizeFrame, setConstraints } from './constraints';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { pivotBox } from '../parent';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { pivotBox } from '@feega/motion-core/motion/parent';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {

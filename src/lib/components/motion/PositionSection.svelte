@@ -13,18 +13,18 @@
   import RotateCw from '@lucide/svelte/icons/rotate-cw-square';
   import FlipHorizontal from '@lucide/svelte/icons/flip-horizontal-2';
   import FlipVertical from '@lucide/svelte/icons/flip-vertical-2';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { setProps, setTransform, type OpResult } from '$lib/motion/timeline';
-  import { setClipFlags } from '$lib/motion/organize';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+  import { setClipFlags } from '@feega/motion-core/motion/organize';
   import { Action } from '$lib/motion/actions';
   import IconButton from './IconButton.svelte';
-  import { HORIZONTALS, Horizontal, VERTICALS, Vertical } from '$lib/motion/constraints/model';
+  import { HORIZONTALS, Horizontal, VERTICALS, Vertical } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { Side, Toggle, pinnedHorizontally, pinnedVertically, toggleHorizontal, toggleVertical } from '$lib/motion/constraints/sides';
   import { Edge } from '$lib/motion/space';
   import { Flip, QUARTER_TURN, flipClips, turnClips } from '$lib/motion/layer-props';
-  import { pivotBox } from '$lib/motion/parent';
-  import { TRANSFORM } from '$lib/motion/keyframes';
+  import { pivotBox } from '@feega/motion-core/motion/parent';
+  import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
 
   let { doc, clip, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
 

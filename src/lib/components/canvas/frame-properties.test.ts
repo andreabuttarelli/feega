@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FrameProperties, typingInBar } from './frame-properties.svelte';
-import { DocMode } from '$lib/motion/doc';
+import { DocMode } from '@feega/motion-core/motion/doc';
 
 describe('frame properties handed to the right bar', () => {
   it('holds the session of the frame being edited until it is cleared', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
 import sharp from 'sharp';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { AttachmentKind } from '$lib/chat-attachments';
 

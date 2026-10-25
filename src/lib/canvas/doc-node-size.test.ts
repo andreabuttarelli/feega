@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat } from '$lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { FrameKind, docNodeSize, motionNodeSize } from './motion-node';
 
 const page = { width: 1440, height: 900 };

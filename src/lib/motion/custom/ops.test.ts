@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setProps, type OpResult } from '../timeline';
-import { CheckState, ComponentMode, sourceHash } from './component';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { CheckState, ComponentMode, sourceHash } from '@feega/motion-core/motion/custom/component';
 import { Occurrence, recordCheck, removeComponent, updateComponent, writeComponent } from './ops';
 
 function must(r: OpResult): MotionDoc {

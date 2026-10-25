@@ -72,7 +72,7 @@ import { CANVAS_TEMPLATES } from '$lib/canvas/templates';
 import { WIRE_MODES } from '$lib/canvas-edges';
 import { cancelWorkflow, enqueueWorkflow, planWorkflowDryRun, workflowCredits } from '$lib/server/canvas/workflow';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
-import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { FORMATS, MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
 import { motionNodeSize } from '$lib/canvas/motion-node';
 import { cancelRender } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';

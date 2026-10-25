@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { resolveMedia } from './compose';
-import { fillsSchema } from '../fill/model';
+import { resolveMedia } from '@feega/motion-core/motion/hyperframes/compose';
+import { fillsSchema } from '@feega/motion-core/motion/fill/model';
 
 const image = (raw: Record<string, unknown>) => fillsSchema.parse([{ type: 'image', ...raw }]);
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { Background, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip } from './timeline';
-import { designStill } from './still';
+import { Background, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { designStill } from '@feega/motion-core/motion/still';
 
 const video = newMotionDoc(MotionFormat.Square);
 const still: MotionDoc = { ...video, still: { frame: 0 } };

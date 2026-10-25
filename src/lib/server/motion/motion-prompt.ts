@@ -2,10 +2,10 @@ import { THREE_GUIDANCE } from './three-guidance';
 import { Vision, VIEW_FRAMES, MAX_FRAMES_PER_VIEW } from './frames';
 import { FORBIDDEN_NAMES } from '$lib/motion/custom/lint';
 import { EXPRESSION_EXAMPLES } from '$lib/motion/expression/guide';
-import { EFFECT_KINDS } from '$lib/motion/effects/registry';
+import { EFFECT_KINDS } from '@feega/motion-core/motion/effects/registry';
 import { UNITS_GUIDE } from '$lib/motion/units';
 import { HOUSE_DEFAULTS_RULE, STYLES } from '$lib/motion/style';
-import { DEFAULT_STYLE, type MotionStyle } from '$lib/motion/style-model';
+import { DEFAULT_STYLE, type MotionStyle } from '@feega/motion-core/motion/style-model';
 import { WEB_GUIDANCE } from '$lib/server/web/web-tools';
 import { LOOP_RULE } from '$lib/motion/loop';
 

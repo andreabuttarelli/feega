@@ -1,6 +1,6 @@
-import { compOf, findClip, type MotionClip, type MotionComp, type MotionDoc } from './doc';
-import { precompose, withOverride } from './precomp';
-import { setProps, type OpResult } from './timeline';
+import { compOf, findClip, type MotionClip, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { precompose, withOverride } from '@feega/motion-core/motion/precomp';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export type NewId = () => string;
 

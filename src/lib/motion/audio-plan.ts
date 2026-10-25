@@ -1,8 +1,8 @@
-import type { ComponentId } from './components';
-import { clipsOf, type MotionClip, type MotionDoc } from './doc';
-import { flattenComps } from './precomp';
-import { SOUND, sampleTrack } from './keyframes';
-import { isRemapped } from './time-remap';
+import type { ComponentId } from '@feega/motion-core/motion/components';
+import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
+import { SOUND, sampleTrack } from '@feega/motion-core/motion/keyframes';
+import { isRemapped } from '@feega/motion-core/motion/time-remap';
 
 export type GainPoint = { time: number; value: number };
 export type AudioEntry = { clipId: string; url: string; at: number; offset: number; duration: number; left: GainPoint[]; right: GainPoint[] };

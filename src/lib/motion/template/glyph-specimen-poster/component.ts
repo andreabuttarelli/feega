@@ -1,4 +1,4 @@
-import { VAR_PREFIX, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
+import { VAR_PREFIX, type CustomComponent, type PropSpec } from '@feega/motion-core/motion/custom/component';
 import { colourProp, fontProp, linesProp, numberProp, posterComponent, prefixProp, smallTextProps, textPartProps } from '../poster-kit';
 import { GLYPH_SPECIMEN_CSS, GLYPH_SPECIMEN_VIEW } from './view';
 

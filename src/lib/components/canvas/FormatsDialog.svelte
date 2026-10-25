@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FORMATS } from '$lib/motion/doc';
+  import { FORMATS } from '@feega/motion-core/motion/doc';
   import { CREATE_FORMATS, type FormatTarget } from '$lib/motion/reformat';
 
   let { oncreate, onclose }: { oncreate: (targets: FormatTarget[]) => void; onclose: () => void } = $props();

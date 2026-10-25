@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { installEngine, type TestTimeline } from '../engine/testing';
-import { FEEGA_TOKENS } from '../brand';
-import { Ease } from '../design';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { ParentOpacity } from '../parent';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { ParentOpacity } from '@feega/motion-core/motion/parent';
 import { addNull, setParent, setParentOpacity } from '../parent-ops';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
 import { seekPlan } from '../custom/determinism';
-import { composeHtml } from './compose';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

@@ -1,5 +1,5 @@
-import type { PathItem } from '$lib/motion/gpu-full/display-list';
-import { dashes } from '$lib/motion/gpu-full/stroke';
+import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import type { Glyphs } from './chrome';

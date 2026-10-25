@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { displayListAt, FilterKind, ItemKind, type PathItem } from './display-list';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { displayListAt, FilterKind, ItemKind, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

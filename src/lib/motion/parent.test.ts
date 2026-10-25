@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { DOC_VERSION, MotionFormat, findClip, newMotionDoc, parseMotionDoc, upgradeDoc, type MotionDoc } from './doc';
-import { ParentOpacity, ancestorsOf, apply2d, childrenOf, parentChoices, worldAt } from './parent';
+import { Ease } from '@feega/motion-core/motion/design';
+import { DOC_VERSION, MotionFormat, findClip, newMotionDoc, parseMotionDoc, upgradeDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { ParentOpacity, ancestorsOf, apply2d, childrenOf, parentChoices, worldAt } from '@feega/motion-core/motion/parent';
 import { KeepWorld, addNull, nullFromSelection, setParent, setParentOpacity } from './parent-ops';
-import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
+import { addClip, setKeyframes, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

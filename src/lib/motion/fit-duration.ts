@@ -1,7 +1,7 @@
-import { TrackKind, type ComponentId } from './components';
-import type { MotionDoc } from './doc';
+import { TrackKind, type ComponentId } from '@feega/motion-core/motion/components';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { STYLES, styleOf } from './style';
-import type { OpResult } from './timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 type Clip = MotionDoc['tracks'][number]['clips'][number];
 

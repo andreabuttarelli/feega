@@ -1,10 +1,10 @@
-import { TrackKind } from '$lib/motion/components';
-import { MotionFormat, type MotionDoc } from '$lib/motion/doc';
-import type { FontFace } from '$lib/motion/fonts/model';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { FontFace } from '@feega/motion-core/motion/fonts/model';
 import { assemble, type Beat, type TrackSpec } from '$lib/motion/template-kit';
 import { exposeField, FieldType, type FieldInput } from './fields';
 import type { TemplateEntry } from './library';
-import type { KeyFields } from './key-fields';
+import type { KeyFields } from '@feega/motion-core/motion/template/key-fields';
 
 export const BUILTIN_PREFIX = 'builtin:';
 

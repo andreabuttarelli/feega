@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { Align, Direction, Justify, TrackType } from '$lib/motion/layout/auto-layout';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Align, Direction, Justify, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
 import { setAutoLayout, wrapInAutoLayout } from '$lib/motion/layout/ops';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import AutoLayoutSection from './AutoLayoutSection.svelte';
 
 

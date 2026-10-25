@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc, findClip } from '../doc';
-import { parsePath } from '../shape/geometry';
+import { MotionFormat, newMotionDoc, parseMotionDoc, findClip } from '@feega/motion-core/motion/doc';
+import { parsePath } from '@feega/motion-core/motion/shape/geometry';
 import { ICON_NAMES, addIcon } from './icons';
 
 describe('built-in icons', () => {

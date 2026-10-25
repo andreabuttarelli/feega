@@ -59,7 +59,7 @@ describe('/app/compose starts a composition from a template', () => {
     const motion = (id: string, poster: string | null, render: string | null) => ({ id, projectId: 'p1', canvasId: 'c1', name: id, updatedAt: '2026-10-08', data: { docHeadRevision: 2, posterAssetId: poster, lastRenderAssetId: render } });
     listRecentNodes.mockResolvedValueOnce([motion('m1', 'po1', 're1'), motion('m2', null, 're2'), motion('m3', null, null)]);
     const { newDraft, applyDraft } = await import('$lib/motion/composition-draft');
-    const { newMotionDoc } = await import('$lib/motion/doc');
+    const { newMotionDoc } = await import('@feega/motion-core/motion/doc');
     const verdict = applyDraft(newMotionDoc(newDraft('helix').format), newDraft('helix'));
     const doc = verdict.ok ? verdict.doc : null;
     readHeads.mockResolvedValueOnce(new Map(['m1', 'm2', 'm3'].map((id) => [id, { version: 2, doc, summary: null, actorKind: 'user' }])));

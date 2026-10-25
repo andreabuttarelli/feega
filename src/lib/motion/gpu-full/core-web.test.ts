@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BlendMode } from '../blend';
-import { ItemKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem } from './display-list';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { ItemKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { Pictures } from './raster';
 import { GL_PICTURE_SIDE, glPictureSize, pictureKey, wantedPictures, warmCore, rasterOf } from './core-web';
 

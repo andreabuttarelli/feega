@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { motionEngine, type EaseFn } from './engine';
+import { motionEngine, type EaseFn } from '@feega/motion-core/motion/engine/engine';
 
 const engine = motionEngine({} as Window & Record<string, unknown>);
 const SAMPLES = 2000;

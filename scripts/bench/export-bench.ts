@@ -4,17 +4,17 @@ import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { build } from 'vite';
 import { chromium, webkit, type BrowserType } from 'playwright';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { composeHtml } from '$lib/motion/hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { exportSize } from '$lib/motion/export-plan';
 import { Resolution } from '$lib/motion/render-quote';
-import { CAPTURE_REQUEST, Layering } from '$lib/motion/hyperframes/capture';
-import type { MotionDoc } from '$lib/motion/doc';
+import { CAPTURE_REQUEST, Layering } from '@feega/motion-core/motion/hyperframes/capture';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { STATS_REPLY, STATS_REQUEST, withProbe, type BenchInput, type BenchResult, type ParityFrame, type ParityInput } from './probe';
 import base from '../vite-node.config';
 import { libraryPath } from '../motion-libs';
-import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
-import { MOTION_LIBS_ROUTE } from '$lib/motion/libs/catalog';
+import { lanesWithin, webglPerLane } from '@feega/motion-core/motion/export/webgl-budget';
+import { MOTION_LIBS_ROUTE } from '@feega/motion-core/motion/libs/catalog';
 
 const ENGINES: Record<string, BrowserType> = { chromium, webkit };
 const LAUNCH: Record<string, Parameters<BrowserType['launch']>[0]> = {

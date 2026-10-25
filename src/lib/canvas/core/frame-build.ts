@@ -1,9 +1,9 @@
-import type { BrandTokens } from '$lib/motion/brand';
-import type { MotionDoc } from '$lib/motion/doc';
-import { drawFrame, prepare, type DisplayList } from '$lib/motion/gpu-full/display-list';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 import { readClips } from '$lib/motion/gpu-full/dom/custom';
-import type { FaceBook } from '$lib/motion/gpu-full/text/face';
-import type { Smoothing } from '$lib/motion/gpu-full/text/painter';
+import type { FaceBook } from '@feega/motion-core/motion/gpu-full/text/face';
+import type { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { sceneNodeIds } from '$lib/motion/scenes';
 import { frameOfLive } from './frame-source';
 

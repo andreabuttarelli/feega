@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MIXED } from '$lib/motion/text-runs';
-import { ListKind } from '$lib/motion/text-lists';
+import { MIXED } from '@feega/motion-core/motion/text-runs';
+import { ListKind } from '@feega/motion-core/motion/text-lists';
 import { TextRange } from './text-range.svelte';
 
 describe('the text selection Properties edits while typing', () => {

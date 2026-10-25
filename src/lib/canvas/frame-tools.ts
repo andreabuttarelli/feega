@@ -1,4 +1,4 @@
-import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { canEditPoints } from '$lib/motion/shape/vector-edit';
 import { FrameView, shows, type FrameViews } from './frame-view';

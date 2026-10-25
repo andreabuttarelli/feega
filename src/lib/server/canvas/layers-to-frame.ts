@@ -5,7 +5,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import { frameStore } from '$lib/server/motion/move-element';
 import { layersFrame, type PlacedLayer } from '$lib/motion/layers-frame';
 import { OutputKind, type Output } from '$lib/motion/move-element';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { LayerBox } from '$lib/layer-boxes';
 
 const FRAME_GAP = 80;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
-import { addClip, setKeyframes } from './timeline';
-import { Ease } from './design';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes } from '@feega/motion-core/motion/timeline';
+import { Ease } from '@feega/motion-core/motion/design';
 import { OpKind, applyOps, diffDoc, rebase } from './doc-ops';
 
 function must(result: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {

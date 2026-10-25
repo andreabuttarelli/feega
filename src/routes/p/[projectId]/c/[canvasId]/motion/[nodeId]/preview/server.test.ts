@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MotionFormat, newClip, newMotionDoc } from '$lib/motion/doc';
-import { defaultProps } from '$lib/motion/components';
+import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { defaultProps } from '@feega/motion-core/motion/components';
 
 const state = vi.hoisted(() => ({ head: null as null | Record<string, unknown> }));
 

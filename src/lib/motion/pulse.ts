@@ -1,6 +1,6 @@
-import { clipsOf, type MotionDoc } from './doc';
-import type { OpResult } from './timeline';
-import { setExpression } from './expression/ops';
+import { clipsOf, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
 
 export enum PulseProp {
   Scale = 'scale',

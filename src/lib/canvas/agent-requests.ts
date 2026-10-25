@@ -1,7 +1,7 @@
 import { CHECK_REQUEST, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
-import { CheckState } from '$lib/motion/custom/component';
+import { CheckState } from '@feega/motion-core/motion/custom/component';
 import type { CheckRun } from '$lib/motion/custom/run-check';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 export type AgentPart = { type: string; data: unknown };
 export type DrawnFrame = { time: number; data: string };

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { setProps } from '$lib/motion/timeline';
-  import { LineEdit, editLines, lineRows, markedPoster } from '$lib/motion/poster-lines';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { setProps } from '@feega/motion-core/motion/timeline';
+  import { LineEdit, editLines, lineRows, markedPoster } from '@feega/motion-core/motion/poster-lines';
 
   let { doc, clip, onchange }: { doc: MotionDoc; clip: MotionClip; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 

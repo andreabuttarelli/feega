@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { FPS } from '../design';
-import { MotionFormat, newMotionDoc, parseMotionDoc } from '../doc';
-import { addClip } from '../timeline';
-import { bakeComposition, CAMERA_FIELDS, INSTANCE_FIELDS, type CompositionProps } from './composition';
+import { FPS } from '@feega/motion-core/motion/design';
+import { MotionFormat, newMotionDoc, parseMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { bakeComposition, CAMERA_FIELDS, INSTANCE_FIELDS, type CompositionProps } from '@feega/motion-core/motion/hyperframes/composition';
 
 const RING = {
   kind: 'spec' as const,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BRIEF_AUTO_GO_S, GO_MESSAGE, briefAwaits, pendingBoard, pendingBrief, promptTexts, savedBrief } from './script-brief';
-import { MotionFormat, newMotionDoc } from './doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { toolsForMirror } from '$lib/chat-stream-events';
 
 const written = { toolName: 'write_script', status: 'done' as const, output: { ok: true, brief: '**Research**\n- For: makers' } };

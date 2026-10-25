@@ -1,6 +1,6 @@
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { setParent } from './parent-ops';
-import { duplicateClip, removeClips, splitClip, type OpResult } from './timeline';
+import { duplicateClip, removeClips, splitClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum ClipOp {
   Split = 'split',

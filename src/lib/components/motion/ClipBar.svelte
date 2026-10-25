@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { Caption, type ActionId } from '$lib/motion/actions';
   import { PickMode, barActions } from '$lib/motion/clip-bar';
   import IconButton from './IconButton.svelte';

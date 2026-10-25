@@ -1,6 +1,6 @@
-import type { MotionDoc } from './doc';
-import { PlayMode, interactiveOf } from './interactive/settings';
-import { MotionStyle } from './style-model';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { PlayMode, interactiveOf } from '@feega/motion-core/motion/interactive/settings';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
 
 export enum Ending {
   LoopOff = 'loop-off',
