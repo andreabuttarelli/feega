@@ -1,1 +1,0 @@
-{"default":{"identifier":"default","description":"The bundled page only. The hosted app gets no IPC.","local":true,"windows":["main"],"permissions":["core:default"]}}
