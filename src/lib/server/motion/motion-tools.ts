@@ -42,7 +42,7 @@ import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, defaultProps, type Com
 import { fieldsOf } from '$lib/motion/inspector';
 import { EASE_IDS, Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
-import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
+import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MOTION_FORMATS, MotionFormat, clipsOf, findClip, formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { sceneEdit } from '$lib/motion/scenes';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
@@ -143,8 +143,8 @@ import { Zone, ranked } from '$lib/motion/vector-ui/importance';
 import { SHOTS, SHOT_IDS, ShotCursor, ShotUi, shotPreview } from '$lib/motion/shots/library';
 import { CURSOR_GUIDE, CURSOR_SLOT } from '$lib/motion/shots/cursor';
 import { ShotSound, sfxLabel, type Sfx, type SfxCue } from '$lib/motion/sfx';
-import { ShotFocus, addShot, placeSfx } from '$lib/motion/shots/ops';
-import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
+import { ShotFocus, addShot, placeSfx, shotSlots } from '$lib/motion/shots/ops';
+import { RECREATE_STATES, UI_KINDS, UI_KIT, UiKind, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
 import { MORPH_KINDS, DEFAULT_REEL } from '$lib/motion/ui-morph/reel';
 import { addMorphReel } from '$lib/motion/ui-morph/ops';
 import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
@@ -606,6 +606,23 @@ function explained(doc: MotionDoc, error: string): string {
   return error;
 }
 
+type KitProp = { type: string; default?: unknown; minimum?: number; maximum?: number; format?: string };
+
+const kitPropsMade = new Map<UiKind, Record<string, KitProp>>();
+
+function kitProps(kind: UiKind): Record<string, KitProp> {
+  const made = kitPropsMade.get(kind);
+  if (made) {
+    return made;
+  }
+  const piece = UI_KIT[kind];
+  const written = writeComponent(newMotionDoc(MotionFormat.Landscape), piece.name, { source: { html: piece.html, css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } });
+  const properties = written.ok ? written.doc.components[piece.name].propsSchema.properties : {};
+  const props = Object.fromEntries(Object.entries(properties).map(([key, spec]) => [key, { type: spec.type, default: spec.default, minimum: spec.minimum, maximum: spec.maximum, format: spec.format }]));
+  kitPropsMade.set(kind, props);
+  return props;
+}
+
 function propsError(doc: MotionDoc, clipId: string, patch: Record<string, unknown>, error: string): string {
   const clip = findClip(doc, clipId)?.clip;
   if (!clip) {
@@ -671,7 +688,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   };
   const propsIn = (component: ComponentId, props: Record<string, unknown> = {}) => storedRecord(propsOwner(component), props, session.doc);
   const newFromPx = (component: ComponentId, props: Record<string, unknown> = {}) => propsFromPx(props, shownRecord(propsOwner(component), defaultProps(component), session.doc), session.doc);
-  const editFromPx = (clipId: string, props: Record<string, unknown>) => propsFromPx(props, shownRecord(propsOf(clipId), findClip(session.doc, clipId)?.clip.props ?? {}, session.doc), session.doc);
+  const ownPropsOf = (clipId: string): ReadonlySet<string> => {
+    const clip = findClip(session.doc, clipId)?.clip;
+    const custom = clip?.component === 'Custom' ? session.doc.components[String(clip.props.name)] : undefined;
+    return new Set(Object.keys(custom?.propsSchema.properties ?? {}));
+  };
+  const editFromPx = (clipId: string, props: Record<string, unknown>) => propsFromPx(props, shownRecord(propsOf(clipId), findClip(session.doc, clipId)?.clip.props ?? {}, session.doc), session.doc, ownPropsOf(clipId));
   const keyIn =
     (owner: Owner, prop: string) =>
     (k: KeyInput): Keyframe =>
@@ -2578,7 +2600,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_ui: tool({
-      description: `Recreate a piece of product UI live, as vector UI in the brand style, instead of a screenshot: ${UI_KINDS.map((k) => `${k} (${UI_KIT[k].about})`).join(' ')} Every piece also takes font, ink, muted, paper, line, accent (colours from analyze_site or use_brand), radius (px, the site's corners), zoom (size) and speed (1 = default timing). It animates itself across its duration; give it at least 2.5 s. Move, scale and keyframe the clip like any other (camera following the action).`,
+      description: `Recreate a piece of product UI live, as vector UI in the brand style, instead of a screenshot: ${UI_KINDS.map((k) => `${k} (${UI_KIT[k].about})`).join(' ')} Every piece also takes font, ink, muted, paper, line, accent (colours from analyze_site or use_brand), radius (px, the site's corners), zoom (size) and speed (1 = default timing). It animates itself across its duration; give it at least 2.5 s. Move, scale and keyframe the clip like any other (camera following the action). Each kind's own props, typed: list_ui_kinds.`,
       inputSchema: z.object({ kind: z.enum(UI_KINDS), start: z.number().min(0), duration: z.number().positive(), props: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(), track_id: z.string().optional() }),
       execute: async (input) => {
         const piece = UI_KIT[input.kind];
@@ -2596,6 +2618,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const shown = created(apply(placed, `added ${piece.name}`), id);
         return shown.ok ? { ...shown, anchors: Object.keys(anchorsOf(session.doc, id)?.anchors ?? {}) } : shown;
       }
+    }),
+
+    list_ui_kinds: tool({
+      description: 'The props of each add_ui kind, with type, default and range, before you place one; kind narrows it to one.',
+      inputSchema: z.object({ kind: z.enum(UI_KINDS).optional() }),
+      execute: async (input) => ({ ok: true, kinds: (input.kind ? [input.kind] : UI_KINDS).map((kind) => ({ kind, about: UI_KIT[kind].about, props: kitProps(kind) })) })
     }),
 
     recreate_ui: tool({
@@ -2645,7 +2673,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     list_shots: tool({
       description: 'The library of premium shots: handcrafted, deterministic scenes with their own camera move, secondary motion, house easing and holds. For a trailer or product film, direct with shots (add_shot) instead of laying out primitives.',
       inputSchema: z.object({}),
-      execute: async () => ({ ok: true, shots: SHOT_IDS.map((id) => ({ id, about: SHOTS[id].about, slots: Object.keys(SHOTS[id].slots.shape), text_limits: SHOTS[id].limits, seconds: SHOTS[id].seconds, needs_ui: SHOTS[id].ui === ShotUi.Required, cursor: SHOTS[id].cursor === ShotCursor.Scripted ? CURSOR_GUIDE : null, preview: shotPreview(id) })) })
+      execute: async () => ({ ok: true, shots: SHOT_IDS.map((id) => ({ id, about: SHOTS[id].about, slots: shotSlots(id), text_limits: SHOTS[id].limits, seconds: SHOTS[id].seconds, needs_ui: SHOTS[id].ui === ShotUi.Required, cursor: SHOTS[id].cursor === ShotCursor.Scripted ? CURSOR_GUIDE : null, preview: shotPreview(id) })) })
     }),
 
     add_shot: tool({
