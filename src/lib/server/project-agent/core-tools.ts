@@ -39,11 +39,20 @@ export function slimSchema(schema: unknown, depth = 0): unknown {
   );
 }
 
+function namedIn(schema: unknown, line: string): unknown {
+  if (!isObject(schema) || !isObject(schema.properties)) {
+    return schema;
+  }
+  const required = new Set(Array.isArray(schema.required) ? (schema.required as string[]) : []);
+  const kept = Object.entries(schema.properties).filter(([name]) => required.has(name) || line.includes(name));
+  return { ...schema, properties: Object.fromEntries(kept) };
+}
+
 export function slimTool(original: Tool, line: string): Tool {
   const full = asSchema(original.inputSchema);
   return tool({
     description: line,
-    inputSchema: jsonSchema(slimSchema(full.jsonSchema) as never),
+    inputSchema: jsonSchema(slimSchema(namedIn(full.jsonSchema, line)) as never),
     execute: async (input: unknown, options) => {
       const checked = await full.validate?.(input);
       if (checked && !checked.success) {
