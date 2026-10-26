@@ -640,6 +640,26 @@ describe("readTree", () => {
         ...part,
       });
 
+    it("inks svg text with its fill", () => {
+      const svg = el({ parent: 0, tag: "svg", svg: true, size: [100, 40] });
+      const text = el({
+        parent: 1,
+        tag: "text",
+        svg: true,
+        at: null,
+        text: "ab",
+        lines: [line(["a", "b"], [20, 26])],
+        style: { fill: "rgb(0, 0, 255)", "font-family": '"Inter Tight", system-ui', "font-size": "10px", "font-weight": "600" },
+      });
+      const read = readTree(tree(root(), svg, text), typeset());
+
+      expect(read.gaps).toEqual([]);
+      expect((read.drawn as DrawnPath[]).map((g) => g.paint)).toEqual([
+        { kind: PaintKind.Solid, color: [0, 0, 1, 1] },
+        { kind: PaintKind.Solid, color: [0, 0, 1, 1] },
+      ]);
+    });
+
     it("draws every glyph where the browser placed it, on the line baseline", () => {
       const read = readTree(tree(root(), label()), typeset());
       const glyphs = read.drawn as DrawnPath[];
@@ -1282,6 +1302,32 @@ describe("readTree, CSS a motion template draws with", () => {
       [20, 0],
       [180, 200],
     ]);
+  });
+
+  it("draws an svg the probe rasterised as its bitmap, and nothing inside it", () => {
+    const svg = el({ parent: 0, tag: "svg", svg: true, at: [10, 20], size: [50, 40], layer: 2 });
+    const masked = el({ parent: 1, tag: "rect", svg: true, at: null, attrs: { width: "50", height: "40", mask: "url(#m)" }, style: { fill: 'url("#dots")' } });
+
+    expect(readTree(tree(root(), svg, masked))).toEqual({
+      drawn: [{ kind: DrawnKind.Layer, layer: 2, width: 50, height: 40, opacity: 1, matrix: [1, 0, 0, 1, 10, 20] }],
+      gaps: [],
+    });
+  });
+
+  it("cuts out the band a hard-stopped mask-image hides", () => {
+    const stencil = box({
+      "mask-image":
+        "linear-gradient(90deg, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 40%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0) 60%, rgb(0, 0, 0) 60%)",
+      "background-color": "rgb(255, 0, 0)",
+    });
+
+    const read = readTree(tree(root(), stencil));
+    const [layer] = read.drawn[0].masks ?? [];
+    const xs = layer.cover.kind === CoverKind.Path ? layer.cover.contours.flat().filter((_, i) => i % 2 === 0).map((x) => apply2d(layer.cover.matrix, [x, 0])[0]) : [];
+
+    expect(read.gaps).toEqual([]);
+    expect(layer).toMatchObject({ invert: true, cover: { kind: CoverKind.Path, contours: [expect.any(Array)] } });
+    expect([Math.min(...xs), Math.max(...xs)].map(Math.round)).toEqual([80, 120]);
   });
 
   it("still refuses a mask-image it cannot split into edge fades", () => {

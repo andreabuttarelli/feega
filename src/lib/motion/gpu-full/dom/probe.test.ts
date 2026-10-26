@@ -183,4 +183,28 @@ describe("domProbe", () => {
     expect(kids[2].style.color).toBe("rgb(4, 5, 6)");
     expect(document.querySelectorAll(".grain span")).toHaveLength(0);
   });
+
+  it("hands an svg with masks or pattern paint a bitmap of the whole svg, and not a plain one", async () => {
+    const { reply } = await asked(
+      '<svg width="40" height="40"><defs><pattern id="dots"></pattern><mask id="m"></mask></defs><rect width="40" height="40" fill="url(#dots)" mask="url(#m)"></rect></svg><svg width="10" height="10"><rect width="10" height="10"></rect></svg>',
+    );
+    const nodes = (reply.trees[CLIP] as { nodes: { tag: string; layer: number }[] }).nodes;
+
+    expect(nodes.filter((n) => n.tag === "svg").map((n) => n.layer !== NO_INDEX)).toEqual([true, false]);
+  });
+
+  it("places svg text by its characters in the text's own user space, without a raster", async () => {
+    const extents: Record<string, DOMRect> = { 0: { x: 5, y: 8, width: 6, height: 14 } as DOMRect, 1: { x: 11, y: 8, width: 6, height: 14 } as DOMRect };
+    Object.assign(window.SVGElement.prototype, {
+      getNumberOfChars: () => 2,
+      getExtentOfChar: (i: number) => extents[i],
+    });
+
+    const { reply } = await asked('<svg width="40" height="40"><text x="5" y="20">ab</text></svg>');
+    const nodes = (reply.trees[CLIP] as { nodes: { tag: string; lines: unknown[]; raster: unknown }[] }).nodes;
+    const text = nodes.find((n) => n.tag === "text");
+
+    expect(text?.lines).toEqual([{ chars: ["a", "b"], xs: [5, 11], top: 8, height: 14 }]);
+    expect(text?.raster).toBeNull();
+  });
 });
