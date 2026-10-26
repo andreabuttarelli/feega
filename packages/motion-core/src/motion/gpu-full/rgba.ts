@@ -4,6 +4,7 @@ const BYTE = 255;
 const TRANSPARENT: Rgba = [0, 0, 0, 0];
 const HEX = /^#([0-9a-f]{3,8})$/i;
 const FUNCTIONAL = /^rgba?\(([^)]+)\)$/i;
+const SRGB = /^color\(srgb\s+([^)]+)\)$/i;
 
 function fromHex(digits: string): Rgba | null {
   const full = digits.length <= 4 ? [...digits].map((d) => d + d).join('') : digits;
@@ -29,6 +30,11 @@ export function rgbaOf(css: string): Rgba | null {
   const hex = HEX.exec(value);
   if (hex) {
     return fromHex(hex[1]);
+  }
+  const srgb = SRGB.exec(value);
+  if (srgb) {
+    const [r, g, b, a] = srgb[1].split(/[\s/]+/).filter(Boolean).map(Number);
+    return [r, g, b, a ?? 1];
   }
   const fn = FUNCTIONAL.exec(value);
   return fn ? fromFunctional(fn[1]) : null;

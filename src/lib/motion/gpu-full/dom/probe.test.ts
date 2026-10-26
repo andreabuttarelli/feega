@@ -42,4 +42,11 @@ describe('domProbe', () => {
     expect(reply.error).toBeUndefined();
     expect(frames).toBe(0);
   });
+
+  it('hands an image and a url background a bitmap of their own', async () => {
+    const { reply } = await asked('<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="><div style="background-image: url(data:image/gif;base64,R0lGODlhAQABAAAAACw=)"></div><div></div>');
+    const nodes = (reply.trees[CLIP] as { nodes: { tag: string; layer: number }[] }).nodes;
+
+    expect(nodes.map((n) => n.layer)).toEqual([NO_INDEX, 0, 1, NO_INDEX]);
+  });
 });

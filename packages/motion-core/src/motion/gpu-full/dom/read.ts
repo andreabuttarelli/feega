@@ -3,7 +3,7 @@ import { invert2d } from '../../parent';
 import { ellipseOutline, flatten, parsePath, rectOutline, type Outline } from '../../shape/geometry';
 import { FillRule, MAX_STOPS, PaintKind, type Paint } from '../paint';
 import { rgbaOf, type Rgba } from '../rgba';
-import { cornerOf, isNone, lengthOf, linearGradient, splitTop, tileOf, transformOf, type Gradient, type Size } from './css';
+import { cornerOf, homographyOf, isNone, lengthOf, linearGradient, perspectiveOf, radialGradient, splitTop, tileOf, transformOf, type Gradient, type Size } from './css';
 import { NO_INDEX, type RawNode, type RawTree, type TextLine } from './tree';
 import { Ligatures } from '../text/face';
 import { glyphContours, moved, NO_TYPESET, SMOOTHING, Smoothing, type Typeset } from '../text/painter';
@@ -50,7 +50,7 @@ export type DomGapCount = { element: string; reason: DomGap; count: number };
 export type DomRead = { drawn: Drawn[]; gaps: DomGapCount[] };
 
 type Own = { drawn: Drawn[]; gaps: DomGap[] };
-type Scope = { matrix: Affine; viewport: Size; typeset: Typeset; defs: RawTree['defs'] };
+type Scope = { matrix: Affine; viewport: Size; typeset: Typeset; defs: RawTree['defs']; perspective: ReturnType<typeof perspectiveOf> };
 type Style = RawNode['style'];
 type BoxShape = { round: true; radii: number[] } | { round: false; ellipse: true };
 type Painter = (node: RawNode, scope: Scope) => Own;
@@ -73,11 +73,11 @@ const CORNERS = ['top-left', 'top-right', 'bottom-right', 'bottom-left'] as cons
 const REPEAT = 'repeat';
 const NO_REPEAT = 'no-repeat';
 const ORIGIN_POSITIONS = new Set(['', '0% 0%', '0px 0px', 'left top']);
+const URL_IMAGE = /^url\(/;
 
 const REFUSALS: [DomGap, (s: Style) => boolean][] = [
   [DomGap.Filter, (s) => !isNone(s['backdrop-filter'])],
   [DomGap.Mask, (s) => !isNone(s['mask-image'])],
-  [DomGap.Transform, (s) => transformOf(s.transform, s['transform-origin']) === null]
 ];
 
 const flat = (outline: Outline, dx = 0, dy = 0): number[][] => outline.map((c) => flatten(c).flatMap(([x, y]) => [x + dx, y + dy]));
@@ -148,7 +148,18 @@ function bandsOf(gradient: Gradient, tile: Size, tiles: [number, number][], size
   return [...bands.values()].filter((b) => b.contours.length);
 }
 
-function backgroundOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Own {
+function radialOf(image: string, size: Size, shape: BoxShape, matrix: Affine): DrawnPath | null {
+  const radial = radialGradient(image, size);
+  if (!radial || radial.stops.length > MAX_STOPS) {
+    return null;
+  }
+  const squash = radial.radii[1] / radial.radii[0];
+  const contours = flat(outlineOf(shape, size)).map((c) => c.map((v, i) => (i % 2 ? v / squash : v)));
+  const paint: Paint = { kind: PaintKind.Radial, center: [radial.center[0], radial.center[1] / squash], radius: radial.radii[0], stops: radial.stops };
+  return path(contours, paint, mul2d(matrix, [1, 0, 0, squash, 0, 0]));
+}
+
+function backgroundOf(s: Style, size: Size, shape: BoxShape, matrix: Affine, bitmap: number): Own {
   const drawn: Drawn[] = [];
   const color = rgbaOf(s['background-color'] ?? '');
   if (color && color[3] > 0) {
@@ -162,17 +173,29 @@ function backgroundOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Ow
   const positions = splitTop(s['background-position'] ?? '');
   const repeats = splitTop(s['background-repeat'] ?? REPEAT);
   const layers = images.map((image, i) => ({ image, tile: tileOf(sizes[i % sizes.length], size), position: positions[i % (positions.length || 1)] ?? '', repeat: repeats[i % repeats.length] }));
-  const unsupported = layers.some((l) => !l.tile || !ORIGIN_POSITIONS.has(l.position) || (l.repeat !== REPEAT && l.repeat !== NO_REPEAT) || bordered(s));
-  if (unsupported) {
+  const unsupported = layers.some((l) => !URL_IMAGE.test(l.image) && (!l.tile || !ORIGIN_POSITIONS.has(l.position) || (l.repeat !== REPEAT && l.repeat !== NO_REPEAT))) || bordered(s);
+  const urls = layers.some((l) => URL_IMAGE.test(l.image));
+  if (unsupported || (urls && bitmap === NO_INDEX)) {
     return { drawn, gaps: [DomGap.Background] };
   }
+  if (urls) {
+    drawn.push({ kind: DrawnKind.Layer, layer: bitmap, width: size.w, height: size.h, opacity: 1, matrix });
+  }
   for (const layer of [...layers].reverse()) {
+    if (URL_IMAGE.test(layer.image)) {
+      continue;
+    }
     const tile = layer.tile as Size;
+    const single = layer.repeat === NO_REPEAT || (tile.w >= size.w && tile.h >= size.h);
+    const radial = layer.image.startsWith('radial-gradient(') ? radialOf(layer.image, single ? size : tile, shape, matrix) : null;
+    if (radial && single) {
+      drawn.push(radial);
+      continue;
+    }
     const gradient = linearGradient(layer.image, tile);
     if (!gradient || gradient.stops.length > MAX_STOPS) {
       return { drawn, gaps: [DomGap.Background] };
     }
-    const single = layer.repeat === NO_REPEAT || (tile.w >= size.w && tile.h >= size.h);
     if (!single && !squared(shape)) {
       return { drawn, gaps: [DomGap.Radius] };
     }
@@ -237,7 +260,7 @@ function pixelSnapped(m: Affine, size: Size): Affine {
   return [(x1 - x0) / size.w, 0, 0, (y1 - y0) / size.h, x0, y0];
 }
 
-const SHADOW = /^((?:rgba?|hsla?)\([^)]*\)|#[0-9a-f]+|[a-z]+)\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px(?:\s+(-?[\d.]+)px)?$/i;
+const SHADOW = /^((?:rgba?|hsla?|color)\([^)]*\)|#[0-9a-f]+|[a-z]+)\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px(?:\s+(-?[\d.]+)px)?$/i;
 const SHADOW_SIGMA = 0.5;
 
 function shadowsOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Own {
@@ -270,7 +293,7 @@ const boxPainter: Painter = (node, scope) => {
     return nothing(DomGap.Radius);
   }
   const matrix = pixelSnapped(scope.matrix, size);
-  const background = backgroundOf(node.style, size, shape, matrix);
+  const background = backgroundOf(node.style, size, shape, matrix, node.layer);
   const border = borderOf(node.style, size, shape, matrix);
   const shadow = shadowsOf(node.style, size, shape, matrix);
   return { drawn: [...shadow.drawn, ...background.drawn, ...border.drawn], gaps: [...shadow.gaps, ...background.gaps, ...border.gaps] };
@@ -553,7 +576,7 @@ const PAINTERS: Record<string, Painter> = {
   path: shapePainter(pathOf),
   text: groupPainter,
   tspan: groupPainter,
-  img: mediaPainter,
+  img: layerPainter,
   video: mediaPainter,
   picture: mediaPainter,
   iframe: mediaPainter,
@@ -615,6 +638,33 @@ function overlapping(items: Drawn[]): boolean {
   return boxes.some((a, i) => !a || boxes.some((b, j) => j > i && (!b || (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h))));
 }
 
+type Warp = (p: [number, number]) => [number, number];
+
+const warpContours = (contours: number[][], local: Affine, warp: Warp) => {
+  const back = invert2d(local);
+  return contours.map((c) => c.flatMap((_, i) => (i % 2 ? [] : apply2d(back, warp(apply2d(local, [c[i], c[i + 1]]))))));
+};
+
+const warpMasks = (masks: MaskLayer[] | undefined, warp: Warp) => masks?.map((m) => (m.cover.kind === CoverKind.Path ? { ...m, cover: { ...m.cover, contours: warpContours(m.cover.contours, m.cover.matrix, warp) } } : m));
+
+function warpOne(d: Drawn, warp: Warp): Drawn {
+  const masks = warpMasks(d.masks, warp);
+  const look = masks ? { masks } : {};
+  if (d.kind === DrawnKind.Path) {
+    return { ...d, ...look, contours: warpContours(d.contours, d.matrix, warp) };
+  }
+  return d.kind === DrawnKind.Group ? { ...d, ...look, items: d.items.map((i) => warpOne(i, warp)) } : { ...d, ...look };
+}
+
+function warped(items: Drawn[], placed: Affine, fitted: Affine, project: (p: [number, number]) => [number, number] | null): Drawn[] {
+  const toElement = invert2d(fitted);
+  const warp: Warp = (p) => {
+    const q = project(apply2d(toElement, p));
+    return q ? apply2d(placed, q) : p;
+  };
+  return items.map((d) => warpOne(d, warp));
+}
+
 export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead {
   const { nodes } = tree;
   const children = nodes.map(() => [] as number[]);
@@ -631,18 +681,20 @@ export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead 
     const node = nodes[i];
     const refusal = REFUSALS.find(([gap, hit]) => !(gap === DomGap.Order && node.parent === NO_INDEX) && hit(node.style));
     const view = viewportOf(node, outer.viewport);
-    if (refusal || !view) {
-      gap(node, refusal ? refusal[0] : DomGap.Geometry);
+    const [x, y] = (node.at ?? [0, 0]).map((v) => (isNone(node.style.transform) ? v : Math.round(v)));
+    const lens = outer.perspective && { ...outer.perspective, origin: [outer.perspective.origin[0] - x, outer.perspective.origin[1] - y] as [number, number] };
+    const transform = transformOf(node.style.transform, node.style['transform-origin'], { w: node.size[0], h: node.size[1] }, lens);
+    if (refusal || !view || !transform) {
+      gap(node, refusal ? refusal[0] : view ? DomGap.Transform : DomGap.Geometry);
       return [];
     }
-    const [x, y] = (node.at ?? [0, 0]).map((v) => (isNone(node.style.transform) ? v : Math.round(v)));
-    const matrix = mul2d(mul2d(outer.matrix, [1, 0, 0, 1, x, y]), transformOf(node.style.transform, node.style['transform-origin']) as Affine);
+    const matrix = mul2d(mul2d(outer.matrix, [1, 0, 0, 1, x, y]), transform);
     const visible = !HIDDEN.has(node.style.visibility ?? '');
     const own = visible ? painterOf(node)(node, { ...outer, matrix }) : nothing();
     const text = visible && node.text ? textOf(node, { ...outer, matrix }) : nothing();
     [...own.gaps, ...text.gaps].forEach((reason) => gap(node, reason));
     const order = node.svg ? children[i] : stacked(children[i].map((c) => nodes[c]), children[i]);
-    const inner = { ...outer, matrix: mul2d(matrix, view.fit), viewport: view.viewport };
+    const inner = { ...outer, matrix: mul2d(matrix, view.fit), viewport: view.viewport, perspective: perspectiveOf(node.style.perspective, node.style['perspective-origin']) };
     const kids = order.flatMap((c) => visit(c, inner));
     const size = { w: node.size[0], h: node.size[1] };
     const clipped = CLIPPING.has(node.style.overflow ?? '') && node.at && kids.length && spills(kids, matrix, size) ? boxClip(node, kids, matrix) : kids;
@@ -655,7 +707,9 @@ export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead 
       gap(node, effected);
       return [];
     }
-    const items = effected;
+    const homography = homographyOf(node.style.transform, node.style['transform-origin'], lens);
+    const placed = mul2d(outer.matrix, [1, 0, 0, 1, x, y]);
+    const items = homography ? warped(effected, placed, matrix, homography) : effected;
     const opacity = opacityOf(node.style);
     if (opacity < 1 && items.length > 1 && overlapping(items)) {
       return [{ kind: DrawnKind.Group, items, opacity, matrix: [1, 0, 0, 1, 0, 0] }];
@@ -663,6 +717,6 @@ export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead 
     return items.map((d) => ({ ...d, opacity: d.opacity * opacity }));
   };
 
-  const drawn = nodes.length ? visit(0, { matrix: [1, 0, 0, 1, 0, 0], viewport: { w: tree.width, h: tree.height }, typeset, defs: tree.defs }) : [];
+  const drawn = nodes.length ? visit(0, { matrix: [1, 0, 0, 1, 0, 0], viewport: { w: tree.width, h: tree.height }, typeset, defs: tree.defs, perspective: null }) : [];
   return { drawn, gaps: [...gaps.values()] };
 }

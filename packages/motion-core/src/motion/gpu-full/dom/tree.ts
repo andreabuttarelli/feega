@@ -13,6 +13,8 @@ export const READ_STYLES = [
   'opacity',
   'transform',
   'transform-origin',
+  'perspective',
+  'perspective-origin',
   'z-index',
   'overflow',
   'background-color',

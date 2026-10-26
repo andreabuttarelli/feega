@@ -104,6 +104,82 @@ export function domProbe(cfg: ProbeConfig) {
     return { layer: layers.push(createImageBitmap(canvas)) - 1, width: canvas.width, height: canvas.height, at: [left - box.left, top - box.top] };
   };
 
+  const URL_IMAGE = /url\(\s*["']?([^"')]+)["']?\s*\)/;
+  const loaded = new Map<string, Promise<HTMLImageElement>>();
+
+  const loadImage = (src: string) => {
+    const known = loaded.get(src);
+    if (known) {
+      return known;
+    }
+    const image = new Image();
+    image.src = src;
+    const ready = image.decode().then(() => image);
+    loaded.set(src, ready);
+    return ready;
+  };
+
+  const lengthIn = (value: string | undefined, basis: number, auto: number) => (!value || value === 'auto' ? auto : value.endsWith('%') ? (parseFloat(value) * basis) / 100 : parseFloat(value));
+
+  const tileIn = (value: string, box: [number, number], image: HTMLImageElement): [number, number] => {
+    const [iw, ih] = [image.naturalWidth || box[0], image.naturalHeight || box[1]];
+    if (value === 'cover' || value === 'contain') {
+      const scale = (value === 'cover' ? Math.max : Math.min)(box[0] / iw, box[1] / ih);
+      return [iw * scale, ih * scale];
+    }
+    const [w, h] = value.split(/\s+/);
+    const width = lengthIn(w, box[0], NaN);
+    const height = lengthIn(h, box[1], NaN);
+    return [width || (height ? (iw * height) / ih : iw), height || (width ? (ih * width) / iw : ih)];
+  };
+
+  const splitLayers = (value: string) => value.split(/,(?![^(]*\))/).map((v) => v.trim());
+
+  const bitmapOf = async (size: [number, number], paint: (pen: CanvasRenderingContext2D) => Promise<void>) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.ceil(size[0]));
+    canvas.height = Math.max(1, Math.ceil(size[1]));
+    await paint(canvas.getContext('2d') as CanvasRenderingContext2D).catch(() => undefined);
+    return createImageBitmap(canvas);
+  };
+
+  const backgroundLayer = (computed: CSSStyleDeclaration, size: [number, number]) =>
+    bitmapOf(size, async (pen) => {
+      const images = splitLayers(computed.backgroundImage);
+      const sizes = splitLayers(computed.backgroundSize);
+      const positions = splitLayers(computed.backgroundPosition);
+      const repeats = splitLayers(computed.backgroundRepeat);
+      for (let i = images.length - 1; i >= 0; i--) {
+        const src = URL_IMAGE.exec(images[i])?.[1];
+        if (!src) {
+          continue;
+        }
+        const image = await loadImage(src);
+        const [tw, th] = tileIn(sizes[i % sizes.length] ?? 'auto', size, image);
+        const [px, py] = (positions[i % positions.length] ?? '0% 0%').split(/\s+/);
+        const x = lengthIn(px, size[0] - tw, 0);
+        const y = lengthIn(py, size[1] - th, 0);
+        if ((repeats[i % repeats.length] ?? 'repeat') === 'no-repeat') {
+          pen.drawImage(image, x, y, tw, th);
+          continue;
+        }
+        const pattern = pen.createPattern(image, 'repeat');
+        pattern?.setTransform(new DOMMatrix([tw / (image.naturalWidth || tw), 0, 0, th / (image.naturalHeight || th), x, y]));
+        pen.fillStyle = pattern ?? 'transparent';
+        pen.fillRect(0, 0, size[0], size[1]);
+      }
+    });
+
+  const imageLayer = (image: HTMLImageElement, computed: CSSStyleDeclaration, size: [number, number]) =>
+    bitmapOf(size, async (pen) => {
+      await image.decode();
+      const [iw, ih] = [image.naturalWidth, image.naturalHeight];
+      const fit = computed.objectFit;
+      const scale = fit === 'cover' ? Math.max(size[0] / iw, size[1] / ih) : fit === 'contain' ? Math.min(size[0] / iw, size[1] / ih) : NaN;
+      const [w, h] = Number.isNaN(scale) ? size : [iw * scale, ih * scale];
+      pen.drawImage(image, (size[0] - w) / 2, (size[1] - h) / 2, w, h);
+    });
+
   const REFERENCE = /url\(\s*["']?#([^"')]+)["']?\s*\)/;
   const REFERRING = ['clip-path', 'filter', 'fill', 'stroke', 'mask-image'];
 
@@ -166,6 +242,20 @@ export function domProbe(cfg: ProbeConfig) {
       const base = node.parent === cfg.none ? own : rects[node.parent];
       node.at = [own.left - base.left, own.top - base.top];
       node.size = [own.width, own.height];
+    });
+    nodes.forEach((node, i) => {
+      const el = elements[i];
+      if (node.layer !== cfg.none || !(el instanceof HTMLElement)) {
+        return;
+      }
+      const computed = getComputedStyle(el);
+      if (el instanceof HTMLImageElement) {
+        node.layer = layers.push(imageLayer(el, computed, node.size)) - 1;
+        return;
+      }
+      if (URL_IMAGE.test(computed.backgroundImage)) {
+        node.layer = layers.push(backgroundLayer(computed, node.size)) - 1;
+      }
     });
     return { width: rects[0]?.width ?? 0, height: rects[0]?.height ?? 0, nodes, defs: defsOf(nodes) };
   };

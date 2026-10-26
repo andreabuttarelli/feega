@@ -25,4 +25,9 @@ describe('rgbaOf', () => {
     expect(rgbaOf('transparent')).toEqual([0, 0, 0, 0]);
     expect(rgbaOf('var(--x)')).toBeNull();
   });
+
+  it('reads the srgb colour a computed color-mix() resolves to', () => {
+    expect(rgbaOf('color(srgb 1 0.5 0)')).toEqual([1, 0.5, 0, 1]);
+    expect(rgbaOf('color(srgb 0.2 0.4 0.6 / 0.38)')).toEqual([0.2, 0.4, 0.6, 0.38]);
+  });
 });

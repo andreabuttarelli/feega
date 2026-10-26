@@ -411,3 +411,96 @@ describe('readTree', () => {
     });
   });
 });
+
+describe('readTree, CSS a motion template draws with', () => {
+  const box = (style: RawNode['style'], part: Partial<RawNode> = {}) => el({ parent: 0, at: [0, 0], size: [200, 100], style, ...part });
+  const world = (item: DrawnPath, p: [number, number]) => apply2d(item.matrix, p).map((v) => Math.round(v * 100) / 100);
+
+  it('fills a box with an elliptical radial gradient sized and placed in percent', () => {
+    const wash = box({ 'background-image': 'radial-gradient(130% 110% at 18% 8%, rgb(255, 0, 0) 0%, rgb(0, 0, 255) 100%)' });
+
+    const read = readTree(tree(root(), wash));
+    const [item] = read.drawn as DrawnPath[];
+
+    expect(read.gaps).toEqual([]);
+    expect(near(bounds(item))).toEqual({ left: 0, top: 0, right: 200, bottom: 100 });
+    expect(item.paint).toMatchObject({ kind: PaintKind.Radial, radius: 260, stops: [{ at: 0 }, { at: 1 }] });
+    expect(world(item, (item.paint as { center: [number, number] }).center)).toEqual([36, 8]);
+    expect(item.matrix[3] / item.matrix[0]).toBeCloseTo(110 / 260);
+  });
+
+  it('reaches the farthest corner with a default radial gradient', () => {
+    const wash = box({ 'background-image': 'radial-gradient(rgb(255, 255, 255), rgba(0, 0, 0, 0))' });
+
+    const [item] = paths(tree(root(), wash));
+
+    expect((item.paint as { radius: number }).radius).toBeCloseTo(100 * Math.SQRT2);
+    expect(world(item, (item.paint as { center: [number, number] }).center)).toEqual([100, 50]);
+  });
+
+  it('stacks two radial layers, the first one on top', () => {
+    const light = box({ 'background-image': 'radial-gradient(circle at 0% 0%, rgb(255, 0, 0) 0%, rgba(0, 0, 0, 0) 50%), radial-gradient(circle 40px at 50% 50%, rgb(0, 0, 255), rgba(0, 0, 0, 0))' });
+
+    const drawn = paths(tree(root(), light));
+
+    expect(drawn.map((d) => (d.paint as { radius: number }).radius)).toEqual([40, expect.closeTo(Math.hypot(200, 100))]);
+  });
+
+  it('draws a box under a 3D transform with its corners where the browser projects them', () => {
+    const tilt = 'matrix3d(0.9, 0.05, 0, 0.0004, -0.04, 0.95, 0, 0.0002, 0, 0, 1, 0, 30, 20, 0, 1)';
+    const screen = box({ 'background-color': 'rgb(255, 255, 255)', transform: tilt, 'transform-origin': '0px 0px' });
+
+    const read = readTree(tree(root(), screen));
+    const [item] = read.drawn as DrawnPath[];
+    const projected = ([x, y]: [number, number]) => {
+      const w = 0.0004 * x + 0.0002 * y + 1;
+      return [(0.9 * x - 0.04 * y + 30) / w, (0.05 * x + 0.95 * y + 20) / w];
+    };
+    const corners: [number, number][] = [[0, 0], [200, 0], [200, 100], [0, 100]];
+    const drawnPoints = Array.from({ length: item.contours[0].length / 2 }, (_, i) => world(item, [item.contours[0][2 * i], item.contours[0][2 * i + 1]]));
+    const miss = (c: [number, number]) => Math.min(...drawnPoints.map((p) => Math.hypot(p[0] - projected(c)[0], p[1] - projected(c)[1])));
+
+    expect(read.gaps).toEqual([]);
+    expect(corners.map(miss).every((d) => d < 0.05)).toBe(true);
+  });
+
+  it('projects a child through the perspective its parent sets', () => {
+    const stage = el({ parent: 0, at: [0, 0], size: [400, 300], style: { perspective: '400px', 'perspective-origin': '200px 150px' } });
+    const card = el({ parent: 1, at: [100, 100], size: [200, 100], style: { 'background-color': 'rgb(0, 0, 0)', transform: 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 200, 1)', 'transform-origin': '100px 50px' } });
+
+    const [item] = paths(tree(root(), stage, card));
+
+    expect(near(bounds(item))).toEqual({ left: 0, top: 50, right: 400, bottom: 250 });
+  });
+
+  it('draws a url background from the bitmap the page rasterised for it', () => {
+    const grain = box({ 'background-image': 'url("data:image/svg+xml;utf8,<svg/>")', 'background-size': '180px 180px' }, { layer: 3 });
+
+    const read = readTree(tree(root(), grain));
+
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn).toMatchObject([{ kind: DrawnKind.Layer, layer: 3, width: 200, height: 100 }]);
+  });
+
+  it('paints a gradient layer over the url bitmap under it', () => {
+    const both = box({ 'background-image': 'linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255)), url("a.png")' }, { layer: 0 });
+
+    expect(readTree(tree(root(), both)).drawn.map((d) => d.kind)).toEqual([DrawnKind.Layer, DrawnKind.Path]);
+  });
+
+  it('still names a url background the page could not rasterise', () => {
+    expect(readTree(tree(root(), box({ 'background-image': 'url("a.png")' }))).gaps).toMatchObject([{ reason: DomGap.Background }]);
+  });
+
+  it('draws an image from its bitmap', () => {
+    const image = box({}, { tag: 'img', layer: 1 });
+
+    expect(readTree(tree(root(), image)).drawn).toMatchObject([{ kind: DrawnKind.Layer, layer: 1, width: 200, height: 100 }]);
+  });
+
+  it('reads color-mix() stops and shadows in the srgb form the browser computes', () => {
+    const mixed = box({ 'background-image': 'radial-gradient(color(srgb 1 0 0 / 0.38) 0%, rgba(0, 0, 0, 0) 72%)', 'box-shadow': 'color(srgb 0 0 1 / 0.45) 0px 4px 8px 0px' });
+
+    expect(readTree(tree(root(), mixed)).gaps).toEqual([]);
+  });
+});

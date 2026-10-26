@@ -42,17 +42,83 @@ export function lengthOf(value: string | undefined, basis: number): number | nul
   return m[2] === '%' ? (Number(m[1]) * basis) / PERCENT : Number(m[1]);
 }
 
-export function transformOf(transform: string | undefined, origin: string | undefined): Affine | null {
+type Matrix4 = number[];
+type Perspective = { depth: number; origin: [number, number] };
+
+const MATRIX_2D = /^matrix\(([^)]+)\)$/;
+const MATRIX_3D = /^matrix3d\(([^)]+)\)$/;
+const translate4 = (x: number, y: number): Matrix4 => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, 0, 1];
+const mul4 = (a: Matrix4, b: Matrix4): Matrix4 => Array.from({ length: 16 }, (_, i) => [0, 1, 2, 3].reduce((sum, k) => sum + a[k * 4 + (i % 4)] * b[Math.floor(i / 4) * 4 + k], 0));
+const originOf = (origin: string | undefined) => (origin ?? '0px 0px').split(/\s+/).map((v) => parseFloat(v) || 0) as [number, number];
+
+export function perspectiveOf(depth: string | undefined, origin: string | undefined): Perspective | null {
+  const d = parseFloat(depth ?? '');
+  return d > 0 ? { depth: d, origin: originOf(origin) } : null;
+}
+
+export function transformOf(transform: string | undefined, origin: string | undefined, size: Size = { w: 1, h: 1 }, perspective: Perspective | null = null): Affine | null {
   if (isNone(transform)) {
     return IDENTITY;
   }
-  const m = /^matrix\(([^)]+)\)$/.exec((transform ?? '').trim());
-  if (!m) {
+  const value = (transform ?? '').trim();
+  const flat = MATRIX_2D.exec(value);
+  const [ox, oy] = originOf(origin);
+  if (flat) {
+    const [a, b, c, d, e, f] = flat[1].split(',').map(Number);
+    return mul2d(mul2d([1, 0, 0, 1, ox, oy], [a, b, c, d, e, f]), [1, 0, 0, 1, -ox, -oy]);
+  }
+  const deep = deepOf(transform, origin, perspective);
+  return deep && flattened(deep, size);
+}
+
+type Point = [number, number];
+
+function deepOf(transform: string | undefined, origin: string | undefined, perspective: Perspective | null): Matrix4 | null {
+  const deep = MATRIX_3D.exec((transform ?? '').trim());
+  if (!deep) {
     return null;
   }
-  const [a, b, c, d, e, f] = m[1].split(',').map(Number);
-  const [ox, oy] = (origin ?? '0px 0px').split(/\s+/).map((v) => parseFloat(v) || 0);
-  return mul2d(mul2d([1, 0, 0, 1, ox, oy], [a, b, c, d, e, f]), [1, 0, 0, 1, -ox, -oy]);
+  const [ox, oy] = originOf(origin);
+  const own = mul4(mul4(translate4(ox, oy), deep[1].split(',').map(Number)), translate4(-ox, -oy));
+  return perspective ? mul4(viewOf(perspective), own) : own;
+}
+
+const projectBy =
+  (m: Matrix4) =>
+  ([x, y]: Point): Point | null => {
+    const w = m[3] * x + m[7] * y + m[15];
+    return w > 0 ? [(m[0] * x + m[4] * y + m[12]) / w, (m[1] * x + m[5] * y + m[13]) / w] : null;
+  };
+
+export function homographyOf(transform: string | undefined, origin: string | undefined, perspective: Perspective | null): ((p: Point) => Point | null) | null {
+  const deep = deepOf(transform, origin, perspective);
+  return deep && projectBy(deep);
+}
+
+function viewOf({ depth, origin: [px, py] }: Perspective): Matrix4 {
+  const lens = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -1 / depth, 0, 0, 0, 1];
+  return mul4(mul4(translate4(px, py), lens), translate4(-px, -py));
+}
+
+function flattened(m: Matrix4, size: Size): Affine | null {
+  const box = size.w > 0 && size.h > 0 ? size : { w: 1, h: 1 };
+  const corners: [number, number][] = [[0, 0], [box.w, 0], [box.w, box.h], [0, box.h]];
+  const projected = corners.map(projectBy(m));
+  if (projected.some((p) => p === null)) {
+    return null;
+  }
+  const points = projected as number[][];
+  const [hx, hy] = [box.w / 2, box.h / 2];
+  const signs = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  const fit = (axis: number) => {
+    const mean = points.reduce((s, p) => s + p[axis], 0) / 4;
+    const alongX = points.reduce((s, p, i) => s + signs[i][0] * p[axis], 0) / (4 * hx);
+    const alongY = points.reduce((s, p, i) => s + signs[i][1] * p[axis], 0) / (4 * hy);
+    return [alongX, alongY, mean - alongX * hx - alongY * hy];
+  };
+  const [a, c, e] = fit(0);
+  const [b, d, f] = fit(1);
+  return [a, b, c, d, e, f];
 }
 
 export function cornerOf(value: string | undefined, size: Size): [number, number] | null {
@@ -85,7 +151,7 @@ type RawStop = { color: Rgba; at: number | null };
 function stopsOf(args: string[], length: number): RawStop[] | null {
   const stops: RawStop[] = [];
   for (const arg of args) {
-    const m = /^((?:rgba?|hsla?)\([^)]*\)|#[0-9a-f]+|[a-z]+)\s*(.*)$/i.exec(arg);
+    const m = /^((?:rgba?|hsla?|color)\([^)]*\)|#[0-9a-f]+|[a-z]+)\s*(.*)$/i.exec(arg);
     const color = m ? rgbaOf(m[1]) : null;
     if (!m || !color) {
       return null;
@@ -150,4 +216,52 @@ export function tileOf(value: string | undefined, box: Size): Size | null {
   const w = parts[0] === 'auto' ? box.w : lengthOf(parts[0], box.w);
   const h = (parts[1] ?? 'auto') === 'auto' ? box.h : lengthOf(parts[1], box.h);
   return w === null || h === null || w <= 0 || h <= 0 ? null : { w, h };
+}
+
+export type Radial = { center: [number, number]; radii: [number, number]; stops: Stop[] };
+
+const RADIAL_HEAD = /^(circle|ellipse|closest-|farthest-|at\s|-?[\d.]+(px|%))/;
+const POSITION_WORDS: Record<string, string> = { left: '0%', top: '0%', center: '50%', right: '100%', bottom: '100%' };
+const NEAREST = (a: number, b: number) => Math.min(a, b);
+const FARTHEST = (a: number, b: number) => Math.max(a, b);
+const EXTENTS: Record<string, { pick: (a: number, b: number) => number; corner: boolean }> = {
+  'closest-side': { pick: NEAREST, corner: false },
+  'farthest-side': { pick: FARTHEST, corner: false },
+  'closest-corner': { pick: NEAREST, corner: true },
+  'farthest-corner': { pick: FARTHEST, corner: true }
+};
+
+function radiiOf(words: string[], [cx, cy]: [number, number], size: Size): [number, number] | null {
+  const circle = words.includes('circle');
+  const rest = words.filter((w) => w !== 'circle' && w !== 'ellipse');
+  const extent = EXTENTS[rest[0] ?? 'farthest-corner'];
+  if (extent) {
+    const [x, y] = [extent.pick(cx, size.w - cx), extent.pick(cy, size.h - cy)];
+    if (circle) {
+      return extent.corner ? [Math.hypot(x, y), Math.hypot(x, y)] : [extent.pick(x, y), extent.pick(x, y)];
+    }
+    return extent.corner ? [x * Math.SQRT2, y * Math.SQRT2] : [x, y];
+  }
+  const rx = lengthOf(rest[0], size.w);
+  const ry = rest.length > 1 ? lengthOf(rest[1], size.h) : rx;
+  return rx === null || ry === null ? null : [rx, ry];
+}
+
+export function radialGradient(css: string, size: Size): Radial | null {
+  const m = /^radial-gradient\((.*)\)$/s.exec(css.trim());
+  if (!m) {
+    return null;
+  }
+  const args = splitTop(m[1]);
+  const headed = RADIAL_HEAD.test(args[0]);
+  const [shape, at] = headed ? (` ${args[0]}`.split(/\sat\s/) as [string, string?]) : ['', undefined];
+  const place = (at ?? 'center').trim().split(/\s+/).map((w) => POSITION_WORDS[w] ?? w);
+  const cx = lengthOf(place[0], size.w);
+  const cy = lengthOf(place[1] ?? '50%', size.h);
+  if (cx === null || cy === null) {
+    return null;
+  }
+  const radii = radiiOf(shape.trim().split(/\s+/).filter(Boolean), [cx, cy], size);
+  const raw = radii && radii[0] > 0 && radii[1] > 0 ? stopsOf(headed ? args.slice(1) : args, radii[0]) : null;
+  return radii && raw ? { center: [cx, cy], radii, stops: placed(raw) } : null;
 }
