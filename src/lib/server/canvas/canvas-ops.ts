@@ -34,7 +34,10 @@ import { enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
 import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles';
 import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-variables';
-import { drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
+import { importLottieAt } from '$lib/server/motion/lottie-at';
+import { lottieSource } from '$lib/motion/import-lottie';
+import { SafeFetchError, safeFetchBytes } from '$lib/server/tool-guard';
+import { MoveOutcome, drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { NODE_NAME_MAX } from '$lib/canvas/node-name';
@@ -219,6 +222,32 @@ function frameBox(input: z.infer<typeof drawFrameInput>) {
   const preset = input.format && input.format !== MotionFormat.Custom ? FORMATS[input.format] : null;
   const height = preset ? (input.w * preset.height) / preset.width : (input.h as number);
   return { left: input.x, top: input.y, width: input.w, height };
+}
+
+const LOTTIE_MAX_BYTES = 8_000_000;
+const LOTTIE_FETCH_TIMEOUT_MS = 15_000;
+
+const importLottieInput = z
+  .object({
+    canvasId: z.string(),
+    x: z.number().finite().describe('canvas position of the frame centre'),
+    y: z.number().finite(),
+    lottie: z.record(z.string(), z.unknown()).optional().describe('the Lottie JSON itself'),
+    url: z.string().url().startsWith('https://').optional().describe('an https URL of a .json or .lottie file')
+  })
+  .strict()
+  .refine((a) => Boolean(a.lottie) !== Boolean(a.url), 'give lottie or url, not both');
+
+async function lottieOf(input: z.infer<typeof importLottieInput>): Promise<unknown> {
+  if (input.lottie) {
+    return input.lottie;
+  }
+  try {
+    const fetched = await safeFetchBytes(input.url as string, { maxBytes: LOTTIE_MAX_BYTES, timeoutMs: LOTTIE_FETCH_TIMEOUT_MS, scheme: 'https-only' });
+    return fetched.ok ? lottieSource(fetched.bytes) : 'The file could not be downloaded.';
+  } catch (e) {
+    return e instanceof SafeFetchError ? e.message : 'The file could not be downloaded.';
+  }
 }
 
 const MOTION_TYPE = 'motion';
@@ -756,6 +785,22 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: drawFrameInput,
     run: async (ctx, input) => frameAnswer(await drawFrameAt(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, frameBox(input), input.format, input.still))
+  }),
+
+  import_lottie: op({
+    access: Access.Write,
+    input: importLottieInput,
+    run: async (ctx, input) => {
+      const json = await lottieOf(input);
+      if (typeof json === 'string') {
+        return { outcome: MoveOutcome.Invalid, message: json };
+      }
+      const placed = await importLottieAt(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, json, { x: input.x, y: input.y }, () => crypto.randomUUID().slice(0, 8));
+      if ('error' in placed) {
+        return { outcome: MoveOutcome.Invalid, message: placed.error };
+      }
+      return { outcome: placed.outcome, frame_id: placed.frameId, skipped: placed.skipped };
+    }
   }),
 
   group_elements: op({

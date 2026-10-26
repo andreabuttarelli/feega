@@ -427,7 +427,7 @@
     bind:this={fileInput}
     type="file"
     class="sr-only"
-    accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml,.svg,video/mp4,video/webm,video/quicktime,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,text/html,text/csv,text/plain,text/markdown,.xml,.rss,.atom,.ipynb,.ttf,.otf,.woff,.woff2"
+    accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml,.svg,.json,.lottie,video/mp4,video/webm,video/quicktime,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,text/html,text/csv,text/plain,text/markdown,.xml,.rss,.atom,.ipynb,.ttf,.otf,.woff,.woff2"
     onchange={fileChosen}
   />
 

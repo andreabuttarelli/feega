@@ -16,7 +16,7 @@ The formats come from the exporter code: see the generated table in [Export form
 
 ## Lottie
 
-Export a frame as Lottie or dotLottie, up to 30 seconds, with shapes, gradients, masks and text as shapes. Anything that cannot be written is listed.
+Export a frame as Lottie or dotLottie, up to 30 seconds, with shapes, gradients, masks and text as shapes. Anything that cannot be written is listed. To bring a Lottie file in, see [Lottie import](/integrations/figma-and-svg/#lottie-import).
 
 ## Stills and vectors
 

@@ -103,6 +103,7 @@ import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motio
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
+import { importLottieAt } from '$lib/server/motion/lottie-at';
 import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
 import { DropOn, OutputKind } from '$lib/motion/move-element';
 
@@ -1455,6 +1456,22 @@ export const actions: Actions<CanvasParams> = {
     }
     const nodes = await Promise.all(pasted.frameIds.map((nodeId) => findNode(scope.db, { orgId: scope.orgId, nodeId })));
     return { outcome: pasted.outcome, nodes: nodes.filter((n) => n !== null), undo: pasted.undo, skipped: pasted.skipped, fills: pasted.fills, fileKey: pasted.fileKey };
+  },
+
+  importLottie: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const at = figmaAtSchema.safeParse(jsonField(fd, 'at'));
+    const json = jsonField(fd, 'lottie');
+    if (!at.success || json === null) {
+      return fail(400, { error: 'invalid Lottie' });
+    }
+    const placed = await importLottieAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, json, at.data, () => crypto.randomUUID().slice(0, 8));
+    if ('error' in placed) {
+      return fail(400, { error: placed.error });
+    }
+    const node = await findNode(scope.db, { orgId: scope.orgId, nodeId: placed.frameId });
+    return { outcome: placed.outcome, nodes: node ? [node] : [], undo: placed.undo, skipped: placed.skipped };
   },
 
   placeOutput: async ({ request, params, locals, setHeaders }) => {

@@ -25,6 +25,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   copy_frame_element: 'Copy an element the same way move_frame_element moves it; the source keeps it.',
   draw_element: 'Draw a free Text, Box, Ellipse or Path on the canvas, outside any frame.',
   draw_frame: 'Draw an empty frame at x,y with a width and a preset format or a height.',
+  import_lottie: 'Import a Lottie animation (JSON or an https URL of a .json or .lottie) as an editable frame at x,y; answers what it could not carry over.',
   group_elements: 'Group 2 or more free elements, or wrap any nodes in a Section.',
   ungroup_element: 'Dissolve a Group.',
   rotate_group: 'Turn a Group and its members around its centre.',
