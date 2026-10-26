@@ -18,15 +18,19 @@
   <p class="lead">One canvas where you and your AI agents draw, animate and generate. Run it on your machine, or in the cloud.</p>
 
   <div class="block">
-    <p class="label">Tell your AI agent (Claude Code, Codex)</p>
+    <div class="head">
+      <p class="label">Tell your AI agent (Claude Code, Codex)</p>
+      <button type="button" onclick={() => copy('prompt', AGENT_PROMPT)}>{copied === 'prompt' ? 'Copied' : 'Copy prompt'}</button>
+    </div>
     <pre>{AGENT_PROMPT}</pre>
-    <button type="button" onclick={() => copy('prompt', AGENT_PROMPT)}>{copied === 'prompt' ? 'Copied' : 'Copy prompt'}</button>
   </div>
 
   <div class="block">
-    <p class="label">Or run it yourself (Node 22)</p>
+    <div class="head">
+      <p class="label">Or run it yourself (Node 22)</p>
+      <button type="button" onclick={() => copy('commands', LOCAL_COMMANDS)}>{copied === 'commands' ? 'Copied' : 'Copy commands'}</button>
+    </div>
     <pre>{LOCAL_COMMANDS}</pre>
-    <button type="button" onclick={() => copy('commands', LOCAL_COMMANDS)}>{copied === 'commands' ? 'Copied' : 'Copy commands'}</button>
   </div>
 
   <p class="cloud">
@@ -60,7 +64,6 @@
   }
 
   .block {
-    position: relative;
     margin-top: 24px;
     max-width: 760px;
     padding: 16px;
@@ -75,7 +78,6 @@
 
   pre {
     margin: 10px 0 0;
-    padding-right: 110px;
     overflow-x: auto;
     white-space: pre-wrap;
     word-break: break-word;
@@ -84,10 +86,15 @@
     line-height: 1.5;
   }
 
+  .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
   button {
-    position: absolute;
-    top: 12px;
-    right: 12px;
+    flex: none;
     padding: 6px 10px;
     font: inherit;
     color: var(--site-ink);
@@ -118,11 +125,11 @@
 
   @media (min-width: 1200px) {
     .hero {
-      padding: 200px 20px 100px;
+      padding: 120px 20px 80px;
     }
 
     h1 {
-      font-size: 96px;
+      font-size: 64px;
       max-width: 1100px;
     }
 
