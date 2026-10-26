@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Edge } from '$lib/motion/space';
-import { STACK_GAP, alignTiles, stackTiles } from './align';
+import { Axis, Edge } from '$lib/motion/space';
+import { STACK_GAP, alignTiles, distributeTiles, stackTiles } from './align';
 
 const tiles = [
   { id: 'a', x: 0, y: 0, width: 100, height: 50 },
@@ -59,5 +59,35 @@ describe('stacking canvas tiles', () => {
 
   it('one tile has nothing to stack', () => {
     expect(stackTiles([row[0]], STACK_GAP)).toEqual([]);
+  });
+});
+
+describe('distributing canvas tiles', () => {
+  const row = [
+    { id: 'a', x: 0, y: 0, width: 100, height: 50 },
+    { id: 'b', x: 120, y: 0, width: 100, height: 50 },
+    { id: 'c', x: 500, y: 0, width: 100, height: 50 }
+  ];
+
+  it('spreads equal gaps between the outer tiles along the axis', () => {
+    expect(distributeTiles(row, Axis.X)).toEqual([{ id: 'b', x: 250, y: 0 }]);
+  });
+
+  it('keeps the outer tiles where they are', () => {
+    expect(distributeTiles(row, Axis.X).map((m) => m.id)).not.toContain('a');
+    expect(distributeTiles(row, Axis.X).map((m) => m.id)).not.toContain('c');
+  });
+
+  it('works vertically', () => {
+    const column = [
+      { id: 'a', x: 0, y: 0, width: 50, height: 100 },
+      { id: 'b', x: 0, y: 10, width: 50, height: 100 },
+      { id: 'c', x: 0, y: 300, width: 50, height: 100 }
+    ];
+    expect(distributeTiles(column, Axis.Y)).toEqual([{ id: 'b', x: 0, y: 150 }]);
+  });
+
+  it('needs three tiles', () => {
+    expect(distributeTiles(row.slice(0, 2), Axis.X)).toEqual([]);
   });
 });
