@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { anchorShift, editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { rangeOf, select, selectionIn, textOf, type Span } from '$lib/canvas/editable-text';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import GradientHandles from './GradientHandles.svelte';
@@ -33,7 +33,6 @@
 
   const style = $derived(editCss(look, layout));
   let barAt = $state({ left: 0, top: 0 });
-  let laid: number | null = null;
 
   const CARET_PX = 2;
   const BAR_GAP_PX = 32;
@@ -48,8 +47,7 @@
       field.style.width = `${field.scrollWidth + CARET_PX}px`;
     }
     const content = field.scrollHeight;
-    laid ??= content;
-    field.style.marginTop = `${(laid - content) * layout.vertical}px`;
+    field.style.marginTop = `${anchorShift(layout, content)}px`;
     field.style.height = `${content}px`;
     const own = field.getBoundingClientRect();
     const host = field.offsetParent?.getBoundingClientRect() ?? own;
