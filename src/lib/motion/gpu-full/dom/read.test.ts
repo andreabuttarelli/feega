@@ -1225,6 +1225,24 @@ describe("readTree, CSS a motion template draws with", () => {
     ]);
   });
 
+  it("draws an svg image from its bitmap, at its own x and y", () => {
+    const image = el({
+      parent: 0,
+      tag: "image",
+      svg: true,
+      layer: 1,
+      size: [30, 20],
+      attrs: { x: "5", y: "7", width: "30", height: "20" },
+    });
+
+    const read = readTree(tree(root(), image));
+
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn).toMatchObject([
+      { kind: DrawnKind.Layer, layer: 1, width: 30, height: 20, matrix: [1, 0, 0, 1, 5, 7] },
+    ]);
+  });
+
   it("reads color-mix() stops and shadows in the srgb form the browser computes", () => {
     const mixed = box({
       "background-image":

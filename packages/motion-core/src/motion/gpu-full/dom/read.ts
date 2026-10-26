@@ -745,6 +745,31 @@ const layerPainter: Painter = (node, scope) => {
 
 const groupPainter: Painter = () => nothing();
 const mediaPainter: Painter = () => nothing(DomGap.Media);
+
+const svgImagePainter: Painter = (node, scope) => {
+  const box = numbers(
+    len(node.attrs, "x", scope.viewport.w) ?? 0,
+    len(node.attrs, "y", scope.viewport.h) ?? 0,
+    len(node.attrs, "width", scope.viewport.w),
+    len(node.attrs, "height", scope.viewport.h),
+  );
+  if (node.layer === NO_INDEX || !box) {
+    return nothing(DomGap.Media);
+  }
+  return {
+    drawn: [
+      {
+        kind: DrawnKind.Layer,
+        layer: node.layer,
+        width: box[2],
+        height: box[3],
+        opacity: 1,
+        matrix: mul2d(scope.matrix, [1, 0, 0, 1, box[0], box[1]]),
+      },
+    ],
+    gaps: [],
+  };
+};
 const elementPainter: Painter = () => nothing(DomGap.Element);
 
 type Geometry = (attrs: RawNode["attrs"], viewport: Size) => Outline | null;
@@ -1374,7 +1399,7 @@ const PAINTERS: Record<string, Painter> = {
   object: mediaPainter,
   embed: mediaPainter,
   audio: mediaPainter,
-  image: mediaPainter,
+  image: svgImagePainter,
 };
 
 const painterOf = (node: RawNode): Painter =>
