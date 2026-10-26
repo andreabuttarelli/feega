@@ -156,14 +156,14 @@ function bandsOf(gradient: Gradient, tile: Size, tiles: [number, number][], size
   return [...bands.values()].filter((b) => b.contours.length);
 }
 
-function radialOf(image: string, size: Size, shape: BoxShape, matrix: Affine): DrawnPath | null {
-  const radial = radialGradient(image, size);
+function radialOf(image: string, area: Size, [dx, dy]: [number, number], size: Size, shape: BoxShape, matrix: Affine): DrawnPath | null {
+  const radial = radialGradient(image, area);
   if (!radial || radial.stops.length > MAX_STOPS) {
     return null;
   }
   const squash = radial.radii[1] / radial.radii[0];
   const contours = flat(outlineOf(shape, size)).map((c) => c.map((v, i) => (i % 2 ? v / squash : v)));
-  const paint: Paint = { kind: PaintKind.Radial, center: [radial.center[0], radial.center[1] / squash], radius: radial.radii[0], stops: radial.stops };
+  const paint: Paint = { kind: PaintKind.Radial, center: [radial.center[0] + dx, (radial.center[1] + dy) / squash], radius: radial.radii[0], stops: radial.stops };
   return path(contours, paint, mul2d(matrix, [1, 0, 0, squash, 0, 0]));
 }
 
@@ -180,8 +180,13 @@ function backgroundOf(s: Style, size: Size, shape: BoxShape, matrix: Affine, bit
   const sizes = splitTop(s['background-size'] ?? 'auto');
   const positions = splitTop(s['background-position'] ?? '');
   const repeats = splitTop(s['background-repeat'] ?? REPEAT);
-  const layers = images.map((image, i) => ({ image, tile: tileOf(sizes[i % sizes.length], size), position: positions[i % (positions.length || 1)] ?? '', repeat: repeats[i % repeats.length] }));
-  const unsupported = layers.some((l) => !URL_IMAGE.test(l.image) && (!l.tile || !ORIGIN_POSITIONS.has(l.position) || (l.repeat !== REPEAT && l.repeat !== NO_REPEAT))) || bordered(s);
+  const [top, right, bottom, left] = sidesOf(s).map((side) => side.width);
+  const inner: Size = { w: Math.max(0, size.w - left - right), h: Math.max(0, size.h - top - bottom) };
+  const at: [number, number] = [left, top];
+  const framed = bordered(s);
+  const layers = images.map((image, i) => ({ image, tile: tileOf(sizes[i % sizes.length], inner), position: positions[i % (positions.length || 1)] ?? '', repeat: repeats[i % repeats.length] })).filter((l) => !isNone(l.image));
+  const once = (l: (typeof layers)[number]) => l.repeat === NO_REPEAT || (l.tile !== null && l.tile.w >= inner.w && l.tile.h >= inner.h);
+  const unsupported = layers.some((l) => !URL_IMAGE.test(l.image) && (!l.tile || !ORIGIN_POSITIONS.has(l.position) || (l.repeat !== REPEAT && l.repeat !== NO_REPEAT) || (framed && !once(l))));
   const urls = layers.some((l) => URL_IMAGE.test(l.image));
   if (unsupported || (urls && bitmap === NO_INDEX)) {
     return { drawn, gaps: [DomGap.Background] };
@@ -194,8 +199,8 @@ function backgroundOf(s: Style, size: Size, shape: BoxShape, matrix: Affine, bit
       continue;
     }
     const tile = layer.tile as Size;
-    const single = layer.repeat === NO_REPEAT || (tile.w >= size.w && tile.h >= size.h);
-    const radial = layer.image.startsWith('radial-gradient(') ? radialOf(layer.image, single ? size : tile, shape, matrix) : null;
+    const single = once(layer);
+    const radial = layer.image.startsWith('radial-gradient(') ? radialOf(layer.image, single ? inner : tile, at, size, shape, matrix) : null;
     if (radial && single) {
       drawn.push(radial);
       continue;
@@ -208,14 +213,14 @@ function backgroundOf(s: Style, size: Size, shape: BoxShape, matrix: Affine, bit
       return { drawn, gaps: [DomGap.Radius] };
     }
     const tiles = single ? [[0, 0]] : grid(size, tile);
-    const bands = squared(shape) ? bandsOf(gradient, tile, tiles as [number, number][], size) : null;
+    const bands = squared(shape) && !framed ? bandsOf(gradient, tile, tiles as [number, number][], size) : null;
     if (bands) {
       drawn.push(...bands.map((b) => path(b.contours, solid(b.color), matrix)));
       continue;
     }
     for (const [x, y] of tiles) {
-      const contours = single ? flat(outlineOf(shape, { w: Math.min(tile.w, size.w), h: Math.min(tile.h, size.h) })) : [[x, y, Math.min(x + tile.w, size.w), y, Math.min(x + tile.w, size.w), Math.min(y + tile.h, size.h), x, Math.min(y + tile.h, size.h)]];
-      const paint: Paint = { kind: PaintKind.Linear, from: [gradient.from[0] + x, gradient.from[1] + y], to: [gradient.to[0] + x, gradient.to[1] + y], stops: gradient.stops };
+      const contours = single ? flat(outlineOf(shape, framed ? size : { w: Math.min(tile.w, size.w), h: Math.min(tile.h, size.h) })) : [[x, y, Math.min(x + tile.w, size.w), y, Math.min(x + tile.w, size.w), Math.min(y + tile.h, size.h), x, Math.min(y + tile.h, size.h)]];
+      const paint: Paint = { kind: PaintKind.Linear, from: [gradient.from[0] + x + at[0], gradient.from[1] + y + at[1]], to: [gradient.to[0] + x + at[0], gradient.to[1] + y + at[1]], stops: gradient.stops };
       drawn.push(path(contours, paint, matrix));
     }
   }
@@ -539,11 +544,15 @@ const filterEffect: GroupEffect = ({ node, items, matrix, defs }) => {
     return items;
   }
   const found = filterOf(value ?? '', defs);
-  if (!found || (items.length > 1 && !found.spreads)) {
+  if (!found) {
     return DomGap.Filter;
   }
   const filter = regioned(found.filter, items);
-  return items.map((d) => ({ ...d, filters: [...(d.filters ?? []), filter], space: linearOf(matrix), origin: [matrix[4], matrix[5]] as [number, number] }));
+  const look = { space: linearOf(matrix), origin: [matrix[4], matrix[5]] as [number, number] };
+  if (items.length > 1 && !found.spreads) {
+    return [{ kind: DrawnKind.Group, items, opacity: 1, matrix: [1, 0, 0, 1, 0, 0], filters: [filter], ...look }];
+  }
+  return items.map((d) => ({ ...d, filters: [...(d.filters ?? []), filter], ...look }));
 };
 
 const REGION_DEFAULTS = { x: '-10%', y: '-10%', width: '120%', height: '120%' };
@@ -587,7 +596,10 @@ const blendEffect: GroupEffect = ({ node, items }) => {
   if (PLAIN_BLEND.has(mode)) {
     return items;
   }
-  return BLENDS.has(mode) && items.length <= 1 ? items.map((d) => ({ ...d, blend: mode as BlendMode })) : DomGap.Blend;
+  if (!BLENDS.has(mode)) {
+    return DomGap.Blend;
+  }
+  return items.length <= 1 ? items.map((d) => ({ ...d, blend: mode as BlendMode })) : [{ kind: DrawnKind.Group, items, opacity: 1, matrix: [1, 0, 0, 1, 0, 0], blend: mode as BlendMode }];
 };
 
 const OPAQUE = 1;

@@ -131,14 +131,14 @@ describe('readTree', () => {
     expect(paths(tree(root(), wash))[0].paint).toMatchObject({ kind: PaintKind.Linear, from: [50, expect.closeTo(0)], to: [50, expect.closeTo(50)], stops: [{ at: 0 }, { at: 1 }] });
   });
 
-  it('leaves out a subtree whose filter mixes its items together and names it', () => {
+  it('filters a subtree whose filter mixes its items together as one group', () => {
     const blurred = el({ parent: 0, size: [50, 50], attrs: { class: 'soft' }, style: { filter: 'drop-shadow(rgb(0, 0, 0) 2px 2px 4px)', 'background-color': 'rgb(0, 0, 0)' } });
     const child = el({ parent: 1, size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
 
     const read = readTree(tree(root(), blurred, child));
 
-    expect(read.drawn).toEqual([]);
-    expect(read.gaps).toEqual([{ element: 'div.soft', reason: DomGap.Filter, count: 1 }]);
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn).toMatchObject([{ kind: DrawnKind.Group, items: [{ kind: DrawnKind.Path }, { kind: DrawnKind.Path }], filters: [{ kind: FilterKind.Css }] }]);
   });
 
   it('composites a canvas as a layer over its css box', () => {
@@ -355,17 +355,18 @@ describe('readTree', () => {
       expect(read.drawn.map((d) => d.filters)).toEqual([[{ kind: FilterKind.Svg, nodes: [blur] }], [{ kind: FilterKind.Svg, nodes: [blur] }]]);
     });
 
-    it('refuses a group whose filter mixes its shapes together', () => {
+    it('filters a group whose filter mixes its shapes together as one', () => {
       const read = readTree(withDefs(tree(root(), svg(), g({ filter: 'url("#noise")' }), rect(2), rect(2))));
 
-      expect(read.drawn).toEqual([]);
-      expect(read.gaps.map((g) => g.reason)).toEqual([DomGap.Filter]);
+      expect(read.gaps).toEqual([]);
+      expect(read.drawn).toMatchObject([{ kind: DrawnKind.Group, filters: [{ kind: FilterKind.Svg }] }]);
     });
 
-    it('refuses a group that blends as one', () => {
+    it('blends a group as one', () => {
       const read = readTree(withDefs(tree(root(), svg(), g({ 'mix-blend-mode': 'multiply' }), rect(2), rect(2))));
 
-      expect(read.gaps.map((g) => g.reason)).toEqual([DomGap.Blend]);
+      expect(read.gaps).toEqual([]);
+      expect(read.drawn).toMatchObject([{ kind: DrawnKind.Group, blend: BlendMode.Multiply }]);
     });
   });
   describe('svg paint', () => {
@@ -569,5 +570,24 @@ describe('readTree, CSS a motion template draws with', () => {
 
     expect(shade.filters).toHaveLength(1);
     expect(shade.masks?.[0].cover).toMatchObject({ kind: CoverKind.Path });
+  });
+
+  it('skips the empty layers a colour-only background layer leaves in the list', () => {
+    const glow = box({ 'background-image': 'radial-gradient(480px 400px at 0% 0%, color(srgb 1 0 0 / 0.22), rgba(0, 0, 0, 0) 70%), none', 'background-color': 'rgb(0, 0, 0)' });
+
+    const read = readTree(tree(root(), glow));
+
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn).toHaveLength(2);
+  });
+
+  it('places a single gradient inside the border of a bordered box', () => {
+    const sides = Object.fromEntries(['top', 'right', 'bottom', 'left'].flatMap((side) => [[`border-${side}-width`, '1px'], [`border-${side}-style`, 'solid'], [`border-${side}-color`, 'rgb(255, 255, 255)']]));
+    const pill = box({ ...sides, 'background-image': 'linear-gradient(rgb(255, 0, 0), rgb(0, 0, 255))' });
+
+    const read = readTree(tree(root(), pill));
+
+    expect(read.gaps).toEqual([]);
+    expect((read.drawn[0] as DrawnPath).paint).toMatchObject({ kind: PaintKind.Linear, from: [100, expect.closeTo(1)], to: [100, expect.closeTo(99)] });
   });
 });
