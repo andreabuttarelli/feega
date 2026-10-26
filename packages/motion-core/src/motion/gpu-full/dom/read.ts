@@ -268,10 +268,28 @@ function pixelSnapped(m: Affine, size: Size): Affine {
   return [(x1 - x0) / size.w, 0, 0, (y1 - y0) / size.h, x0, y0];
 }
 
-const SHADOW = /^((?:rgba?|hsla?|color)\([^)]*\)|#[0-9a-f]+|[a-z]+)\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px(?:\s+(-?[\d.]+)px)?$/i;
+const SHADOW = /^((?:rgba?|hsla?|color)\([^)]*\)|#[0-9a-f]+|[a-z]+)\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px(?:\s+(-?[\d.]+)px)?(\s+inset)?$/i;
 const SHADOW_SIGMA = 0.5;
+const INSET_REACH = 3;
 
-function shadowsOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Own {
+enum ShadowSide {
+  Outer = 'outer',
+  Inner = 'inner'
+}
+
+const blurOf = (blur: number, matrix: Affine) => (blur > 0 ? { filters: [{ kind: FilterKind.Css, fns: [{ name: 'blur', args: [`${blur * SHADOW_SIGMA}px`] }] }] as Filter[], space: linearOf(matrix), origin: [matrix[4], matrix[5]] as [number, number] } : {});
+
+function innerShadow(color: Rgba, [dx, dy, blur, spread]: number[], size: Size, shape: BoxShape, matrix: Affine): DrawnPath {
+  const reach = blur * INSET_REACH + Math.abs(dx) + Math.abs(dy) + Math.abs(spread) + 1;
+  const around = [-reach, -reach, size.w + reach, -reach, size.w + reach, size.h + reach, -reach, size.h + reach];
+  const hole: Size = { w: size.w - 2 * spread, h: size.h - 2 * spread };
+  const holeShape: BoxShape = shape.round ? { ...shape, radii: shape.radii.map((r) => Math.max(0, r - spread)) } : shape;
+  const contours = hole.w > 0 && hole.h > 0 ? [around, ...flat(outlineOf(holeShape, hole), dx + spread, dy + spread)] : [around];
+  const inside: MaskLayer = { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: flat(outlineOf(shape, size)), matrix } };
+  return { ...path(contours, solid(color), matrix, FillRule.EvenOdd), ...blurOf(blur, matrix), masks: [inside] };
+}
+
+function shadowsOf(s: Style, size: Size, shape: BoxShape, matrix: Affine, side: ShadowSide): Own {
   if (isNone(s['box-shadow'])) {
     return nothing();
   }
@@ -283,13 +301,19 @@ function shadowsOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Own {
       return nothing(DomGap.Shadow);
     }
     const [dx, dy, blur, spread] = [Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5] ?? 0)];
-    const grown: Size = { w: Math.max(0, size.w + 2 * spread), h: Math.max(0, size.h + 2 * spread) };
-    const grownShape: BoxShape = shape.round ? { ...shape, radii: shape.radii.map((r) => Math.max(0, r + spread)) } : shape;
-    if (color[3] <= 0 || !grown.w || !grown.h) {
+    if ((m[6] ? ShadowSide.Inner : ShadowSide.Outer) !== side || color[3] <= 0) {
       continue;
     }
-    const filters: Filter[] = blur > 0 ? [{ kind: FilterKind.Css, fns: [{ name: 'blur', args: [`${blur * SHADOW_SIGMA}px`] }] }] : [];
-    drawn.push({ ...path(flat(outlineOf(grownShape, grown), dx - spread, dy - spread), solid(color), matrix), ...(filters.length ? { filters, space: linearOf(matrix), origin: [matrix[4], matrix[5]] as [number, number] } : {}) });
+    if (side === ShadowSide.Inner) {
+      drawn.push(innerShadow(color, [dx, dy, blur, spread], size, shape, matrix));
+      continue;
+    }
+    const grown: Size = { w: Math.max(0, size.w + 2 * spread), h: Math.max(0, size.h + 2 * spread) };
+    const grownShape: BoxShape = shape.round ? { ...shape, radii: shape.radii.map((r) => Math.max(0, r + spread)) } : shape;
+    if (!grown.w || !grown.h) {
+      continue;
+    }
+    drawn.push({ ...path(flat(outlineOf(grownShape, grown), dx - spread, dy - spread), solid(color), matrix), ...blurOf(blur, matrix) });
   }
   return { drawn, gaps: [] };
 }
@@ -303,8 +327,9 @@ const boxPainter: Painter = (node, scope) => {
   const matrix = pixelSnapped(scope.matrix, size);
   const background = backgroundOf(node.style, size, shape, matrix, node.layer);
   const border = borderOf(node.style, size, shape, matrix);
-  const shadow = shadowsOf(node.style, size, shape, matrix);
-  return { drawn: [...shadow.drawn, ...background.drawn, ...border.drawn], gaps: [...shadow.gaps, ...background.gaps, ...border.gaps] };
+  const shadow = shadowsOf(node.style, size, shape, matrix, ShadowSide.Outer);
+  const inset = shadowsOf(node.style, size, shape, matrix, ShadowSide.Inner);
+  return { drawn: [...shadow.drawn, ...background.drawn, ...inset.drawn, ...border.drawn], gaps: [...shadow.gaps, ...background.gaps, ...border.gaps] };
 };
 
 const layerPainter: Painter = (node, scope) => {
@@ -333,6 +358,15 @@ const pointsOf: Geometry = (attrs) => {
   }
   const pts = Array.from({ length: Math.floor(values.length / 2) }, (_, i) => [values[2 * i], values[2 * i + 1]] as const);
   return [{ vertices: pts.map((p) => ({ p, in: p, out: p })), closed: true }];
+};
+
+const lineOf: Geometry = (attrs, vp) => {
+  const v = numbers(len(attrs, 'x1', vp.w), len(attrs, 'y1', vp.h), len(attrs, 'x2', vp.w), len(attrs, 'y2', vp.h));
+  if (!v) {
+    return null;
+  }
+  const ends = [[v[0], v[1]] as const, [v[2], v[3]] as const];
+  return [{ vertices: ends.map((p) => ({ p, in: p, out: p })), closed: false }];
 };
 
 const shifted = (outline: Outline, dx: number, dy: number): Outline => outline.map((c) => ({ ...c, vertices: c.vertices.map((v) => ({ p: [v.p[0] + dx, v.p[1] + dy] as const, in: [v.in[0] + dx, v.in[1] + dy] as const, out: [v.out[0] + dx, v.out[1] + dy] as const })) }));
@@ -429,7 +463,7 @@ function textOf(node: RawNode, scope: Scope): Own {
   return { drawn, gaps };
 }
 
-const GEOMETRY: Record<string, Geometry> = { polygon: pointsOf, polyline: pointsOf, rect: rectOf, circle: circleOf, ellipse: ellipseOf, path: pathOf };
+const GEOMETRY: Record<string, Geometry> = { line: lineOf, polygon: pointsOf, polyline: pointsOf, rect: rectOf, circle: circleOf, ellipse: ellipseOf, path: pathOf };
 
 const REFERENCE = /^url\(\s*["']?#([^"')]+)["']?\s*\)$/;
 const SPREADING = new Set(['feGaussianBlur', 'feColorMatrix', 'feComponentTransfer', 'feFuncR', 'feFuncG', 'feFuncB', 'feFuncA']);
@@ -617,6 +651,7 @@ const PAINTERS: Record<string, Painter> = {
   g: groupPainter,
   polygon: shapePainter(pointsOf),
   polyline: shapePainter(pointsOf),
+  line: shapePainter(lineOf),
   rect: shapePainter(rectOf),
   circle: shapePainter(circleOf),
   ellipse: shapePainter(ellipseOf),

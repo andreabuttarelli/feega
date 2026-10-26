@@ -66,7 +66,7 @@ export const READ_STYLES = [
   'stroke-dasharray'
 ] as const;
 
-export const READ_ATTRS = ['points', 'd', 'x', 'y', 'width', 'height', 'rx', 'ry', 'r', 'cx', 'cy', 'viewBox', 'href', 'class'] as const;
+export const READ_ATTRS = ['points', 'd', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'rx', 'ry', 'r', 'cx', 'cy', 'viewBox', 'href', 'class'] as const;
 
 export type ReadStyle = (typeof READ_STYLES)[number];
 export type ReadAttr = (typeof READ_ATTRS)[number];

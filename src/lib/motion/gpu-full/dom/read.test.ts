@@ -539,4 +539,35 @@ describe('readTree, CSS a motion template draws with', () => {
     expect(points.some(([x, y]) => Math.abs(x - 12) < 0.01 && Math.abs(y) < 0.01)).toBe(true);
     expect(points.some(([x, y]) => Math.abs(x) < 0.01 && Math.abs(y - 6) < 0.01)).toBe(true);
   });
+
+  it('strokes an svg line', () => {
+    const svg = el({ parent: 0, tag: 'svg', svg: true, size: [100, 100] });
+    const line = el({ parent: 1, tag: 'line', svg: true, at: null, attrs: { x1: '10', y1: '20', x2: '90', y2: '20' } as RawNode['attrs'], style: { fill: 'none', stroke: 'rgb(0, 0, 0)', 'stroke-width': '2px' } });
+
+    const read = readTree(tree(root(), svg, line));
+
+    expect(read.gaps).toEqual([]);
+    expect(near(bounds(read.drawn[0] as DrawnPath))).toMatchObject({ left: 10, top: 19, right: 90, bottom: 21 });
+  });
+
+  it('paints a hard inset shadow as a ring inside the box, over its background', () => {
+    const bezel = box({ 'background-color': 'rgb(255, 255, 255)', 'box-shadow': 'rgba(0, 0, 0, 0.5) 0px 0px 0px 4px inset' });
+
+    const read = readTree(tree(root(), bezel));
+    const ring = read.drawn[1] as DrawnPath;
+
+    expect(read.gaps).toEqual([]);
+    expect(ring.rule).toBe(FillRule.EvenOdd);
+    expect(ring.contours).toHaveLength(2);
+    expect(near(bounds({ ...ring, contours: [ring.contours[1]] }))).toEqual({ left: 4, top: 4, right: 196, bottom: 96 });
+  });
+
+  it('blurs an inset shadow inside the box it shades', () => {
+    const glow = box({ 'box-shadow': 'rgb(0, 0, 255) 0px 3px 6px 0px inset' });
+
+    const [shade] = readTree(tree(root(), glow)).drawn as DrawnPath[];
+
+    expect(shade.filters).toHaveLength(1);
+    expect(shade.masks?.[0].cover).toMatchObject({ kind: CoverKind.Path });
+  });
 });
