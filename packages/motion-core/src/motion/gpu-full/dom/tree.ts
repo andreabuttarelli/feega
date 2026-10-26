@@ -14,6 +14,7 @@ export const READ_STYLES = [
   'transform',
   'transform-origin',
   'perspective',
+  'transform-style',
   'perspective-origin',
   'z-index',
   'overflow',

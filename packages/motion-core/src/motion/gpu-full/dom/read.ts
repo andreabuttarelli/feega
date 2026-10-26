@@ -3,7 +3,7 @@ import { invert2d } from '../../parent';
 import { ellipseOutline, flatten, parsePath, rectOutline, type Outline } from '../../shape/geometry';
 import { FillRule, MAX_STOPS, PaintKind, type Paint } from '../paint';
 import { rgbaOf, type Rgba } from '../rgba';
-import { cornerOf, homographyOf, isNone, lengthOf, linearGradient, perspectiveOf, radialGradient, splitTop, tileOf, transformOf, type Gradient, type Size } from './css';
+import { affineOf, cornerOf, flattened, isNone, lengthOf, linearGradient, matrix4Of, mul4, perspectiveOf, projectBy, radialGradient, splitTop, tileOf, translate4, viewOf, type Gradient, type Matrix4, type Size } from './css';
 import { NO_INDEX, type RawNode, type RawTree, type TextLine } from './tree';
 import { Ligatures } from '../text/face';
 import { glyphContours, moved, NO_TYPESET, SMOOTHING, Smoothing, type Typeset } from '../text/painter';
@@ -41,7 +41,7 @@ export enum DrawnKind {
   Group = 'group'
 }
 
-export type Look = { masks?: MaskLayer[]; filters?: Filter[]; space?: Linear; origin?: [number, number]; blend?: BlendMode };
+export type Look = { masks?: MaskLayer[]; filters?: Filter[]; space?: Linear; origin?: [number, number]; blend?: BlendMode; backdrop?: number };
 export type DrawnPath = { kind: DrawnKind.Path; contours: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine } & Look;
 export type DrawnLayer = { kind: DrawnKind.Layer; layer: number; width: number; height: number; opacity: number; matrix: Affine } & Look;
 export type DrawnGroup = { kind: DrawnKind.Group; items: Drawn[]; opacity: number; matrix: Affine } & Look;
@@ -50,7 +50,7 @@ export type DomGapCount = { element: string; reason: DomGap; count: number };
 export type DomRead = { drawn: Drawn[]; gaps: DomGapCount[] };
 
 type Own = { drawn: Drawn[]; gaps: DomGap[] };
-type Scope = { matrix: Affine; viewport: Size; typeset: Typeset; defs: RawTree['defs']; perspective: ReturnType<typeof perspectiveOf> };
+type Scope = { matrix: Affine; viewport: Size; typeset: Typeset; defs: RawTree['defs']; perspective: ReturnType<typeof perspectiveOf>; depth: { chain: Matrix4; base: Affine } | null; projected?: boolean };
 type Style = RawNode['style'];
 type BoxShape = { round: true; radii: number[]; squash?: number } | { round: false; ellipse: true };
 type Painter = (node: RawNode, scope: Scope) => Own;
@@ -75,8 +75,14 @@ const NO_REPEAT = 'no-repeat';
 const ORIGIN_POSITIONS = new Set(['', '0% 0%', '0px 0px', 'left top']);
 const URL_IMAGE = /^url\(/;
 
+const BACKDROP_BLUR = /^blur\(([\d.]+)px\)$/;
+const backdropOf = (s: Style) => {
+  const m = BACKDROP_BLUR.exec((s['backdrop-filter'] ?? '').trim());
+  return m ? Number(m[1]) : null;
+};
+
 const REFUSALS: [DomGap, (s: Style) => boolean][] = [
-  [DomGap.Filter, (s) => !isNone(s['backdrop-filter'])],
+  [DomGap.Filter, (s) => !isNone(s['backdrop-filter']) && backdropOf(s) === null],
 ];
 
 const flat = (outline: Outline, dx = 0, dy = 0): number[][] => outline.map((c) => flatten(c).flatMap(([x, y]) => [x + dx, y + dy]));
@@ -329,12 +335,14 @@ const boxPainter: Painter = (node, scope) => {
   if (!shape) {
     return nothing(DomGap.Radius);
   }
-  const matrix = pixelSnapped(scope.matrix, size);
+  const matrix = scope.projected ? scope.matrix : pixelSnapped(scope.matrix, size);
   const background = backgroundOf(node.style, size, shape, matrix, node.layer);
   const border = borderOf(node.style, size, shape, matrix);
   const shadow = shadowsOf(node.style, size, shape, matrix, ShadowSide.Outer);
   const inset = shadowsOf(node.style, size, shape, matrix, ShadowSide.Inner);
-  return { drawn: [...shadow.drawn, ...background.drawn, ...inset.drawn, ...border.drawn], gaps: [...shadow.gaps, ...background.gaps, ...border.gaps] };
+  const blur = backdropOf(node.style);
+  const behind: Drawn[] = blur ? [{ ...path(flat(outlineOf(shape, size)), solid([0, 0, 0, 0]), matrix), backdrop: blur }] : [];
+  return { drawn: [...shadow.drawn, ...behind, ...background.drawn, ...inset.drawn, ...border.drawn], gaps: [...shadow.gaps, ...background.gaps, ...border.gaps] };
 };
 
 const layerPainter: Painter = (node, scope) => {
@@ -777,19 +785,24 @@ export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead 
     const refusal = REFUSALS.find(([gap, hit]) => !(gap === DomGap.Order && node.parent === NO_INDEX) && hit(node.style));
     const view = viewportOf(node, outer.viewport);
     const [x, y] = (node.at ?? [0, 0]).map((v) => (isNone(node.style.transform) ? v : Math.round(v)));
-    const lens = outer.perspective && { ...outer.perspective, origin: [outer.perspective.origin[0] - x, outer.perspective.origin[1] - y] as [number, number] };
-    const transform = transformOf(node.style.transform, node.style['transform-origin'], { w: node.size[0], h: node.size[1] }, lens);
+    const own4 = matrix4Of(node.style.transform, node.style['transform-origin']);
+    const local = own4 && mul4(translate4(x, y), own4);
+    const chain = local && (outer.depth ? mul4(outer.depth.chain, local) : outer.perspective ? mul4(viewOf(outer.perspective), local) : local);
+    const base = outer.depth ? outer.depth.base : outer.matrix;
+    const exact = chain && affineOf(chain);
+    const transform = chain && (exact ?? flattened(chain, { w: node.size[0], h: node.size[1] }));
     if (refusal || !view || !transform) {
       gap(node, refusal ? refusal[0] : view ? DomGap.Transform : DomGap.Geometry);
       return [];
     }
-    const matrix = mul2d(mul2d(outer.matrix, [1, 0, 0, 1, x, y]), transform);
+    const matrix = mul2d(base, transform);
+    const preserved = node.style['transform-style'] === 'preserve-3d';
     const visible = !HIDDEN.has(node.style.visibility ?? '');
-    const own = visible ? painterOf(node)(node, { ...outer, matrix }) : nothing();
+    const own = visible ? painterOf(node)(node, { ...outer, matrix, projected: !exact || outer.projected }) : nothing();
     const text = visible && node.text ? textOf(node, { ...outer, matrix }) : nothing();
     [...own.gaps, ...text.gaps].forEach((reason) => gap(node, reason));
     const order = node.svg ? children[i] : stacked(children[i].map((c) => nodes[c]), children[i]);
-    const inner = { ...outer, matrix: mul2d(matrix, view.fit), viewport: view.viewport, perspective: perspectiveOf(node.style.perspective, node.style['perspective-origin']) };
+    const inner = { ...outer, matrix: mul2d(matrix, view.fit), viewport: view.viewport, perspective: perspectiveOf(node.style.perspective, node.style['perspective-origin']), depth: preserved && chain ? { chain, base } : null, projected: !preserved && (!exact || outer.projected) };
     const kids = order.flatMap((c) => visit(c, inner));
     const size = { w: node.size[0], h: node.size[1] };
     const clipped = CLIPPING.has(node.style.overflow ?? '') && node.at && kids.length && spills(kids, matrix, size) ? boxClip(node, kids, matrix) : kids;
@@ -797,14 +810,14 @@ export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead 
       gap(node, DomGap.Clip);
       return [];
     }
+    const ownCount = own.drawn.length + text.drawn.length;
     const effected = grouped({ node, items: [...own.drawn, ...text.drawn, ...clipped], matrix, viewport: outer.viewport, defs: tree.defs });
     if (!Array.isArray(effected)) {
       gap(node, effected);
       return [];
     }
-    const homography = homographyOf(node.style.transform, node.style['transform-origin'], lens);
-    const placed = mul2d(outer.matrix, [1, 0, 0, 1, x, y]);
-    const items = homography ? warped(effected, placed, matrix, homography) : effected;
+    const warp = (drawn: Drawn[]) => (exact || !chain ? drawn : warped(drawn, base, matrix, projectBy(chain)));
+    const items = preserved ? [...warp(effected.slice(0, ownCount)), ...effected.slice(ownCount)] : warp(effected);
     const opacity = opacityOf(node.style);
     if (opacity < 1 && items.length > 1 && overlapping(items)) {
       return [{ kind: DrawnKind.Group, items, opacity, matrix: [1, 0, 0, 1, 0, 0] }];
@@ -812,6 +825,6 @@ export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead 
     return items.map((d) => ({ ...d, opacity: d.opacity * opacity }));
   };
 
-  const drawn = nodes.length ? visit(0, { matrix: [1, 0, 0, 1, 0, 0], viewport: { w: tree.width, h: tree.height }, typeset, defs: tree.defs, perspective: null }) : [];
+  const drawn = nodes.length ? visit(0, { matrix: [1, 0, 0, 1, 0, 0], viewport: { w: tree.width, h: tree.height }, typeset, defs: tree.defs, perspective: null, depth: null }) : [];
   return { drawn, gaps: [...gaps.values()] };
 }

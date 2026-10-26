@@ -42,13 +42,15 @@ export function lengthOf(value: string | undefined, basis: number): number | nul
   return m[2] === '%' ? (Number(m[1]) * basis) / PERCENT : Number(m[1]);
 }
 
-type Matrix4 = number[];
+export type Matrix4 = number[];
 type Perspective = { depth: number; origin: [number, number] };
+type Point = [number, number];
 
 const MATRIX_2D = /^matrix\(([^)]+)\)$/;
 const MATRIX_3D = /^matrix3d\(([^)]+)\)$/;
-const translate4 = (x: number, y: number): Matrix4 => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, 0, 1];
-const mul4 = (a: Matrix4, b: Matrix4): Matrix4 => Array.from({ length: 16 }, (_, i) => [0, 1, 2, 3].reduce((sum, k) => sum + a[k * 4 + (i % 4)] * b[Math.floor(i / 4) * 4 + k], 0));
+const IDENTITY4: Matrix4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+export const translate4 = (x: number, y: number): Matrix4 => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, 0, 1];
+export const mul4 = (a: Matrix4, b: Matrix4): Matrix4 => Array.from({ length: 16 }, (_, i) => [0, 1, 2, 3].reduce((sum, k) => sum + a[k * 4 + (i % 4)] * b[Math.floor(i / 4) * 4 + k], 0));
 const originOf = (origin: string | undefined) => (origin ?? '0px 0px').split(/\s+/).map((v) => parseFloat(v) || 0) as [number, number];
 
 export function perspectiveOf(depth: string | undefined, origin: string | undefined): Perspective | null {
@@ -56,51 +58,37 @@ export function perspectiveOf(depth: string | undefined, origin: string | undefi
   return d > 0 ? { depth: d, origin: originOf(origin) } : null;
 }
 
-export function transformOf(transform: string | undefined, origin: string | undefined, size: Size = { w: 1, h: 1 }, perspective: Perspective | null = null): Affine | null {
+export function matrix4Of(transform: string | undefined, origin: string | undefined): Matrix4 | null {
   if (isNone(transform)) {
-    return IDENTITY;
+    return IDENTITY4;
   }
   const value = (transform ?? '').trim();
   const flat = MATRIX_2D.exec(value);
-  const [ox, oy] = originOf(origin);
-  if (flat) {
-    const [a, b, c, d, e, f] = flat[1].split(',').map(Number);
-    return mul2d(mul2d([1, 0, 0, 1, ox, oy], [a, b, c, d, e, f]), [1, 0, 0, 1, -ox, -oy]);
-  }
-  const deep = deepOf(transform, origin, perspective);
-  return deep && flattened(deep, size);
-}
-
-type Point = [number, number];
-
-function deepOf(transform: string | undefined, origin: string | undefined, perspective: Perspective | null): Matrix4 | null {
-  const deep = MATRIX_3D.exec((transform ?? '').trim());
-  if (!deep) {
+  const deep = MATRIX_3D.exec(value);
+  const lifted = (v: number[]) => [v[0], v[1], 0, 0, v[2], v[3], 0, 0, 0, 0, 1, 0, v[4], v[5], 0, 1];
+  const own = flat ? lifted(flat[1].split(',').map(Number)) : deep ? deep[1].split(',').map(Number) : null;
+  if (!own) {
     return null;
   }
   const [ox, oy] = originOf(origin);
-  const own = mul4(mul4(translate4(ox, oy), deep[1].split(',').map(Number)), translate4(-ox, -oy));
-  return perspective ? mul4(viewOf(perspective), own) : own;
+  return mul4(mul4(translate4(ox, oy), own), translate4(-ox, -oy));
 }
 
-const projectBy =
+export const affineOf = (m: Matrix4): Affine | null => (Math.abs(m[3]) < 1e-12 && Math.abs(m[7]) < 1e-12 && Math.abs(m[15] - 1) < 1e-12 ? [m[0], m[1], m[4], m[5], m[12], m[13]] : null);
+
+export const projectBy =
   (m: Matrix4) =>
   ([x, y]: Point): Point | null => {
     const w = m[3] * x + m[7] * y + m[15];
     return w > 0 ? [(m[0] * x + m[4] * y + m[12]) / w, (m[1] * x + m[5] * y + m[13]) / w] : null;
   };
 
-export function homographyOf(transform: string | undefined, origin: string | undefined, perspective: Perspective | null): ((p: Point) => Point | null) | null {
-  const deep = deepOf(transform, origin, perspective);
-  return deep && projectBy(deep);
-}
-
-function viewOf({ depth, origin: [px, py] }: Perspective): Matrix4 {
+export function viewOf({ depth, origin: [px, py] }: Perspective): Matrix4 {
   const lens = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -1 / depth, 0, 0, 0, 1];
   return mul4(mul4(translate4(px, py), lens), translate4(-px, -py));
 }
 
-function flattened(m: Matrix4, size: Size): Affine | null {
+export function flattened(m: Matrix4, size: Size): Affine | null {
   const box = size.w > 0 && size.h > 0 ? size : { w: 1, h: 1 };
   const corners: [number, number][] = [[0, 0], [box.w, 0], [box.w, box.h], [0, box.h]];
   const projected = corners.map(projectBy(m));

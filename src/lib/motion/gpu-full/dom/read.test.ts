@@ -590,4 +590,48 @@ describe('readTree, CSS a motion template draws with', () => {
     expect(read.gaps).toEqual([]);
     expect((read.drawn[0] as DrawnPath).paint).toMatchObject({ kind: PaintKind.Linear, from: [100, expect.closeTo(1)], to: [100, expect.closeTo(99)] });
   });
+
+  it('blurs what is behind a box with a backdrop blur, under the box', () => {
+    const glass = box({ 'backdrop-filter': 'blur(12px)', 'background-color': 'rgba(255, 255, 255, 0.2)' });
+
+    const read = readTree(tree(root(), glass));
+
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn).toMatchObject([{ kind: DrawnKind.Path, backdrop: 12 }, { kind: DrawnKind.Path }]);
+  });
+
+  it('still refuses a backdrop filter other than a blur', () => {
+    expect(readTree(tree(root(), box({ 'backdrop-filter': 'saturate(2)' }))).gaps).toMatchObject([{ reason: DomGap.Filter }]);
+  });
+
+  it('carries the perspective through a preserve-3d parent to its children', () => {
+    const scene = el({ parent: 0, at: [0, 0], size: [400, 300], style: { perspective: '400px', 'perspective-origin': '200px 150px' } });
+    const ring = el({ parent: 1, at: [100, 100], size: [0, 0], style: { 'transform-style': 'preserve-3d', transform: 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 200, 1)' } as RawNode['style'] });
+    const card = el({ parent: 2, at: [0, 0], size: [200, 100], style: { 'background-color': 'rgb(0, 0, 0)' } });
+
+    const read = readTree(tree(root(), scene, ring, card));
+
+    expect(read.gaps).toEqual([]);
+    expect(near(bounds(read.drawn[0] as DrawnPath))).toEqual({ left: 0, top: 50, right: 400, bottom: 250 });
+  });
+
+  it('turns a child of a preserve-3d parent in depth before the perspective projects it', () => {
+    const [cos, sin] = [Math.cos(Math.PI / 6), Math.sin(Math.PI / 6)];
+    const scene = el({ parent: 0, at: [0, 0], size: [400, 300], style: { perspective: '400px', 'perspective-origin': '200px 150px' } });
+    const ring = el({ parent: 1, at: [100, 100], size: [0, 0], style: { 'transform-style': 'preserve-3d', transform: 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 100, 1)' } as RawNode['style'] });
+    const card = el({ parent: 2, at: [0, 0], size: [200, 100], style: { 'background-color': 'rgb(0, 0, 0)', transform: `matrix3d(${cos}, 0, ${-sin}, 0, 0, 1, 0, 0, ${sin}, 0, ${cos}, 0, 0, 0, 0, 1)`, 'transform-origin': '100px 50px' } });
+    const projected = ([x, y]: [number, number]): [number, number] => {
+      const [px, pz] = [100 + (x - 100) * cos, -(x - 100) * sin + 100];
+      const scale = 400 / (400 - pz);
+      return [200 + (px + 100 - 200) * scale, 150 + (y + 100 - 150) * scale];
+    };
+
+    const read = readTree(tree(root(), scene, ring, card));
+    const item = read.drawn[0] as DrawnPath;
+    const points = Array.from({ length: item.contours[0].length / 2 }, (_, i) => apply2d(item.matrix, [item.contours[0][2 * i], item.contours[0][2 * i + 1]]));
+    const miss = (c: [number, number]) => Math.min(...points.map((p) => Math.hypot(p[0] - projected(c)[0], p[1] - projected(c)[1])));
+
+    expect(read.gaps).toEqual([]);
+    expect(([[0, 0], [200, 0], [200, 100], [0, 100]] as [number, number][]).map(miss)).toEqual([0, 0, 0, 0].map(() => expect.closeTo(0, 1)));
+  });
 });
