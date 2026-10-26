@@ -14,9 +14,9 @@ The Electron shell (#1331) built only unsigned local packages. Now:
 
 ## Frameless window
 
-- No native title bar or window buttons: macOS `titleBarStyle:
-  'hidden'` + `setWindowButtonVisibility(false)`, elsewhere
-  `frame: false`. Cmd/Ctrl+Q/W/M stay in Electron's default menu.
+- No native title bar; window controls stay. macOS: traffic lights at
+  (12, 8) inside the strip. Windows/Linux: `titleBarOverlay` 28px high,
+  colours follow the system theme. Cmd/Ctrl+Q/W/M via the default menu.
 - `app.html` marks `data-window="frameless"` only when the UA has both
   `FeegaNative/` and `Electron/` (Capacitor stays out). Not
   `data-shell`: the root layout already owns it (app/site).

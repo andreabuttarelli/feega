@@ -34,7 +34,7 @@ Download from [GitHub Releases](https://github.com/andreabuttarelli/feega/releas
 
 Unsigned builds: on macOS right-click the app → Open the first time; on Windows SmartScreen → More info → Run anyway.
 
-**Window.** No title bar: drag the window by its top edge. Cmd/Ctrl+W closes, Cmd+M minimises, Cmd/Ctrl+Q quits.
+**Window.** No title bar: the window controls sit over the app's top edge, which drags the window. Cmd/Ctrl+W closes, Cmd+M minimises, Cmd/Ctrl+Q quits.
 
 **Updates.** The app checks on launch and every 4 hours, downloads in the background and asks to restart. On macOS this works only for signed builds; Windows and the Linux AppImage update unsigned. The `.deb` does not self-update.
 
