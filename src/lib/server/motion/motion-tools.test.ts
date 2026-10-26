@@ -251,6 +251,17 @@ describe('motion agent tools', () => {
     expect(out.blocking.some((q) => q.includes('jumps to the first'))).toBe(false);
   });
 
+  it('view_frames blocks a canvas that vanishes right after a cut', async () => {
+    const probe = async (times: number[]) => times.map((time, i) => ({ time, luma: 20, lumaStd: i % 6 === 0 || i % 6 === 5 ? 20 : 4.5, whiteShare: 0 }));
+    const { run } = setup({ probe, inspect: async (frames) => frames.map((f) => ({ time: f.time, luma: 120, lumaStd: 40, whiteShare: 0 })) });
+    await run('add_clip', { component: 'Title', start: 0, duration: 2, props: { text: 'One' } });
+    await run('add_clip', { component: 'Title', start: 2, duration: 2, props: { text: 'Two' } });
+
+    const out = (await run('view_frames', { times: [1] })) as { blocking: string[] };
+
+    expect(out.blocking.some((q) => q.includes('vanishes'))).toBe(true);
+  });
+
   it('view_frames takes at most six times', () => {
     const { schema } = setup();
 
