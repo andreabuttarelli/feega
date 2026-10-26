@@ -37,16 +37,32 @@ describe('a kie model doc', () => {
   });
 
   it('skips a model that needs an input the wire cannot fill', () => {
-    expect(specOfDoc(doc('Edit', 'acme/edit', { prompt: { type: 'string' }, image_url: { type: 'string' } }, ['prompt', 'image_url']))).toBeNull();
     expect(specOfDoc(doc('Moded', 'acme/moded', { prompt: { type: 'string' }, mode: { type: 'string' } }, ['prompt', 'mode']))).toBeNull();
   });
 
   it('skips a model that is named after the media it must be given', () => {
     const optional = { prompt: { type: 'string' }, image_urls: { type: 'array', items: { type: 'string' } } };
 
-    expect(specOfDoc(doc('I2V', 'acme/image-to-video', optional))).toBeNull();
-    expect(specOfDoc(doc('Edit', 'acme/image-edit', optional))).toBeNull();
+    expect(specOfDoc(doc('V2V', 'acme/video-to-video', optional))).toBeNull();
     expect(specOfDoc(doc('Ext', 'acme/extend', optional))).toBeNull();
+  });
+
+  it('takes a required image as a media input the node supplies', () => {
+    const spec = specOfDoc(doc('Edit', 'acme/edit', { prompt: { type: 'string' }, image_url: { type: 'string' } }, ['prompt', 'image_url']));
+
+    expect(spec).toMatchObject({ fields: { images: ['image_url'] }, requiresImage: true });
+  });
+
+  it('maps first and last frames', () => {
+    const spec = specOfDoc(doc('I2V', 'acme/image-to-video', { prompt: { type: 'string' }, first_frame_url: { type: 'string' }, last_frame_url: { type: 'string' } }, ['first_frame_url']));
+
+    expect(spec).toMatchObject({ fields: { images: ['first_frame_url'], lastFrame: 'last_frame_url' }, requiresImage: true });
+  });
+
+  it('reads a duration range from its description when the doc lists no enum', () => {
+    const spec = specOfDoc(doc('Range', 'acme/range', { prompt: { type: 'string' }, duration: { type: 'integer', description: 'Video duration in 4-6 seconds.' } }));
+
+    expect(spec).toMatchObject({ durations: [4, 5, 6], numericDuration: true });
   });
 
   it('skips a page that is not a create-task spec', () => {

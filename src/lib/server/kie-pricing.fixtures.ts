@@ -22,5 +22,7 @@ export const KIE_FIXTURE_PRICES = pricesOf([
   record('ideogram v3-edit, image-to-image, TURBO', '3.5', 'per image', 'https://kie.ai/ideogram/v3?model=ideogram%2Fv3-edit', 'image'),
   record('qwen text-to-image', '2', 'per image', 'https://kie.ai/qwen?model=qwen%2Ftext-to-image', 'image'),
   record('qwen3 pro text-to-image', '6.4', 'per image', 'https://kie.ai/qwen3?model=qwen3%2Fpro-text-to-image', 'image'),
+  record('nano-banana-2-lite, 1k', '4', 'per image', 'https://kie.ai/nano-banana-2-lite', 'image'),
+  record('bytedance seedance 2, 720p', '5', 'per second', 'https://kie.ai/seedance?model=bytedance%2Fseedance-2', 'video'),
   record('acme video, 720p', '3', 'per second', 'https://kie.ai/acme?model=acme%2Ftext-to-video', 'video')
 ]);

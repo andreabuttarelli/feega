@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IMAGE_MODEL_CHOICES } from '$lib/image-models';
+import { VIDEO_MODEL_CHOICES } from '$lib/video-models';
 import { IMAGE_TOOLS_GROUP, IMAGE_TOOL_MODEL, ImageTool } from '$lib/image-tools';
 import { KIE_CREDIT_USD } from './kie';
 import { KieBilling, KIE_MODELS, kieModelRows } from './kie-catalogue';
@@ -13,7 +14,7 @@ const rows = kieModelRows(KIE_FIXTURE_PRICES, [], '2026-10-15T00:00:00.000Z');
 
 describe('the kie catalogue', () => {
   it('only discounts models the picker already offers', () => {
-    const offered = new Set(IMAGE_MODEL_CHOICES.map((c) => c.id));
+    const offered = new Set([...IMAGE_MODEL_CHOICES, ...VIDEO_MODEL_CHOICES].map((c) => c.id));
     expect(KIE_MODELS.filter((model) => model.discountFor).every((model) => offered.has(model.discountFor!))).toBe(true);
   });
 
@@ -54,12 +55,44 @@ describe('the kie catalogue', () => {
     expect(twin.find((r) => r.id === 'kie/qwen3/pro-text-to-image')?.wire_spec.discountFor).toBe('qwen3-pro');
   });
 
+  it('prices a model whose doc has no resolution input by one flat line, whatever the list says', () => {
+    const lite = kieModelRows(KIE_FIXTURE_PRICES, [SPEC({ model: 'nano-banana-2-lite', fields: { prompt: 'prompt', images: [], imageList: 'image_urls' }, resolutions: [], durations: [], aspectRatios: ['1:1'] })], '2026-10-15T00:00:00.000Z').find((r) => r.id === 'kie/nano-banana-2-lite')!;
+
+    expect(lite.supported_resolutions).toEqual([]);
+    expect(taskUsdFor(lite.pricing, {})).toBeCloseTo(4 * KIE_CREDIT_USD, 6);
+  });
+
+  it('flags a model that needs an image so a node without one is refused before kie is called', () => {
+    const edit = kieModelRows(KIE_FIXTURE_PRICES, [SPEC({ model: 'qwen/text-to-image', fields: { prompt: 'prompt', images: ['image_url'] }, requiresImage: true, resolutions: [], durations: [], aspectRatios: [] })], '2026-10-15T00:00:00.000Z').find((r) => r.id === 'kie/qwen/text-to-image')!;
+
+    expect(edit.wire_spec).toMatchObject({ requiresImage: true });
+    expect(edit.input_modalities).toEqual(['text', 'image']);
+  });
+
+  it('maps the kie twin of an offered video model as its discount', () => {
+    const rows = kieModelRows(KIE_FIXTURE_PRICES, [SPEC({ model: 'bytedance/seedance-2' })], '2026-10-15T00:00:00.000Z');
+
+    expect(rows.find((r) => r.id === 'kie/bytedance/seedance-2')?.wire_spec.discountFor).toBe('bytedance/seedance-2');
+  });
+
   it('prices a model with no resolution input by one flat line', () => {
     const qwen = kieModelRows(KIE_FIXTURE_PRICES, [SPEC({ model: 'qwen/text-to-image', fields: { prompt: 'prompt', images: [] }, resolutions: [], durations: [], aspectRatios: [] })], '2026-10-15T00:00:00.000Z').find((r) => r.id === 'kie/qwen/text-to-image')!;
 
     expect(qwen.catalogue).toBe('image');
     expect(qwen.supported_resolutions).toEqual([]);
     expect(taskUsdFor(qwen.pricing, {})).toBeCloseTo(2 * KIE_CREDIT_USD, 6);
+  });
+
+  it('does not list an image tool a second time as a plain model', () => {
+    const doubled = kieModelRows(KIE_FIXTURE_PRICES, [SPEC({ model: 'recraft/remove-background', resolutions: [], durations: [], aspectRatios: [] })], '2026-10-15T00:00:00.000Z');
+
+    expect(doubled.filter((r) => r.wire_spec.model === 'recraft/remove-background')).toHaveLength(1);
+  });
+
+  it('does not list an image tool a second time as a plain model', () => {
+    const doubled = kieModelRows(KIE_FIXTURE_PRICES, [SPEC({ model: 'recraft/remove-background', resolutions: [], durations: [], aspectRatios: [] })], '2026-10-15T00:00:00.000Z');
+
+    expect(doubled.filter((r) => r.wire_spec.model === 'recraft/remove-background')).toHaveLength(1);
   });
 
   it('skips a doc whose model the price list does not know, and never doubles a curated model', () => {
@@ -69,7 +102,7 @@ describe('the kie catalogue', () => {
     expect(extra.filter((r) => r.id === 'kie/nano-banana-2')).toHaveLength(1);
   });
 
-  it('offers Grok Imagine text-to-video on kie alone, priced per second from kie\'s price list', () => {
+  it('offers Grok Imagine text-to-video on kie alone, priced per second', () => {
     const grok = rows.find((r) => r.id === 'kie/grok-imagine/text-to-video')!;
 
     expect(grok.catalogue).toBe('video');

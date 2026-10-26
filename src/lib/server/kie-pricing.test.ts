@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { creditsBy, fetchKiePrices, KieUnit, pricesOf } from './kie-pricing';
+import { creditsBy, fetchKiePrices, KieUnit, linesOfModel, pricesOf } from './kie-pricing';
 
 const record = (modelDescription: string, creditPrice: string, creditUnit: string, anchor: string, interfaceType = 'image') => ({ modelDescription, creditPrice, creditUnit, anchor, interfaceType });
 
@@ -64,5 +64,37 @@ describe('the kie price list', () => {
 
     await expect(fetchKiePrices(reply({ code: 200, data: { pages: 1, records: [] } }))).rejects.toThrow('kie_pricing_failed');
     await expect(fetchKiePrices(reply({ code: 422, msg: 'bad', data: null }))).rejects.toThrow('kie_pricing_failed: 422 bad');
+  });
+});
+
+describe('joining a model to its price lines', () => {
+  const SHARED = pricesOf([
+    record('seedream 5 Pro, text-to-image, 2K', '14', 'per image', 'https://kie.ai/seedream-5-0-pro'),
+    record('seedream 5 Pro, text-to-image, 1K', '7', 'per image', 'https://kie.ai/seedream-5-0-pro'),
+    record('seedream 5 Pro, image-to-image, 2K', '14', 'per image', 'https://kie.ai/seedream-5-0-pro'),
+    record('Qwen-Image-2.1, text to image, 1K', '3', 'per image', 'https://kie.ai/qwen-image-2.1'),
+    record('Google nano banana 2, 1K', '8', 'per image', 'https://kie.ai/nano-banana-2')
+  ]);
+
+  it('finds the lines by anchor first', () => {
+    expect(linesOfModel(SHARED, 'nano-banana-2')?.lines).toHaveLength(1);
+  });
+
+  it('falls back to the description when the page is shared by several models', () => {
+    const lines = linesOfModel(SHARED, 'seedream/5-pro-text-to-image')!.lines;
+
+    expect(creditsBy(lines, KieUnit.Image, resolutionOf)).toEqual({ '1K': 7, '2K': 14 });
+  });
+
+  it('never mixes a sibling model into the match', () => {
+    expect(linesOfModel(SHARED, 'seedream/5-pro-image-to-image')!.lines).toHaveLength(1);
+  });
+
+  it('uses the alias for a model the description spells differently', () => {
+    expect(linesOfModel(SHARED, 'qwen2-1/text-to-image')!.lines).toHaveLength(1);
+  });
+
+  it('answers nothing for an unknown model', () => {
+    expect(linesOfModel(SHARED, 'ghost/model')).toBeUndefined();
   });
 });

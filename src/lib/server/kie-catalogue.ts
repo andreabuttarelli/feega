@@ -1,11 +1,12 @@
 import type { AiModelRow } from './ai-models-sync';
 import { KIE_CREDIT_USD } from './kie';
-import { creditsBy, KieUnit, modelKeyOf, type KieLine, type KiePrices } from './kie-pricing';
+import { creditsBy, KieUnit, linesOfModel, type KieLine, type KiePrices } from './kie-pricing';
 import type { KieSpec } from './kie-docs';
 import { PER_RUN, type TaskPriceLine } from './generation/task-pricing';
 import { idPrefixOf, TaskProviderName } from './generation/task-providers';
 import type { WireFields } from './canvas/task-provider';
 import { GPT_IMAGE_2_MODEL, GPT_IMAGE_25_SUNBURST_MODEL, NANO_BANANA_2_MODEL, NANO_BANANA_PRO_MODEL, QWEN3_PRO_MODEL } from '$lib/image-models';
+import { SEEDANCE_25_MODEL } from '$lib/video-models';
 import { IMAGE_TOOLS_GROUP, IMAGE_TOOL_MODEL, ImageTool } from '$lib/image-tools';
 
 export enum KieBilling {
@@ -25,6 +26,7 @@ type KieModel = {
   durations?: readonly number[];
   aspectRatios: readonly string[];
   numeric?: boolean;
+  requiresImage?: true;
 };
 
 type PricedKieModel = KieModel & { creditsByResolution: Readonly<Record<string, number>> };
@@ -77,7 +79,11 @@ const NO_RESOLUTION = '';
 const OPENROUTER_TWINS: Readonly<Record<string, string>> = {
   'gpt-image-2-text-to-image': GPT_IMAGE_2_MODEL,
   'gpt-image-2-5-sunburst-text-to-image': GPT_IMAGE_25_SUNBURST_MODEL,
-  'qwen3/pro-text-to-image': QWEN3_PRO_MODEL
+  'qwen3/pro-text-to-image': QWEN3_PRO_MODEL,
+  'bytedance/seedance-2-5': SEEDANCE_25_MODEL,
+  'bytedance/seedance-2': 'bytedance/seedance-2',
+  'bytedance/seedance-2-fast': 'bytedance/seedance-2-fast',
+  'bytedance/seedance-2-mini': 'bytedance/seedance-2-mini'
 };
 
 const BILLING_UNITS: Readonly<Record<KieBilling, readonly KieUnit[]>> = {
@@ -102,7 +108,7 @@ const PRICE_LINES: Readonly<Record<KieBilling, (model: PricedKieModel) => TaskPr
 };
 
 function pricedModel(model: KieModel, prices: KiePrices): PricedKieModel | null {
-  const lines = prices.get(modelKeyOf(model.kieModel))?.lines ?? [];
+  const lines = linesOfModel(prices, model.kieModel)?.lines ?? [];
   const creditsByResolution = creditsBy(lines, BILLING_UNITS[model.billing], (l) => l.resolution ?? NO_RESOLUTION);
   return Object.keys(creditsByResolution).length ? { ...model, creditsByResolution } : null;
 }
@@ -138,6 +144,7 @@ function kieRow(model: PricedKieModel, syncedAt: string): AiModelRow {
       model: model.kieModel,
       ...(model.discountFor ? { discountFor: model.discountFor } : {}),
       ...(model.numeric ? { numeric: [model.fields.duration!] } : {}),
+      ...(model.requiresImage ? { requiresImage: true } : {}),
       defaults: model.defaultResolution === NO_RESOLUTION ? {} : { resolution: model.defaultResolution },
       maxRefs: model.maxRefs,
       fields: model.fields
@@ -150,7 +157,7 @@ function enumSpelling(resolution: string, allowed: readonly string[]): string | 
 }
 
 function discovered(spec: KieSpec, prices: KiePrices): PricedKieModel | null {
-  const found = prices.get(modelKeyOf(spec.model));
+  const found = linesOfModel(prices, spec.model);
   const catalogue = found?.catalogue;
   if (!found || (catalogue !== 'image' && catalogue !== 'video')) {
     return null;
@@ -161,10 +168,10 @@ function discovered(spec: KieSpec, prices: KiePrices): PricedKieModel | null {
     return null;
   }
   const spelled = (l: KieLine): string | null => {
-    if (!spec.resolutions.length) {
-      return l.resolution === null ? NO_RESOLUTION : null;
+    if (!spec.resolutions.length || l.resolution === null) {
+      return NO_RESOLUTION;
     }
-    return l.resolution === null ? NO_RESOLUTION : enumSpelling(l.resolution, spec.resolutions);
+    return enumSpelling(l.resolution, spec.resolutions);
   };
   const priced = creditsBy(found.lines, BILLING_UNITS[billing], spelled);
   const flat = priced[NO_RESOLUTION];
@@ -185,6 +192,7 @@ function discovered(spec: KieSpec, prices: KiePrices): PricedKieModel | null {
     defaultResolution: resolutions[0],
     ...(perSecond ? { durations: spec.durations } : {}),
     ...(spec.numericDuration && spec.fields.duration ? { numeric: true } : {}),
+    ...(spec.requiresImage ? { requiresImage: true as const } : {}),
     aspectRatios: spec.aspectRatios
   };
 }
@@ -250,16 +258,16 @@ function kieToolRow(model: KieToolModel, pricing: TaskPriceLine[], syncedAt: str
 
 function toolRows(prices: KiePrices, syncedAt: string): AiModelRow[] {
   return KIE_TOOL_MODELS.flatMap((model) => {
-    const lines = toolPriceLines(model, prices.get(modelKeyOf(model.kieModel))?.lines ?? []);
+    const lines = toolPriceLines(model, linesOfModel(prices, model.kieModel)?.lines ?? []);
     return lines.length ? [kieToolRow(model, lines, syncedAt)] : [];
   });
 }
 
 export function kieModelRows(prices: KiePrices, specs: readonly KieSpec[], syncedAt: string): AiModelRow[] {
-  const curated = new Set(KIE_MODELS.map((model) => model.kieModel));
+  const taken = new Set([...KIE_MODELS, ...KIE_TOOL_MODELS].map((model) => model.kieModel));
   const models = [
     ...KIE_MODELS.map((model) => pricedModel(model, prices)),
-    ...specs.filter((spec) => !curated.has(spec.model)).map((spec) => discovered(spec, prices))
+    ...specs.filter((spec) => !taken.has(spec.model)).map((spec) => discovered(spec, prices))
   ];
   const unique = new Map(models.filter((m): m is PricedKieModel => m !== null).map((m) => [m.kieModel, m]));
   return [...[...unique.values()].map((model) => kieRow(model, syncedAt)), ...toolRows(prices, syncedAt)];

@@ -11,9 +11,11 @@ const SPEC_BLOCK = /```yaml\n([\s\S]*?)\n```/;
 
 const LIST_REFS = new Set(['image_urls', 'input_urls', 'image_input', 'reference_image_urls']);
 
-const NEEDS_INPUT_MEDIA = /image-to|video-to|reference-to|keyframe-to|-edit|edit$|extend|upscale|transition|motion-control|lip-sync|segment/;
+const NEEDS_INPUT_MEDIA = /video-to|reference-to|keyframe-to|videoedit|video-edit|extend|upscale|transition|motion-control|lip-sync|segment/;
 
-const FILLED_BY_WIRE = new Set(['prompt', 'aspect_ratio', 'resolution', 'duration']);
+const FILLED_BY_WIRE = new Set(['prompt', 'aspect_ratio', 'resolution', 'duration', 'image_url', 'first_frame_url', ...LIST_REFS]);
+
+const DURATION_RANGE = /(\d+)\s*-\s*(\d+)\s*seconds/i;
 
 export type KieSpec = {
   model: string;
@@ -24,9 +26,10 @@ export type KieSpec = {
   durations: number[];
   numericDuration: boolean;
   maxRefs: number;
+  requiresImage?: true;
 };
 
-type Prop = { type?: string; enum?: unknown[]; maxItems?: number };
+type Prop = { type?: string; enum?: unknown[]; maxItems?: number; description?: string };
 
 type Schema = { properties?: { model?: { default?: string }; input?: { required?: string[]; properties?: Record<string, Prop> } } };
 
@@ -41,10 +44,23 @@ function fieldsOf(props: Record<string, Prop>): WireFields {
     ...(props.aspect_ratio ? { aspectRatio: 'aspect_ratio' } : {}),
     ...(props.resolution ? { resolution: 'resolution' } : {}),
     ...(props.duration ? { duration: 'duration' } : {}),
-    images: [],
+    images: ['image_url', 'first_frame_url'].filter((name) => props[name]),
+    ...(props.last_frame_url ? { lastFrame: 'last_frame_url' } : {}),
     ...(listName ? { imageList: listName } : {})
   };
 }
+
+function durationsOf(prop: Prop | undefined): number[] {
+  const listed = enumOf(prop).map(Number).filter(Number.isFinite);
+  const range = (prop?.description ?? '').match(DURATION_RANGE);
+  if (listed.length || !range) {
+    return listed;
+  }
+  const [from, to] = [Number(range[1]), Number(range[2])];
+  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+}
+
+const needsImage = (required: readonly string[]): boolean => required.some((name) => name === 'image_url' || name === 'first_frame_url' || LIST_REFS.has(name));
 
 export function specOfDoc(text: string): KieSpec | null {
   const block = text.match(SPEC_BLOCK)?.[1];
@@ -75,9 +91,10 @@ export function specOfDoc(text: string): KieSpec | null {
     fields: fieldsOf(props),
     aspectRatios: enumOf(props.aspect_ratio),
     resolutions: enumOf(props.resolution),
-    durations: enumOf(props.duration).map(Number).filter(Number.isFinite),
+    durations: durationsOf(props.duration),
     numericDuration: props.duration?.type === 'integer' || props.duration?.type === 'number',
-    maxRefs: listName ? (props[listName].maxItems ?? 1) : 0
+    maxRefs: listName ? (props[listName].maxItems ?? 1) : 0,
+    ...(needsImage(input.required ?? []) ? { requiresImage: true as const } : {})
   };
 }
 

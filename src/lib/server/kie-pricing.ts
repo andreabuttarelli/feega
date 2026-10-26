@@ -13,7 +13,7 @@ export enum KieUnit {
 
 const UNITS: ReadonlySet<string> = new Set(Object.values(KieUnit));
 
-export type KieLine = { credits: number; unit: KieUnit; resolution: string | null; tier: string | null };
+export type KieLine = { credits: number; unit: KieUnit; resolution: string | null; tier: string | null; descriptionKey: string };
 
 export type KieModelPrices = { catalogue: string; lines: KieLine[] };
 
@@ -24,6 +24,10 @@ type PriceRecord = { modelDescription?: string; interfaceType?: string; creditPr
 type PricePage = { code?: number; msg?: string; data?: { records?: PriceRecord[]; pages?: number } | null };
 
 export const modelKeyOf = (id: string): string => id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+const DESCRIPTION_ALIASES: Readonly<Record<string, string>> = {
+  'qwen2-1/text-to-image': 'qwen-image-2-1-text-to-image'
+};
 
 const RESOLUTION = /\b\d(?:\.\d)?K\b|\b\d{3,4}p\b/gi;
 
@@ -64,7 +68,7 @@ export function pricesOf(records: readonly PriceRecord[]): KiePrices {
     const tier = description.match(TIER)?.[1] ?? null;
     const entry = prices.get(key) ?? { catalogue: record.interfaceType ?? '', lines: [] };
     for (const resolution of resolutionsOf(description)) {
-      entry.lines.push({ credits, unit: record.creditUnit as KieUnit, resolution, tier });
+      entry.lines.push({ credits, unit: record.creditUnit as KieUnit, resolution, tier, descriptionKey: modelKeyOf(description) });
     }
     prices.set(key, entry);
   }
@@ -107,4 +111,15 @@ export function creditsBy(lines: readonly KieLine[], unit: KieUnit | readonly Ki
     }
   }
   return credits;
+}
+
+export function linesOfModel(prices: KiePrices, model: string): KieModelPrices | undefined {
+  const key = modelKeyOf(model);
+  const direct = prices.get(key);
+  if (direct) {
+    return direct;
+  }
+  const prefix = DESCRIPTION_ALIASES[model] ?? key;
+  const entries = [...prices.values()].map((entry) => ({ catalogue: entry.catalogue, lines: entry.lines.filter((l) => l.descriptionKey === prefix || l.descriptionKey.startsWith(`${prefix}-`)) }));
+  return entries.find((entry) => entry.lines.length);
 }
