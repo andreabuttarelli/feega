@@ -11,7 +11,7 @@
   <a href="https://feega.app"><img src="https://img.shields.io/badge/Get_started-feega.app-c485fe?style=flat&labelColor=131313" alt="Get started on feega.app" /></a>
 </p>
 
-![feega](./docs/readme-hero.png)
+![feega: design, motion and AI on one canvas](./docs/readme-hero.gif)
 
 **feega is an open-source infinite canvas where people and AI agents design, animate and generate
 together.** You draw frames, animate them on a timeline and export them; the chat agent, the
