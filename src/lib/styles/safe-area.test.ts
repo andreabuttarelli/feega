@@ -39,6 +39,45 @@ describe('safe area shell', () => {
   });
 });
 
+describe('desktop shell without a title bar', () => {
+  async function desktop(probe: (page: import('playwright').Page) => Promise<string>): Promise<string> {
+    const page = await browser.newPage();
+    await page.setContent(`<html data-window="frameless"><style>${SAFE_AREA_CSS}</style><div id="shell" class="safe-shell"></div></html>`);
+    const value = await probe(page);
+    await page.close();
+    return value;
+  }
+
+  it('keeps shell content below the drag strip', async () => {
+    expect(await desktop((p) => p.locator('#shell').evaluate((el) => getComputedStyle(el).paddingTop))).toBe('28px');
+  });
+
+  it('draws a draggable strip across the top', async () => {
+    const strip = await desktop((p) =>
+      p.evaluate(() => {
+        const s = getComputedStyle(document.body, '::before');
+        return [s.position, s.top, s.height, s.getPropertyValue('app-region')].join(' ');
+      })
+    );
+    expect(strip).toBe('fixed 0px 28px drag');
+  });
+
+  it('marks only the Electron shell, never the mobile one or the browser', async () => {
+    const marker = read('src/app.html').match(/<script>(\(function\(u\)[^<]*data-window[^<]*)<\/script>/)![1];
+    const shell = async (userAgent: string) => {
+      const context = await browser.newContext({ userAgent });
+      const page = await context.newPage();
+      await page.setContent(`<script>${marker}</script>`);
+      const value = await page.evaluate(() => document.documentElement.dataset.window ?? 'browser');
+      await context.close();
+      return value;
+    };
+    expect(await shell('Mozilla/5.0 Chrome/140 Electron/38.2.0 Safari/537.36 FeegaNative/0.1.0')).toBe('frameless');
+    expect(await shell('Mozilla/5.0 (iPhone) AppleWebKit/605 FeegaNative/1.0')).toBe('browser');
+    expect(await shell('Mozilla/5.0 Chrome/140 Safari/537.36')).toBe('browser');
+  });
+});
+
 describe('layouts that render under viewport-fit=cover', () => {
   it('ship the safe-area rules app-wide', () => {
     expect(read('src/app.css')).toContain("@import './lib/styles/safe-area.css'");

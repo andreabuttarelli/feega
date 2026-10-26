@@ -11,3 +11,15 @@ The Electron shell (#1331) built only unsigned local packages. Now:
   which the CLI installer also owns (`cli-v*`).
 - macOS auto-update needs a signed build (Squirrel.Mac).
 - Old assets accumulate on `desktop-latest`; prune when it matters.
+
+## Frameless window
+
+- No native title bar or window buttons: macOS `titleBarStyle:
+  'hidden'` + `setWindowButtonVisibility(false)`, elsewhere
+  `frame: false`. Cmd/Ctrl+Q/W/M stay in Electron's default menu.
+- `app.html` marks `data-window="frameless"` only when the UA has both
+  `FeegaNative/` and `Electron/` (Capacitor stays out). Not
+  `data-shell`: the root layout already owns it (app/site).
+- `safe-area.css`: a fixed 28px drag strip, and `--safe-top` = 28px so
+  `.safe-shell` layouts start below it instead of under it.
+- Icon rebuilt from `static/icon-512.png` (was 256px).

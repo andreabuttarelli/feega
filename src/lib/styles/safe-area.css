@@ -14,3 +14,19 @@
   padding-top: 0;
   padding-bottom: 0;
 }
+
+:root[data-window='frameless'] {
+  --desktop-drag: 28px;
+  --safe-top: var(--desktop-drag);
+}
+
+:root[data-window='frameless'] body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--desktop-drag);
+  z-index: 2147483647;
+  app-region: drag;
+}

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, shell, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { watchUpdates } = require('./updates.cjs');
+const { frameless } = require('./chrome.cjs');
 const { start, authReturn, staysInside, DEEP_LINK_SCHEME } = require('./routing.cjs');
 
 const START_URL_ENV = 'FEEGA_URL';
@@ -27,7 +28,8 @@ function deepLinkIn(argv) {
 }
 
 function open() {
-  window = new BrowserWindow({ width: 1440, height: 900, minWidth: 800, minHeight: 600, title: 'feega', backgroundColor: '#0c0c0c' });
+  window = new BrowserWindow({ width: 1440, height: 900, minWidth: 800, minHeight: 600, title: 'feega', backgroundColor: '#0c0c0c', ...frameless(process.platform) });
+  window.setWindowButtonVisibility?.(false);
   window.webContents.setUserAgent(userAgent(window));
 
   window.webContents.setWindowOpenHandler(({ url }) => {

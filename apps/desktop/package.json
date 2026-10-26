@@ -16,7 +16,8 @@
     "files": [
       "main.cjs",
       "routing.cjs",
-      "updates.cjs"
+      "updates.cjs",
+      "chrome.cjs"
     ],
     "directories": {
       "buildResources": "build",
