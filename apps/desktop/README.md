@@ -21,4 +21,4 @@ once from `dist/`. Supabase must list `feega://auth/callback` in its redirect UR
 | Apple Developer ID cert + notarisation (`APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `CSC_LINK`) | macOS outside the store |
 | Windows code-signing cert (OV/EV or Azure Trusted Signing) | SmartScreen |
 | Bundle id `app.feega.desktop` confirmed | all |
-| Update feed (electron-updater) | auto-update |
+| Tag `desktop-v<version>` | release + update feed (`desktop-latest`) |
