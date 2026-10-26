@@ -1,7 +1,7 @@
 <script lang="ts">
   import { FAQ } from '../home';
 
-  const FIRST_COLUMN = 7;
+  const FIRST_COLUMN = Math.ceil(FAQ.length / 2);
 
   const columns = [FAQ.slice(0, FIRST_COLUMN), FAQ.slice(FIRST_COLUMN)];
 </script>

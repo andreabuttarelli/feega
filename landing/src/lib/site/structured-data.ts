@@ -1,3 +1,6 @@
+import { FAQ } from './home';
+import { plainText } from './text';
+
 const SITE = 'https://www.feega.app/';
 
 const ORGANIZATION = {
@@ -33,4 +36,21 @@ const FOUNDER = {
 
 const script = (data: object) => `<script type="application/ld+json">${JSON.stringify(data)}</` + 'script>';
 
-export const HOME_JSON_LD = [ORGANIZATION, APPLICATION, FOUNDER].map(script).join('');
+export const faqJsonLd = (items: readonly { q: string; a: string }[]) =>
+  script({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: items.map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: plainText(a) } }))
+  });
+
+export const breadcrumbJsonLd = (name: string, path: string) =>
+  script({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'feega', item: SITE },
+      { '@type': 'ListItem', position: 2, name, item: `${SITE}${path.slice(1)}` }
+    ]
+  });
+
+export const HOME_JSON_LD = [ORGANIZATION, APPLICATION, FOUNDER].map(script).join('') + faqJsonLd(FAQ);

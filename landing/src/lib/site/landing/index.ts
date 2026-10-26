@@ -27,3 +27,10 @@ export const LANDING_PAGES: Readonly<Record<string, LandingPage>> = pages;
 export function isLandingSlug(slug: string): boolean {
   return Object.hasOwn(LANDING_PAGES, slug);
 }
+
+export const SMALL_WIDTH = 800;
+export const FULL_WIDTH = 1600;
+
+export const smallSrc = (src: string) => src.replace(/\.webp$/, `-${SMALL_WIDTH}.webp`);
+
+export const srcset = (src: string) => `${smallSrc(src)} ${SMALL_WIDTH}w, ${src} ${FULL_WIDTH}w`;
