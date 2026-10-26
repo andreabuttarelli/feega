@@ -34,12 +34,14 @@ pub struct Gpu {
 pub struct Stats {
     pub presents: Vec<f64>,
     pub work_ms: Vec<f64>,
+    pub latency_ms: Vec<f64>,
     pub first_frame_ms: f64,
     pub error: String,
 }
 
 impl Stats {
-    fn record(&mut self, at: f64, work: f64) {
+    fn record(&mut self, at: f64, work: f64, latency: Option<f64>) {
+        self.latency_ms.extend(latency);
         if self.presents.len() >= STATS_KEPT {
             self.presents.drain(..STATS_KEPT / 2);
             self.work_ms.drain(..STATS_KEPT / 2);
@@ -223,6 +225,7 @@ pub fn spawn(gpu: Gpu, size: (u32, u32), link: Link) {
 }
 
 struct Work {
+    camera_at: Option<Instant>,
     framed: bool,
     changed: bool,
 }
@@ -238,7 +241,7 @@ fn drain(core: &mut Core, batch: Batch, stats: &Mutex<Stats>) -> Work {
     if let Some(camera) = batch.camera {
         core.camera = camera;
     }
-    Work { framed: batch.frame || moved, changed: moved || edited }
+    Work { camera_at: batch.camera_at, framed: batch.frame || moved, changed: moved || edited }
 }
 
 fn run(gpu: Gpu, size: (u32, u32), link: Link) -> Result<(), String> {
@@ -254,7 +257,7 @@ fn run(gpu: Gpu, size: (u32, u32), link: Link) -> Result<(), String> {
         if batch.closed {
             return Ok(());
         }
-        let work = drain(&mut core, batch, &link.stats);
+        let mut work = drain(&mut core, batch, &link.stats);
         if !work.framed && !core.pending {
             wait = None;
             continue;
@@ -265,7 +268,8 @@ fn run(gpu: Gpu, size: (u32, u32), link: Link) -> Result<(), String> {
             if latest.closed {
                 return Ok(());
             }
-            drain(&mut core, latest, &link.stats);
+            let later = drain(&mut core, latest, &link.stats);
+            work.camera_at = work.camera_at.or(later.camera_at);
         }
 
         let started = now();
@@ -279,7 +283,7 @@ fn run(gpu: Gpu, size: (u32, u32), link: Link) -> Result<(), String> {
                 first = false;
                 stats.first_frame_ms = link.started.elapsed().as_secs_f64() * 1000.0;
             }
-            stats.record(now(), now() - started);
+            stats.record(now(), now() - started, work.camera_at.map(|at| at.elapsed().as_secs_f64() * 1000.0));
         }
 
         let current = Told::of(&painted);

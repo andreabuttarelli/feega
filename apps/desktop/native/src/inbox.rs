@@ -1,5 +1,5 @@
 use std::sync::{Condvar, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gpu_core::retained::Camera;
 
@@ -18,13 +18,20 @@ pub enum Command {
 
 #[derive(Default)]
 struct Pending {
+    staged: Vec<Command>,
     commands: Vec<Command>,
+    camera_at: Option<Instant>,
     camera: Option<Camera>,
     frame: bool,
     closed: bool,
 }
 
 impl Pending {
+    fn commit(&mut self) {
+        let staged = std::mem::take(&mut self.staged);
+        self.commands.extend(staged);
+    }
+
     fn empty(&self) -> bool {
         self.commands.is_empty() && self.camera.is_none() && !self.frame && !self.closed
     }
@@ -32,6 +39,7 @@ impl Pending {
 
 pub struct Batch {
     pub commands: Vec<Command>,
+    pub camera_at: Option<Instant>,
     pub camera: Option<Camera>,
     pub frame: bool,
     pub closed: bool,
@@ -45,17 +53,21 @@ pub struct Inbox {
 
 impl Inbox {
     pub fn send(&self, command: Command) {
-        self.pending.lock().unwrap().commands.push(command);
-        self.wake.notify_one();
+        self.pending.lock().unwrap().staged.push(command);
     }
 
     pub fn camera(&self, camera: Camera) {
-        self.pending.lock().unwrap().camera = Some(camera);
+        let mut pending = self.pending.lock().unwrap();
+        pending.commit();
+        pending.camera = Some(camera);
+        pending.camera_at.get_or_insert_with(Instant::now);
         self.wake.notify_one();
     }
 
     pub fn frame(&self) {
-        self.pending.lock().unwrap().frame = true;
+        let mut pending = self.pending.lock().unwrap();
+        pending.commit();
+        pending.frame = true;
         self.wake.notify_one();
     }
 
@@ -69,6 +81,6 @@ impl Inbox {
         if pending.empty() {
             pending = self.wake.wait_timeout(pending, patience.unwrap_or(IDLE_WAKE)).unwrap().0;
         }
-        Batch { commands: std::mem::take(&mut pending.commands), camera: pending.camera.take(), frame: std::mem::take(&mut pending.frame), closed: pending.closed }
+        Batch { commands: std::mem::take(&mut pending.commands), camera_at: pending.camera_at.take(), camera: pending.camera.take(), frame: std::mem::take(&mut pending.frame), closed: pending.closed }
     }
 }

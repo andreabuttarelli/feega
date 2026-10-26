@@ -30,7 +30,9 @@ function main() {
   if (process.argv.includes(UNIVERSAL_FLAG)) {
     universal();
   } else {
-    fs.copyFileSync(build(null), OUTPUT);
+    const built = build(null);
+    fs.rmSync(OUTPUT, { force: true });
+    fs.copyFileSync(built, OUTPUT);
   }
   console.log(`built ${OUTPUT}`);
 }

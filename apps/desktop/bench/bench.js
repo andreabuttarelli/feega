@@ -1,5 +1,7 @@
 import { createCoreNative, rasterOf, pictureKey } from '/engine.js';
 
+addEventListener('error', (e) => fetch('/mark?name=' + encodeURIComponent('error ' + e.message) + '&what=x'));
+addEventListener('unhandledrejection', (e) => fetch('/mark?name=' + encodeURIComponent('rejected ' + e.reason) + '&what=x'));
 const params = new URLSearchParams(location.search);
 const bridge = window.feegaNativeCanvas;
 const MODE = bridge ? 'native' : 'web';
@@ -102,6 +104,8 @@ async function drain() {
   return JSON.parse(await bridge.stats());
 }
 
+const q = (list, p) => { const a = [...list].sort((x, y) => x - y); return a.length ? +a[Math.min(a.length - 1, Math.floor(a.length * p))].toFixed(2) : null; };
+
 function summarise(name, presents, work, ms) {
   const gaps = presents.slice(1).map((t, i) => t - presents[i]).sort((a, b) => a - b);
   const sorted = [...work].sort((a, b) => a - b);
@@ -202,7 +206,7 @@ for (const phase of PHASES) {
   }
   const taken = await drain();
   await mark(phase.name, 'end');
-  out.phases.push(summarise(phase.name, taken.presents, taken.work, phase.ms));
+  out.phases.push({ ...summarise(phase.name, taken.presents, taken.work, phase.ms), latencyP50: q(taken.latency ?? [], 0.5), latencyP95: q(taken.latency ?? [], 0.95) });
 }
 
 running = false;

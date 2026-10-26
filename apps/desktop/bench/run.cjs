@@ -89,11 +89,13 @@ function serve(onResult, onMark) {
 }
 
 async function main() {
+  console.error("bundling");
   await bundle();
+  console.error("bundled");
   const marks = [];
   const samples = [];
   let result = null;
-  const server = await serve((r) => (result = r), (name, what) => marks.push({ name, what, t: Date.now() }));
+  const server = await serve((r) => (result = r), (name, what) => (console.error('mark', name, what), marks.push({ name, what, t: Date.now() })));
   const electron = process.env.ELECTRON_BIN ?? require(path.join(DESKTOP, 'node_modules', 'electron'));
   const env = { ...process.env, FEEGA_URL: `http://127.0.0.1:${server.address().port}/?label=${label}${option('shots') ? `&shots=${option('shots')}` : ''}` };
   if (mode === 'native') {
@@ -112,7 +114,7 @@ async function main() {
 
   while (!result) {
     await new Promise((ok) => setTimeout(ok, 500));
-    if (child.exitCode !== null) {
+    if (child.exitCode !== null || child.signalCode) {
       break;
     }
   }
@@ -140,4 +142,4 @@ async function main() {
   console.table(result.phases);
 }
 
-main();
+main().then(() => process.exit(0));

@@ -122,7 +122,8 @@ impl NativeCanvas {
         let mut stats = self.stats.lock().unwrap();
         let presents = std::mem::take(&mut stats.presents);
         let work = std::mem::take(&mut stats.work_ms);
-        serde_json::json!({ "presents": presents, "work": work, "firstFrameMs": stats.first_frame_ms, "error": stats.error }).to_string()
+        let latency = std::mem::take(&mut stats.latency_ms);
+        serde_json::json!({ "presents": presents, "work": work, "latency": latency, "firstFrameMs": stats.first_frame_ms, "error": stats.error }).to_string()
     }
 
     #[napi]
