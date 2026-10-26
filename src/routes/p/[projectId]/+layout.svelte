@@ -6,6 +6,7 @@
   import '$lib/styles/tailwind.css';
   import { page } from '$app/state';
   import { onDestroy, untrack } from 'svelte';
+  import { LocalOff, isOff } from '$lib/local-user';
   import CanvasTopBar from '$lib/components/canvas/CanvasTopBar.svelte';
   import FloatingRail from '$lib/components/canvas/FloatingRail.svelte';
   import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
@@ -233,7 +234,7 @@
   {:else if onCanvasRoute}
     <CanvasTopBar
       {projectId}
-      onVersions={() => versionsPanel.show()}
+      onVersions={isOff(LocalOff.Versions) ? null : () => versionsPanel.show()}
       projectName={data.project.name}
       projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
         id: p.id,
@@ -244,7 +245,7 @@
       }))}
       projectMode={data.project.mode}
       brandName={data.brand?.name ?? null}
-      onComments={() => commentsPanel.show()}
+      onComments={isOff(LocalOff.Comments) ? null : () => commentsPanel.show()}
       commentsUnseen={commentsPanel.unseen}
       canvasName={currentCanvas?.name ?? ''}
       canvasHref={currentCanvas?.href ?? ''}

@@ -12,6 +12,11 @@ describe('in modalità locale niente tracciamento', () => {
     expect(localOff(LocalOff.Analytics, { PUBLIC_FEEGA_LOCAL: '1' })).toBe(true);
   });
 
+  it('la chat è spenta in locale e accesa nel cloud', () => {
+    expect(localOff(LocalOff.Chat, { PUBLIC_FEEGA_LOCAL: '1' })).toBe(true);
+    expect(localOff(LocalOff.Chat, {})).toBe(false);
+  });
+
   it('nel cloud restano accesi', () => {
     expect(localOff(LocalOff.CookieBanner, {})).toBe(false);
   });

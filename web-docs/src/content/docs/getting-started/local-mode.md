@@ -28,6 +28,8 @@ port 5173 and need no `feega login`. What an agent adds or changes appears live 
 Sharing, comments, saved versions, voices and AI generation answer with a message instead of
 running. Import the file at feega.app to use them: canvas menu or home page, **Import .feega**.
 
+Chat, Share, credits, comments, saved versions and Drive/Dropbox import are not shown.
+
 To open a different file, stop the server and start it again with that file.
 
 ## Safety

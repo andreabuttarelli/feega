@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LocalOff, isOff } from '$lib/local-user';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
@@ -3563,7 +3564,7 @@
     <CanvasAddBar
       onpick={addAtCentre}
       onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) ? viewCentre() : undefined) : undefined}
-      oncloud={props.onCloud ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
+      oncloud={props.onCloud && !isOff(LocalOff.CloudImport) ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
       techniques={props.techniques}
       ontechnique={props.onTechnique ? (id) => props.onTechnique?.(id, viewCentre()) : undefined}

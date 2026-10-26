@@ -90,15 +90,17 @@
         </button>
       {/each}
     </div>
-    <div class="pane" hidden={tab !== BarTab.Chat}>
-      {#if viewOnly}
-        <p class="chat-view-only" data-testid="chat-view-only">View only: the chat edits the canvas and spends credits. Ask an admin for edit access.</p>
-      {:else}
-        {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
-          <ChatPanel {projectId} prefill={rightBar.prefill} reload={rightBar.reload} context={() => binding?.context?.() ?? {}} onturnend={() => binding?.onturnend?.()} ondata={(part) => binding?.ondata?.(part)} {onbusy} />
-        {/await}
-      {/if}
-    </div>
+    {#if rightBar.tabs.includes(BarTab.Chat)}
+      <div class="pane" hidden={tab !== BarTab.Chat}>
+        {#if viewOnly}
+          <p class="chat-view-only" data-testid="chat-view-only">View only: the chat edits the canvas and spends credits. Ask an admin for edit access.</p>
+        {:else}
+          {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
+            <ChatPanel {projectId} prefill={rightBar.prefill} reload={rightBar.reload} context={() => binding?.context?.() ?? {}} onturnend={() => binding?.onturnend?.()} ondata={(part) => binding?.ondata?.(part)} {onbusy} />
+          {/await}
+        {/if}
+      </div>
+    {/if}
     <div class="pane is-guide" hidden={tab !== BarTab.Guide}>
       {#if guideSeen}
         <CanvasGuideTab initialSlug={$guideOpenRequest} onopened={() => guideOpenRequest.set(null)} />

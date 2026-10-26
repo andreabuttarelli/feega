@@ -12,6 +12,7 @@
   import ConnectionDot from './ConnectionDot.svelte';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { ShareState } from '$lib/canvas/shared-view';
+  import { LocalOff, isOff } from '$lib/local-user';
   import { BILLING_PATH } from '$lib/billing-path';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
   import { CanvasAction, submitCanvasAction, renameProjectAction } from '$lib/canvas/canvas-list';
@@ -237,7 +238,7 @@
       <DropdownMenu.Content align="start" collisionPadding={EDGE} class="sw-menu w-[300px]">
         <div class="sw-head">
           <span class="sw-head-name" title={projectName}>{projectName}</span>
-          {#if brandName}
+          {#if brandName && !isOff(LocalOff.Brand)}
             <Badge variant="outline" data-testid="switcher-brand">{brandName}</Badge>
           {/if}
         </div>
@@ -307,14 +308,18 @@
             {#if commentsUnseen}<span class="unseen-dot" role="img" aria-label="Unread mention"></span>{/if}
           </DropdownMenu.Item>
         {/if}
-        <DropdownMenu.Item class="sw-row" data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>
-          <span class="sw-lead"><Plus size={ICON} /></span>
-          {$_('app.shell.canvasActions.new')}
-        </DropdownMenu.Item>
-        <DropdownMenu.Item class="sw-row" data-testid="canvas-import-feega" onSelect={() => feegaFile?.pick()}>
+        {#if !isOff(LocalOff.NewCanvas)}
+          <DropdownMenu.Item class="sw-row" data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>
+            <span class="sw-lead"><Plus size={ICON} /></span>
+            {$_('app.shell.canvasActions.new')}
+          </DropdownMenu.Item>
+        {/if}
+        {#if !isOff(LocalOff.ImportCanvas)}
+          <DropdownMenu.Item class="sw-row" data-testid="canvas-import-feega" onSelect={() => feegaFile?.pick()}>
           <span class="sw-lead"><Upload size={ICON} /></span>
           Import .feega…
         </DropdownMenu.Item>
+        {/if}
         <DropdownMenu.Item class="sw-row" data-testid="canvas-save-feega" onSelect={() => feegaFile?.save()}>
           <span class="sw-lead"><Download size={ICON} /></span>
           Download .feega
@@ -369,11 +374,13 @@
     {#if $canvasLink}
       <ConnectionDot state={$canvasLink} />
     {/if}
-    <a href={BILLING_PATH} class="credits">
-      <CreditAmount amount={creditBalance} />
-    </a>
+    {#if !isOff(LocalOff.Credits)}
+      <a href={BILLING_PATH} class="credits">
+        <CreditAmount amount={creditBalance} />
+      </a>
+    {/if}
 
-    {#if modeAllows(mode, Capability.Share)}
+    {#if modeAllows(mode, Capability.Share) && !isOff(LocalOff.Share)}
       <CanvasShare {shareToken} {onShare} />
     {/if}
 
