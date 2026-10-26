@@ -191,6 +191,25 @@ describe('named ease handles', () => {
   });
 });
 
+describe('keyframe coverage per kind', () => {
+  const BOXED = ['Logo', 'SocialMockup', 'CanvasMock'] as const;
+  const at = (value: number): Keyframe[] => [{ frame: 0, value, ease: Ease.Linear }];
+
+  it.each(BOXED)('%s animates its box size', (component) => {
+    for (const prop of ['width', 'height']) {
+      expect(isAnimatable(component, prop)).toBe(true);
+      expect(keyframesProblem({ component, mask: null, keyframes: { [prop]: at(0.4) } })).toBeNull();
+      expect(keyframesProblem({ component, mask: null, keyframes: { [prop]: at(5) } })).toMatch(new RegExp(prop));
+    }
+  });
+
+  it('an adjustment layer animates its strength as opacity and nothing else', () => {
+    expect(ANIMATABLE.Adjustment.map((p) => p.key)).toEqual(['opacity']);
+    expect(keyframesProblem({ component: 'Adjustment', mask: null, keyframes: { opacity: at(0.5) } })).toBeNull();
+    expect(keyframesProblem({ component: 'Adjustment', mask: null, keyframes: { rotateZ: at(5) } })).toMatch(/rotateZ/);
+  });
+});
+
 describe('the house curves on keyframes', () => {
   const HOUSE: [Ease, string][] = [
     [Ease.Standard, 'feega.inOut'],
