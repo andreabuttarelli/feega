@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fetchHiggsfieldModels, modelFromDoc, parseModelDoc, withDiscovered } from './higgsfield-docs';
-import { HIGGSFIELD_MODELS, higgsfieldModelRows, type HiggsfieldModel } from './higgsfield-catalogue';
+import { HIGGSFIELD_MODELS, higgsfieldModelRows, retiredRows, schemaHashOf, type HiggsfieldModel } from './higgsfield-catalogue';
 import {
   HF_DOC_KLING_MOTION,
   HF_DOC_KLING_TEXT,
@@ -9,6 +9,7 @@ import {
   HF_DOC_WAN_REFERENCE
 } from './higgsfield-docs.fixtures';
 
+const SYNCED = '2026-10-26T00:00:00.000Z';
 const MODELS_BASE = 'https://docs.higgsfield.ai/docs/models';
 
 const modelOf = (doc: { markdown: string }): HiggsfieldModel | null => {
@@ -57,13 +58,12 @@ describe('Higgsfield model docs', () => {
     });
   });
 
-  it('maps reference lists, resolution and aspect ratio, and prices a duration range', () => {
+  it('maps reference lists, resolution and aspect ratio, and quotes a wide duration range at submit', () => {
     const model = modelOf(HF_DOC_WAN_REFERENCE)!;
     expect(model.fields).toMatchObject({ imageList: 'image_urls', videoList: 'video_urls', resolution: 'resolution', aspectRatio: 'aspect_ratio' });
-    expect(model.priceBy).toEqual([
-      { key: 'duration', values: [2, 3, 4, 5, 6, 7, 8, 9, 10] },
-      { key: 'resolution', values: ['720p', '1080p'] }
-    ]);
+    expect(model.priceBy).toEqual([]);
+    expect(model.resolutions).toEqual(['720p', '1080p']);
+    expect(model.wire).toMatchObject({ quotedAtSubmit: true });
   });
 
   it('leaves the price to the submit when the variants are too many to ask', () => {
@@ -108,17 +108,42 @@ describe('Higgsfield model docs', () => {
   });
 
   it('prices a discovered model through the estimate and offers it like a hand-wired one', async () => {
-    const wan = modelOf(HF_DOC_WAN_REFERENCE)!;
+    const kling = modelOf(HF_DOC_KLING_TEXT)!;
     const asked: Record<string, unknown>[] = [];
     const estimate = async (_path: string, inputs: Record<string, unknown>) => {
       asked.push(inputs);
       return 0.5;
     };
 
-    const { rows } = await higgsfieldModelRows({ estimate }, '2026-10-26T00:00:00.000Z', [wan]);
+    const { rows } = await higgsfieldModelRows({ estimate }, '2026-10-26T00:00:00.000Z', [kling]);
 
-    expect(rows.map((r) => r.id)).toEqual(['higgsfield/wan/v2.7/reference-to-video']);
-    expect(asked).toHaveLength(18);
-    expect(asked[0]).toMatchObject({ prompt: expect.any(String), duration: 2, resolution: '720p' });
+    expect(rows.map((r) => r.id)).toEqual(['higgsfield/kling-video/v2.5-turbo/pro/text-to-video']);
+    expect(asked).toHaveLength(2);
+    expect(asked[0]).toMatchObject({ prompt: expect.any(String), duration: 5 });
+  });
+
+  it('does not estimate again a model whose endpoint and schema are unchanged', async () => {
+    const kling = modelOf(HF_DOC_KLING_TEXT)!;
+    const first = await higgsfieldModelRows({ estimate: async () => 0.5 }, SYNCED, [kling]);
+    const estimate = vi.fn(async () => 9);
+
+    const again = await higgsfieldModelRows({ estimate }, SYNCED, [kling], first.rows);
+    expect(estimate).not.toHaveBeenCalled();
+    expect(again.rows[0].pricing).toEqual(first.rows[0].pricing);
+
+    const changed = { ...kling, priceBy: [{ key: 'duration', values: [5, 10, 15] }] };
+    expect(schemaHashOf(changed)).not.toBe(schemaHashOf(kling));
+    await higgsfieldModelRows({ estimate }, SYNCED, [changed], first.rows);
+    expect(estimate).toHaveBeenCalledTimes(3);
+  });
+
+  it('marks a stored row unavailable when its endpoint left the docs, and keeps the others', async () => {
+    const kling = modelOf(HF_DOC_KLING_TEXT)!;
+    const wan = modelOf(HF_DOC_WAN_REFERENCE)!;
+    const { rows } = await higgsfieldModelRows({ estimate: async () => 0.5 }, SYNCED, [kling, wan]);
+
+    const retired = retiredRows(rows, [kling.path], '2026-11-01T00:00:00.000Z');
+
+    expect(retired.map((r) => [r.id, r.expires_at])).toEqual([[`higgsfield/${wan.path}`, '2026-11-01T00:00:00.000Z']]);
   });
 });

@@ -10,10 +10,13 @@
 - A page becomes a model only if it has `prompt` and every required input
   without a default is one we fill (prompt, image/video urls).
 - Wire fields come from one role table (`ROLES`). Duration and resolution
-  are priced through `/estimate`; above 24 combinations the model is
+  are priced through `/estimate`; above 8 combinations the model is
   `quotedAtSubmit` instead.
 - Hand-wired entries win over a discovered one with the same endpoint:
   they carry what the docs do not say (reference caps, restyle presets).
 - Docs unreachable: only the hand table syncs, as before.
-- Wiro was already read live from its tool list; nothing hard-coded to drop.
-- Not done: removing rows for endpoints that leave the docs.
+- Estimates are cached in the stored row (`wire_spec.schemaHash`, a hash of
+  the endpoint + schema): unchanged models are not re-estimated.
+- A stored Higgsfield row whose endpoint left the docs (and the hand table)
+  gets `expires_at = now`; never deleted. Skipped when the docs fetch fails.
+- Wiro also reads the `image-to-video` and `video-to-video` categories.

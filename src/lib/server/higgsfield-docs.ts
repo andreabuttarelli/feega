@@ -13,7 +13,7 @@ const ALLOWED = /Allowed values: (.+?)\.?$/m;
 const MINIMUM = /Minimum: `(-?\d+)`/;
 const MAXIMUM = /Maximum: `(-?\d+)`/;
 const PAGE_BATCH = 10;
-const MAX_PRICE_PAIRS = 24;
+const MAX_PRICE_PAIRS = 8;
 const MAX_RANGE_VALUES = 40;
 const VIDEO_PATH = /video/;
 

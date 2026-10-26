@@ -28,7 +28,7 @@ import { DEFAULT_WIRO_BASE_URL } from './wiro';
 import { kieModelRows } from './kie-catalogue';
 import { fetchKieSpecs } from './kie-docs';
 import { fetchKiePrices } from './kie-pricing';
-import { HIGGSFIELD_MODELS, higgsfieldModelRows, sourceWith } from './higgsfield-catalogue';
+import { HIGGSFIELD_MODELS, higgsfieldModelRows, retiredRows, sourceWith } from './higgsfield-catalogue';
 import { fetchHiggsfieldModels, withDiscovered } from './higgsfield-docs';
 import { higgsfieldConfig } from './higgsfield';
 import { configuredIn, TaskProviderName } from './generation/task-providers';
@@ -381,13 +381,21 @@ async function keepImagePricing(admin: SupabaseClient, rows: AiModelRow[]): Prom
   );
 }
 
-async function higgsfieldRows(doFetch: typeof fetch, syncedAt: string): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
+async function storedHiggsfield(admin: SupabaseClient): Promise<AiModelRow[]> {
+  const { data } = await admin.from('ai_models').select('*').eq('provider', TaskProviderName.Higgsfield);
+  return (data ?? []) as AiModelRow[];
+}
+
+async function higgsfieldRows(admin: SupabaseClient, doFetch: typeof fetch, syncedAt: string): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
   const config = higgsfieldConfig(env);
   if (!config) {
     return { rows: [], ok: true };
   }
-  const discovered = await fetchHiggsfieldModels(doFetch).catch(() => []);
-  return higgsfieldModelRows(sourceWith(config), syncedAt, withDiscovered(HIGGSFIELD_MODELS, discovered));
+  const [discovered, stored] = await Promise.all([fetchHiggsfieldModels(doFetch).catch(() => null), storedHiggsfield(admin)]);
+  const models = withDiscovered(HIGGSFIELD_MODELS, discovered ?? []);
+  const priced = await higgsfieldModelRows(sourceWith(config), syncedAt, models, stored);
+  const retired = discovered ? retiredRows(stored, models.map((m) => m.path), syncedAt) : [];
+  return { ...priced, rows: [...priced.rows, ...retired] };
 }
 
 async function kieRows(doFetch: typeof fetch, syncedAt: string): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
@@ -417,7 +425,7 @@ export async function syncAiModels(
     fetchCatalogue(doFetch, baseUrl, VIDEO_CATALOGUE, syncedAt),
     fetchWiroCatalogue(doFetch, opts.wiroBaseUrl ?? env.WIRO_BASE_URL?.trim() ?? DEFAULT_WIRO_BASE_URL, syncedAt),
     kieRows(doFetch, syncedAt),
-    higgsfieldRows(doFetch, syncedAt)
+    higgsfieldRows(admin, doFetch, syncedAt)
   ]);
 
   const rows = await keepImagePricing(admin, results.flatMap((result) => result.rows));

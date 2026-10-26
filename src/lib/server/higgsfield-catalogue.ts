@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { AiModelRow } from './ai-models-sync';
 import type { WireFields } from './canvas/task-provider';
 import type { TaskWireSpec } from './canvas/task-run';
@@ -183,9 +184,23 @@ function pairsOf(variants: readonly Variant[]): Pair[] {
 
 const asWire = (pair: Pair): Record<string, string> => Object.fromEntries(Object.entries(pair).map(([key, value]) => [key, String(value)]));
 
-async function priceLines(model: HiggsfieldModel, estimate: Estimate): Promise<TaskPriceLine[] | null> {
+export function schemaHashOf(model: HiggsfieldModel): string {
+  return createHash('sha1').update(JSON.stringify(model)).digest('hex');
+}
+
+function cachedLines(model: HiggsfieldModel, stored: readonly AiModelRow[]): TaskPriceLine[] | null {
+  const row = stored.find((r) => r.id === idOf(model) && r.wire_spec.schemaHash === schemaHashOf(model));
+  const lines = (row?.pricing as { lines?: TaskPriceLine[] } | undefined)?.lines;
+  return lines ?? null;
+}
+
+async function priceLines(model: HiggsfieldModel, estimate: Estimate, stored: readonly AiModelRow[]): Promise<TaskPriceLine[] | null> {
   if (model.wire?.quotedAtSubmit) {
     return NO_LINES;
+  }
+  const cached = cachedLines(model, stored);
+  if (cached) {
+    return cached;
   }
   const lines = await Promise.all(
     pairsOf(model.priceBy).map(async (pair) => {
@@ -228,9 +243,11 @@ const MODALITY_FIELDS: ReadonlyArray<[string, (fields: WireFields) => boolean]> 
 
 const modalitiesOf = (fields: WireFields): string[] => MODALITY_FIELDS.filter(([, takes]) => takes(fields)).map(([modality]) => modality);
 
+const idOf = (model: HiggsfieldModel): string => `${idPrefixOf(TaskProviderName.Higgsfield)}${model.path}`;
+
 function higgsfieldRow(model: HiggsfieldModel, priced: { lines: TaskPriceLine[]; options: HiggsfieldOption[] }, syncedAt: string): AiModelRow {
   return {
-    id: `${idPrefixOf(TaskProviderName.Higgsfield)}${model.path}`,
+    id: idOf(model),
     catalogue: model.catalogue,
     provider: TaskProviderName.Higgsfield,
     label: model.label,
@@ -246,18 +263,19 @@ function higgsfieldRow(model: HiggsfieldModel, priced: { lines: TaskPriceLine[];
     context_length: null,
     intelligence_index: null,
     uncensored: false,
-    wire_spec: { path: model.path, numeric: [...model.numeric], fields: model.fields, ...model.wire }
+    wire_spec: { schemaHash: schemaHashOf(model), path: model.path, numeric: [...model.numeric], fields: model.fields, ...model.wire }
   };
 }
 
 export async function higgsfieldModelRows(
   source: CatalogueSource,
   syncedAt: string,
-  models: readonly HiggsfieldModel[] = HIGGSFIELD_MODELS
+  models: readonly HiggsfieldModel[] = HIGGSFIELD_MODELS,
+  stored: readonly AiModelRow[] = []
 ): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
   try {
     const priced = await Promise.all(
-      models.map(async (model) => ({ model, lines: await priceLines(model, source.estimate), options: await optionsOf(model, source) }))
+      models.map(async (model) => ({ model, lines: await priceLines(model, source.estimate, stored), options: await optionsOf(model, source) }))
     );
     const rows = priced
       .filter((p) => p.lines !== null && p.options !== null)
@@ -266,6 +284,11 @@ export async function higgsfieldModelRows(
   } catch (error) {
     return { rows: [], ok: false, reason: error instanceof Error ? error.message : 'higgsfield estimate failed' };
   }
+}
+
+export function retiredRows(stored: readonly AiModelRow[], livePaths: readonly string[], syncedAt: string): AiModelRow[] {
+  const live = new Set(livePaths.map((path) => `${idPrefixOf(TaskProviderName.Higgsfield)}${path}`));
+  return stored.filter((row) => !live.has(row.id) && row.expires_at === null).map((row) => ({ ...row, expires_at: syncedAt }));
 }
 
 export function sourceWith(config: HiggsfieldConfig): CatalogueSource {
