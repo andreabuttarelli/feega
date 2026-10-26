@@ -6,11 +6,14 @@ import { AI_KEY_VARS } from '$lib/local-ai-keys';
 
 process.env.FEEGA_LOCAL_FILE = join(mkdtempSync(join(tmpdir(), 'feega-local-ai-')), 'ai.feega');
 process.env.HOST = '127.0.0.1';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'local';
+process.env.PUBLIC_SUPABASE_URL = 'http://supabase.invalid';
 process.env.PUBLIC_APP_URL = 'http://127.0.0.1:5173';
 
 const { gateOrgAiActionForForm } = await import('$lib/server/cli-auth');
 const { LOCAL_AI_MESSAGE } = await import('./local-mode');
 
+vi.mock('$env/dynamic/private', () => ({ env: process.env }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 
 const ORG = 'org';
