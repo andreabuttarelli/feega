@@ -6,6 +6,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   list_nodes: 'Live nodes of a canvas.',
   canvas_snapshot: 'Nodes, connections, runs, products, posts, influencers and revision of a canvas in one read.',
   canvas_revision: 'Live revision of a canvas, or that canvas or project is gone.',
+  get_selection: 'What the caller has selected on an open canvas, and the view, per open session; waits up to 3.5 s; no_open_session when none.',
   create_node: 'Create a typed node at x,y (data per describe_node_types).',
   update_node: 'Patch the data of one node; null removes a field.',
   move_node: 'Move a node to x,y.',

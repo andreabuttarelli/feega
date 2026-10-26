@@ -60,6 +60,7 @@ import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
+import { readSelection, SELECTION_WAIT_MS } from '$lib/server/canvas/selection-read';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { undoGesture } from '$lib/server/canvas/undo';
 import { parseUndoItem, type UndoItem } from '$lib/canvas/undo-plan';
@@ -480,6 +481,18 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => {
       const memberships = (await listMemberships(ctx.db, ctx.userId)).filter((m) => m.org.id === ctx.orgId);
       return canvasRevision(ctx.db, { canvasId: input.canvasId, projectId: ctx.projectId, memberships });
+    }
+  }),
+
+  get_selection: op({
+    access: Access.Read,
+    input: canvasIdInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const { channelFeed } = await import('$lib/server/canvas/selection-feed');
+      return readSelection(channelFeed, { canvasId: input.canvasId, userId: ctx.userId, waitMs: SELECTION_WAIT_MS });
     }
   }),
 
