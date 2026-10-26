@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LocalOff, isOff } from '$lib/local-user';
   import { followDocks } from '$lib/canvas/dock-lift';
   import { localStore } from '$lib/browser-storage';
   import type { Snippet } from 'svelte';
@@ -19,7 +20,7 @@
   import { Command } from '$lib/motion/shortcuts';
   import { ACTIONS, tipText } from '$lib/motion/actions';
   import CanvasTemplateGallery from './CanvasTemplateGallery.svelte';
-  import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
+  import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, CLOUD_ADDABLE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { MOBILE_QUERY } from '$lib/breakpoints';
@@ -97,6 +98,7 @@
     ontemplate?.(id);
   }
 
+  const offered = (what: Addable) => !(isOff(LocalOff.CloudNodes) && CLOUD_ADDABLE.has(what));
   const slot = (what: Addable) => CANVAS_ADD_BAR.indexOf(what) + 1;
 
   function pickMore(what: Addable) {
@@ -211,7 +213,7 @@
 
   const canvasSections = (): Section[] => [
     { title: 'Design', tiles: drawTiles },
-    { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].map(addTile) },
+    { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].filter(offered).map(addTile) },
     { title: 'Media', tiles: [UPLOAD_TILE, ...cloudTiles()] },
     {
       title: 'Templates',
@@ -297,7 +299,7 @@
 {/snippet}
 
 {#snippet nodesSlot()}
-  {#each CANVAS_BAR_MAIN as what (what)}
+  {#each CANVAS_BAR_MAIN.filter(offered) as what (what)}
     {@const Icon = ADDABLE_ICON[what]}
     <span class="tool">
       <button
@@ -435,7 +437,7 @@
 
   {#if showMore}
     <div class="more">
-      {#each CANVAS_BAR_MORE as what (what)}
+      {#each CANVAS_BAR_MORE.filter(offered) as what (what)}
         {@const Icon = ADDABLE_ICON[what]}
         <button
           type="button"

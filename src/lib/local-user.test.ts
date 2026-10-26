@@ -25,3 +25,13 @@ describe('in modalità locale niente tracciamento', () => {
     expect(trackingAllowed('feega.app')).toBe(false);
   });
 });
+
+describe('in locale niente nodi che chiedono il cloud', () => {
+  it('immagine, video e sorgenti online sono spenti, il testo resta', async () => {
+    const { CLOUD_ADDABLE } = await import('./canvas/addable');
+
+    expect(localOff(LocalOff.CloudNodes, { PUBLIC_FEEGA_LOCAL: '1' })).toBe(true);
+    expect(CLOUD_ADDABLE.has('video')).toBe(true);
+    expect(CLOUD_ADDABLE.has('text')).toBe(false);
+  });
+});
