@@ -87,7 +87,7 @@
     margin: 0;
     padding: 22px 20px;
     overflow-x: auto;
-    background: #121212;
+    background: #4f4f4f;
     color: #fff;
     font-family: 'Fragment Mono', monospace;
     font-size: 13px;
