@@ -39,6 +39,7 @@ describe('group and ungroup', () => {
       ['tidy-up', 'Mod+Alt+T'],
       ['stack', 'Shift+A'],
       ['section-selection', 'Shift+S'],
+      ['run-technique-rows', null],
       ['edit-technique', null],
       ['detach-technique', null],
       ['save-technique', null],
@@ -150,6 +151,8 @@ describe('enabledFor', () => {
     expect(shownFor('run-technique', [technique])).toBe(true);
     expect(shownFor('detach-technique', [technique])).toBe(true);
     expect(shownFor('edit-technique', [technique, technique])).toBe(false);
+    expect(shownFor('run-technique-rows', [technique])).toBe(true);
+    expect(shownFor('run-technique-rows', [technique, technique])).toBe(false);
     expect(shownFor('run-technique', [{ type: 'text', data: {} }])).toBe(false);
   });
 

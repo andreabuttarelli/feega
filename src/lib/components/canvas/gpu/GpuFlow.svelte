@@ -3119,6 +3119,7 @@
     'run-workflow': (ids) => props.onRunWorkflow?.(ids),
     'save-technique': (ids) => props.onSaveTechnique?.(ids),
     'run-technique': (ids) => props.onRunTechnique?.(ids),
+    'run-technique-rows': (ids) => props.onRunTechniqueRows?.(ids),
     'edit-technique': (ids) => props.onEditTechnique?.(ids),
     'detach-technique': (ids) => props.onDetachTechnique?.(ids),
     'run-downstream': (ids) => props.onRunGraph?.(GraphScope.Downstream, ids),

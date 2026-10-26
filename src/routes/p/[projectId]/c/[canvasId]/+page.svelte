@@ -18,6 +18,7 @@
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
   import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
+  import TechniqueRowsDialog from '$lib/components/canvas/TechniqueRowsDialog.svelte';
   import CanvasVersionsDialog from '$lib/components/canvas/CanvasVersionsDialog.svelte';
   import type { CanvasVersion } from '$lib/server/canvas/canvas-versions';
   import { localStore } from '$lib/browser-storage';
@@ -217,6 +218,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { connectorsFor, orphanedByModelChange, type ConnectorType, type GenerativeNodeKind, connectorsForNode } from '$lib/canvas/connectors';
   import { portsOf } from '$lib/canvas/node-ports';
   import { TECHNIQUE_NODE, TECHNIQUE_EDIT_PREFIX, instancePorts } from '$lib/canvas/technique-instance';
+  import type { ColumnMapping } from '$lib/canvas/technique-batch';
+  import type { TechniqueSlot } from '$lib/canvas/technique';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
@@ -3641,6 +3644,35 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
+  let rowsTechnique = $state<{ id: string; name: string; inputs: TechniqueSlot[] } | null>(null);
+
+  function openTechniqueRows(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const technique = node ? techniqueOfTile(node) : null;
+    rowsTechnique = technique ? { id: technique.id, name: technique.name, inputs: technique.inputs } : null;
+  }
+
+  const rowsFields = (rows: string[][], mapping: ColumnMapping) => ({ technique_id: rowsTechnique?.id ?? '', rows: JSON.stringify(rows), mapping: JSON.stringify(mapping) });
+
+  async function previewTechniqueRows(rows: string[][], mapping: ColumnMapping) {
+    const out = await post('preview_technique_rows', rowsFields(rows, mapping));
+    return out ? { rows: Number(out.rows), creditsPerRow: Number(out.creditsPerRow), credits: Number(out.credits) } : null;
+  }
+
+  async function startTechniqueRows(rows: string[][], mapping: ColumnMapping) {
+    const out = await post('run_technique_rows', rowsFields(rows, mapping));
+    return out ? { workflowIds: out.workflowIds as string[], runIds: out.runIds as string[] } : null;
+  }
+
+  async function techniqueRowsProgress(runIds: string[]) {
+    const out = await post('technique_rows_progress', { run_ids: JSON.stringify(runIds) });
+    return out ? { total: Number(out.total), done: Number(out.done), failed: Number(out.failed), running: Number(out.running) } : null;
+  }
+
+  async function cancelTechniqueRows(workflowIds: string[]) {
+    await post('cancel_technique_rows', { workflow_ids: JSON.stringify(workflowIds) });
+  }
+
   async function editTechnique(ids: string[]) {
     const node = techniqueNodeIn(ids);
     const opened = node ? await post('open_technique', { technique_id: String(node.data.techniqueId) }) : null;
@@ -3891,6 +3923,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if exportElements}
     <ExportDialog count={exportElements.elementIds.length} onexport={(rows) => exportPicked(exportElements!, rows)} onclose={() => (exportElements = null)} />
   {/if}
+  {#if rowsTechnique}
+    <TechniqueRowsDialog
+      name={rowsTechnique.name}
+      inputs={rowsTechnique.inputs}
+      onpreview={previewTechniqueRows}
+      onstart={startTechniqueRows}
+      onprogress={techniqueRowsProgress}
+      oncancel={cancelTechniqueRows}
+      onclose={() => (rowsTechnique = null)}
+    />
+  {/if}
   {#if versionsPanel.open}
     <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
   {/if}
@@ -3981,6 +4024,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onTechnique={insertTechnique}
     onSaveTechnique={saveTechnique}
     onRunTechnique={runTechniqueNode}
+    onRunTechniqueRows={openTechniqueRows}
     onEditTechnique={editTechnique}
     onDetachTechnique={detachTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
