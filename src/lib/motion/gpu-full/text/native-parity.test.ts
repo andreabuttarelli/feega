@@ -1,16 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../../doc';
-import { addClip, type OpResult } from '../../timeline';
-import { FillType } from '../../fill/model';
-import { FontCategory, FontSource, type FontFace } from '../../fonts/model';
-import { addAnimator } from '../../text-animators/ops';
-import { AnimatorUnit, SelectorShape } from '../../text-animators/model';
-import { displayListAt, ItemKind, type DisplayList } from '../display-list';
-import { faceBook, type FaceRule, type Source } from './fonts';
-import { fontkitSource } from './fontkit-face';
-import { Smoothing, type Typeset } from './painter';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { FontCategory, FontSource, type FontFace } from '@feega/motion-core/motion/fonts/model';
+import { addAnimator } from '@feega/motion-core/motion/text-animators/ops';
+import { AnimatorUnit, SelectorShape } from '@feega/motion-core/motion/text-animators/model';
+import { displayListAt, ItemKind, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
+import { faceBook, type FaceRule, type Source } from '@feega/motion-core/motion/gpu-full/text/fonts';
+import { fontkitSource } from '@feega/motion-core/motion/gpu-full/text/fontkit-face';
+import { Smoothing, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
 
 const FIXTURE = '../../../../../packages/gpu-core/tests/fixtures/text-parity.json';
 const LATIN: [number, number][] = [[0, 0xff]];

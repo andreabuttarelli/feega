@@ -9,26 +9,28 @@
   import { tick } from 'svelte';
   import { CLIP_FAMILIES, ClipFamily, Preview, familyOf, tileFrames } from '$lib/motion/track-style';
   import { filmstrip, type Strip } from '$lib/motion/filmstrip';
-  import { COMPONENTS, THREE_D_COMPONENTS, TrackKind } from '$lib/motion/components';
-  import { compOf, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-  import { ClipEdge, moveClip, moveKeyframes, moveTrack, removeKeyframes, setKeyEase, setKeyInterp, setKeyframe, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
-  import { withParams } from '$lib/motion/custom/params';
+  import { COMPONENTS, THREE_D_COMPONENTS, TrackKind } from '@feega/motion-core/motion/components';
+  import { compOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+  import { ClipEdge, duplicateKeyframes, moveClip, moveKeyframes, moveTrack, removeKeyframes, setKeyEase, setKeyInterp, setKeyframe, setLaneMuted, trimClip, type KeyRef, type OpResult } from '@feega/motion-core/motion/timeline';
+  import { withParams } from '@feega/motion-core/motion/custom/params';
   import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
   import { Axis, lockAxis, pinchView, type PinchStart } from '$lib/motion/timeline-touch';
   import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rowWindow, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
-  import { MASK_KINDS, Matte } from '$lib/motion/mask';
-  import type { MotionTrack } from '$lib/motion/doc';
-  import { Interp, Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
-  import { CAMERA, CAMERA_LANE, type CameraKey } from '$lib/motion/camera';
-  import { cameraEditAt, cameraLanes, cameraValueAt } from '$lib/motion/camera-ops';
-  import { animProp, ValueKind } from '$lib/motion/keyframes';
+  import { MASK_KINDS, Matte } from '@feega/motion-core/motion/mask';
+  import type { MotionTrack } from '@feega/motion-core/motion/doc';
+  import { Interp, Source, type EaseSpec, type Keyframe } from '@feega/motion-core/motion/keyframes';
+  import { CAMERA, CAMERA_LANE, type CameraKey } from '@feega/motion-core/motion/camera';
+  import { cameraEditAt, cameraLanes, cameraValueAt } from '@feega/motion-core/motion/camera-ops';
+  import { animProp, ValueKind } from '@feega/motion-core/motion/keyframes';
   import { editAt, parseDecimal, valueAt } from '$lib/motion/inspector';
   import { sliderOf, toShown, toStored, type Owner } from '$lib/motion/units';
   import { formatValue, precisionOf, scrubbed, type Range } from '$lib/motion/number-field';
-  import { ancestorsOf } from '$lib/motion/parent';
+  import { ancestorsOf } from '@feega/motion-core/motion/parent';
   import { setParent } from '$lib/motion/parent-ops';
   import EasePicker from './EasePicker.svelte';
-  import { allMarkers, isLocked, setClipFlags, setTrackFlags, shownTracks } from '$lib/motion/organize';
+  import { marqueeHits, relatedSelection } from '$lib/motion/timeline-select';
+  import { isTypingTarget } from '$lib/shortcuts';
+  import { allMarkers, isLocked, setClipFlags, setTrackFlags, shownTracks } from '@feega/motion-core/motion/organize';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
   import { FadeEdge, dragFade, fadeHandles } from '$lib/motion/fade-handles';
 
@@ -98,7 +100,7 @@
   let strips = $state<Record<string, Strip>>({});
 
   let open = $state<string[]>([]);
-  let easing = $state<{ ref: KeyRef; next: KeyRef; ease: EaseSpec; left: number; top: number } | null>(null);
+  let easing = $state<{ ref: KeyRef; next: KeyRef; ease: EaseSpec; intensity?: number; left: number; top: number } | null>(null);
   let whip = $state<{ clipId: string; x0: number; y0: number; x: number; y: number } | null>(null);
 
   let draft = $state<MotionDoc | null>(null);
@@ -399,17 +401,20 @@
 
   function openEase(e: MouseEvent, clip: KeyOwner, ref: KeyRef, next: KeyRef, ease: EaseSpec) {
     e.stopPropagation();
+    if (justMarqueed) {
+      return;
+    }
     const rect = lanes!.getBoundingClientRect();
-    easing = { ref, next, ease, left: e.clientX - rect.left + lanes!.scrollLeft, top: e.clientY - rect.top + lanes!.scrollTop + 8 };
+    easing = { ref, next, ease, intensity: keyAt(ref)?.intensity, left: e.clientX - rect.left + lanes!.scrollLeft, top: e.clientY - rect.top + lanes!.scrollTop + 8 };
   }
 
-  function pickEase(ease: EaseSpec) {
+  function pickEase(ease: EaseSpec, intensity?: number) {
     if (!easing) {
       return;
     }
-    const result = setKeyEase(doc, easing.ref, ease);
+    const result = setKeyEase(doc, easing.ref, ease, intensity);
     if (result.ok) {
-      easing = { ...easing, ease };
+      easing = { ...easing, ease, intensity };
       onchange(result.doc, 'Changed an ease');
     }
   }
@@ -523,13 +528,94 @@
     [Drag.FadeIn]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.In, at),
     [Drag.FadeOut]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.Out, at),
     [Drag.Keys]: (g, at) => {
-      g.delta = snapTo(g.base, g.originFrom + (at - g.grabFrame), [], g.originFrom) - g.originFrom;
+      const raw = g.originFrom + (at - g.grabFrame);
+      const edge = snapTo(g.base, raw, [], g.originFrom);
+      markSnap(edge !== raw ? edge : null);
+      g.delta = edge - g.originFrom;
       return moveKeyframes(g.base, g.refs, g.delta);
     }
   };
 
+  const MARQUEE_START_PX = 4;
+  type Marquee = { x0: number; y0: number; x: number; y: number; add: boolean; live: boolean };
+  let marquee = $state<Marquee | null>(null);
+  let justMarqueed = false;
+
+  function pendMarquee(e: PointerEvent) {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('.key')) {
+      return;
+    }
+    marquee = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, add: e.shiftKey || e.metaKey || e.ctrlKey, live: false };
+  }
+
+  function dragMarquee(e: PointerEvent): boolean {
+    if (!marquee) {
+      return false;
+    }
+    const live = marquee.live || Math.hypot(e.clientX - marquee.x0, e.clientY - marquee.y0) > MARQUEE_START_PX;
+    marquee = { ...marquee, x: e.clientX, y: e.clientY, live };
+    return live;
+  }
+
+  function keyBoxes() {
+    return [...(lanes?.querySelectorAll<HTMLElement>('[data-key-clip]') ?? [])].map((el) => {
+      const r = el.getBoundingClientRect();
+      return { ref: { clipId: el.dataset.keyClip!, prop: el.dataset.keyProp!, frame: Number(el.dataset.keyLocal) }, box: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } };
+    });
+  }
+
+  function endMarquee(): boolean {
+    const drag = marquee;
+    marquee = null;
+    if (!drag?.live) {
+      return false;
+    }
+    const hits = marqueeHits({ left: drag.x0, top: drag.y0, right: drag.x, bottom: drag.y }, keyBoxes());
+    keySelection = drag.add ? [...keySelection, ...hits.filter((h) => !keySelection.some((k) => sameKey(k, h)))] : hits;
+    justMarqueed = true;
+    setTimeout(() => (justMarqueed = false), 0);
+    return true;
+  }
+
+  function relate() {
+    const related = relatedSelection(doc, { layers: selection, keys: keySelection });
+    selection = related.layers;
+    keySelection = related.keys;
+    open = [...new Set([...open, ...related.keys.map((k) => k.clipId)])];
+  }
+
+  function duplicateKeys() {
+    const result = duplicateKeyframes(doc, keySelection);
+    if (result.ok) {
+      onchange(result.doc, 'Duplicated keyframes');
+    }
+  }
+
+  function onKeys(e: KeyboardEvent) {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey || isTypingTarget(e.target)) {
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      relate();
+      return;
+    }
+    if (e.key.toLowerCase() === 'd' && !e.shiftKey && keySelection.length) {
+      e.preventDefault();
+      e.stopPropagation();
+      duplicateKeys();
+    }
+  }
+
+  function muteLane(owner: KeyOwner, prop: string, muted: boolean) {
+    const result = setLaneMuted(doc, owner.id, prop, muted);
+    if (result.ok) {
+      onchange(result.doc, muted ? 'Muted an animation' : 'Unmuted an animation');
+    }
+  }
+
   function onMove(e: PointerEvent) {
-    if (moveLane(e)) {
+    if (moveLane(e) || dragMarquee(e)) {
       return;
     }
     if (whip) {
@@ -554,6 +640,9 @@
   const SUMMARY: Record<Drag, string> = { [Drag.Move]: 'Moved a clip', [Drag.TrimStart]: 'Trimmed a clip', [Drag.TrimEnd]: 'Trimmed a clip', [Drag.Scrub]: '', [Drag.Keys]: 'Moved keyframes', [Drag.FadeIn]: 'Changed a fade', [Drag.FadeOut]: 'Changed a fade' };
 
   function onUp(e: PointerEvent) {
+    if (endMarquee()) {
+      return;
+    }
     if (whip) {
       dropWhip(e);
       return;
@@ -648,17 +737,21 @@
   }
 </script>
 
-<svelte:window onpointermove={onMove} onpointerup={onUp} />
+<svelte:window onpointermove={onMove} onpointerup={onUp} onkeydowncapture={onKeys} />
 
 {#snippet propRow(owner: KeyOwner, lane: PropLane, rowId: string)}
   {@const keys = owner.keyframes[lane.prop] ?? []}
   {@const mark = keyMark(keys, frame - owner.from)}
   {@const edit = propEdit(owner, lane.prop)}
-  <div class="row prop" data-key-lane={rowId}>
+  {@const muted = owner.id !== CAMERA_LANE && !!clipById(owner.id)?.mutedLanes?.includes(lane.prop)}
+  <div class="row prop" class:muted data-key-lane={rowId}>
     <div class="head">
       <span class="indent prop-indent"></span>
       <button type="button" class="mark" data-mark={mark} aria-label={mark === KeyMark.Here ? `Remove ${lane.label} keyframe` : `Add ${lane.label} keyframe`} title={mark === KeyMark.Here ? 'Remove keyframe here' : 'Add keyframe here'} disabled={owner.id === CAMERA_LANE} onclick={() => toggleMark(owner, lane.prop, mark)}></button>
       <span class="prop-name">{lane.label}</span>
+      {#if owner.id !== CAMERA_LANE && keys.length}
+        <IconButton action={muted ? Action.ShowLayer : Action.HideLayer} size={12} pressed={muted} label={muted ? `Unmute ${lane.label}` : `Mute ${lane.label}`} data-mute={lane.prop} onpointerdown={(e) => e.stopPropagation()} onclick={() => muteLane(owner, lane.prop, !muted)} />
+      {/if}
       {#if !edit}
         <span class="prop-value">{propValue(keys, frame - owner.from)}</span>
       {:else if typing === rowId}
@@ -667,7 +760,7 @@
         <span class="prop-value editable" role="slider" tabindex="0" aria-label={`${lane.label} value`} aria-valuenow={edit.shown} title="Drag to change (Shift ×10, Alt ×0.1), click to type" onpointerdown={(e) => startValue(e, edit)} onpointermove={moveValue} onpointerup={() => endValue(rowId)} onkeydown={(e) => e.key === 'Enter' && (typing = rowId)}>{formatValue(edit.shown, edit.range.step)}<em>{edit.unit}</em></span>
       {/if}
     </div>
-    <div class="lane">
+    <div class="lane" role="presentation" onpointerdown={pendMarquee}>
       {#each keys.slice(0, -1) as key, i (key.frame)}
         <button
           type="button"
@@ -688,6 +781,9 @@
           tabindex="-1"
           aria-label={`${lane.label} keyframe at ${owner.from + key.frame}`}
           data-key-frame={owner.from + key.frame}
+          data-key-clip={owner.id}
+          data-key-prop={lane.prop}
+          data-key-local={key.frame}
           data-interp={key.out ?? Interp.Bezier}
           data-glyph={keyGlyph(key)}
           style={`left: ${(owner.from + key.frame) * ppf}px;`}
@@ -888,8 +984,12 @@
 
     {#if easing}
       <div class="ease-at" style={`left: ${Math.max(headPx, easing.left - 120)}px; top: ${easing.top}px;`}>
-        <EasePicker ease={easing.ease} kinds={segmentKinds(easing)} onpick={pickEase} onkind={pickKind} onclose={() => (easing = null)} />
+        <EasePicker ease={easing.ease} intensity={easing.intensity} kinds={segmentKinds(easing)} onpick={pickEase} onkind={pickKind} onclose={() => (easing = null)} />
       </div>
+    {/if}
+
+    {#if marquee?.live}
+      <div class="marquee" data-testid="key-marquee" style={`left: ${Math.min(marquee.x0, marquee.x)}px; top: ${Math.min(marquee.y0, marquee.y)}px; width: ${Math.abs(marquee.x - marquee.x0)}px; height: ${Math.abs(marquee.y - marquee.y0)}px;`}></div>
     {/if}
 
     {#if whip}
@@ -1587,6 +1687,18 @@
 
   .key:hover {
     border-color: var(--ui-accent);
+  }
+
+  .marquee {
+    position: fixed;
+    z-index: 20;
+    pointer-events: none;
+    border: 1px solid var(--ui-accent);
+    background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+  }
+
+  .row.prop.muted .lane {
+    opacity: 0.35;
   }
 
   .key.picked {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ItemKind, type Item, type PathItem, type ImageItem } from '$lib/motion/gpu-full/display-list';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
+import { ItemKind, type Item, type PathItem, type ImageItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import { faceOf } from '$lib/canvas/gpu/card-face';
 import { NODE_PORTS } from '$lib/canvas/node-ports';
 import { CardPart, cardItems, type CoreCard } from './cards';
@@ -62,10 +62,15 @@ describe('cardItems', () => {
     expect(img.size.height).toBeCloseTo(100 - 13 * 2.4 - 1);
   });
 
-  it('fills a frame stage black', () => {
-    const [stage] = paths(cardItems(card('motion', { kind: 'frame' }), theme, glyphs), CardPart.Stage);
+  it('letterboxes a frame poster on a black stage', () => {
+    const c = card('motion', { kind: 'frame' }, {});
+    const [stage] = paths(cardItems({ ...c, face: { ...c.face, media: { url: 'poster.png', video: false } } }, theme, glyphs), CardPart.Stage);
 
     expect(stage.paint).toEqual({ kind: 'solid', color: rgbaOf('#000000') });
+  });
+
+  it('a frame with nothing to show yet, like a video just combined, is never a black box', () => {
+    expect(paths(cardItems(card('motion', { kind: 'frame' }), theme, glyphs), CardPart.Stage)).toEqual([]);
   });
 
   it('lays thumbnails of a source in three square columns under the header', () => {
@@ -194,8 +199,12 @@ describe('cardItems', () => {
     expect(box(paper.contours)).toEqual([50, 70, 250, 170]);
   });
 
-  it.each(Object.keys(NODE_PORTS))('draws something for a %s card', (kind) => {
+  it.each(Object.keys(NODE_PORTS).filter((kind) => kind !== 'element'))('draws something for a %s card', (kind) => {
     expect(cardItems(card(kind, {}), theme, glyphs).length).toBeGreaterThan(0);
+  });
+
+  it('draws nothing for a free element without a picture, never a black stage', () => {
+    expect(cardItems(card('element', {}), theme, glyphs)).toEqual([]);
   });
 
   it('sets a title in the bold face', () => {

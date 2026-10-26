@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { findClip, type MotionDoc } from '$lib/motion/doc';
-  import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
   import { quadOf, type Quad } from '$lib/motion/scene-select';
   import { displayName, type FrameCursor, type FramePeer } from '$lib/realtime/frame-presence';
 

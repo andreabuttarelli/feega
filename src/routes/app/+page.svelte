@@ -15,6 +15,9 @@
   import ChatAttachments from '$lib/components/brand-agent/ChatAttachments.svelte';
   import IconButton from '$lib/components/motion/IconButton.svelte';
   import { Tool } from '$lib/motion/actions';
+  import FeegaFile from '$lib/components/canvas/FeegaFile.svelte';
+  import { isFeegaFile } from '$lib/canvas/feega-file';
+  import { DashboardPage, PAGE_PATH } from '$lib/dashboard/pages';
 
   let { data, form } = $props();
 
@@ -31,6 +34,7 @@
   let field = $state<HTMLTextAreaElement | null>(null);
   let composer = $state<HTMLFormElement | null>(null);
   let picker = $state<HTMLInputElement | null>(null);
+  let feegaFile = $state<FeegaFile | null>(null);
   const recents = $derived(data.dashboard.canvases);
 
   const uploads = $derived(data.attachProjectId ? new ChatUploads(data.attachProjectId) : null);
@@ -91,7 +95,7 @@
   }
 
   function dragged(e: DragEvent) {
-    if (!uploads || !e.dataTransfer?.types.includes('Files')) {
+    if (!e.dataTransfer?.types.includes('Files')) {
       return;
     }
     e.preventDefault();
@@ -100,11 +104,17 @@
 
   function dropped(e: DragEvent) {
     dragging = false;
-    if (!uploads || !e.dataTransfer?.files.length) {
+    const files = [...(e.dataTransfer?.files ?? [])];
+    if (!files.length) {
       return;
     }
     e.preventDefault();
-    uploads.add([...e.dataTransfer.files]);
+    const feega = files.find(isFeegaFile);
+    if (feega) {
+      void feegaFile?.take(feega);
+      return;
+    }
+    uploads?.add(files);
   }
 
   const submit = ({ cancel }: { cancel: () => void }) => {
@@ -129,9 +139,11 @@
       <Button variant="secondary" data-testid="home-import" onclick={() => picker?.click()}>import</Button>
       <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
     {/if}
+    <Button variant="secondary" data-testid="home-import-feega" onclick={() => feegaFile?.pick()}>import .feega</Button>
     <form method="POST" action="?/project" use:apiEnhance>
       <Button type="submit" data-testid="new-canvas">new canvas</Button>
     </form>
+    <FeegaFile bind:this={feegaFile} page={PAGE_PATH[DashboardPage.Home]} />
   </div>
 
   <div class="scroll" data-testid="home-scroll">

@@ -2,19 +2,19 @@ import type { Db } from '$lib/server/db/client';
 import { activeRenderRuns, claimRun, completeRun, createRun, failRun, listNodeRuns, queuedRenderRuns, releaseClaim, RENDER_JOB_PREFIX, setRunParams, type NodeRun } from '$lib/server/repos/node-runs';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { logAiCall } from '$lib/server/ai-log';
-import { formatOf, type MotionDoc } from '$lib/motion/doc';
+import { formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { creditsOfCost, HOLD_BUFFER, RENDER_CALL_LABEL, renderClass, renderQuote, sandboxCostUsd, type RenderQuote } from '$lib/motion/render-quote';
 import { advance, startProgress, progressOf, type RenderEvent, type RenderProgress, type RenderView } from '$lib/motion/server-render';
 import { unverified } from '$lib/motion/custom/determinism';
 import { exportFolder, exportPath, outputSize } from '$lib/motion/export-plan';
-import { composeHtml, HYPERFRAMES_VERSION, type ComposeInput } from '$lib/motion/hyperframes/compose';
-import { assetOrigins } from '$lib/motion/hyperframes/csp';
+import { composeHtml, HYPERFRAMES_VERSION, type ComposeInput } from '@feega/motion-core/motion/hyperframes/compose';
+import { assetOrigins } from '@feega/motion-core/motion/hyperframes/csp';
 import { libsOrigin } from './libs-origin';
 import { audioPlan } from '$lib/motion/audio-plan';
 import { holdCredits, releaseCredits, splitPortions, type Portion } from '$lib/server/credit-hold';
 import { checkTask, FarmTask, farmChunks, farmProblem, firstSlices, framesOf, halves, launchAssembly, launchPiece, MAX_ATTEMPTS, pieceFile, stopWorker, TaskState, WORKER_GONE, type FarmJob, type Slice, type TaskCheck } from './farm-render';
 import { costSpans } from '$lib/motion/render-cost';
-import { FORMAT, exportProblem, type ExportFormat, type RenderSettings } from '$lib/motion/export-formats';
+import { ExportFormat, FORMAT, exportProblem, gifOf, type RenderSettings } from '$lib/motion/export-formats';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { lengthProblem } from '$lib/motion/render-length';
 import { saveExport } from './export';
@@ -78,6 +78,7 @@ export function farmJob(input: ComposeInput, settings: RenderSettings): FarmJob 
     allowHosts: reachable.map((origin) => new URL(origin).host),
     format: settings.format,
     quality: settings.quality,
+    gif: settings.format === ExportFormat.Gif ? gifOf(settings) : undefined,
     motionBlur: doc.motionBlur.enabled ? { shutterAngle: doc.motionBlur.shutterAngle, shutterPhase: doc.motionBlur.shutterPhase, samples: doc.motionBlur.samples } : null,
     cost: costSpans(doc, out.width * out.height),
     renderClass: renderClass(doc)

@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { holdsDoc } from './motion-node';
 
 export type PropertiesTarget = { id: string; name: string };
 
@@ -12,7 +13,7 @@ export const propertiesRequest = writable<string | null>(null);
 
 export function targetOf(selected: readonly string[], rows: readonly Row[]): PropertiesTarget | null {
   const row = selected.length === 1 ? rows.find((r) => r.id === selected[0]) : null;
-  if (row?.type !== 'motion') {
+  if (!row || !holdsDoc(row.type)) {
     return null;
   }
   return { id: row.id, name: row.displayName ?? UNNAMED };

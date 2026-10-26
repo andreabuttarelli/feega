@@ -1,6 +1,6 @@
-import { findClip, type MotionClip, type MotionDoc } from './doc';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { editAt, valueAt } from './inspector';
-import type { OpResult } from './timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 export type MaskBox = { x: number; y: number; width: number; height: number; rotation: number };
 type Frame = { width: number; height: number };

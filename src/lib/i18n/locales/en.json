@@ -1,76 +1,7 @@
 {
   "landing": {
-    "hero": {
-      "connect": {
-        "title": "Connect feega to your AI",
-        "subtitle": "It works with any agent that speaks MCP. Pick the way that suits you.",
-        "close": "Close",
-        "copy": "Copy",
-        "copied": "Copied",
-        "tabs": {
-          "auto": "Automatic",
-          "mcp": "By app",
-          "cli": "Command line"
-        },
-        "auto": {
-          "s1": "Copy the text below.",
-          "s2": "Paste it into your AI — Claude, ChatGPT, Cursor, whichever you use.",
-          "s3": "It connects to feega and asks you to sign in. That's it.",
-          "peek": "See what you're copying",
-          "note": "Nothing to install here: the sign-in happens in your agent, and no API key ever leaves this page."
-        },
-        "mcp": {
-          "lead": "One address for every host. Add it as a remote MCP server and complete the sign-in it opens.",
-          "docs": "Docs"
-        },
-        "cli": {
-          "lead": "For a terminal. Same account, same brands — useful for scripts and CI, not needed to use feega from an agent.",
-          "note": "The CLI and the local MCP server share one session, so signing in once covers both."
-        },
-        "how": {
-          "oneCommand": "one command",
-          "configFile": "config file",
-          "connectors": "in the app's connector settings"
-        },
-        "easiest": "Easiest",
-        "copyBig": "Copy the setup prompt",
-        "copiedBig": "Copied — now paste it to your AI"
-      }
-    },
     "nav": {
       "brandAria": "feega — pronounced oh to one"
-    }
-  },
-  "pricing": {
-    "card": {
-      "mostPopular": "MOST POPULAR",
-      "perMo": "/mo",
-      "yearNote": "save {sym}{save}/yr",
-      "monthNote": "billed monthly",
-      "customName": "Custom",
-      "customTagline": "For agencies and teams with bespoke needs.",
-      "customPrice": "Let's talk",
-      "customSub": "Volume, white-label & custom workflows",
-      "customCta": "Book a call",
-      "customFeats": "Unlimited social accounts|Dedicated AI capacity|Custom Radar sources|Team seats & white-label|Custom workflows|Priority support",
-      "statPosts": "Posts",
-      "statVideos": "AI videos",
-      "statArticles": "Blog",
-      "perMonth": "/ mo"
-    },
-    "plans": {
-      "go": {
-        "tagline": "You publish. We prepare.",
-        "highlights": "Strategy & editorial plan for your brand|Posts ready to export — you publish|SEO, GEO & blog hosting|Leads on Reddit, Google & Bing|Email support"
-      },
-      "starter": {
-        "tagline": "For one brand getting consistent.",
-        "highlights": "Autopublish to 2 social accounts|Editorial plan on autopilot|Blog articles built to rank|Backlink network across feega brands|Meta Ads — you approve spend"
-      },
-      "pro": {
-        "tagline": "The full autonomous manager.",
-        "highlights": "Autopublish to 8 social accounts|Higher capacity across posts, blog & leads|Backlink network across feega brands|Up to 4K images / videos|Leads on X, Threads & LinkedIn too (~30–60/day)|Priority human support"
-      }
     }
   },
   "login": {
@@ -170,96 +101,6 @@
       "titleSignup": "feega — Create account"
     }
   },
-  "warnings": {
-    "title": "Notifications",
-    "close": "Close",
-    "resolve": "Fix it",
-    "empty": "Nothing here — you're all set.",
-    "all": "All",
-    "errors": "Errors",
-    "warnings": "Warnings",
-    "suggestions": "Suggestions",
-    "noPlatforms": {
-      "title": "No platforms selected",
-      "msg": "Pick the socials the AI should create content for in Studio."
-    },
-    "notConnected": {
-      "title": "Platforms not connected",
-      "msg": "You operate on {platforms} but haven't connected the account(s) — nothing can publish until you do."
-    },
-    "reconnect": {
-      "title": "Reconnect your account",
-      "msg": "The connection to {platforms} expired or broke — reconnect it in Settings or publishing will keep failing."
-    },
-    "proposed": {
-      "title": "A proposal is waiting",
-      "msg": "Autopilot proposed an updated strategy/plan — review and approve it so it can execute."
-    },
-    "strategyMismatch": {
-      "title": "Strategy out of sync",
-      "msg": "Your strategy was built for {strategy}, but you now operate on {current}. Regenerate it to fit your platforms."
-    },
-    "planMismatch": {
-      "title": "Editorial plan out of sync",
-      "msg": "Your plan was built for {plan}, but you now operate on {current}. Adjust it so the weekly content fits your platforms."
-    },
-    "crosspost": {
-      "title": "Cross-post opportunity",
-      "msg": "{count} generated posts don't yet cover {platforms}. You can cross-post them to your new platforms."
-    },
-    "failed": {
-      "title": "{count} posts failed to publish",
-      "msg": "Publishing failed — check the account connection and retry."
-    },
-    "attention": {
-      "title": "{count} posts need a look",
-      "msg": "Review these before they go out — weak media scores or a Director flag."
-    },
-    "quota": {
-      "title": "Monthly post budget used up",
-      "msg": "You've used all {quota} posts for this month — it resets next cycle, or upgrade your plan."
-    },
-    "noStrategy": {
-      "title": "No strategy yet",
-      "msg": "Generate your growth strategy — it steers every plan and post."
-    },
-    "noPlan": {
-      "title": "No editorial plan yet",
-      "msg": "Generate your 4-week editorial plan so the weekly autopilot has a roadmap to execute."
-    },
-    "continueOnboarding": {
-      "title": "Finish setting up your brand",
-      "msg": "Ask feega in chat to add people, competitors, strategy and your first posts — or keep exploring and come back anytime."
-    },
-    "pending": {
-      "title": "{count} posts to review",
-      "msg": "You have posts waiting for approval."
-    },
-    "calendarConflicts": {
-      "title": "{count} calendar clashes",
-      "msg": "Posts are double-booked at the same time — let the AI rearrange your calendar."
-    },
-    "studioLogo": {
-      "title": "No logo yet",
-      "msg": "Add your logo in Studio so the AI reproduces it instead of inventing a wordmark."
-    },
-    "studioVisual": {
-      "title": "No visual style yet",
-      "msg": "Add a visual style brief so generated images match your brand's look."
-    },
-    "studioCompetitors": {
-      "title": "No competitors added",
-      "msg": "Add competitors so the AI can claim the visual and content white space they leave."
-    },
-    "studioHashtags": {
-      "title": "No preferred hashtags",
-      "msg": "Set hashtags per platform to control which ones the AI uses instead of inventing them."
-    },
-    "blogOff": {
-      "title": "Blog not active",
-      "msg": "Turn on the blog so feega also generates articles — from your editorial plan and from radar news, not just social posts."
-    }
-  },
   "app": {
     "nav2": {
       "layers": "Layers",
@@ -270,24 +111,16 @@
     },
     "nav": {
       "settings": "Settings",
-      "upgrade": "Upgrade",
       "workspace": "Workspace",
       "sectionAccount": "Account",
       "sectionBrand": "Brand",
       "sectionProject": "Project"
     },
     "hub": {
-      "publish": {
-        "calendar": "Calendar",
-        "promote": "Promote"
-      },
       "overview": {
         "brand": {
           "products": "Products"
         }
-      },
-      "ads": {
-        "social": "Ads"
       }
     },
     "shell": {
@@ -302,7 +135,7 @@
       "shareCopied": "Copied",
       "shareNewLink": "New link (old one stops working)",
       "chatTab": "Chat",
-      "guideTab": "Guide",
+      "guideTab": "Guides",
       "guideBack": "Back to guides",
       "mobile": {
         "canvas": "Canvas",
@@ -347,52 +180,7 @@
       "team": {
         "title": "Team"
       },
-      "linkedin": {
-        "title": "Connect LinkedIn",
-        "subtitle": "Choose what to post to — your personal profile or a Company Page you admin.",
-        "personalDesc": "Post from your own LinkedIn profile",
-        "pagesTitle": "Company Pages",
-        "pagesDesc": "A LinkedIn Page you administer",
-        "noPages": "No Company Pages found — your LinkedIn account doesn't admin any Pages.",
-        "connectThis": "Connect",
-        "working": "Connecting…",
-        "back": "Back to settings",
-        "retry": "Reconnect LinkedIn",
-        "expired": "This connection link has expired. Please reconnect LinkedIn to try again.",
-        "missing": "Missing connection data. Please reconnect LinkedIn to try again.",
-        "failed": "Couldn't complete the connection. Please try again."
-      },
-      "facebook": {
-        "title": "Connect Facebook",
-        "subtitle": "Pick the Page to post to. Choosing a Page also connects its linked Instagram account.",
-        "pagesTitle": "Your Pages",
-        "pagesDesc": "A Facebook Page you manage",
-        "noPages": "No Pages found — your Facebook account doesn't manage any Pages.",
-        "connectThis": "Connect",
-        "working": "Connecting…",
-        "back": "Back to settings",
-        "retry": "Reconnect Facebook",
-        "expired": "This connection link has expired. Please reconnect Facebook to try again.",
-        "missing": "Missing connection data. Please reconnect Facebook to try again.",
-        "failed": "Couldn't complete the connection. Please try again."
-      },
-      "connectedAccounts": "Connected accounts",
-      "syncFromZernio": "Sync",
-      "remove": "Remove",
       "keep": "Keep",
-      "active": "Active",
-      "disconnect": "Disconnect",
-      "noAccountsTitle": "No accounts connected yet",
-      "noAccountsBody": "Connect one below — feega imports it automatically when you come back.",
-      "syncedToast": "✓ Synced.",
-      "disconnectedToast": "✓ Disconnected.",
-      "connectPlatform": "Connect a platform",
-      "accountsUsed": "{used} of {limit} accounts",
-      "seatCostMsg": "Each connected account costs ${cost}/month, billed from your credit balance.",
-      "limitReachedMsg": "Not enough credits for another account's monthly fee ({limit} connected now). Buy more credits to connect another.",
-      "connectedAddAnother": "{count} connected · add another",
-      "connectViaOauth": "Connect via OAuth",
-      "connect": "Connect →",
       "save": "Save",
       "close": "Close",
       "profile": {
@@ -407,6 +195,21 @@
         "lastName": "Last name",
         "session": "Session",
         "signOutDesc": "Sign out of feega on this device.",
+        "figmaTitle": "Figma",
+        "figmaDesc": "Paste a personal access token so pasting from Figma brings its images too. Layers and text paste without one.",
+        "figmaToken": "Personal access token",
+        "figmaTokenSet": "A token is saved. Paste a new one to replace it.",
+        "figmaTokenHint": "Figma, Settings, Security, Personal access tokens. The token is stored encrypted and never shown again.",
+        "figmaSave": "Save token",
+        "figmaTest": "Test",
+        "figmaRemove": "Remove",
+        "figmaSaved": "Figma token saved.",
+        "figmaTested": "Connected to Figma.",
+        "figmaRemoved": "Figma token removed.",
+        "figmaInvalid": "Paste a valid Figma token.",
+        "figmaRejected": "Figma did not accept this token.",
+        "figmaNone": "Save a token first.",
+        "figmaUnavailable": "Figma tokens are not available yet.",
         "saved": "Profile saved.",
         "avatarSaved": "Profile photo updated.",
         "avatarRemoved": "Profile photo removed.",
@@ -460,6 +263,36 @@
           "failed": "We couldn't delete the brand. Please try again."
         }
       },
+      "models": {
+        "title": "Models",
+        "subtitle": "Choose which image, video and 3D models your organization can generate with. A medium with nothing checked offers every model.",
+        "image": "Image",
+        "video": "Video",
+        "model3d": "3D",
+        "save": "Save",
+        "saved": "Saved.",
+        "adminOnly": "Only owners and admins can change this.",
+        "unavailable": "Could not save. Try again later."
+      },
+      "spend": {
+        "title": "Billing limits",
+        "subtitle": "Stop spending once a limit is reached. Spending is counted from your AI usage; a monthly limit starts again on the first of the month.",
+        "orgMember": "Each member, in every project",
+        "projectMember": "Each member, in this project",
+        "projectTotal": "This project, everyone together",
+        "amount": "Limit in USD",
+        "reset": "Resets",
+        "resetNone": "Never",
+        "resetMonthly": "Monthly",
+        "save": "Save",
+        "remove": "Remove",
+        "none": "No limit",
+        "saved": "Saved.",
+        "removed": "Limit removed.",
+        "adminOnly": "Only owners and admins can change this.",
+        "invalid": "Enter an amount above zero.",
+        "unavailable": "Could not save. Try again later."
+      },
       "apiKeys": {
         "title": "API Keys",
         "subtitle": "Generate long-lived keys for custom integrations. Keys have full read & write access. Use them as Bearer tokens in your scripts, CI/CD, or automation tools.",
@@ -508,9 +341,6 @@
           "videoMotionDesc": "Which model takes the movement from a reference video and applies it to a subject in your image. Not the same as motion videos, which are rendered from code and use no generative model."
         }
       },
-      "ads": {
-        "noCountryMatch": "No country found"
-      },
       "project": {
         "title": "Project"
       },
@@ -547,9 +377,6 @@
         "storeFailed": "The purchase did not go through. Nothing was charged.",
         "storePurchased": "Purchase complete. Your credits appear here in a few seconds."
       }
-    },
-    "ads": {
-      "syncing": "Syncing…"
     },
     "orgs": {
       "label": "Organisation",

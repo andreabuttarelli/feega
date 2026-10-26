@@ -6,7 +6,8 @@ export enum PropertiesView {
   Frame = 'frame',
   Clip = 'clip',
   Part = 'part',
-  Multiple = 'multiple'
+  Multiple = 'multiple',
+  Template = 'template'
 }
 
 export function propertiesFor(selection: { count: number; clip: string | null; part: string | null }): PropertiesView {

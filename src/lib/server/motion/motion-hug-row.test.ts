@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
 import type { ZodType } from 'zod';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { Direction, Sizing } from '$lib/motion/layout/auto-layout';
-import { withAutoLayout } from '$lib/motion/layout/resolve';
-import { pivotBox } from '$lib/motion/parent';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { pivotBox } from '@feega/motion-core/motion/parent';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;

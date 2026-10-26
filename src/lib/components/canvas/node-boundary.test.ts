@@ -1,12 +1,10 @@
 // @vitest-environment jsdom
-import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import BoundaryProbe from './fixtures/BoundaryProbe.svelte';
 
 const dir = dirname(fileURLToPath(import.meta.url));
-const tile = readFileSync(join(dir, 'CanvasTile.svelte'), 'utf8');
 const { flushSync, mount, unmount } = (await import(join(dir, '../../../../node_modules/svelte/src/index-client.js'))) as typeof import('svelte');
 
 describe('a node that fails to render', () => {
@@ -33,9 +31,5 @@ describe('a node that fails to render', () => {
 
     expect(document.body.textContent).toContain('node body');
     expect(document.querySelector('[role="alert"]')).toBeNull();
-  });
-
-  it('wraps every canvas tile body in the boundary', () => {
-    expect(tile).toMatch(/<NodeBoundary>\s*\{@render render\(\)\(\{ id: tile\.id, selected \}\)\}\s*<\/NodeBoundary>/);
   });
 });

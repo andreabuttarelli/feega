@@ -72,4 +72,21 @@ describe('duplicare una selezione', () => {
     expect(out.nodes).toEqual([]);
     expect(fake.calls.some((c) => c.op === 'insert')).toBe(false);
   });
+
+  it('a free element duplicates as an element node with its size and its drawing', async () => {
+    const doc = { version: 5, fps: 30, width: 400, height: 200, durationInFrames: 150, background: 'transparent', tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 'box', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 } }] }], comps: {}, assets: [] };
+    const fake = fakeDb({
+      nodes: [{ id: 'e', canvas_id: 'canvas', project_id: 'project', type: 'motion', display_name: 'Box', x: 0, y: 0, z: 0, width: 200, height: 100, data: { format: '16:9', docHeadRevision: 3, kind: 'element' }, version: 1 }],
+      nodes_connections: [],
+      motion_revisions: [{ id: 'r', org_id: 'org', node_id: 'e', version: 3, doc, summary: null, actor_kind: 'user' }]
+    });
+
+    await duplicateNodes(fake.db, { ...scope, nodeIds: ['e'], actor: { kind: 'user', id: 'user' } });
+
+    const insert = fake.calls.find((c) => c.table === 'nodes' && c.op === 'insert');
+    expect(insert?.payload).toMatchObject({ type: 'element', width: 200, height: 100, data: { docHeadRevision: 1 } });
+    expect((insert?.payload as { data: Record<string, unknown> }).data.kind).toBeUndefined();
+    const revision = fake.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert');
+    expect(revision?.payload).toMatchObject({ version: 1, doc: { tracks: [{ clips: [{ id: 'box' }] }] } });
+  });
 });

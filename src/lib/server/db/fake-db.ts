@@ -119,6 +119,9 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         call.limit = n;
         return chain;
       },
+      range() {
+        return chain;
+      },
       select() {
         return chain;
       },

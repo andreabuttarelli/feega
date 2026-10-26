@@ -45,17 +45,31 @@ function environment() {
 	};
 }
 
-function open(connection: ReturnType<typeof socket>, env = environment(), frames = frameHub({ userId: 'me', name: 'Me' }, () => 7).line, cursors?: CanvasLine) {
+function open(connection: ReturnType<typeof socket>, env = environment(), frames = frameHub({ userId: 'me', name: 'Me' }, () => 7).line, cursors?: CanvasLine, onComments?: () => void) {
 	const onChange = vi.fn();
 	const onLink = vi.fn();
 	const onPeers = vi.fn();
 	const onReconnect = vi.fn();
 	const onCanvasList = vi.fn();
-	const close = connectCanvas({ client: connection.client as unknown as SupabaseClient, canvasId: 'canvas', projectId: 'proj', peer, onChange, onPeers, onReconnect, onCanvasList, onLink, frames, cursors, environment: env.env });
+	const close = connectCanvas({ client: connection.client as unknown as SupabaseClient, canvasId: 'canvas', projectId: 'proj', peer, onChange, onPeers, onReconnect, onCanvasList, onLink, onComments, frames, cursors, environment: env.env });
 	return { close, onChange, onPeers, onReconnect, onCanvasList, onLink, env };
 }
 
 describe('canvas collaboration', () => {
+	it('tells the page when a comment of this canvas is added, edited or deleted', async () => {
+		const connection = socket();
+		const onComments = vi.fn();
+		open(connection, environment(), undefined, undefined, onComments);
+		await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalled());
+
+		const comments = connection.listeners.find(({ filter }) => filter.table === 'canvas_comments')!;
+		expect(comments.filter).toEqual({ event: '*', schema: 'public', table: 'canvas_comments', filter: 'canvas_id=eq.canvas' });
+		comments.callback({ eventType: 'INSERT' });
+		comments.callback({ eventType: 'UPDATE' });
+		comments.callback({ eventType: 'DELETE' });
+		expect(onComments).toHaveBeenCalledTimes(3);
+	});
+
 	it('receives changes for both canvas tables and refreshes after reconnect', async () => {
 		const connection = socket();
 		const callbacks = open(connection);

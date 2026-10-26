@@ -1,5 +1,5 @@
 import { embedSource, isSourceEmbed, legacyFingerprint, revisionFingerprint, type InteractiveInput } from '$lib/motion/interactive/bundle';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { embedRefusal } from '$lib/gallery/refusals';
 import type { ProjectMode } from '$lib/project-mode';
 

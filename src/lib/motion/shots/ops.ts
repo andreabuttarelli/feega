@@ -1,18 +1,41 @@
 import { z } from 'zod';
-import type { MotionDoc } from '../doc';
-import { addClip, addTrack, type OpResult } from '../timeline';
-import { TrackKind } from '../components';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, addTrack, type OpResult } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { SFX_LIBRARY, ShotSound, cursorCues, type Sfx, type SfxCue } from '../sfx';
 import { writeComponent } from '../custom/ops';
 import { VECTOR_TOKEN } from '../vector-ui/piece';
 import { VectorRole, type VectorNode, type VectorUi } from '../vector-ui/model';
 import { Zone, ranked, zoneOf } from '../vector-ui/importance';
-import { AUTO_CURSOR, SHOTS, ShotUi, overLimits, shotSource, type ShotId } from './library';
+import { AUTO_CURSOR, SHOTS, ShotUi, overLimits, shotSource, slotRuleProblem, type ShotId } from './library';
 import { cursorMath, type CursorStep, type CursorUi } from './cursor';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
-export const STYLE_SLOTS = z.object({ font: z.string().max(64).optional(), ink: z.string().regex(HEX).optional(), paper: z.string().regex(HEX).optional(), muted: z.string().regex(HEX).optional(), accent: z.string().regex(HEX).optional() });
+export const STYLE_SLOTS = z.object({
+  font: z.string().max(64).optional().meta({ default: 'sans', description: 'a registered font family' }),
+  ink: z.string().regex(HEX).optional().meta({ default: '#ffffff', description: 'text colour' }),
+  paper: z.string().regex(HEX).optional().meta({ default: '#000000', description: 'background colour' }),
+  muted: z.string().regex(HEX).optional().meta({ default: '#8b8b8b', description: 'secondary text colour' }),
+  accent: z.string().regex(HEX).optional().meta({ default: '#0099ff', description: 'accent colour' })
+});
+
+export type SlotSpec = { type: string; required: boolean; default?: unknown; minimum?: number; maximum?: number; enum?: unknown[]; about?: string };
+
+type JsonProp = { type?: string; anyOf?: JsonProp[]; default?: unknown; minimum?: number; maximum?: number; enum?: unknown[]; description?: string };
+
+const typeOf = (prop: JsonProp): string => prop.type ?? [...new Set((prop.anyOf ?? []).map(typeOf))].join('|');
+
+function slotSpec(prop: JsonProp, required: boolean): SlotSpec {
+  const { default: fallback, minimum, maximum, enum: options, description } = prop;
+  return { type: typeOf(prop), required, ...(fallback === undefined ? {} : { default: fallback }), ...(minimum === undefined ? {} : { minimum }), ...(maximum === undefined ? {} : { maximum }), ...(options ? { enum: options } : {}), ...(description ? { about: description } : {}) };
+}
+
+export function shotSlots(id: ShotId): Record<string, SlotSpec> {
+  const schema = z.toJSONSchema(SHOTS[id].slots.extend(STYLE_SLOTS.shape), { io: 'input', unrepresentable: 'any' }) as { properties?: Record<string, JsonProp>; required?: string[] };
+  const required = new Set(schema.required ?? []);
+  return Object.fromEntries(Object.entries(schema.properties ?? {}).map(([key, prop]) => [key, slotSpec(prop, required.has(key))]));
+}
 
 const BEAT = /^beat \d+$/;
 const SNAP_S = 0.3;
@@ -172,7 +195,7 @@ export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & 
   if (seconds < spec.seconds.min || seconds > spec.seconds.max) {
     return { ok: false, error: `${plan.shot} lasts ${spec.seconds.min}–${spec.seconds.max} s: pass seconds ${spec.seconds.min}–${spec.seconds.max}, best ${spec.seconds.best}, or leave it out; never stretch a shot to fit words, cut the words` };
   }
-  const crowded = overLimits(plan.shot, parsed.data);
+  const crowded = overLimits(plan.shot, parsed.data) ?? slotRuleProblem(plan.shot, parsed.data);
   if (crowded) {
     return { ok: false, error: crowded };
   }

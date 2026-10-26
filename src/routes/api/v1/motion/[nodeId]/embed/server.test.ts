@@ -48,7 +48,7 @@ vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
     if (!store.head) {
       return null;
     }
-    const { newMotionDoc, MotionFormat } = await import('$lib/motion/doc');
+    const { newMotionDoc, MotionFormat } = await import('@feega/motion-core/motion/doc');
     return { version: store.head, doc: { ...newMotionDoc(MotionFormat.Landscape), interactive: { loop: false, outside: 'fallback', playback: store.playback } }, summary: null, actorKind: 'user' };
   }
 }));

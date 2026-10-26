@@ -1,4 +1,4 @@
-import type { BLOB_TINT, BlobNumberKey } from './model';
+import type { BLOB_TINT, BlobNumberKey } from '@feega/motion-core/motion/blob/model';
 
 type BlobInputKey = Exclude<BlobNumberKey, 'presence'> | (typeof BLOB_TINT)['key'];
 

@@ -1,4 +1,4 @@
-import type { Item } from '$lib/motion/gpu-full/display-list';
+import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { SelectBody, type SelectRow } from '$lib/canvas/node-view';
 import { BORDER, CardPart, Fit, LEADING, UiGlyph, at, box, glyph, image, measure, panel, write, type Ctx } from './card-kit';
 import { rect, solid } from './shapes';

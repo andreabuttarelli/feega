@@ -3,18 +3,18 @@ import type { Actor } from '$lib/server/repos/actor';
 import { Checkpoint, RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { parseOps } from '$lib/motion/doc-ops';
-import { OpsOutcome, commitOps } from '$lib/server/motion/frame-ops';
+import { OpsOutcome, commitOnto, commitOps } from '$lib/server/motion/frame-ops';
 import { batchView, renderView } from '$lib/server/motion/render-run';
 import type { MotionEditorScope } from '$lib/server/motion/editor-scope';
 import { saveExport } from '$lib/server/motion/export';
 import { deleteFontFamily, orgFontFamilies, renameFontFamily, saveFontUpload, type FontChange } from '$lib/server/motion/font-upload';
-import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
+import { assetUrls, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { withTemplateSounds } from '$lib/server/motion/template-sounds';
 import { laySfx } from '$lib/server/motion/sfx';
 import { withOrgContext } from '$lib/server/ai-log';
-import { parseMotionDoc } from '$lib/motion/doc';
+import { parseMotionDoc } from '@feega/motion-core/motion/doc';
 import type { Sfx } from '$lib/motion/sfx';
 import { Sound, generateSound } from '$lib/server/motion/voiceover';
 import { rowRequests, rowsFrom } from '$lib/server/motion/batch-input';
@@ -29,7 +29,7 @@ import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { cancelRender } from '$lib/server/motion/render-run';
 import { startFarmRender } from '$lib/server/motion/render-start';
 import { exportStill } from '$lib/server/motion/still-export';
-import { stillAskSchema, stillExport } from '$lib/motion/still-model';
+import { stillAskSchema, stillExport } from '@feega/motion-core/motion/still-model';
 import { splitTags } from '$lib/gallery/model';
 import { publishStatus } from '$lib/server/gallery/http';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
@@ -105,10 +105,14 @@ export const EDITOR_OPS = {
     access: EditorAccess.Write,
     input: z.object({ version: z.number(), doc: z.unknown(), summary: summaryInput }),
     run: async (ctx, input) => {
-      const write = await saveMotionDoc(ctx.db, {
+      const parsed = parseMotionDoc(input.doc);
+      if (!parsed.ok) {
+        return refused(HTTP_BAD_REQUEST, { error: parsed.error });
+      }
+      const write = await commitOnto(ctx.db, {
         ...nodeScope(ctx),
         expectedVersion: Number.isInteger(input.version) ? input.version : -1,
-        doc: input.doc,
+        doc: parsed.doc,
         actor: ctx.actor,
         summary: input.summary || null,
         checkpoint: Checkpoint.Coalesce

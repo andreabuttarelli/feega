@@ -1,6 +1,6 @@
 import { ALIGN_ACTIONS, ALIGN_EDGE, type SelectionActionId } from '$lib/canvas/selection-actions';
-import { FrameKind } from '$lib/canvas/motion-node';
-import { compOf, findClip, type MotionDoc } from './doc';
+import { DocNodeType, FrameKind } from '$lib/canvas/motion-node';
+import { compOf, findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { elementName } from './element-name';
 import { Command } from './shortcuts';
 import type { Edge } from './space';
@@ -13,8 +13,27 @@ const FRAME_COMMAND: Partial<Record<SelectionActionId, Command>> = {
   'tidy-up': Command.TidyUp,
   'flip-horizontal': Command.FlipHorizontal,
   'flip-vertical': Command.FlipVertical,
+  'create-component': Command.CreateComponent,
+  'detach-instance': Command.DetachInstance,
+  'reset-instance': Command.ResetInstance,
+  'push-instance': Command.PushInstance,
   'use-as-mask': Command.UseAsMask,
   'release-mask': Command.RemoveMask,
+  'select-matching': Command.SelectMatching,
+  'select-same-fill': Command.SelectSameFill,
+  'select-same-stroke': Command.SelectSameStroke,
+  'select-same-font': Command.SelectSameFont,
+  'select-same-effect': Command.SelectSameEffect,
+  'frame-selection': Command.FrameSelection,
+  'resize-to-fit': Command.ResizeToFit,
+  'auto-layout': Command.AutoLayout,
+  'union': Command.Union,
+  'subtract': Command.Subtract,
+  'intersect': Command.Intersect,
+  'exclude': Command.Exclude,
+  'flatten': Command.Flatten,
+  'outline-stroke': Command.OutlineStroke,
+  'outline-text': Command.TextToPath,
   delete: Command.Delete
 };
 
@@ -60,6 +79,6 @@ export function frameLayers(doc: MotionDoc, ids: readonly string[]): FrameLayer[
 export function frameSummaries(doc: MotionDoc, ids: readonly string[]) {
   return ids.map((id) => {
     const clip = findClip(doc, id)?.clip;
-    return { id, type: 'clip', data: clip && compOf(clip) ? { kind: FrameKind.Group } : {} };
+    return clip && compOf(clip) ? { id, type: DocNodeType.Element, data: { kind: FrameKind.Group } } : { id, type: 'clip', data: {} };
   });
 }

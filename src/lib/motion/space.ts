@@ -1,10 +1,10 @@
-import { findClip, type MotionDoc } from './doc';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { EditMode } from './edit-mode';
-import type { Transform, TransformKey } from './keyframes';
-import { isLocked } from './organize';
-import { pivotBox, transformAt } from './parent';
+import type { Transform, TransformKey } from '@feega/motion-core/motion/keyframes';
+import { isLocked } from '@feega/motion-core/motion/organize';
+import { pivotBox, transformAt } from '@feega/motion-core/motion/parent';
 import { Grip, aabb, dragPatch, quadOf, writePatch, type Bounds, type Boxes, type Pt } from './scene-select';
-import { setKeyframes, setTransform, type OpResult } from './timeline';
+import { setKeyframes, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { tidyMoves } from './tidy';
 
 export enum Edge {
@@ -55,6 +55,8 @@ const WRITE: Record<EditMode, (doc: MotionDoc, clipId: string, frame: number, pa
   [EditMode.Design]: shifted,
   [EditMode.Motion]: writePatch
 };
+
+export const writeTransform = (mode: EditMode, doc: MotionDoc, clipId: string, frame: number, patch: Transform): OpResult => WRITE[mode](doc, clipId, frame, patch);
 
 function moveOne(doc: MotionDoc, clipId: string, frame: number, by: Pt, mode: EditMode): OpResult {
   const clip = findClip(doc, clipId)?.clip;
@@ -133,8 +135,23 @@ const SPAN: Record<Axis, { start: (b: Bounds) => number; size: (b: Bounds) => nu
   [Axis.Y]: { start: (b) => b.top, size: (b) => b.bottom - b.top }
 };
 
-export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, axis: Axis, mode: EditMode): OpResult {
-  if (ids.length < MIN_DISTRIBUTED) {
+const SAME_GAP_PX = 0.5;
+
+export function gapOf(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, axis: Axis): number | null {
+  const bounds = ids.length > 1 ? boundsOf(doc, ids, frame, boxes) : null;
+  if (!bounds || typeof bounds === 'string') {
+    return null;
+  }
+  const { start, size } = SPAN[axis];
+  const ordered = [...ids].map((id) => bounds.get(id)!).sort((a, b) => start(a) - start(b));
+  const gaps = ordered.slice(1).map((b, i) => start(b) - (start(ordered[i]) + size(ordered[i])));
+  return gaps.every((g) => Math.abs(g - gaps[0]) <= SAME_GAP_PX) ? gaps[0] : null;
+}
+
+const MIN_SPACED = 2;
+
+export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, axis: Axis, mode: EditMode, spacing?: number): OpResult {
+  if (ids.length < (spacing === undefined ? MIN_DISTRIBUTED : MIN_SPACED)) {
     return fail(`distribute needs at least ${MIN_DISTRIBUTED} clips`);
   }
   const bounds = boundsOf(doc, ids, frame, boxes);
@@ -146,7 +163,7 @@ export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: n
   const first = bounds.get(ordered[0])!;
   const last = bounds.get(ordered[ordered.length - 1])!;
   const sizes = ordered.map((id) => size(bounds.get(id)!));
-  const gap = (start(last) + size(last) - start(first) - sizes.reduce((a, b) => a + b, 0)) / (ordered.length - 1);
+  const gap = spacing ?? (start(last) + size(last) - start(first) - sizes.reduce((a, b) => a + b, 0)) / (ordered.length - 1);
   const moves = ordered.map((id, i): [string, Pt] => {
     const wanted = start(first) + sizes.slice(0, i).reduce((a, b) => a + b, 0) + gap * i;
     return [id, along(axis, wanted - start(bounds.get(id)!))];

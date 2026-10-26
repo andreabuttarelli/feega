@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { deleteAsset, insertAsset, listFontAssets, setAssetContent } from '$lib/server/repos/assets';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
-import { FONT_NAME } from '$lib/motion/fonts/model';
+import { FONT_NAME } from '@feega/motion-core/motion/fonts/model';
 import { familyFromFileName, fontFamilies, fontFileOf, type FontFamily, type FontFile } from '$lib/motion/fonts/library';
 import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
 import { readFontMeta } from './font-meta';

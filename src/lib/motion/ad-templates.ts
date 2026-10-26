@@ -1,7 +1,7 @@
-import { AssetKind, TrackKind } from './components';
-import { Ease, TransitionKind } from './design';
-import { MotionFormat, type MotionDoc } from './doc';
-import { MaskKind } from './mask';
+import { AssetKind, TrackKind } from '@feega/motion-core/motion/components';
+import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
+import { MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { MaskKind } from '@feega/motion-core/motion/mask';
 import { FADE_OUT, RISE, assemble, edge, type Beat, type TrackSpec } from './template-kit';
 import { TRAILER_V2_SECONDS, feegaTrailerV2 } from './trailer-v2';
 import { UI_RING_SECONDS, uiRing } from './ui-ring';

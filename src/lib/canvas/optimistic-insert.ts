@@ -1,6 +1,6 @@
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
-import { MOTION_NODE_BAR_H, atFirstRevision, motionNodeSize, drawnFrameNodeOf, elementNodeOf, frameNodeOf } from './motion-node';
-import { MotionFormat, type MotionDoc } from '$lib/motion/doc';
+import { MOTION_NODE_BAR_H, atFirstRevision, drawnFrameNodeOf, elementNodeOf, frameNodeOf } from './motion-node';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { drawnElement, drawnOf, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
 import { PENDING_FRAME_TYPE } from './pending-frame';
@@ -15,7 +15,7 @@ export function placedFrame(p: Placement): CanvasNodeRecord {
     id: p.id,
     canvasId: p.canvasId,
     projectId: p.projectId,
-    type: 'motion',
+    type: shaped.type,
     displayName: p.name,
     position: { ...p.at, z: 0 },
     size: { width: shaped.w, height: shaped.h },
@@ -59,6 +59,8 @@ const GHOST_SHAPE: Record<DrawnWire['tool'], (ghost: Ghost) => string> = {
   [DrawTool.Pen]: ({ wire, box }) => `<path d="${wire.tool === DrawTool.Pen ? wire.path : ''}" transform="translate(${-box.left} ${-box.top})" ${GHOST_PAINT}/>`,
   [DrawTool.Ellipse]: ({ box }) => `<ellipse cx="${box.width / 2}" cy="${box.height / 2}" rx="${box.width / 2}" ry="${box.height / 2}" ${GHOST_PAINT}/>`,
   [DrawTool.Rectangle]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_PAINT}/>`,
+  [DrawTool.Polygon]: ({ box }) => `<polygon points="${box.width / 2},0 ${box.width},${box.height} 0,${box.height}" ${GHOST_PAINT}/>`,
+  [DrawTool.Star]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_PAINT}/>`,
   [DrawTool.Text]: ghostText
 };
 
@@ -77,7 +79,7 @@ export function drawnTile(id: string, wire: DrawnWire): { node: CanvasNodeRecord
     id,
     canvasId: '',
     projectId: '',
-    type: 'motion',
+    type: shaped.type,
     displayName: null,
     position: { x: made.box.left, y: made.box.top, z: 0 },
     size: { width: shaped.w, height: shaped.h },
@@ -93,7 +95,7 @@ export function drawnFrameTile(id: string, box: CanvasBox): CanvasNodeRecord {
     id,
     canvasId: '',
     projectId: '',
-    type: 'motion',
+    type: shaped.type,
     displayName: null,
     position: { x: box.left, y: box.top, z: 0 },
     size: { width: shaped.w, height: shaped.h },
@@ -102,9 +104,14 @@ export function drawnFrameTile(id: string, box: CanvasBox): CanvasNodeRecord {
   };
 }
 
-export function defaultFrameBox(at: { x: number; y: number }): CanvasBox {
-  const node = motionNodeSize(MotionFormat.Landscape);
-  const width = node.w;
-  const height = node.h - MOTION_NODE_BAR_H;
+export const FIRST_FRAME_SIDE = 100;
+export const FRAME_GAP = 40;
+
+type Side = { width: number; height: number };
+
+export function defaultFrameBox(at: { x: number; y: number }, last: Side | null): CanvasBox {
+  const { width, height } = last ?? { width: FIRST_FRAME_SIDE, height: FIRST_FRAME_SIDE };
   return { left: at.x - width / 2, top: at.y - height / 2, width, height };
 }
+
+export const besideBox = (tile: { x: number; y: number; w: number; h: number }): CanvasBox => ({ left: tile.x + tile.w + FRAME_GAP, top: tile.y, width: tile.w, height: tile.h - MOTION_NODE_BAR_H });

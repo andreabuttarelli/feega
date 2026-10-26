@@ -15,7 +15,7 @@ import { saveMotionDoc, type AssetSigner } from '$lib/server/motion/editor';
 import { publishMotionEmbed } from '$lib/server/motion/agent-embed';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { motionEditorPath, newMotionData } from '$lib/canvas/motion-node';
-import { formatOf, parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { formatOf, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { docProblems } from '$lib/motion/direction';
 import { factsOf } from '$lib/gallery/model';
 import type { Actor } from '$lib/server/repos/actor';

@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { Corner } from './geometry';
-import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized } from './gesture';
+import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, resizedAt, rotateZoneAt } from './gesture';
 import { CanvasMode } from '../canvas-mode';
 
 const mouse = { pointer: Pointer.Mouse, button: 0, shift: false, space: false, mode: CanvasMode.Edit };
 
+const NO_KEYS = { shift: false, alt: false };
+
 describe('gestureFor — one row per way a press can start', () => {
   it('a press on a port starts a wire, on a corner a resize, on a node a drag', () => {
     expect(gestureFor({ kind: HitKind.Port, nodeId: 'a', handle: 'text' }, mouse)).toBe(GestureKind.Connect);
-    expect(gestureFor({ kind: HitKind.Corner, nodeId: 'a', corner: Corner.BottomRight }, mouse)).toBe(GestureKind.Resize);
+    expect(gestureFor({ kind: HitKind.Corner, nodeId: 'a', unit: [1, 1] }, mouse)).toBe(GestureKind.Resize);
     expect(gestureFor({ kind: HitKind.Node, nodeId: 'a' }, mouse)).toBe(GestureKind.Drag);
   });
 
@@ -62,6 +64,28 @@ describe('drag, resize, marquee', () => {
     expect(resized(box, Corner.TopLeft, { x: 90, y: 90 }, { w: 50, h: 50 })).toEqual({ x: 50, y: 50, w: 50, h: 50 });
   });
 
+  it('a side handle resizes only its side, the opposite side stays put', () => {
+    const box = { x: 0, y: 0, w: 100, h: 50 };
+    expect(resizedAt(box, [1, 0.5], { x: 30, y: 40 }, { w: 1, h: 1 }, NO_KEYS, 0)).toEqual({ x: 0, y: 0, w: 130, h: 50 });
+    expect(resizedAt(box, [0.5, 0], { x: 30, y: 10 }, { w: 1, h: 1 }, NO_KEYS, 0)).toEqual({ x: 0, y: 10, w: 100, h: 40 });
+  });
+
+  it('Alt resizes from the centre, Shift keeps the ratio', () => {
+    const box = { x: 0, y: 0, w: 100, h: 50 };
+    expect(resizedAt(box, [1, 0.5], { x: 20, y: 0 }, { w: 1, h: 1 }, { shift: false, alt: true }, 0)).toEqual({ x: -20, y: 0, w: 140, h: 50 });
+    expect(resizedAt(box, [1, 0.5], { x: 100, y: 0 }, { w: 1, h: 1 }, { shift: true, alt: false }, 0)).toEqual({ x: 0, y: -25, w: 200, h: 100 });
+  });
+
+  it('a rotated box keeps its opposite side fixed in the world', () => {
+    const box = { x: 0, y: 0, w: 100, h: 50 };
+    const out = resizedAt(box, [1, 0.5], { x: 0, y: 20 }, { w: 1, h: 1 }, NO_KEYS, 90);
+    expect(out.w).toBeCloseTo(120);
+    expect(out.h).toBeCloseTo(50);
+    const leftMid = (b: typeof box) => ({ x: b.x + b.w / 2 - Math.cos(Math.PI / 2) * (b.w / 2), y: b.y + b.h / 2 - Math.sin(Math.PI / 2) * (b.w / 2) });
+    expect(leftMid(out).x).toBeCloseTo(leftMid(box).x);
+    expect(leftMid(out).y).toBeCloseTo(leftMid(box).y);
+  });
+
   it('a marquee picks every tile it touches, added to the selection with shift', () => {
     const tiles = [
       { id: 'a', x: 0, y: 0, w: 10, h: 10 },
@@ -71,5 +95,39 @@ describe('drag, resize, marquee', () => {
     expect(box).toEqual({ x: 5, y: 5, w: 10, h: 10 });
     expect(marqueePick(tiles, box, [], false)).toEqual(['a']);
     expect(marqueePick(tiles, box, ['b'], true)).toEqual(['b', 'a']);
+  });
+});
+
+describe('rotateZoneAt — the invisible zone just outside a corner', () => {
+  const box = { x: 0, y: 0, w: 100, h: 50 };
+
+  it('finds the corner a point lies beyond', () => {
+    expect(rotateZoneAt(box, 0, { x: 110, y: 60 }, 1)).toEqual([1, 1]);
+    expect(rotateZoneAt(box, 0, { x: -10, y: -10 }, 1)).toEqual([-1, -1]);
+    expect(rotateZoneAt(box, 0, { x: 110, y: -10 }, 1)).toEqual([1, -1]);
+    expect(rotateZoneAt(box, 0, { x: -10, y: 60 }, 1)).toEqual([-1, 1]);
+  });
+
+  it('leaves the inside, the sides and the far field alone', () => {
+    expect(rotateZoneAt(box, 0, { x: 50, y: 25 }, 1)).toBeNull();
+    expect(rotateZoneAt(box, 0, { x: 110, y: 25 }, 1)).toBeNull();
+    expect(rotateZoneAt(box, 0, { x: 150, y: 100 }, 1)).toBeNull();
+  });
+
+  it('keeps its size on screen at any zoom', () => {
+    expect(rotateZoneAt(box, 0, { x: 110, y: 60 }, 2)).toBeNull();
+    expect(rotateZoneAt(box, 0, { x: 105, y: 55 }, 2)).toEqual([1, 1]);
+    expect(rotateZoneAt(box, 0, { x: 130, y: 80 }, 0.5)).toEqual([1, 1]);
+  });
+
+  it('turns with the object about its centre', () => {
+    expect(rotateZoneAt(box, 90, { x: 85, y: -35 }, 1)).toEqual([-1, -1]);
+    expect(rotateZoneAt(box, 90, { x: 110, y: 60 }, 1)).toBeNull();
+  });
+});
+
+describe('gestureFor — rotate', () => {
+  it('a press in a rotate zone starts a rotation', () => {
+    expect(gestureFor({ kind: HitKind.Rotate, nodeId: 'a', unit: [1, 1] }, mouse)).toBe(GestureKind.Rotate);
   });
 });

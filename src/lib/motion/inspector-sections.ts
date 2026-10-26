@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { ClipFamily } from './track-style';
 import type { LayoutStore } from './editor-layout';
-import { Control, Group } from './components';
-import { VAR_PREFIX } from './custom/component';
+import { Control, Group } from '@feega/motion-core/motion/components';
+import { VAR_PREFIX } from '@feega/motion-core/motion/custom/component';
 import { FieldFill } from './number-field';
-import { Source, type Transform } from './keyframes';
+import { Source, type Transform } from '@feega/motion-core/motion/keyframes';
 import { secondsLabel } from './inspector';
-import { clipName } from './organize';
-import type { MotionClip } from './doc';
+import { clipName } from '@feega/motion-core/motion/organize';
+import type { MotionClip } from '@feega/motion-core/motion/doc';
 
 export enum Section {
   Content = 'content',
@@ -120,7 +120,7 @@ const GROUP_SECTION: Record<Group, Section> = {
   [Group.Camera]: Section.ThreeD
 };
 
-const TEXT_KEYS: ReadonlySet<string> = new Set(['font', 'weight', 'fontWeight', 'italic', 'size', 'tracking', 'leading', 'textCase', 'stretch', 'slant', 'axes', 'align', 'sizing']);
+const TEXT_KEYS: ReadonlySet<string> = new Set(['font', 'weight', 'fontWeight', 'italic', 'size', 'tracking', 'leading', 'textCase', 'stretch', 'slant', 'axes', 'align', 'sizing', 'verticalAlign', 'paragraphSpacing', 'paragraphIndent', 'lineHeight', 'letterSpacing', 'maxLines', 'textWrap', 'leadingTrim', 'decoration', 'decorationStyle', 'decorationThickness', 'decorationOffset', 'decorationColor', 'skipInk', 'features']);
 
 const KEY_SECTION: Record<string, Section> = {
   opacity: Section.Layer,
@@ -192,6 +192,8 @@ const LOOKS: Record<string, Partial<FieldLook>> = {
   size: { short: 'Size' },
   tracking: { short: 'Spacing', unit: EM },
   leading: { short: 'Line', unit: TIMES },
+  paragraphSpacing: { short: 'Paragraph', unit: EM },
+  paragraphIndent: { short: 'Indent', unit: EM },
   rotateX: { short: 'Tilt X', unit: DEGREES },
   rotateY: { short: 'Tilt Y', unit: DEGREES },
   rotateZ: { short: 'Rotate', unit: DEGREES },

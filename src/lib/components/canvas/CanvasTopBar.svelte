@@ -1,4 +1,5 @@
 <script lang="ts">
+  import History from '@lucide/svelte/icons/history';
   import { _ } from 'svelte-i18n';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import { cn } from '$lib/utils';
@@ -11,12 +12,7 @@
   import ConnectionDot from './ConnectionDot.svelte';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { ShareState } from '$lib/canvas/shared-view';
-  import { openSheet } from '$lib/canvas/sheet-nav';
   import { BILLING_PATH } from '$lib/billing-path';
-  import Megaphone from '@lucide/svelte/icons/megaphone';
-  import { page } from '$app/state';
-  import { SOCIAL_PUBLISHING_SURFACE, shownUnder } from '$lib/social-publishing';
-  import { canvasSelection, promotePath } from '$lib/canvas/promote-sheet';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
   import { CanvasAction, submitCanvasAction, renameProjectAction } from '$lib/canvas/canvas-list';
   import Plus from '@lucide/svelte/icons/plus';
@@ -29,7 +25,9 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { matching, needsSearch, recentFirst } from '$lib/canvas/switcher-list';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import FeegaFile from './FeegaFile.svelte';
+  import Download from '@lucide/svelte/icons/download';
+  import Upload from '@lucide/svelte/icons/upload';
   import { Capability, modeAllows, modeOf, ProjectMode } from '$lib/project-mode';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string; mode?: string };
@@ -59,7 +57,10 @@
     profile,
     org,
     projectMode = ProjectMode.Standard,
-    brandName = null
+    brandName = null,
+    onVersions = null,
+    onComments = null,
+    commentsUnseen = false
   }: {
     projectId: string;
     projectName: string;
@@ -76,6 +77,9 @@
     org: { name: string } | null;
     projectMode?: string;
     brandName?: string | null;
+    onVersions?: (() => void) | null;
+    onComments?: (() => void) | null;
+    commentsUnseen?: boolean;
   } = $props();
 
   const ICON = 16;
@@ -116,6 +120,8 @@
   }
   const inUncensored = $derived(projectMode === ProjectMode.Uncensored);
   const mode = $derived(modeOf(projectMode));
+
+  let feegaFile = $state<FeegaFile | null>(null);
 
   let renaming = $state(false);
   let draftName = $state('');
@@ -207,7 +213,7 @@
     </DropdownMenu.Root>
     {/if}
 
-    <div class="canvas-title" class:centred={!inlineStage.editing} data-testid="canvas-title">
+    <div class="canvas-title centred" data-testid="canvas-title">
     <span class="sep">/</span>
 
     {#if renaming}
@@ -225,6 +231,7 @@
     <DropdownMenu.Root>
       <DropdownMenu.Trigger class="switcher-btn" data-testid="canvas-switcher" title={canvasName}>
         <span class="truncate canvas-name">{canvasName}</span>
+        {#if commentsUnseen}<span class="unseen-dot" data-testid="comments-unseen" role="img" aria-label="Unread mention"></span>{/if}
         <ChevronDown size={ICON} />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="start" collisionPadding={EDGE} class="sw-menu w-[300px]">
@@ -287,9 +294,30 @@
           </div>
         {/each}
         <DropdownMenu.Separator />
+        {#if onVersions}
+          <DropdownMenu.Item class="sw-row" data-testid="canvas-versions" onSelect={onVersions}>
+            <span class="sw-lead"><History size={ICON} /></span>
+            Versions…
+          </DropdownMenu.Item>
+        {/if}
+        {#if onComments}
+          <DropdownMenu.Item class="sw-row" data-testid="canvas-comments" onSelect={onComments}>
+            <span class="sw-lead"><MessageSquare size={ICON} /></span>
+            Comments
+            {#if commentsUnseen}<span class="unseen-dot" role="img" aria-label="Unread mention"></span>{/if}
+          </DropdownMenu.Item>
+        {/if}
         <DropdownMenu.Item class="sw-row" data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>
           <span class="sw-lead"><Plus size={ICON} /></span>
           {$_('app.shell.canvasActions.new')}
+        </DropdownMenu.Item>
+        <DropdownMenu.Item class="sw-row" data-testid="canvas-import-feega" onSelect={() => feegaFile?.pick()}>
+          <span class="sw-lead"><Upload size={ICON} /></span>
+          Import .feega…
+        </DropdownMenu.Item>
+        <DropdownMenu.Item class="sw-row" data-testid="canvas-save-feega" onSelect={() => feegaFile?.save()}>
+          <span class="sw-lead"><Download size={ICON} /></span>
+          Download .feega
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
@@ -324,6 +352,8 @@
     </div>
   {/snippet}
 
+  <FeegaFile bind:this={feegaFile} page={canvasHref} />
+
   <ConfirmDialog
     bind:open={confirmingDelete}
     title={$_('app.shell.canvasActions.confirmDeleteTitle')}
@@ -336,24 +366,12 @@
   <div class="top-slot" data-top-slot></div>
   <div class="top-box right">
     <div class="top-peers" data-top-peers></div>
-    {#if $canvasLink && !inlineStage.editing}
+    {#if $canvasLink}
       <ConnectionDot state={$canvasLink} />
     {/if}
     <a href={BILLING_PATH} class="credits">
       <CreditAmount amount={creditBalance} />
     </a>
-
-    {#if modeAllows(mode, Capability.Promote) && shownUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.topBarActions, 'promote')}
-      <button
-        type="button"
-        class="promote-btn"
-        data-testid="topbar-promote"
-        onclick={() => openSheet(projectId, promotePath($canvasSelection))}
-      >
-        <Megaphone size={14} />
-        Promote
-      </button>
-    {/if}
 
     {#if modeAllows(mode, Capability.Share)}
       <CanvasShare {shareToken} {onShare} />
@@ -372,6 +390,15 @@
 </header>
 
 <style>
+  .unseen-dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-left: 4px;
+    background: #0b6bff;
+    border-radius: 9999px;
+  }
+
   .canvas-topbar {
     position: relative;
     z-index: 20;
@@ -535,23 +562,6 @@
     color: var(--ui-accent-text);
   }
 
-
-  .promote-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 10px;
-    flex-shrink: 0;
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-input);
-    color: var(--ui-text);
-    font: inherit;
-    font-size: var(--ui-type-label);
-    font-weight: var(--ui-weight-semibold);
-    cursor: pointer;
-  }
 
   .credits {
     display: inline-flex;

@@ -1,4 +1,4 @@
-import type { ShaderNode } from './preset';
+import type { ShaderNode } from '@feega/motion-core/motion/shader-effects/preset';
 
 export type Definition = { name: string; fragment: unknown; props: Record<string, { default?: unknown }> };
 

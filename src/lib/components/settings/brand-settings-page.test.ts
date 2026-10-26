@@ -11,7 +11,7 @@ const routeDir = (section: string) =>
  * `brands` was cut down to logo, name, slug, website, short description, content — no palette,
  * target audience, voice, hashtags, fonts, platforms, timezone. The routes that edited those
  * fields (and the `people` / talent feature) are gone with the columns; this test keeps them
- * from coming back as a dangling route, a nav entry or a dead link in the warnings banner.
+ * from coming back as a dangling route or a nav entry.
  */
 const REMOVED = ['platforms', 'hashtags', 'voice-examples', 'timezone', 'people'];
 
@@ -45,18 +45,5 @@ describe('la pagina brand mostra solo le colonne vere', () => {
   it('mostra uno stato vuoto quando il progetto non ha un brand', () => {
     const page = read('../../../routes/p/[projectId]/settings/brand/+page.svelte');
     expect(page).toContain('!data.brand');
-  });
-
-  /**
-   * Un avviso che punta a una rotta cancellata è un 404 che non fallisce nessun test di import:
-   * il link è una stringa. `dead-links.test.ts` tiene fermo che nessun link vivo punti a una
-   * rotta assente.
-   */
-  it('non lascia link a rotte cancellate negli avvisi', () => {
-    const source = read('../../warnings.ts');
-
-    for (const section of REMOVED) {
-      expect(source, `punta ancora a settings/${section}`).not.toContain(`/settings/${section}`);
-    }
   });
 });

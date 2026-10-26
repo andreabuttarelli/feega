@@ -1,11 +1,11 @@
-import type { MotionClip, MotionDoc } from './doc';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { CURSOR_PIECE, anchorBox, anchorsOf, startOf, type Box, type Point } from './clicks';
-import { Ease } from './design';
-import { TRANSFORM, type Keyframe } from './keyframes';
-import { MaskKind, type MaskKey } from './mask';
-import { pivotBox, pivotOf, transformAt } from './parent';
-import { sampleTrack } from './sample-track';
-import { setKeyframes, setMask, type OpResult } from './timeline';
+import { Ease } from '@feega/motion-core/motion/design';
+import { TRANSFORM, type Keyframe } from '@feega/motion-core/motion/keyframes';
+import { MaskKind, type MaskKey } from '@feega/motion-core/motion/mask';
+import { pivotBox, pivotOf, transformAt } from '@feega/motion-core/motion/parent';
+import { sampleTrack } from '@feega/motion-core/motion/sample-track';
+import { setKeyframes, setMask, type OpResult } from '@feega/motion-core/motion/timeline';
 import type { Rect } from './ui-kit/anchors';
 
 export enum Isolate {

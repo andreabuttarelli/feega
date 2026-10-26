@@ -6,15 +6,16 @@
     tiltX = $bindable(0),
     tiltY = $bindable(0),
     clipId,
+    tilt = true,
     onpreset
-  }: { active?: boolean; tiltX?: number; tiltY?: number; clipId: string | null; onpreset: (preset: InteractivePreset) => void } = $props();
+  }: { active?: boolean; tiltX?: number; tiltY?: number; tilt?: boolean; clipId: string | null; onpreset: (preset: InteractivePreset) => void } = $props();
 </script>
 
 <div class="interactive" data-testid="interactive-panel">
-  <button type="button" class="toggle" aria-pressed={active} onclick={() => (active = !active)} data-testid="interactive-toggle">Interactive preview</button>
+  {#if tilt}<button type="button" class="toggle" aria-pressed={active} onclick={() => (active = !active)} data-testid="interactive-toggle">Interactive preview</button>{/if}
   {#if active}
-    <label>Tilt X <input type="range" min="-1" max="1" step="0.01" bind:value={tiltX} data-testid="tilt-x" /></label>
-    <label>Tilt Y <input type="range" min="-1" max="1" step="0.01" bind:value={tiltY} data-testid="tilt-y" /></label>
+    {#if tilt}<label>Tilt X <input type="range" min="-1" max="1" step="0.01" bind:value={tiltX} data-testid="tilt-x" /></label>
+    <label>Tilt Y <input type="range" min="-1" max="1" step="0.01" bind:value={tiltY} data-testid="tilt-y" /></label>{/if}
     {#each INTERACTIVE_PRESETS as preset (preset)}
       <button type="button" disabled={PRESET[preset].clip && !clipId} title={PRESET[preset].about} onclick={() => onpreset(preset)} data-testid={`preset-${preset}`}>{PRESET[preset].label}</button>
     {/each}

@@ -1,8 +1,8 @@
-import type { MotionDoc } from '../doc';
-import { FillType } from '../fill/model';
-import { ShapeKind } from '../shape/schema';
-import { StrokeAlign } from '../stroke/model';
-import { addClip, type OpResult } from '../timeline';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
+import { StrokeAlign } from '@feega/motion-core/motion/stroke/model';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { ICON_PATHS } from './paths';
 
 export const ICON_NAMES = Object.keys(ICON_PATHS);

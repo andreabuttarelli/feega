@@ -1,10 +1,11 @@
 <script lang="ts">
   import IconButton from './IconButton.svelte';
+  import type { Component } from 'svelte';
   import { Action, guideSections } from '$lib/motion/actions';
 
-  let { onclose }: { onclose: () => void } = $props();
+  type HelpRow = { id: string; name: string; icon?: Component; keys: string; gesture: string };
 
-  const sections = guideSections();
+  let { onclose, sections = guideSections() }: { onclose: () => void; sections?: { group: string; rows: HelpRow[] }[] } = $props();
 </script>
 
 <button type="button" class="scrim" aria-label="Close" onclick={onclose}></button>
@@ -22,7 +23,7 @@
           {#each section.rows as row (row.id)}
             {@const Icon = row.icon}
             <li data-action={row.id}>
-              <span class="icon"><Icon size={14} /></span>
+              <span class="icon">{#if Icon}<Icon size={14} />{/if}</span>
               <span class="name">{row.name}</span>
               <span class="keys">{#each row.keys.split(' ').filter(Boolean) as key (key)}<kbd>{key}</kbd>{/each}</span>
               <span class="gesture">{row.gesture}</span>

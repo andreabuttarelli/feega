@@ -1,9 +1,10 @@
-import { tool, type Tool } from 'ai';
+import type { Tool } from 'ai';
+import { ToolAccess, ToolFamily, toolsOf, type ToolRow } from '$lib/server/edit/tool-row';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
-import { MOTION_FORMATS, type MotionFormat } from '$lib/motion/doc';
+import { MOTION_FORMATS, type MotionFormat } from '@feega/motion-core/motion/doc';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { Preset, settingsOf } from '$lib/motion/export-formats';
 import { findMotionNode } from '$lib/server/motion/editor';
@@ -16,6 +17,7 @@ import { MAX_FRAMES_PER_VIEW } from '$lib/server/motion/frames';
 import { framePaths, framesPrefix, putFrames, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { motionEmbedState, publishMotionEmbed, type EmbedAnswer } from '$lib/server/motion/agent-embed';
+import { shareMotionFrame } from '$lib/server/motion/agent-share';
 
 const PICK_RELAY = 'The motion agent asks the user which references to follow: call ask_reference_pick with this question and these candidates (same ids) so the user picks here, then pass their answer to ask_motion_agent as reference_pick (follow and avoid ids, note; or rejected true with their query and avoid_all when they turned them all down).';
 
@@ -45,7 +47,8 @@ export const MOTION_DELEGATION_TOOLS = [
   'render_motion_video',
   'get_motion_render',
   'publish_motion_embed',
-  'get_motion_embed'
+  'get_motion_embed',
+  'share_motion_frame'
 ] as const;
 
 export type MotionDelegationDeps = { db: Db; orgId: string; projectId: string; userId: string; origin: string; model?: string; canvasId?: string | null; pollMs?: number };
@@ -90,7 +93,7 @@ const VIEW_PREFIX = 'view-';
 
 const mediaLine = (media: Asset[]) => `Media from the canvas to use (asset ids in list_assets): ${media.map((a) => `${a.id} (${a.type})`).join(', ')}.`;
 
-export function createMotionDelegation(deps: MotionDelegationDeps): Record<string, Tool> {
+export function motionRows(deps: MotionDelegationDeps): ToolRow[] {
   const { db, orgId, projectId, userId } = deps;
   const actor = agentActor(userId, SIDEBAR_AGENT_KEY);
   const pollMs = deps.pollMs ?? POLL_MS;
@@ -141,20 +144,26 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
     return relayed(state);
   }
 
-  return {
-    list_motion_videos: tool({
-      description: 'List the motion videos of THIS project: node id, name, format, revision, poster and editor_url. Free.',
-      inputSchema: z.object({}).strict(),
-      execute: async () => ({ videos: await listMotionVideos(db, { orgId, projectId }) })
-    }),
+  return [
+    {
+      name: 'list_motion_videos',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Read,
+      summary: 'List the motion videos of THIS project: node id, name, format, revision, poster and editor_url. Free.',
+      input: z.object({}).strict(),
+      run: async () => ({ videos: await listMotionVideos(db, { orgId, projectId }) })
+    },
 
-    create_motion_video: tool({
-      description: [
+    {
+      name: 'create_motion_video',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Spend,
+      summary: [
         'Create a new motion video node on a canvas of THIS project (default: the canvas the user has open, else the "Motion" canvas), placed to the right of the nodes listed in near.',
         'With a brief, the motion agent starts building it right away (costs credits, only when the user asked): poll get_motion_run with the returned run_id.',
         'media: node or asset ids whose image, video or audio the motion agent should use.'
       ].join(' '),
-      inputSchema: z
+      input: z
         .object({
           name: z.string().min(1).max(80),
           canvasId: z.string().optional(),
@@ -164,7 +173,7 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
           media: z.array(z.string()).optional()
         })
         .strict(),
-      execute: async (input: { name: string; canvasId?: string; format?: MotionFormat; near?: string[]; brief?: string; media?: string[] }) => {
+      run: async (input: { name: string; canvasId?: string; format?: MotionFormat; near?: string[]; brief?: string; media?: string[] }) => {
         const started = await startMotion(db, MOTION_START_DEPS, { orgId, projectId, canvasId: input.canvasId ?? deps.canvasId ?? null, userId, name: input.name, format: input.format, near: input.near, actor });
         if (!started) {
           return { error: 'canvas_not_found', message: 'No canvas with that id in this project.' };
@@ -172,27 +181,36 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
         const created = { node_id: started.nodeId, canvas_id: started.canvasId, editor_url: motionEditorPath(started) };
         return input.brief ? { ...created, ...(await ask(started.nodeId, input.brief, input.media)) } : created;
       }
-    }),
+    },
 
-    ask_motion_agent: tool({
-      description: [
+    {
+      name: 'ask_motion_agent',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Spend,
+      summary: [
         'Hand a request to the motion editor agent for one motion video of THIS project: it writes the video itself, in the editor thread, and costs credits like the editor — only when the user asked.',
         'Runs in the background: poll get_motion_run with the returned run_id. media: node or asset ids of the canvas whose image, video or audio it should use.'
       ].join(' '),
-      inputSchema: z.object({ nodeId: z.string(), request: z.string().min(1).max(8000), media: z.array(z.string()).optional(), reference_pick: pickReplySchema.optional() }).strict(),
-      execute: async (input: { nodeId: string; request: string; media?: string[]; reference_pick?: PickReply }) => ask(input.nodeId, input.request, input.media, input.reference_pick)
-    }),
+      input: z.object({ nodeId: z.string(), request: z.string().min(1).max(8000), media: z.array(z.string()).optional(), reference_pick: pickReplySchema.optional() }).strict(),
+      run: async (input: { nodeId: string; request: string; media?: string[]; reference_pick?: PickReply }) => ask(input.nodeId, input.request, input.media, input.reference_pick)
+    },
 
-    get_motion_run: tool({
-      description: `State of a motion agent run: waits up to waitSeconds (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S}) for it to finish. Done: reply and summary say what changed — tell the user, with the editor_url link. Still running: say so and that the video keeps building; poll again if the user waits.`,
-      inputSchema: z.object({ runId: z.string(), waitSeconds: z.number().min(0).max(MAX_WAIT_S).optional() }).strict(),
-      execute: async (input: { runId: string; waitSeconds?: number }) => settled(input.runId, input.waitSeconds ?? DEFAULT_WAIT_S)
-    }),
+    {
+      name: 'get_motion_run',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Read,
+      summary: `State of a motion agent run: waits up to waitSeconds (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S}) for it to finish. Done: reply and summary say what changed — tell the user, with the editor_url link. Still running: say so and that the video keeps building; poll again if the user waits.`,
+      input: z.object({ runId: z.string(), waitSeconds: z.number().min(0).max(MAX_WAIT_S).optional() }).strict(),
+      run: async (input: { runId: string; waitSeconds?: number }) => settled(input.runId, input.waitSeconds ?? DEFAULT_WAIT_S)
+    },
 
-    view_motion_frames: tool({
-      description: `Look at a saved motion video of THIS project: up to ${MAX_FRAMES_PER_VIEW} frames at the given seconds, drawn on the server, with the quality gate (quality, blocking). Free. Use it to check what the motion agent built before telling the user.`,
-      inputSchema: z.object({ nodeId: z.string(), times: z.array(z.number().min(0)).min(1).max(MAX_FRAMES_PER_VIEW) }).strict(),
-      execute: async (input: { nodeId: string; times: number[] }, { toolCallId }) => {
+    {
+      name: 'view_motion_frames',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Read,
+      summary: `Look at a saved motion video of THIS project: up to ${MAX_FRAMES_PER_VIEW} frames at the given seconds, drawn on the server, with the quality gate (quality, blocking). Free. Use it to check what the motion agent built before telling the user.`,
+      input: z.object({ nodeId: z.string(), times: z.array(z.number().min(0)).min(1).max(MAX_FRAMES_PER_VIEW) }).strict(),
+      run: async (input: { nodeId: string; times: number[] }, { toolCallId }) => {
         if (!(await inProject(input.nodeId))) {
           return NOT_FOUND;
         }
@@ -206,39 +224,62 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
         return { ...drawn.body, frames: kept ?? images.map((f) => ({ time: f.time, path: null })) };
       },
       toModelOutput: ({ toolCallId, output }) => framesForModel(output, drawnByCall.get(toolCallId))
-    }),
+    },
 
-    render_motion_video: tool({
-      description: 'Export a motion video of THIS project to MP4 1080p. Returns a render_url the user opens to render it in their browser, and its credits. Only when the user asked.',
-      inputSchema: z.object({ nodeId: z.string() }).strict(),
-      execute: async (input: { nodeId: string }) => {
+    {
+      name: 'render_motion_video',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Spend,
+      summary: 'Export a motion video of THIS project to MP4 1080p. Returns a render_url the user opens to render it in their browser, and its credits. Only when the user asked.',
+      input: z.object({ nodeId: z.string() }).strict(),
+      run: async (input: { nodeId: string }) => {
         if (!(await inProject(input.nodeId))) {
           return NOT_FOUND;
         }
         const asked = await requestRender(db, { orgId, userId, nodeId: input.nodeId, mode: RenderMode.Browser, settings: settingsOf(Preset.Social), origin: deps.origin, actor });
         return asked.ok ? asked.body : { error: asked.error, detail: asked.detail };
       }
-    }),
+    },
 
-    get_motion_render: tool({
-      description: 'State of a render started with render_motion_video: status, progress and file_url once done.',
-      inputSchema: z.object({ runId: z.string() }).strict(),
-      execute: async (input: { runId: string }) => {
+    {
+      name: 'get_motion_render',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Read,
+      summary: 'State of a render started with render_motion_video: status, progress and file_url once done.',
+      input: z.object({ runId: z.string() }).strict(),
+      run: async (input: { runId: string }) => {
         const state = await renderState(db, { orgId, runId: input.runId });
         return state.ok ? state.body : { error: state.error };
       }
-    }),
+    },
 
-    publish_motion_embed: tool({
-      description: 'Publish a motion video of THIS project as an embeddable interactive page: returns its public url and a two-line loader snippet. Only when the user asked. Refused for content the moderation refuses.',
-      inputSchema: z.object({ nodeId: z.string() }).strict(),
-      execute: async (input: { nodeId: string }) => ((await inProject(input.nodeId)) ? embedBody(await publishMotionEmbed(db, { orgId, nodeId: input.nodeId }, deps.origin)) : NOT_FOUND)
-    }),
+    {
+      name: 'publish_motion_embed',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Write,
+      summary: 'Publish a motion video of THIS project as an embeddable interactive page: returns its public url and a two-line loader snippet. Only when the user asked. Refused for content the moderation refuses.',
+      input: z.object({ nodeId: z.string() }).strict(),
+      run: async (input: { nodeId: string }) => ((await inProject(input.nodeId)) ? embedBody(await publishMotionEmbed(db, { orgId, nodeId: input.nodeId }, deps.origin)) : NOT_FOUND)
+    },
 
-    get_motion_embed: tool({
-      description: 'Whether a motion video of THIS project is published as an embed, with its url and snippet. Free.',
-      inputSchema: z.object({ nodeId: z.string() }).strict(),
-      execute: async (input: { nodeId: string }) => ((await inProject(input.nodeId)) ? embedBody(await motionEmbedState(db, { orgId, nodeId: input.nodeId }, deps.origin)) : NOT_FOUND)
-    })
-  };
+    {
+      name: 'get_motion_embed',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Read,
+      summary: 'Whether a motion video of THIS project is published as an embed, with its url and snippet. Free.',
+      input: z.object({ nodeId: z.string() }).strict(),
+      run: async (input: { nodeId: string }) => ((await inProject(input.nodeId)) ? embedBody(await motionEmbedState(db, { orgId, nodeId: input.nodeId }, deps.origin)) : NOT_FOUND)
+    },
+
+    {
+      name: 'share_motion_frame',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Write,
+      summary: 'The public viewer link of ONE frame of THIS project: a full-screen page that plays it on a loop. Publishes its embed if needed and turns the canvas share link on; returns url and embed_url. Only when the user asked to share. Free.',
+      input: z.object({ nodeId: z.string() }).strict(),
+      run: async (input: { nodeId: string }) => ((await inProject(input.nodeId)) ? embedBody(await shareMotionFrame(db, { orgId, nodeId: input.nodeId }, deps.origin)) : NOT_FOUND)
+    }
+  ];
 }
+
+export const createMotionDelegation = (deps: MotionDelegationDeps): Record<string, Tool> => toolsOf(motionRows(deps));

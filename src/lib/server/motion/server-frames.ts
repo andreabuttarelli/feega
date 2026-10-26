@@ -1,4 +1,4 @@
-import { composeHtml, type ComposeInput } from '$lib/motion/hyperframes/compose';
+import { composeHtml, type ComposeInput } from '@feega/motion-core/motion/hyperframes/compose';
 import type { Frame } from './frames';
 import { libsOrigin } from './libs-origin';
 
@@ -23,7 +23,6 @@ export type StillPort = { open: (viewport: Viewport) => Promise<StillPage> };
 export type PageBox = { left: number; top: number; width: number; height: number };
 
 export type ExportPage = StillPage & {
-  freeze: () => Promise<string>;
   boxOf: (clipId: string) => Promise<PageBox | null>;
   shot: (mime: string, quality: number | undefined, clip: PageBox | null) => Promise<Buffer>;
 };

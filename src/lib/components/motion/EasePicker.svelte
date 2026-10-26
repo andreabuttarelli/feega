@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { EASE_IDS, EASE_LABEL } from '$lib/motion/design';
-  import { INTERPS, INTERP_LABEL, Interp, type Bezier, type EaseSpec } from '$lib/motion/keyframes';
+  import { KEY_EASE_IDS, EASE_LABEL } from '@feega/motion-core/motion/design';
+  import { easeCss } from '$lib/motion/ease-css';
+  import { DEFAULT_INTENSITY, INTERPS, INTERP_LABEL, Interp, isSpring, type Bezier, type EaseSpec } from '@feega/motion-core/motion/keyframes';
   import { KeySide, easePath } from '$lib/motion/timeline-view';
   import { parseDecimal } from '$lib/motion/inspector';
 
@@ -12,13 +13,24 @@
 
   let {
     ease,
+    intensity,
     kinds = { [KeySide.Out]: Interp.Bezier, [KeySide.In]: Interp.Bezier },
     onpick,
     onkind,
     onclose
-  }: { ease: EaseSpec; kinds?: Record<KeySide, Interp>; onpick: (ease: EaseSpec) => void; onkind?: (side: KeySide, kind: Interp) => void; onclose: () => void } = $props();
+  }: { ease: EaseSpec; intensity?: number; kinds?: Record<KeySide, Interp>; onpick: (ease: EaseSpec, intensity?: number) => void; onkind?: (side: KeySide, kind: Interp) => void; onclose: () => void } = $props();
 
   const bezier = $derived<Bezier>(typeof ease === 'string' ? DEFAULT_BEZIER : ease);
+
+  const level = $derived(intensity ?? DEFAULT_INTENSITY);
+
+  function pickNamed(id: EaseSpec) {
+    onpick(id, isSpring(id) ? level : undefined);
+  }
+
+  async function copyCss() {
+    await navigator.clipboard.writeText(easeCss(ease, level));
+  }
 
   function setPoint(index: number, text: string) {
     const parsed = parseDecimal(text);
@@ -36,13 +48,19 @@
     <path d={easePath(ease, PREVIEW_PX)} />
   </svg>
   <div class="named">
-    {#each EASE_IDS as id (id)}
-      <button type="button" class:on={ease === id} title={EASE_LABEL[id]} onclick={() => onpick(id)}>
+    {#each KEY_EASE_IDS as id (id)}
+      <button type="button" class:on={ease === id} title={EASE_LABEL[id]} onclick={() => pickNamed(id)}>
         <svg width={CURVE_PX} height={CURVE_PX} viewBox={`-1 -1 ${CURVE_PX + 2} ${CURVE_PX + 2}`}><path d={easePath(id, CURVE_PX)} /></svg>
         <span>{EASE_LABEL[id]}</span>
       </button>
     {/each}
   </div>
+  {#if isSpring(ease)}
+    <label class="intensity">
+      <span>Intensity</span>
+      <input type="range" min="0" max="1" step="0.05" value={level} aria-label="Intensity" oninput={(e) => onpick(ease, Number(e.currentTarget.value))} />
+    </label>
+  {/if}
   {#if onkind}
     {#each Object.values(KeySide) as side (side)}
       <div class="kinds" role="group" aria-label={SIDE_LABEL[side]} data-key-side={side}>
@@ -59,7 +77,10 @@
       <input type="text" inputmode="decimal" aria-label={`Bezier ${i + 1}`} value={String(point)} onchange={(e) => setPoint(i, e.currentTarget.value)} />
     {/each}
   </div>
-  <button type="button" class="close" onclick={onclose}>Done</button>
+  <div class="actions">
+    <button type="button" onclick={copyCss}>Copy as CSS</button>
+    <button type="button" class="close" onclick={onclose}>Done</button>
+  </div>
 </div>
 
 <style>
@@ -91,7 +112,7 @@
 
   .named {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 3px;
   }
 
@@ -159,8 +180,24 @@
     font: inherit;
   }
 
-  .close {
-    align-self: flex-end;
+  .intensity {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--ui-mono);
+    color: var(--ui-ink-2);
+  }
+
+  .intensity input {
+    flex: 1;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .actions button {
     padding: 2px 8px;
     border: 1px solid var(--ui-line);
   }

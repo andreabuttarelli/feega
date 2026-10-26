@@ -11,7 +11,7 @@ import { readHead } from '$lib/server/repos/motion-revisions';
 import { FramesFailure, motionFrames } from '$lib/server/motion/agent-frames';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { remoteFramesWhenClosed } from './frames-source';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { detailOf, elementsOf, summarizeCanvas } from './canvas-summary';
 import type { Answer } from './runners';
 

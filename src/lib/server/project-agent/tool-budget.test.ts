@@ -3,37 +3,61 @@ import { asSchema, type Tool } from 'ai';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { createProjectTools } from './project-tools';
 import { createMotionDelegation } from './motion-delegation';
-import { createFrameTools } from './frame-tools';
-import { motionToolList, motionToolSpec } from '$lib/server/motion/tool-run';
+import { frameRunner } from './frame-tools';
+import { LOADED_CAP, LOAD_TOOLS, ToolLoading, frameSurface } from './tool-loading';
 
 const SCOPE = { orgId: 'o', projectId: 'p', userId: 'u' };
 const FRAME_TOOLS_MAX_CHARS = 4_000;
-const CANVAS_CHAT_MAX_CHARS = 30_000;
+const CANVAS_CHAT_MAX_CHARS = 32_000;
 const EDITOR_TO_FRAME_TOOLS_RATIO = 35;
+const CORE_MAX_CHARS = 8_000;
+const TOOL_MAX_CHARS = 600;
+const CATALOGUE_TO_CORE_RATIO = 6;
 
 async function promptChars(tools: Record<string, Tool>): Promise<number> {
   const sizes = await Promise.all(Object.entries(tools).map(async ([name, t]) => name.length + String(t.description ?? '').length + JSON.stringify(await asSchema(t.inputSchema).jsonSchema).length));
   return sizes.reduce((a, b) => a + b, 0);
 }
 
-async function editorChars(): Promise<number> {
-  const specs = await Promise.all(motionToolList().map((t) => motionToolSpec(t.name)));
-  return specs.reduce((sum, s) => sum + s!.name.length + s!.description.length + JSON.stringify(s!.input_schema).length, 0);
-}
-
-describe('the canvas chat reaches every frame tool without carrying them in its prompt', () => {
+describe('the canvas chat offers a small core and loads the rest', () => {
   const { db } = fakeDb({});
-  const frame = createFrameTools({ db, ...SCOPE, open: null, editor: null });
-  const canvas = { ...createProjectTools({ db, ...SCOPE }), ...createMotionDelegation({ db, ...SCOPE, origin: 'https://feega.test' }), ...frame };
+  const deps = { db, ...SCOPE, open: null, editor: null };
+  const core = { ...createProjectTools({ db, ...SCOPE }), ...createMotionDelegation({ db, ...SCOPE, origin: 'https://feega.test' }) };
+  const made = frameSurface(ToolLoading.Load, deps, frameRunner(deps), core, []);
+  const offered = (tools: Record<string, Tool>, names: string[]) => Object.fromEntries(names.map((n) => [n, tools[n]]));
 
-  it('the frame tools cost a fraction of the editor toolset they reach', async () => {
-    const frameChars = await promptChars(frame);
+  it('the core stays under its budget', async () => {
+    const { tools, active } = await made;
 
-    expect(frameChars).toBeLessThan(FRAME_TOOLS_MAX_CHARS);
-    expect(await editorChars()).toBeGreaterThan(frameChars * EDITOR_TO_FRAME_TOOLS_RATIO);
+    const chars = await promptChars(offered({ ...core, ...tools }, active()!));
+
+    console.log(`chat core: ${chars} chars, ${active()!.length} tools`);
+    expect(chars).toBeLessThan(CORE_MAX_CHARS);
   });
 
-  it('the canvas chat surface stays under its budget with the frame tools in', async () => {
-    expect(await promptChars(canvas)).toBeLessThan(CANVAS_CHAT_MAX_CHARS);
+  it('no core tool is heavier than its own budget', async () => {
+    const { tools, active } = await made;
+    const shown = offered({ ...core, ...tools }, active()!);
+
+    for (const [name, t] of Object.entries(shown)) {
+      expect(await promptChars({ [name]: t }), name).toBeLessThan(TOOL_MAX_CHARS);
+    }
+  });
+
+  it('the catalogue it reaches is several times the core', async () => {
+    const { tools, active } = await made;
+
+    expect(await promptChars(tools)).toBeGreaterThan((await promptChars(offered({ ...core, ...tools }, active()!))) * CATALOGUE_TO_CORE_RATIO);
+  });
+
+  it('never offers more than the loaded cap on top of the core', async () => {
+    const { tools, active } = await made;
+    const frameNames = Object.keys(tools).filter((n) => !n.endsWith('_tools') && !(n in core));
+
+    await tools[LOAD_TOOLS].execute!({ names: frameNames.slice(0, LOADED_CAP) } as never, { toolCallId: 'a', messages: [] } as never);
+    await tools[LOAD_TOOLS].execute!({ names: frameNames.slice(LOADED_CAP, LOADED_CAP + 5) } as never, { toolCallId: 'b', messages: [] } as never);
+
+    expect(active()!.filter((n) => frameNames.includes(n))).toHaveLength(LOADED_CAP);
   });
 });
+

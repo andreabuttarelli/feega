@@ -11,12 +11,12 @@ describe('sheetOutcomeOf: cosa fare del load della rotta vera', () => {
   });
 
   it('un load riuscito apre il foglio con i suoi dati', () => {
-    const outcome = sheetOutcomeOf('/p/x/calendar', {
+    const outcome = sheetOutcomeOf('/p/x/ads', {
       type: 'loaded',
       status: 200,
       data: { posts: [] }
     });
-    expect(outcome).toEqual({ kind: 'open', href: '/p/x/calendar', data: { posts: [] } });
+    expect(outcome).toEqual({ kind: 'open', href: '/p/x/ads', data: { posts: [] } });
   });
 
   it('un load con status diverso da 200 naviga invece di aprire un foglio a metà', () => {

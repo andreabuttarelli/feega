@@ -1,6 +1,6 @@
-import { findClip, type MotionDoc } from '../doc';
-import { setProps, type OpResult } from '../timeline';
-import { FontCategory, FontSource, isBuiltin, searchFonts, usedFaces, variantsOf, type CatalogueFont, type FontFace, type FontVariant } from './model';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FontCategory, FontSource, isBuiltin, searchFonts, usedFaces, variantsOf, type CatalogueFont, type FontFace, type FontVariant } from '@feega/motion-core/motion/fonts/model';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -87,4 +87,25 @@ export function removeFont(doc: MotionDoc, family: string): OpResult {
     return fail(`${family} is used by ${users.map((c) => c.id).join(', ')}: change their font first`);
   }
   return { ok: true, doc: { ...doc, fonts: doc.fonts.filter((f) => f.family !== family), assets: doc.assets.filter((a) => !variantsOf(face).some((v) => v.assetId === a.id)) } };
+}
+
+const swapped = (props: Record<string, unknown>, from: string, to: string): Record<string, unknown> => {
+  const runs = Array.isArray(props.runs) ? (props.runs as { font?: string }[]).map((r) => (r.font === from ? { ...r, font: to } : r)) : props.runs;
+  return { ...props, ...(props.font === from ? { font: to } : {}), ...(runs === undefined ? {} : { runs }) };
+};
+
+type Tracked = { tracks: { clips: { props: Record<string, unknown> }[] }[] };
+
+const swappedTracks = <T extends Tracked>(owner: T, from: string, to: string): T => ({ ...owner, tracks: owner.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, props: swapped(c.props, from, to) })) })) });
+
+export function replaceFont(doc: MotionDoc, from: string, to: string, catalogue: readonly CatalogueFont[]): OpResult {
+  const verdict = registered(doc, to, catalogue);
+  if (typeof verdict === 'string') {
+    return fail(verdict);
+  }
+  const family = verdict.face?.family ?? to;
+  const comps = Object.fromEntries(Object.entries(verdict.doc.comps).map(([id, comp]) => [id, swappedTracks(comp as never, from, family)]));
+  const moved = { ...swappedTracks(verdict.doc, from, family), comps } as MotionDoc;
+  const old = moved.fonts.find((f) => f.family === from);
+  return old ? removeFont(moved, from) : { ok: true, doc: moved };
 }

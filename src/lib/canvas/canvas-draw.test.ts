@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { parsePath, pathData, type Outline } from '$lib/motion/shape/geometry';
-import { CanvasTheme } from '$lib/motion/draw-create';
+import { parsePath, pathData, type Outline } from '@feega/motion-core/motion/shape/geometry';
+import { CANVAS_INK, CanvasTheme } from '$lib/motion/draw-create';
 import { drawnOnCanvas } from './canvas-draw';
 
 const HOST = { left: 100, top: 50, width: 1000, height: 500 };
@@ -31,6 +31,19 @@ describe('a shape drawn over the canvas lands in canvas units', () => {
     const clip = { component: 'Shape', props: { shape: 'path', path: 'M 0 0 L 1 1', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } };
 
     expect(drawnOnCanvas(clip, HOST, ZOOM_TWO)).toEqual({ tool: DrawTool.Pen, path: pathData(parsePath('M 200 112.5 L 300 137.5') as Outline) });
+  });
+
+  it('a polygon and a star keep their tool', () => {
+    const box = { x: 0.5, y: 0.5, width: 0.2, height: 0.1 };
+
+    expect(drawnOnCanvas({ component: 'Shape', props: { shape: 'polygon', ...box } }, HOST, ZOOM_TWO)?.tool).toBe(DrawTool.Polygon);
+    expect(drawnOnCanvas({ component: 'Shape', props: { shape: 'star', ...box } }, HOST, ZOOM_TWO)?.tool).toBe(DrawTool.Star);
+  });
+
+  it('a stroked path keeps its stroke and missing fill, inked for the canvas theme', () => {
+    const clip = { component: 'Shape', props: { shape: 'path', path: 'M 0 0 L 1 1', fillKind: 'none', strokeKind: 'solid', stroke: 'brand.text', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } };
+
+    expect(drawnOnCanvas(clip, HOST, ZOOM_TWO, CanvasTheme.Dark)).toMatchObject({ tool: DrawTool.Pen, fill: null, stroke: CANVAS_INK[CanvasTheme.Dark] });
   });
 
   it('anything else is not a drawing', () => {

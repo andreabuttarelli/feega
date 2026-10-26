@@ -94,6 +94,24 @@ mod gpu {
     }
 
     #[test]
+    fn a_primitive_subregion_keeps_its_output_inside_the_region() {
+        let pixels = render(&square(r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [{ "tag": "feOffset", "attrs": { "dx": 0, "dy": 0, "x": 0, "y": 0, "width": 32, "height": 64 } }] }] }"#));
+
+        assert_eq!(px(&pixels, 20, 32)[0], 255);
+        assert_eq!(px(&pixels, 40, 32)[0], 0);
+    }
+
+    #[test]
+    fn a_primitive_subregion_follows_the_filter_space_and_origin() {
+        let json = square(r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [{ "tag": "feOffset", "attrs": { "dx": 0, "dy": 0, "x": 0, "y": 0, "width": 32, "height": 128 } }] }] }"#)
+            .replace(r#""space": [1, 0, 0, 1]"#, r#""space": [0.5, 0, 0, 0.5], "origin": [16, 0]"#);
+        let pixels = render(&json);
+
+        assert_eq!(px(&pixels, 24, 32)[0], 255);
+        assert_eq!(px(&pixels, 40, 32)[0], 0);
+    }
+
+    #[test]
     fn a_drop_shadow_lands_beside_the_item() {
         let pixels = render(&square(r##"{ "kind": "css", "fns": [{ "name": "drop-shadow", "args": ["8px", "0px", "0px", "#ff0000"] }] }"##));
 

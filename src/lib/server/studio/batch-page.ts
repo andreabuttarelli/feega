@@ -15,24 +15,19 @@ import { ENVIRONMENTS, isEnvironment } from '$lib/studio/environments';
 import { SHOTS, isShot } from '$lib/studio/shots';
 import { MAX_VARIATIONS } from '$lib/studio/plan';
 import { MARKETPLACES } from '$lib/studio/marketplace';
-import { sendToCalendar } from '$lib/server/studio/studio-calendar';
-import { listOrgBrands } from '$lib/server/repos/brands';
 
 export const config = { maxDuration: 300 };
 
-const HTTP_BAD_REQUEST = 400;
 const HTTP_UNPROCESSABLE = 422;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const load = async (event: ServerLoadEvent<BatchParams>) => {
   const { db, orgId, projectId, batch } = await batchScope(event);
   event.depends(`studio:batch:${batch.id}`);
 
-  const [items, balance, options, brands] = await Promise.all([
+  const [items, balance, options] = await Promise.all([
     listItems(db, { orgId, batchId: batch.id }),
     orgCreditBalance(db, orgId),
-    studioOptions(db, { orgId, projectId }),
-    listOrgBrands(db, orgId)
+    studioOptions(db, { orgId, projectId })
   ]);
   const originals = Object.fromEntries(options.products.map((p) => [p.title, p.image]));
   const { urls } = await signedAssets(db, orgId, items.flatMap((i) => (i.assetId ? [i.assetId] : [])), 'mediaGrid');
@@ -56,7 +51,6 @@ export const load = async (event: ServerLoadEvent<BatchParams>) => {
       url: i.assetId ? (urls[i.assetId] ?? null) : null,
       original: originals[i.productTitle] ?? null
     })),
-    brands: brands.map((b) => ({ id: b.id, name: b.name })),
     marketplaces: Object.entries(MARKETPLACES).map(([id, m]) => ({ id, label: m.label, size: m.size })),
     perImage,
     balance,
@@ -132,17 +126,6 @@ export const actions: Actions<BatchParams> = {
     const [itemId] = idsOf(await event.request.formData());
     await approveItem(scope.db, scope, { itemId, approval: Approval.Rejected });
     return { ok: true };
-  },
-
-  calendar: async (event) => {
-    const scope = await batchScope(event);
-    const form = await event.request.formData();
-    const date = String(form.get('date') ?? '');
-    if (!ISO_DATE.test(date)) {
-      return fail(HTTP_BAD_REQUEST, { error: 'Choose a day.' });
-    }
-    const outcome = await sendToCalendar(scope.db, scope, { batchId: scope.batch.id, brandId: String(form.get('brand_id') ?? ''), date });
-    return 'error' in outcome ? fail(HTTP_UNPROCESSABLE, { error: outcome.error }) : { post: outcome.post };
   },
 
   drain: async (event) => {

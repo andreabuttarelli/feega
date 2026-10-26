@@ -88,7 +88,11 @@ fn run(xy: vec2<i32>) -> vec4<f32> {
 "#;
 
 const FLOOD: &str = r#"
-fn run(xy: vec2<i32>) -> vec4<f32> { return vec4<f32>(p[0] * p[3], p[1] * p[3], p[2] * p[3], p[3]); }
+fn run(xy: vec2<i32>) -> vec4<f32> {
+  let cell = centre(xy);
+  if (cell.x < p[4] || cell.y < p[5] || cell.x >= p[4] + p[6] || cell.y >= p[5] + p[7]) { return vec4<f32>(0.0); }
+  return vec4<f32>(p[0] * p[3], p[1] * p[3], p[2] * p[3], p[3]);
+}
 "#;
 
 const COMPOSITE: &str = r#"

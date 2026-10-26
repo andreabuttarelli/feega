@@ -1,11 +1,11 @@
-import { COMPONENTS, TrackKind, type ComponentId } from './components';
-import { MAX_SHORT_SIDE, MAX_SIDE, MAX_TRACKS, MotionFormat, cloneDoc, compsOf, findClip, newClip, newMotionDoc, type AssetRef, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
-import { FPS, maxFrames } from './design';
+import { COMPONENTS, TrackKind, type ComponentId } from '@feega/motion-core/motion/components';
+import { MAX_SHORT_SIDE, MAX_SIDE, MAX_TRACKS, MotionFormat, cloneDoc, compsOf, findClip, newClip, newMotionDoc, type AssetRef, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { FPS, maxFrames } from '@feega/motion-core/motion/design';
 import { fieldsOf } from './inspector';
 import { retimer } from './frame-rate';
-import { DocMode } from './still';
-import { removeClips, type OpResult } from './timeline';
-import { TRANSFORM } from './keyframes';
+import { DocMode } from '@feega/motion-core/motion/still';
+import { removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
+import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
 
 export type Point = { x: number; y: number };
 export type Size = { width: number; height: number };
@@ -13,7 +13,7 @@ export type Box = { left: number; top: number; width: number; height: number };
 
 type Carried = Pick<MotionDoc, 'assets' | 'fonts' | 'components' | 'comps'>;
 
-export type Element = { clip: MotionClip; fps: number; size: Size; stillAt: number; carried: Carried };
+export type Element = { clip: MotionClip; fps: number; size: Size; stillAt: number; carried: Carried; fillsFrame?: boolean };
 
 export type Placement = { at: Point; frame?: number };
 
@@ -192,6 +192,10 @@ function timed(clip: MotionClip, target: MotionDoc, element: Element, frame?: nu
     return { ...moved, durationInFrames, from: Math.max(0, target.still.frame - retime.frame(element.stillAt)) };
   }
   const wanted = Math.max(0, Math.round(frame ?? moved.from));
+  if (element.fillsFrame) {
+    const from = Math.min(wanted, target.durationInFrames - 1);
+    return { ...moved, from, durationInFrames: Math.max(1, target.durationInFrames - from) };
+  }
   return { ...moved, durationInFrames, from: Math.min(wanted, limit - durationInFrames) };
 }
 
@@ -276,6 +280,52 @@ export function pasteElements(doc: MotionDoc, elements: readonly Element[], newI
   return ids.length ? { ok: true, doc: next, ids } : { ok: false, error: 'nothing to paste' };
 }
 
+export function replaceElements(doc: MotionDoc, ids: readonly string[], elements: readonly Element[], newId: NewId): PastedElements {
+  const [element] = elements;
+  if (!element) {
+    return { ok: false, error: 'nothing copied to replace with' };
+  }
+  let next = doc;
+  const placedIds: string[] = [];
+  for (const id of ids) {
+    const old = findClip(next, id)?.clip;
+    const removed = old ? removeClips(next, [id]) : null;
+    if (!old || !removed?.ok) {
+      continue;
+    }
+    const placed = placeElement(removed.doc, { ...element, clip: { ...element.clip, id: newId() } }, { at: clipCentre(old), frame: old.from }, newId);
+    if (!placed.ok) {
+      return placed;
+    }
+    next = placed.doc;
+    placedIds.push(placed.clipId);
+  }
+  return placedIds.length ? { ok: true, doc: next, ids: placedIds } : { ok: false, error: 'nothing selected to replace' };
+}
+
+const meanOf = (points: readonly Point[]): Point => ({ x: points.reduce((sum, p) => sum + p.x, 0) / points.length, y: points.reduce((sum, p) => sum + p.y, 0) / points.length });
+
+export function pasteOverElements(doc: MotionDoc, ids: readonly string[], elements: readonly Element[], newId: NewId): PastedElements {
+  const selected = ids.flatMap((id) => findClip(doc, id)?.clip ?? []);
+  if (!elements.length || !selected.length) {
+    return { ok: false, error: 'nothing selected to paste over' };
+  }
+  const target = meanOf(selected.map(clipCentre));
+  const source = meanOf(elements.map((e) => clipCentre(e.clip)));
+  let next = doc;
+  const placedIds: string[] = [];
+  for (const element of elements) {
+    const own = clipCentre(element.clip);
+    const placed = placeElement(next, { ...element, clip: { ...element.clip, id: newId() } }, { at: { x: own.x + target.x - source.x, y: own.y + target.y - source.y }, frame: selected[0].from }, newId);
+    if (!placed.ok) {
+      return placed;
+    }
+    next = placed.doc;
+    placedIds.push(placed.clipId);
+  }
+  return { ok: true, doc: next, ids: placedIds };
+}
+
 function ownBox(clip: MotionClip): Box | null {
   const { props } = clip;
   if (!laidOut(clip.component) || typeof props.width !== 'number' || typeof props.height !== 'number') {
@@ -327,7 +377,7 @@ export function mediaElement(output: Output, fps: number = FPS): Element {
   const durationInFrames = media.frames(output, fps) ?? Math.round((COMPONENTS[media.component].durationInFrames * fps) / FPS);
   const clip = newClip({ id: `${media.component.toLowerCase()}-${crypto.randomUUID().slice(0, 8)}`, from: 0, durationInFrames, component: media.component, props: { ...MEDIA_FIT[output.kind], [media.prop]: media.value(output) } });
   const asset = media.asset(output);
-  return { clip, fps, size: media.size(output), stillAt: 0, carried: { assets: asset ? [asset] : [], fonts: [], components: {}, comps: {} } };
+  return { clip, fps, size: media.size(output), stillAt: 0, fillsFrame: output.kind === OutputKind.Image, carried: { assets: asset ? [asset] : [], fonts: [], components: {}, comps: {} } };
 }
 
 function refreshed(doc: MotionDoc, clipId: string, element: Element): OpResult {

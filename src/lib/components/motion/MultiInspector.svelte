@@ -1,23 +1,26 @@
 <script lang="ts">
   import Layers from '@lucide/svelte/icons/layers';
   import type { Bounds } from '$lib/motion/scene-select';
-  import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+  import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { EditMode, editIn } from '$lib/motion/edit-mode';
   import { valueAt } from '$lib/motion/inspector';
-  import { withParams } from '$lib/motion/custom/params';
-  import { TRANSFORM, isAnimatable } from '$lib/motion/keyframes';
+  import { withParams } from '@feega/motion-core/motion/custom/params';
+  import { TRANSFORM, isAnimatable } from '@feega/motion-core/motion/keyframes';
   import { sliderOf, toShown, toStored } from '$lib/motion/units';
   import { fieldLook } from '$lib/motion/inspector-sections';
-  import { BLEND_MODES, blendLabel, type BlendMode } from '$lib/motion/blend';
+  import { BLEND_MODES, blendLabel, type BlendMode } from '@feega/motion-core/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { MIXED, shared, type Shared } from '$lib/motion/mixed';
   import { FieldKind } from '$lib/motion/number-field';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { aabb, quadOf, type Boxes } from '$lib/motion/scene-select';
   import { unionBounds } from '$lib/motion/multi-select';
-  import { HORIZONTALS, VERTICALS } from '$lib/motion/constraints/model';
+  import { HORIZONTALS, VERTICALS } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { PropKind, STYLE_PROPS, placeBox, setPropAcross, sharedConstraint, sharedProp, type BoxPatch } from '$lib/motion/selection-props';
+  import { isBrandToken, recolour, selectionColours } from '$lib/motion/selection-colours';
+  import { BRAND_COLORS } from '@feega/motion-core/motion/components';
+  import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
   import NumberField from './NumberField.svelte';
 
   let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; onchange: (doc: MotionDoc, summary: string) => void } = $props();
@@ -72,6 +75,30 @@
     }
   }
 
+  const GAP_RANGE = { min: -100000, max: 100000, step: 1 };
+  const GAP_FIELDS = [
+    { axis: Axis.X, label: 'H', name: 'Horizontal gap' },
+    { axis: Axis.Y, label: 'V', name: 'Vertical gap' }
+  ] as const;
+  const gaps = $derived(Object.fromEntries(GAP_FIELDS.map((f) => [f.axis, gapOf(doc, [...ids], frame, propBoxes(doc), f.axis)])) as Record<Axis, number | null>);
+  const gapShown = (axis: Axis): Shared<number> => (gaps[axis] === null ? MIXED : Math.round(gaps[axis]! * 100) / 100);
+
+  function setGap(axis: Axis, px: number) {
+    const result = distributeSpace(doc, [...ids], frame, propBoxes(doc), axis, EditMode.Design, px);
+    if (result.ok) {
+      onchange(result.doc, `Spaced ${ids.length} layers`);
+    }
+  }
+
+  const colours = $derived(selectionColours(doc, ids));
+
+  function swapColour(from: string, to: string) {
+    const result = recolour(doc, ids, from, to);
+    if (result.ok) {
+      onchange(result.doc, `Recoloured ${from} on ${ids.length} layers`);
+    }
+  }
+
   function setStyle(key: string, value: unknown) {
     const result = setPropAcross(doc, ids, key, value);
     if (result.ok) {
@@ -123,6 +150,16 @@
         </div>
       </section>
     {/if}
+    <section class="section" data-section="spacing">
+      <h3>Spacing</h3>
+      <div class="grid2">
+        {#each GAP_FIELDS as f (f.axis)}
+          <div data-prop={`gap-${f.axis}`}>
+            <NumberField label={f.label} kind={FieldKind.Glyph} name={f.name} value={gapShown(f.axis)} range={GAP_RANGE} unit="px" onchange={(v) => setGap(f.axis, v)} />
+          </div>
+        {/each}
+      </div>
+    </section>
     <section class="section" data-section="layout">
       <h3>Layout</h3>
       <div class="grid2">
@@ -155,6 +192,23 @@
               <input type="text" aria-label={f.label} placeholder="Mixed" value={textProp(f.key)} onchange={(e) => setStyle(f.key, e.currentTarget.value)} />
             </label>
           {/if}
+        {/each}
+      </section>
+    {/if}
+    {#if colours.length}
+      <section class="section" data-section="colours">
+        <h3>Selection colours</h3>
+        {#each colours as colour (colour)}
+          <label class="line" data-colour={colour}>
+            <span>{colour}</span>
+            {#if isBrandToken(colour)}
+              <select aria-label={`Replace ${colour}`} data-testid="token-swap" value={colour} onchange={(e) => swapColour(colour, e.currentTarget.value)}>
+                {#each BRAND_COLORS as token (token)}<option value={token}>{token}</option>{/each}
+              </select>
+            {:else}
+              <input type="color" aria-label={`Replace ${colour}`} value={colour.slice(0, 7)} onchange={(e) => swapColour(colour, e.currentTarget.value)} />
+            {/if}
+          </label>
         {/each}
       </section>
     {/if}

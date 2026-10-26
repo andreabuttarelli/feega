@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
+import { listAllTools } from './server.ts';
 import { createServer, type Server } from 'node:http';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -53,7 +54,7 @@ const fake: Server = createServer((req, res) => {
       return;
     }
     if (route === '/api/v1/motion/renders/render-1') {
-      send(200, { run_id: 'render-1', mode: 'browser', status: 'done', asset_id: 'a1', file_url: 'https://files/a1.mp4' });
+      send(200, { run_id: 'render-1', mode: 'browser', status: 'done', asset_id: 'a1', file_url: 'https://files/a1.mp4', render_url: `https://feega.app/render/${'x'.repeat(900)}`, settings: { quality: 'high', fps: 30, notes: 'y'.repeat(900) } });
       return;
     }
     if (route === '/api/v1/motion/shader-effects') {
@@ -72,6 +73,10 @@ const fake: Server = createServer((req, res) => {
     if (route === `/api/v1/motion/${NODE}/embed`) {
       const published = req.method !== 'DELETE';
       send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, react: `<FeegaMotion id="${NODE}" />`, flutter: `FeegaMotion(id: '${NODE}')`, revision: 3 } : { published });
+      return;
+    }
+    if (route === `/api/v1/motion/${NODE}/share`) {
+      send(200, { url: `https://feega.app/s/tok/${NODE}`, embed_url: `https://feega.app/e/${NODE}` });
       return;
     }
     if (route === `/api/v1/motion/${NODE}/budget`) {
@@ -229,6 +234,12 @@ describe('the motion agent over MCP', () => {
     expect(result?.structuredContent).toMatchObject({ published: false });
   });
 
+  test('share_motion_frame returns the viewer link of one frame', async () => {
+    const result = await callTool('share_motion_frame', { node_id: NODE });
+    expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/share` });
+    expect(result?.structuredContent).toMatchObject({ url: `https://feega.app/s/tok/${NODE}` });
+  });
+
   test('motion_budget reads what a video spent across all its turns', async () => {
     const result = await callTool('motion_budget', { node_id: NODE });
     expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/budget` });
@@ -285,11 +296,18 @@ describe('the motion agent over MCP', () => {
     expect(JSON.stringify(result)).toContain('https://files/a1.mp4');
   });
 
+  test('a get_render poll answers status and file only, under 300 chars', async () => {
+    const result = (await callTool('get_render', { run_id: 'render-1' })) as { content?: { text?: string }[]; structuredContent?: unknown };
+
+    expect(result.content?.[0]?.text?.length ?? 0).toBeLessThan(300);
+    expect(result.structuredContent).toBeUndefined();
+  });
+
   test('only the motion tools are exposed, not the editor ones', async () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
-    const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
+    const names = (await listAllTools()).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'motion_editor_op', 'motion_tool', 'new_motion_from_template', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'motion_editor_op', 'motion_tool', 'new_motion_from_template', 'publish_motion_embed', 'restore_motion_revision', 'share_motion_frame', 'view_motion_frames']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');

@@ -1,10 +1,10 @@
-import type { MotionClip, MotionDoc } from './doc';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { editAt, valueAt } from './inspector';
-import { withParams } from './custom/params';
-import type { KeyValue } from './keyframes';
-import { setKeyframes, type OpResult } from './timeline';
-import { VideoControl, controlShown } from './still';
-import { timelineFits } from './editor-mount';
+import { withParams } from '@feega/motion-core/motion/custom/params';
+import type { KeyValue } from '@feega/motion-core/motion/keyframes';
+import { setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { VideoControl, controlShown } from '@feega/motion-core/motion/still';
+import { timelineFits } from '@feega/motion-core/motion/editor-mount';
 
 export enum EditMode {
   Design = 'design',
@@ -13,6 +13,23 @@ export enum EditMode {
 
 export const EDIT_MODE_KEY = 'feega.frame-edit-mode';
 
+type ModeStore = Pick<Storage, 'getItem' | 'setItem'>;
+
+export function recalledMode(store: Pick<ModeStore, 'getItem'> | null): string | null {
+  try {
+    return store?.getItem(EDIT_MODE_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function rememberMode(store: Pick<ModeStore, 'setItem'> | null, mode: EditMode): void {
+  try {
+    store?.setItem(EDIT_MODE_KEY, mode);
+  } catch {
+    return;
+  }
+}
 
 const animated = (clip: MotionClip, key: string) => Boolean(clip.keyframes[key]?.length);
 
@@ -44,7 +61,7 @@ const NEXT: Record<EditMode, EditMode> = { [EditMode.Design]: EditMode.Motion, [
 
 export const nextMode = (mode: EditMode): EditMode => NEXT[mode];
 
-export const readMode = (stored: string | null): EditMode => (Object.values(EditMode) as string[]).includes(stored ?? '') ? (stored as EditMode) : EditMode.Motion;
+export const readMode = (stored: string | null): EditMode => (Object.values(EditMode) as string[]).includes(stored ?? '') ? (stored as EditMode) : EditMode.Design;
 
 export function startMode(doc: MotionDoc, stored: string | null): EditMode {
   return controlShown(doc, VideoControl.EditMode) && timelineFits(doc) ? readMode(stored) : EditMode.Design;

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
-import { setStill } from '$lib/motion/still';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { setStill } from '@feega/motion-core/motion/still';
 import { OutputKind, type Output } from '$lib/motion/move-element';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
-import { DropOn, MoveOutcome, copyElement, moveElement, placeOutput, retireFrameInputs, type FrameStore, type StoredFrame } from './move-element';
+import { DropOn, MoveOutcome, copyElement, moveElement, pastedSchema, placeMedia, placeOutput, retireFrameInputs, type FrameStore, type StoredFrame } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const VIDEO_ID = '33333333-2222-4333-8444-555555555555';
@@ -157,6 +157,23 @@ describe('dropping an element on the empty canvas', () => {
   });
 });
 
+describe('a pasted picture over a frame', () => {
+  it('lands inside the frame as an image element, with no node of its own', async () => {
+    const m = memory();
+    seed(m, 'b', newMotionDoc(MotionFormat.Square));
+
+    const placed = await placeMedia(m.store, { kind: OutputKind.Image, assetId: IMAGE_ID, name: 'pasted.png', width: 400, height: 300 }, { on: DropOn.Frame, nodeId: 'b', at: { x: 0.3, y: 0.6 } });
+
+    expect(placed).toMatchObject({ outcome: MoveOutcome.Done, frameId: 'b', created: false });
+    expect(clipsOf(headOf(m, 'b').doc)[0]).toMatchObject({ component: 'Image', props: { assetId: IMAGE_ID, x: 0.3, y: 0.6 } });
+    expect(placed.outcome === MoveOutcome.Done && placed.undo).toEqual([{ kind: 'doc.revision', nodeId: 'b', before: 1, after: 2 }]);
+  });
+
+  it('an unknown frame is refused', async () => {
+    expect((await placeMedia(memory().store, { kind: OutputKind.Image, assetId: IMAGE_ID, name: 'x' }, { on: DropOn.Frame, nodeId: 'nope', at: { x: 0.5, y: 0.5 } })).outcome).toBe(MoveOutcome.NotFound);
+  });
+});
+
 describe('a generated output dropped into a frame', () => {
   it('a picture becomes an image element; the generative node is not touched', async () => {
     const m = memory();
@@ -279,5 +296,28 @@ describe('copying an element out of a frame', () => {
     expect(copied).toMatchObject({ outcome: MoveOutcome.Done, frameId: 'b' });
     expect(findClip(headOf(m, 'a').doc, 'txt')).not.toBeNull();
     expect(clipsOf(headOf(m, 'b').doc)).toHaveLength(1);
+  });
+});
+
+describe('pastedSchema', () => {
+  const gradient = { type: 'linear-gradient', stops: [{ color: '#ff0000', pos: 0 }, { color: '#0000ff', pos: 1 }], angle: 90 };
+
+  it('lets a pasted path carry a gradient fill', () => {
+    const parsed = pastedSchema.safeParse({ tool: 'pen', path: 'M0 0L10 0L10 10Z', fill: '#ff0000', stroke: null, gradient });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it('refuses a gradient with one stop', () => {
+    const parsed = pastedSchema.safeParse({ tool: 'pen', path: 'M0 0L10 0L10 10Z', gradient: { ...gradient, stops: [gradient.stops[0]] } });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('lets a pasted text carry its colour and weight', () => {
+    const box = { left: 0, top: 0, width: 100, height: 30 };
+
+    expect(pastedSchema.safeParse({ tool: 'text', box, text: 'hi', color: '#336699', weight: 700 }).success).toBe(true);
+    expect(pastedSchema.safeParse({ tool: 'text', box, text: 'hi', color: 'red' }).success).toBe(false);
   });
 });

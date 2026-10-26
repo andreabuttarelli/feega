@@ -7,7 +7,7 @@ import { saveMotionDoc } from '$lib/server/motion/editor';
 import { MOTION_START_DEPS, startMotion, type MotionStart } from '$lib/server/motion/start';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { composeEditorPath, draftFromDoc } from '$lib/motion/composition-draft';
-import type { AssetRef } from '$lib/motion/doc';
+import type { AssetRef, MotionDoc } from '@feega/motion-core/motion/doc';
 import { swapAssetIds, type GalleryAsset } from '$lib/gallery/model';
 import { exposeMainFields } from '$lib/gallery/remix-fields';
 import { downloadFile, isGalleryFile, storeRemixFile, type FileBytes } from './files';
@@ -40,10 +40,7 @@ const REMIX_SUMMARY = 'Remix of';
 
 const fail = (error: RemixError, message: string): Remixed => ({ ok: false, error, message });
 
-async function copyAssets(db: Db, ports: RemixPorts, scope: { orgId: string; projectId: string; itemId: string }, assets: GalleryAsset[]): Promise<Record<string, string> | null> {
-  if (assets.some((a) => !isGalleryFile(db, a.url, scope.itemId))) {
-    return null;
-  }
+export async function copyAssetFiles(db: Db, ports: RemixPorts, scope: { orgId: string; projectId: string }, assets: GalleryAsset[]): Promise<Record<string, string>> {
   const download = ports.download ?? downloadFile;
   const ids: Record<string, string> = {};
   for (const asset of assets) {
@@ -55,30 +52,42 @@ async function copyAssets(db: Db, ports: RemixPorts, scope: { orgId: string; pro
   return ids;
 }
 
+type Landing = { orgId: string; userId: string; actor: Actor; projectId: string; canvasId: string | null; title: string; doc: MotionDoc; summary: string };
+
+export type Landed = { ok: true; start: MotionStart; editorPath: string } | { ok: false; error: RemixError; message: string };
+
+export async function landMotionDoc(db: Db, input: Landing): Promise<Landed> {
+  const start = await startMotion(db, MOTION_START_DEPS, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId, userId: input.userId, name: input.title, picture: input.doc });
+  if (!start) {
+    return fail(RemixError.CanvasNotFound, 'That canvas is not in this project.');
+  }
+
+  const workspace = { orgId: input.orgId, author: workspaceAuthor(input) };
+  const doc = await adoptLayouts(db, workspace, await adoptShaders(db, workspace, exposeMainFields(input.doc)));
+  const saved = await saveMotionDoc(db, { orgId: input.orgId, nodeId: start.nodeId, expectedVersion: 0, doc, actor: input.actor, summary: input.summary });
+  if (saved.outcome !== RevisionOutcome.Written) {
+    return fail(RemixError.NotSaved, 'The copy could not be saved.');
+  }
+
+  return { ok: true, start, editorPath: draftFromDoc(doc) ? composeEditorPath(start) : motionEditorPath(start) };
+}
+
 export async function remixGalleryItem(db: Db, ports: RemixPorts, input: RemixInput): Promise<Remixed> {
   const item = await findGalleryItem(db, input.itemId);
   if (!item) {
     return fail(RemixError.NotFound, 'This video is not in the gallery any more.');
   }
 
-  const ids = await copyAssets(db, ports, { orgId: input.orgId, projectId: input.projectId, itemId: item.id }, item.assets);
-  if (!ids) {
+  if (item.assets.some((a) => !isGalleryFile(db, a.url, item.id))) {
     return fail(RemixError.ForeignFile, 'This gallery item points at a file outside the gallery.');
   }
 
-  const start = await startMotion(db, MOTION_START_DEPS, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId, userId: input.userId, name: item.title, picture: item.doc });
-  if (!start) {
-    return fail(RemixError.CanvasNotFound, 'That canvas is not in this project.');
+  const ids = await copyAssetFiles(db, ports, { orgId: input.orgId, projectId: input.projectId }, item.assets);
+  const landed = await landMotionDoc(db, { ...input, title: item.title, doc: swapAssetIds(item.doc, ids), summary: `${REMIX_SUMMARY} ${item.title}` });
+  if (!landed.ok) {
+    return landed;
   }
 
-  const workspace = { orgId: input.orgId, author: workspaceAuthor(input) };
-  const doc = await adoptLayouts(db, workspace, await adoptShaders(db, workspace, exposeMainFields(swapAssetIds(item.doc, ids))));
-  const saved = await saveMotionDoc(db, { orgId: input.orgId, nodeId: start.nodeId, expectedVersion: 0, doc, actor: input.actor, summary: `${REMIX_SUMMARY} ${item.title}` });
-  if (saved.outcome !== RevisionOutcome.Written) {
-    return fail(RemixError.NotSaved, 'The copy could not be saved.');
-  }
-
-  await recordRemix(db, { orgId: input.orgId, itemId: item.id, nodeId: start.nodeId, actor: input.actor });
-  const editorPath = draftFromDoc(doc) ? composeEditorPath(start) : motionEditorPath(start);
-  return { ok: true, start, editorPath, title: item.title };
+  await recordRemix(db, { orgId: input.orgId, itemId: item.id, nodeId: landed.start.nodeId, actor: input.actor });
+  return { ok: true, start: landed.start, editorPath: landed.editorPath, title: item.title };
 }

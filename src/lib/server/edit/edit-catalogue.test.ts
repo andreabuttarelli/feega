@@ -7,7 +7,8 @@ import { SHOWCASE_CANVAS_OPS, SHOWCASE_MOTION_TOOLS } from '../mcp-showcase-pari
 
 describe('one name for every op the edit tool reaches', () => {
   it('a name shared by two registries goes to the canvas first, then the frame, and the loser is prefixed', () => {
-    const catalogue = buildCatalogue({ [Family.Canvas]: ['list_templates', 'cancel_render'], [Family.Frame]: ['list_templates', 'list_fonts'], [Family.Editor]: ['cancel_render', 'list_fonts'] });
+    const blank = () => ({ access: 'read', summary: '', schema: async () => null, run: async () => ({ status: 200, body: null }) });
+    const catalogue = buildCatalogue({ [Family.Canvas]: ['list_templates', 'cancel_render'], [Family.Frame]: ['list_templates', 'list_fonts'], [Family.Editor]: ['cancel_render', 'list_fonts'] }, { [Family.Canvas]: blank, [Family.Frame]: blank, [Family.Editor]: blank });
 
     expect(catalogue.get('list_templates')).toMatchObject({ family: Family.Canvas, source: 'list_templates' });
     expect(catalogue.get('frame_list_templates')).toMatchObject({ family: Family.Frame, source: 'list_templates' });
@@ -32,5 +33,9 @@ describe('one name for every op the edit tool reaches', () => {
 
     expect([...SHOWCASE_CANVAS_OPS].filter((n) => catalogue.get(n)?.family !== Family.Canvas)).toEqual([]);
     expect([...SHOWCASE_MOTION_TOOLS].filter((n) => catalogue.get(n)?.family !== Family.Frame)).toEqual([]);
+  });
+
+  it('every op carries a one-line summary, or find_tools cannot rank it', () => {
+    expect([...editCatalogue().values()].filter((o) => !o.summary).map((o) => o.name)).toEqual([]);
   });
 });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { fitTexts, freeTextFit, hostFit, keepTextSize, resizedTexts, resizedFreeText } from './text-fit';
-import { setProps } from './timeline';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
+import { setProps } from '@feega/motion-core/motion/timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -39,6 +39,11 @@ describe('a free text is its own box', () => {
     expect(hostFit({ w: 300, h: 100 }, share)).toEqual({ w: 300, h: 50 });
     expect(hostFit({ w: 300, h: 50 }, share)).toBeNull();
     expect(hostFit({ w: 300, h: 50 }, { width: 1, height: 1.004, stage: { width: 1920, height: 320 } }), 'a fit that changes nothing is not a resize').toBeNull();
+  });
+
+  it('grows its host past the stage when the typed line or the wrapped lines outgrow it', () => {
+    expect(freeTextFit(free('auto'), { tx: { left: 0, top: 0, width: 3840, height: 1080 } })).toEqual({ width: 2, height: 1, stage: { width: 1920, height: 1080 } });
+    expect(freeTextFit(free('auto-height'), { tx: { left: 0, top: 0, width: 1920, height: 3240 } })).toEqual({ width: 1, height: 3, stage: { width: 1920, height: 1080 } });
   });
 
   it('stays put when it fits or is fixed', () => {

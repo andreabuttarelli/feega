@@ -126,7 +126,7 @@ vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => {
       if (!store.head) {
         return null;
       }
-      const { newMotionDoc, MotionFormat } = await import('$lib/motion/doc');
+      const { newMotionDoc, MotionFormat } = await import('@feega/motion-core/motion/doc');
       return { version: store.head, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actorKind: 'user' };
     },
     appendRevision: async (_db: unknown, input: { expectedVersion: number; doc: unknown; summary?: string | null }) => {
@@ -188,14 +188,18 @@ describe('the canvas agent delegates motion videos', () => {
     expect(Object.keys(tools())).not.toContain('add_clip');
   });
 
+  it('shares a frame of this project only', async () => {
+    expect(await call(tools().share_motion_frame, { nodeId: 'not-here' })).toMatchObject({ error: 'motion_node_not_found' });
+  });
+
   it('lists the motion videos of this project', async () => {
     const out = await call(tools().list_motion_videos, {});
-    expect(out.videos).toEqual([expect.objectContaining({ node_id: NODE, editor_url: `/p/${PROJECT}/c/${CANVAS}/motion/${NODE}` })]);
+    expect(out.videos).toEqual([expect.objectContaining({ node_id: NODE, editor_url: `/p/${PROJECT}/c/${CANVAS}?frame=${NODE}` })]);
   });
 
   it('asks the motion agent and reads its summary back once the run is done', async () => {
     const asked = await call(tools().ask_motion_agent, { nodeId: NODE, request: 'make a 6 s title saying hello' });
-    expect(asked).toMatchObject({ status: 'running', editor_url: `/p/${PROJECT}/c/${CANVAS}/motion/${NODE}` });
+    expect(asked).toMatchObject({ status: 'running', editor_url: `/p/${PROJECT}/c/${CANVAS}?frame=${NODE}` });
 
     const run = await call(tools().get_motion_run, { runId: asked.run_id, waitSeconds: 5 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from './doc';
-import { VideoControl, controlShown } from './still';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { VideoControl, controlShown } from '@feega/motion-core/motion/still';
 import { EditMode, startMode } from './edit-mode';
 
 const video = newMotionDoc(MotionFormat.Landscape);
@@ -23,6 +23,10 @@ describe('which video controls a frame shows', () => {
 describe('the edit mode a frame opens in', () => {
   it('a still frame opens in Design even when Motion was the last mode, since it has no switch back', () => {
     expect(startMode(still, EditMode.Motion)).toBe(EditMode.Design);
+  });
+
+  it('a motion frame opens in Design when no mode was ever chosen', () => {
+    expect(startMode(video, null)).toBe(EditMode.Design);
   });
 
   it('a motion frame opens in the last mode used', () => {

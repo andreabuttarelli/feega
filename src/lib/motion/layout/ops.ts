@@ -1,13 +1,13 @@
-import { TrackKind } from '../components';
-import { findClip, type MotionClip, type MotionDoc } from '../doc';
-import { pivotBox } from '../parent';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { pivotBox } from '@feega/motion-core/motion/parent';
 import { setParent } from '../parent-ops';
 import { layerOrder } from '../siblings';
-import { addClip, moveClip, type OpResult } from '../timeline';
-import { Align, Direction, Sizing } from './auto-layout';
-import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, autoLayoutSchema, layoutItemSchema, type AutoLayout, type LayoutItem } from './model';
-import { childrenInOrder, withAutoLayout } from './resolve';
-import { isText } from './text-extent';
+import { addClip, moveClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Align, Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
+import { childrenInOrder, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { isText } from '@feega/motion-core/motion/layout/text-extent';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -37,9 +37,13 @@ export function setAutoLayout(doc: MotionDoc, clipId: string, patch: Partial<Aut
   if (patch === null) {
     return { ok: true, doc: withClip(doc, clipId, (c) => ({ ...c, autoLayout: null })) };
   }
-  const parsed = autoLayoutSchema.safeParse({ ...(found.clip.autoLayout ?? DEFAULT_AUTO_LAYOUT), ...patch });
+  const parsed = autoLayoutSchema.safeParse({ ...(found.clip.autoLayout ?? NEW_AUTO_LAYOUT), ...patch });
   if (!parsed.success) {
     return fail(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
+  }
+  const invalid = flexOnHug(parsed.data, found.clip.layoutItem);
+  if (invalid) {
+    return fail(invalid);
   }
   return { ok: true, doc: withClip(doc, clipId, (c) => ({ ...c, autoLayout: parsed.data })) };
 }
@@ -52,6 +56,10 @@ export function setLayoutItem(doc: MotionDoc, clipId: string, patch: Partial<Lay
   const parsed = layoutItemSchema.safeParse({ ...(found.clip.layoutItem ?? DEFAULT_LAYOUT_ITEM), ...patch });
   if (!parsed.success) {
     return fail(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
+  }
+  const invalid = flexOnHug(found.clip.autoLayout, parsed.data);
+  if (invalid) {
+    return fail(invalid);
   }
   return { ok: true, doc: withClip(doc, clipId, (c) => ({ ...c, layoutItem: parsed.data })) };
 }
@@ -116,14 +124,40 @@ function ownTracks(doc: MotionDoc, clipIds: readonly string[], trackId: string):
 
 enum Container {
   Frame = 'frame',
-  AutoLayout = 'auto-layout'
+  AutoLayout = 'auto-layout',
+  Group = 'group'
 }
 
-const CONTAINER_TRACK: Record<Container, string> = { [Container.Frame]: 'Frame', [Container.AutoLayout]: 'Auto layout' };
+const CONTAINER_TRACK: Record<Container, string> = { [Container.Frame]: 'Frame', [Container.AutoLayout]: 'Auto layout', [Container.Group]: 'Group' };
 
 export const wrapInAutoLayout = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.AutoLayout);
 
+export const wrapInGroup = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Group);
+
 export const wrapInFrame = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Frame);
+
+export function resizeToFit(doc: MotionDoc, containerId: string): OpResult {
+  const container = findClip(doc, containerId)?.clip;
+  const children = doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.parent === containerId && hasBox(c));
+  if (!container || !children.length) {
+    return fail(`${containerId} has no children to fit`);
+  }
+  if (container.autoLayout) {
+    return setLayoutItem(doc, containerId, HUG);
+  }
+
+  return { ok: true, doc: withClip(doc, containerId, (c) => ({ ...c, props: { ...c.props, ...boxAround(doc, children) } })) };
+}
+
+export function boxAround(doc: MotionDoc, children: readonly MotionClip[]) {
+  const size = { width: doc.width, height: doc.height };
+  const boxes = children.map((c) => pivotBox(c.props, size));
+  const left = Math.min(...boxes.map((b) => b.left));
+  const top = Math.min(...boxes.map((b) => b.top));
+  const right = Math.max(...boxes.map((b) => b.left + b.width));
+  const bottom = Math.max(...boxes.map((b) => b.top + b.height));
+  return { x: (left + right) / 2 / size.width, y: (top + bottom) / 2 / size.height, width: (right - left) / size.width, height: (bottom - top) / size.height };
+}
 
 export function removeAutoLayout(doc: MotionDoc, containerId: string): OpResult {
   const container = findClip(doc, containerId)?.clip;
@@ -168,6 +202,7 @@ function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trac
     return result;
   }
   result = container === Container.AutoLayout ? setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start }) : result;
+  result = container === Container.Group && result.ok ? { ok: true, doc: withClip(result.doc, id, (c) => ({ ...c, group: true })) } : result;
   for (const p of placed) {
     if (!result.ok) {
       return result;

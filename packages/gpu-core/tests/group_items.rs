@@ -102,3 +102,16 @@ fn a_layer_draws_its_picture_at_its_size_through_its_matrix() {
     assert_eq!(at(&pixels, 4, 16), [0, 0, 255, 255]);
     assert_eq!(at(&pixels, 50, 16), [0, 0, 255, 255]);
 }
+
+#[test]
+fn a_turned_use_paints_its_background_as_the_turned_rectangle() {
+    let frame = r#"{ "width": 40, "height": 20, "background": [0, 0, 0, 1], "items": [] }"#;
+    let mut groups = Groups::new();
+    groups.put("f", parse(frame).unwrap());
+    let screen = r#"{ "width": 200, "height": 200, "background": null, "items": [{ "kind": "use", "clip": "u", "group": "f", "matrix": [0, 1, -1, 0, 100, 0] }] }"#;
+
+    let (list, _) = expand(&parse(screen).unwrap(), &groups);
+
+    let Item::Path(back) = &list.items[0] else { panic!("{:?}", list.items) };
+    assert_eq!(back.contours[0], vec![100.0, 0.0, 100.0, 40.0, 80.0, 40.0, 80.0, 0.0]);
+}

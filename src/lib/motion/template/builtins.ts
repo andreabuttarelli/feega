@@ -1,7 +1,7 @@
-import { LAYOUTS } from '$lib/canvas/composition/index';
-import type { LayoutId, LayoutParam } from '$lib/canvas/composition/types';
-import { COMPOSITION_CAMERAS, TITLE_LOOK } from '$lib/motion/components';
-import { Ease, TransitionKind } from '$lib/motion/design';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
+import type { LayoutId, LayoutParam } from '@feega/motion-core/canvas/composition/types';
+import { COMPOSITION_CAMERAS, TITLE_LOOK } from '@feega/motion-core/motion/components';
+import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
 import { FADE_OUT, RISE, edge, type Beat } from '$lib/motion/template-kit';
 import { FieldType } from './fields';
 import type { TemplateEntry } from './library';

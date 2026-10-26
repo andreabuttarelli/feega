@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { sampleTrack } from '../keyframes';
-import { Bounds, PHYSICS_PRESETS, PhysicsPreset, type Physics } from './model';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { sampleTrack } from '@feega/motion-core/motion/keyframes';
+import { Bounds, PHYSICS_PRESETS, PhysicsPreset, type Physics } from '@feega/motion-core/motion/physics/model';
 import { applyPhysicsPreset, setPhysics } from './ops';
-import { bakePhysics, simulate } from './simulate';
+import { bakePhysics, simulate } from '@feega/motion-core/motion/physics/simulate';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ChevronDown } from "@lucide/svelte";
+	import ChevronDown from "@lucide/svelte/icons/chevron-down";
 	import type { HTMLSelectAttributes } from "svelte/elements";
 	import { cn, type WithElementRef } from "$lib/utils.js";
 

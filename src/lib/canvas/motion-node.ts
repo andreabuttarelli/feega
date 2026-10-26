@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { versionNamesSchema, type VersionNames } from '$lib/motion/version-names';
-import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
+import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { presetOf } from '$lib/motion/frame-presets';
 import { NodeMode, Opening } from './inline-motion';
-import { FrameFormat } from '$lib/motion/hyperframes/capture';
+import { FrameFormat } from '@feega/motion-core/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
 import { FramePress } from '$lib/motion/drill';
 import { grantedPath } from './asset-url';
@@ -13,15 +14,34 @@ export enum FrameKind {
   Group = 'group'
 }
 
-type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress };
+type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress; timeline: boolean; selectsOwnClip: boolean };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move },
-  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick },
-  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick }
+  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move, timeline: true, selectsOwnClip: false },
+  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick, timeline: false, selectsOwnClip: true },
+  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick, timeline: true, selectsOwnClip: false }
 };
 
+export enum TileBody {
+  Dom = 'dom',
+  Standin = 'standin'
+}
+
+export enum HoverHost {
+  Node = 'node',
+  Overlay = 'overlay'
+}
+
+const HOVER_HOST: Record<TileBody, HoverHost> = {
+  [TileBody.Dom]: HoverHost.Node,
+  [TileBody.Standin]: HoverHost.Overlay
+};
+
+export const hoverHostOf = (body: TileBody): HoverHost => HOVER_HOST[body];
+
 export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];
+
+export const leftEmpty = (kind: FrameKind, doc: { tracks: { clips: unknown[] }[] }): boolean => !CHROME[kind].takesDrops && doc.tracks.every((t) => t.clips.length === 0);
 
 export type MotionNode = {
   id: string;
@@ -60,6 +80,13 @@ export const motionNodeSchema = z.object({
   budgetRaisedUsd: z.number().min(0).optional(),
   kind: z.enum(FrameKind).optional(),
   versionNames: versionNamesSchema.optional(),
+  interactive: z.boolean().default(false)
+});
+
+export const elementNodeSchema = z.object({
+  docHeadRevision: z.number().int().min(0),
+  posterRevision: z.number().int().min(0).optional(),
+  kind: z.literal(FrameKind.Group).optional(),
   interactive: z.boolean().default(false)
 });
 
@@ -121,6 +148,8 @@ const sizingOf = (node: Pick<MotionNode, 'kind'>): Sizing => (FREE_KIND.has(node
 
 export const heightFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>): boolean => node.kind === FrameKind.Frame && node.format !== MotionFormat.Custom;
 
+export const tileFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>, doc: Pick<MotionDoc, 'width' | 'height'>): boolean => heightFollowsDoc(node) || (node.kind === FrameKind.Frame && presetOf(doc) !== null);
+
 export type FrameResize = { w: number; h: number; picture: Picture | null };
 
 const RESIZE: Record<Sizing, (node: MotionNode, asked: { w: number; h: number }, picture: Picture, mode: NodeMode) => FrameResize> = {
@@ -135,17 +164,21 @@ export function frameResize(node: MotionNode, asked: { w: number; h: number }, p
   return RESIZE[sizingOf(node)](node, asked, picture, mode);
 }
 
-export function elementNodeOf(box: { width: number; height: number }, kind: FrameKind = FrameKind.Element): { data: Record<string, unknown>; w: number; h: number } {
-  return { data: { ...newMotionData(docFormat(box)), kind }, w: Math.round(box.width), h: Math.round(box.height) };
+export type DocNodeShape = { type: DocNodeType; data: Record<string, unknown>; w: number; h: number };
+
+const elementData = (kind: FrameKind): Record<string, unknown> => (kind === FrameKind.Group ? { docHeadRevision: 0, kind } : { docHeadRevision: 0 });
+
+export function elementNodeOf(box: { width: number; height: number }, kind: FrameKind = FrameKind.Element): DocNodeShape {
+  return { type: DocNodeType.Element, data: elementData(kind), w: Math.round(box.width), h: Math.round(box.height) };
 }
 
-export function drawnFrameNodeOf(box: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
-  return { data: newMotionData(docFormat(box)), w: Math.round(box.width), h: Math.round(box.height) + MOTION_NODE_BAR_H };
+export function drawnFrameNodeOf(box: { width: number; height: number }): DocNodeShape {
+  return { type: DocNodeType.Motion, data: newMotionData(docFormat(box)), w: Math.round(box.width), h: Math.round(box.height) + MOTION_NODE_BAR_H };
 }
 
-export function frameNodeOf(picture: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
+export function frameNodeOf(picture: { width: number; height: number }): DocNodeShape {
   const format = docFormat(picture);
-  return { data: newMotionData(format), ...frameNodeSize(MOTION_STAGE_WIDTH[format], picture) };
+  return { type: DocNodeType.Motion, data: newMotionData(format), ...frameNodeSize(MOTION_STAGE_WIDTH[format], picture) };
 }
 
 export const FIRST_REVISION = 1;
@@ -156,30 +189,70 @@ export function newMotionData(format: MotionFormat = MotionFormat.Vertical): Rec
   return { format, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null };
 }
 
+export enum DocNodeType {
+  Motion = 'motion',
+  Element = 'element'
+}
+
+export const DOC_NODE_TYPES: readonly string[] = Object.values(DocNodeType);
+
+export const holdsDoc = (type: string): type is DocNodeType => DOC_NODE_TYPES.includes(type);
+
+const KIND_OF_TYPE: Record<DocNodeType, (stored: FrameKind | undefined) => FrameKind> = {
+  [DocNodeType.Motion]: (stored) => stored ?? FrameKind.Frame,
+  [DocNodeType.Element]: (stored) => (stored === FrameKind.Group ? FrameKind.Group : FrameKind.Element)
+};
+
+const storedKind = (raw: unknown): FrameKind | undefined => (Object.values(FrameKind).includes(raw as FrameKind) ? (raw as FrameKind) : undefined);
+
+export const docKindOf = (type: DocNodeType, raw: unknown): FrameKind => KIND_OF_TYPE[type](storedKind(raw));
+
 export function motionOf(row: { id: string; type: string; data: Record<string, unknown> }): MotionNode | null {
-  if (row.type !== 'motion') {
+  if (!holdsDoc(row.type)) {
     return null;
   }
 
   const parsed = motionNodeSchema.safeParse({ ...newMotionData(), ...row.data });
   const data = parsed.success ? parsed.data : motionNodeSchema.parse(newMotionData());
-  return { id: row.id, ...data, kind: data.kind ?? FrameKind.Frame };
+  return { id: row.id, ...data, kind: docKindOf(row.type, data.kind) };
 }
 
-export function motionEditorPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
+const LEGACY_FREE: ReadonlySet<unknown> = new Set([FrameKind.Element, FrameKind.Group]);
+
+export function currentDocNode<T extends { type: string; data: Record<string, unknown> }>(row: T): T {
+  if (row.type !== DocNodeType.Motion || !LEGACY_FREE.has(row.data.kind)) {
+    return row;
+  }
+  const { kind, ...rest } = row.data;
+  return { ...row, type: DocNodeType.Element, data: { ...rest, ...elementData(kind as FrameKind) } };
+}
+
+export function docNodeCopy<T extends { type: string; data: Record<string, unknown> }>(row: T): T {
+  const current = currentDocNode(row);
+  const { posterRevision: _poster, ...data } = atFirstRevision(current.data);
+  return { ...current, data };
+}
+
+export const FRAME_PARAM = 'frame';
+
+export function motionNodePath(input: { projectId: string; canvasId: string; nodeId: string }): string {
   return `/p/${input.projectId}/c/${input.canvasId}/motion/${input.nodeId}`;
 }
 
+export function motionEditorPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
+  return `/p/${input.projectId}/c/${input.canvasId}?${FRAME_PARAM}=${input.nodeId}`;
+}
+
 export function motionSourcePath(input: { projectId: string; canvasId: string; nodeId: string; revision: number }): string {
-  return `${motionEditorPath(input)}/source?rev=${input.revision}`;
+  return `${motionNodePath(input)}/source?rev=${input.revision}`;
 }
 
 export function motionPreviewPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
-  return grantedPath(`${motionEditorPath(input)}/preview`);
+  return grantedPath(`${motionNodePath(input)}/preview`);
 }
 
 export function motionLivePath(input: { projectId: string; canvasId: string; nodeId: string }): string {
-  return grantedPath(`${motionEditorPath(input)}/live`);
+  return grantedPath(`${motionNodePath(input)}/live`);
 }
 
 export function storyboardPath(projectId: string, data: Record<string, unknown>): string | null {
@@ -197,8 +270,8 @@ const DEFAULT_SIZE: Record<FrameKind, (node: MotionNode) => { w: number; h: numb
   [FrameKind.Group]: () => ELEMENT_MIN_SIZE
 };
 
-export function frameDefaultSize(data: Record<string, unknown>): { w: number; h: number } {
-  const node = motionOf({ id: '', type: 'motion', data })!;
+export function frameDefaultSize(data: Record<string, unknown>, type: DocNodeType = DocNodeType.Motion): { w: number; h: number } {
+  const node = motionOf({ id: '', type, data })!;
   return DEFAULT_SIZE[node.kind](node);
 }
 

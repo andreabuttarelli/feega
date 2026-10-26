@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, motionDocSchema, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
-import { mergeView, precompose, viewOf } from '$lib/motion/precomp';
+import { MotionFormat, motionDocSchema, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { mergeView, precompose, viewOf } from '@feega/motion-core/motion/precomp';
 import { applyValues, exposeField, FieldType, fieldValues, removeField } from './fields';
 
 function withTitle(): MotionDoc {

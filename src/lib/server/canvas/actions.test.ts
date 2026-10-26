@@ -82,6 +82,16 @@ describe('canvas action input', () => {
     expect(input.calls.some((call) => call.op === 'insert')).toBe(true);
   });
 
+  it('creates a section at the asked size, so a section can wrap what is selected', async () => {
+    const input = event({ type: 'section', x: '10', y: '20', width: '800', height: '500', data: '{"title":"Launch"}' });
+    const result = await actions.create(input as never);
+    const inserted = input.calls.find((call) => call.op === 'insert') as { values?: Record<string, unknown> } | undefined;
+
+    expect(result).not.toMatchObject({ status: 400 });
+    expect(JSON.stringify(inserted)).toContain('800');
+    expect(JSON.stringify(inserted)).toContain('500');
+  });
+
   it('rejects an influencer node without influencer_id, before writing', async () => {
     const input = event({ type: 'influencer', x: '0', y: '0', data: '{}' });
     const result = await actions.create(input as never);

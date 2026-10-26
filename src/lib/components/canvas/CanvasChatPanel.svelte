@@ -7,16 +7,46 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
-  import { canvasSelection } from '$lib/canvas/promote-sheet';
+  import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { replaceState } from '$app/navigation';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import { handoffOf, withoutHandoff, type ChatHandoff } from '$lib/canvas/chat-handoff';
+  import { untrack } from 'svelte';
   import BarSlot from '$lib/components/brand-agent/BarSlot.svelte';
-  import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
+  import { BarTab, portalInto, rightBar, type BarProperties } from '$lib/components/brand-agent/right-bar-host.svelte';
+  import { readChatTab, writeChatTab } from '$lib/shell-prefs';
+  import FrameInspectorPanel from './FrameInspectorPanel.svelte';
+  import { frameProperties, typingInBar } from './frame-properties.svelte';
+  import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
+  import { answerAgent } from '$lib/canvas/agent-requests';
+  import { browserPorts, type AskedFrame } from '$lib/canvas/agent-capture';
 
   let { open }: { open: boolean } = $props();
 
   let prefill = $state<ChatPrefill | null>(null);
+  let propertiesShown = $state(readChatTab() === BarTab.Properties);
+
+  const properties: BarProperties = {
+    get shown() {
+      return propertiesShown;
+    },
+    onshow(shown) {
+      propertiesShown = shown;
+    }
+  };
+
+  $effect(() => {
+    const picked = frameProperties.session?.selection.join(',');
+    if (!picked) {
+      return;
+    }
+    untrack(() => {
+      if (!typingInBar(document.activeElement)) {
+        rightBar.select(BarTab.Properties);
+        writeChatTab(BarTab.Properties);
+      }
+    });
+  });
 
   $effect(() => {
     const handoff = $page.data.handoff as ChatHandoff | null | undefined;
@@ -28,6 +58,22 @@
     prefill = briefPrefill(handoff.text, handoff.attachments, Date.now());
     replaceState(withoutHandoff($page.url), $page.state);
   });
+
+  let asked: AskedFrame | null = null;
+
+  function context() {
+    const frame = frameProperties.openFrame();
+    const params = get(page).params;
+    asked = frame && frameProperties.tokens ? { projectId: params.projectId ?? '', nodeId: frame.nodeId, tokens: frameProperties.tokens, assets: frameProperties.extras?.assetUrls ?? {}, analyses: frameProperties.extras?.analyses } : null;
+    return { canvasId: params.canvasId ?? null, selection: get(canvasSelection), ...(frame ? { frame } : {}) };
+  }
+
+  function answerFrameRequest(part: StreamData) {
+    if (!asked) {
+      return;
+    }
+    void answerAgent(part, browserPorts(asked)).catch((e) => console.error('[canvas] agent request not answered', part.type, e));
+  }
 
   function onResizeStart(e: PointerEvent) {
     e.preventDefault();
@@ -64,12 +110,23 @@
       onpointerdown={onResizeStart}
     ></div>
     <div class="chat-column">
-      <BarSlot {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
+      <BarSlot {prefill} {properties} {context} ondata={answerFrameRequest} />
     </div>
   </div>
+  {#if rightBar.propertiesPane}
+    <div class="properties" use:portalInto={rightBar.propertiesPane}>
+      <FrameInspectorPanel session={frameProperties.session} tokens={frameProperties.tokens} assets={frameProperties.extras?.assets ?? []} fonts={frameProperties.extras} upload={frameProperties.extras?.uploadMedia ?? null} analyses={frameProperties.extras?.analyses} part={frameProperties.part} />
+    </div>
+  {/if}
 {/if}
 
 <style>
+  .properties {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
   .chat-pane {
     position: relative;
     flex: 0 0 auto;

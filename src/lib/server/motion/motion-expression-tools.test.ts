@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession } from './motion-tools';
@@ -27,6 +27,19 @@ describe('motion agent expression tool', () => {
 
     await run('set_expression', { clip_id: 'id1', prop: 'rotateZ', expression: null });
     expect(findClip(session.doc, 'id1')!.clip.expressions).toEqual({});
+  });
+
+  it('expression_to_keys turns the expression into keyframes and removes it', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
+    await run('set_expression', { clip_id: 'id1', prop: 'rotateZ', expression: 'time * 90' });
+
+    expect((await run('expression_to_keys', { clip_id: 'id1', prop: 'rotateZ' })).ok).toBe(true);
+
+    const clip = findClip(session.doc, 'id1')!.clip;
+    expect(clip.expressions).toEqual({});
+    expect(clip.keyframes.rotateZ.length).toBeGreaterThanOrEqual(2);
+    expect(String((await run('expression_to_keys', { clip_id: 'id1', prop: 'rotateZ' })).error)).toContain('no rotateZ expression');
   });
 
   it('set_expression on the camera, and a broken expression comes back as an error', async () => {

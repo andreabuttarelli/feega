@@ -1,8 +1,8 @@
 import type { Db } from '$lib/server/db/client';
 import { findBrand, findBrandLook, listOrgBrands, type Brand } from '$lib/server/repos/brands';
 import { listBrandProducts } from '$lib/server/repos/products';
-import { paletteFrom } from '$lib/motion/brand';
-import { fontsFrom } from '$lib/motion/fonts/model';
+import { paletteFrom } from '@feega/motion-core/motion/brand';
+import { fontsFrom } from '@feega/motion-core/motion/fonts/model';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 
 const PRODUCTS_MAX = 12;

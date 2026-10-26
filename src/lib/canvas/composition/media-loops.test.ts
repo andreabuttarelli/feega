@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { cameraAt } from './camera';
-import { LAYOUTS } from './index';
-import { instancesOf, poseAt, type PoseInput } from './pose';
-import type { LayoutId, Transform } from './types';
+import { cameraAt } from '@feega/motion-core/canvas/composition/camera';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
+import { instancesOf, poseAt, type PoseInput } from '@feega/motion-core/canvas/composition/pose';
+import type { LayoutId, Transform } from '@feega/motion-core/canvas/composition/types';
 
 const MEDIA_LOOPS: LayoutId[] = [
 	'marquee',

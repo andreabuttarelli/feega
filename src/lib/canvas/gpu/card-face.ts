@@ -1,4 +1,4 @@
-import { FrameKind } from '../motion-node';
+import { DocNodeType, FrameKind, docKindOf } from '../motion-node';
 import { NODE_KIND_LABEL, NameTag } from '../node-label';
 import { NODE_EMPTY_HINT } from '../node-empty';
 import { isNodeType, type NodeType } from '../node-data';
@@ -6,6 +6,7 @@ import { isUploadedNodeRow } from '../uploaded-node';
 import type { Poster } from '../poster-lod';
 import type { GenTileView } from '../gen-tile-view';
 import type { SourceTile } from '../source-thumbs';
+import { techniqueFace } from '../technique-face';
 import { selectView, type BatchView, type NodeView, type SelectView } from '../node-view';
 import { EMBED_REFUSAL_HINT, normalizeEmbedUrl, sourceOf } from '../iframe-node';
 
@@ -25,6 +26,7 @@ export enum Surface {
   Effects = 'effects',
   List = 'list',
   Doc = 'doc',
+  Section = 'section',
   Blank = 'blank'
 }
 
@@ -59,6 +61,7 @@ export type CardFace = {
   rows: CardRow[];
   pills: string[];
   count: string;
+  tint: string | null;
 };
 
 type Data = Record<string, unknown>;
@@ -143,8 +146,8 @@ const listFace: Draw = (d, asset) => {
   };
 };
 
-const motion: Draw = (d, asset, t) => {
-  const kind = str(d.kind) || FrameKind.Frame;
+const docFace = (type: DocNodeType): Draw => (d, asset, t) => {
+  const kind = docKindOf(type, d.kind);
   const live = str(d.lastRenderAssetId);
   const rev = typeof d.docHeadRevision === 'number' && d.docHeadRevision ? `Rev ${d.docHeadRevision}` : 'Empty';
   return {
@@ -161,7 +164,8 @@ const FACES: Record<NodeType, Draw> = {
   video: generate(true),
   audio: textGenerate,
   model3d: (d, asset, t) => ({ ...generate(false)(d, asset, t), media: str(d.posterRefId) ? { url: asset(str(d.posterRefId)), video: false } : null }),
-  motion,
+  motion: docFace(DocNodeType.Motion),
+  element: docFace(DocNodeType.Element),
   doc: (d) => ({ surface: Surface.Doc, text: str(d.content), pills: ['Read', 'Write'], count: d.public === true ? 'Revoke' : 'Public link' }),
   iframe: embedFace,
   social_account_feed: preview(feedTitle, 'Select the node to choose the account.', 'No posts yet. Select the node to sync.', (d) => str(d.handle).trim() !== ''),
@@ -174,7 +178,9 @@ const FACES: Record<NodeType, Draw> = {
   effects: (d, _a, _t, view) => ({ surface: Surface.Effects, media: view?.media?.url ? { url: view.media.url, video: view.media.kind === 'video' } : null, subtitle: ref(d) ? '' : EFFECTS_PENDING, empty: EFFECTS_EMPTY, actions: [OPEN_EDITOR] }),
   composition: (d, asset) => ({ surface: Surface.Effects, media: ref(d) ? { url: asset(ref(d)!), video: true } : null, empty: COMPOSITION_EMPTY, actions: [COMPONENT, OPEN_EDITOR] }),
   calendar: hollow('calendar'),
-  studio_batch: (_d, _a, _t, view) => ({ surface: Surface.Pick, title: 'Open Photo studio', batch: view?.batch ?? null })
+  studio_batch: (_d, _a, _t, view) => ({ surface: Surface.Pick, title: 'Open Photo studio', batch: view?.batch ?? null }),
+  section: (d) => ({ surface: Surface.Section, title: str(d.title) || 'Section', tint: str(d.fill) || null }),
+  technique: (d, _a, _t, view) => techniqueFace(str(d.name), view?.technique ?? null)
 };
 
 const BLANK: CardFace = {
@@ -199,7 +205,8 @@ const BLANK: CardFace = {
   batch: null,
   rows: [],
   pills: [],
-  count: ''
+  count: '',
+  tint: null
 };
 
 function labelOf(t: FaceTile, kind: NodeType): string | null {

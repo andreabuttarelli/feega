@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { EditMode } from './edit-mode';
 import { MIXED } from './mixed';
 import { aabb, quadOf } from './scene-select';
 import { propBoxes } from './space';
-import { addClip, type OpResult } from './timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { unionBounds } from './multi-select';
 import { setConstraints } from './constraints/constraints';
-import { Horizontal, Vertical } from './constraints/model';
+import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
 import { placeBox, setPropAcross, sharedConstraint, sharedProp } from './selection-props';
 
 const must = (r: OpResult): MotionDoc => {
@@ -48,16 +48,23 @@ describe('a prop across a selection', () => {
 });
 
 describe('constraints across a selection', () => {
-  it('read as the default when never set', () => {
-    expect(sharedConstraint(clips, 'horizontal')).toBe(Horizontal.Scale);
+  it('read as scale for a layer saved without any', () => {
+    const old = clips.map((c) => ({ ...c, constraints: undefined }));
+
+    expect(sharedConstraint(old, 'horizontal')).toBe(Horizontal.Scale);
+  });
+
+  it('read as left and top for a new layer', () => {
+    expect(sharedConstraint(clips, 'horizontal')).toBe(Horizontal.Left);
+    expect(sharedConstraint(clips, 'vertical')).toBe(Vertical.Top);
   });
 
   it('are Mixed when the clips differ', () => {
-    const pinned = must(setConstraints(base, ['a'], { horizontal: Horizontal.Left }));
+    const pinned = must(setConstraints(base, ['a'], { horizontal: Horizontal.Right }));
     const both = ['a', 'b'].map((id) => findClip(pinned, id)!.clip);
 
     expect(sharedConstraint(both, 'horizontal')).toBe(MIXED);
-    expect(sharedConstraint(both, 'vertical')).toBe(Vertical.Scale);
+    expect(sharedConstraint(both, 'vertical')).toBe(Vertical.Top);
   });
 });
 

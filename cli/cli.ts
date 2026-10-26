@@ -41,6 +41,16 @@ program
   });
 
 program
+  .command('local [file]')
+  .description('Run feega locally on one canvas saved in a .feega file: no account, no database')
+  .option('--port <port>', 'port to listen on (default 5173)')
+  .option('--build', 'rebuild the app first')
+  .action(async (file, options) => {
+    const { cmdLocal } = await import('./commands/local.ts');
+    await cmdLocal(file ?? 'canvas.feega', options);
+  });
+
+program
   .command('brands')
   .description('Elenca tutti i brand')
   .action(async () => {
@@ -108,9 +118,12 @@ motion
   .description('Render a video: a free link that renders in your browser')
   .option('--server', 'Render on our servers (not available yet)')
   .option('--resolution <r>', '720p, 1080p, 1440p or 2160p')
-  .option('--format <f>', 'With --server: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif')
+  .option('--format <f>', 'With --server: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif, apng')
   .option('--quality <q>', 'standard, high (default) or max')
-  .option('--fps <n>', '24, 25, 30, 50 or 60')
+  .option('--fps <n>', '24, 25, 30, 50, 60 or 120 (120 renders on our servers)')
+  .option('--gif-loop <mode>', 'GIF: forever (default), once or boomerang')
+  .option('--gif-fps <n>', 'GIF frame rate, 8 to 30 (default 15)')
+  .option('--gif-width <px>', 'GIF width, 64 to 1920 (default 640)')
   .option('--org <id>', 'Which org, if you belong to more than one')
   .action(async (nodeId: string, opts) => {
     const { cmdMotionRender } = await import('./commands/motion.ts');
@@ -146,6 +159,15 @@ motion
   .action(async (nodeId: string, opts) => {
     const { cmdMotionEmbed } = await import('./commands/motion.ts');
     await cmdMotionEmbed(nodeId, opts);
+  });
+
+motion
+  .command('share <nodeId>')
+  .description('Create the public viewer link of one frame (plays on a loop, swipes between frames on a phone; free)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionShare } = await import('./commands/motion.ts');
+    await cmdMotionShare(nodeId, opts);
   });
 
 motion
@@ -447,7 +469,7 @@ canvas
 canvas
   .command('export <projectId> <targets...>')
   .description('Export frames, or one element as frameId:elementId: one file, or a zip for several (free, no AI)')
-  .option('--format <f>', 'png, jpg, webp, svg or pdf (one file, a page per frame)', 'png')
+  .option('--format <f>', 'png, jpg, webp, svg, pdf (one file, a page per frame), lottie or dotlottie (the animation)', 'png')
   .option('--scale <n>', 'Scale 0.5–4')
   .option('--width <px>', 'Fixed width, keeps the ratio')
   .option('--height <px>', 'Fixed height, keeps the ratio')
@@ -461,6 +483,25 @@ canvas
   .action(async (projectId: string, targets: string[], opts) => {
     const { cmdCanvasExport } = await import('./commands/canvas.ts');
     await cmdCanvasExport(projectId, targets, opts);
+  });
+
+canvas
+  .command('save <projectId> <canvasId>')
+  .description('Save a whole canvas as a .feega file: nodes, lines, frames and their media (free)')
+  .option('--out <file>', 'Where to save it (default: <canvas name>.feega)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, canvasId: string, opts) => {
+    const { cmdCanvasSave } = await import('./commands/canvas.ts');
+    await cmdCanvasSave(projectId, canvasId, opts);
+  });
+
+canvas
+  .command('import <projectId> <file>')
+  .description('Open a .feega file as a new canvas in a project, e.g. one saved from a local instance')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, file: string, opts) => {
+    const { cmdCanvasImport } = await import('./commands/canvas.ts');
+    await cmdCanvasImport(projectId, file, opts);
   });
 
 canvas
@@ -519,6 +560,44 @@ effects
   .action(async (effectId: string, opts) => {
     const { cmdEffectsPatch } = await import('./commands/effects.ts');
     await cmdEffectsPatch(effectId, opts);
+  });
+
+const allowlist = program
+  .command('allowlist')
+  .description('Show which image, video and 3D models your org offers')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdAllowlist } = await import('./commands/model-allowlist.ts');
+    await cmdAllowlist(opts);
+  });
+
+allowlist
+  .command('set <medium> [ids...]')
+  .description('Replace the models a medium (image, video, model3d) offers; no ids allows every model. Admins only')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (medium: string, ids: string[], opts) => {
+    const { cmdAllowlistSet } = await import('./commands/model-allowlist.ts');
+    await cmdAllowlistSet(medium as 'image' | 'video' | 'model3d', ids, opts);
+  });
+
+const caps = program
+  .command('caps')
+  .description('Show the spend caps of your org')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdCaps } = await import('./commands/spend-caps.ts');
+    await cmdCaps(opts);
+  });
+
+caps
+  .command('set <scope> <usd>')
+  .description('Set a cap (scope: org_member, project_member, project_total; usd, or "off" to remove). Admins only')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .option('--project <id>', 'The project, for the project scopes')
+  .option('--reset <reset>', 'none or monthly')
+  .action(async (scope: string, usd: string, opts) => {
+    const { cmdCapsSet } = await import('./commands/spend-caps.ts');
+    await cmdCapsSet(scope as 'org_member', usd, opts);
   });
 
 const layouts = program

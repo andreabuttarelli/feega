@@ -10,32 +10,34 @@
 // terzo concetto ancora, quanto di un abbonamento va in produzione contenuti. Le tre costanti
 // coesistono, nessuna sostituisce le altre.
 
-// 100% di markup sul costo provider = 200 crediti ogni $1 di `ai_calls.cost_usd`. Non un markup
+// 20% di markup sul costo provider = 120 crediti ogni $1 di `ai_calls.cost_usd`. Non un markup
 // del 20%: quello dà solo il 16,7% di margine (margine = markup / (1+markup)), e con uno sconto a
 // scala sopra andava sotto zero sui clienti più grandi — l'errore che questa costante corregge.
-export const AI_MARKUP = 1.0;
+export const AI_MARKUP = 0.2;
 
-// Nessun gradino della scala, in nessuna colonna, può scendere sotto questo margine nel caso
+// Con il 20% di markup il margine di ogni gradino è markup / (1 + markup) = 16,7%: il 35% di
+// prima non è più raggiungibile per costruzione, il resto del margine viene dal prezzo
+// dell'abbonamento contro i crediti concessi. Nessun gradino può scendere sotto questo margine nel caso
 // peggiore (il cliente spende ogni credito comprato). Pinnato dal test in credit-ladder.test.ts:
 // aggiungere un gradino o alzare un bonus senza farlo girare è esattamente come il floor si
 // attraversa senza che nessuno se ne accorga finché non arriva la fattura.
-export const MARGIN_FLOOR = 0.35;
+export const MARGIN_FLOOR = 0.15;
 
 // Il cambio "costo provider → credito addebitato" per il debito di una chiamata AI. Vale SEMPRE
 // questo, a prescindere da come l'org ha comprato i suoi crediti.
-export const CREDITS_PER_USD_SUBSCRIPTION_LIST = 100 * (1 + AI_MARKUP); // 200
+export const CREDITS_PER_USD_SUBSCRIPTION_LIST = 100 * (1 + AI_MARKUP); // 120
 
 // Quanti crediti concede UN dollaro di prezzo abbonamento (`PLANS[].mUsd` → `PLANS[].credits`,
 // plans.ts) — un QUARTO concetto ancora, diverso dagli altri tre sopra: quello è il cambio a cui
-// SI SPENDE un credito (SEMPRE 200/$1, a prescindere da come è stato comprato), questo è il
+// SI SPENDE un credito (SEMPRE 120/$1, a prescindere da come è stato comprato), questo è il
 // cambio a cui un piano NE CONCEDE (100/$1 di prezzo). I due non sono la stessa cosa per
 // costruzione: un piano da $89 concede 8900 crediti di GRANT, che valgono la metà in costo
-// provider reale (8900 / 200 = $44,50) — il margine che finanzia tutto il resto (blog, SEO,
+// provider reale (8900 / 120 = $74,17) — il margine che finanzia tutto il resto (blog, SEO,
 // strategia, chat) oltre alla produzione dei post.
 export const CREDITS_PER_USD_GRANT = 100;
 
 export const MULTIPLIER_FLOOR = 4;
-export const CHAT_MULTIPLIER = 4;
+export const CHAT_MULTIPLIER = 1.2;
 
 export const PLAN_CURRENCY = 'eur';
 
@@ -88,7 +90,7 @@ export function marginForRung(price: number, credits: number): number {
 // un cliente legge senza calcolatrice, margine effettivo 36.4%.
 export const ZERNIO_COST_PER_ACCOUNT_USD_PLACEHOLDER = 7;
 export const ACCOUNT_SEAT_USD = 11;
-export const ACCOUNT_SEAT_CREDITS = ACCOUNT_SEAT_USD * CREDITS_PER_USD_SUBSCRIPTION_LIST; // 2200
+export const ACCOUNT_SEAT_CREDITS = ACCOUNT_SEAT_USD * CREDITS_PER_USD_SUBSCRIPTION_LIST; // 1320
 
 // ── Crediti di benvenuto ────────────────────────────────────────────────────────────
 export const WELCOME_CREDITS = 100;

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { setStill } from './still';
-import { COMPONENTS } from './components';
+import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setStill } from '@feega/motion-core/motion/still';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { DrawTool } from './draw-tool';
-import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, penClip } from './draw-create';
-import { parsePath, type Outline } from './shape/geometry';
-import type { OpResult } from './timeline';
-import { TextSizing } from './text-sizing';
+import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
+import { parsePath, type Outline } from '@feega/motion-core/motion/shape/geometry';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
+import { FillType } from '@feega/motion-core/motion/fill/model';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -19,6 +20,16 @@ const video = () => ({ ...newMotionDoc(MotionFormat.Landscape), durationInFrames
 const still = () => ok(setStill(video(), 0));
 const BOX = { x: 0.4, y: 0.3, width: 0.2, height: 0.1 };
 const TEXT_LEADING = COMPONENTS.Text.schema.parse({}).leading;
+
+describe('drawing a frame inside a frame', () => {
+  it('is a rect Shape container that clips its content and carries its own fill', () => {
+    const clip = findClip(ok(drawClip(video(), DrawTool.Frame, BOX, 0, 'f1')), 'f1')!.clip;
+
+    expect(clip.component).toBe('Shape');
+    expect(clip.clipContent).toBe(true);
+    expect(clip.props).toMatchObject({ shape: 'rect', ...BOX, fills: [{ type: FillType.Solid }] });
+  });
+});
 
 describe('creating an element by drawing inside a frame', () => {
   it('a rectangle is a rect Shape clip on the drawn box', () => {
@@ -46,7 +57,7 @@ describe('creating an element by drawing inside a frame', () => {
   it('in a video it starts at the playhead; in a still it spans the whole frame', () => {
     const atPlayhead = findClip(ok(drawClip(video(), DrawTool.Rectangle, BOX, 120, 'r1')), 'r1')!.clip;
     expect(atPlayhead.from).toBe(120);
-    expect(atPlayhead.from + atPlayhead.durationInFrames).toBeLessThanOrEqual(300);
+    expect(atPlayhead.from + atPlayhead.durationInFrames).toBe(300);
 
     const doc = still();
     const onStill = findClip(ok(drawClip(doc, DrawTool.Rectangle, BOX, 40, 'r1')), 'r1')!.clip;
@@ -108,11 +119,63 @@ describe('drawing an element on the canvas, outside any frame', () => {
     expect(findClip(drawn.doc, 'p1')!.clip.props).toMatchObject({ shape: 'path', x: 0.5, y: 0.5, width: 1, height: 1 });
   });
 
-  it('a big box stays inside the frame resolution limits', () => {
-    const drawn = made(drawnElement({ tool: DrawTool.Ellipse, box: { left: 0, top: 0, width: 5000, height: 2500 } }, 'e1'));
+  it('an arrow drawn from two points is a stroked open path with its head at the end', () => {
+    const wire = drawnOf({ tool: DrawTool.Arrow, from: { x: 0, y: 100 }, to: { x: 300, y: 100 } });
+    if (typeof wire === 'string') {
+      throw new Error(wire);
+    }
+    const drawn = made(drawnElement(wire, 'a1'));
+    const props = findClip(drawn.doc, 'a1')!.clip.props;
 
-    expect(drawn.doc.width).toBeLessThanOrEqual(1920);
-    expect(drawn.doc.height).toBeLessThanOrEqual(1080);
+    expect(drawn.box.left).toBe(0);
+    expect(drawn.box.left + drawn.box.width).toBe(300);
+    expect(props).toMatchObject({ shape: 'path', fillKind: 'none', strokeKind: 'solid', stroke: CANVAS_INK[CanvasTheme.Light] });
+    expect(String(props.path).match(/L/g)?.length).toBeGreaterThan(1);
+  });
+
+  it('a line takes the stroke colour it is given', () => {
+    const wire = drawnOf({ tool: DrawTool.Line, from: { x: 0, y: 0 }, to: { x: 100, y: 100 }, stroke: '#ff0000' });
+    if (typeof wire === 'string') {
+      throw new Error(wire);
+    }
+
+    expect(findClip(made(drawnElement(wire, 'l1')).doc, 'l1')!.clip.props).toMatchObject({ stroke: '#ff0000', fillKind: 'none' });
+  });
+
+  it('a pasted path keeps its fill, and a stroke-only path draws its stroke without fill', () => {
+    const outline = parsePath('M 0 0 L 10 0 L 10 10 Z') as Outline;
+    const filled = made(drawnElement({ tool: DrawTool.Pen, outline, fill: '#ff0000' }, 'f1'));
+    const stroked = made(drawnElement({ tool: DrawTool.Pen, outline, fill: null, stroke: '#00ff00' }, 's1'));
+
+    expect(findClip(filled.doc, 'f1')!.clip.props).toMatchObject({ fill: '#ff0000', fillKind: 'solid' });
+    expect(findClip(stroked.doc, 's1')!.clip.props).toMatchObject({ fillKind: 'none', strokeKind: 'solid', stroke: '#00ff00' });
+  });
+
+  it('a pasted path keeps its gradient as a fill layer', () => {
+    const outline = parsePath('M 0 0 L 10 0 L 10 10 Z') as Outline;
+    const gradient = { type: FillType.Linear, stops: [{ color: '#ff0000', pos: 0 }, { color: '#0000ff', pos: 1 }], angle: 90 };
+    const drawn = made(drawnElement({ tool: DrawTool.Pen, outline, fill: '#ff0000', gradient }, 'g1'));
+
+    expect(findClip(drawn.doc, 'g1')!.clip.props.fills).toMatchObject([gradient]);
+  });
+
+  it('a pasted text keeps its colour', () => {
+    const drawn = made(drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 60 }, text: 'hi', color: '#336699' }, 't3'));
+
+    expect(findClip(drawn.doc, 't3')!.clip.props.color).toBe('#336699');
+  });
+
+  it('a pasted text carries its words', () => {
+    const drawn = made(drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 60 }, text: 'hello there' }, 't2'));
+
+    expect(findClip(drawn.doc, 't2')!.clip.props.text).toBe('hello there');
+  });
+
+  it('a big box stays inside the frame resolution limits', () => {
+    const drawn = made(drawnElement({ tool: DrawTool.Ellipse, box: { left: 0, top: 0, width: 9000, height: 4500 } }, 'e1'));
+
+    expect(drawn.doc.width).toBeLessThanOrEqual(3840);
+    expect(drawn.doc.height).toBeLessThanOrEqual(2160);
   });
 });
 
@@ -166,12 +229,17 @@ describe('the resizing a drawn text starts with', () => {
   const box = { x: 0.5, y: 0.5, width: 0.3, height: 0.1 };
   const sizingOf = (r: OpResult) => (r.ok ? findClip(r.doc, 'tx')?.clip.props.sizing : null);
 
-  it('a dragged text keeps its width and grows in height', () => {
-    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx'))).toBe('auto-height');
+  it('a text drawn without a sizing grows with its line', () => {
+    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx'))).toBe('auto');
   });
 
-  it('a clicked text grows with its line', () => {
-    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx', TextSizing.AutoWidth))).toBe('auto');
+  it('a text the chat or an agent draws without a sizing grows with its line', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 40 } }, 'tx');
+    expect(drawn.ok ? findClip(drawn.doc, 'tx')?.clip.props.sizing : null).toBe('auto');
+  });
+
+  it('a dragged text keeps its width and grows in height', () => {
+    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx', TextSizing.AutoHeight))).toBe('auto-height');
   });
 
   it('a free text drawn on the canvas keeps the resizing it was drawn with', () => {
@@ -192,3 +260,53 @@ describe('drawing a frame in a chosen format', () => {
     expect(drawnFrame(box, MotionFormat.Square, 1).still).toEqual({ frame: 30 });
   });
 });
+
+describe('shape tools', () => {
+  it.each([
+    [DrawTool.Polygon, { shape: 'polygon', sides: 3 }],
+    [DrawTool.Star, { shape: 'star', points: 5 }]
+  ])('%s draws its shape on the box', (tool, props) => {
+    const clip = findClip(ok(drawClip(video(), tool, BOX, 0, 's1')), 's1')!.clip;
+    expect(clip.props).toMatchObject({ ...props, ...BOX });
+  });
+
+  it('a line is an open two-point path from where the drag started', () => {
+    const outline = lineOutline({ x: 10, y: 50 }, { x: 110, y: 0 }, DrawTool.Line);
+    expect(outline).toHaveLength(1);
+    expect(outline[0].closed).toBe(false);
+    expect(outline[0].vertices.map((v) => v.p)).toEqual([
+      [10, 50],
+      [110, 0]
+    ]);
+  });
+
+  it('an arrow strokes a head back from the tip, in one open stroke', () => {
+    const outline = lineOutline({ x: 0, y: 0 }, { x: 100, y: 0 }, DrawTool.Arrow);
+    expect(outline).toHaveLength(1);
+    expect(outline[0].closed).toBe(false);
+    const points = outline[0].vertices.map((v) => v.p);
+    expect(points).toHaveLength(5);
+    expect(points[3]).toEqual([100, 0]);
+    expect(points[2][0]).toBeLessThan(100);
+    expect(points[4][0]).toBeLessThan(100);
+  });
+
+  it('a drawn line keeps a stroke and no fill', () => {
+    const made = drawnElement({ tool: DrawTool.Pen, outline: lineOutline({ x: 0, y: 0 }, { x: 100, y: 40 }, DrawTool.Line), fill: null, stroke: '#111111' }, 'l1');
+    expect(made.ok).toBe(true);
+    const clip = made.ok ? findClip(made.doc, 'l1')!.clip : null;
+    expect(clip?.props).toMatchObject({ shape: 'path', fillKind: 'none', strokeKind: 'solid', stroke: '#111111' });
+  });
+
+  it('a flat line on the canvas gets room around it and a stroke two canvas units wide', () => {
+    const made = drawnElement({ tool: DrawTool.Pen, outline: lineOutline({ x: 0, y: 10 }, { x: 200, y: 10 }, DrawTool.Line), fill: null, stroke: '#111111' }, 'l2');
+    expect(made.ok).toBe(true);
+    if (!made.ok) {
+      return;
+    }
+    expect(made.box.height).toBeGreaterThanOrEqual(24);
+    const clip = findClip(made.doc, 'l2')!.clip;
+    expect((clip.props.strokeWidth as number) * Math.min(made.box.width, made.box.height)).toBeCloseTo(2, 5);
+  });
+});
+

@@ -10,7 +10,7 @@
 # SHA256 placeholders below are filled by .github/workflows/cli-release.yml on each cli-v* tag.
 
 class Feega < Formula
-  desc "Command-line client for feega — social media AI autopilot"
+  desc "Command-line client for feega — infinite canvas for motion video and images"
   homepage "https://feega.app"
   version "0.1.0"
   license "Apache-2.0"

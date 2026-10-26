@@ -1,93 +1,35 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import type { BrandTokens } from '$lib/motion/brand';
-  import type { MotionDoc } from '$lib/motion/doc';
-  import { drawFrame, prepare, type Prepared } from '$lib/motion/gpu-full/display-list';
-  import { NO_TYPESET, smoothingOf } from '$lib/motion/gpu-full/text/painter';
-  import { FACES_PARAM, faceEngineOf, loadFontsWith } from '$lib/motion/gpu-full/text/engines';
-  import type { Raster } from '$lib/motion/gpu-full/raster';
-  import { BACKENDS, type FullBackend } from '$lib/motion/gpu-full/backends';
-  import { createMedia } from '$lib/motion/gpu-full/media';
-  import { mountCustomReads, type CustomReads } from '$lib/motion/gpu-full/dom/custom';
-  import type { Compose } from '$lib/motion/gpu-full/dom/reader';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { FACES_PARAM } from '@feega/motion-core/motion/gpu-full/text/engines';
+  import type { FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
+  import type { Compose } from '@feega/motion-core/motion/gpu-full/dom/reader';
+  import { mountPlayer, type Player } from '@feega/motion-core/motion/gpu-full/play';
 
   let { backend, doc, tokens, assets, compose, time, onfallback }: { backend: FullBackend; doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; compose: Compose; time: () => number; onfallback: (reason: unknown) => void } = $props();
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let host = $state<HTMLDivElement | null>(null);
   let gaps = $state(0);
-  let typeset = $state(NO_TYPESET);
-  const prepared = $derived(prepare(doc, tokens, assets, typeset));
-  let reads = $state.raw<{ of: Prepared; custom: Promise<CustomReads> } | null>(null);
-
-  $effect(() => {
-    let current = true;
-    void loadFontsWith(faceEngineOf(new URLSearchParams(location.search).get(FACES_PARAM)))(doc, assets, tokens).then((fonts) => current && (typeset = { fonts, smoothing: smoothingOf(navigator.userAgent) }));
-    return () => {
-      current = false;
-    };
-  });
-
-  $effect(() => {
-    const frameHost = host;
-    const of = prepared;
-    if (!frameHost) {
-      return;
-    }
-    const custom = untrack(() => mountCustomReads(frameHost, compose, of));
-    reads = { of, custom };
-    return () => void custom.then((r) => r.dispose(), () => {});
-  });
+  let player = $state.raw<Player | null>(null);
 
   $effect(() => {
     const target = canvas;
-    if (!target) {
+    const frameHost = host;
+    if (!target || !frameHost) {
       return;
     }
-    let raster: Raster | null = null;
-    let gone = false;
-    untrack(() => BACKENDS[backend](target, doc.width, doc.height)).then(
-      (made) => (gone ? made.dispose() : (raster = made)),
-      onfallback
-    );
-    const media = createMedia();
-    let drawn: [Prepared | null, number] = [null, -1];
-    let busy = false;
-    let loop = 0;
-    const tick = () => {
-      loop = requestAnimationFrame(tick);
-      const current = reads;
-      const into = raster;
-      if (!current || !into || busy) {
-        return;
-      }
-      const now = current.of;
-      const frame = Math.round(time() * now.doc.fps);
-      if (drawn[0] === now && drawn[1] === frame) {
-        return;
-      }
-      drawn = [now, frame];
-      busy = true;
-      void current.custom
-        .then((r) => r.readAt(frame))
-        .then(async (read) => {
-          const list = drawFrame(now, frame, read.reads);
-          gaps = list.unsupported.length;
-          await media.ready(list);
-          into.draw(list, (item) => read.picture(item) ?? media.pictures(item));
-        })
-        .catch(onfallback)
-        .finally(() => {
-          busy = false;
-        });
-    };
-    loop = requestAnimationFrame(tick);
+    const made = untrack(() => mountPlayer({ canvas: target, host: frameHost, backend, size: { width: doc.width, height: doc.height }, time, faces: new URLSearchParams(location.search).get(FACES_PARAM), onfallback, ongaps: (n) => (gaps = n) }));
+    player = made;
     return () => {
-      cancelAnimationFrame(loop);
-      gone = true;
-      raster?.dispose();
-      media.dispose();
+      player = null;
+      made.dispose();
     };
+  });
+
+  $effect(() => {
+    player?.show({ doc, tokens, assets, compose });
   });
 </script>
 

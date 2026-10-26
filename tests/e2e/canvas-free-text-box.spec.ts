@@ -11,7 +11,7 @@ async function tileRect(page: Page) {
   return (await tile.boundingBox())!;
 }
 
-for (const [renderer, query] of [['gpu', ''], ['dom', '?renderer=dom']]) {
+for (const [renderer, query] of [['gpu', '']]) {
   test.describe(`a free text on the ${renderer} canvas is one object of the drawn size @real`, () => {
     test.skip(!REAL_STACK, 'richiede E2E_REAL_STACK=1');
 
@@ -33,9 +33,9 @@ for (const [renderer, query] of [['gpu', ''], ['dom', '?renderer=dom']]) {
       expect(Math.abs(box.width - DRAG.width)).toBeLessThanOrEqual(1);
       expect(Math.abs(box.height - DRAG.height)).toBeLessThanOrEqual(1);
 
-      const { data } = await admin.from('nodes').select('width, height, data').eq('canvas_id', session.canvasId).is('deleted_at', null);
+      const { data } = await admin.from('nodes').select('width, height, type, data').eq('canvas_id', session.canvasId).is('deleted_at', null);
       expect(data).toHaveLength(1);
-      expect((data![0].data as { kind?: string }).kind).toBe('element');
+      expect(data![0].type).toBe('element');
 
       await page.keyboard.press('Escape');
       await page.keyboard.press('Escape');

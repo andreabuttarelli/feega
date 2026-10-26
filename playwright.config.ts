@@ -8,9 +8,6 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${E2E_PORT}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
-  // Un Zernio finto in locale, mai il vero: calendar.spec.ts programma/pubblica/cancella per
-  // davvero contro questo server, non contro l'account di nessuno. Deve partire PRIMA di
-  // webServer — è lì che ZERNIO_BASE_URL viene letta la prima volta.
   globalSetup: './tests/e2e/fixtures/global-setup.ts',
   timeout: 30_000,
   expect: { timeout: 10_000 },
@@ -26,10 +23,10 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    ...(process.env.E2E_REAL_STACK === '1' ? [{ name: 'webkit-iphone', testMatch: /canvas-motion-(webgl|open)/, use: { ...devices['iPhone 15'] } }, { name: 'webkit', testMatch: /selection-outline|dashboard-nav|page-zoom-lock|gpu-canvas-no-scroll/, use: { ...devices['Desktop Safari'] } }, { name: 'webkit-ipad', testMatch: /page-zoom-lock/, use: { ...devices['iPad Pro 11'] } }] : []),
+    ...(process.env.E2E_REAL_STACK === '1' ? [{ name: 'webkit-iphone', testMatch: /canvas-motion-webgl/, use: { ...devices['iPhone 15'] } }, { name: 'webkit', testMatch: /selection-outline|dashboard-nav|gpu-canvas-no-scroll/, use: { ...devices['Desktop Safari'] } }] : []),
     ...(process.env.E2E_HEAVY_PHONE === '1' ? [{ name: 'webkit-iphone-heavy', testMatch: /phone-heavy-frame-memory|ipad-playback-fps|landing-edit-latency/ }] : []),
     ...(process.env.FLUID_TOUCH === '1' ? [{ name: 'webkit-touch', testMatch: /fluidity-touch/ }] : []),
-    ...(process.env.E2E_PERF === '1' ? [{ name: 'webkit-perf', testMatch: /canvas-frame-budget|canvas-stress|editor-scrub|fluidity-scorecard|canvas-inline-play|inline-editor-open|canvas-core-perf/, use: { ...devices['Desktop Safari'] } }, { name: 'webkit-iphone-perf', testMatch: /canvas-core-perf/, use: { ...devices['iPhone 15'] } }] : [])
+    ...(process.env.E2E_PERF === '1' ? [{ name: 'webkit-perf', testMatch: /editor-scrub|fluidity-scorecard|canvas-core-perf/, use: { ...devices['Desktop Safari'] } }, { name: 'webkit-iphone-perf', testMatch: /canvas-core-perf/, use: { ...devices['iPhone 15'] } }] : [])
   ],
   webServer: {
     command: `npx vite dev --port ${E2E_PORT} --strictPort`,
@@ -43,12 +40,7 @@ export default defineConfig({
       PUBLIC_APP_URL: BASE_URL,
       ORIGIN: BASE_URL,
       NO_HMR: '1',
-      // Un mock Zernio, mai il vero: la firma di publish.ts è HTTP, quindi le spec che devono
-      // programmare/pubblicare puntano qui invece che a https://zernio.com — vedi
-      // calendar.spec.ts per il server che risponde su questa porta.
-      ...(process.env.ZERNIO_BASE_URL ? { ZERNIO_BASE_URL: process.env.ZERNIO_BASE_URL } : {}),
-      ...(process.env.E2E_FAKE_IMAGES && process.env.LLM_BASE_URL ? { LLM_BASE_URL: process.env.LLM_BASE_URL } : {}),
-      ZERNIO_API_KEY: process.env.ZERNIO_API_KEY ?? 'e2e-placeholder-zernio-key'
+      ...(process.env.E2E_FAKE_IMAGES && process.env.LLM_BASE_URL ? { LLM_BASE_URL: process.env.LLM_BASE_URL } : {})
     }
   }
 });

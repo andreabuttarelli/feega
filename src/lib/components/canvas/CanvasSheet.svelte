@@ -6,7 +6,7 @@
   import { openSheet, closeSheet } from '$lib/canvas/sheet-nav';
   import { SHEET_PAGE_LOADERS, settingsPageLoader } from '$lib/canvas/sheet-pages';
   import { sheetEntryForPath } from '$lib/shell-nav';
-  import { settingsGroupsFor, SETTINGS_HOME } from '$lib/components/settings/platforms';
+  import { SETTINGS_GROUPS, SETTINGS_HOME } from '$lib/components/settings/platforms';
   import { cn } from '$lib/utils';
 
   let { projectId }: { projectId: string } = $props();
@@ -55,7 +55,7 @@
         {#if entry.id === 'settings'}
           <div class="settings-shell">
             <nav class="settings-switcher" aria-label={$_('app.nav.settings')}>
-              {#each settingsGroupsFor(page.data.socialPublishing) as group (group.labelKey)}
+              {#each SETTINGS_GROUPS as group (group.labelKey)}
                 <p class="switcher-group">{$_(group.labelKey)}</p>
                 {#each group.items as item (item.section)}
                   <button
@@ -82,18 +82,6 @@
               {/await}
             </div>
           </div>
-        {:else if entry.id === 'calendar'}
-          {#await SHEET_PAGE_LOADERS.calendar() then { default: CalendarPage }}
-            <CalendarPage data={sheet.data as never} form={null} />
-          {/await}
-        {:else if entry.id === 'ads'}
-          {#await SHEET_PAGE_LOADERS.ads() then { default: AdsSocialPage }}
-            <AdsSocialPage data={sheet.data as never} form={null} />
-          {/await}
-        {:else if entry.id === 'promote'}
-          {#await SHEET_PAGE_LOADERS.promote() then { default: PromotePage }}
-            <PromotePage data={sheet.data as never} form={null} />
-          {/await}
         {/if}
       </div>
     </Sheet.Content>

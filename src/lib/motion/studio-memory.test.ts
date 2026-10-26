@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from './doc';
-import { TrackKind } from './components';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { memoryNote, studioMemory } from './studio-memory';
 
 const clip = (component: string, props: Record<string, unknown>) => ({ id: component, from: 0, durationInFrames: 30, component, props }) as never;

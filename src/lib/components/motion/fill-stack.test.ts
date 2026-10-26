@@ -2,8 +2,8 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { fillsSchema, type Fill } from '$lib/motion/fill/model';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { fillsSchema, type Fill } from '@feega/motion-core/motion/fill/model';
 import { MediaKind } from '$lib/motion/media/pick';
 import type { MediaUploader } from './media-upload';
 import FillStack from './FillStack.svelte';
@@ -196,6 +196,49 @@ describe('the fill stack in Properties', () => {
     expect(sent(onchange)[0]).toMatchObject({ fit: 'tile' });
   });
 
+  it('a tiled image edits its rotation and has no crop window', () => {
+    const onchange = show(stack([{ type: 'image', fit: 'tile' }]));
+    click(rows()[0]);
+    change(byId<HTMLInputElement>('fill-rotation'), '30');
+    expect(sent(onchange)[0]).toMatchObject({ fit: 'tile', rotation: 30 });
+    expect(document.querySelector('[data-testid="fill-crop-w"]')).toBeNull();
+  });
+
+  it('a cropped image edits its window', () => {
+    const onchange = show(stack([{ type: 'image', fit: 'crop' }]));
+    click(rows()[0]);
+    change(byId<HTMLInputElement>('fill-crop-w'), '50');
+    expect(sent(onchange)[0]).toMatchObject({ crop: { x: 0, y: 0, w: 0.5, h: 1 } });
+    expect(document.querySelector('[data-testid="fill-rotation"]')).toBeNull();
+  });
+
+  it('an image layer is adjusted by sliders and reset in one click', () => {
+    const onchange = show(stack([{ type: 'image', adjust: { exposure: 0.2 } }]));
+    click(rows()[0]);
+    const slider = byId('fill-adjust-contrast').querySelector<HTMLInputElement>('input[type="range"]')!;
+    slider.value = '40';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    expect(sent(onchange)[0]).toMatchObject({ adjust: { exposure: 0.2, contrast: 0.4 } });
+    click(byId('fill-adjust-reset'));
+    expect((sent(onchange)[0] as { adjust?: unknown }).adjust).toBeUndefined();
+  });
+
+  it('the crop button hands the picture to the canvas', () => {
+    const oncrop = vi.fn();
+    app = mount(FillStack, { target: document.body, props: { fills: stack([{ type: 'image', assetId: 'pic' }]), assets: ASSETS, tokens: FEEGA_TOKENS, onchange: vi.fn(), upload: null, oncrop } });
+    flushSync();
+    click(rows()[0]);
+    click(byId('fill-crop-edit'));
+    expect(oncrop).toHaveBeenCalledOnce();
+  });
+
+  it('without a canvas to crop on there is no crop button', () => {
+    show(stack([{ type: 'image', assetId: 'pic' }]));
+    click(rows()[0]);
+    expect(document.querySelector('[data-testid="fill-crop-edit"]')).toBeNull();
+  });
+
   it('an image layer takes a link, copied into the project as a picture', async () => {
     const upload = vi.fn(async () => ({ ok: true as const, asset: { id: 'copied', kind: MediaKind.Image, label: 'b.jpg', previewUrl: '/a/copied' } }));
     const onchange = show(stack([{ type: 'image', assetId: 'pic' }]), upload);
@@ -210,5 +253,20 @@ describe('the fill stack in Properties', () => {
     click(byId('media-link-use'));
     await vi.waitFor(() => expect(sent(onchange)[0]).toMatchObject({ type: 'image', assetId: 'copied' }));
     expect(upload).toHaveBeenCalledWith(new URL('https://cdn.test/b.jpg'), expect.any(Function));
+  });
+
+  it('a typed shorthand of the same colour still shows the full hex', () => {
+    show(stack([{ type: 'solid', color: '#ffffff' }]));
+    click(inRow(0, 'fill-swatch'));
+    const hex = byId('fill-editor').querySelector<HTMLInputElement>('input.hex')!;
+    change(hex, 'ff');
+    expect(hex.value).toBe('FFFFFF');
+  });
+
+  it('a typed rgba sets colour and opacity in one change', () => {
+    const onchange = show(stack([{ type: 'solid', color: '#111111' }]));
+    click(inRow(0, 'fill-swatch'));
+    change(byId('fill-editor').querySelector<HTMLInputElement>('input.hex')!, 'rgba(255, 0, 0, 0.5)');
+    expect(sent(onchange)[0]).toMatchObject({ type: 'solid', color: '#ff000080' });
   });
 });

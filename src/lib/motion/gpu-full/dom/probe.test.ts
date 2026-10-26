@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { domProbe } from './probe';
-import { CUSTOM_ROOT_PREFIX, DOM_READ_REPLY, DOM_READ_REQUEST, NO_INDEX, READ_ATTRS, READ_STYLES, TEXT_PAD } from './tree';
+import { domProbe } from '@feega/motion-core/motion/gpu-full/dom/probe';
+import { CUSTOM_ROOT_PREFIX, DOM_READ_REPLY, DOM_READ_REQUEST, NO_INDEX, READ_ATTRS, READ_STYLES, TEXT_PAD } from '@feega/motion-core/motion/gpu-full/dom/tree';
 
 const CLIP = 'poster';
 const CONFIG = { request: DOM_READ_REQUEST, reply: DOM_READ_REPLY, timeline: 'main', prefix: CUSTOM_ROOT_PREFIX, none: NO_INDEX, pad: TEXT_PAD, styles: READ_STYLES, attrs: READ_ATTRS };

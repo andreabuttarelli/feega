@@ -1,11 +1,11 @@
-import { findClip, type MotionClip, type MotionDoc } from '../doc';
-import { withAutoLayout } from '../layout/resolve';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { aabb, quadOf, snapMove, type Bounds, type Guide } from '../scene-select';
 import { propBoxes } from '../space';
-import type { OpResult } from '../timeline';
-import type { Pt } from './geometry';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import type { Pt } from '@feega/motion-core/motion/shape/geometry';
 import { setPath, shapePath, type ShapeParams } from './ops';
-import { ShapeKind } from './schema';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 
 const EDITABLE: ReadonlySet<string> = new Set([ShapeKind.Path, ShapeKind.Vector, ShapeKind.Polygon, ShapeKind.Star, ShapeKind.Line]);
 const NEEDS_PATH: ReadonlySet<string> = new Set([ShapeKind.Polygon, ShapeKind.Star, ShapeKind.Line]);

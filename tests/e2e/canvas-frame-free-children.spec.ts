@@ -59,18 +59,17 @@ test.describe('children of a frame are free on the canvas @real', () => {
     expect(error).toBeNull();
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    const stage = page.locator(`[data-motion-node="${node.id}"] [data-frame-stage]`);
+    const stage = page.locator(`[data-testid="frame-overlays"] [data-frame="${node.id}"]`);
     await expect(stage).toBeVisible({ timeout: 20_000 });
 
     const grab = await pointIn(stage, { x: BOX_AT.x - BOX_SIZE / 4, y: BOX_AT.y });
     await expect(async () => {
       await page.mouse.click(grab.x, grab.y);
-      await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 1500 });
+      await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 1500 });
     }).toPass({ timeout: 25_000 });
-    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
 
     const frameBefore = await framePosition(admin, node.id);
-    const selectedBox = (await page.getByTestId('selection-box').boundingBox())!;
+    const selectedBox = (await page.getByTestId('frame-selection').boundingBox())!;
     await dragFrom(page, { x: selectedBox.x + selectedBox.width * GRAB_SHARE, y: selectedBox.y + selectedBox.height / 2 });
     await expect.poll(async () => (await boxAt(admin, node.id))?.x ?? 0, { timeout: 15_000, message: 'the child moved inside the frame' }).toBeGreaterThan(BOX_AT.x + MOVED_MIN);
     expect(await framePosition(admin, node.id), 'the frame stayed where it was').toEqual(frameBefore);
@@ -84,7 +83,7 @@ test.describe('children of a frame are free on the canvas @real', () => {
     const child = await boxAt(admin, node.id);
     const again = await pointIn(stage, { x: child!.x - BOX_SIZE / 4, y: child!.y });
     await page.mouse.click(again.x, again.y);
-    await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 10_000 });
     await page.keyboard.press('Delete');
     await expect.poll(() => boxAt(admin, node.id), { timeout: 15_000, message: 'Delete removed the selected child' }).toBeNull();
   });

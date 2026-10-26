@@ -1,8 +1,9 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { MaskKind } from '$lib/motion/mask';
+  import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { MaskKind } from '@feega/motion-core/motion/mask';
   import { CORNERS, Grab, cornerAt, dragBox, dragPoint, editMaskAt, maskBox, pointAt, type MaskBox } from '$lib/motion/mask-handles';
-  import { setMask, type OpResult } from '$lib/motion/timeline';
+  import { setMask, type OpResult } from '@feega/motion-core/motion/timeline';
 
   let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
@@ -34,8 +35,9 @@
     if (!drag || !host) {
       return;
     }
-    const rect = host.getBoundingClientRect();
-    const delta = { dx: (e.clientX - drag.x) / rect.width, dy: (e.clientY - drag.y) / rect.height };
+    const now = hostFraction(e, host);
+    const was = hostFraction({ clientX: drag.x, clientY: drag.y }, host);
+    const delta = { dx: now.x - was.x, dy: now.y - was.y };
     live =
       typeof drag.grab === 'number'
         ? { box: drag.box, points: dragPoint(drag.points, drag.grab, drag.box, delta, size) }

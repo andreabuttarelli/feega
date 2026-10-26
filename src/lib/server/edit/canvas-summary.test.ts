@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { summarizeCanvas, elementsOf, detailOf } from './canvas-summary';
 
 const frameDoc = (): MotionDoc => ({

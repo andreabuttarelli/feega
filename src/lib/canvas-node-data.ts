@@ -17,13 +17,14 @@ import type { SelectNode } from '$lib/canvas/select-node';
 import type { CustomOutput } from '$lib/canvas/select-outputs';
 import { EFFECTS, type EffectStep } from '$lib/canvas/effects';
 import type { EffectsNode } from '$lib/canvas/effects-node';
-import { LAYOUTS } from '$lib/canvas/composition/index';
-import { CAMERA_PRESETS } from '$lib/canvas/composition/camera';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
+import { CAMERA_PRESETS } from '@feega/motion-core/canvas/composition/camera';
 import { compositionTemplateSchema, type CompositionNode } from '$lib/canvas/composition-node';
-import { cellSchema, type CellSpec } from '$lib/motion/components';
+import { cellSchema, type CellSpec } from '@feega/motion-core/motion/components';
 import { newCalendarData } from '$lib/canvas/calendar-node';
 import { newMotionData } from '$lib/canvas/motion-node';
 import { newStudioBatchData } from '$lib/canvas/studio-batch-node';
+import { SECTION_DEFAULT_FILL } from '$lib/canvas/node-data';
 export { influencerNodeOf as influencerOf, type InfluencerNode } from '$lib/canvas/influencer-node';
 
 /**
@@ -61,7 +62,10 @@ export const NODE_TYPES = [
   'audio',
   'model3d',
   'motion',
-  'studio_batch'
+  'element',
+  'studio_batch',
+  'section',
+  'technique'
 ] as const;
 
 function syncStatusOf(v: unknown): SyncStatus {
@@ -401,6 +405,10 @@ export function newNodeRow(what: Addable): Record<string, unknown> {
 
   if (what === 'motion') {
     return newMotionData();
+  }
+
+  if (what === 'section') {
+    return { title: 'Section', fill: SECTION_DEFAULT_FILL };
   }
 
   if (what === 'studio_batch') {

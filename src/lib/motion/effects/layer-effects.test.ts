@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { Ease } from '../design';
-import { EFFECTS, EFFECT_ALPHA, EffectKind, defaultValues, editedParams } from './registry';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Ease } from '@feega/motion-core/motion/design';
+import { EFFECTS, EFFECT_ALPHA, EffectKind, defaultValues, editedParams } from '@feega/motion-core/motion/effects/registry';
 import { addEffect } from './ops';
-import { effectKey } from './model';
-import { effectLayer, effectTimeline } from './render';
+import { effectKey } from '@feega/motion-core/motion/effects/model';
+import { effectLayer, effectTimeline } from '@feega/motion-core/motion/effects/render';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -62,7 +62,7 @@ describe('layer effects', () => {
   });
 
   it('a paired alpha is edited inside its colour, not as its own field', () => {
-    expect(editedParams(EffectKind.DropShadow).map((p) => p.key)).toEqual(['distance', 'angle', 'blur', 'color']);
+    expect(editedParams(EffectKind.DropShadow).map((p) => p.key)).toEqual(['distance', 'angle', 'x', 'y', 'blur', 'spread', 'color', 'behind']);
     expect(editedParams(EffectKind.GaussianBlur).map((p) => p.key)).toEqual(['radius']);
   });
 

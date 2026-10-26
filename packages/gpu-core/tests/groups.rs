@@ -28,6 +28,17 @@ fn a_use_places_its_group_through_its_matrix() {
 }
 
 #[test]
+fn a_use_moves_the_filter_origin_with_its_group() {
+    let framed = FRAME.replace(r#""space": [1, 0, 0, 1]"#, r#""space": [1, 0, 0, 1], "origin": [10, 0]"#);
+    let mut groups = Groups::new();
+    groups.put("frame-1", parse(&framed).unwrap());
+    let (list, _) = expand(&parse(SCREEN).unwrap(), &groups);
+    let Item::Path(card) = &list.items[1] else { panic!() };
+
+    assert_eq!(card.look.origin, Some([50.0, 40.0]));
+}
+
+#[test]
 fn a_use_clips_to_its_frame_on_screen_and_paints_the_frame_background() {
     let (list, _) = expand(&parse(SCREEN).unwrap(), &groups());
     let Item::Path(back) = &list.items[0] else { panic!() };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { DEFAULT_INTERACTIVE } from '$lib/motion/interactive/settings';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { DEFAULT_INTERACTIVE } from '@feega/motion-core/motion/interactive/settings';
 import { headPatch } from './editor';
 
 describe('the node data a saved revision writes', () => {

@@ -31,7 +31,7 @@ vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
     if (!store.head) {
       return null;
     }
-    const { newMotionDoc, MotionFormat } = await import('$lib/motion/doc');
+    const { newMotionDoc, MotionFormat } = await import('@feega/motion-core/motion/doc');
     return { version: store.head, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actorKind: 'user' };
   }
 }));
@@ -72,6 +72,12 @@ describe('POST /api/v1/motion/[nodeId]/render', () => {
     expect(body.render_url).toMatch(/^https:\/\/feega\.app\/render\/run-1\.[A-Za-z0-9_-]{40,}$/);
     expect(store.runs[0]).toMatchObject({ orgId: ORG, nodeId: NODE, actorKind: 'agent', actorId: USER, externalJobId: 'browser-render:3' });
     expect(store.farm).toEqual([]);
+  });
+
+  it('a browser link also comes as a headless url that starts the render with no click', async () => {
+    const body = await (await post({})).json();
+
+    expect(body.headless_url).toBe(`${body.render_url}?autostart=1`);
   });
 
   it('il browser non passa dal cancello dei crediti', async () => {

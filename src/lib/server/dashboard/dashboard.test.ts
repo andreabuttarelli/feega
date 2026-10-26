@@ -67,8 +67,8 @@ describe('the dashboard: projects, tool outputs, one org', () => {
   it('motion videos open their editor on the canvas that holds them', async () => {
     const { motions } = await dashboardFor(db, deps(), 'org');
     expect(motions).toEqual([
-      { id: 'm1', name: 'Trailer', projectName: 'Project a', updatedAt: '2026-10-03', format: '16:9', poster: 'https://signed/poster-1', preview: 'https://video/render-1', href: '/p/a/c/c1/motion/m1' },
-      { id: 'm2', name: 'Untitled video', projectName: 'Project b', updatedAt: '2026-10-02', format: '9:16', poster: null, preview: null, href: '/p/b/c/c9/motion/m2' }
+      { id: 'm1', name: 'Trailer', projectName: 'Project a', updatedAt: '2026-10-03', format: '16:9', poster: 'https://signed/poster-1', preview: 'https://video/render-1', href: '/p/a/c/c1?frame=m1' },
+      { id: 'm2', name: 'Untitled video', projectName: 'Project b', updatedAt: '2026-10-02', format: '9:16', poster: null, preview: null, href: '/p/b/c/c9?frame=m2' }
     ]);
   });
 

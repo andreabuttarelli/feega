@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { Ease } from '../design';
-import { ModifierKind } from './modifiers';
-import { addModifier, morphTo, removeModifier, setModifier, setPath, shapePath } from './ops';
-import { ShapeKind } from './schema';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Ease } from '@feega/motion-core/motion/design';
+import { ModifierKind } from '@feega/motion-core/motion/shape/modifiers';
+import { addModifier, morphToClip, morphTo, removeModifier, setModifier, setPath, shapePath } from './ops';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -52,5 +52,27 @@ describe('shape ops', () => {
   it('a param out of range or unknown is refused with the reason', () => {
     const bad = addModifier(doc, 's', ModifierKind.Trim, 't', { nope: 1 });
     expect(bad.ok ? '' : bad.error).toContain('trim has no nope');
+  });
+});
+
+describe('morph to another shape on the canvas', () => {
+  const two = () => must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'path', path: 'M0 0L1 0L0.5 1Z' } }, 'tri'));
+
+  it("takes the other clip's outline as the next target and keys the morph from the playhead", () => {
+    const morphed = must(morphToClip(two(), 's', 'tri', 10));
+
+    expect(props(morphed).morphs).toEqual(['M0 0L1 0L0.5 1Z']);
+    expect(findClip(morphed, 's')!.clip.keyframes.morph.map((k) => [k.frame, k.value])).toEqual([
+      [10, 0],
+      [40, 1]
+    ]);
+  });
+
+  it('refuses itself, a missing clip and a clip that is not a shape', () => {
+    const withText = must(addClip(two(), { component: 'Text', from: 0, durationInFrames: 30 }, 't'));
+
+    expect(morphToClip(withText, 's', 's', 0).ok).toBe(false);
+    expect(morphToClip(withText, 's', 'nope', 0).ok).toBe(false);
+    expect(morphToClip(withText, 's', 't', 0).ok).toBe(false);
   });
 });

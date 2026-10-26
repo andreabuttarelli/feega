@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { styleProblems } from '$lib/motion/style';
-import { MotionStyle } from '$lib/motion/style-model';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
 import { REEL_COMPONENT } from '$lib/motion/ui-morph/piece';
 import { createMotionTools, type MotionSession } from './motion-tools';
 

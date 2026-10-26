@@ -26,14 +26,14 @@ import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS } from './source-filters';
 import { CUSTOM, EFFECTS } from './effects';
 import { nodeReferenceSchema } from './node-references';
 import type { EffectId, EffectParam } from './effects';
-import { LAYOUTS } from './composition/index';
-import { cellSchema } from '$lib/motion/components';
-import { CAMERA_PRESETS } from './composition/camera';
-import type { LayoutId } from './composition/types';
-import type { CameraPresetId } from './composition/camera';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
+import { cellSchema } from '@feega/motion-core/motion/components';
+import { CAMERA_PRESETS } from '@feega/motion-core/canvas/composition/camera';
+import type { LayoutId } from '@feega/motion-core/canvas/composition/types';
+import type { CameraPresetId } from '@feega/motion-core/canvas/composition/camera';
 import { CALENDAR_VIEWS } from '$lib/calendar/period-grid';
 import { CALENDAR_SCOPES } from './calendar-node';
-import { motionNodeSchema } from './motion-node';
+import { elementNodeSchema, motionNodeSchema } from './motion-node';
 import { LAYOUT_KEYS, nodeLayoutSchema } from './node-layout';
 import { compositionTemplateSchema } from './composition-node';
 import { studioBatchNodeSchema } from './studio-batch-node';
@@ -397,6 +397,21 @@ const effectsSchema = z.object({
   sourceRefId: z.string().nullish()
 });
 
+export const SECTION_DEFAULT_FILL = '#f3f3f3';
+
+const sectionSchema = z.object({
+  title: z.string().max(80).default('Section'),
+  fill: z.string().regex(HEX_COLOR, 'invalid colour, expected #rrggbb').default(SECTION_DEFAULT_FILL)
+});
+
+const techniqueSchema = z.object({
+  techniqueId: z.string().uuid(),
+  name: z.string().max(48),
+  runY: z.number().nullish(),
+  workflowId: z.string().nullish(),
+  ranVersion: z.number().int().nullish()
+});
+
 const calendarSchema = z.object({
   view: z.enum(CALENDAR_VIEWS),
   scope: z.enum(CALENDAR_SCOPES),
@@ -461,7 +476,10 @@ export const NODE_DATA_SCHEMAS = {
   audio: audioSchema,
   model3d: model3dSchema,
   motion: motionNodeSchema,
-  studio_batch: studioBatchNodeSchema
+  element: elementNodeSchema,
+  studio_batch: studioBatchNodeSchema,
+  section: sectionSchema,
+  technique: techniqueSchema
 } as const;
 
 export type NodeType = keyof typeof NODE_DATA_SCHEMAS;
@@ -568,8 +586,8 @@ export function validateNodeData(type: string, data: unknown): NodeDataVerdict {
   }
 
   const schema = NODE_DATA_SCHEMAS[type];
-  const { rotation, groupId, ...own } = (data ?? {}) as Record<string, unknown>;
-  const layout = nodeLayoutSchema.safeParse({ rotation, groupId });
+  const { rotation, groupId, colorTag, ...own } = (data ?? {}) as Record<string, unknown>;
+  const layout = nodeLayoutSchema.safeParse({ rotation, groupId, colorTag });
   if (!layout.success) {
     return { ok: false, error: `${type}.data.${layout.error.issues[0].path.join('.')}: ${layout.error.issues[0].message}` };
   }
@@ -606,6 +624,8 @@ function fieldsOf(type: NodeType): string[] {
 export const SYSTEM_OWNED_FIELDS = [
   'refId',
   'sourceRefId',
+  'layerRefIds',
+  'layerBoxes',
   'mediaKind',
   'assetId',
   'runId',
@@ -620,6 +640,8 @@ export const SYSTEM_OWNED_FIELDS = [
 export const SERVER_WRITTEN_FIELDS: readonly string[] = [
   'refId',
   'sourceRefId',
+  'layerRefIds',
+  'layerBoxes',
   'mediaKind',
   'assetId',
   'runId',

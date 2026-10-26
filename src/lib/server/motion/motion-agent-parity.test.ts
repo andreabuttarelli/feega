@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
 import type { z } from 'zod';
-import { MotionFormat, motionDocSchema, newMotionDoc } from '$lib/motion/doc';
-import { cameraSchema } from '$lib/motion/camera';
+import { MotionFormat, motionDocSchema, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { cameraSchema } from '@feega/motion-core/motion/camera';
 import { createMotionTools, type MotionSession } from './motion-tools';
-import { LAYOUTS } from '$lib/canvas/composition/index';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
 type Access = { write: string[]; read: string } | { fixed: string };
@@ -23,7 +23,7 @@ const DOC: Record<string, Access> = {
   assets: { write: ['add_asset', 'remove_asset'], read: 'assets' },
   camera: { write: ['set_camera'], read: 'camera' },
   look: { write: ['set_look', 'set_light', 'remove_light', 'set_light_keyframes'], read: 'look' },
-  fonts: { write: ['set_font', 'register_font', 'remove_font'], read: 'fonts' },
+  fonts: { write: ['set_font', 'register_font', 'remove_font', 'replace_font'], read: 'fonts' },
   components: { write: ['write_component', 'update_components', 'remove_component'], read: 'components' },
   shaders: { write: ['add_custom_effect'], read: 'shaders' },
   markers: { write: ['set_marker', 'remove_marker', 'mark_beats'], read: 'markers' },
@@ -36,6 +36,7 @@ const DOC: Record<string, Access> = {
   freeSize: { write: ['set_canvas'], read: 'format' },
   layoutGuides: { write: ['set_canvas'], read: 'layoutGuides' },
   styles: { write: ['named_style'], read: 'styles' },
+  variables: { write: ['variable'], read: 'variables' },
   links: { fixed: 'written by the canvas when a generative node is connected to the frame (connect_nodes)' }
 };
 
@@ -50,6 +51,7 @@ const TRACK: Record<string, Access> = {
 
 const CLIP: Record<string, Access> = {
   id: { write: ['add_clip'], read: 'id' },
+  name: { write: ['rename_clip'], read: 'name' },
   from: { write: ['set_timing', 'move_clip'], read: 'start' },
   durationInFrames: { write: ['set_timing', 'trim_clip'], read: 'duration' },
   trimStart: { write: ['trim_clip'], read: 'trimStart' },
@@ -73,7 +75,9 @@ const CLIP: Record<string, Access> = {
   constraints: { write: ['set_layout_item', 'set_constraints'], read: 'constraints' },
   partStyles: { write: ['set_part_fill'], read: 'partStyles' },
   styleRef: { write: ['named_style'], read: 'styleRef' },
-  expressions: { write: ['set_expression', 'pulse_with_music'], read: 'expressions' },
+  bind: { write: ['variable'], read: 'bind' },
+  effectStyleRef: { write: ['named_style'], read: 'effectStyleRef' },
+  expressions: { write: ['set_expression', 'expression_to_keys', 'pulse_with_music'], read: 'expressions' },
   effects: { write: ['add_effect', 'set_effect', 'remove_effect', 'set_lut'], read: 'effects' },
   shaders: { write: ['add_custom_effect', 'set_custom_effect', 'remove_custom_effect'], read: 'shaders' },
   blend: { write: ['set_blend_mode'], read: 'blend' },
@@ -83,9 +87,12 @@ const CLIP: Record<string, Access> = {
   path: { write: ['set_motion_path', 'set_path_tangent'], read: 'path' },
   physics: { write: ['set_physics', 'apply_physics_preset'], read: 'physics' },
   hidden: { write: ['set_visibility'], read: 'hidden' },
+  mutedLanes: { write: ['edit_lane'], read: 'mutedLanes' },
   locked: { write: ['set_visibility'], read: 'locked' },
   bleed: { write: ['set_visibility'], read: 'bleed' },
+  lockRatio: { write: ['set_visibility'], read: 'lockRatio' },
   clipContent: { write: ['set_visibility'], read: 'clipContent' },
+  group: { write: ['frame_clips', 'ungroup'], read: 'group' },
   markers: { write: ['set_marker', 'remove_marker'], read: 'markers' }
 };
 

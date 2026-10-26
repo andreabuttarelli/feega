@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, addTrack } from '$lib/motion/timeline';
-import { TrackKind } from '$lib/motion/components';
+import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { EditMode } from '$lib/motion/edit-mode';
 import { maskMembers, useAsMask } from '$lib/motion/mask-group';
 import { Command } from '$lib/motion/shortcuts';
-import { CUSTOM_CLIP } from '$lib/motion/poster-parts';
+import { CUSTOM_CLIP } from '@feega/motion-core/motion/poster-parts';
+import { createComponent } from '$lib/motion/main-component';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
 
 const NODES = [
@@ -32,6 +33,18 @@ const ok = (r: ReturnType<typeof layerEdit>) => {
 };
 
 describe('layer rows', () => {
+  it('mark a component instance so the panel draws its diamond', () => {
+    const made = createComponent(video(), ['t1'], (() => {
+      let n = 0;
+      return () => `c${++n}`;
+    })(), 'Button');
+    const doc = made.ok ? made.doc : video();
+    const rows = layerRows(NODES, { nodeId: 'm1', doc });
+
+    expect(rows.find((r) => r.id === 'c2')).toMatchObject({ instance: true, label: 'Button' });
+    expect(rows.find((r) => r.id === 'm1')?.instance).toBeUndefined();
+  });
+
   it('list every canvas node at the top level, named, and only the open video unfolds into its clips', () => {
     const doc = video();
     const rows = layerRows(NODES, { nodeId: 'm1', doc });
@@ -51,6 +64,25 @@ describe('layer rows', () => {
     const rows = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], { nodeId: 'e1', doc }, { e1: frameRows(doc, 'e1') });
 
     expect(rows.map((r) => [r.id, r.kind, r.label, r.nodeId])).toEqual([['e1', LayerKind.Node, 'Rectangle', 'e1']]);
+  });
+
+  it('draws a free element with a shape icon, not the frame clapperboard', () => {
+    const [row] = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], null);
+
+    expect(row.type).toBe('shape');
+  });
+
+  it('draws a free element with the icon of what it is', () => {
+    const glyphs = ['ellipse', 'Text', 'Image'];
+    const rows = layerRows(glyphs.map((glyph, i) => ({ id: `e${i}`, type: 'motion', name: null, element: true, glyph })), null);
+
+    expect(rows.map((r) => r.type)).toEqual(glyphs);
+  });
+
+  it('names an element glyph from its clip: the shape for a shape, the component otherwise', () => {
+    expect(elementGlyph({ component: 'Shape', props: { shape: 'ellipse' } })).toBe('ellipse');
+    expect(elementGlyph({ component: 'Text', props: {} })).toBe('Text');
+    expect(elementGlyph(undefined)).toBeUndefined();
   });
 
   it('picks the one element row while its shape is selected inside it', () => {
@@ -200,10 +232,18 @@ describe('layer edits go through the doc operations the editor and the agent alr
     expect(ok(layerEdit(doc, track, LayerAction.Rename, 'Front')).tracks[0].name).toBe('Front');
   });
 
+  it('renames any element, and a blank name gives back its own', () => {
+    const named = ok(layerEdit(video(), 't1', LayerAction.Rename, '  Headline '));
+
+    expect(layerRows(NODES, { nodeId: 'm1', doc: named }).find((r) => r.id === 't1')!.label).toBe('Headline');
+
+    const cleared = ok(layerEdit(named, 't1', LayerAction.Rename, ' '));
+    expect(layerRows(NODES, { nodeId: 'm1', doc: cleared }).find((r) => r.id === 't1')!.label).toBe('Title');
+  });
+
   it('refuses what the model has no place for', () => {
     const doc = video();
 
-    expect(layerEdit(doc, 't1', LayerAction.Rename, 'x').ok).toBe(false);
     expect(layerEdit(doc, doc.tracks[0].id, LayerAction.Up).ok).toBe(false);
     expect(layerEdit(doc, 'nope', LayerAction.Hide).ok).toBe(false);
   });
@@ -531,5 +571,16 @@ describe('dragging several layers at once', () => {
     const doc = stacked();
 
     expect(order(ok(dropLayers(doc, ['b', 'c'], 'c', Place.Above, order(doc))))).toEqual(order(ok(dropLayer(doc, 'b', 'c', Place.Above))));
+  });
+});
+
+describe('the frame ring while the pointer is on one of its elements', () => {
+  it('yields to the element the pointer is on', () => {
+    expect(frameRinged({ nodeId: 'm1', id: 't1' }, 'm1', null, 'm1')).toBe(false);
+  });
+
+  it('still rings for a layer row hovered elsewhere, or for the frame itself', () => {
+    expect(frameRinged({ nodeId: 'm1', id: 't1' }, 'm1', null, null)).toBe(true);
+    expect(frameRinged({ nodeId: 'm1', id: 'm1' }, 'm1', null, 'm1')).toBe(true);
   });
 });

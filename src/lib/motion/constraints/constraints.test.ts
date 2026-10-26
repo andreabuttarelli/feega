@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Horizontal, Vertical, resizeFrame, setConstraints } from './constraints';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { pivotBox } from '../parent';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { pivotBox } from '@feega/motion-core/motion/parent';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -46,8 +46,32 @@ describe('constraints', () => {
     expect([box.left, box.top]).toEqual([150, 950]);
   });
 
-  it('scale, the default, keeps the proportions', () => {
+  it('a new layer is pinned to left and top', () => {
     const doc = ok(addClip({ ...newMotionDoc(MotionFormat.Custom), width: 1000, height: 1000, freeSize: true }, card, 'card'));
+
+    expect(findClip(doc, 'card')!.clip.constraints).toEqual({ horizontal: Horizontal.Left, vertical: Vertical.Top });
+  });
+
+  it('a document saved without constraints still parses without any', () => {
+    const doc = ok(addClip({ ...newMotionDoc(MotionFormat.Custom), width: 1000, height: 1000, freeSize: true }, card, 'card'));
+    const old = JSON.parse(JSON.stringify(doc));
+    delete old.tracks.find((t: { clips: unknown[] }) => t.clips.length).clips[0].constraints;
+    const parsed = parseMotionDoc(old);
+
+    expect(parsed.ok && findClip(parsed.doc, 'card')!.clip.constraints).toBeUndefined();
+  });
+
+  it('a pinned layer wider than the shrunken frame stays valid', () => {
+    const wide = { ...card, props: { ...card.props, x: 0.5, y: 0.5, width: 1, height: 1 } };
+    const doc = ok(addClip({ ...newMotionDoc(MotionFormat.Custom), width: 1000, height: 1000, freeSize: true }, wide, 'card'));
+    const resized = ok(resizeFrame(doc, { width: 500, height: 500 }));
+
+    expect(findClip(resized, 'card')!.clip.props).toMatchObject({ width: 1, height: 1 });
+    expect(parseMotionDoc(JSON.parse(JSON.stringify(resized))).ok).toBe(true);
+  });
+
+  it('scale keeps the proportions', () => {
+    const doc = ok(setConstraints(ok(addClip({ ...newMotionDoc(MotionFormat.Custom), width: 1000, height: 1000, freeSize: true }, card, 'card')), ['card'], { horizontal: Horizontal.Scale, vertical: Vertical.Scale }));
 
     expect(boxAfter(doc, { width: 1600, height: 1000 })).toEqual({ left: 80, top: 850, width: 160, height: 100 });
   });

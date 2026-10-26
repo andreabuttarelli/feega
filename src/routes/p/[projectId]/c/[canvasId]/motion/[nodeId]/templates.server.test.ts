@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
-import { precompose } from '$lib/motion/precomp';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { exposeField, FieldType } from '$lib/motion/template/fields';
 import { templatesDb } from '$lib/server/motion/templates-testing';
-import { TrackKind } from '$lib/motion/components';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { insertTemplate } from '$lib/motion/template/library';
 import { PROMPT_INPUT_TEMPLATE } from '$lib/motion/template/prompt-input/template';
 
@@ -15,7 +15,7 @@ vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReac
 vi.mock('$lib/server/motion/sfx', () => ({ laySfx: async (_db: unknown, _scope: unknown, sfx: string) => ({ ok: true, assetId: `sfx-${sfx}`, url: null, seconds: 0.1 }) }));
 vi.mock('$lib/server/motion/editor', () => ({ findMotionNode: async () => ({ record: { id: 'n1' }, node: {} }), assetUrls: vi.fn(), headOrNew: vi.fn(), motionAssets: vi.fn(), motionTokens: vi.fn(), saveMotionDoc: vi.fn() }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/frame-editor/editor-page');
 
 function event(db: unknown, fields: Record<string, string>) {
   const form = new FormData();

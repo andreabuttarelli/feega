@@ -7,6 +7,7 @@
   import ProjectDragPanel from './ProjectDragPanel.svelte';
   import InfluencersPanel from './InfluencersPanel.svelte';
   import LayersPanel from './LayersPanel.svelte';
+  import ComponentsList from './ComponentsList.svelte';
   import X from '@lucide/svelte/icons/x';
   import { IconButton, IconSize, SegmentedControl, Side } from '$lib/components/ui/shell';
   import { PANEL_WIDTHS } from '$lib/shell-nav';
@@ -63,6 +64,7 @@
       {#if kind === 'layers'}
         <LayersPanel />
       {:else}
+        {#if kind === 'assets'}<ComponentsList />{/if}
         <ProjectDragPanel {projectId} {kind} />
       {/if}
     </div>

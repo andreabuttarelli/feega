@@ -8,8 +8,8 @@ import type { Tool } from 'ai';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { createProjectTools } from './project-tools';
 import { SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const PROJECT = '22222222-2222-2222-2222-222222222222';
@@ -416,5 +416,27 @@ describe('the chat reaches every canvas op of the API, from the same table', () 
   it('keeps the ops that need bytes the chat cannot send out of it', () => {
     expect(opsOf(tools())).not.toContain('request_upload');
     expect(opsOf(tools())).not.toContain('clone_voice');
+  });
+
+  it('reaches the canvas style library and variables', () => {
+    expect(opsOf(tools())).toEqual(expect.arrayContaining(['styles', 'variables']));
+  });
+});
+
+describe('the chat draws what the canvas draws', () => {
+  it('an arrow from two points becomes a free element', async () => {
+    const rows = {
+      canvases: [{ id: CANVAS, org_id: ORG, project_id: PROJECT, name: 'Canvas', viewport: null }],
+      projects: [{ id: PROJECT, org_id: ORG, name: 'P', slug: 'p', brand_id: null, archived_at: null, updated_at: '', mode: 'standard' }],
+      nodes: [] as Record<string, unknown>[],
+      motion_revisions: [] as Record<string, unknown>[],
+      canvas_events: [{}]
+    };
+    const { db } = fakeDb(rows, { filter: true, mutate: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = await run(tools.draw_element, { canvasId: CANVAS, drawn: { tool: 'arrow', from: { x: 0, y: 100 }, to: { x: 300, y: 100 } } });
+
+    expect(out).toMatchObject({ outcome: 'done', new_frame: true, element_id: expect.any(String) });
   });
 });

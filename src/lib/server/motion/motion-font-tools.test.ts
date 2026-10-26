@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession } from './motion-tools';
@@ -38,6 +38,16 @@ describe('motion agent font tools', () => {
     await run('set_font', { clip_id: 'id1', family: 'sans' });
     expect((await run('remove_font', { family: 'Playfair Display' })).ok).toBe(true);
     expect(session.doc.fonts).toEqual([]);
+  });
+
+  it('replace_font swaps a family for another across the whole video', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 2 });
+    await run('set_font', { clip_id: 'id1', family: 'Playfair Display' });
+
+    expect((await run('replace_font', { from: 'Playfair Display', to: 'Space Grotesk' })).ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.props.font).toBe('Space Grotesk');
+    expect(session.doc.fonts.map((f) => f.family)).toEqual(['Space Grotesk']);
   });
 
   it('register_font makes a family available to custom component font params', async () => {

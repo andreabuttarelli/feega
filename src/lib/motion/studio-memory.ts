@@ -1,5 +1,5 @@
-import type { MotionDoc } from './doc';
-import { TrackKind } from './components';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
 
 export type StudioMemory = { style: string | null; typeScale: number | null; palette: string[]; fonts: string[]; shots: string[]; music: string[] };
 

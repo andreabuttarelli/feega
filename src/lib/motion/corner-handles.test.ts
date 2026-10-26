@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, setTransform, type OpResult } from './timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { cornerHandleAt, cornerLocalPoint } from './corner-handles';
 
 function must(r: OpResult): MotionDoc {

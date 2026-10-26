@@ -1,0 +1,41 @@
+{
+  "version": 5,
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "durationInFrames": 150,
+  "background": "brand",
+  "still": { "frame": 0 },
+  "tracks": [
+    {
+      "id": "v1",
+      "kind": "visual",
+      "name": "Video 1",
+      "clips": [
+        {
+          "id": "demo-shape",
+          "from": 0,
+          "durationInFrames": 150,
+          "component": "Shape",
+          "props": {
+            "shape": "rect",
+            "x": 0.3,
+            "y": 0.62,
+            "width": 0.2,
+            "height": 0.2,
+            "fills": [{ "type": "solid", "color": "#0095ff" }]
+          }
+        },
+        {
+          "id": "demo-text",
+          "from": 0,
+          "durationInFrames": 150,
+          "component": "Text",
+          "props": { "text": "Hello, feega", "x": 0.5, "y": 0.25 }
+        }
+      ]
+    }
+  ],
+  "comps": {},
+  "assets": []
+}

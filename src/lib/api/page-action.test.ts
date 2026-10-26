@@ -6,7 +6,6 @@ const PAGE_ACTION = /\?\/\$?\{?[A-Za-z_]|x-sveltekit-action/;
 const EDITOR_ACTION_CALLERS = [
   'src/lib/motion/poster-capture.ts',
   'src/lib/motion/export/save.ts',
-  'src/lib/components/motion/MotionEditorShell.svelte',
   'src/lib/components/motion/StillExport.svelte',
   'src/lib/components/motion/TemplateLibrary.svelte',
   'src/lib/components/motion/SoundDialog.svelte',

@@ -15,8 +15,9 @@
  */
 
 import type { PostCompositionNode } from './post-composition';
-import { FrameKind } from './motion-node';
+import { FrameKind, docKindOf, holdsDoc } from './motion-node';
 import { Edge } from '$lib/motion/space';
+import { FRAME_DIALOG_ACTIONS, isFrameDialogAction, type FrameDialogActionId } from './frame-dialogs';
 import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-plan';
 
 export type SelectionActionId =
@@ -24,8 +25,18 @@ export type SelectionActionId =
   | 'connect-new'
   | 'connect-existing'
   | 'run-workflow'
+  | 'save-technique'
+  | 'run-technique'
+  | 'edit-technique'
+  | 'detach-technique'
   | 'run-downstream'
   | 'run-stale'
+  | 'remove-background'
+  | 'upscale-image'
+  | 'inpaint'
+  | 'outpaint'
+  | 'split-layers'
+  | 'layers-to-frame'
   | 'copy-id'
   | 'report'
   | 'group'
@@ -41,13 +52,36 @@ export type SelectionActionId =
   | 'align-middle'
   | 'align-bottom'
   | 'tidy-up'
+  | 'stack'
   | 'flip-horizontal'
   | 'flip-vertical'
   | 'use-as-mask'
   | 'release-mask'
+  | 'select-matching'
+  | 'select-same-fill'
+  | 'select-same-stroke'
+  | 'select-same-font'
+  | 'select-same-effect'
+  | 'frame-selection'
+  | 'resize-to-fit'
+  | 'section-selection'
+  | 'auto-layout'
+  | 'union'
+  | 'subtract'
+  | 'intersect'
+  | 'exclude'
+  | 'flatten'
+  | 'outline-stroke'
+  | 'outline-text'
+  | 'create-component'
+  | 'detach-instance'
+  | 'reset-instance'
+  | 'push-instance'
   | 'create-formats'
+  | 'combine-video'
   | 'export'
-  | 'delete';
+  | 'delete'
+  | FrameDialogActionId;
 
 export type SelectionActionGroup = 'primary' | 'secondary' | 'overflow' | 'menu' | 'danger';
 
@@ -61,6 +95,10 @@ export type SelectionAction = {
 
 export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'run-workflow', label: 'Run flow', group: 'primary', minNodes: 2 },
+  { id: 'save-technique', label: 'Save as technique…', group: 'menu', minNodes: 2 },
+  { id: 'run-technique', label: 'Run technique', group: 'secondary', minNodes: 1 },
+  { id: 'edit-technique', label: 'Edit technique', group: 'menu', minNodes: 1 },
+  { id: 'detach-technique', label: 'Detach technique', group: 'menu', minNodes: 1 },
   { id: 'run-downstream', label: 'Run from here', group: 'secondary', minNodes: 1 },
   { id: 'run-stale', label: 'Re-run out of date', group: 'secondary', minNodes: 1 },
   { id: 'connect-new', label: 'Connect to new…', group: 'secondary', minNodes: 1 },
@@ -68,6 +106,12 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, shortcut: 'Mod+D' },
   { id: 'group', label: 'Group', group: 'secondary', minNodes: 2, shortcut: 'Mod+G' },
   { id: 'ungroup', label: 'Ungroup', group: 'secondary', minNodes: 1, shortcut: 'Mod+Shift+G' },
+  { id: 'remove-background', label: 'Remove background', group: 'secondary', minNodes: 1 },
+  { id: 'upscale-image', label: 'Upscale 2×', group: 'secondary', minNodes: 1 },
+  { id: 'inpaint', label: 'Inpaint…', group: 'secondary', minNodes: 1 },
+  { id: 'outpaint', label: 'Outpaint…', group: 'secondary', minNodes: 1 },
+  { id: 'split-layers', label: 'Split into layers', group: 'secondary', minNodes: 1 },
+  { id: 'layers-to-frame', label: 'Layers to frame', group: 'secondary', minNodes: 1 },
   { id: 'copy', label: 'Copy', group: 'menu', minNodes: 1, shortcut: 'Mod+C' },
   { id: 'paste', label: 'Paste', group: 'menu', minNodes: 1, shortcut: 'Mod+V' },
   { id: 'bring-front', label: 'Bring to front', group: 'menu', minNodes: 1, shortcut: 'Mod+]' },
@@ -79,12 +123,44 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'align-middle', label: 'Align vertical centres', group: 'menu', minNodes: 1, shortcut: 'Alt+V' },
   { id: 'align-bottom', label: 'Align bottom', group: 'menu', minNodes: 1, shortcut: 'Alt+S' },
   { id: 'tidy-up', label: 'Tidy up', group: 'menu', minNodes: 2, shortcut: 'Mod+Alt+T' },
+  { id: 'stack', label: 'Stack', group: 'menu', minNodes: 2, shortcut: 'Shift+A' },
   { id: 'flip-horizontal', label: 'Flip horizontal', group: 'menu', minNodes: 1, shortcut: 'Shift+H' },
   { id: 'flip-vertical', label: 'Flip vertical', group: 'menu', minNodes: 1, shortcut: 'Shift+V' },
   { id: 'use-as-mask', label: 'Use as mask', group: 'menu', minNodes: 1, shortcut: 'Mod+Ctrl+M' },
   { id: 'release-mask', label: 'Remove mask', group: 'menu', minNodes: 1 },
+  { id: 'select-matching', label: 'Select matching layers', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+A' },
+  { id: 'select-same-fill', label: 'Select same fill', group: 'menu', minNodes: 1 },
+  { id: 'select-same-stroke', label: 'Select same stroke', group: 'menu', minNodes: 1 },
+  { id: 'select-same-font', label: 'Select same font', group: 'menu', minNodes: 1 },
+  { id: 'select-same-effect', label: 'Select same effect', group: 'menu', minNodes: 1 },
+  { id: 'frame-selection', label: 'Frame selection', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+G' },
+  { id: 'resize-to-fit', label: 'Resize to fit', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+Shift+R' },
+  { id: 'section-selection', label: 'Section selection', group: 'menu', minNodes: 1, shortcut: 'Shift+S' },
+  { id: 'auto-layout', label: 'Add auto layout', group: 'menu', minNodes: 1, shortcut: 'Shift+A' },
+  { id: 'union', label: 'Union', group: 'menu', minNodes: 2, shortcut: 'Alt+Shift+U' },
+  { id: 'subtract', label: 'Subtract', group: 'menu', minNodes: 2, shortcut: 'Alt+Shift+S' },
+  { id: 'intersect', label: 'Intersect', group: 'menu', minNodes: 2, shortcut: 'Alt+Shift+I' },
+  { id: 'exclude', label: 'Exclude', group: 'menu', minNodes: 2, shortcut: 'Alt+Shift+E' },
+  { id: 'flatten', label: 'Flatten', group: 'menu', minNodes: 1, shortcut: 'Mod+E' },
+  { id: 'outline-stroke', label: 'Outline stroke', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+O' },
+  { id: 'outline-text', label: 'Outline text', group: 'menu', minNodes: 1, shortcut: 'Mod+Shift+O' },
+  { id: 'create-component', label: 'Create component', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+K' },
+  { id: 'detach-instance', label: 'Detach instance', group: 'menu', minNodes: 1 },
+  { id: 'push-instance', label: 'Push overrides to main', group: 'menu', minNodes: 1 },
+  { id: 'reset-instance', label: 'Reset all overrides', group: 'menu', minNodes: 1 },
   { id: 'create-formats', label: 'Create formats…', group: 'menu', minNodes: 1 },
-  { id: 'export', label: 'Export…', group: 'menu', minNodes: 1 },
+  { id: 'combine-video', label: 'Combine into video', group: 'menu', minNodes: 2 },
+  { id: 'export', label: 'Export…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-voice', label: 'Add voice-over…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-music', label: 'Add music…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-interactive', label: 'Interactive…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-components', label: 'Components…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-templates', label: 'Templates…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-branches', label: 'Branches…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-history', label: 'Version history…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-chat', label: 'Chat history…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-save-template', label: 'Save as template…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-publish', label: 'Publish to gallery…', group: 'overflow', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
   { id: 'report', label: 'Report content', group: 'overflow', minNodes: 1 },
   { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, shortcut: 'Backspace' }
@@ -103,21 +179,42 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
-type Summary = { data: Record<string, unknown> };
+type Summary = { type: string; data: Record<string, unknown> };
 
-const isGroup = (n: Summary) => n.data.kind === FrameKind.Group;
+const kindOf = (n: Summary): FrameKind | null => (holdsDoc(n.type) ? docKindOf(n.type, n.data.kind) : null);
 
-const isDrawn = (n: Summary) => typeof n.data.format === 'string' && n.data.kind !== FrameKind.Group;
+const isGroup = (n: Summary) => kindOf(n) === FrameKind.Group;
 
-const isFrame = (n: Summary) => typeof n.data.format === 'string' && (n.data.kind ?? FrameKind.Frame) === FrameKind.Frame;
+const isDrawn = (n: Summary) => kindOf(n) !== null && kindOf(n) !== FrameKind.Group;
+
+const isFrame = (n: Summary) => kindOf(n) === FrameKind.Frame;
+
+const isOneFrame = (summaries: readonly Summary[]) => summaries.length === 1 && isFrame(summaries[0]);
+
+const FRAME_DIALOG_SHOWN = Object.fromEntries((Object.keys(FRAME_DIALOG_ACTIONS) as FrameDialogActionId[]).map((id) => [id, isOneFrame]));
+
+const isOneFinishedImage = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'image' && Boolean(summaries[0].data.refId);
+
+const isOneTechnique = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'technique';
 
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
+  ...FRAME_DIALOG_SHOWN,
+  'run-technique': isOneTechnique,
+  'edit-technique': isOneTechnique,
+  'detach-technique': isOneTechnique,
+  'remove-background': isOneFinishedImage,
+  'upscale-image': isOneFinishedImage,
+  inpaint: isOneFinishedImage,
+  outpaint: isOneFinishedImage,
+  'split-layers': isOneFinishedImage,
+  'layers-to-frame': (summaries) => isOneFinishedImage(summaries) && Array.isArray(summaries[0].data.layerRefIds) && summaries[0].data.layerRefIds.length > 0,
   ungroup: (summaries) => summaries.some(isGroup),
   'create-formats': (summaries) => summaries.length === 1 && isFrame(summaries[0]),
+  'combine-video': (summaries) => summaries.length > 1 && summaries.every(isFrame),
   export: (summaries) => summaries.length > 0 && summaries.every(isDrawn)
 };
 
@@ -125,13 +222,13 @@ export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): 
   return SHOWN[id]?.(summaries) ?? true;
 }
 
-export type FrameOnlyActionId = 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask';
+export type FrameOnlyActionId = 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask' | 'select-matching' | 'select-same-fill' | 'select-same-stroke' | 'select-same-font' | 'select-same-effect' | 'frame-selection' | 'resize-to-fit' | 'auto-layout' | 'union' | 'subtract' | 'intersect' | 'exclude' | 'flatten' | 'outline-stroke' | 'outline-text';
 
-export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId>;
+export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId | FrameDialogActionId>;
 
-const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask']);
+const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text']);
 
-export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id);
+export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id) && !isFrameDialogAction(id);
 
 const MIN_ALIGNED_TILES = 2;
 
@@ -162,6 +259,11 @@ const GATES: Partial<Record<SelectionActionId, (input: GateInput) => Gate>> = {
       edges,
       nodeTypesById
     );
+    return { enabled: plan.ok, reason: plan.ok ? undefined : plan.reason };
+  },
+  'save-technique': ({ nodeSummaries, edges }) => {
+    const asGenerative = new Map(nodeSummaries.map((n) => [n.id, [...GENERATIVE_TYPES][0]]));
+    const plan = planWorkflow(nodeSummaries.map((n) => n.id), edges, asGenerative);
     return { enabled: plan.ok, reason: plan.ok ? undefined : plan.reason };
   },
   'run-downstream': ({ nodeSummaries, edges }) => {

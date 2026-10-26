@@ -1,18 +1,18 @@
 <script lang="ts">
-  import type { Tile } from '../CanvasFlow.svelte';
+  import type { Tile } from '../flow-types';
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { isNodeType } from '$lib/canvas/node-data';
-  import { dragAngle } from '$lib/canvas/node-layout';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { tileHovered } from '$lib/canvas/layers';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
 
-  let { tile, selected, full, painted = false, resizable = false, onrotate, knobDrawn = false }: { tile: Tile; selected: boolean; full: boolean; painted?: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void; knobDrawn?: boolean } = $props();
+  let { tile, selected, full, painted = false, resizable = false, onaddbeside, showAdd = false }: { tile: Tile; selected: boolean; full: boolean; painted?: boolean; resizable?: boolean; onaddbeside?: (id: string) => void; showAdd?: boolean } = $props();
+
+  let overPlus = $state(false);
 
   const CORNERS = ['top left', 'top right', 'bottom left', 'bottom right'] as const;
 
-  const SNAP_DEG = 15;
   const spaced = (i: number, n: number) => `${((i + 1) / (n + 1)) * 100}%`;
   const kind = $derived(tile.kind && isNodeType(tile.kind) ? tile.kind : null);
   const Icon = $derived(kind ? NODE_KIND_ICON[kind] : null);
@@ -21,22 +21,6 @@
   const chrome = $derived(nodeChrome(tile.id, selected, layersSource.video));
   const ringColor = $derived(tile.output ? CONNECTOR_STYLE[tile.output].color : 'var(--accent, #7c5cff)');
   const outputs = $derived(tile.connectable === false ? [] : (tile.outputs ?? []));
-
-  function startRotate(e: PointerEvent) {
-    e.stopPropagation();
-    const handle = e.currentTarget as HTMLElement;
-    const box = handle.closest('.svelte-flow__node')!.getBoundingClientRect();
-    const centre = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-    const from = { x: e.clientX, y: e.clientY };
-    handle.setPointerCapture(e.pointerId);
-    handle.onpointerup = (up) => {
-      handle.onpointerup = null;
-      const degrees = dragAngle(centre, from, { x: up.clientX, y: up.clientY }, up.shiftKey ? SNAP_DEG : 0);
-      if (degrees) {
-        onrotate?.(tile.id, degrees);
-      }
-    };
-  }
 </script>
 
 {#if full && label && Icon && !painted}
@@ -82,11 +66,36 @@
   {/each}
 {/if}
 
-{#if selected && tile.rotatable && onrotate}
-  <button type="button" class="rotate-handle nodrag nopan" class:drawn={knobDrawn} aria-label="Rotate" data-testid="rotate-handle" onpointerdown={startRotate}></button>
+{#if onaddbeside && (showAdd || overPlus)}
+  <button type="button" class="add-beside nodrag nopan" onpointerenter={() => (overPlus = true)} onpointerleave={() => (overPlus = false)} aria-label="Add a frame beside" title="Add a frame of the same size" data-testid="add-frame-beside" onpointerdown={(e) => e.stopPropagation()} onclick={() => onaddbeside(tile.id)}>+</button>
 {/if}
 
 <style>
+  .add-beside {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 8px);
+    z-index: 5;
+    width: 24px;
+    height: 24px;
+    translate: 0 -50%;
+    pointer-events: all;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--ui-line);
+    border-radius: var(--ui-radius-full, 9999px);
+    background: var(--ui-surface, #fff);
+    color: var(--ui-ink);
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .add-beside:hover {
+    background: var(--ui-hover);
+  }
+
   .port-layer {
     display: contents;
   }
@@ -208,24 +217,5 @@
   }
   .handle.bottom {
     top: 100%;
-  }
-
-  .rotate-handle {
-    position: absolute;
-    left: 50%;
-    top: -28px;
-    width: 12px;
-    height: 12px;
-    margin-left: -6px;
-    padding: 0;
-    border: 2px solid var(--accent, #7c5cff);
-    border-radius: var(--ui-radius-full);
-    background: var(--ui-panel-raised, #fff);
-    cursor: grab;
-    z-index: 5;
-  }
-
-  .rotate-handle.drawn {
-    opacity: 0;
   }
 </style>

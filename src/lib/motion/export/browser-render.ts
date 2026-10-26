@@ -1,4 +1,4 @@
-import type { MotionDoc } from '../doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { audioPlan } from '../audio-plan';
 import type { Quality } from '../export-formats';
 import { frameTimes, samplesPerFrame, type Size } from '../export-plan';

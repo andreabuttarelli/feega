@@ -1,15 +1,15 @@
-import { COMPONENTS, HEADLINE_SIZE, TITLE_LOOK, TITLE_RANGE, TrackKind } from './components';
+import { COMPONENTS, HEADLINE_SIZE, TITLE_LOOK, TITLE_RANGE, TrackKind } from '@feega/motion-core/motion/components';
 import { STORY_BEATS, STORY_SHARE, storyBeats } from './story';
-import type { MotionDoc } from './doc';
-import { EffectKind } from './effects/registry';
-import { JunctionKind } from './junction-model';
-import { TransitionKind } from './design';
-import { EASE_BEZIER, easeCurve, type Bezier, type Keyframe } from './keyframes';
-import { motionEngine } from './engine/engine';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
+import { JunctionKind } from '@feega/motion-core/motion/junction-model';
+import { TransitionKind } from '@feega/motion-core/motion/design';
+import { EASE_BEZIER, easeCurve, type Bezier, type Keyframe } from '@feega/motion-core/motion/keyframes';
+import { motionEngine } from '@feega/motion-core/motion/engine/engine';
 import { loopSeam, tooDense } from './ui-morph/ops';
 import { uiOverload } from './ui-focus';
 import { PEAK_SHOTS } from './shots/library';
-import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from './style-model';
+import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from '@feega/motion-core/motion/style-model';
 
 export enum Forbidden {
   Particles = 'particles',

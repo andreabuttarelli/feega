@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat } from '$lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { BUILTIN_TEMPLATES } from './builtins';
 import { TEMPLATE_CARDS, templateCard } from './cards';
 import { cardLine, cardProblems, EdgeTone, Energy, Joint, MediaAspect, SectionRole, TextAmount, type TemplateCard } from './card';

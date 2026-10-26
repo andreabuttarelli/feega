@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Ligatures } from './face';
-import { layOut, Shaping, Spaces, type Flow, type Type } from './layout';
+import { Ligatures } from '@feega/motion-core/motion/gpu-full/text/face';
+import { layOut, Shaping, Spaces, type Flow, type Type } from '@feega/motion-core/motion/gpu-full/text/layout';
 import { boxBook, boxFace, seenLigatures, SPACE, UPM, WIDE } from './test-face';
 
 const SIZE = 100;

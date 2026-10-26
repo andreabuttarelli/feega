@@ -1,7 +1,7 @@
-import { COMPONENTS, TrackKind } from './components';
-import { findClip, type MotionDoc } from './doc';
-import type { OpResult } from './timeline';
-import type { BlendMode } from './blend';
+import { COMPONENTS, TrackKind } from '@feega/motion-core/motion/components';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import type { BlendMode } from '@feega/motion-core/motion/blend';
 
 export function setBlendMode(doc: MotionDoc, clipId: string, mode: BlendMode): OpResult {
   const found = findClip(doc, clipId);

@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 const SOURCES = ['src/lib/motion', 'src/lib/server/motion'].map((dir) => join(process.cwd(), dir));
 const TOOL_SHAPED = /\b(?:add|set|list|get|apply|remove|view|read|write|patch|edit|render|register|analyze|import|move|trim|mark|cut|duck|pulse|freeze|morph|expose|unexpose|insert|detach|save|generate|use|export|parent|arrange)_[a-z_]+\b/g;
-const NOT_TOOLS: ReadonlySet<string> = new Set(['parent_id', 'render_in_progress', 'render_unavailable', 'render_unsupported', 'render_not_found', 'render_url', 'cut_review', 'mark_color', 'patch_uses', 'set_overlay']);
+const NOT_TOOLS: ReadonlySet<string> = new Set(['parent_id', 'render_in_progress', 'render_unavailable', 'render_unsupported', 'render_not_found', 'render_url', 'cut_review', 'mark_color', 'patch_uses', 'patch_group', 'set_overlay', 'add_mode']);
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

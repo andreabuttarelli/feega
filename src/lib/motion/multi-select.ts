@@ -1,8 +1,8 @@
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { EditMode } from './edit-mode';
 import { snapMove, type Bounds, type Guide, type Pt } from './scene-select';
 import { moveBy } from './space';
-import type { OpResult } from './timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 export const toggled = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
 

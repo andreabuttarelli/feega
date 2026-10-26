@@ -145,6 +145,13 @@ deposits the asset. Poll the node (`query`) rather than expecting a file now. Sp
 `credits_exhausted` failure means the org is out. A finished image or text comes back with
 `asset_ids` and `media` (the `get_media` links for it).
 
+`variants` (1, 2, 4 or 8; a video up to 4) makes several results in one call and spends that many
+times the price of one run. `into: "nodes"` (default) creates new output nodes next to the source,
+wired from the same inputs, and returns their `nodeIds`; `into: "history"` lands every result in
+the node's own history (the canvas shows a grid to pick the current one). The model allow-list and
+the spend caps apply to the whole batch, which is refused before anything is spent when either
+blocks it; `cancel_node_loop` stops the runs of a batch that are still pending.
+
 `get_media({ org, node_ids?, run_ids?, asset_ids? })` resolves nodes (their current output), runs
 (what that run produced) and assets to: type, mime, width/height, duration, and two signed links
 — `preview_url` (images only, 1024px long edge, valid 5 minutes: fetch it to see the image)
@@ -179,6 +186,7 @@ and its session. Free.
 |-----|-----|
 | `edit` | (none: `feega canvas`, `feega motion tool` and `feega motion op` reach the same ops) |
 | `view` | (none: `feega motion frames` draws a frame) |
+| `canvas_file` | `feega canvas save` / `feega canvas import` (local server only) |
 
 `edit({ org, op, target?, element?, input?, version?, project_id?, ops? })` runs one op or, with op
 `batch`, up to 500 `ops` mixing canvas ops, frame tools and frame editor actions. Op `describe`
@@ -192,14 +200,15 @@ lists them all and gives strict schemas. `view({ org, op, input })` reads: `canv
 | `canvas_tool` | `feega canvas <projectId> <op> --input <json>` |
 | `canvas_tool` `request_upload` + `register_upload` | `feega canvas upload <projectId> <file> [--canvas <id>]` |
 | `canvas_tool` `list_models` | `feega canvas models <projectId> [--medium image]` |
+| `canvas_file` | save or open a canvas as a `.feega` file on the local disk |
 
 `canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
 through the same code (op `describe` `{}` lists them all, `{ op }` gives one input schema; `draw_frame` `{ canvasId, x, y, w, format?, still? }` makes a frame or still): `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`, `list_models` (models this project can run, with provider, credits, uncensored flag and `routes[]` — one row per provider that serves the model; pass its `provider` to `run_node`),
-`list_templates`, `create_node`, `update_node`, `move_node`, `resize_node`, `duplicate_nodes`,
+`list_templates`, `create_node`, `update_node`, `move_node`, `resize_node`, `rename_node`, `duplicate_nodes`,
 `write_nodes`, `paste_nodes`,
 `connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,
 `rename_canvas`, `delete_canvas`, `rename_project`, `share_canvas`, `share_doc`,
-`insert_template`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
+`insert_template`, `list_techniques`, `save_technique`, `place_technique`, `run_technique_node`, `detach_technique`, `open_technique`, `run_technique`, `delete_technique`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
 `show_run`, `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
 `retry_loop_combination`, `preview_workflow`, `run_workflow`, `cancel_workflow`,
 `preview_run_graph`, `run_graph`, `cancel_render`, `withdraw_from_gallery`, `request_upload`,
@@ -262,6 +271,7 @@ list. Returns how many combinations it actually stopped.
 | `get_render` | `feega motion render-status <runId>` |
 | `publish_motion_embed` | `feega motion embed <nodeId> [--unpublish]` |
 | `get_motion_embed` | `feega motion embed <nodeId> --status` |
+| `share_motion_frame` | `feega motion share <nodeId>` |
 | `motion_budget` | `feega motion budget <nodeId> [--raise]` |
 | `view_motion_frames` | `feega motion frames <nodeId> --at 1,2.5,4 [--width 640] [--out dir]` |
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |
@@ -279,9 +289,9 @@ list. Returns how many combinations it actually stopped.
 
 `list_motion_videos({ org, project_id? })` lists `motion` nodes newest first: `node_id`, `name`,
 `project_id`, `canvas_id`, `format`, `version` (0 = empty), signed `poster_url` /
-`last_render_url` (one hour) and `editor_url`.
+`last_render_url` (one hour) and `editor_url` (the canvas, with the frame selected).
 
-`ask_motion_agent({ org, node_id, prompt, wait? })` runs one turn of the motion editor's agent on
+`ask_motion_agent({ org, node_id, prompt, wait? })` (MCP: unlisted alias, to be removed next release; the CLI keeps `feega motion ask`) runs one turn of the motion editor's agent on
 a `motion` node, with the editor's own tools, and saves a new revision. It returns at once with
 `{ run_id, status: "running" }`; poll `get_motion_run({ org, run_id })` until `done`, which carries
 `reply`, `summary`, `version` and `cost_usd`. `wait: true` polls for you, up to about 4 minutes of a turn that can run up to 30. The agent
@@ -298,6 +308,11 @@ once, expires in 30 minutes if nobody opens it, and is claimed by the first devi
 that device renders, saves the MP4 to the project and closes the run. `mode: "server"` is not
 available yet: it is refused with 403 `server_render_unavailable`. `get_render({ org, run_id })` returns
 `status`, `mode`, `asset_id` and a signed `file_url` (one hour) once `done`.
+
+`share_motion_frame({ org, node_id })` creates the public viewer link of one frame — a clean page that
+loops it, tap to play, swipe between the canvas's shared frames on a phone — and returns `{ url, embed_url }`.
+It publishes the embed and turns the canvas share on if needed; turning the canvas share off kills every
+frame link. Free; uncensored projects get 403 with `refusal`.
 
 `publish_motion_embed({ org, node_id, action? })` hosts the interactive web export of the saved
 revision and returns `{ published, url, snippet, react, flutter, revision }` — `react` and `flutter`
@@ -384,3 +399,5 @@ permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publisha
 | `team_op` `invite_link` / `disable_invite_link` | `feega team link` / `link-off` |
 | `team_op` `set_role` / `remove_member` | `feega team role <userId> <role>` / `remove <userId>` |
 | `team_op` `leave` / `transfer_ownership` | `feega team leave` / `transfer <userId>` |
+| `model_allowlist` | `feega allowlist [set <medium> [ids...]]` |
+| `spend_caps` | `feega caps [set <scope> <usd\|off> [--project <id>] [--reset monthly]]` |

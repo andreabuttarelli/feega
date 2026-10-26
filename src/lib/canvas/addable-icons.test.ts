@@ -44,12 +44,7 @@ describe('le superfici che li mostrano', () => {
     expect(bar).not.toMatch(/icons\/(type|image|video|globe|file-text)'/);
   });
 
-  it('la targhetta di ogni nodo viene dal registro di CanvasTile, non da una copia locale', () => {
-    const tile = read('CanvasTile.svelte');
-
-    expect(tile).toMatch(/NODE_KIND_ICON/);
-    expect(tile).toMatch(/NODE_KIND_LABEL/);
-
+  it('nessun nodo disegna una propria targhetta', () => {
     for (const name of ['GenNode.svelte', 'IframeNode.svelte', 'DocNode.svelte', 'ProductsNode.svelte', 'SocialFeedNode.svelte', 'InfluencerNode.svelte', 'UploadedNode.svelte']) {
       expect(read(name)).not.toMatch(/-tag/);
     }

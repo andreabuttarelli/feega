@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from './doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { Resolution } from './render-quote';
 import { AudioMode, BROWSER_RESOLUTIONS, Support, eta, exportSize, exportSupport, frameTimes, outputSize, samplesPerFrame } from './export-plan';
-import { BROWSER_SAMPLES } from './motion-blur';
-import { addClip } from './timeline';
-import type { MotionDoc } from './doc';
+import { BROWSER_SAMPLES } from '@feega/motion-core/motion/motion-blur';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 describe('export plan', () => {
   it('1080p keeps the doc size, 720p scales it to an even size', () => {
@@ -48,6 +48,12 @@ describe('export plan', () => {
     expect(Math.min(...frame(12))).toBeGreaterThanOrEqual(12);
     expect(Math.max(...frame(9))).toBeLessThan(10);
     expect(Math.max(...frame(5)) - Math.min(...frame(5))).toBeGreaterThan(0);
+  });
+
+  it('a 4K doc rendered at 2160p is native, not scaled', () => {
+    const native = { ...newMotionDoc(MotionFormat.Landscape), width: 3840, height: 2160 };
+
+    expect(outputSize(native, Resolution.P2160)).toEqual({ width: 3840, height: 2160, scale: 1 });
   });
 
   it('a server render scales the doc up to the asked short side, 4K included', () => {

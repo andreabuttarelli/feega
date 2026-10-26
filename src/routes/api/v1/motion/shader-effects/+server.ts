@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
-import { SHADER_EFFECTS, SHADER_EFFECT_IDS, ShaderPlay } from '$lib/motion/shader-effects/catalogue';
+import { SHADER_EFFECTS, SHADER_EFFECT_IDS, ShaderPlay } from '@feega/motion-core/motion/shader-effects/catalogue';
 import type { RequestHandler } from './$types';
 
 const listing = () =>

@@ -1,4 +1,4 @@
-import { INPUT_GUIDE } from './inputs';
+import { INPUT_GUIDE } from '@feega/motion-core/motion/expression/inputs';
 
 export const EXPRESSION_GUIDE = [
   'A safe JavaScript subset: numbers, + - * / % **, comparisons, && || !, a ? b : c, const/let lines, [lists]; no loops, functions or globals.',

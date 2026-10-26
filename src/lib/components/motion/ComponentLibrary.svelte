@@ -3,14 +3,14 @@
   import { SvelteSet } from 'svelte/reactivity';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import X from '@lucide/svelte/icons/x';
-  import type { AssetKind } from '$lib/motion/components';
+  import type { AssetKind } from '@feega/motion-core/motion/components';
   import { FIELD_INPUT, FOCUS_RING, IconButton, IconSize, Kbd, Panel, PanelHeader, SegmentedControl, Surface, Tone, type SegmentOption } from '$lib/components/ui/shell';
   import { cn } from '$lib/utils.js';
   import ComponentDetail from './ComponentDetail.svelte';
   import type { MediaUploader } from './media-upload';
-  import { FORMATS, MotionFormat } from '$lib/motion/doc';
+  import { FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
   import { Dismiss, dismissFrom, spatialStep } from '$lib/motion/template/browser';
-  import { DocMode } from '$lib/motion/still';
+  import { DocMode } from '@feega/motion-core/motion/still';
   import type { SectionRole } from '$lib/motion/template/card';
   import { ADD_TARGET, AddTarget, byShape, matching, metaLine, rolesIn, type CatalogueItem } from '$lib/motion/template/catalogue';
   import type { Instance } from '$lib/motion/template/library';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { assembleArgs, audioMixArgs, concatList } from './render-commands';
 import type { AudioEntry } from '$lib/motion/audio-plan';
-import { ExportFormat } from '$lib/motion/export-formats';
+import { ExportFormat, GifLoop } from '$lib/motion/export-formats';
 
 const flat = (at: number, end: number, value: number) => [
   { time: at, value },
@@ -122,6 +122,32 @@ describe('finishing each format', () => {
     expect(gif).toMatch(/fps=15,scale='min\(640,iw\)':-2.*palettegen.*paletteuse/);
     expect(gif).not.toContain('mix.m4a');
     expect(gif).toContain('-loop 0');
+  });
+
+  const gifArgs = (gif: { loop: GifLoop; fps: number; width: number }) => assembleArgs({ list: 'l.txt', audio: null, out: 'o.gif', format: ExportFormat.Gif, gif }).join(' ');
+
+  it('a GIF takes its fps and width from the options', () => {
+    expect(gifArgs({ loop: GifLoop.Forever, fps: 24, width: 1280 })).toMatch(/fps=24,scale='min\(1280,iw\)'/);
+  });
+
+  it('a GIF that does not loop says so', () => {
+    expect(gifArgs({ loop: GifLoop.Once, fps: 15, width: 640 })).toContain('-loop -1');
+  });
+
+  it('a boomerang plays forward then backward, once through the palette, looping forever', () => {
+    const boomerang = gifArgs({ loop: GifLoop.Boomerang, fps: 15, width: 640 });
+
+    expect(boomerang).toMatch(/reverse.*concat=n=2.*palettegen/);
+    expect(boomerang).toContain('-loop 0');
+  });
+
+  it('an APNG is decoded with its alpha, silent and looping forever', () => {
+    const apng = args(ExportFormat.Apng);
+
+    expect(apng).toContain('-c:v libvpx-vp9 -f concat');
+    expect(apng).toContain('-f apng -plays 0');
+    expect(apng).not.toContain('mix.m4a');
+    expect(apng.endsWith('o')).toBe(true);
   });
 
   it('a PNG sequence writes numbered frames, silent', () => {

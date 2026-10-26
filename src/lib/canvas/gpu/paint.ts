@@ -15,6 +15,7 @@ const dom = () => Paint.Dom;
 
 export const PAINT: Record<NodeType, (data: Data) => Paint> = {
   motion: (data) => (typeof data.posterAssetId === 'string' && data.posterAssetId ? Paint.Gpu : Paint.Dom),
+  element: () => Paint.Dom,
   image: (data) => (isUploadedNodeRow({ type: 'image', data }) ? Paint.Gpu : Paint.Dom),
   text: dom,
   video: dom,
@@ -32,7 +33,9 @@ export const PAINT: Record<NodeType, (data: Data) => Paint> = {
   effects: dom,
   composition: dom,
   calendar: dom,
-  studio_batch: dom
+  studio_batch: dom,
+  section: gpu,
+  technique: gpu
 };
 
 type Placed = { id: string; kind?: string; x: number; y: number; w: number; h: number };

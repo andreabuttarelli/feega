@@ -7,7 +7,7 @@ use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap
 use vello::kurbo::Rect;
 
 use crate::compositor::{Compositor, Painter};
-use crate::display_list::parse;
+use crate::display_list::{parse, parse_splice};
 use crate::engine::Engine;
 use crate::filter_passes::layer_texture;
 use crate::groups::{report, Library, Limits, Plan};
@@ -82,8 +82,7 @@ impl Painter for GpuPainter<'_> {
     }
 
     fn tile(&self) -> (u32, u32) {
-        let side = self.device.limits().max_texture_dimension_2d;
-        (side, side)
+        crate::compositor::render_tile(self.device.limits().max_texture_dimension_2d)
     }
 
     fn shift(&mut self, (dx, dy): (i32, i32)) -> Result<(), JsValue> {
@@ -191,6 +190,8 @@ impl WebCore {
         let format = surface.get_capabilities(&adapter).formats.into_iter().find(|f| !f.is_srgb()).ok_or_else(|| failed("no linear surface format"))?;
         surface.configure(&device, &wgpu::SurfaceConfiguration { usage: wgpu::TextureUsages::RENDER_ATTACHMENT, format, width, height, present_mode: wgpu::PresentMode::Fifo, alpha_mode: wgpu::CompositeAlphaMode::PreMultiplied, view_formats: vec![], desired_maximum_frame_latency: 2, color_space: wgpu::SurfaceColorSpace::Auto });
         let engine = Engine::new(&device).map_err(failed)?;
+        let mut library = Library::new();
+        library.compose_encodings();
         let blitter = wgpu::util::TextureBlitter::new(&device, format);
         let target = storage(&device, width, height);
         let limits = Limits { side: CACHE_SIDE.min(device.limits().max_texture_dimension_2d), rasters: RASTERS_PER_DRAW, items: ITEMS_PER_RASTER };
@@ -199,7 +200,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), library: Library::new(), cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector })
+        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -235,6 +236,13 @@ impl WebCore {
         self.library.append_group(key, &parse(list_json).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
+    }
+
+    pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &str) -> Result<bool, JsValue> {
+        self.compositor.touch(to, &self.library);
+        let patched = self.library.patch_group(from, to, &parse_splice(splice_json).map_err(failed)?);
+        self.compositor.touch(to, &self.library);
+        Ok(patched)
     }
 
     pub fn drop_group(&mut self, key: &str) {

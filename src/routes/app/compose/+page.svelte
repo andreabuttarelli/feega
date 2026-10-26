@@ -4,9 +4,9 @@
   import { goto } from '$app/navigation';
   import PageHead from '$lib/components/PageHead.svelte';
   import PreviewCard from '$lib/components/compose/PreviewCard.svelte';
-  import { LAYOUTS } from '$lib/canvas/composition/index';
-  import { COMPOSITION_LAYOUTS } from '$lib/motion/components';
-  import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+  import { LAYOUTS } from '@feega/motion-core/canvas/composition';
+  import { COMPOSITION_LAYOUTS } from '@feega/motion-core/motion/components';
+  import { FORMATS, MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
   import { sendPoster, videoPoster } from '$lib/motion/poster-capture';
 

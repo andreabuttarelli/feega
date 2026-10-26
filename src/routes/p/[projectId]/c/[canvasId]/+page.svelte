@@ -1,14 +1,35 @@
 <script lang="ts">
-  import { hostFit, keepTextSize, type HostShare } from '$lib/motion/text-fit';
+  import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
+  import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
+  import CommentPin from '$lib/components/canvas/CommentPin.svelte';
+  import { withColour } from '$lib/canvas/node-colour';
+  import CompareOverlay from '$lib/components/canvas/CompareOverlay.svelte';
+  import OutputViewer from '$lib/components/canvas/OutputViewer.svelte';
+  import { OUTPUT_KIND_OF, viewableRuns, type OutputKind, type ViewerRun } from '$lib/canvas/run-info';
+  import CloudPicker from '$lib/components/canvas/CloudPicker.svelte';
+  import { CloudMode, type CloudProviderId } from '$lib/canvas/cloud-picker';
+  import NodeSearch from '$lib/components/canvas/NodeSearch.svelte';
+  import { NODES_PARAM, idsFromLink, selectionLink } from '$lib/canvas/selection-link';
+  import type { CommentThread } from '$lib/canvas/comment-threads';
+  import { marksFor } from '$lib/canvas/comment-marks';
+  import { hasUnseenMention, latestActivity, mentionedIds, type Teammate } from '$lib/canvas/comment-mentions';
+  import { readSeen, writeSeen } from '$lib/canvas/comments-seen';
+  import { keepTextSize } from '$lib/motion/text-fit';
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
+  import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
+  import CanvasVersionsDialog from '$lib/components/canvas/CanvasVersionsDialog.svelte';
+  import type { CanvasVersion } from '$lib/server/canvas/canvas-versions';
   import { localStore } from '$lib/browser-storage';
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
-  import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
-  import type { Stack } from '$lib/canvas/stacking';
-  import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
+  import { Pasted, isSvgFile, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
+  import { svgDrawings } from '$lib/canvas/svg-drawings';
+import { pasteTargets } from '$lib/canvas/paste-into-frame';
+  import { DeleteMode, SECTION_TYPE, membershipAfter, withMembers } from '$lib/canvas/section';
+  import { stackedLocally, Stack } from '$lib/canvas/stacking';
+  import type { FrameStep } from '$lib/canvas/frame-multi';
+  import { TEXT_BOX } from '$lib/canvas/frame-paste';
   import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
-  import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
   /**
    * LA TELA.
@@ -39,7 +60,7 @@
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
-  import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
+  import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
@@ -51,6 +72,7 @@
   import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
+  import CanvasShortcutHelp from '$lib/components/canvas/CanvasShortcutHelp.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
@@ -64,11 +86,8 @@
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
-  import { untrack } from 'svelte';
-  import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
-  import { Renderer, Switch, rendererOf } from '$lib/canvas/gpu/renderer-flag';
-  import RendererBadge from '$lib/components/canvas/gpu/RendererBadge.svelte';
-  import { dev } from '$app/environment';
+  import { onMount, untrack } from 'svelte';
+  import { Renderer, rendererOf } from '$lib/canvas/gpu/renderer-flag';
   import { feedView, personView, productsView } from '$lib/canvas/source-thumbs';
 import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type NodeView } from '$lib/canvas/node-view';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
@@ -104,37 +123,39 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
-  import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { frameHolding, type FrameHold } from '$lib/canvas/frame-holding';
+  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
-  import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
-  import { FEEGA_TOKENS } from '$lib/motion/brand';
-  import { AssetKind } from '$lib/motion/components';
+  import { Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+  import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+  import { AssetKind } from '@feega/motion-core/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
+  import FrameHover from '$lib/components/canvas/FrameHover.svelte';
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
+  import { TileBody } from '$lib/canvas/motion-node';
+  import OutputDragHandle from '$lib/components/canvas/OutputDragHandle.svelte';
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, frameResize, heightFollowsDoc, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { DrawTool } from '$lib/motion/draw-tool';
+  import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
+  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
-  import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
-  import { fitToNode } from '$lib/motion/custom-size';
-  import { barContextOf } from '$lib/canvas/bottom-bar';
-  import { CanvasState, NodeMode, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
-  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
+  import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
+  import { NodeMode } from '$lib/canvas/inline-motion';
   import { decoded, painted } from '$lib/canvas/paint-wait';
-  import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHead } from '$lib/canvas/frame-outlines';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
-  import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
-  import { framesToWarm } from '$lib/canvas/warm-frames';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
-  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type HostMove, type PointerPoint } from '$lib/canvas/canvas-drop';
-  import { canvasSelection } from '$lib/canvas/promote-sheet';
+  import type { SceneDrop } from '$lib/canvas/scene-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import { inputChanged } from '$lib/canvas/effects/editor';
@@ -161,6 +182,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     type WiredListSource
   } from '$lib/canvas/list-node';
   import { verdictForUpload, canvasUploadPrefix } from '$lib/canvas/upload-kind';
+  import { isFeegaFile } from '$lib/canvas/feega-file';
+  import { importFeega } from '$lib/canvas/feega-transfer';
   import { FONT_FILE } from '$lib/motion/fonts/library';
   import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
   import { isUploadedNodeRow, uploadedNodeOf } from '$lib/canvas/uploaded-node';
@@ -174,26 +197,36 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
   import { nodeSize } from '$lib/canvas/node-size';
+  import { cleanNodeName } from '$lib/canvas/node-name';
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
+  import { reloadTechniques, techniquesOf } from '$lib/canvas/techniques.svelte';
+  import { promptSkillsOf, saveSkill } from '$lib/canvas/prompt-skills.svelte';
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
-  import { producedRuns } from '$lib/canvas/gen-history';
+  import { historyItemsOf, producedRuns } from '$lib/canvas/gen-history';
   import { genTileView, type GenTileView } from '$lib/canvas/gen-tile-view';
   import { runQuoteOf, type RunQuote } from '$lib/canvas/run-quote';
+  import { DEFAULT_INTO, DEFAULT_VARIANTS, VariantInto, browserVariantsStorage, effectiveVariants, readRemembered, variantsIntoOf, writeRemembered, type RememberedVariants } from '$lib/canvas/variants';
   import { type Addable } from '$lib/canvas/addable';
   import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
   import { tileNode } from '$lib/canvas/connect-rules';
   import { planDelete } from '$lib/canvas/delete-plan';
   import { connectorsFor, orphanedByModelChange, type ConnectorType, type GenerativeNodeKind, connectorsForNode } from '$lib/canvas/connectors';
   import { portsOf } from '$lib/canvas/node-ports';
+  import { TECHNIQUE_NODE, TECHNIQUE_EDIT_PREFIX, instancePorts } from '$lib/canvas/technique-instance';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
+  import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
+  import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
+  import type { Extend } from '$lib/outpaint';
+  import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
   import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
+  import { ImageTool } from '$lib/image-tools';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
   import {
     docData,
@@ -226,8 +259,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { Product } from '$lib/server/repos/products';
   import type { SocialPost } from '$lib/server/repos/social-posts';
   import { BILLING_PATH } from '$lib/billing-path';
+  import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
+  import type { FigmaJob } from '$lib/canvas/figma/images';
+  import { ImagesOutcome } from '$lib/canvas/figma/fetch-images';
+
+  const LINK_COPIED_MS = 1500;
 
   let { data } = $props();
+  const techniqueShelf = techniquesOf(untrack(() => data.projectId));
+  const skillShelf = promptSkillsOf(untrack(() => data.projectId));
 
   function announceWelcome() {
     const campaign = campaignOf(page.url.searchParams.get(WELCOME_PARAM));
@@ -243,6 +283,112 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   $effect(() => {
     untrack(announceWelcome);
+  });
+
+  function openLinkedNodes() {
+    const ids = idsFromLink(page.url.searchParams).filter((id) => nodes.some((n) => n.id === id));
+    const clean = new URL(page.url);
+    clean.searchParams.delete(NODES_PARAM);
+    replaceState(clean, page.state);
+    if (ids.length) {
+      focusOn(ids, undefined, FocusMode.Select);
+    }
+  }
+
+  let linkCopied = $state(false);
+
+  let viewing = $state<{ runs: ViewerRun[]; start: number; kind: OutputKind } | null>(null);
+
+  let pairing = $state<{ left: string; right: string; leftLabel: string; rightLabel: string } | null>(null);
+
+  function compareOutputs(ids: string[]) {
+    const [a, b] = ids.map((id) => nodes.find((n) => n.id === id));
+    if (!a || !b || typeof a.data.refId !== 'string' || typeof b.data.refId !== 'string') {
+      return;
+    }
+    const urlOf = (assetId: string) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full);
+    const nameOf = (n: typeof a) => n.displayName ?? (typeof n.data.prompt === 'string' ? n.data.prompt.slice(0, 24) : 'Image');
+    pairing = { left: urlOf(a.data.refId), right: urlOf(b.data.refId), leftLabel: nameOf(a), rightLabel: nameOf(b) };
+  }
+
+  function viewOutput(id: string) {
+    const node = nodes.find((n) => n.id === id);
+    const kind = node ? OUTPUT_KIND_OF[node.type] : undefined;
+    if (!node || !kind) {
+      return;
+    }
+    const outputs = viewableRuns((runs[id] ?? []) as ViewerRun[]);
+    const shown = outputs.findIndex((run) => run.outputAssetId === node.data.refId);
+    if (!outputs.length) {
+      return;
+    }
+    viewing = { runs: outputs, start: Math.max(shown, 0), kind };
+  }
+
+  let cloud = $state<{ provider: CloudProviderId; mode: CloudMode; nodeId: string | null; at: { x: number; y: number } } | null>(null);
+
+  function openCloud(provider: CloudProviderId, mode: CloudMode, nodeId: string | null, at: { x: number; y: number }) {
+    cloud = { provider, mode, nodeId, at };
+  }
+
+  async function pickCloud(target: string, provider: CloudProviderId) {
+    if (!cloud) {
+      return;
+    }
+    const { mode, nodeId, at } = cloud;
+    const base = `/api/v1/projects/${data.projectId}/cloud/${provider}`;
+    if (mode === CloudMode.Import) {
+      const res = await fetch(`${base}/import`, { method: 'POST', body: JSON.stringify({ fileId: target, place: { canvasId: data.canvas.id, x: at.x, y: at.y } }) });
+      const body = (await res.json().catch(() => ({}))) as { node?: CanvasNodeRecord | null; error?: string };
+      if (!res.ok || !body.node) {
+        failed = body.error ?? 'Import failed';
+        return;
+      }
+      const created = body.node;
+      nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })];
+      cloud = null;
+      return;
+    }
+    const node = nodes.find((n) => n.id === nodeId);
+    const assetId = [node?.data.assetId, node?.data.refId].find((v): v is string => typeof v === 'string');
+    if (!assetId) {
+      return;
+    }
+    const res = await fetch(`${base}/export`, { method: 'POST', body: JSON.stringify({ assetId, folder: target }) });
+    if (!res.ok) {
+      failed = 'Export failed';
+      return;
+    }
+    cloud = null;
+  }
+
+  async function copySelectionLink() {
+    await navigator.clipboard.writeText(selectionLink(page.url, selectedIds));
+    linkCopied = true;
+    setTimeout(() => (linkCopied = false), LINK_COPIED_MS);
+  }
+
+  function openLinkedFrame() {
+    if (page.url.searchParams.has(NODES_PARAM)) {
+      openLinkedNodes();
+      return;
+    }
+
+    const id = page.url.searchParams.get(FRAME_PARAM);
+    if (!id) {
+      return;
+    }
+
+    const clean = new URL(page.url);
+    clean.searchParams.delete(FRAME_PARAM);
+    replaceState(clean, page.state);
+    if (nodes.some((n) => n.id === id)) {
+      focusOn([id], undefined, FocusMode.Select);
+    }
+  }
+
+  onMount(() => {
+    requestAnimationFrame(openLinkedFrame);
   });
 
   let coachOpen = $state(untrack(() => data.onboarding.visible));
@@ -324,25 +470,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return true;
   }
 
-  async function moveOut(out: ElementOut, phase: DragPhase, version: number): Promise<number | null> {
-    const source = inlineMotion;
-    markFrame(phase === DragPhase.Over ? out.client : null, source);
-    const drop = phase === DragPhase.Drop && source ? dropAt(out.client, source) : null;
-    if (!source || !drop) {
-      return null;
-    }
-    const res = await post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), versions: JSON.stringify({ [source]: version }), ...(out.box ? { box: JSON.stringify(out.box) } : {}) });
-    return landed(res) ? ((res?.versions as Record<string, number>)[source] ?? null) : null;
-  }
-
-  const canvasundo: CanvasUndo = {
-    owns: (nodeId, version) => {
-      const next = undoStack.nextUndo();
-      return next?.source === 'server' && writesFrameAt(next.gesture, nodeId, version);
-    },
-    run: () => undo()
-  };
-
   const freeElement = (ids: string[]): string | null => {
     const row = ids.length === 1 ? nodes.find((n) => n.id === ids[0]) : null;
     const holdsNodes = row ? nodes.some((n) => layoutOf(n.data).groupId === row.id) : false;
@@ -369,81 +496,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return DropVerdict.Taken;
   }
 
-  type HostBox = { id: string; x: number; y: number; w: number; h: number };
-  const HOST_MIN_PX = 4;
-  let hostOrigin: HostBox | null = null;
-
-  const placeHost = (box: HostBox) => (nodes = nodes.map((n) => (n.id !== box.id ? n : n.w === box.w && n.h === box.h ? { ...n, x: box.x, y: box.y } : { ...n, x: box.x, y: box.y, w: box.w, h: box.h, userHeight: box.h })));
-
-  let turnFrom: { id: string; rotation: number } | null = null;
-
-  const turnTo = (id: string, rotation: number) => (nodes = nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, rotation } } : n)));
-
-  function hostTurn(id: string, rotation: number, turn: number, phase: DragPhase) {
-    turnFrom = turnFrom?.id === id ? turnFrom : { id, rotation };
-    const from = turnFrom.rotation;
-    if (phase !== DragPhase.Drop) {
-      turnTo(id, from + turn);
+  async function elementOut(source: string, out: ElementOut, phase: DragPhase) {
+    markFrame(phase === DragPhase.Over ? out.client : null, source);
+    const drop = phase === DragPhase.Drop ? dropAt(out.client, source) : null;
+    if (!drop) {
       return;
     }
-    turnFrom = null;
-    turnTo(id, from);
-    if (turn !== 0) {
-      rotateGroupBy(id, turn);
-    }
-  }
-
-  const fittedHosts = new Map<string, string>();
-
-  function fitHost(id: string | null, share: HostShare) {
-    const row = id ? nodes.find((n) => n.id === id) : null;
-    const settled = row ? `${row.w}x${row.h}@${motionOf(row)?.docHeadRevision ?? 0}` : "";
-    const next = row ? hostFit(row, share) : null;
-    if (!row || !next || fittedHosts.get(row.id) === settled) {
-      return;
-    }
-    fittedHosts.set(row.id, `${next.w}x${next.h}@${motionOf(row)?.docHeadRevision ?? 0}`);
-    void resize(row.id, next.w, next.h);
-  }
-
-  function hostDrag({ turn, ...shift }: HostMove, to: PointerPoint, phase: DragPhase) {
-    const id = inlineMotion;
-    const row = id ? nodes.find((n) => n.id === id) : null;
-    if (id && row && (turn !== 0 || turnFrom)) {
-      hostTurn(id, layoutOf(row.data).rotation, turn, phase);
-      return;
-    }
-    const zero = toFlow?.({ x: 0, y: 0 });
-    const unit = toFlow?.({ x: 1, y: 1 });
-    if (!id || !row || !zero || !unit) {
-      return;
-    }
-    const scale = unit.x - zero.x;
-    const origin = hostOrigin?.id === id ? hostOrigin : { id, x: row.x, y: row.y, w: row.w, h: row.h };
-    hostOrigin = origin;
-    const next = { id, x: origin.x + shift.dx * scale, y: origin.y + shift.dy * scale, w: Math.max(HOST_MIN_PX, origin.w + shift.dw * scale), h: Math.max(HOST_MIN_PX, origin.h + shift.dh * scale) };
-    const sized = next.w !== origin.w || next.h !== origin.h;
-    if (phase !== DragPhase.Drop) {
-      placeHost(next);
-      cursors.port.update({ live: [{ id, x: next.x, y: next.y }] });
-      if (!sized) {
-        tileDragOver([id], to);
-      }
-      return;
-    }
-    hostOrigin = null;
-    cursors.port.update({ live: [] });
-    placeHost(origin);
-    if (!sized && tileDrop([id], to) === DropVerdict.Taken) {
-      return;
-    }
-    if (next.x !== origin.x || next.y !== origin.y) {
-      void moveEnd([{ id, x: next.x, y: next.y }]);
-      void move(id, next.x, next.y);
-    }
-    if (sized) {
-      void resize(id, next.w, next.h);
-    }
+    landed(await post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), ...(out.box ? { box: JSON.stringify(out.box) } : {}) }));
   }
 
   const regroups = inOrder();
@@ -495,6 +554,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     regroup('groupElements', { ids: JSON.stringify(ids), node_id: id });
   }
 
+  function wrapInSection(ids: string[]) {
+    const id = crypto.randomUUID();
+    regroup('wrapSection', { ids: JSON.stringify(ids), node_id: id });
+  }
+
   function ungroupElements(ids: string[]) {
     for (const id of ids) {
       nodes = ungroupedLocally(nodes, id);
@@ -503,28 +567,40 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function restack(ids: string[], to: Stack) {
-    const res = await post('restack', { ids: JSON.stringify(ids), to });
-    if (res) {
+    nodes = stackedLocally(nodes, ids, to);
+    if (!(await post('restack', { ids: JSON.stringify(ids), to }))) {
       await refresh();
     }
   }
 
-  async function drawElement(drawn: DrawnWire) {
+  async function drawElement(drawn: DrawnWire): Promise<string> {
     const id = crypto.randomUUID();
     const ghost = drawnTile(id, drawn);
     if (!ghost) {
-      void saveDrawn(id, drawn);
-      return;
+      void saveDrawn(id, drawn).then(() => focusOn([id], undefined, FocusMode.Select));
+      return id;
     }
     await decoded(ghost.look);
     catalogPosters.set(id, ghost.look);
     nodes = [...nodes, toTile(ghost.node)];
+    focusOn([id], undefined, FocusMode.Select);
     void saveDrawn(id, drawn);
     await painted();
+    return id;
+  }
+
+  let lastFrameSide: { width: number; height: number } | null = null;
+
+  async function addFrameBeside(id: string) {
+    const tile = nodes.find((n) => n.id === id);
+    if (tile) {
+      await drawFrame({ box: besideBox(tile) });
+    }
   }
 
   async function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }) {
-    const box = 'box' in target ? target.box : defaultFrameBox(target.at);
+    const box = 'box' in target ? target.box : defaultFrameBox(target.at, lastFrameSide);
+    lastFrameSide = { width: box.width, height: box.height };
     const id = crypto.randomUUID();
     nodes = [...nodes, toTile(drawnFrameTile(id, box))];
     void saveFrame(id, box);
@@ -553,15 +629,20 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
     nodes = settle(nodes, id, toTile(node));
-    focusOn([id], undefined, FocusMode.Select);
+    const hold = 'box' in drawn ? frameHolding(nodes, drawn.box) : null;
+    if (hold) {
+      intoFrame(id, hold);
+    }
   }
 
-  $effect(() => {
-    const id = inlineMotion;
-    if (id && catalogPosters.has(id) && inlineStage.paintOf(id) === Paint.Swapped) {
-      catalogPosters.delete(id);
+  async function intoFrame(id: string, hold: FrameHold) {
+    const res = await post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at }) });
+    if (!landed(res)) {
+      focusOn([id], undefined, FocusMode.Select);
+      return;
     }
-  });
+    nodes = nodes.filter((n) => n.id !== id);
+  }
 
   async function dropOutput(nodeId: string, client: PointerPoint) {
     const drop = dropAt(client, null);
@@ -1106,8 +1187,27 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       itemPort: () => itemPortOf(n.type === 'list' ? listValuesByNode[n.id]?.itemKind : upstreamListOf(n.id)?.itemKind),
       mediaKind: () => upstreamEffectsMediaOf(n.id)?.kind ?? (n.data.mediaKind === 'video' ? 'video' : 'image'),
       audioOperation: () => audioOperationOfTile(n),
-      audioInput: () => audioInputOfTile(n)
+      audioInput: () => audioInputOfTile(n),
+      techniquePorts: () => {
+        const technique = techniqueOfTile(n);
+        return technique ? instancePorts(technique) : { inputs: [], output: null };
+      }
     });
+  }
+
+  function techniqueOfTile(n: Tile) {
+    return techniqueShelf.list.find((t) => t.id === n.data.techniqueId) ?? null;
+  }
+
+  function techniqueView(n: Tile): NodeView | null {
+    if (n.type !== TECHNIQUE_NODE) {
+      return null;
+    }
+    const technique = techniqueOfTile(n);
+    if (!technique) {
+      return null;
+    }
+    return { technique: { name: technique.name, version: technique.version, inputs: technique.inputs.length, outputs: technique.outputs.length, ranVersion: typeof n.data.ranVersion === 'number' ? n.data.ranVersion : null } };
   }
 
   /**
@@ -1116,9 +1216,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * lascia passare tutto.
    */
   function tileHeight(n: Tile): number {
-    if (n.id === inlineMotion) {
-      return frameFit(n.id, n.w, NodeMode.Edit)?.h ?? n.h;
-    }
     if (n.type !== 'text' || !(n.id in grownHeights)) return n.h;
     return grownTextNodeHeight(grownHeights[n.id], n.userHeight);
   }
@@ -1138,9 +1235,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       displayName: n.displayName,
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
-      rotatable: motionOf(n)?.kind === FrameKind.Group,
-      behind: chrome.behind,
-      members: chrome.behind ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
+      rotatable: !!motionOf(n) && chrome.turns,
+      behind: chrome.behind || n.type === SECTION_TYPE,
+      members: chrome.behind || n.type === SECTION_TYPE ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
@@ -1228,11 +1325,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!row) {
       return null;
     }
-    return mediaView(row) ?? selectedView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
+    return mediaView(row) ?? selectedView(row) ?? techniqueView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
   }
 
-  let domReason = $state<string | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Dom ? (data.rendererSwitch === Switch.ForceDom ? 'kill switch' : '?renderer=dom') : null);
-  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) !== Renderer.Dom ? null : (CanvasFlow as unknown as typeof GpuFlow));
+  let Flow = $state<typeof GpuFlow | null>(null);
   $effect(() => {
     if (Flow) {
       return;
@@ -1250,6 +1346,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let failed = $state<string | null>(null);
   let fontAdded = $state<string | null>(null);
+  let techniqueNotice = $state<string | null>(null);
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
   let topPeers = $state<HTMLElement | null>(null);
@@ -1303,7 +1400,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const SAVE_MAX_WAIT_MS = 2000;
   const SAVE_BACKOFF_CAP_MS = 30000;
   const REMOTE_REFRESH_MS = 250;
-  const WARM_EVERY_MS = 1000;
   let saveStatus = $state(SaveStatus.Saved);
   let placeStatus = $state(SaveStatus.Saved);
   let unsentCount = $state(0);
@@ -1391,7 +1487,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * cronologia, non due stack separati: creare un nodo dopo averne spostato un altro e poi
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'turn'; turn: Turn };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -1421,114 +1517,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   function selectionChanged(ids: string[]) {
     if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
-    const before = untrack(() => inlineMotion);
     selectedIds = ids;
     cursors.port.update({ selection: ids });
-    leaveNow(before);
   }
 
-  function leaveNow(before: string | null) {
-    const after = untrack(() => inlineMotion);
-    if (before && before !== after) {
-      inlineStage.leave(before);
-    }
-  }
-
-  const liveHost = $derived(domReason ? LiveHost.Node : LiveHost.Canvas);
-
-  let dismissedMotion = $state<string | null>(null);
-  let requestedMotion = $state<string | null>(null);
-  let pageWidth = $state(0);
-  const opening = $derived(openingOf(viewportOf(pageWidth)));
-  const openingHere = $derived.by(() => {
-    const row = selectedIds.length === 1 ? nodes.find((n) => n.id === selectedIds[0]) : null;
-    return row ? openingFor(row, opening) : opening;
-  });
-  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, openingHere, requestedMotion));
-  const editingMotion = $derived(editorOn(inlineMotion, inlineStage.leaving));
-  let lastOpen: string | null = null;
-
-  $effect(() => {
-    const open = inlineMotion;
-    const closed = lastOpen;
-    lastOpen = open;
-    untrack(() => {
-      if (open && open === inlineStage.leaving) {
-        inlineStage.landed(open);
-      }
-      if (closed && closed !== open && nodes.some((n) => n.id === closed)) {
-        inlineStage.leave(closed);
-      }
-    });
-  });
-
-  $effect(() => {
-    if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => dismissedMotion)) {
-      dismissedMotion = null;
-    }
-    if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => requestedMotion)) {
-      requestedMotion = null;
-    }
-  });
-
-  $effect(() => {
-    const [id] = selectedIds;
-    if (selectedIds.length === 1 && untrack(() => nodes.find((n) => n.id === id))?.type === 'motion') {
-      untrack(() => warmMotion(id));
-    }
-  });
-
-  function headRevisionOf(id: string): number {
-    const row = nodes.find((n) => n.id === id);
-    return row && row.type === 'motion' ? (motionOf(row)?.docHeadRevision ?? 0) : 0;
-  }
-
-  function warmMotion(id: string) {
-    if (!nodes.some((n) => n.id === id && n.version > 0)) {
-      return;
-    }
-    prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
-  }
-
-  function warmHovered(e: PointerEvent) {
-    const id = (e.target as Element | null)?.closest?.('[data-motion-node]')?.getAttribute('data-motion-node');
-    if (id) {
-      warmMotion(id);
-    }
-  }
-
-  const warmed = new Map<string, number>();
-
-  function warmInView() {
-    const corner = toFlow?.({ x: 0, y: 0 });
-    const far = toFlow?.({ x: innerWidth, y: innerHeight });
-    if (!corner || !far) {
-      return;
-    }
-    const view = { x: corner.x, y: corner.y, w: far.x - corner.x, h: far.y - corner.y };
-    const frames = nodes.filter((n) => n.type === 'motion' && n.version > 0).map((n) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, version: n.version }));
-    for (const id of framesToWarm(frames, view, warmed)) {
-      warmed.set(id, frames.find((f) => f.id === id)!.version);
-      warmMotion(id);
-    }
-  }
-
-  $effect(() => {
-    const timer = setInterval(() => (window.requestIdleCallback ? window.requestIdleCallback(warmInView) : warmInView()), WARM_EVERY_MS);
-    return () => clearInterval(timer);
-  });
-
-  function reframe(id: string | null, free: Insets) {
-    const row = id ? nodes.find((n) => n.id === id) : null;
-    if (id && reframesOn(viewportOf(pageWidth)) === Reframe.Frame) {
-      focusOn([id], free, row && !tileChromeOf(row).bar ? FocusMode.Reveal : FocusMode.Frame);
-    }
-  }
-
-  function requestMotion(id: string) {
-    dismissedMotion = null;
-    requestedMotion = id;
-  }
+  const core = $derived(rendererOf(page.url) === Renderer.Core);
+  const liveHost = LiveHost.Canvas;
 
   $effect(() => {
     canvasSelection.set(selectedIds);
@@ -1538,12 +1532,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   $effect(() => {
     propertiesTarget.set(targetOf(selectedIds, nodes));
     return () => propertiesTarget.set(null);
-  });
-
-  $effect(() => {
-    if ($propertiesRequest) {
-      requestMotion($propertiesRequest);
-    }
   });
 
   let seenRevision = '';
@@ -1558,6 +1546,120 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       failed = DROPPED_EDIT_NOTICE;
     }
   }
+
+  let canvasVersions = $state<CanvasVersion[] | null>(null);
+
+  $effect(() => {
+    if (versionsPanel.open) {
+      void loadVersions();
+    }
+  });
+
+  async function loadVersions() {
+    const res = await post('canvasVersions', {});
+    canvasVersions = (res?.versions as CanvasVersion[] | undefined) ?? [];
+  }
+
+  async function saveVersion(name: string) {
+    await post('saveCanvasVersion', { name });
+    await loadVersions();
+  }
+
+  async function restoreVersion(version: CanvasVersion) {
+    await post('restoreCanvasVersion', { version_id: version.id });
+    versionsPanel.hide();
+    await refresh();
+  }
+
+  let commentThreads = $state<CommentThread[] | null>(null);
+  let viewCentre = $state({ cx: 0, cy: 0 });
+
+  $effect(() => {
+    if (commentsPanel.open) {
+      void loadComments();
+    }
+  });
+
+  let commentTeam = $state<Teammate[]>([]);
+  const me = $derived(data.session?.user?.id ?? '');
+
+  async function loadComments() {
+    const res = await post('canvasComments', {});
+    commentThreads = (res?.threads as CommentThread[] | undefined) ?? [];
+    commentTeam = (res?.teammates as Teammate[] | undefined) ?? [];
+  }
+
+  onMount(() => {
+    void loadComments();
+  });
+
+  $effect(() => {
+    const threads = commentThreads;
+    if (!threads) {
+      return;
+    }
+    if (commentsPanel.open) {
+      const latest = latestActivity(threads);
+      if (latest) {
+        writeSeen(data.canvas.id, latest);
+      }
+      commentsPanel.setUnseen(false);
+      return;
+    }
+    commentsPanel.setUnseen(hasUnseenMention(threads, me, readSeen(data.canvas.id)));
+  });
+
+  $effect(() => {
+    const refreshWhenBack = () => {
+      if (document.visibilityState === 'visible') {
+        void loadComments();
+      }
+    };
+    window.addEventListener('focus', refreshWhenBack);
+    document.addEventListener('visibilitychange', refreshWhenBack);
+    return () => {
+      window.removeEventListener('focus', refreshWhenBack);
+      document.removeEventListener('visibilitychange', refreshWhenBack);
+    };
+  });
+
+  const pinTarget = $derived.by(() => {
+    const dropped = commentsPanel.pending;
+    if (dropped) {
+      return { ...dropped, label: dropped.timeMs === undefined ? 'the spot you clicked' : `the playhead, ${(dropped.timeMs / 1000).toFixed(2)}s` };
+    }
+    const picked = tiles.find((t) => t.id === selectedIds[0]);
+    return picked ? { nodeId: picked.id, x: picked.w, y: 0, label: 'the selected node' } : { nodeId: null, x: viewCentre.cx, y: viewCentre.cy, label: 'the middle of the view' };
+  });
+
+  async function addThread(body: string) {
+    const at = pinTarget;
+    await post('addComment', { body, x: at.x, y: at.y, ...(at.nodeId ? { node_id: at.nodeId } : {}), ...(at.timeMs === undefined ? {} : { time_ms: at.timeMs }), mention: mentionedIds(body, commentTeam) });
+    commentsPanel.settle();
+    await loadComments();
+  }
+
+  async function replyTo(threadId: string, body: string) {
+    await post('addComment', { body, parent_id: threadId, mention: mentionedIds(body, commentTeam) });
+    await loadComments();
+  }
+
+  async function editCommentBody(commentId: string, body: string) {
+    await post('editComment', { comment_id: commentId, body, mention: mentionedIds(body, commentTeam) });
+    await loadComments();
+  }
+
+  async function deleteCommentById(commentId: string) {
+    await post('deleteComment', { comment_id: commentId });
+    await loadComments();
+  }
+
+  async function resolveThread(thread: CommentThread) {
+    await post('resolveComment', { comment_id: thread.id, resolved: thread.resolved ? '0' : '1' });
+    await loadComments();
+  }
+
+  const livePins = (nodeId: string | null) => (commentThreads ?? []).filter((t) => t.nodeId === nodeId && !t.resolved);
 
   async function refresh(): Promise<boolean> {
     const version = ++snapshotVersion;
@@ -1643,7 +1745,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         if (moved) { nodes = moved; return; }
         refreshSoon();
       },
-      onReconnect: () => { void checkStale(Trigger.Reconnect); },
+      onReconnect: () => { void checkStale(Trigger.Reconnect); void loadComments(); },
+      onComments: () => { void loadComments(); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
       onPeers: (value) => { peers = value; cursors.port.crowd(value.length + 1); },
       onLink: (state) => { canvasLink.set(state); },
@@ -1814,9 +1917,24 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  async function upload(file: File) {
+  async function pictureSize(file: File): Promise<{ width: number; height: number } | null> {
+    const bitmap = await createImageBitmap(file).catch(() => null);
+    const size = bitmap ? { width: bitmap.width, height: bitmap.height } : null;
+    bitmap?.close();
+    return size;
+  }
+
+  async function upload(file: File, at = { x: 0, y: 0 }, hold: FrameHold | null = null) {
+    if (isFeegaFile(file)) {
+      failed = (await importFeega(`/p/${data.projectId}/c/${data.canvas.id}`, file)) ?? failed;
+      return;
+    }
     if (FONT_FILE.test(file.name)) {
       await uploadFontFile(file);
+      return;
+    }
+    if (isSvgFile(file)) {
+      await pasteSvg(await file.text(), at);
       return;
     }
     const verdict = verdictForUpload(file.type, file.name, file.size);
@@ -1834,8 +1952,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
+    if (hold) {
+      const size = await pictureSize(file);
+      landed(await post('upload', {
+        path, file_name: file.name, mime_type: file.type, bytes: file.size, ...(size ?? {}),
+        drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at })
+      }));
+      return;
+    }
+
     const result = await post('upload', {
-      path, file_name: file.name, mime_type: file.type, bytes: file.size, x: 0, y: 0
+      path, file_name: file.name, mime_type: file.type, bytes: file.size, x: at.x, y: at.y
     });
     const created = result?.node as CanvasNodeRecord | undefined;
     if (created) { nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })]; }
@@ -2047,6 +2174,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (created.type === 'influencer') {
       void refresh();
     }
+    if (created.type === SECTION_TYPE) {
+      void restack([created.id], Stack.Back);
+    }
   }
 
   /**
@@ -2110,8 +2240,42 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       estimatedTextInputTokens: estimate?.inputTokens,
       estimatedTextOutputTokens: estimate?.outputTokens,
       hasUpstreamImage: edges.some((e) => e.target === row.id && e.targetHandle === 'images'),
-      imageChoices: catalogue.image
+      imageChoices: catalogue.image,
+      remembered: rememberedVariants
     });
+  }
+
+  const variantsUserId = data.session?.user?.id ?? '';
+  let rememberedVariants = $state<RememberedVariants | null>(null);
+  let variantsRunning = $state<Record<string, number>>({});
+
+  onMount(() => {
+    rememberedVariants = readRemembered(browserVariantsStorage(), variantsUserId);
+  });
+
+  function rememberVariants(patch: { variants?: number; variantsInto?: VariantInto }) {
+    const base = rememberedVariants ?? { count: DEFAULT_VARIANTS, into: DEFAULT_INTO };
+    rememberedVariants = { count: patch.variants ?? base.count, into: patch.variantsInto ?? base.into };
+    writeRemembered(browserVariantsStorage(), variantsUserId, rememberedVariants);
+  }
+
+  function variantsPlanFor(gen: GenNodeState): { count: number; into: VariantInto } {
+    const choice = catalogue[gen.medium]?.find((c) => c.id === effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []));
+    return { count: effectiveVariants(gen.medium, gen.params, rememberedVariants, choice), into: variantsIntoOf(gen.params, rememberedVariants) };
+  }
+
+  function historyFor(id: string) {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const items = gen ? historyItemsOf({ ...gen, runs: runsByNode[id] ?? [] }) : [];
+    return gen && items.length ? { items, urlOf: assetUrl, onshow: (runId: string) => void restore(id, gen, runId) } : null;
+  }
+
+  function variantsInFlightFor(id: string): number {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const historyBatch = gen?.running ? variantsPlanFor(gen) : null;
+    return variantsRunning[id] ?? (historyBatch && historyBatch.count > 1 && historyBatch.into === VariantInto.History ? historyBatch.count : 0);
   }
 
   function genViewFor(id: string): GenTileView | null {
@@ -2127,9 +2291,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const variableTextInput = estimate?.variableInput ?? (gen.medium === 'text' && revision !== '[]');
     const entry = mediumCatalogue[gen.medium];
     const hasUpstreamText = hasUpstreamTextByNode[id] ?? false;
-    const quote = runQuoteOf({ node, choices: entry.choices, hasUpstreamText, variableTextInput, enhanceUnitCredits: entry.enhanceUnitCredits, estimatedTextInputTokens: estimate?.inputTokens, estimatedTextOutputTokens: estimate?.outputTokens });
+    const quote = runQuoteOf({ node, choices: entry.choices, hasUpstreamText, variableTextInput, enhanceUnitCredits: entry.enhanceUnitCredits, estimatedTextInputTokens: estimate?.inputTokens, estimatedTextOutputTokens: estimate?.outputTokens, remembered: rememberedVariants });
 
-    return genTileView(node, quote, { hasUpstreamText, variableTextInput, loopQueued: loopQueuedByNode[id] ?? 0, loopVisible: loopAffordanceByNode[id]?.visible ?? false, loopCombinationCount: loopAffordanceByNode[id]?.combinationCount ?? 0 });
+    return genTileView(node, quote, { hasUpstreamText, variableTextInput, loopQueued: loopQueuedByNode[id] ?? 0, loopVisible: loopAffordanceByNode[id]?.visible ?? false, loopCombinationCount: loopAffordanceByNode[id]?.combinationCount ?? 0, variantsInFlight: variantsInFlightFor(id) });
   }
 
   function runNode(id: string) {
@@ -2149,16 +2313,29 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
-    nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
+    const variants = variantsPlanFor(gen);
+    const batched = variants.count > 1;
+    const params = batched || gen.params.variants !== undefined ? { ...gen.params, variants: variants.count, variantsInto: variants.into } : gen.params;
+    const spawnsNodes = batched && variants.into === VariantInto.Nodes;
+
+    if (!spawnsNodes) {
+      nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
+    }
+    if (batched) {
+      variantsRunning = { ...variantsRunning, [id]: variants.count };
+    }
 
     pending += 1;
     const result = await postAtVersion('run', id, {
       medium: gen.medium,
       prompt: gen.prompt,
       model: effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []) ?? '',
-      params: JSON.stringify(gen.params)
+      params: JSON.stringify(params)
     });
     pending -= 1;
+
+    const { [id]: _settled, ...stillRunning } = variantsRunning;
+    variantsRunning = stillRunning;
 
     if (!result) {
       // Il motivo VERO sta già scritto su `nodes.data` — `giveUp()` lo mette lì prima di
@@ -2210,6 +2387,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     await post('run_loop', { node_id: id, confirm: safety.verdict === 'confirm' ? '1' : '0' });
     await refresh();
     void invalidate('app:credits');
+  }
+
+  async function cancelRunFor(id: string) {
+    await post('cancel_run', { node_id: id });
+    await refresh();
   }
 
   /** Ferma i biglietti non ancora reclamati da un tick — quelli già in corso finiscono, i
@@ -2417,22 +2599,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     [FrameKind.Group]: (_, row) => ({ width: row.w, height: row.h })
   };
 
-  function frameFit(id: string, w: number, mode: NodeMode = NodeMode.Preview): { w: number; h: number } | null {
-    const row = nodes.find((node) => node.id === id);
-    const motion = motionOf(row ?? { id, type: '', data: {} });
-    if (!motion || !row) {
-      return null;
-    }
-    const open = layersSource.video;
-    const picture = open?.nodeId === id ? open.doc : PICTURE_OF_KIND[motion.kind](motion, row);
-    return frameNodeSize(w, picture, mode, motion.kind);
-  }
-
   $effect(() => {
     const open = layersSource.video;
     const row = open ? untrack(() => nodes.find((node) => node.id === open.nodeId)) : null;
     const motion = row ? motionOf(row) : null;
-    if (!open || !row || !motion || !heightFollowsDoc(motion)) {
+    if (!open || !row || !motion || !tileFollowsDoc(motion, open.doc)) {
       return;
     }
     const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motion.kind);
@@ -2449,20 +2620,30 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const open = layersSource.video?.nodeId === id ? layersSource.video : null;
     const shown = open ? { ...motion, format: formatOf(open.doc) } : motion;
-    const mode = id === inlineMotion ? NodeMode.Edit : NodeMode.Preview;
-    return frameResize(shown, { w, h }, open?.doc ?? PICTURE_OF_KIND[motion.kind](motion, row), mode);
+    return frameResize(shown, { w, h }, open?.doc ?? PICTURE_OF_KIND[motion.kind](motion, row), NodeMode.Preview);
   }
+
+  let resizeMode = ResizeMode.Constrained;
+
+  const readResizeMode = (e: PointerEvent) => {
+    resizeMode = e.metaKey || e.ctrlKey ? ResizeMode.Ignored : ResizeMode.Constrained;
+  };
 
   async function sizeFrameDoc(id: string, picture: { width: number; height: number }, was: { width: number; height: number } | null = null) {
     const open = layersSource.video;
     if (open?.nodeId === id) {
-      open.edit(fitToNode(was ? keepTextSize(open.doc, was, picture) : open.doc, picture), 'Resized the frame');
+      open.edit(was ? fitElementToNode(keepTextSize(open.doc, was, picture), picture) : fitToNode(open.doc, picture, resizeMode), 'Resized the frame');
       return;
     }
-    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height });
+    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height, mode: resizeMode });
     if (result?.undo) {
       pushGesture({ items: result.undo as UndoItem[] });
     }
+  }
+
+  function renameNode(id: string, name: string) {
+    nodes = nodes.map((n) => (n.id === id ? { ...n, displayName: cleanNodeName(name) } : n));
+    void post('rename', { node_id: id, name });
   }
 
   async function resize(id: string, width: number, height: number) {
@@ -2496,7 +2677,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     const plan = size ? framePlan(id, size.w, size.h) : null;
-    const fitted = plan?.picture ? fitToNode(open.doc, plan.picture) : null;
+    const fitted = plan?.picture ? fitToNode(open.doc, plan.picture, resizeMode) : null;
     open.preview(fitted?.ok ? fitted.doc : null);
   }
 
@@ -2738,7 +2919,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   $effect(() =>
     layersSource.publishCanvas({
       get nodes() {
-        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), ...frameLook(n) }));
+        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), glyph: layersSource.glyphs.get(n.id), ...frameLook(n) }));
       },
       outlinesUrl: `/p/${data.projectId}/c/${data.canvas.id}/frame-outlines`,
       previewUrl: (nodeId) => motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId }),
@@ -2746,10 +2927,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         return selectedIds;
       },
       select: (ids) => focusOn(ids, undefined, FocusMode.Select),
-      open: (id) => {
-        requestMotion(id);
-        focusOn([id], undefined, FocusMode.Select);
-      }
+      open: (id) => focusOn([id], undefined, FocusMode.Select),
+      rename: renameNode
     })
   );
 
@@ -2934,6 +3113,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       audio?: boolean;
       enhancePrompt?: boolean;
       repeat?: number;
+      variants?: number;
+      variantsInto?: VariantInto;
       /** I campi dichiarati da `ai_models.param_schema` che il toolbar generico scrive — un solo
        *  bucket dinamico, invece di un campo esplicito per ogni nome di parametro possibile. */
       dynamicParams?: Record<string, unknown>;
@@ -2941,6 +3122,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   ) {
     const chosen = nodes.filter((n) => ids.includes(n.id));
     if (!chosen.length) { return; }
+
+    if (patch.variants !== undefined || patch.variantsInto !== undefined) { rememberVariants(patch); }
 
     const droppedEdges: UndoItem[] = [];
     const clearedReferenceIds: string[] = [];
@@ -3131,8 +3314,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * Sparisce subito e torna se il server rifiuta: su una tela si lavora a gesti, e un nodo che
    * resta lì mezzo secondo dopo ⌫ fa premere ⌫ una seconda volta.
    */
-  async function remove(ids: string[]) {
-    const plan = planDelete({ ids, edges, undeletable: [] });
+  async function remove(ids: string[], mode = DeleteMode.WithContents) {
+    const plan = planDelete({ ids: mode === DeleteMode.WithContents ? withMembers(nodes, ids) : ids, edges, undeletable: [] });
     if (plan.empty) {
       return;
     }
@@ -3187,12 +3370,50 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let formatsFor = $state<string | null>(null);
+  let inpaintFor = $state<string | null>(null);
+  let outpaintFor = $state<string | null>(null);
   let exportFor = $state<string[] | null>(null);
+  let exportElements = $state<{ frameId: string; elementIds: string[] } | null>(null);
+
+  async function exportPicked(picked: { frameId: string; elementIds: string[] }, rows: ExportRow[]) {
+    await saves.flush(picked.frameId);
+    const elements = picked.elementIds.map((elementId) => ({ frameId: picked.frameId, elementId }));
+    const out = await post('exportSelection', { elements: JSON.stringify(elements), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
+    return out?.url ? (out as { url: string; name: string; files: string[]; skipped?: string[] }) : 'Export failed';
+  }
 
   async function exportFrames(frameIds: string[], rows: ExportRow[]) {
     await Promise.all(frameIds.map((id) => saves.flush(id)));
     const out = await post('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
-    return out?.url ? (out as { url: string; name: string; files: string[] }) : 'Export failed';
+    return out?.url ? (out as { url: string; name: string; files: string[]; skipped?: string[] }) : 'Export failed';
+  }
+
+  async function insertSceneDrop(drop: SceneDrop) {
+    await Promise.all([saves.flush(drop.targetId), saves.flush(drop.sourceId)]);
+    landed(await post('insertScene', { target: drop.targetId, source: drop.sourceId, at: drop.at }));
+  }
+
+  async function combineScenes(frameIds: string[]) {
+    landed(await post('combineScenes', { frame_ids: JSON.stringify(frameIds) }));
+  }
+
+  async function imageTool(nodeId: string, tool: ImageTool) {
+    landed(await post('imageTool', { node_id: nodeId, tool }));
+    void invalidate('app:credits');
+  }
+
+  async function inpaint(nodeId: string, prompt: string, mask: Mask) {
+    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Inpaint, prompt, mask: JSON.stringify(mask) }));
+    void invalidate('app:credits');
+  }
+
+  async function outpaint(nodeId: string, prompt: string, extend: Extend) {
+    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
+    void invalidate('app:credits');
+  }
+
+  async function layersToFrame(nodeId: string) {
+    landed(await post('layersToFrame', { node_id: nodeId }));
   }
 
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
@@ -3221,16 +3442,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * RELATIVE al centro della selezione: incollare altrove, o su un'altra tela della stessa org,
    * deve posare il gruppo dov'è il puntatore, non dov'era quando è stato copiato.
    */
-  type Clipboard = {
-    nodes: { type: string; data: Record<string, unknown>; dx: number; dy: number }[];
-    edges: { sourceIndex: number; targetIndex: number; sourceHandle: string | null; targetHandle: string | null }[];
-    freeIds: string[];
-  };
-  let clipboard = $state<Clipboard | null>(null);
+  let clipboard = $state<CopiedTiles | null>(null);
 
-  function copy(ids: string[]) {
+  function copy(ids: string[]): ClipboardPayload | null {
     const chosen = nodes.filter((n) => ids.includes(n.id));
-    if (!chosen.length) { return; }
+    if (!chosen.length) { return null; }
     elementClipboard.copyTiles();
 
     const indexOf = new Map(chosen.map((n, i) => [n.id, i]));
@@ -3239,7 +3455,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
     clipboard = {
       freeIds: chosen.flatMap((n) => freeElement([n.id]) ?? []),
-      nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy })),
+      nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy, source: n.id, width: n.w, height: n.h })),
       edges: edges
         .filter((e) => indexOf.has(e.source) && indexOf.has(e.target))
         .map((e) => ({
@@ -3251,18 +3467,120 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
           targetHandle: e.targetHandle ?? null
         }))
     };
+    return { tiles: clipboard };
+  }
+
+  const FIGMA_PASTE = 'These Figma layers could not be read. In Figma use Copy as → Copy as SVG, then paste here.';
+  const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
+
+  async function pasteFigma(html: string, at: { x: number; y: number }) {
+    const res = await post('pasteFigma', { html, at: JSON.stringify(at) });
+    const landedNodes = res?.outcome === 'done' ? ((res.nodes ?? []) as CanvasNodeRecord[]) : [];
+    if (!landedNodes.length) {
+      failed = FIGMA_PASTE;
+      return;
+    }
+    nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
+    const skipped = (res?.skipped ?? []) as string[];
+    if (skipped.length) {
+      failed = `${FIGMA_SKIPPED} ${skipped.join('; ')}`;
+    }
+    const fileKey = (res?.fileKey ?? null) as string | null;
+    const fills = (res?.fills ?? []) as { nodeId: string; images: FigmaImage[] }[];
+    if (fileKey && fills.length) {
+      figmaJobs = [...figmaJobs, ...fills.map((f) => ({ ...f, fileKey }))];
+    }
+  }
+
+  let figmaJobs = $state<FigmaJob[]>([]);
+  let figmaTokenMissing = $state(false);
+
+  function figmaImagesAnswered(outcome: ImagesOutcome) {
+    figmaTokenMissing = outcome === ImagesOutcome.NoToken;
+  }
+
+  async function pasteSvg(svg: string, at: { x: number; y: number }) {
+    const drawings = svgDrawings(svg, at);
+    if (!drawings.length) {
+      failed = 'This SVG has no shapes to paste';
+      return;
+    }
+    const made = await Promise.all(
+      drawings.map(async ({ wire, box }) => {
+        const res = await post('drawElement', { drawn: JSON.stringify(wire), node_id: crypto.randomUUID() });
+        const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+        return node ? { node, undo: (res?.undo ?? []) as UndoItem[], box } : null;
+      })
+    );
+    const landedShapes = made.filter((m) => m !== null);
+    if (!landedShapes.length) { return; }
+    nodes = [...nodes, ...landedShapes.map((m) => toTile(m.node))];
+    pushGesture({ items: landedShapes.flatMap((m) => m.undo) });
+    const hold = frameHolding(nodes, { left: at.x, top: at.y, width: 0, height: 0 });
+    if (hold) {
+      for (const m of landedShapes) {
+        await intoFrame(m.node.id, frameHolding(nodes, m.box) ?? hold);
+      }
+      return;
+    }
+    const ids = landedShapes.map((m) => m.node.id);
+    focusOn(ids, undefined, FocusMode.Select);
+    groupElements(ids);
+  }
+
+  function pasteText(text: string, at: { x: number; y: number }) {
+    const longest = Math.min(TEXT_BOX.maxChars, Math.max(...text.split('\n').map((line) => line.length)));
+    const width = longest * TEXT_BOX.lineHeight * TEXT_BOX.charWidth;
+    const height = TEXT_BOX.lineHeight;
+    void drawElement({ tool: DrawTool.Text, box: { left: at.x - width / 2, top: at.y - height / 2, width, height }, text, sizing: NEW_TEXT_SIZING });
+  }
+
+  const PASTE_DATA: { [K in Pasted]: (data: Extract<PasteData<File>, { kind: K }>, at: { x: number; y: number }) => void } = {
+    [Pasted.Feega]: ({ payload }, at) => {
+      if (payload.elements) {
+        elementClipboard.copyElements(payload.elements.frameId, payload.elements.clipIds, payload.elements.elements);
+      }
+      if (payload.tiles) {
+        clipboard = payload.tiles;
+        elementClipboard.copyTiles();
+      }
+      void paste(at);
+    },
+    [Pasted.Svg]: ({ svg }, at) => void pasteSvg(svg, at),
+    [Pasted.Image]: ({ file }, at) => void upload(file, at, frameHolding(nodes, { left: at.x, top: at.y, width: 0, height: 0 })),
+    [Pasted.Text]: ({ text }, at) => pasteText(text, at),
+    [Pasted.Figma]: ({ html }, at) => void pasteFigma(html, at)
+  };
+
+  function pasteData(data: PasteData<File>, at: { x: number; y: number }) {
+    (PASTE_DATA[data.kind] as (d: PasteData<File>, a: { x: number; y: number }) => void)(data, at);
   }
 
   /** ⌘V: quel che `copy` ha in mano, riposato attorno al punto dato — vuoto se non si è mai copiato. */
   const PASTE_STAGGER = 24;
 
+  function pastedDrop(at: { x: number; y: number }): Drop {
+    const hold = frameHolding(nodes, { left: at.x, top: at.y, width: 0, height: 0 });
+    return hold ? { on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at } : { on: DropOn.Canvas, x: at.x, y: at.y };
+  }
+
   async function pasteElementsAt(at: { x: number; y: number }, copied: CopiedElements) {
     for (const [i, clip] of copied.clipIds.entries()) {
-      landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Canvas, x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER }) }));
+      landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify(pastedDrop({ x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER })) }));
     }
   }
 
   const FRAME_CENTRE = { x: 0.5, y: 0.5 };
+
+  async function pasteElementsIntoEach(frameIds: string[], copied: CopiedElements) {
+    for (const nodeId of frameIds) {
+      for (const clip of copied.clipIds) {
+        landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Frame, nodeId, at: FRAME_CENTRE }) }));
+      }
+    }
+  }
 
   async function pasteFreeInto(frameId: string, freeIds: string[]) {
     for (const source of freeIds) {
@@ -3272,19 +3590,23 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function paste(at: { x: number; y: number }) {
     const copied = elementClipboard.elements;
+    const selectedTiles = nodes.filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, takesDrops: tileChromeOf(n).takesDrops }));
     if (elementClipboard.kind === Copied.Elements && copied) {
-      await pasteElementsAt(at, copied);
+      const frames = pasteTargets(selectedTiles, copied.clipIds);
+      await (frames.length > 1 ? pasteElementsIntoEach(frames, copied) : pasteElementsAt(at, copied));
       return;
     }
     if (!clipboard) { return; }
-    const frameId = pasteIntoFrame(nodes.filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, takesDrops: tileChromeOf(n).takesDrops })), clipboard.freeIds);
-    if (frameId) {
-      await pasteFreeInto(frameId, clipboard.freeIds);
+    const frames = pasteTargets(selectedTiles, clipboard.freeIds);
+    if (frames.length) {
+      for (const frameId of frames) {
+        await pasteFreeInto(frameId, clipboard.freeIds);
+      }
       return;
     }
 
     const result = await post('paste', {
-      nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy }))),
+      nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy, source: n.source, width: n.width, height: n.height }))),
       edges: JSON.stringify(clipboard.edges)
     });
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
@@ -3292,6 +3614,63 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (created.length) { nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))]; }
     if (connected.length) { edges = [...edges, ...connected.map(toEdge)]; }
     if (created.length) { pushGesture(createManyGesture(created, connected)); }
+  }
+
+  async function saveTechnique(ids: string[]) {
+    const editing = data.canvas.name.startsWith(TECHNIQUE_EDIT_PREFIX) ? data.canvas.name.slice(TECHNIQUE_EDIT_PREFIX.length) : '';
+    const name = prompt('Technique name (lowercase words with dashes)', editing)?.trim();
+    if (!name) {
+      return;
+    }
+
+    const saved = await post('save_technique', { ids: JSON.stringify(ids), name });
+    if (saved) {
+      void reloadTechniques(data.projectId, techniqueShelf);
+    }
+  }
+
+  const techniqueNodeIn = (ids: string[]) => nodes.find((n) => ids.includes(n.id) && n.type === TECHNIQUE_NODE);
+
+  async function runTechniqueNode(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const queued = node ? await post('run_technique_node', { node_id: node.id }) : null;
+    if (queued) {
+      techniqueNotice = 'Running. Results land on the Technique runs canvas.';
+      void refresh();
+    }
+  }
+
+  async function editTechnique(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const opened = node ? await post('open_technique', { technique_id: String(node.data.techniqueId) }) : null;
+    if (opened) {
+      leave(`/p/${data.projectId}/c/${String(opened.canvasId)}`, null);
+    }
+  }
+
+  async function detachTechnique(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const detached = node ? await post('detach_technique', { node_id: node.id }) : null;
+    if (!node || !detached) {
+      return;
+    }
+    const created = (detached.nodes ?? []) as CanvasNodeRecord[];
+    const connected = (detached.connections ?? []) as Connection[];
+    nodes = [...nodes.filter((n) => n.id !== node.id), ...created.map((n) => toTile(n, { select: true }))];
+    edges = [...edges, ...connected.map(toEdge)];
+  }
+
+  async function insertTechnique(id: string, at: { x: number; y: number }) {
+    const result = await post('insert_technique', { technique_id: id, x: at.x, y: at.y });
+    const created = (result?.nodes ?? []) as CanvasNodeRecord[];
+    const connected = (result?.connections ?? []) as Connection[];
+    if (!created.length) {
+      return;
+    }
+    techniqueNotice = typeof result?.message === 'string' ? result.message : null;
+    nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))];
+    edges = [...edges, ...connected.map(toEdge)];
+    pushGesture(createManyGesture(created, connected));
   }
 
   async function insertTemplate(id: string, at: { x: number; y: number }) {
@@ -3362,9 +3741,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onAccepted(inverseMoveGesture(gesture));
   }
 
+  let historyTurn: Promise<void> = Promise.resolve();
+  const inTurn = (step: () => Promise<void>) => (historyTurn = historyTurn.then(step, step));
+
   async function undo() {
     const entry = undoStack.popUndo();
     if (!entry) { return; }
+    if (entry.source === 'frame') {
+      entry.step.back();
+      undoStack.pushRedo(entry);
+      return;
+    }
     if (entry.source === 'turn') {
       const back = undoTurn(entry.turn);
       if (turnGroup(back)) { undoStack.pushRedo({ source: 'turn', turn: back }); }
@@ -3380,6 +3767,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   async function redo() {
     const entry = undoStack.popRedo();
     if (!entry) { return; }
+    if (entry.source === 'frame') {
+      entry.step.forward();
+      undoStack.pushUndo(entry);
+      return;
+    }
     if (entry.source === 'turn') {
       const back = undoTurn(entry.turn);
       if (turnGroup(back)) { undoStack.pushUndo({ source: 'turn', turn: back }); }
@@ -3400,6 +3792,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * un peer non le ha mai spostate.
    */
   async function moveEnd(moves: { id: string; x: number; y: number }[]) {
+    for (const change of membershipAfter(nodes, moves)) {
+      void write(change.id, { groupId: change.groupId }, SaveTiming.Now);
+    }
+
     const gesture = buildMoveGesture(
       moves.map((m) => ({ nodeId: m.id, after: { x: m.x, y: m.y } })),
       (nodeId) => {
@@ -3423,28 +3819,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * «Genera» resta spento finché non c'è chi esegue il giro (fase 3).
    */
 
-  const EMPTY_ORIGIN = { x: 0, y: 0 };
-  const CHAT_INPUT = 'chat-composer-input';
-
-  const EMPTY_STARTS: Record<EmptyAction, () => void> = {
-    [EmptyAction.Chat]: () => {
-      requestChat();
-      requestAnimationFrame(() => document.getElementById(CHAT_INPUT)?.focus());
-    },
-    [EmptyAction.Frame]: () => (frameLibraryAt = EMPTY_ORIGIN),
-    [EmptyAction.Image]: () => void create('image', EMPTY_ORIGIN),
-    [EmptyAction.Video]: () => void create('video', EMPTY_ORIGIN)
-  };
-
   const canvasMode = $derived(canvasModeFor(data.org.role));
   const viewOnly = $derived(canvasMode === CanvasMode.View);
 </script>
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
+<svelte:window onpointermovecapture={readResizeMode} onpointerupcapture={readResizeMode} />
 
-<svelte:window bind:innerWidth={pageWidth} />
-
-<div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} class:view-only={viewOnly} style={inlineMotion ? neighbourStyle() : undefined}>
+<div class="canvas" class:view-only={viewOnly}>
   {#if peers.length || canvasPeers.length}
     {#if topPeers}
       <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></Portal>
@@ -3453,6 +3835,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     {/if}
   {/if}
   <CursorChat onchat={(chat) => cursors.port.update({ chat })} />
+  <CanvasShortcutHelp />
   {#if presenter && following !== presenter.userId}
     <div class="presenting" role="status" data-testid="presenter-prompt">
       {displayName(presenter.name)} is presenting
@@ -3470,6 +3853,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {/if}
     </p>
   {/if}
+  {#if figmaTokenMissing}
+    <p class="warning" role="status" data-testid="figma-token-hint">
+      Add a Figma token in Settings to import images
+      <a href="/p/{data.projectId}/settings/profile">Open settings</a>
+    </p>
+  {/if}
+  {#if techniqueNotice}
+    <p class="warning" role="status" data-testid="technique-notice">{techniqueNotice}</p>
+  {/if}
   {#if fontAdded}
     <p class="warning" role="status" data-testid="font-added">{fontAdded}</p>
   {/if}
@@ -3486,10 +3878,26 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     </div>
   {/if}
 
+  {#if commentsPanel.open}
+    <CanvasCommentsPanel threads={commentThreads} {me} team={commentTeam} pinsTo={pinTarget.label} onadd={addThread} onreply={replyTo} onedit={editCommentBody} ondelete={deleteCommentById} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
+  {/if}
+
   <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
 
   {#if exportFor}
     <ExportDialog count={exportFor.length} onexport={(rows) => exportFrames(exportFor!, rows)} onclose={() => (exportFor = null)} />
+  {/if}
+  {#if exportElements}
+    <ExportDialog count={exportElements.elementIds.length} onexport={(rows) => exportPicked(exportElements!, rows)} onclose={() => (exportElements = null)} />
+  {/if}
+  {#if versionsPanel.open}
+    <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
+  {/if}
+  {#if outpaintFor}
+    <OutpaintDialog onapply={(prompt, extend) => outpaint(outpaintFor!, prompt, extend)} onclose={() => (outpaintFor = null)} />
+  {/if}
+  {#if inpaintFor}
+    <InpaintDialog src={assetUrl(String(nodes.find((n) => n.id === inpaintFor)?.data?.refId ?? '')) ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
   {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
@@ -3515,7 +3923,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if viewOnly}<p class="view-only-badge" data-testid="view-only">View only</p>{/if}
   {#if Flow}
   <Flow
-    core={rendererOf(page.url, data.rendererSwitch) === Renderer.Core}
+    {core}
     mode={canvasMode}
     postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
@@ -3523,10 +3931,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onMove={move}
     onMoveEnd={moveEnd}
     onResize={resize}
+    onPlace={storeSize}
+    onRename={renameNode}
     onConnect={connect}
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}
+    onCombineScenes={combineScenes}
+    onInsertScene={insertSceneDrop}
+    onImageTool={imageTool}
+    onLayersToFrame={layersToFrame}
+    onInpaint={(id) => (inpaintFor = id)}
+    onOutpaint={(id) => (outpaintFor = id)}
     onExport={(ids) => (exportFor = ids)}
+    onExportRows={exportFrames}
     onEdgeDelete={disconnect}
     onEdgeModeChange={setEdgeMode}
     onCreate={create}
@@ -3535,23 +3952,40 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDraw={drawElement}
     onDrawFrame={drawFrame}
     onRotate={rotateGroupBy}
+    onAddBeside={addFrameBeside}
+    onSection={wrapInSection}
+    onSectionChange={(id, patch) => void write(id, patch, SaveTiming.Now)}
+    onViewOutput={viewOutput}
+    onCompareOutputs={compareOutputs}
+    onCloud={openCloud}
+    onColourChange={(ids, tag) => ids.forEach((id) => void write(id, withColour(tag), SaveTiming.Now))}
     onGroup={groupElements}
     onUngroup={ungroupElements}
     onRestack={restack}
     onTileDragOver={tileDragOver}
     onTileDrop={tileDrop}
+    onElementOut={elementOut}
     onFlow={(fn) => (toFlow = fn)}
     onUpload={upload}
     onDuplicate={duplicate}
     onCopy={copy}
     onPaste={paste}
+    onClip={copy}
+    onPasteData={pasteData}
+    {figmaJobs}
+    onFigmaImages={figmaImagesAnswered}
+    onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
+    techniques={techniqueShelf.list}
+    onTechnique={insertTechnique}
+    onSaveTechnique={saveTechnique}
+    onRunTechnique={runTechniqueNode}
+    onEditTechnique={editTechnique}
+    onDetachTechnique={detachTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
-    onNodeClicked={(id) => (dismissedMotion = dismissedAfterClick(dismissedMotion, id))}
-    onNodeDoubled={requestMotion}
-    barContext={barContextOf(inlineMotion ? CanvasState.Editing : CanvasState.Browsing)}
-    onUndo={undo}
-    onRedo={redo}
+    onUndo={() => inTurn(undo)}
+    onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
+    onRedo={() => inTurn(redo)}
     onConnectNew={connectNew}
     {focus}
     onConnectExisting={connectExisting}
@@ -3561,6 +3995,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     {runQuoteFor}
     {genViewFor}
     onRunNode={runNode}
+    {variantsInFlightFor}
+    {historyFor}
+    onCancelVariants={cancelLoopFor}
+    onCancelRun={cancelRunFor}
     {nodeSummaries}
     {modelChoicesFor}
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
@@ -3569,25 +4007,50 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     viewOf={sourceView}
     cardPreviews={data.cardPreviews}
     previewsAt={`/p/${data.projectId}/c/${data.canvas.id}/card-previews`}
-    onfail={(why) => {
-      console.warn(`[canvas] GPU renderer failed: ${why} → dom`);
-      domReason = why;
-      Flow = CanvasFlow as unknown as typeof GpuFlow;
-    }}
     peers={drawnPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
     onLive={(live) => {
       cursors.port.update({ live });
       liveResized(live);
     }}
-    onView={(view) => cursors.port.update({ view })}
+    onView={(view) => {
+      viewCentre = { cx: view.cx, cy: view.cy };
+      cursors.port.update({ view });
+    }}
     onUserPan={() => (following = null)}
+    commenting={commentsPanel.placing}
+    onCommenting={(on) => commentsPanel.place(on)}
+    onComment={(at) => commentsPanel.drop(at)}
+    commentMarks={(nodeId, fps) => marksFor(commentThreads ?? [], nodeId, fps)}
+    onMark={(id) => commentsPanel.focus(id)}
+    onPinAtPlayhead={(nodeId, timeMs) => commentsPanel.drop({ nodeId, x: 0, y: 0, timeMs })}
     follow={followView}
   >
-    {#snippet tileOver({ id })}
+    {#snippet canvasOver()}
+      {#if commentsPanel.pending && !commentsPanel.pending.nodeId}
+        <CommentPin ghost at={commentsPanel.pending} />
+      {/if}
+      {#each livePins(null) as thread (thread.id)}
+        <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(id) => commentsPanel.focus(id)} />
+      {/each}
+    {/snippet}
+    {#snippet tileOver({ id, body })}
+      {#if commentsPanel.pending?.nodeId === id}
+        <CommentPin ghost at={commentsPanel.pending} />
+      {/if}
+      {#each livePins(id) as thread (thread.id)}
+        <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(picked) => commentsPanel.focus(picked)} />
+      {/each}
       {@const over = liveHost === LiveHost.Canvas ? nodes.find((n) => n.id === id) : null}
       {@const overMotion = over ? motionOf(over) : null}
-      {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive && tileMode(id, inlineMotion, inlineStage.leaving) === NodeMode.Preview} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
+      {@const hoverNode = nodes.find((n) => n.id === id)}
+      {@const hoverMotion = hoverNode ? motionOf(hoverNode) : null}
+      {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && !core}
+        <FrameHover nodeId={id} revision={hoverMotion.docHeadRevision} previewUrl={motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} width={FORMATS[hoverMotion.format].width} height={FORMATS[hoverMotion.format].height} />
+      {/if}
+      {@const hoverGen = hoverNode ? genOf(hoverNode) : null}
+      {#if body === TileBody.Standin && hoverGen?.refId && !hoverGen.running}<OutputDragHandle nodeId={id} />{/if}
+      {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
     {/snippet}
     {#snippet tile({ id, selected })}
       {@const row = nodes.find((n) => n.id === id)}
@@ -3627,6 +4090,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             loopQueued={loopQueuedByNode[row.id] ?? 0}
             loopVisible={loopAffordanceByNode[row.id]?.visible ?? false}
             loopCombinationCount={loopAffordanceByNode[row.id]?.combinationCount ?? 0}
+            variantsInFlight={variantsInFlightFor(row.id)}
+            remembered={rememberedVariants}
             onchange={(patch) => changeGen(id, gen, patch)}
             onestimate={(prompt, model, revision) => void estimateTextCost(id, prompt, model ?? '', revision)}
             onrun={() => run(id, gen)}
@@ -3636,6 +4101,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onshow={(runId) => restore(id, gen, runId)}
             onmeasure={(contentHeight) => (grownHeights[id] = contentHeight)}
             example={exampleFor(row)}
+            skills={skillShelf.list}
+            onsaveskill={(name, body) => saveSkill(data.projectId, name, body)}
           >
             {#snippet result({ refId, text })}
               <!-- `/c/<tela>/assets/<id>` firma lo storage al volo: un URL firmato messo qui
@@ -3794,7 +4261,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
           <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} nodeMode={tileMode(id, inlineMotion, inlineStage.leaving)} onenter={() => requestMotion(id)} {liveHost} liveUrl={motionLivePath(motionAt)} />
+          <MotionNode node={motion} href={motionNodePath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} {liveHost} liveUrl={motionLivePath(motionAt)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}
@@ -3804,18 +4271,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     {/snippet}
   </Flow>
   {/if}
-  {#if dev && domReason}
-    <RendererBadge renderer="dom" reason={domReason} />
-  {/if}
-  {#if !viewOnly && showsEmptyState(nodes.length, inlineMotion)}
-    <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
-  {/if}
-  {#if editingMotion}
-    {#key editingMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onreveal={(free) => editingMotion && focusOn([editingMotion], free, FocusMode.Reveal)} onmoveout={moveOut} onhostdrag={hostDrag} onhostfit={(share) => fitHost(editingMotion, share)} {canvasundo} />
-    {/key}
-  {/if}
-
   {#if componentPicking}
     {@const pickingId = componentPicking.id}
     {@const pickingAssets = cardAssets(compositionCards(pickingId, edges, nodes))}
@@ -3860,6 +4315,24 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
 
 
+  {#if cloud}
+    <CloudPicker provider={cloud.provider} mode={cloud.mode} projectId={data.projectId} returnTo={page.url.pathname} onpick={pickCloud} onclose={() => (cloud = null)} />
+  {/if}
+
+  <NodeSearch {nodes} onjump={(id) => focusOn([id], undefined, FocusMode.Select)} />
+
+  {#if pairing}
+    <CompareOverlay {...pairing} onclose={() => (pairing = null)} />
+  {/if}
+
+  {#if viewing}
+    <OutputViewer runs={viewing.runs} start={viewing.start} kind={viewing.kind} urlFor={(assetId) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full)} onclose={() => (viewing = null)} />
+  {/if}
+
+  {#if selectedIds.length}
+    <button type="button" class="copy-link" data-testid="copy-selection-link" onclick={copySelectionLink}>{linkCopied ? 'Link copied' : 'Copy link to selection'}</button>
+  {/if}
+
   {#if coachOpen}
     <OnboardingCoach
       step={coachStep}
@@ -3889,28 +4362,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     color: var(--ui-text);
     font-size: var(--ui-type-caption);
     transform: translateX(-50%);
-  }
-
-  .canvas.editing :global([role='toolbar'][aria-label='Selection actions']) {
-    display: none;
-  }
-
-  @media (max-width: 767px) {
-    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing']))) {
-      opacity: var(--neighbour-body);
-    }
-
-    .canvas.editing :global(.svelte-flow__edge) {
-      opacity: var(--neighbour-edges);
-    }
-
-    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing'])) .node-label) {
-      opacity: var(--neighbour-label);
-    }
-
-    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing'])) .svelte-flow__handle) {
-      opacity: var(--neighbour-ports);
-    }
   }
 
   .pending-frame {
@@ -4102,5 +4553,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     color: var(--color-destructive);
     background: var(--color-background);
     border: 1px solid var(--color-destructive);
+  }
+
+  .copy-link {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    z-index: 5;
+    transform: translateX(-50%);
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-surface, var(--background));
+    color: var(--ui-ink);
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
   }
 </style>

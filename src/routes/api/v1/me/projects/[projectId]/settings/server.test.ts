@@ -29,7 +29,7 @@ vi.mock('$lib/server/tenancy', async (original) => ({ ...(await original<object>
 vi.mock('$lib/server/email', async (original) => ({ ...(await original<object>()), sendEmail: vi.fn(async () => undefined) }));
 vi.mock('$lib/server/cli-auth', async (original) => ({ ...(await original<object>()), generateApiKey: () => ({ key: 'feega_k', hash: 'h', prefix: 'feega_k' }) }));
 vi.mock('$lib/server/supabase-admin', () => ({ createAdminClient: () => state.kit.client }));
-vi.mock('$lib/server/offerable-models', () => ({ offerableSlotChoices: vi.fn(async () => ({ choices: [], synced: true })) }));
+vi.mock('$lib/server/offerable-models', () => ({ offerableSlotChoices: vi.fn(async () => ({ choices: [], synced: true })), offerableModels: vi.fn(async () => ({ choices: [], synced: true })) }));
 
 const projectLayout = await import('$lib/server/projects/project-shell');
 const settingsLayout = await import('$lib/server/settings/shell');
@@ -42,7 +42,9 @@ const ROUTES: Record<SettingsSection, () => Promise<{ load?: (e: never) => unkno
   [SettingsSection.Team]: () => import('$lib/server/settings/pages/team'),
   [SettingsSection.ApiKeys]: () => import('$lib/server/settings/pages/api-keys'),
   [SettingsSection.Danger]: () => import('$lib/server/settings/pages/danger'),
-  [SettingsSection.Products]: () => import('$lib/server/settings/pages/products')
+  [SettingsSection.Products]: () => import('$lib/server/settings/pages/products'),
+  [SettingsSection.Models]: () => import('$lib/server/settings/pages/models'),
+  [SettingsSection.Spend]: () => import('$lib/server/settings/pages/spend')
 };
 const shellApi = await import('./+server');
 const sectionApi = await import('./[section]/+server');
@@ -115,6 +117,9 @@ function form(fields: Record<string, string>): FormData {
 }
 
 const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
+  [SettingsSection.Models, 'saveAllowlist', { medium: 'image' }],
+  [SettingsSection.Spend, 'saveCap', { scope: 'org_member', cap_usd: '5' }],
+  [SettingsSection.Spend, 'removeCap', { scope: 'org_member' }],
   [SettingsSection.Project, 'rename', { name: 'Relaunch' }],
   [SettingsSection.Project, 'rename', { name: '' }],
   [SettingsSection.Project, 'linkBrand', { brandId: 'b2' }],
@@ -137,6 +142,9 @@ const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
   [SettingsSection.Video, 'updateMediaModel', { slot: 'image', model: '' }],
   [SettingsSection.Profile, 'updateProfile', { firstName: 'Ada', lastName: 'Byron' }],
   [SettingsSection.Profile, 'removeProfileAvatar', {}],
+  [SettingsSection.Profile, 'saveFigmaToken', { token: '' }],
+  [SettingsSection.Profile, 'testFigmaToken', {}],
+  [SettingsSection.Profile, 'removeFigmaToken', {}],
   [SettingsSection.Profile, 'uploadProfileAvatar', {}],
   [SettingsSection.Content, 'enable', {}],
   [SettingsSection.Content, 'disable', {}],

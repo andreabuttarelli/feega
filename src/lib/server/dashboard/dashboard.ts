@@ -4,7 +4,7 @@ import { listRecentBatches, listRecentCanvases, listRecentImages, listRecentNode
 import { signedAssets } from '$lib/server/studio/studio-media';
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { motionEditorPath, motionOf } from '$lib/canvas/motion-node';
-import type { MotionFormat } from '$lib/motion/doc';
+import type { MotionFormat } from '@feega/motion-core/motion/doc';
 import { ProjectMode } from '$lib/project-mode';
 
 export type DashboardDeps = {

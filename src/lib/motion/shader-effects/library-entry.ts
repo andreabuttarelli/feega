@@ -26,8 +26,8 @@ import { componentDefinition as CursorRipples } from 'shaders/core/CursorRipples
 import { componentDefinition as ChromaFlow } from 'shaders/core/ChromaFlow';
 import { componentDefinition as ImageTexture } from 'shaders/core/ImageTexture';
 import { mountShader, type Core, type Definition, type Library, type Size } from './adapter';
-import { libraryProps, shaderTree } from './preset';
-import { SHADER_EFFECTS } from './catalogue';
+import { libraryProps, shaderTree } from '@feega/motion-core/motion/shader-effects/preset';
+import { SHADER_EFFECTS } from '@feega/motion-core/motion/shader-effects/catalogue';
 
 const DEFINITIONS: Record<string, Definition> = { MeshGradient, FlowingGradient, Aurora, Plasma, Swirl, SimplexNoise, FilmGrain, FlutedGlass, LiquidMetal, BrushedMetal, Chrome, Godrays, LensFlare, LightLeak, Vignette, WaveDistortion, ChromaticAberration, IrisWipe, NoiseDissolve, RippleWipe, ZoomBlur, ProgressiveBlur, CursorRipples, ChromaFlow, ImageTexture } as unknown as Record<string, Definition>;
 

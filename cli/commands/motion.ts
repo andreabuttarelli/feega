@@ -67,14 +67,19 @@ function printRun(run: MotionRun) {
   }
 }
 
-type RenderOpts = { org?: string; server?: boolean; resolution?: string; format?: string; quality?: string; fps?: string };
+type RenderOpts = { org?: string; server?: boolean; resolution?: string; format?: string; quality?: string; fps?: string; gifLoop?: string; gifFps?: string; gifWidth?: string };
+
+function gifOf(opts: RenderOpts) {
+  const gif = { loop: opts.gifLoop, fps: opts.gifFps ? Number(opts.gifFps) : undefined, width: opts.gifWidth ? Number(opts.gifWidth) : undefined };
+  return Object.values(gif).some((v) => v !== undefined) ? gif : undefined;
+}
 
 export async function cmdMotionRender(nodeId: string, opts: RenderOpts) {
   await renderAndReport(await token(), nodeId, opts);
 }
 
 export async function renderAndReport(bearer: string, nodeId: string, opts: RenderOpts) {
-  const started = await motionApi.render(bearer, nodeId, { mode: opts.server ? 'server' : 'browser', resolution: opts.resolution, format: opts.format, quality: opts.quality, fps: opts.fps ? Number(opts.fps) : undefined }, opts.org);
+  const started = await motionApi.render(bearer, nodeId, { mode: opts.server ? 'server' : 'browser', resolution: opts.resolution, format: opts.format, quality: opts.quality, fps: opts.fps ? Number(opts.fps) : undefined, gif: gifOf(opts) }, opts.org);
   printRender(started);
 }
 
@@ -166,6 +171,11 @@ type EmbedOpts = { org?: string; unpublish?: boolean; status?: boolean; download
 
 export async function cmdMotionEmbed(nodeId: string, opts: EmbedOpts) {
   await embedAndReport(await token(), nodeId, opts);
+}
+
+export async function cmdMotionShare(nodeId: string, opts: { org?: string }) {
+  const shared = await motionApi.share(await token(), nodeId, opts.org);
+  console.log(shared.url);
 }
 
 export async function embedAndReport(bearer: string, nodeId: string, opts: EmbedOpts) {

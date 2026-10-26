@@ -1,10 +1,10 @@
-import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { Sfx, sfxLabel, type SfxCue } from '$lib/motion/sfx';
-import { AssetKind } from '$lib/motion/components';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import { placeSfx } from '$lib/motion/shots/ops';
-import type { OpResult } from '$lib/motion/timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 import type { SfxAsset } from './motion-tools';
-import { customValues, Strictness } from '$lib/motion/custom/component';
+import { customValues, Strictness } from '@feega/motion-core/motion/custom/component';
 import { instanceComp } from '$lib/motion/template/library';
 import { locateClip } from '$lib/motion/template/fields';
 import { PROMPT_COMPONENT } from '$lib/motion/template/prompt-input/component';

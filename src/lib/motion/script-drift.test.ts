@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc } from './doc';
-import { Act, scriptSchema, type LaunchScript } from './script';
+import { MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Act, scriptSchema, type LaunchScript } from '@feega/motion-core/motion/script';
 import { blocking, docProblems, Quality } from './direction';
 import { markStory, StoryBeat } from './story';
 

@@ -1,5 +1,5 @@
-import type { PathItem } from '$lib/motion/gpu-full/display-list';
-import { dashes } from '$lib/motion/gpu-full/stroke';
+import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import type { Glyphs } from './chrome';
@@ -12,7 +12,6 @@ export enum OverlayPart {
   Guide = 'guide',
   PeerCursor = 'peer-cursor',
   PeerTag = 'peer-tag',
-  Rotate = 'rotate',
   Ghost = 'ghost',
   Hover = 'hover',
   Running = 'running'
@@ -41,7 +40,6 @@ const PEER_TEXT = '#ffffff';
 const REFUSED = '#c0392b';
 const HOVER_ALPHA = 0.5;
 const RUNNING_LINE = 1.5;
-const ROTATE = { size: 12, lift: 28, border: 2 };
 
 const WIRE_COLOUR: Record<EdgeLook, (t: CoreTheme) => string> = {
   [EdgeLook.Plain]: (t) => t.wire,
@@ -62,7 +60,7 @@ export function edgeItems(id: string, c: Curve, look: EdgeLook, theme: CoreTheme
   if (look !== EdgeLook.Iterate) {
     return [solid(clip, line(path, WIRE_WIDTH), colour)];
   }
-  return [...dashes(path, false, ITERATE_DASH, ITERATE_GAP).map((d) => solid(clip, line(d, WIRE_WIDTH), colour)), ...badge(id, c, theme)];
+  return [...dashes(path, false, [ITERATE_DASH, ITERATE_GAP]).map((d) => solid(clip, line(d, WIRE_WIDTH), colour)), ...badge(id, c, theme)];
 }
 
 export function marqueeItems(m: Box, zoom: number, theme: CoreTheme): PathItem[] {
@@ -83,14 +81,6 @@ export function peerItems(p: CorePeer, zoom: number, glyphs: Glyphs): PathItem[]
   const top = PEER_TAG.y + (PEER_TAG.h - PEER_TAG.line) / 2;
   const text = name.contours.map((c) => at(c.map((v, i) => (i % 2 === 0 ? v + PEER_TAG.x + PEER_TAG.pad : v + top))));
   return [solid(`${p.id}:${OverlayPart.PeerCursor}`, [at(PEER_ARROW)], p.color), solid(`${p.id}:${OverlayPart.PeerTag}`, pill, p.color), solid(`${p.id}:${OverlayPart.PeerTag}`, text, PEER_TEXT)];
-}
-
-export function rotateItems(id: string, b: Box, theme: CoreTheme): PathItem[] {
-  const clip = `${id}:${OverlayPart.Rotate}`;
-  const r = ROTATE.size / 2;
-  const cx = b.x + b.w / 2;
-  const cy = b.y - ROTATE.lift + r;
-  return [solid(clip, circle(cx, cy, r), theme.accent), solid(clip, circle(cx, cy, r - ROTATE.border), theme.panel)];
 }
 
 export function ghostItems(c: Curve, ok: boolean, zoom: number, theme: CoreTheme): PathItem[] {

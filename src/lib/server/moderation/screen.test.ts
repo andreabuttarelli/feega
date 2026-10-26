@@ -48,6 +48,15 @@ describe('screening a generation before it reaches the provider', () => {
     expect(await screenGeneration(p, request('x'))).toMatchObject({ ok: false });
   });
 
+  it('tells a self-hoster which key to add when the judge has no LLM configured', async () => {
+    const p = ports({
+      decide: vi.fn(async () => Promise.reject(new Error('jev_not_configured'))),
+      judge: vi.fn(async () => Promise.reject(new Error('LLM_API_KEY is not configured')))
+    });
+    const out = await screenGeneration(p, request('a mountain lake'));
+    expect(!out.ok && out.error).toContain('Add LLM_API_KEY to .env');
+  });
+
   const jevDown = (reason: string) => vi.fn(async () => Promise.reject(new Error(reason)));
   const judgeDown = () => vi.fn(async () => Promise.reject(new Error('judge down')));
   const judgeClears = () => vi.fn(async () => ({ allowed: true, category: 'safe', reason: 'landscape' }));

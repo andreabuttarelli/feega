@@ -7,8 +7,6 @@ import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { MAX_FRAME_SIZE } from '$lib/server/motion/server-frames';
 import type { RequestHandler } from './$types';
 
-export const config = { maxDuration: 60, memory: 2048 };
-
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;

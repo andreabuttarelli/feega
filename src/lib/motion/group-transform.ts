@@ -1,10 +1,10 @@
-import { findClip, type MotionDoc } from './doc';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { EditMode } from './edit-mode';
-import type { Transform } from './keyframes';
-import { IDENTITY, apply2d, invert2d, transformAt, worldAt } from './parent';
+import type { Transform } from '@feega/motion-core/motion/keyframes';
+import { IDENTITY, apply2d, invert2d, transformAt, worldAt } from '@feega/motion-core/motion/parent';
 import { anchorOf, snapMove, type Bounds, type Guide, type Pt } from './scene-select';
 import { patchEach } from './space';
-import type { OpResult } from './timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 const DEG = 180 / Math.PI;
 const TINY = 1e-9;

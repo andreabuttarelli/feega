@@ -19,5 +19,8 @@ export const NODE_EMPTY_HINT: Record<NodeType, string> = {
   audio: 'Pick an operation, then write or connect what to voice.',
   model3d: 'Connect a product image to turn it into a 3D model.',
   motion: 'Open the editor to build a video from titles, media and 3D.',
+  element: 'Select it to edit its fill, stroke and text.',
+  technique: 'Connect the inputs this technique declares, then run it.',
+  section: 'Drag frames and nodes in to keep them together.',
   studio_batch: 'Pick a Photo studio batch: its approved photos flow to the nodes you connect.'
 };

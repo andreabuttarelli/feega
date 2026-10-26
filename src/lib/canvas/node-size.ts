@@ -10,12 +10,14 @@ import { selectNodeSize } from './select-node';
 import { effectsNodeSize } from './effects-node';
 import { compositionNodeSize } from './composition-node';
 import { calendarNodeSize } from './calendar-node';
-import { frameDefaultSize } from './motion-node';
+import { DocNodeType, frameDefaultSize } from './motion-node';
 import { studioBatchNodeSize } from './studio-batch-node';
 
 type Size = { w: number; h: number };
 
 const FALLBACK_SIZE: Size = { w: 320, h: 240 };
+export const SECTION_SIZE: Size = { w: 640, h: 420 };
+const TECHNIQUE_SIZE: Size = { w: 320, h: 180 };
 
 const NODE_SIZE: Record<NodeType, (data: Record<string, unknown>) => Size> = {
   text: () => genNodeSize('text'),
@@ -36,7 +38,10 @@ const NODE_SIZE: Record<NodeType, (data: Record<string, unknown>) => Size> = {
   audio: () => genNodeSize('audio'),
   model3d: () => genNodeSize('model3d'),
   motion: frameDefaultSize,
-  studio_batch: studioBatchNodeSize
+  element: (data) => frameDefaultSize(data, DocNodeType.Element),
+  studio_batch: studioBatchNodeSize,
+  section: () => SECTION_SIZE,
+  technique: () => TECHNIQUE_SIZE
 };
 
 export function nodeSize(type: string, data: Record<string, unknown> = {}): Size {

@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
-import type { MotionDoc } from '$lib/motion/doc';
-import { freeName, rewireShaders } from '$lib/motion/shaders/model';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { freeName, rewireShaders } from '@feega/motion-core/motion/shaders/model';
 import { createEffect, listEffects, Outcome } from '$lib/server/repos/effects';
 import type { Actor } from '$lib/server/repos/actor';
 

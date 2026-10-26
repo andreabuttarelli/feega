@@ -1,10 +1,11 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { boxOf } from '$lib/motion/layout';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { boxOf } from '@feega/motion-core/motion/layout';
   import { cornerInset, roundnessFromInset } from '$lib/motion/draw-tool';
   import { cornerHandleAt, cornerLocalPoint } from '$lib/motion/corner-handles';
-  import { cornerRadii, withCorner, type Corners, type Pt } from '$lib/motion/shape/geometry';
-  import { setProps } from '$lib/motion/timeline';
+  import { cornerRadii, withCorner, type Corners, type Pt } from '@feega/motion-core/motion/shape/geometry';
+  import { setProps } from '@feega/motion-core/motion/timeline';
+  import { hostFraction } from '$lib/motion/host-point';
 
   let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
@@ -25,8 +26,8 @@
   }
 
   function local(e: PointerEvent): Pt {
-    const rect = host!.getBoundingClientRect();
-    return cornerLocalPoint(doc, clip, frame, [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height]);
+    const [fx, fy] = hostFraction(host!, e);
+    return cornerLocalPoint(doc, clip, frame, [fx * doc.width, fy * doc.height]);
   }
 
   function begin(e: PointerEvent, index: number) {

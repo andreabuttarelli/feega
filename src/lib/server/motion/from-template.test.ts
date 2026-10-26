@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db/client';
-import { MotionFormat, parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 import { PROMPT_TEMPLATE_ID } from '$lib/motion/template/prompt-input/template';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';

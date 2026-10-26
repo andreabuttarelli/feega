@@ -21,6 +21,16 @@ Source of truth: `src/lib/motion/interactive/{host,protocol,player}.ts`.
 |---|---|
 | `GET /e/<id>?fit=cover\|contain` | the player page; fills its frame |
 | `GET /e/<id>.json` | `{ width, height, playback, scrollLength, vars }`, CORS open |
+| `GET /e/<id>/source.json` | `{ doc, tokens, assets, playback, loop, scrollLength }` for a video gpu-core can draw; 404 for one that reads live input. CORS open |
+| `GET /motion-player.js` | ES module defining `<feega-gpu-player>`: gpu-core (wasm, WebGPU then WebGL) drawing a doc. CORS open |
+
+## Which player draws
+
+`/e/<id>` serves `<feega-gpu-player>` unless the video reads live input (`doc.interactive` set, or an
+expression reading pointer/tilt/scroll/vars): those keep `<hyperframes-player>`, the HTML player.
+Embeds published before source embeds keep the HTML page they were stored with. The rule lives in
+`stageOf` (`src/lib/motion/interactive/bundle.ts`). The React SDK fetches `source.json` and draws
+inline with the same element; on 404 it frames `/e/<id>` as before.
 
 `playback` is `autoplay`, `in-view`, `scrub` or `paused`. A `scrub` video is driven by host
 progress; a host builds a scroll story `scrollLength` viewports tall with the player pinned in it.

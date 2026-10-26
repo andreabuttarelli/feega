@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import { wireCurve } from '$lib/canvas/gpu/geometry';
-import { EdgeLook, OverlayPart, edgeItems, guideItems, marqueeItems, peerItems, rotateItems, type CoreTheme } from './overlay';
+import { EdgeLook, OverlayPart, edgeItems, guideItems, marqueeItems, peerItems, type CoreTheme } from './overlay';
 import type { Glyphs } from './chrome';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', paper2: '#f9f9f9', line: '#e5e5e5', line2: '#d2d2d7', chip: '#f2f2f2', chipInk: '#141414', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
@@ -62,13 +62,5 @@ describe('peerItems', () => {
 
     expect(box(items[0].contours)).toEqual([100, 100, 106, 108]);
     expect(box(pill.contours)).toEqual([105, 108, 127, 117]);
-  });
-});
-
-describe('rotateItems', () => {
-  it('centres a 12px knob 28px above the tile', () => {
-    const [ring] = rotateItems('n', { x: 0, y: 100, w: 200, h: 50 }, theme);
-
-    expect(box(ring.contours)).toEqual([94, 72, 106, 84]);
   });
 });

@@ -27,11 +27,13 @@ iframe, social feed, social post mockup, products, ads) — through **MCP tools*
 
 | Situation | Action |
 |-----------|--------|
-| feega MCP is connected | Call MCP tools (`query`, `ask_motion_agent`, `run_node_generation`, …) |
+| feega MCP is connected | Call MCP tools (`query`, `view`, `edit`, `describe`, `find_tools`, …) |
 | MCP not available | Shell: `feega …` after `feega login` |
 
 MCP reaches the whole org: any project, canvas, node the signed-in user can
-see. The CLI is narrower — it is the fallback for motion and gallery without a connected
+see. A session lists 10 core tools; every other tool named here is found with `find_tools`,
+listed with `load_tools`, or run through `edit` `{op: "<tool>", input}`. `describe {op}` gives any
+exact schema. `ask_motion_agent` and `get_motion_run` are unlisted aliases kept for one release; build with frame ops instead. The CLI is narrower — it is the fallback for motion and gallery without a connected
 agent. Never invent REST endpoints or API keys.
 
 ## Auth (always OAuth)
@@ -132,14 +134,12 @@ the twin has the same shapes and seed, the other side. All free.
 
 Custom effects: `write_effect` writes a GLSL shader effect for the whole workspace (name, frag, params)
 and returns its check; `patch_effect` edits it by find/replace at its `version`. `list_effects` shows
-them under `custom`, each with the `step` to put in an `apply_effects` stack. On motion clips, ask
-`ask_motion_agent` to add it.
+them under `custom`, each with the `step` to put in an `apply_effects` stack. On motion clips, add it with frame ops through `edit`.
 
-The canvas and motion agents browse the web themselves (`web_search`, `read_page`, `read_store`, `view_images`, `screenshot_page`, `import_image`, `import_products`), so a request to `ask_motion_agent` can say "find X's brand colours". As an external agent, browse with your own web tools; feega does not proxy search.
+The canvas and motion agents browse the web themselves (`web_search`, `read_page`, `read_store`, `view_images`, `screenshot_page`, `import_image`, `import_products`). As an external agent, browse with your own web tools; feega does not proxy search.
 
 Custom composition layouts: `write_layout` writes a spec layout (placement, slots, animation) for the
-workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists them; ask
-`ask_motion_agent` to arrange a composition on one.
+workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists them.
 
 Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
 
@@ -163,7 +163,11 @@ element in full), `activity { canvas_id, since? }` (recent events and running ru
 readable from the server), `snapshot { node_id, time?, width? }` (the frame as an image; needs the
 server renderer and says `server_frames_unavailable` when it is closed).
 
+`canvas_file` saves a canvas to a `.feega` file or imports one (local MCP only; `feega canvas save` / `feega canvas import`).
+
 ## Work a canvas with the chat's checks
+
+`canvas_file` saves a canvas to a `.feega` file on the local disk or opens one back as a new canvas.
 
 `canvas_tool` runs the project chat's own canvas ops on one `project_id`: `op` names it, `input`
 carries its fields in camelCase. List canvases, nodes and runs; create, update, move, connect and
@@ -189,13 +193,7 @@ finishes regardless, and what it already produced stays in the output list.
 
 A `motion` node is a video built in the motion editor. `list_motion_videos` finds them (optionally
 per project) with their `node_id`, revision and poster. `get_motion_summary` reads one — revision,
-duration, every track and clip in seconds. `ask_motion_agent` asks the editor's own AI to change
-it in plain words ("make the title red and add a bounce"): one turn of the same agent the editor
-chat runs, a new revision, the exchange visible in the editor chat. It returns at once with a
-running `run_id`: poll `get_motion_run` every few seconds until `done` (reply, summary, new
-`version`); `wait: true` polls for you up to about 4 minutes of a turn that can run up to 30. Spends credits. `attachments` (up to 10, 20 MB each): images the agent sees and can place
-(e.g. a logo) and PDF/DOCX/PPTX/XLSX/CSV/TXT/MD/HTML it reads as text — each a public `url`, a
-project `asset_id`, or base64 `data` + `name` + `mime_type`. CLI: `feega motion ask <nodeId> "<prompt>"
+duration, every track and clip in seconds. Change it with frame ops through `edit` (`describe` lists them). CLI: `feega motion ask <nodeId> "<prompt>"
 --attach ./brief.pdf https://…/logo.png asset:<id>`.
 `list_shader_effects` (CLI `feega motion shaders`) lists the GPU shader effects the agent adds —
 gradients, noise, glass, metal, light, distortions, wipes, blurs — with their knobs: name one in the prompt.
@@ -215,12 +213,12 @@ the video's scroll length. Live components (games, generative pieces) run live t
 shows a still of them. Publishing again updates it in place, `action: "unpublish"` takes it
 down. Uncensored projects are refused. It also returns `react` and `flutter` snippets: the
 same player inside a React (`@feega/motion-react`) or Flutter (`feega_motion`) app.
-`motion_budget` reads what a video spent across its turns; `action: "raise"` lets it spend more, only when the user asks to continue. `get_motion_embed` reads the state. The self-contained HTML (no hosting):
+To send someone one frame, `share_motion_frame` returns a viewer link (loops, tap to play, swipe between shared frames on a phone) and turns the canvas share on; free. `motion_budget` reads what a video spent across its turns; `action: "raise"` lets it spend more, only when the user asks to continue. `get_motion_embed` reads the state. The self-contained HTML (no hosting):
 `feega motion embed <nodeId> --download page.html`.
 
 See a video with `view_motion_frames` (up to 6 times in seconds): the frames come back as
 images with the quality gate's `quality` and `blocking` notes. Free; look before and after
-`ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`. Against a local server
+each change. CLI: `feega motion frames <nodeId> --at 1,2.5,4`. Against a local server
 the frames need `CHROMIUM_PATH` (a local Chrome binary, e.g.
 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`) in its env; without it the call
 answers `closed` / "frames unavailable".
@@ -258,10 +256,24 @@ Built-in line icons (arrow, check, close, menu, search, user, star, heart, play,
 path clip (x, y centre 0..1, size a share of the short side). Through `motion_tool`.
 
 Named styles keep a video consistent: `named_style` `{ action: "define", name, style: { kind:
-"text", font, size, weight, tracking, leading, color } }` (or `{ kind: "colour", color }`)
-creates or edits one; `action: "apply"` with `name` and `clip_ids` links clips (a colour style
-paints text colour or shape fill); `"detach"` unlinks, `"remove"` deletes, `"list"` lists them
-with their clips. Editing a style restyles every linked clip. Through `motion_tool`.
+"text", font, size, weight, tracking, leading, color } }` (or `{ kind: "colour", color }`,
+`{ kind: "paint", fills }` for a gradient or image fill, `{ kind: "effect", effects }` for
+shadows and blurs) creates or edits one; `action: "save"` with `name`, one `clip_ids` entry and
+`kind` makes a style from that clip's current look; `"apply"` with `name` and `clip_ids` links
+clips (a colour style paints text colour or shape fill; an effect style has its own slot, so a
+clip keeps one effect style next to one text, colour or paint style); `"detach"` unlinks (`slot`
+`styleRef` or `effectStyleRef`, both when omitted), `"remove"` deletes, `"list"` lists them with
+their clips. Editing a style restyles every linked clip. Through `motion_tool`.
+
+Variables with modes (light/dark, brand A/B): `variable` `{ action: "define", collection, name, type:
+"colour"|"number"|"string"|"boolean", values: { <mode>: value | { alias: "Collection/name" } },
+modes? }` creates or edits one (every mode needs a value); `"add_mode"` adds a mode; `"mode"`
+switches the video to a mode and every bound clip takes that mode's value; `"bind"` `{ collection,
+name, clip_id, target }` links a prop (a colour to fill/stroke/color, a number to roundness, opacity,
+width, `autoLayout.gap`, `autoLayout.padding`...); `"unbind"`, `"remove"`, `"list"`. `set_props` on
+a bound prop is refused. Through `motion_tool`. Across the frames of a canvas: edit op `variables`
+(list; define a value, synced to every frame that has the collection; switch a mode per frame with
+`frames`; bind `ids` as `frameId:elementId`).
 
 The frame editor page's own actions (read the head, save the whole doc, apply doc ops, render and
 batch status) run through `motion_editor_op` `{ node_id, op, input }` with the same answers as
@@ -285,8 +297,7 @@ edits included, and the clips each card plays), `write_storyboard` writes it fro
 The public gallery holds free motion videos and compositions anyone can remix, many by Feega.
 `search_gallery` finds them by title words, `kind`, `format`, `duration` (short, medium, long) or
 `tag`. `remix_gallery_item` copies one into a project as a new `motion` node with its texts,
-colours, logo and media exposed as fields; then offer to put the user's brand on it with
-`ask_motion_agent`. `publish_to_gallery` shares a `motion` node, only when the user asks: it is
+colours, logo and media exposed as fields; then offer to put the user's brand on it with frame ops. `publish_to_gallery` shares a `motion` node, only when the user asks: it is
 refused for uncensored projects, real brands (their logo, a real-brand script, logos or pictures
 imported from a website) and content the moderation refuses. Free. CLI: `feega gallery [query]`,
 `feega gallery remix <itemId> --project <id>`, `feega gallery publish <nodeId> --title "…"`.
@@ -303,6 +314,12 @@ as viewer), `disable_invite_link`, `set_role`, `remove_member`, `leave`, `transf
 Viewers see everything and change nothing; free organisations have limited editor seats (a
 `seat_limit` answer carries `upgrade_path`). CLI: `feega orgs`, `feega orgs use <orgId>`,
 `feega orgs create <name>`, `feega team [invite|resend|revoke|link|link-off|role|remove|leave|transfer]`.
+`model_allowlist` reads which image, video and 3D models the org offers (an empty list means every
+model) and, for admins and only when the user asks, replaces one medium's list: `feega allowlist
+[set <medium> [ids...]]`.
+`spend_caps` reads the org's spend caps (`org_member`, `project_member`, `project_total`, each with an
+optional monthly reset) and, for admins and only when the user asks, sets or removes one: `feega caps
+[set <scope> <usd|off> [--project <id>] [--reset monthly]]`. A run a cap refuses answers `cap_reached`.
 
 ## References (load on demand)
 

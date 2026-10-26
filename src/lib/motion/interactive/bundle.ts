@@ -1,25 +1,26 @@
-import type { BrandTokens } from '../brand';
-import type { AudioAnalysis } from '../audio-analysis';
-import type { MotionDoc } from '../doc';
-import { Target, composeHtml, hostedScriptTag, inlinedScript, type Inlined } from '../hyperframes/compose';
-import { MOTION_RUNTIME_ROUTE, PARTICLE_RUNTIME_GLOBAL, RuntimeDelivery } from '../hyperframes/runtime-delivery';
-import { Chunk, chunkUrl } from '../hyperframes/runtime-chunks';
-import { MOTION_ENV_ROUTE } from '../look';
-import { HOSTED, MODULES, Module, Script, cdnRewrites, defaultOrigin, folderOf, libsBase, moduleUrl, notice, scriptUrl } from '../libs/catalog';
-import type { InlinedModules } from '../hyperframes/three';
-import { MATTE_RUNTIME } from '../hyperframes/mattes';
-import { esc } from '../hyperframes/html';
-import { InputKey } from '../expression/inputs';
-import { INPUT_MESSAGE } from './runtime';
-import { EVENT_MESSAGE } from '../custom/runtime';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { Target, composeHtml, hostedScriptTag, inlinedScript, type Inlined } from '@feega/motion-core/motion/hyperframes/compose';
+import { MOTION_RUNTIME_ROUTE, PARTICLE_RUNTIME_GLOBAL, RuntimeDelivery } from '@feega/motion-core/motion/hyperframes/runtime-delivery';
+import { Chunk, chunkUrl } from '@feega/motion-core/motion/hyperframes/runtime-chunks';
+import { MOTION_ENV_ROUTE } from '@feega/motion-core/motion/look';
+import { HOSTED, MODULES, Module, Script, cdnRewrites, defaultOrigin, folderOf, libsBase, moduleUrl, notice, scriptUrl } from '@feega/motion-core/motion/libs/catalog';
+import type { InlinedModules } from '@feega/motion-core/motion/hyperframes/three';
+import { MATTE_RUNTIME } from '@feega/motion-core/motion/hyperframes/mattes';
+import { esc } from '@feega/motion-core/motion/hyperframes/html';
+import { InputKey } from '@feega/motion-core/motion/expression/inputs';
+import { INPUT_MESSAGE, LIVE_GLOBAL } from '@feega/motion-core/motion/interactive/runtime';
+import { EVENT_MESSAGE } from '@feega/motion-core/motion/custom/runtime';
 import { playerMain, type PlayerConfig } from './player';
 import { EMBED_ROUTE, HOST_MESSAGE, gestureScrub, hostMain, readHost, selfScroll } from './host';
-import { Liveness, PlayMode, SCROLL_LENGTH, interactiveOf, type Interactive } from './settings';
+import { Liveness, PlayMode, SCROLL_LENGTH, interactiveOf, isInteractive, type Interactive } from '@feega/motion-core/motion/interactive/settings';
+import { GPU_PLAYER_TAG, GPU_SOURCE_ATTR } from '@feega/motion-core/motion/gpu-full/player-tag';
 import { FIT_SCALE, fitBox } from './fit';
 import { LINK_MESSAGE, NATIVE_BRIDGE, PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEvent } from './protocol';
 import type { EmbedSettings } from './loader';
 import { bridgeScript } from './live-bridge';
-import { VAR_RULES, coerceVars, type VarDecl } from './var-model';
+import { VAR_RULES, coerceVars, type VarDecl } from '@feega/motion-core/motion/interactive/var-model';
 import { usedAssetUrls } from '../doc-assets';
 
 export const BUNDLE_FILE = 'feega-interactive.html';
@@ -255,6 +256,21 @@ function storedSource(page: string): EmbedSource | null {
   return json ? (JSON.parse(json) as EmbedSource) : null;
 }
 
+export type GpuSource = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; playback: PlayMode; loop: boolean; scrollLength: number };
+
+export function gpuSource(page: string, origin: string): GpuSource | null {
+  const source = storedSource(page);
+  if (!source) {
+    return null;
+  }
+  const { doc, tokens, assets, analyses, settings } = source;
+  const composed = composeHtml({ doc, tokens, assets, analyses, liveness: Liveness.Live, target: Target.Screen, origin, runtime: RuntimeDelivery.Hosted });
+  if (stageOf(doc, composed) !== Stage.Gpu) {
+    return null;
+  }
+  return { doc, tokens, assets, playback: settings.playback, loop: settings.loop, scrollLength: settings.scrollLength };
+}
+
 export function hostedPage(page: string, origin: string): string | null {
   const source = storedSource(page);
   if (!source) {
@@ -264,14 +280,39 @@ export function hostedPage(page: string, origin: string): string | null {
   return servedPage(source, origin);
 }
 
-function servedPage({ doc, tokens, assets, analyses, settings, title }: EmbedSource, origin: string): string {
+export const GPU_PLAYER_ROUTE = '/motion-player.js';
+const GPU_SOURCE_ID = 'feega-source';
+const HYPERFRAMES_STAGE = '<hyperframes-player id="player" sandbox-origin="opaque" assets-loading-ui="none" disable-click-to-play></hyperframes-player>';
+
+export enum Stage {
+  Hyperframes = 'hyperframes',
+  Gpu = 'gpu'
+}
+
+const readsLiveInput = (composed: string) => composed.includes(`window.${LIVE_GLOBAL}(`);
+
+export const stageOf = (doc: MotionDoc, composed: string): Stage => (isInteractive(doc) || readsLiveInput(composed) ? Stage.Hyperframes : Stage.Gpu);
+
+type Staged = { player: string; stage: string };
+
+const STAGES: Record<Stage, (source: EmbedSource, origin: string) => Staged> = {
+  [Stage.Hyperframes]: (_, origin) => ({ player: hostedScriptTag(origin, Script.Player), stage: HYPERFRAMES_STAGE }),
+  [Stage.Gpu]: ({ doc, tokens, assets }, origin) => ({
+    player: `<script type="module" src="${origin}${GPU_PLAYER_ROUTE}"></script>`,
+    stage: `<script type="application/json" id="${GPU_SOURCE_ID}">${scriptJson({ doc, tokens, assets })}</script><${GPU_PLAYER_TAG} id="player" ${GPU_SOURCE_ATTR}="${GPU_SOURCE_ID}"></${GPU_PLAYER_TAG}>`
+  })
+};
+
+function servedPage(source: EmbedSource, origin: string, forced?: Stage): string {
+  const { doc, tokens, assets, analyses, settings, title } = source;
   const composed = composeHtml({ doc, tokens, assets, analyses, liveness: Liveness.Live, target: Target.Screen, origin, runtime: RuntimeDelivery.Hosted });
-  return `<!doctype html>${playerPage(composed, doc, settings, title, hostedScriptTag(origin, Script.Player))}`;
+  const { player, stage } = STAGES[forced ?? stageOf(doc, composed)](source, origin);
+  return `<!doctype html>${pageOf(sourceOf(composed, doc, settings), esc(title), player, stage)}`;
 }
 
 export type LiveSource = Omit<EmbedSource, 'settings'>;
 
-export const livePage = (source: LiveSource, origin: string): string => servedPage({ ...source, settings: interactiveOf(source.doc) }, origin).replace('</body>', `${bridgeScript()}</body>`);
+export const livePage = (source: LiveSource, origin: string): string => servedPage({ ...source, settings: interactiveOf(source.doc) }, origin, Stage.Hyperframes).replace('</body>', `${bridgeScript()}</body>`);
 
 export const isSourceEmbed = (page: string) => STORED_SOURCE.test(page);
 
@@ -334,7 +375,7 @@ export function playerPage(html: string, doc: MotionDoc, settings: Interactive, 
   return pageOf(sourceOf(html, doc, settings), esc(title), player);
 }
 
-function pageOf(source: PlayerSource, title: string, player: string): string {
+function pageOf(source: PlayerSource, title: string, player: string, stage = HYPERFRAMES_STAGE): string {
   return [
     '<html lang="en"><head><meta charset="UTF-8" />',
     '<meta name="viewport" content="width=device-width, initial-scale=1" />',
@@ -342,7 +383,7 @@ function pageOf(source: PlayerSource, title: string, player: string): string {
     player,
     `<style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}#stage{position:relative;width:100%;height:100%;overflow:hidden}#player{position:absolute}#pad{position:absolute;inset:0;width:100%;height:100%}#pad{touch-action:${PAD_TOUCH[source.playback as PlayMode]}}html.${SELF_SCROLL}{overflow-y:auto;height:auto}html.${SELF_SCROLL} body{overflow:visible;height:${SELF_SCROLL_VIEWPORTS * 100}vh}html.${SELF_SCROLL} #stage{position:sticky;top:0;height:100vh}</style>`,
     '</head><body><div id="stage">',
-    '<hyperframes-player id="player" sandbox-origin="opaque" assets-loading-ui="none" disable-click-to-play></hyperframes-player>',
+    stage,
     '<div id="pad"></div></div>',
     `<script>(${playerMain.toString()})(${scriptJson(playerConfig(source))},${readHost.toString()},${selfScroll.toString()},${fitBox.toString()},${gestureScrub.toString()},${coerceVars.toString()});</script>`,
     '</body></html>'

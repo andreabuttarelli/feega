@@ -1,11 +1,12 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { pathData, type Pt } from '$lib/motion/shape/geometry';
-  import { pathSpace } from '$lib/motion/shape/space';
+  import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { pathData, type Pt } from '@feega/motion-core/motion/shape/geometry';
+  import { pathSpace } from '@feega/motion-core/motion/shape/space';
   import { isTyping } from '$lib/motion/shortcuts';
-  import { EMPTY_NETWORK, networkSchema, type Vector, type VectorNetwork } from '$lib/motion/vector/model';
-  import { networkStroke } from '$lib/motion/vector/outline';
-  import { nearestOnNetwork } from '$lib/motion/vector/curve-math';
+  import { EMPTY_NETWORK, networkSchema, type Vector, type VectorNetwork } from '@feega/motion-core/motion/vector/model';
+  import { networkStroke } from '@feega/motion-core/motion/vector/outline';
+  import { nearestOnNetwork } from '@feega/motion-core/motion/vector/curve-math';
   import { Tangent, breakAtVertex, deleteVertex, handlesAt, removeVertex, splitSegmentAt, toggleSmoothVertex, type Handle } from '$lib/motion/vector/edit';
   import { addVertex, connect, fillClosed, moveVertex, setTangent } from '$lib/motion/vector/draw';
   import { setNetwork } from '$lib/motion/vector/ops';
@@ -50,8 +51,8 @@
   const shownHandles = $derived(selected === null ? [] : handlesAt(network, selected));
 
   function local(e: PointerEvent): Vector {
-    const rect = host!.getBoundingClientRect();
-    const [x, y] = space.toLocal([((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height]);
+    const at = hostFraction(e, host!);
+    const [x, y] = space.toLocal([at.x * doc.width, at.y * doc.height]);
     return { x, y };
   }
 
@@ -85,8 +86,7 @@
   }
 
   function pressSegment(e: PointerEvent) {
-    const rect = host!.getBoundingClientRect();
-    const hit = nearestOnNetwork(local(e), network, HIT_SCREEN_PX / Math.max(rect.width, 1));
+    const hit = nearestOnNetwork(local(e), network, HIT_SCREEN_PX / Math.max(hostWidth(host!), 1));
     if (!hit) {
       return;
     }
@@ -112,7 +112,7 @@
       return raw;
     }
     const own = saved.vertices.flatMap((v, i) => (i === held ? [] : [pointBounds(space.toFrame([v.x, v.y]))]));
-    const result = snapPoint(space.toFrame([raw.x, raw.y]), [...targets, ...own], { width: doc.width, height: doc.height }, snapReach(doc.width, host!.getBoundingClientRect().width));
+    const result = snapPoint(space.toFrame([raw.x, raw.y]), [...targets, ...own], { width: doc.width, height: doc.height }, snapReach(doc.width, hostWidth(host!)));
     guides = result.guides;
     const [x, y] = space.toLocal(result.point);
     return { x, y };

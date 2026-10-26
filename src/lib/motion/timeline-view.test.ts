@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc } from './doc';
-import { Ease } from './design';
-import { Source } from './keyframes';
-import { addClip, setKeyframes, type OpResult } from './timeline';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import { Source } from '@feega/motion-core/motion/keyframes';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
 import { feegaTrailerV2 } from './trailer-v2';
-import { withParams } from './custom/params';
+import { withParams } from '@feega/motion-core/motion/custom/params';
 import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, pxPerFrame, snapped, timecode, headerPx, fitZoom, ZOOM_MIN } from './timeline-view';
 
 describe('timeline view', () => {

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from '../design';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { FEEGA_TOKENS } from '../brand';
-import { composeHtml } from './compose';
-import { EffectKind } from '../effects/registry';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { addEffect } from '../effects/ops';
-import { effectKey } from '../effects/model';
-import { GRAIN_TILE, grainTile } from './three-grain';
+import { effectKey } from '@feega/motion-core/motion/effects/model';
+import { GRAIN_TILE, grainTile } from '@feega/motion-core/motion/hyperframes/three-grain';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {

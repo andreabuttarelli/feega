@@ -1,4 +1,4 @@
-import type { Gap } from '$lib/motion/gpu-full/display-list';
+import type { Gap } from '@feega/motion-core/motion/gpu-full/display-list';
 
 export type FrameGaps = { id: string; gaps: readonly Gap[] };
 export type Row = { reason: string; gaps: number; frames: number; only: number };

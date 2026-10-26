@@ -1,5 +1,6 @@
 <script lang="ts">
-  import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
+  import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
+  import { onMount } from 'svelte';
   import { CanvasMode } from '$lib/canvas/canvas-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import type { SharedNode } from '$lib/canvas/shared-view';
@@ -17,6 +18,11 @@
   import { reportHref } from '$lib/reports/report-link';
 
   let { data } = $props();
+
+  let Flow = $state<typeof GpuFlow | null>(null);
+  onMount(() => {
+    void import('$lib/components/canvas/gpu/GpuFlow.svelte').then((m) => (Flow = m.default));
+  });
 
   const byId = $derived(new Map<string, SharedNode>(data.shared.nodes.map((n) => [n.id, n])));
 
@@ -36,7 +42,8 @@
 
 <main class="shared-canvas">
   <h1 class="share-title">{data.shared.name}</h1>
-  <CanvasFlow {tiles} {edges} mode={CanvasMode.View}>
+  {#if Flow}
+  <Flow {tiles} {edges} mode={CanvasMode.View}>
     {#snippet tile({ id })}
       {@const node = byId.get(id)}
       {#if node}
@@ -114,7 +121,8 @@
         </div>
       {/if}
     {/snippet}
-  </CanvasFlow>
+  </Flow>
+  {/if}
 
   <a class="mark" href="/">feega</a>
   <div class="legal-mark">
@@ -139,17 +147,6 @@
     position: fixed;
     inset: 0;
     background: var(--ui-panel-sunken, #f9f9f9);
-  }
-
-  .shared-canvas :global(.svelte-flow__handle) {
-    opacity: 0 !important;
-    pointer-events: none;
-  }
-
-  .shared-canvas :global(.svelte-flow__node:focus),
-  .shared-canvas :global(.svelte-flow__node:focus-visible),
-  .shared-canvas :global(.tile-selection) {
-    outline: none;
   }
 
   .view {

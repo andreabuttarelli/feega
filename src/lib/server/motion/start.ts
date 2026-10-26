@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { createCanvas, createNode, listCanvases, listNodes, type CanvasNodeRecord } from '$lib/server/repos/canvas';
-import { frameNodeOf, newMotionData } from '$lib/canvas/motion-node';
-import type { MotionFormat } from '$lib/motion/doc';
+import { DocNodeType, frameNodeOf, newMotionData } from '$lib/canvas/motion-node';
+import type { MotionFormat } from '@feega/motion-core/motion/doc';
 import { nodeSize } from '$lib/canvas/node-size';
 import { placeBeside, type Rect } from '$lib/canvas/placement';
 import type { Actor } from '$lib/server/repos/actor';
@@ -65,9 +65,9 @@ function spotFor(nodes: CanvasNodeRecord[], size: { w: number; h: number }, near
   return placeBeside(related, size, occupied);
 }
 
-export function frameShape(picture: Picture): { data: Record<string, unknown>; width: number; height: number } {
+export function frameShape(picture: Picture): { type: DocNodeType; data: Record<string, unknown>; width: number; height: number } {
   const shaped = frameNodeOf(picture);
-  return { data: shaped.data, width: shaped.w, height: shaped.h };
+  return { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h };
 }
 
 const bareShape = (input: StartInput) => (input.picture ? frameShape(input.picture) : { data: newMotionData(input.format) });

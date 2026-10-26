@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { creditsOfCost, estimatedUsage, HOLD_BUFFER, IDLE, RenderClass, renderClass, renderCostUsd, renderQuote, Resolution, RENDER_MULTIPLIER, sandboxCostUsd, type WorkerUsage } from './render-quote';
 import { MULTIPLIER_FLOOR } from '$lib/credit-ladder';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip } from './timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 
 function doc(frames: number, component?: string, props: Record<string, unknown> = {}): MotionDoc {
   const base = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: frames };

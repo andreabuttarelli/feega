@@ -1,5 +1,5 @@
-import { everyClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-import { BrandKind } from '$lib/motion/script';
+import { everyClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { BrandKind } from '@feega/motion-core/motion/script';
 import { Capability, MODE_ALLOWS, modeAllows, type ProjectMode } from '$lib/project-mode';
 
 export enum PublishRefusal {

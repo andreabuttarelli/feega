@@ -7,7 +7,7 @@ import RBush from 'rbush';
 import KDBush from 'kdbush';
 import inside from 'robust-point-in-polygon';
 import ClipperLib from 'clipper-lib';
-import { GENERATIVE_GLOBAL } from './generative';
+import { GENERATIVE_GLOBAL } from '@feega/motion-core/motion/custom/generative';
 
 (window as unknown as Record<string, unknown>)[GENERATIVE_GLOBAL] = {
   createNoise2D,

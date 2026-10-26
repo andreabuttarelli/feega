@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { AssetKind } from '$lib/motion/components';
-  import type { MotionDoc } from '$lib/motion/doc';
-  import { FieldType } from '$lib/motion/template/field-model';
+  import { AssetKind } from '@feega/motion-core/motion/components';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { FieldType } from '@feega/motion-core/motion/template/field-model';
   import { locateClip, setDeepProps, setField } from '$lib/motion/template/fields';
   import type { TemplateFieldValue } from '$lib/motion/template/library';
-  import { FieldLayout } from '$lib/motion/template/key-fields';
-  import { PropFormat } from '$lib/motion/custom/component';
+  import { FieldLayout } from '@feega/motion-core/motion/template/key-fields';
+  import { PropFormat } from '@feega/motion-core/motion/custom/component';
   import { MediaAccept, MediaKind, acceptOf, itemOfPick, pickOfItem, type MediaPick } from '$lib/motion/media/pick';
   import MediaPicker from './MediaPicker.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';

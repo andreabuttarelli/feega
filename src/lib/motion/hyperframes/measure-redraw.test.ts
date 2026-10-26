@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { REDRAWN, REDRAW_QUIET_MS, MEASURE_REQUEST, measureScript } from './measure';
+import { REDRAWN, REDRAW_QUIET_MS, MEASURE_REQUEST, measureScript } from '@feega/motion-core/motion/hyperframes/measure';
 
 const told: unknown[] = [];
 

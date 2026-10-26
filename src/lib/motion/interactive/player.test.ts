@@ -4,8 +4,8 @@ import { playerMain, type PlayerConfig } from './player';
 import { gestureScrub, readHost, selfScroll, HOST_MESSAGE } from './host';
 import { fitBox, FIT_SCALE } from './fit';
 import { LINK_MESSAGE, NATIVE_BRIDGE, PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEvent } from './protocol';
-import { PlayMode } from './settings';
-import { VAR_RULES, VarKind, coerceVars, type VarDecl } from './var-model';
+import { PlayMode } from '@feega/motion-core/motion/interactive/settings';
+import { VAR_RULES, VarKind, coerceVars, type VarDecl } from '@feega/motion-core/motion/interactive/var-model';
 
 const VARS: VarDecl[] = [
   { name: 'speed', kind: VarKind.Number, default: 1, min: 0, max: 4 },

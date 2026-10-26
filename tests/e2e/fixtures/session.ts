@@ -411,4 +411,3 @@ export { expect };
 
 export const REAL_STACK = process.env.E2E_REAL_STACK === '1';
 export const ON_PRODUCTION = REAL_STACK && !!process.env.PUBLIC_SUPABASE_URL && e2eTarget() === E2eTarget.Production;
-export const SOCIAL_PUBLISHING = process.env.E2E_SOCIAL_PUBLISHING === '1';

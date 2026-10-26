@@ -1,4 +1,4 @@
-import { EffectKind, type Effect, type LayerNode, type LayerTree, type Mask, type MaskComposite, type Paint, type Rgba } from '../hyperframes/layer-tree';
+import { EffectKind, type Effect, type LayerNode, type LayerTree, type Mask, type MaskComposite, type Paint, type Rgba } from '@feega/motion-core/motion/hyperframes/layer-tree';
 
 export type Rect = [number, number, number, number];
 

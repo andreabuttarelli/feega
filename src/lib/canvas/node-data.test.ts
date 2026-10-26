@@ -34,7 +34,10 @@ describe('NODE_DATA_SCHEMAS — una riga per tipo, tutti i 10 valori di nodes_ty
         'audio',
         'model3d',
         'motion',
-        'studio_batch'
+        'element',
+        'studio_batch',
+        'section',
+        'technique'
       ].sort()
     );
   });

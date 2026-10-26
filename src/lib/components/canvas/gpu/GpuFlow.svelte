@@ -1,21 +1,99 @@
 <script lang="ts">
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
-  import { Gesture } from '$lib/motion/drill';
-  import { onMount, untrack, type ComponentProps } from 'svelte';
-  import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
+  import { Depth, Gesture } from '$lib/motion/drill';
+  import { FrameFit, framePicker, type WorldRect } from '$lib/canvas/frame-pick';
+  import { onDestroy, onMount, untrack } from 'svelte';
+  import { TILE_PAINTED } from '@feega/motion-core/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
   import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
   import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
-  import type CanvasFlow from '../CanvasFlow.svelte';
-  import type { Tile } from '../CanvasFlow.svelte';
+  import FrameOverlays from '../FrameOverlays.svelte';
+  import { alignSide } from '$lib/canvas/frame-tools';
+  import { FRAME_ELEMENT_MENU, canRunInFrame, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
+  import { Action, type ActionId } from '$lib/motion/actions';
+  import { loadOutliner } from '$lib/motion/fonts/outliner';
+  import { frameLayers, frameSummaries } from '$lib/motion/frame-menu';
+  import { followDocks } from '$lib/canvas/dock-lift';
+  import { frameScreenRect } from '$lib/canvas/frame-screen';
+  import FrameSelection from '../FrameSelection.svelte';
+  import FrameGuides from '../FrameGuides.svelte';
+  import FrameTools from '../FrameTools.svelte';
+  import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from '$lib/canvas/frame-view';
+  import type { Boxes } from '$lib/motion/scene-select';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { findClip, type MotionClip } from '@feega/motion-core/motion/doc';
+  import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
+  import CoreTextEdit from '../CoreTextEdit.svelte';
+  import GradientHandles from '../GradientHandles.svelte';
+  import CropHandles from '../CropHandles.svelte';
+  import { styleLibrary } from '$lib/canvas/style-library.svelte';
+  import { libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import { renameStyle } from '$lib/motion/styles';
+  import { variableLibrary } from '$lib/canvas/variable-library.svelte';
+  import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
+  import { removeVariable } from '$lib/motion/variables';
+  import type { Collection } from '@feega/motion-core/motion/variables-model';
+  import type { Style } from '@feega/motion-core/motion/styles-model';
+  import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
+  import { imageTarget } from '$lib/canvas/crop-handles';
+  import { cropRequest } from '$lib/canvas/crop-request.svelte';
+  import { ImageTool } from '$lib/image-tools';
+  import type { FillOf, FillType } from '@feega/motion-core/motion/fill/model';
+  import type { Fill } from '@feega/motion-core/motion/fill/model';
+  import { baseStyle, commitText, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { caretSource } from '$lib/canvas/core/text-caret';
+  import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
+  import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
+  import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
+  import type { ListItem } from '@feega/motion-core/motion/text-lists';
+  import { frameProperties } from '../frame-properties.svelte';
+  import { trailerFrom } from '$lib/motion/trailer';
+  import FrameDialogs from '../FrameDialogs.svelte';
+  import FramePeers from '$lib/components/motion/FramePeers.svelte';
+  import RemixBanner from '$lib/components/gallery/RemixBanner.svelte';
+  import { FramePeering, peerBoxes } from '$lib/canvas/frame-peering.svelte';
+  import { framePresence } from '$lib/realtime/frame-presence';
+  import { handoffPath } from '$lib/canvas/chat-handoff';
+  import { BRAND_REMIX_PROMPT } from '$lib/gallery/model';
+  import { goto } from '$app/navigation';
+  import { FrameExtras } from '$lib/canvas/frame-extras.svelte';
+  import { FRAME_DIALOG_ACTIONS, FrameDialog, isFrameDialogAction } from '$lib/canvas/frame-dialogs';
+  import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import type { ExportRow } from '$lib/motion/export-rows';
+  import { Reach, frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { chainTarget, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
+  import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
+  import { ImagesOutcome, figmaImageAssets } from '$lib/canvas/figma/fetch-images';
+  import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
+  import { quadBox, quadStyle } from '$lib/canvas/quad-box';
+  import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
+  import { unionBounds } from '$lib/motion/multi-select';
+  import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
+  import { postPageAction } from '$lib/api/page-action';
+  import { Grip, handlesOf, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
+  import { copyElements, guessedBoxes } from '$lib/motion/move-element';
+  import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
+  import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+  import { frameOfLive } from '$lib/canvas/core/frame-source';
+  import { EditMode, recalledMode, rememberMode, startMode } from '$lib/motion/edit-mode';
+  import { withPlayhead } from '$lib/canvas/frame-playhead';
+  import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
+  import FrameTimeline from '../FrameTimeline.svelte';
+  import type { FlowProps, Tile } from '../flow-types';
+  import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
+  import { COLOUR_TAG_HEX, colourOf } from '$lib/canvas/node-colour';
+  import { CloudMode } from '$lib/canvas/cloud-picker';
   import SelectionToolbar from '../SelectionToolbar.svelte';
   import NextStepChips from '../NextStepChips.svelte';
   import CanvasContextMenu from '../CanvasContextMenu.svelte';
+  import CommandPalette from '../CommandPalette.svelte';
   import ConnectPicker from '../ConnectPicker.svelte';
   import PageZoomLock from '../PageZoomLock.svelte';
   import NodeBoundary from '../NodeBoundary.svelte';
@@ -23,12 +101,18 @@
   import GpuTileChrome from './GpuTileChrome.svelte';
   import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
-  import { liveDocs } from '$lib/canvas/core/live-docs.svelte';
+  import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
+  import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
+  import { CANVAS_DRAG_COMPONENT, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
+  import { placeInstance } from '$lib/motion/canvas-components';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
+  import { editableIds } from '$lib/canvas/frame-live';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
-  import { tileHovered } from '$lib/canvas/layers';
+  import { elementGlyph } from '$lib/canvas/layers';
+  import { frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
@@ -37,9 +121,10 @@
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
+  import { isSvgFile } from '$lib/canvas/system-clipboard';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-  import { BarContext } from '$lib/canvas/bottom-bar';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, leftEmpty } from '$lib/canvas/motion-node';
+  import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
@@ -47,9 +132,16 @@
   import { FocusMode, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
-  import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
+  import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
+  import { CANVAS_COMMAND_OF, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
+  import type { Command } from '$lib/motion/shortcuts';
+  import { HTML_MIME, Pasted, TEXT_MIME, clipboardHtml, readPaste, type ClipboardPayload, type PasteData, type PasteSource } from '$lib/canvas/system-clipboard';
+  import { eventSource, systemSource, writeSystem } from '$lib/canvas/system-clipboard-browser';
+  import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
+  import { isTypingTarget } from '$lib/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
-  import { DropVerdict, pointOf } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, isOutside, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
   import { isAddable, type Addable } from '$lib/canvas/addable';
@@ -59,13 +151,14 @@
   import { reportHref } from '$lib/reports/report-link';
   import { GraphScope } from '$lib/canvas/run-graph';
   import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
-  import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { DeleteMode, SECTION_TYPE } from '$lib/canvas/section';
+  import { STACK_GAP, alignTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
 
   import { dragOffset } from '$lib/canvas/duplicate-plan';
-  import { enterFrame } from '$lib/canvas/enter-frame';
+  import { enterSelected } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
   import type { Edge } from '$lib/motion/space';
   import MeasureLayer from '../MeasureLayer.svelte';
@@ -73,12 +166,14 @@
   import type { GenMedium } from '$lib/canvas/gen-node';
   import type { CanvasEdgeKind, FlowEdge, WireMode } from '$lib/canvas-edges';
   import { setTileRender } from '$lib/canvas/tile-render-context';
+  import { resizeCursor, rotateCursor } from '$lib/canvas/resize-cursor';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
+  import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
-  import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
-  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
+  import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
+  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
@@ -100,14 +195,15 @@
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { revealIn as revealDelay } from '$lib/canvas/gpu/reveal-gate';
   import { CANVAS_LOAD_EVENT, LoadKind, claimLoad, loadTiming } from '$lib/canvas/gpu/load-timing';
-  import { engineOf } from '$lib/motion/engine';
+  import { engineOf } from '@feega/motion-core/motion/engine';
   import { track } from '$lib/analytics';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
-  import { followGroup } from '$lib/canvas/node-layout';
+  import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
+  const HALF = 2;
   const CORE = 'core';
   const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
   const SHELF_TICK_MS = 5000;
@@ -150,9 +246,32 @@
     }
   });
   let area = $state({ width: 0, height: 0 });
+  let docked = $state(0);
+  $effect(() => {
+    void picks;
+    if (!surface) {
+      return;
+    }
+    return followDocks(surface, () => [...document.querySelectorAll<HTMLElement>('[data-dock="timeline"]')], (px) => (docked = px));
+  });
   let selected = $state<string[]>([]);
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
+  let addLinger = $state<string | null>(null);
+  let addLingerTimer: ReturnType<typeof setTimeout> | undefined;
+  const ADD_LINGER_MS = 600;
+
+  $effect(() => {
+    const now = hovered;
+    clearTimeout(addLingerTimer);
+    if (now) {
+      addLinger = now;
+      return;
+    }
+    addLingerTimer = setTimeout(() => (addLinger = null), ADD_LINGER_MS);
+    return () => clearTimeout(addLingerTimer);
+  });
+  let pickHover = $state<{ nodeId: string; clip: string; quad: Point[] } | null>(null);
   let overrides = $state<Map<string, Box>>(new Map());
   let copies = $state<Map<string, Box>>(new Map());
   let marquee = $state<Box | null>(null);
@@ -172,14 +291,14 @@
   const tier = $derived(assetTier(view.zoom));
   const tierUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, tier);
 
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}) })));
+  let turning = $state<{ id: string; degrees: number } | null>(null);
+  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning?.id === t.id ? { rotation: turning.degrees } : {}) })));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
   const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
-  const editIds = $derived(new Set(selected.slice(0, DOM_CAP)));
   let drawn = $state(new Set<string>());
   let sticky = $state(new Map<string, number>());
   let wasEditing = new Set<string>();
@@ -201,8 +320,8 @@
   const LIVE_POSTER_CAP = 3;
   let settledView = $state<Viewport | null>(null);
   const domIds = $derived.by(() => {
-    const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => t.kind === 'motion' && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
-    const posters = placed.filter((t) => t.kind === 'motion' && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
+    const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => holdsDoc(t.kind ?? '') && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
+    const posters = placed.filter((t) => holdsDoc(t.kind ?? '') && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
     const sharp = !coreOn && BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
     const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
@@ -211,6 +330,8 @@
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
+  const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
+  const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
     if (coreOn && !coreType) {
@@ -218,6 +339,10 @@
     }
   });
   const coreLook = $derived(wrap ? themeOf(wrap) : null);
+  const tagHexOf = (id: string) => {
+    const tag = colourOf(summaries.get(id)?.data ?? {});
+    return tag ? COLOUR_TAG_HEX[tag] : null;
+  };
   const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
   const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
   const coreCards = $derived.by(() => {
@@ -233,9 +358,10 @@
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.viewOf?.(t.id) ?? null, props.genViewFor?.(t.id) ?? null),
         ...portMarks(t),
         label: labelOf(t),
-        icon: text.icons.get(t.kind as NodeType) ?? null
+        icon: text.icons.get(t.kind as NodeType) ?? null,
+        tag: tagHexOf(t.id)
       };
-      const poster = t.kind === 'motion';
+      const poster = holdsDoc(t.kind ?? '');
       return [{ key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
     });
   });
@@ -251,22 +377,22 @@
         return [];
       }
       const on = selected.includes(t.id);
-      const chrome = nodeChrome(t.id, on, layersSource.video);
-      const hovered = !on && tileHovered(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null);
-      const layers = t.kind === 'motion' ? ChromeLayers.Whole : ChromeLayers.State;
-      if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !hovered) {
+      const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
+      const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
+      const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : ChromeLayers.State;
+      if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
       }
       const marks = portMarks(t);
-      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null } : { label: null, icon: null };
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered, ringColor: ringColour(marks, look), names: on, turn: turnOf(t), layers }];
+      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id) } : { label: null, icon: null };
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, turn: turnOf(t), layers }];
     });
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
   const nodeCards = $derived(coreCards.filter((c) => !c.poster));
   const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
   let domShows = $state(new Set<string>());
-  const handedOver = (t: Tile) => domIds.has(t.id) && (t.kind !== 'motion' || domShows.has(t.id));
+  const handedOver = (t: Tile) => domIds.has(t.id) && (!holdsDoc(t.kind ?? '') || domShows.has(t.id));
   $effect(() => {
     const kept = [...untrack(() => domShows)].filter((id) => domIds.has(id));
     if (kept.length !== untrack(() => domShows.size)) {
@@ -352,7 +478,7 @@
   let shelfHost = $state<HTMLDivElement | null>(null);
   let fontCss: string | null = null;
 
-  const snapshotKind = (t: Tile) => !!t.kind && t.kind !== 'motion' && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
+  const snapshotKind = (t: Tile) => !!t.kind && !holdsDoc(t.kind) && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
   const shotKeyOf = (id: string) => {
     const t = byId.get(id);
     return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.viewOf?.(id) ?? null) : '';
@@ -443,7 +569,7 @@
   const domDrawn = (id: string) => !!wrap?.querySelector(`.gpu-dom-node[data-id="${id}"] [data-drawn="true"], .gpu-dom-node[data-id="${id}"] img.poster`);
   const previewed = (t: Tile) => {
     if (domIds.has(t.id)) {
-      return t.kind !== 'motion' || domDrawn(t.id);
+      return !holdsDoc(t.kind ?? '') || domDrawn(t.id);
     }
     if (coreOn) {
       return coreDrawn.has(t.id);
@@ -804,9 +930,8 @@
   );
 
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
+  const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && spec.flow.nodesDraggable ? selectedBoxes[0] : null);
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && spec.flow.nodesDraggable);
-
-  const editing = $derived(props.barContext === BarContext.Frame);
 
   $effect(() => {
     scene?.setCards(cards);
@@ -826,12 +951,6 @@
       iconed.add(kind);
       void iconBitmap(NODE_KIND_ICON[kind] as never).then((bitmap) => target.setIcon(kind, bitmap)).catch(() => iconed.delete(kind));
     }
-  });
-
-  $effect(() => {
-    const css = wrap ? getComputedStyle(wrap) : null;
-    const level = (name: string) => Number(css?.getPropertyValue(name) || 1);
-    scene?.setDim(editing ? { body: level('--neighbour-body'), edges: level('--neighbour-edges') } : null);
   });
 
   $effect(() => {
@@ -867,8 +986,11 @@
     if (gone.length) {
       select(selected.filter((id) => known.has(id)));
     }
-    if (!fitted && (scene || coreOn) && incoming.length) {
-      fitted = true;
+    if (fitted || !(scene || coreOn)) {
+      return;
+    }
+    fitted = true;
+    if (incoming.length) {
       fitTo(incoming);
     }
   }
@@ -898,7 +1020,7 @@
     return surfaceRect ?? { width: innerWidth, height: innerHeight, left: 0, top: 0 };
   }
 
-  function boundsOf(boxes: Box[]): { x: number; y: number; width: number; height: number } | null {
+  function boundsOf(boxes: WorldRect[]): { x: number; y: number; width: number; height: number } | null {
     if (!boxes.length) {
       return null;
     }
@@ -907,7 +1029,7 @@
     return { x, y, width: Math.max(...boxes.map((b) => b.x + b.w)) - x, height: Math.max(...boxes.map((b) => b.y + b.h)) - y };
   }
 
-  function fitTo(boxes: Box[], maxZoom = READABLE_ZOOM) {
+  function fitTo(boxes: WorldRect[], maxZoom = READABLE_ZOOM) {
     const b = boundsOf(boxes);
     if (!b) {
       return;
@@ -915,6 +1037,22 @@
     const s = screenSize();
     const zoom = Math.max(MIN_ZOOM, Math.min(maxZoom, Math.min(s.width / (b.width * (1 + FIT_PADDING)), s.height / (b.height * (1 + FIT_PADDING)))));
     animateTo({ zoom, x: s.width / 2 - (b.x + b.width / 2) * zoom, y: s.height / 2 - (b.y + b.height / 2) * zoom });
+  }
+
+  function pickedRects(): WorldRect[] {
+    const at = inside?.level.clip && picks.length ? pickerOf(inside.nodeId) : null;
+    return at ? picks.flatMap((id) => at.picker.outline(id, at.space) ?? []) : [];
+  }
+
+  function zoomToSelection() {
+    const rects = pickedRects();
+    if (rects.length) {
+      fitTo(rects, MAX_ZOOM);
+      return;
+    }
+    if (selectedBoxes.length) {
+      fitTo(selectedBoxes);
+    }
   }
 
   let tween = 0;
@@ -990,7 +1128,8 @@
   type Active =
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
     | { kind: GestureKind.Drag; id: string; start: Point; origins: Map<string, Point>; moved: boolean; toggle: boolean }
-    | { kind: GestureKind.Resize; id: string; corner: Corner; start: Point; box: Box; min: { w: number; h: number } }
+    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number } }
+    | { kind: GestureKind.Rotate; id: string; centre: Point; start: Point; base: number; degrees: number }
     | { kind: GestureKind.Marquee; start: Point; base: string[]; additive: boolean; moved: boolean }
     | { kind: GestureKind.Connect; from: Port }
     | { kind: GestureKind.PickEdge; edgeId: string };
@@ -1018,10 +1157,14 @@
       return { kind: HitKind.Port, nodeId: port.nodeId, handle: port.handle };
     }
     if (resizable) {
-      const corner = resizeCornerAt(selectedBoxes[0], w, view.zoom);
-      if (corner) {
-        return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, corner };
+      const unit = resizeHandleAt(selectedBoxes[0], w, view.zoom);
+      if (unit) {
+        return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
       }
+    }
+    const turnUnit = rotatable ? rotateZoneAt(rotatable, rotatable.rotation ?? 0, w, view.zoom) : null;
+    if (rotatable && turnUnit) {
+      return { kind: HitKind.Rotate, nodeId: rotatable.id, unit: turnUnit };
     }
     const node = topNodeAt(w);
     if (node) {
@@ -1046,13 +1189,75 @@
     clickNode(id, e.shiftKey || e.metaKey || e.ctrlKey);
   }
 
+  let naming = $state<{ nodeId: string; value: string; was: string } | null>(null);
+
+  const NAME_MIN_WIDTH = 120;
+  const NAME_HEIGHT = 22;
+
+  const namingBox = $derived.by(() => {
+    const tile = naming ? byId.get(naming.nodeId) : null;
+    if (!tile) {
+      return null;
+    }
+    const s = screenSize();
+    return { left: s.left + view.x + tile.x * view.zoom, top: s.top + view.y + (tile.y - LABEL_CLEARANCE) * view.zoom, width: Math.max(tile.w * view.zoom, NAME_MIN_WIDTH) };
+  });
+
+  function titledAt(world: Point): Tile | null {
+    const hit = placed.findLast((t) => t.tag !== NameTag.Hidden && world.x >= t.x && world.x <= t.x + t.w && world.y >= t.y - LABEL_CLEARANCE && world.y < t.y);
+    return hit ?? null;
+  }
+
+  function startNaming(tile: Tile) {
+    const was = tile.displayName?.trim() ?? '';
+    select([tile.id]);
+    naming = { nodeId: tile.id, value: was, was };
+  }
+
+  function endNaming(save: boolean) {
+    const open = naming;
+    naming = null;
+    if (open && save && open.value.trim() !== open.was) {
+      props.onRename?.(open.nodeId, open.value);
+    }
+  }
+
+  function onNamingKey(e: KeyboardEvent) {
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      endNaming(true);
+    }
+    if (e.key === 'Escape') {
+      endNaming(false);
+    }
+  }
+
   function onDouble(e: MouseEvent) {
     const target = e.target as HTMLElement;
     if (target.closest('.gpu-dom-node [data-motion-node]')) {
       return;
     }
-    const hit = hitAt(toWorld(view, local(e as PointerEvent)));
+    const world = toWorld(view, local(e as PointerEvent));
+    const titled = spec.chrome && props.onRename ? titledAt(world) : null;
+    if (titled) {
+      startNaming(titled);
+      return;
+    }
+    const hit = hitAt(world);
     const id = hit.kind === HitKind.Node ? hit.nodeId : null;
+    const deeper = id ? framePickAt(world) : null;
+    const entered = id && deeper && inside?.nodeId === id ? enteredFrom(deeper.picker.chain(world, deeper.space), picks) : null;
+    if (id && entered) {
+      pickMany(id, [entered]);
+      return;
+    }
+    if (id && deeper?.clip) {
+      select([id]);
+      goInside(id, Gesture.Double, deeper.clip);
+      void startTyping(id, deeper.clip);
+      startCrop(id, deeper.clip);
+      return;
+    }
     if (id) {
       props.onNodeDoubled?.(id);
     }
@@ -1088,8 +1293,940 @@
     glider.invalidate();
   }
 
+  const pickers = new Map<string, { live: object; picker: ReturnType<typeof framePicker> }>();
+  let fetched = $state.raw(new Map<string, { revision: number; live: LiveDoc }>());
+  const asked = new Set<string>();
+
+  const PICK_DOC_RETRIES = 4;
+  const PICK_DOC_RETRY_MS = 1000;
+
+  async function fetchPickDoc(id: string, revision: number, attempt = 0) {
+    const res = await fetch(`${coreSource(id)}?revision=${revision}`).catch(() => null);
+    const body = res?.ok ? ((await res.json().catch(() => null)) as { doc: LiveDoc['doc']; tokens: LiveDoc['tokens']; assets: LiveDoc['assets'] } | null) : null;
+    if (body?.doc) {
+      fetched = new Map(fetched).set(id, { revision, live: { doc: body.doc, tokens: body.tokens, assets: body.assets ?? {} } });
+      return;
+    }
+    if (attempt < PICK_DOC_RETRIES) {
+      await new Promise((resolve) => setTimeout(resolve, PICK_DOC_RETRY_MS));
+      await fetchPickDoc(id, revision, attempt + 1);
+    }
+  }
+
+  $effect(() => {
+    const due = coreFrames.filter((f) => !asked.has(`${f.id}:${f.revision}`));
+    if (!due.length) {
+      return;
+    }
+    due.forEach((f) => asked.add(`${f.id}:${f.revision}`));
+    void (async () => {
+      for (const f of due) {
+        await quiet();
+        await fetchPickDoc(f.id, f.revision);
+      }
+    })();
+  });
+
+  function framePickAt(w: Point) {
+    const id = topNodeAt(w);
+    const frame = id && !domIds.has(id) ? coreFrames.find((f) => f.id === id) : null;
+    const live = frame ? (liveDocs.map.get(frame.id) ?? fetched.get(frame.id)?.live) : null;
+    if (!frame || !live) {
+      return null;
+    }
+    const held = pickers.get(frame.id);
+    const picker = held?.live === live.doc ? held.picker : framePicker(live, () => liveOf(frame.id)?.playhead);
+    pickers.set(frame.id, { live: live.doc, picker });
+    const space = picker.spaceOf(frame.box, byId.get(frame.id)?.rotation ?? 0);
+    const clip = picker.pick(w, space);
+    return { nodeId: frame.id, clip, space, picker, frame };
+  }
+
+  function hoverElement(w: Point) {
+    const hit = framePickAt(w);
+    const quad = hit?.clip ? hit.picker.outlineQuad(hit.clip, hit.space) : null;
+    pickHover = hit?.clip && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad } : null;
+    layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
+  }
+
+  let handleCursor = $state<string | null>(null);
+
+  function hoverHandle(w: Point) {
+    const hit = hitAt(w);
+    const box = hit.kind === HitKind.Corner || hit.kind === HitKind.Rotate ? byId.get(hit.nodeId) : null;
+    if (!box || (hit.kind !== HitKind.Corner && hit.kind !== HitKind.Rotate)) {
+      handleCursor = null;
+      return;
+    }
+    const outward: [number, number] = [hit.unit[0] * 2 - 1, hit.unit[1] * 2 - 1];
+    handleCursor = hit.kind === HitKind.Corner ? resizeCursor(outward, box.rotation ?? 0) : rotateCursor(outward, box.rotation ?? 0);
+  }
+
+  function dropHover() {
+    pickHover = null;
+    layersSource.hover(null);
+  }
+
+  let inside = $state<Inside | null>(null);
+  const savers = new Map<string, FrameEditSession>();
+
+  $effect(() => {
+    const warnUnsaved = (event: BeforeUnloadEvent) => {
+      const open = [...savers.values()].filter((s) => s.unsaved());
+      if (!open.length) {
+        return;
+      }
+      open.forEach((s) => void s.flushPending());
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warnUnsaved);
+    return () => window.removeEventListener('beforeunload', warnUnsaved);
+  });
+  const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
+  const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
+  const revisionOfFrame = (id: string) => coreFrames.find((f) => f.id === id)?.revision ?? 0;
+  const drawnFrames = $derived(coreFrames.map((f) => {
+    const doc = liveOf(f.id)?.doc;
+    const scenes = doc ? sceneStamp(doc, (id) => sceneRevision(revisionOfFrame(id), liveDocs.edits.get(id))) : '';
+    return scenes ? { ...f, scenes } : f;
+  }));
+  $effect(() => {
+    canvasComponents.set(
+      coreFrames.flatMap((f) => {
+        const live = liveOf(f.id);
+        return live ? [{ id: f.id, doc: live.doc }] : [];
+      })
+    );
+  });
+  onDestroy(() => canvasComponents.set([]));
+
+  const PRIMARY_BUTTON = 0;
+  const ROTATE_SNAP_DEG = 15;
+  let picks = $state<string[]>([]);
+  let bandDrag = $state<{ nodeId: string; from: Point; to: Point } | null>(null);
+
+  function goInside(nodeId: string, gesture: Gesture, clip: string | null) {
+    pickedPart = null;
+    inside = { nodeId, level: stepInside(insideLevel(nodeId), gesture, clip) };
+    picks = inside.level.clip ? [inside.level.clip] : [];
+  }
+
+  function pickMany(nodeId: string, ids: string[]) {
+    pickedPart = null;
+    inside = { nodeId, level: stepInside(frameLevel(), Gesture.Click, primaryOf(ids)) };
+    picks = ids;
+  }
+
+  function extendPick(e: PointerEvent, w: Point): boolean {
+    const deep = (e.metaKey || e.ctrlKey) && !e.shiftKey;
+    const hit = (e.shiftKey || deep) && e.button === 0 && e.pointerType === 'mouse' ? framePickAt(w) : null;
+    if (!hit || inside?.nodeId !== hit.nodeId) {
+      return false;
+    }
+    if (hit.clip && deep) {
+      return false;
+    }
+    if (hit.clip) {
+      pickMany(hit.nodeId, toggleId(picks, hit.clip));
+      return true;
+    }
+    const clips = liveOf(hit.nodeId)?.doc.tracks.flatMap((t) => t.clips.map((c) => c.id)) ?? [];
+    const from = w;
+    const move = (ev: PointerEvent) => {
+      bandDrag = { nodeId: hit.nodeId, from, to: toWorld(view, local(ev)) };
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      bandDrag = null;
+      const a = hit.picker.framePoint(from, hit.space);
+      const b = hit.picker.framePoint(toWorld(view, local(ev)), hit.space);
+      const rects = deep
+        ? hit.picker.leafRects()
+        : Object.fromEntries(clips.flatMap((id) => {
+            const r = hit.picker.frameRect(id);
+            return r ? [[id, r]] : [];
+          }));
+      pickMany(hit.nodeId, marqueeIds(rects, spanOf(a, b)));
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    return true;
+  }
+
+  function elementAt(w: Point, reach: Reach) {
+    const hit = framePickAt(w);
+    const doc = hit?.clip && !frameChrome(kindOfNode(hit.nodeId)).dragsHost ? liveOf(hit.nodeId)?.doc : null;
+    if (!hit?.clip || !doc) {
+      return null;
+    }
+    const clip = chainTarget(doc, hit.picker.chain(w, hit.space), inside?.nodeId === hit.nodeId ? picks : [], reach);
+    return clip ? { nodeId: hit.nodeId, clip } : null;
+  }
+
+  function groupOfPick(nodeId: string): string | null {
+    const live = liveOf(nodeId);
+    return live ? parentPick(live.doc, picks[0]) : null;
+  }
+
+  function pickElement(e: PointerEvent, w: Point): boolean {
+    const deep = e.metaKey || e.ctrlKey;
+    const hit = e.button === 0 && !e.shiftKey && e.pointerType === 'mouse' ? elementAt(w, deep ? Reach.Deep : Reach.Top) : null;
+    if (!hit) {
+      return false;
+    }
+    select([hit.nodeId]);
+    goInside(hit.nodeId, deep ? Gesture.Deep : Gesture.Click, hit.clip);
+    return true;
+  }
+
+  async function runFrameAction(id: ActionId) {
+    const nodeId = inside?.nodeId;
+    const live = nodeId ? liveOf(nodeId) : null;
+    if (!nodeId || !live || !picks.length) {
+      return;
+    }
+    const at = scoped(live.doc, picks, frameOfLive(live));
+    if (!at) {
+      return;
+    }
+    const picked = picksFor(id, at.view, at.ids);
+    if (picked) {
+      pickMany(nodeId, at.scene(picked));
+      return;
+    }
+    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: loadOutliner, assets: live.assets });
+    if (!done) {
+      return;
+    }
+    commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
+    pickMany(nodeId, at.scene(done.selection));
+  }
+
+  let elementMenu = $state<Point | null>(null);
+  let elementLayers = $state<{ id: string; label: string }[]>([]);
+
+  function openElementMenu(e: MouseEvent): boolean {
+    const hit = elementAt(toWorld(view, local(e)), Reach.Top);
+    if (!hit) {
+      return false;
+    }
+    if (inside?.nodeId !== hit.nodeId || !picks.includes(hit.clip)) {
+      select([hit.nodeId]);
+      goInside(hit.nodeId, Gesture.Click, hit.clip);
+    }
+    const world = toWorld(view, local(e));
+    const under = framePickAt(world);
+    const doc = liveOf(hit.nodeId)?.doc;
+    elementLayers = under && doc ? frameLayers(doc, under.picker.stack(world, under.space)) : [];
+    elementMenu = { x: e.clientX, y: e.clientY };
+    return true;
+  }
+
+  function runElementMenu(id: SelectionActionId) {
+    const action = frameMenuAction(id);
+    if (action) {
+      void runFrameAction(action);
+    }
+  }
+
+  let ownPicked: string | null = null;
+
+  $effect(() => {
+    const only = selected.length === 1 ? selected[0] : null;
+    if (only && coreFrames.some((f) => f.id === only)) {
+      if (inside?.nodeId !== only) {
+        inside = { nodeId: only, level: frameLevel() };
+        picks = [];
+      }
+      const own = ownClipToPick(ownPicked, only, frameChrome(kindOfNode(only)).selectsOwnClip ? liveOf(only)?.doc.tracks[0]?.clips[0]?.id : null);
+      if (own) {
+        ownPicked = only;
+        untrack(() => goInside(only, Gesture.Click, own));
+      }
+      return;
+    }
+    ownPicked = null;
+    inside = null;
+    picks = [];
+  });
+
+  const modeStore = () => (typeof localStorage === 'undefined' ? null : localStorage);
+
+  function saverOf(nodeId: string) {
+    const held = savers.get(nodeId);
+    const live = liveOf(nodeId);
+    const frame = coreFrames.find((f) => f.id === nodeId);
+    if (held || !live || !frame) {
+      return held ?? null;
+    }
+    const url = `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${nodeId}`;
+    const session: FrameEditSession = new FrameEditSession(
+      { head: { version: frame.revision, doc: live.doc }, selection: [], mode: startMode(live.doc, recalledMode(modeStore())) },
+      {
+        viewPath: () => [],
+        playhead: () => frameOfLive(liveOf(nodeId) ?? live),
+        moded: (mode) => rememberMode(modeStore(), mode),
+        show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
+        recorded: () => autosize(nodeId),
+        stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
+        saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: session.history.present }),
+        pull: async () => {},
+        send: async (ops, version, summary) => {
+          const form = new FormData();
+          form.set('ops', JSON.stringify(ops));
+          form.set('version', String(version));
+          form.set('summary', summary);
+          const result = await postPageAction(url, 'ops', form);
+          return result.type === 'success' ? { ok: true, version: Number(result.data?.version), doc: result.data?.doc as LiveDoc['doc'] } : { ok: false, error: 'Save failed' };
+        }
+      }
+    );
+    savers.set(nodeId, session);
+    return session;
+  }
+
+  const extras = new Map<string, FrameExtras>();
+
+  function extrasOf(nodeId: string) {
+    const held = extras.get(nodeId);
+    const session = saverOf(nodeId);
+    if (held || !session) {
+      return held ?? null;
+    }
+    const made = new FrameExtras({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId }, createSupabaseBrowserClient(), () => session.history.present);
+    extras.set(nodeId, made);
+    return made;
+  }
+
+  let frameDialog = $state<{ nodeId: string; dialog: FrameDialog } | null>(null);
+
+  const dialogSession = $derived(frameDialog ? saverOf(frameDialog.nodeId) : null);
+  const dialogExtras = $derived(frameDialog ? extrasOf(frameDialog.nodeId) : null);
+  const dialogTokens = $derived(frameDialog ? (liveOf(frameDialog.nodeId)?.tokens ?? null) : null);
+
+  function showDialogDoc(nodeId: string, doc: LiveDoc['doc'] | null) {
+    const live = liveOf(nodeId);
+    const shown = doc ?? dialogSession?.history.present;
+    if (live && shown) {
+      liveDocs.set(nodeId, { ...live, doc: shown });
+    }
+  }
+
+  function closeDialog(nodeId: string) {
+    showDialogDoc(nodeId, null);
+    frameDialog = null;
+  }
+
+  let pickedPart = $state<string | null>(null);
+  const soleFrame = $derived(selected.length === 1 && coreFrames.some((f) => f.id === selected[0]) ? selected[0] : null);
+  const panelNodeId = $derived(inside ? inside.nodeId : soleFrame);
+  const panelSession = $derived(panelNodeId ? saverOf(panelNodeId) : null);
+  const panelTokens = $derived(panelNodeId ? (liveOf(panelNodeId)?.tokens ?? null) : null);
+  const panelExtras = $derived(panelNodeId ? extrasOf(panelNodeId) : null);
+
+  $effect(() => {
+    void panelExtras?.load();
+  });
+
+  const remixOf = $derived(panelExtras?.data?.gallery.remixOf ?? null);
+
+  const brandRemix = () => goto(handoffPath({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '' }, BRAND_REMIX_PROMPT));
+
+  const presence = framePresence();
+  const peering = presence ? new FramePeering(presence) : null;
+  const pointedFrame = $derived(inside?.nodeId ?? soleFrame);
+  const onCanvas = $derived(new Set((props.peers ?? []).filter((p) => p.cursor).map((p) => p.userId)));
+
+  onMount(() => peering?.start());
+
+  $effect(() => {
+    styleLibrary.styles = libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
+  });
+
+  function syncStyle(name: string, style: Style) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
+      const saver = saverOf(frame.id);
+      const present = saver?.history.present;
+      const synced = present && JSON.stringify(present.styles?.[name]) !== JSON.stringify(style) ? syncedDoc(present, name, style) : null;
+      if (synced) {
+        commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} style`);
+      }
+    }
+  }
+
+  function syncRename(from: string, to: string) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[from])) {
+      const present = saverOf(frame.id)?.history.present;
+      const renamed = present ? renameStyle(present, from, to) : null;
+      if (renamed?.ok) {
+        commit(frame.id, renamed, `Renamed the ${from} style to ${to}`);
+      }
+    }
+  }
+
+  onMount(() => {
+    styleLibrary.connect({ push: syncStyle, rename: syncRename });
+    return () => styleLibrary.connect(null);
+  });
+
+  $effect(() => {
+    variableLibrary.collections = variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
+  });
+
+  const sharedShape = (c: Collection | undefined) => JSON.stringify(c && { modes: c.modes, vars: c.vars });
+
+  function syncCollection(name: string, collection: Collection) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.variables?.[name])) {
+      const present = saverOf(frame.id)?.history.present;
+      const synced = present && sharedShape(present.variables?.[name]) !== sharedShape(collection) ? syncedCollection(present, name, collection) : null;
+      if (synced) {
+        commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} variables`);
+      }
+    }
+  }
+
+  function syncRemoval(collection: string, variable: string) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.variables?.[collection]?.vars[variable])) {
+      const present = saverOf(frame.id)?.history.present;
+      const removed = present ? removeVariable(present, collection, variable) : null;
+      if (removed?.ok) {
+        commit(frame.id, removed, `Removed ${collection}/${variable}`);
+      }
+    }
+  }
+
+  onMount(() => {
+    variableLibrary.connect({ push: syncCollection, remove: syncRemoval });
+    return () => variableLibrary.connect(null);
+  });
+
+  $effect(() => {
+    peering?.select(pointedFrame, picks);
+  });
+
+  function peerMeasure(nodeId: string, ids: readonly string[]) {
+    const at = pickerOf(nodeId);
+    return Promise.resolve(at ? peerBoxes(at.picker, ids) : {});
+  }
+
+  $effect(() => {
+    layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks[0]?.clips[0])] as const] : []))));
+  });
+
+  $effect(() => {
+    panelSession?.select(picks);
+  });
+
+  $effect(() => {
+    if (!panelNodeId || !panelSession || !panelTokens) {
+      return;
+    }
+    frameProperties.publish(panelNodeId, panelSession, panelTokens, panelExtras);
+    frameProperties.part = pickedPart;
+    return () => frameProperties.clear();
+  });
+
+  const Step = { Back: 'back', Forward: 'forward' } as const;
+  type Step = (typeof Step)[keyof typeof Step];
+
+  function stepFrame(nodeId: string, step: Step) {
+    const session = savers.get(nodeId);
+    if (!session) {
+      return;
+    }
+    if (step === Step.Back) {
+      session.undo();
+    } else {
+      session.redo();
+    }
+    liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
+    if (inside?.nodeId === nodeId) {
+      picks = picks.filter((id) => scopeOf(session.history.present, id));
+    }
+  }
+
+  function commit(nodeId: string, result: OpResult, summary: string) {
+    const session = saverOf(nodeId);
+    session?.apply(result, summary);
+    if (session && result.ok) {
+      liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
+    }
+  }
+
+  function startTrailer() {
+    if (panelNodeId) {
+      commit(panelNodeId, { ok: true, doc: trailerFrom(panelExtras?.assets ?? []) }, 'Started from the feega trailer');
+    }
+  }
+
+  function pickerOf(nodeId: string) {
+    const frame = coreFrames.find((f) => f.id === nodeId);
+    const live = liveOf(nodeId);
+    if (!frame || !live) {
+      return null;
+    }
+    const held = pickers.get(nodeId);
+    const picker = held?.live === live.doc ? held.picker : framePicker(live, () => liveOf(nodeId)?.playhead);
+    pickers.set(nodeId, { live: live.doc, picker });
+    return { picker, space: picker.spaceOf(frame.box, byId.get(nodeId)?.rotation ?? 0, resizing.has(nodeId) ? FrameFit.Stretch : FrameFit.Contain), frame, live };
+  }
+
+  let timed: string | null = null;
+
+  function scrubTo(nodeId: string, frame: number) {
+    const live = liveOf(nodeId);
+    if (live) {
+      timed = nodeId;
+      liveDocs.set(nodeId, withPlayhead(live, frame));
+    }
+  }
+
+  $effect(() => {
+    const leaving = timed;
+    const live = leaving && inside?.nodeId !== leaving ? liveOf(leaving) : null;
+    if (leaving && live) {
+      timed = null;
+      liveDocs.set(leaving, withPlayhead(live, null));
+    }
+  });
+
+  const kindOfNode = (id: string): FrameKind => {
+    const node = summaries.get(id);
+    return node && holdsDoc(node.type) ? docKindOf(node.type, node.data.kind) : FrameKind.Frame;
+  };
+  const typedFreeText = () => (typing && kindOfNode(typing.nodeId) === FrameKind.Element ? typing.nodeId : null);
+
+  const timeline = $derived.by(() => {
+    const nodeId = inside?.nodeId;
+    const live = nodeId ? liveOf(nodeId) : null;
+    const shown = nodeId ? frameChrome(kindOfNode(nodeId)).timeline : false;
+    return nodeId && live && shown ? { nodeId, doc: live.doc, frame: frameOfLive(live) } : null;
+  });
+
+  function selectionMarks(nodeId: string) {
+    const at = inside?.nodeId === nodeId ? pickerOf(nodeId) : null;
+    if (!at) {
+      return [];
+    }
+    const kind = picks.length > 1 ? SelectionKind.Member : SelectionKind.Element;
+    const onScreen = (p: Point): [number, number] => [(p.x - at.frame.box.x) * view.zoom, (p.y - at.frame.box.y) * view.zoom];
+    return picks.flatMap((clip) => {
+      const quad = at.picker.outlineQuad(clip, at.space);
+      const own = findClip(at.live.doc, clip)?.clip;
+      const pivot: [number, number] = [own?.transform.anchorX ?? TRANSFORM.anchorX.fallback, own?.transform.anchorY ?? TRANSFORM.anchorY.fallback];
+      return quad ? [{ clip, kind, pivot, quad: quad.map(onScreen) }] : [];
+    });
+  }
+
+  function gradientMark(nodeId: string) {
+    const mark = picks.length === 1 && typing?.nodeId !== nodeId ? selectionMarks(nodeId)[0] : null;
+    const saver = mark ? saverOf(nodeId) : null;
+    const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip) : null;
+    return mark && target ? { clip: mark.clip, rect: quadBox(mark.quad), index: target.index, fill: target.fill } : null;
+  }
+
+  function dragGradient(nodeId: string, clip: string, index: number, fill: Fill) {
+    const saver = saverOf(nodeId);
+    const result = saver ? withFill(saver.history.present, clip, index, fill) : null;
+    if (result?.ok) {
+      liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), doc: result.doc });
+    }
+  }
+
+  function dropGradient(nodeId: string, clip: string, index: number, fill: Fill) {
+    const saver = saverOf(nodeId);
+    if (saver) {
+      commit(nodeId, withFill(saver.history.present, clip, index, fill), 'Edited gradient');
+    }
+  }
+
+  type Cropping = { nodeId: string; clip: string; index: number; next: FillOf<FillType.Image> };
+  let cropping = $state<Cropping | null>(null);
+
+  function startCrop(nodeId: string, clip: string): boolean {
+    const saver = saverOf(nodeId);
+    const target = saver ? imageTarget(saver.history.present, clip) : null;
+    if (!target) {
+      return false;
+    }
+    cropping = { nodeId, clip, index: target.index, next: target.fill };
+    return true;
+  }
+
+  function cropMark(nodeId: string) {
+    const open = cropping?.nodeId === nodeId ? cropping : null;
+    const mark = open && inside?.nodeId === nodeId ? selectionMarks(nodeId).find((m) => m.clip === open.clip) : null;
+    const saver = mark ? saverOf(nodeId) : null;
+    const target = saver ? imageTarget(saver.history.present, open!.clip) : null;
+    const src = target ? (target.fill.src ?? liveOf(nodeId)?.assets[target.fill.assetId]) : null;
+    return mark && target && src ? { rect: quadBox(mark.quad), fill: target.fill, src } : null;
+  }
+
+  function dragCrop(fill: FillOf<FillType.Image>) {
+    const open = cropping;
+    const saver = open ? saverOf(open.nodeId) : null;
+    const result = open && saver ? withFill(saver.history.present, open.clip, open.index, fill) : null;
+    if (open && result?.ok) {
+      cropping = { ...open, next: fill };
+      liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: result.doc });
+    }
+  }
+
+  function endCrop(apply: boolean) {
+    const open = cropping;
+    const saver = open ? saverOf(open.nodeId) : null;
+    cropping = null;
+    if (!open || !saver) {
+      return;
+    }
+    if (apply) {
+      commit(open.nodeId, withFill(saver.history.present, open.clip, open.index, open.next), 'Cropped image');
+      return;
+    }
+    liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
+  }
+
+  let cropAsks = 0;
+
+  $effect(() => {
+    const asked = cropRequest.asked;
+    if (asked === cropAsks) {
+      return;
+    }
+    cropAsks = asked;
+    untrack(() => {
+      if (inside && picks.length === 1) {
+        startCrop(inside.nodeId, picks[0]);
+      }
+    });
+  });
+
+  function groupMark(nodeId: string): [number, number][] | null {
+    const marks = selectionMarks(nodeId);
+    if (marks.length < 2) {
+      return null;
+    }
+    const xs = marks.flatMap((m) => m.quad.map(([x]) => x));
+    const ys = marks.flatMap((m) => m.quad.map(([, y]) => y));
+    const [left, top, right, bottom] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+    return [
+      [left, top],
+      [right, top],
+      [right, bottom],
+      [left, bottom]
+    ];
+  }
+
+  let frameViews = $state<FrameViews>(FRAME_VIEW_DEFAULT);
+
+  function outlineBoxes(nodeId: string, doc: MotionDoc): Boxes {
+    const at = shows(frameViews, FrameView.Outlines) ? pickerOf(nodeId) : null;
+    if (!at) {
+      return {};
+    }
+    const ids = doc.tracks.flatMap((t) => t.clips.map((c) => c.id));
+    return Object.fromEntries(ids.flatMap((id) => {
+      const rect = at.picker.frameRect(id);
+      return rect ? [[id, rect]] : [];
+    }));
+  }
+
+  function toolsOf(nodeId: string) {
+    const live = inside?.nodeId === nodeId ? liveOf(nodeId) : null;
+    return live ? { doc: live.doc, frame: frameOfLive(live) } : null;
+  }
+
+  function deletePicks(): boolean {
+    const nodeId = inside?.nodeId;
+    const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
+    const at = tools ? scoped(tools.doc, picks, tools.frame) : null;
+    const done = at ? barAction(Action.Delete, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8) }) : null;
+    if (!nodeId || !at || !done) {
+      return false;
+    }
+    const doc = at.merge(done.doc);
+    picks = [];
+    if (leftEmpty(kindOfNode(nodeId), doc)) {
+      dropSelection([nodeId], []);
+      return true;
+    }
+    commit(nodeId, { ok: true, doc }, done.summary);
+    return true;
+  }
+
+  function leaveBuilder() {
+    picks = [];
+    frameBar.tool = DrawTool.Select;
+  }
+
+  function drawnInside(id: string) {
+    picks = [id];
+    frameBar.tool = DrawTool.Select;
+  }
+
+  function marqueeRect(nodeId: string) {
+    const m = bandDrag?.nodeId === nodeId ? bandDrag : null;
+    const frame = coreFrames.find((f) => f.id === nodeId);
+    if (!m || !frame) {
+      return null;
+    }
+    const r = spanOf([m.from.x, m.from.y], [m.to.x, m.to.y]);
+    return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
+  }
+
+  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody };
+  let typing = $state<Typing | null>(null);
+
+  async function startTyping(nodeId: string, clip: string) {
+    const saver = saverOf(nodeId);
+    const at = pickerOf(nodeId);
+    const doc = saver?.history.present;
+    const found = doc ? findClip(doc, clip)?.clip : null;
+    const size = at?.picker.frameSize();
+    if (!saver || !at || !doc || !found || !size || !editsText(doc, clip)) {
+      return;
+    }
+    const caret = await caretSource(() => at.live.tokens, () => at.live.assets)(doc, clip);
+    if (!caret || saver.history.present !== doc) {
+      return;
+    }
+    const look = textEditStyle({ clip: found as MotionClip, doc, tokens: at.live.tokens, frame: size, scale: 1 });
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, doc, at.live.tokens) };
+    liveDocs.set(nodeId, { ...at.live, doc: hideText(doc, clip) });
+  }
+
+  let typeOnArrival = $state<string | null>(null);
+
+  $effect(() => {
+    const id = typeOnArrival;
+    const saver = id ? saverOf(id) : null;
+    const clip = saver?.history.present.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Text');
+    if (!id || !clip || !pickerOf(id)) {
+      return;
+    }
+    typeOnArrival = null;
+    untrack(() => void startTyping(id, clip.id));
+  });
+
+  function stopTyping(text: string, runs: TextRun[], lists: ListItem[]) {
+    const open = typing;
+    const saver = open ? saverOf(open.nodeId) : null;
+    typing = null;
+    if (!open || !saver) {
+      return;
+    }
+    const result = commitText(saver.history.present, open.clip, text, runs, lists);
+    liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
+    if (result.ok && (text !== open.text || JSON.stringify(runs) !== JSON.stringify(open.runs) || JSON.stringify(lists) !== JSON.stringify(open.lists))) {
+      commit(open.nodeId, result, 'Edited text');
+    }
+  }
+
+  function typingMark(nodeId: string) {
+    const open = typing?.nodeId === nodeId ? typing : null;
+    const at = open ? pickerOf(nodeId) : null;
+    if (!open || !at) {
+      return null;
+    }
+    const z = view.zoom;
+    const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
+    const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
+    return { text: open.text, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+  }
+
+  const autosizing = new Map<string, ReturnType<typeof setTimeout>>();
+
+  function autosize(nodeId: string) {
+    clearTimeout(autosizing.get(nodeId));
+    autosizing.set(nodeId, setTimeout(() => void fitTextBoxes(nodeId), 0));
+  }
+
+  async function fitTextBoxes(nodeId: string) {
+    const saver = saverOf(nodeId);
+    const live = liveOf(nodeId);
+    const row = byId.get(nodeId);
+    if (!saver || !live || !row || typing?.nodeId === nodeId) {
+      return;
+    }
+    const doc = saver.history.present;
+    const fit = await measuredTexts(doc, live.tokens, live.assets, kindOfNode(nodeId), { w: row.w, h: row.h });
+    if (!fit || saver.history.present !== doc) {
+      return;
+    }
+    applyTextFit(fit, { amend: (fitted) => saver.amendRoot(fitted, 'Fitted text'), show: (fitted) => liveDocs.set(nodeId, { ...live, doc: fitted }), place: (node) => props.onPlace?.(nodeId, node.w, node.h) });
+  }
+
+  let frameGuides = $state<{ nodeId: string; guides: Guide[]; gaps: Gap[] } | null>(null);
+
+  function frameReach(at: NonNullable<ReturnType<typeof pickerOf>>): number {
+    const a = at.picker.framePoint({ x: 0, y: 0 }, at.space);
+    const b = at.picker.framePoint({ x: SNAP_SCREEN_PX / view.zoom, y: 0 }, at.space);
+    return Math.hypot(b[0] - a[0], b[1] - a[1]);
+  }
+
+  const UNIT_SQUARE: Quad = [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 1]
+  ];
+
+  function resizeOf(nodeId: string, unit: [number, number], start: Point): Active {
+    const t = byId.get(nodeId)!;
+    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
+  }
+
+  function rotateOf(nodeId: string, start: Point): Active {
+    const t = byId.get(nodeId)!;
+    return { kind: GestureKind.Rotate, id: t.id, centre: { x: t.x + t.w / 2, y: t.y + t.h / 2 }, start, base: t.rotation ?? 0, degrees: t.rotation ?? 0 };
+  }
+
+  function rotateHost(nodeId: string, e: PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    downAt = local(e);
+    captureId = e.pointerId;
+    holdSelection(true);
+    active = rotateOf(nodeId, toWorld(view, local(e)));
+    gesturing = true;
+  }
+
+  function resizeHost(nodeId: string, handle: number, e: PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    downAt = local(e);
+    captureId = e.pointerId;
+    holdSelection(true);
+    active = resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e)));
+    gesturing = true;
+  }
+
+  function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
+    if (grip === Grip.Scale && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.has(nodeId)) {
+      resizeHost(nodeId, handle, e);
+      return;
+    }
+    if (grip === Grip.Rotate && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.get(nodeId)?.rotatable) {
+      rotateHost(nodeId, e);
+      return;
+    }
+    if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && pickElement(e, toWorld(view, local(e)))) {
+      e.stopPropagation();
+      return;
+    }
+    const at = pickerOf(nodeId);
+    const saver = saverOf(nodeId);
+    if (!at || !saver || e.button !== 0 || frameChrome(kindOfNode(nodeId)).dragsHost) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    dropHover();
+    const start = saver.history.present;
+    const inScope = scoped(start, clip && !picks.includes(clip) ? [clip] : picks, frameOfLive({ doc: start, playhead: at.live.playhead }));
+    if (!inScope) {
+      return;
+    }
+    const boxes = guessedBoxes(withAutoLayout(inScope.view));
+    const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
+    const from = framePt(e);
+    const reach = frameReach(at);
+    const snapOf = (ev: PointerEvent) => (ev.ctrlKey ? SnapMode.Off : shows(frameViews, FrameView.PixelGrid) ? SnapMode.Pixels : SnapMode.Guides);
+    let result: OpResult | null = null;
+    let carried = false;
+
+    const leaving = (ev: PointerEvent): ElementOut | null => {
+      const stage = wrap?.querySelector<HTMLElement>(`[data-motion-node="${nodeId}"] [data-frame-stage]`)?.getBoundingClientRect();
+      const [clipId] = inScope.ids;
+      const client = { x: ev.clientX, y: ev.clientY };
+      if (grip !== Grip.Move || inScope.ids.length !== 1 || !stage || !isOutside(stage, client)) {
+        return null;
+      }
+      const b = boxes[clipId];
+      const { width, height } = inScope.view;
+      return { clipId, client, box: b ? { left: b.left / width, top: b.top / height, width: b.width / width, height: b.height / height } : null };
+    };
+
+    const move = (ev: PointerEvent) => {
+      const out = leaving(ev);
+      if (out || carried) {
+        props.onElementOut?.(nodeId, out ?? { clipId: '', client: { x: ev.clientX, y: ev.clientY }, box: null }, out ? DragPhase.Over : DragPhase.Back);
+        carried = !!out;
+      }
+      const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
+      result = dragged.result.ok ? { ok: true, doc: inScope.merge(dragged.result.doc) } : dragged.result;
+      frameGuides = { nodeId, guides: dragged.guides, gaps: dragged.gaps };
+      if (result.ok) {
+        liveDocs.set(nodeId, { ...at.live, doc: result.doc });
+      }
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      frameGuides = null;
+      const out = leaving(ev);
+      if (out) {
+        liveDocs.clear(nodeId);
+        props.onElementOut?.(nodeId, out, DragPhase.Drop);
+        return;
+      }
+      if (result?.ok) {
+        commit(nodeId, result, GRIP_SUMMARY[grip]);
+      }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  function frameArea(nodeId: string) {
+    const at = pickerOf(nodeId);
+    if (!at) {
+      return null;
+    }
+    const size = at.picker.frameSize();
+    const r = at.space.toWorld({ left: 0, top: 0, width: size.width, height: size.height });
+    return { size, rect: { left: (r.x - at.frame.box.x) * view.zoom, top: (r.y - at.frame.box.y) * view.zoom, width: r.w * view.zoom, height: r.h * view.zoom } };
+  }
+
+  function measuredIn(nodeId: string): Gap[] {
+    const live = altHeld && inside?.nodeId === nodeId && pickHover?.nodeId === nodeId && !frameGuides ? liveOf(nodeId) : null;
+    if (!live || !pickHover) {
+      return [];
+    }
+    return measuredGaps(live.doc, frameOfLive(live), guessedBoxes(withAutoLayout(live.doc)), picks, pickHover.clip);
+  }
+
+  $effect(() => {
+    const nodeId = inside?.nodeId;
+    if (!nodeId || !liveOf(nodeId)) {
+      return;
+    }
+    return layersSource.publishVideo(
+      videoSide({
+        nodeId,
+        doc: () => liveOf(nodeId)!.doc,
+        selection: () => (inside?.nodeId === nodeId ? picks : []),
+        part: () => (inside?.nodeId === nodeId ? pickedPart : null),
+        select: (ids) => pickMany(nodeId, ids),
+        selectPart: (clipId, part) => {
+          pickMany(nodeId, [clipId]);
+          pickedPart = part;
+        },
+        edit: (result, summary) => commit(nodeId, result, summary)
+      })
+    );
+  });
+
+  function placeComment(w: Point) {
+    const id = topNodeAt(w);
+    const tile = id ? byId.get(id) : null;
+    props.onComment?.(commentPlacement(w, tile ? { id: tile.id, x: tile.x, y: tile.y } : null));
+  }
+
   function onDown(e: PointerEvent) {
     glide = null;
+    dropHover();
     markBusy();
     measureSurface();
     const p = local(e);
@@ -1102,10 +2239,22 @@
       }
     }
     const w = toWorld(view, p);
+    if (props.commenting && e.button === 0 && e.pointerType !== 'touch') {
+      e.preventDefault();
+      placeComment(w);
+      return;
+    }
     const target = e.target as HTMLElement;
     const hit = boxHit(hitAt(w), target);
+    if (hit.kind === HitKind.Node && (extendPick(e, w) || pickElement(e, w))) {
+      e.preventDefault();
+      return;
+    }
+    if (hit.kind === HitKind.Node && e.button === PRIMARY_BUTTON && inside?.nodeId === hit.nodeId && !frameChrome(kindOfNode(hit.nodeId)).dragsHost) {
+      goInside(hit.nodeId, Gesture.Click, null);
+    }
     const inDom = target.closest('.gpu-dom-node');
-    if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && target.closest(INTERACTIVE)) {
+    if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && hit.kind !== HitKind.Rotate && target.closest(INTERACTIVE)) {
       return;
     }
     if (e.button === 2 && hit.kind !== HitKind.Empty) {
@@ -1144,8 +2293,13 @@
         if (hit.kind !== HitKind.Corner) {
           return null;
         }
-        const t = byId.get(hit.nodeId)!;
-        return { kind: GestureKind.Resize, id: t.id, corner: hit.corner, start: w, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
+        return resizeOf(hit.nodeId, hit.unit, w);
+      },
+      [GestureKind.Rotate]: () => {
+        if (hit.kind !== HitKind.Rotate) {
+          return null;
+        }
+        return rotateOf(hit.nodeId, w);
       },
       [GestureKind.Marquee]: () => ({ kind: GestureKind.Marquee, start: w, base: selected, additive: e.shiftKey || e.metaKey || e.ctrlKey, moved: false }),
       [GestureKind.Connect]: () => {
@@ -1202,6 +2356,10 @@
     if (!active) {
       hovered = e.pointerType === 'mouse' ? topNodeAt(w) : null;
       hoverChrome = e.pointerType === 'mouse' ? (hovered ?? portAt(ports, w, view.zoom)?.nodeId ?? null) : null;
+      if (e.pointerType === 'mouse' && !e.buttons) {
+        hoverElement(w);
+        hoverHandle(w);
+      }
       return;
     }
     const far = Math.hypot(p.x - downAt.x, p.y - downAt.y) > MOVE_SLOP_PX;
@@ -1261,9 +2419,17 @@
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
-        const box = resized(a.box, a.corner, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min);
+        const box = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
         overrides = new Map([[a.id, box]]);
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
+      },
+      [GestureKind.Rotate]: (a) => {
+        if (a.kind !== GestureKind.Rotate) {
+          return;
+        }
+        const target = a.base + dragAngle(a.centre, a.start, w);
+        a.degrees = e.shiftKey ? Math.round(target / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG : target;
+        turning = byId.get(a.id)?.members?.length ? null : { id: a.id, degrees: a.degrees };
       },
       [GestureKind.Marquee]: (a) => {
         if (a.kind !== GestureKind.Marquee || (!far && !a.moved)) {
@@ -1346,6 +2512,12 @@
         }
         settleOverrides();
       },
+      [GestureKind.Rotate]: () => {
+        turning = null;
+        if (a.kind === GestureKind.Rotate && a.degrees !== a.base) {
+          props.onRotate?.(a.id, a.degrees - a.base);
+        }
+      },
       [GestureKind.Marquee]: () => {
         marquee = null;
         if (a.kind === GestureKind.Marquee && !a.moved) {
@@ -1384,6 +2556,7 @@
 
   function cancelGesture() {
     active = null;
+    turning = null;
     gesturing = false;
     resizing = new Set();
     marquee = null;
@@ -1420,6 +2593,12 @@
     snapGuides = [];
     snapSpacing = [];
     props.onLive?.([]);
+    const asScene = sceneDrop(ids, (id) => liveOf(id)?.doc ?? null, frameUnderPointer(pointOf(e), ids[0] ?? null));
+    if (asScene && props.onInsertScene) {
+      settleOverrides();
+      props.onInsertScene(asScene);
+      return;
+    }
     if (props.onTileDrop?.(ids, pointOf(e)) === DropVerdict.Taken) {
       settleOverrides();
       return;
@@ -1432,10 +2611,10 @@
       return;
     }
     const moves = ids.flatMap((id) => (overrides.get(id) ? [{ id, x: overrides.get(id)!.x, y: overrides.get(id)!.y }] : []));
+    props.onMoveEnd?.(moves);
     for (const m of moves) {
       props.onMove?.(m.id, m.x, m.y);
     }
-    props.onMoveEnd?.(moves);
     settleOverrides();
   }
 
@@ -1477,7 +2656,6 @@
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
   const corePeers = $derived(coreOn && coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
-  const coreRotate = $derived(coreOn && props.onRotate ? selectedBoxes.filter((t) => t.rotatable && !t.rotation).map((t) => ({ id: t.id, box: { x: t.x, y: t.y, w: t.w, h: t.h } })) : []);
   const stackOrder = $derived(placed.map((t) => t.id));
   const viewZoom = $derived(view.zoom);
   const coreOverlay = $derived(
@@ -1493,9 +2671,8 @@
           glyphs: coreType.glyphs,
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
-          rotate: coreRotate,
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
-          hovered: hovered && !selected.includes(hovered) ? (byId.get(hovered) ?? null) : null,
+          hovered: hovered && !selected.includes(hovered) && layersSource.hovered?.nodeId !== hovered ? (byId.get(hovered) ?? null) : null,
           running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})),
           chrome: coreChrome
         })
@@ -1526,10 +2703,10 @@
     if (!moves.length) {
       return;
     }
+    props.onMoveEnd?.(moves);
     for (const m of moves) {
       props.onMove?.(m.id, m.x, m.y);
     }
-    props.onMoveEnd?.(moves);
   }
 
   const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
@@ -1559,7 +2736,7 @@
 
   function onContextMenu(e: MouseEvent) {
     e.preventDefault();
-    if (suppressMenu || !spec.chrome) {
+    if (suppressMenu || !spec.chrome || openElementMenu(e)) {
       return;
     }
     const node = topNodeAt(toWorld(view, local(e)));
@@ -1608,7 +2785,24 @@
     scaleBy: (factor) => zoomStep(factor)
   };
 
+  function nudgePicks(dx: number, dy: number): boolean {
+    const nodeId = inside?.nodeId;
+    const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
+    if (!nodeId || !tools) {
+      return false;
+    }
+    const at = scoped(tools.doc, picks, tools.frame);
+    const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy], savers.get(nodeId)?.mode ?? EditMode.Design) : null;
+    if (at && result?.ok) {
+      commit(nodeId, { ok: true, doc: at.merge(result.doc) }, GRIP_SUMMARY[Grip.Move]);
+    }
+    return true;
+  }
+
   function nudge(dx: number, dy: number) {
+    if (nudgePicks(dx, dy)) {
+      return;
+    }
     for (const id of selected) {
       const t = byId.get(id);
       if (t) {
@@ -1622,12 +2816,9 @@
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
-    enter: () => {
-      const only = selected.length === 1 ? selected[0] : null;
-      if (only) {
-        enterFrame(only, String(summaries.get(only)?.data.kind ?? '') || undefined);
-      }
-    },
+    stack: () => placeTiles(stackTiles(placedBoxes(selected), STACK_GAP)),
+    'edit-mode': () => inside && savers.get(inside.nodeId)?.toggleMode(),
+    enter: () => enterSelected(selected, summaries),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
     tool: (c) => {
@@ -1635,33 +2826,73 @@
         frameBar.tool = c.tool;
       }
     },
-    delete: () => (selected.length || selectedEdge) && dropSelection(selected, selectedEdge ? [selectedEdge] : []),
-    deselect: () => clearSelection(),
+    section: () => props.onSection?.(selected),
+    'delete-keep': () => selected.length && props.onDelete?.(selected, DeleteMode.KeepContents),
+    delete: () => deletePicks() || ((selected.length || selectedEdge) && dropSelection(selected, selectedEdge ? [selectedEdge] : [])),
+    comment: () => props.onCommenting?.(!props.commenting),
+    deselect: () => {
+      props.onCommenting?.(false);
+      clearSelection();
+    },
     'select-all': () => select(placed.map((t) => t.id)),
     fit: () => fitTo(placed),
     'zoom-actual': () => {
       const s = screenSize();
       view = zoomAt(view, { x: s.width / 2, y: s.height / 2 }, 1 / view.zoom);
     },
-    'zoom-selection': () => selectedBoxes.length && fitTo(selectedBoxes),
+    'zoom-selection': zoomToSelection,
     'zoom-in': () => zoomStep(STEP_ZOOM),
     'zoom-out': () => zoomStep(1 / STEP_ZOOM),
     duplicate: () => selected.length && props.onDuplicate?.(selected),
-    copy: () => selected.length && props.onCopy?.(selected),
-    paste: () => props.onPaste?.(viewCentre()),
+    copy: () => void copySystem(),
+    paste: () => undefined,
     undo: () => props.onUndo?.(),
     redo: () => props.onRedo?.(),
     group: () => props.onGroup?.(selected),
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),
-    'send-back': () => props.onRestack?.(selected, Stack.Back)
+    'send-back': () => props.onRestack?.(selected, Stack.Back),
+    help: () => (shortcutHelp.open = true),
+    view: (c) => {
+      if (c.id === 'view') {
+        frameViews = flipView(frameViews, c.view);
+      }
+    }
   };
 
+  function runPaletteCommand(command: Command) {
+    if (inside?.level.clip && picks.length && canRunInFrame(command)) {
+      void runFrameAction(command);
+      return;
+    }
+    const canvasCommand = CANVAS_COMMAND_OF[command];
+    if (canvasCommand) {
+      KEY_RUN[canvasCommand.id](canvasCommand);
+    }
+  }
+
   function onKeydown(e: KeyboardEvent) {
+    if (frameDialog) {
+      return;
+    }
     markBusy();
     altHeld = e.altKey;
     if (e.key === ' ' && !(e.target as HTMLElement).closest?.(INTERACTIVE)) {
       space = true;
+    }
+    if (cropping && (e.key === 'Enter' || e.key === 'Escape')) {
+      e.preventDefault();
+      endCrop(e.key === 'Enter');
+      return;
+    }
+    const group = e.key === 'Escape' && inside && picks.length === 1 ? groupOfPick(inside.nodeId) : null;
+    if (inside && group) {
+      pickMany(inside.nodeId, [group]);
+      return;
+    }
+    if (e.key === 'Escape' && inside?.level.clip) {
+      goInside(inside.nodeId, Gesture.Leave, null);
+      return;
     }
     if (e.key === 'Escape') {
       picked = null;
@@ -1669,21 +2900,210 @@
       connectPickerAt = null;
       targeting = null;
     }
+    const entered = e.key === 'Enter' && !typing && inside?.level.clip && !(e.target as HTMLElement).closest?.(INTERACTIVE);
+    if (entered) {
+      e.preventDefault();
+      void startTyping(inside!.nodeId, inside!.level.clip!);
+      startCrop(inside!.nodeId, inside!.level.clip!);
+      return;
+    }
     if (!spec.chrome || keyRegion.current !== Region.Canvas) {
+      return;
+    }
+    const frameAction = inside?.level.clip && picks.length && !typing ? frameKeyAction(e) : null;
+    if (frameAction) {
+      e.preventDefault();
+      void runFrameAction(frameAction);
       return;
     }
     const command = matchCanvasShortcut(e);
     if (!command) {
       return;
     }
-    if (preventable(command)) {
+    if (preventable(command) && !NATIVE_CLIPBOARD.has(command.id)) {
       e.preventDefault();
     }
     KEY_RUN[command.id](command);
   }
 
+  const NATIVE_CLIPBOARD = new Set(['copy', 'paste']);
+  let pointer: Point | null = null;
+
+  function clipboardTarget(e: ClipboardEvent): boolean {
+    return Boolean(spec.chrome && !frameDialog && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
+  }
+
+  const framePicks = (): string[] => (inside && picks.length && !frameChrome(kindOfNode(inside.nodeId)).selectsOwnClip ? picks : []);
+
+  function clipOfSelection(): ClipboardPayload | null {
+    const tools = inside && framePicks().length ? toolsOf(inside.nodeId) : null;
+    if (inside && tools) {
+      const elements = copyElements(tools.doc, picks);
+      elementClipboard.copyElements(inside.nodeId, [...picks], elements);
+      return { elements: elementClipboard.elements! };
+    }
+    return selected.length ? (props.onClip?.(selected) ?? null) : null;
+  }
+
+  const CLIP_TEXT = ' ';
+
+  function copySystem() {
+    const payload = clipOfSelection();
+    return payload ? writeSystem(clipboardHtml(payload), CLIP_TEXT) : false;
+  }
+
+  function onCopy(e: ClipboardEvent, cut: boolean) {
+    const payload = clipboardTarget(e) ? clipOfSelection() : null;
+    if (!payload) {
+      return;
+    }
+    e.preventDefault();
+    e.clipboardData!.setData(HTML_MIME, clipboardHtml(payload));
+    e.clipboardData!.setData(TEXT_MIME, CLIP_TEXT);
+    if (cut) {
+      void ((framePicks().length && deletePicks()) || dropSelection(selected, []));
+    }
+  }
+
+  function pasteAt(): Point {
+    const s = screenSize();
+    const inView = pointer && pointer.x >= s.left && pointer.x <= s.left + s.width && pointer.y >= s.top && pointer.y <= s.top + s.height;
+    return inView ? toFlow(pointer!) : viewCentre();
+  }
+
+  const IN_FRAME: { [K in Pasted]?: (data: Extract<PasteData<File>, { kind: K }>) => FramePaste } = {
+    [Pasted.Svg]: ({ svg }) => ({ svg }),
+    [Pasted.Text]: ({ text }) => ({ text }),
+    [Pasted.Figma]: ({ html }) => ({ figma: html })
+  };
+  const PASTED_SUMMARY = 'Pasted';
+  const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
+
+  function pasteInFrame(data: PasteData<File>, at: Point): boolean {
+    const paste = (IN_FRAME[data.kind] as ((d: PasteData<File>) => FramePaste) | undefined)?.(data);
+    const hit = paste ? framePickAt(at) : null;
+    const saver = hit && frameChrome(kindOfNode(hit.nodeId)).takesDrops ? saverOf(hit.nodeId) : null;
+    if (!paste || !hit || !saver) {
+      return false;
+    }
+    const doc = saver.history.present;
+    const [x0, y0] = hit.picker.framePoint(at, hit.space);
+    const [x1, y1] = hit.picker.framePoint({ x: at.x + 1, y: at.y }, hit.space);
+    const done = pastedInFrame(doc, paste, hit.picker.unitAt(at, hit.space), Math.hypot(x1 - x0, y1 - y0), frameOfLive({ doc, playhead: liveOf(hit.nodeId)?.playhead }), () => crypto.randomUUID().slice(0, 8));
+    if (!done) {
+      return false;
+    }
+    select([hit.nodeId]);
+    commit(hit.nodeId, { ok: true, doc: done.doc }, PASTED_SUMMARY);
+    pickMany(hit.nodeId, done.selection);
+    refusal = done.skipped?.length ? `${FIGMA_SKIPPED} ${done.skipped.join('; ')}` : null;
+    if (done.images?.length && done.fileKey) {
+      void fillFigmaImages({ nodeId: hit.nodeId, fileKey: done.fileKey, images: done.images });
+    }
+    return true;
+  }
+
+  const FIGMA_SESSION_TRIES = 20;
+  const FIGMA_SESSION_WAIT_MS = 250;
+  const FIGMA_FILLED_SUMMARY = 'Filled Figma images';
+  const figmaStarted = new Set<FigmaJob>();
+
+  async function sessionOnceLoaded(nodeId: string) {
+    for (let tries = 0; tries < FIGMA_SESSION_TRIES; tries++) {
+      const session = saverOf(nodeId);
+      if (session) {
+        return session;
+      }
+      await new Promise((resolve) => setTimeout(resolve, FIGMA_SESSION_WAIT_MS));
+    }
+    return null;
+  }
+
+  async function fillFigmaImages(job: FigmaJob) {
+    const got = await figmaImageAssets({ projectId: page.params.projectId ?? '', fileKey: job.fileKey, hashes: job.images.map((i) => i.hash) });
+    props.onFigmaImages?.(got.outcome);
+    if (got.outcome !== ImagesOutcome.Filled || !Object.keys(got.assets).length) {
+      return;
+    }
+    const session = await sessionOnceLoaded(job.nodeId);
+    if (!session) {
+      return;
+    }
+    const shown = Object.fromEntries(Object.values(got.assets).map((id) => [id, assetUrl(id)]));
+    liveDocs.set(job.nodeId, { ...(liveOf(job.nodeId) as LiveDoc), assets: { ...liveOf(job.nodeId)?.assets, ...shown } });
+    commit(job.nodeId, { ok: true, doc: imagesFilled(session.history.present, job.images, got.assets) }, FIGMA_FILLED_SUMMARY);
+  }
+
+  $effect(() => {
+    for (const job of props.figmaJobs ?? []) {
+      if (!figmaStarted.has(job)) {
+        figmaStarted.add(job);
+        void fillFigmaImages(job);
+      }
+    }
+  });
+
+  function pasteFrom(source: PasteSource<File> | null, at: Point) {
+    const data = source ? readPaste(source) : null;
+    if (data && pasteInFrame(data, at)) {
+      return;
+    }
+    if (data) {
+      props.onPasteData?.(data, at);
+      return;
+    }
+    props.onPaste?.(at);
+  }
+
+  async function insertImageInFrame(file: File) {
+    const nodeId = soleFrame;
+    const session = nodeId ? saverOf(nodeId) : null;
+    const extras = nodeId ? extrasOf(nodeId) : null;
+    if (!nodeId || !session || !extras || !frameChrome(kindOfNode(nodeId)).takesDrops) {
+      return;
+    }
+    const size = await sizeOfImage(file);
+    const pendingId = `${PENDING_ASSET}${crypto.randomUUID()}`;
+    const pending = imageInFrame(session.history.present, { assetId: pendingId, name: file.name, ...size });
+    if (!pending.ok) {
+      return;
+    }
+    const local = URL.createObjectURL(file);
+    const uploading = extras.uploadMedia(file, () => undefined);
+    session.holdSave(uploading);
+    commit(nodeId, pending, 'Inserted image');
+    const shown = (assetId: string) => liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), assets: { ...liveOf(nodeId)?.assets, [assetId]: local } });
+    shown(pendingId);
+
+    const uploaded = await uploading;
+    if (!uploaded.ok) {
+      session.undo();
+      liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), doc: session.history.present });
+      props.onfail?.(uploaded.error);
+      return;
+    }
+    session.settleHeld(withAssetSwapped(session.history.present, pendingId, uploaded.asset.id));
+    liveDocs.set(nodeId, { ...(liveOf(nodeId) as LiveDoc), doc: session.history.present });
+    shown(uploaded.asset.id);
+  }
+
+  async function onPasteEvent(e: ClipboardEvent) {
+    if (!clipboardTarget(e)) {
+      return;
+    }
+    e.preventDefault();
+    const at = pasteAt();
+    pasteFrom(await eventSource(e.clipboardData!), at);
+  }
+
+  async function pasteSystem(at: Point) {
+    pasteFrom(await systemSource(), at);
+  }
+
   const SELECTION_RUN: Record<CanvasActionId, (ids: string[]) => void> = {
     'tidy-up': (ids) => placeTiles(tidyTiles(placedBoxes(ids))),
+    stack: (ids) => placeTiles(stackTiles(placedBoxes(ids), STACK_GAP)),
+    'section-selection': (ids) => props.onSection?.(ids),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => props.onDuplicate?.(ids),
     'connect-new': () => {
@@ -1695,22 +3115,37 @@
       targeting = ids;
     },
     'run-workflow': (ids) => props.onRunWorkflow?.(ids),
+    'save-technique': (ids) => props.onSaveTechnique?.(ids),
+    'run-technique': (ids) => props.onRunTechnique?.(ids),
+    'edit-technique': (ids) => props.onEditTechnique?.(ids),
+    'detach-technique': (ids) => props.onDetachTechnique?.(ids),
     'run-downstream': (ids) => props.onRunGraph?.(GraphScope.Downstream, ids),
     'run-stale': (ids) => props.onRunGraph?.(GraphScope.Stale, ids),
     'copy-id': (ids) => void navigator.clipboard?.writeText(ids.join('\n')),
     report: (ids) => void window.open(reportHref({ node: ids[0] }), '_blank', 'noopener'),
     group: (ids) => props.onGroup?.(ids),
     ungroup: (ids) => props.onUngroup?.(ids),
-    copy: (ids) => props.onCopy?.(ids),
-    paste: () => menuAt && props.onPaste?.(toFlow(menuAt)),
+    copy: () => void copySystem(),
+    paste: () => menuAt && void pasteSystem(toFlow(menuAt)),
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
-    export: (ids) => props.onExport?.(ids),
+    'combine-video': (ids) => props.onCombineScenes?.(ids),
+    'remove-background': (ids) => props.onImageTool?.(ids[0], ImageTool.RemoveBackground),
+    'upscale-image': (ids) => props.onImageTool?.(ids[0], ImageTool.Upscale),
+    inpaint: (ids) => props.onInpaint?.(ids[0]),
+    outpaint: (ids) => props.onOutpaint?.(ids[0]),
+    'split-layers': (ids) => props.onImageTool?.(ids[0], ImageTool.SplitLayers),
+    'layers-to-frame': (ids) => props.onLayersToFrame?.(ids[0]),
+    export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
     delete: (ids) => props.onDelete?.(ids)
   };
 
   function runSelectionAction(id: SelectionActionId) {
+    if (selected.length === 1 && isFrameDialogAction(id)) {
+      frameDialog = { nodeId: selected[0], dialog: FRAME_DIALOG_ACTIONS[id] };
+      return;
+    }
     if (selected.length && isCanvasAction(id)) {
       SELECTION_RUN[id](selected);
     }
@@ -1745,11 +3180,23 @@
 
   function onDragOver(e: DragEvent) {
     const types = e.dataTransfer?.types ?? [];
-    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, OS_FILES].some((type) => types.includes(type))) {
+    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, CANVAS_DRAG_COMPONENT, OS_FILES].some((type) => types.includes(type))) {
       return;
     }
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'copy';
+  }
+
+  function dropComponent(dragged: ComponentDrag, world: Point) {
+    const targetId = topNodeAt(world);
+    const frame = coreFrames.find((f) => f.id === targetId);
+    const saver = frame ? saverOf(frame.id) : null;
+    const source = liveOf(dragged.frameId)?.doc;
+    if (!frame || !saver || !source) {
+      return;
+    }
+    const offset = { x: (world.x - (frame.box.x + frame.box.w / 2)) / frame.box.w, y: (world.y - (frame.box.y + frame.box.h / 2)) / frame.box.h };
+    commit(frame.id, placeInstance(saver.history.present, source, dragged.compId, () => crypto.randomUUID().slice(0, 8), offset), 'Inserted a component');
   }
 
   function onDrop(e: DragEvent) {
@@ -1757,13 +3204,19 @@
     const files = [...(e.dataTransfer?.files ?? [])];
     if (files.length && props.onUpload) {
       e.preventDefault();
-      files.forEach((file) => props.onUpload?.(file));
+      files.forEach((file) => props.onUpload?.(file, isSvgFile(file) ? toFlow(at) : undefined));
       return;
     }
     const output = e.dataTransfer?.getData(CANVAS_DRAG_OUTPUT);
     if (output) {
       e.preventDefault();
       props.onDropOutput?.(output, at, toFlow(at));
+      return;
+    }
+    const component = parseComponentDrag(e.dataTransfer?.getData(CANVAS_DRAG_COMPONENT) ?? '');
+    if (component) {
+      e.preventDefault();
+      dropComponent(component, toFlow(at));
       return;
     }
     const filled = parseFilledNodeDrag(e.dataTransfer?.getData(CANVAS_DRAG_FILLED_NODE) ?? '');
@@ -1825,11 +3278,10 @@
         })
         .catch((err: unknown) => {
           failed = err instanceof Error ? err.message : String(err);
-          props.onfail?.(failed);
         });
     const recover = (lost: GpuScene) => {
       const next = nextBackend(lost.backend);
-      console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'dom'}`);
+      console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'none'}`);
       lossNote = `${lost.backend} lost`;
       scene = null;
       built = null;
@@ -1839,7 +3291,7 @@
         lost.canvas.remove();
       }
       if (!next) {
-        props.onfail?.('GPU context lost');
+        failed = 'GPU context lost';
         return;
       }
       void start(next);
@@ -1881,10 +3333,29 @@
   if (e.key === ' ') {
     space = false;
   }
-}} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
+}} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} onpointermove={(e) => (pointer = { x: e.clientX, y: e.clientY })} oncopy={(e) => onCopy(e, false)} oncut={(e) => onCopy(e, true)} onpaste={onPasteEvent} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? (coreOn ? CORE : 'pending')} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? (coreOn ? CORE : 'pending')} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
+  {#if timeline}
+    {@const nodeId = timeline.nodeId}
+    <div style="display: contents" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
+      <FrameTimeline
+        doc={timeline.doc}
+        frame={timeline.frame}
+        selection={picks.length > 1 ? picks : inside?.level.clip ? [inside.level.clip] : []}
+        mode={savers.get(nodeId)?.mode}
+        onmode={() => savers.get(nodeId)?.toggleMode()}
+        onframe={(f) => scrubTo(nodeId, f)}
+        onselect={(ids) => (ids.length > 1 ? pickMany(nodeId, ids) : goInside(nodeId, Gesture.Click, ids[0] ?? null))}
+        onaction={(id) => void runFrameAction(id)}
+        marks={props.commentMarks?.(nodeId, timeline.doc.fps) ?? []}
+        onmark={(id) => props.onMark?.(id)}
+        onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
+        onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
+      />
+    </div>
+  {/if}
   <div
     class="surface svelte-flow__pane"
     bind:this={surface}
@@ -1897,16 +3368,64 @@
     onclick={onClickInside}
     ondblclick={onDouble}
     oncontextmenu={onContextMenu}
-    onpointerleave={() => props.onPointer?.(null)}
+    onpointerleave={() => {
+      props.onPointer?.(null);
+      pickHover = null;
+    }}
     class:panning={space}
+    style:cursor={handleCursor}
     data-owns-pinch
   >
     {#if coreOn}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames frames={coreFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
-    <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
+    <FrameOverlays {view} frames={overlayFrames}>
+      {#snippet children(frame)}
+        {@const edit = typingMark(frame.id)}
+        {#if edit}
+          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
+        {/if}
+        {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={shows(frameViews, FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+        {/each}
+        {@const gradient = gradientMark(frame.id)}
+        {#if gradient}
+          <GradientHandles rect={gradient.rect} fill={gradient.fill} onchange={(f) => dragGradient(frame.id, gradient.clip, gradient.index, f)} ondone={(f) => dropGradient(frame.id, gradient.clip, gradient.index, f)} />
+        {/if}
+        {@const crop = cropMark(frame.id)}
+        {#if crop}
+          <CropHandles rect={crop.rect} fill={crop.fill} src={crop.src} onchange={dragCrop} onapply={() => endCrop(true)} oncancel={() => endCrop(false)} />
+        {/if}
+        {@const group = typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? null : groupMark(frame.id)}
+        {#if group}
+          <FrameSelection clip="" quad={group} kind={SelectionKind.Group} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
+        {/if}
+        {@const guideArea = inside?.nodeId === frame.id ? frameArea(frame.id) : null}
+        {@const measuredGapsIn = measuredIn(frame.id)}
+        {#if guideArea && ((frameGuides?.nodeId === frame.id && (frameGuides.guides.length || frameGuides.gaps.length)) || measuredGapsIn.length)}
+          <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} measured={measuredGapsIn} />
+        {/if}
+        {#if pickHover?.nodeId === frame.id}
+          <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+        {/if}
+        {@const live = peering ? liveOf(frame.id) : null}
+        {@const peers = peering ? peering.peersOf(frame.id, onCanvas) : []}
+        {#if peering && live && (peers.length || pointedFrame === frame.id)}
+          <FramePeers doc={live.doc} frame={frameOfLive(live)} redraws={0} {peers} measure={() => peerMeasure(frame.id, peers.flatMap((p) => p.selection))} onpointer={(cursor) => pointedFrame === frame.id && peering.point(frame.id, cursor, picks)} />
+        {/if}
+        {@const tools = toolsOf(frame.id)}
+        {#if tools}
+          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
+        {/if}
+        {@const band = marqueeRect(frame.id)}
+        {#if band}
+          <div class="frame-marquee" data-testid="frame-marquee" style={`left:${band.left}px;top:${band.top}px;width:${band.width}px;height:${band.height}px`}></div>
+        {/if}
+      {/snippet}
+    </FrameOverlays>
+    <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom});--zoom:${view.zoom}`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
         {#each curves as c (c.edge.id)}
           <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} class:iterate={(c.edge.mode ?? 'fixed') === 'iterate'} class:linked={selected.includes(c.edge.source) || selected.includes(c.edge.target)} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
@@ -1938,12 +3457,11 @@
           data-kind={t.kind}
           data-core={coreDrawn.has(t.id) || undefined}
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
-          style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
+          style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px;--bar-h:${holdsDoc(t.kind ?? '') && frameChrome(kindOfNode(t.id)).bar ? MOTION_NODE_BAR_H : 0}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} knobDrawn={coreRotate.some((r) => r.id === t.id)} />
-          {@render props.tileOver?.({ id: t.id })}
-          {#if !domIds.has(t.id) && t.kind === 'motion'}
-            {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
+          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onaddbeside={holdsDoc(t.kind ?? '') && kindOfNode(t.id) === FrameKind.Frame ? props.onAddBeside : undefined} showAdd={on || hovered === t.id || addLinger === t.id} />
+          {#if !domIds.has(t.id) && holdsDoc(t.kind ?? '')}
+            {@const kind = kindOfNode(t.id)}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
               <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage data-drawn={drawn.has(t.id) || coreDrawn.has(t.id)}>
                 {#if t.poster}
@@ -1952,6 +3470,7 @@
               </div>
             </div>
           {/if}
+          {@render props.tileOver?.({ id: t.id, body: domIds.has(t.id) ? TileBody.Dom : TileBody.Standin })}
           {#if domIds.has(t.id)}
             <div class="gpu-dom-node" class:unshown={!handedOver(t)} data-testid="gpu-dom-node" data-id={t.id}>
               <NodeBoundary>
@@ -1961,6 +3480,7 @@
           {/if}
         </div>
       {/each}
+      {@render props.canvasOver?.()}
       <PeerLayer peers={corePeers.length ? (props.peers ?? []).filter((p) => p.chat) : (props.peers ?? [])} outlined={!corePeers.length} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
       {#if measured.length || snapGuides.length || snapSpacing.length}
         <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={coreOn ? [] : snapGuides} zoom={view.zoom} />
@@ -1998,6 +3518,19 @@
 
   <PageZoomLock zoom={pageZoom} />
 
+  {#if naming && namingBox}
+    <input
+      class="name-input"
+      data-testid="node-name-input"
+      aria-label="Node name"
+      style={`left:${namingBox.left}px;top:${namingBox.top}px;width:${namingBox.width}px;height:${NAME_HEIGHT}px`}
+      bind:value={naming.value}
+      {@attach (el) => (el.focus(), el.select())}
+      onkeydown={onNamingKey}
+      onblur={() => endNaming(true)}
+    />
+  {/if}
+
   {#if dev}
     <RendererBadge renderer={scene?.backend ?? (coreOn ? CORE : 'starting')} reason={lossNote} />
   {/if}
@@ -2010,12 +3543,13 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && (scene || coreOn) && props.barContext === BarContext.Canvas && frameBar.tool !== DrawTool.Select}
+  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && !inside}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
       ondraw={async (drawn) => {
-        await props.onDraw?.(drawn);
+        const id = await props.onDraw?.(drawn);
+        typeOnArrival = drawn.tool === DrawTool.Text && id ? id : null;
         frameBar.tool = DrawTool.Select;
       }}
       onframe={async (target) => {
@@ -2028,10 +3562,18 @@
   {#if spec.chrome && props.onCreate}
     <CanvasAddBar
       onpick={addAtCentre}
-      onupload={props.onUpload}
+      onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) ? viewCentre() : undefined) : undefined}
+      oncloud={props.onCloud ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
+      techniques={props.techniques}
+      ontechnique={props.onTechnique ? (id) => props.onTechnique?.(id, viewCentre()) : undefined}
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
-      context={props.barContext}
+      ontrailer={panelNodeId ? startTrailer : undefined}
+      onimage={insertImageInFrame}
+      oncomment={props.onCommenting ? () => props.onCommenting?.(!props.commenting) : undefined}
+      commenting={props.commenting}
+      onframelibrary={soleFrame ? () => (frameDialog = { nodeId: soleFrame, dialog: FrameDialog.Templates }) : undefined}
+      context={barContextFor(soleFrame)}
       zoom={view.zoom}
     />
   {/if}
@@ -2047,13 +3589,58 @@
       choicesFor={props.modelChoicesFor}
       catalogueSynced={selectionMedium && props.catalogueSyncedFor ? props.catalogueSyncedFor(selectionMedium) : true}
       runQuote={props.runQuoteFor?.(selected) ?? null}
+      frameTools
       onrun={() => props.onRunNode?.(selected[0])}
+      variantsInFlight={selected.length === 1 ? (props.variantsInFlightFor?.(selected[0]) ?? 0) : 0}
+      oncancelvariants={() => props.onCancelVariants?.(selected[0])}
+      history={selected.length === 1 ? (props.historyFor?.(selected[0]) ?? null) : null}
+      onstop={() => props.onCancelRun?.(selected[0])}
       onaction={runSelectionAction}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
+      onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}
+      oncolourchange={(tag) => props.onColourChange?.(selected, tag)}
+      onview={() => props.onViewOutput?.(selected[0])}
+      oncompare={() => props.onCompareOutputs?.(selected)}
+      onexportcloud={(provider) => props.onCloud?.(provider, CloudMode.Export, selected[0], viewCentre())}
     />
     {#if props.postAction}
       <NextStepChips postAction={props.postAction} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
     {/if}
+  {/if}
+
+  {#if remixOf && spec.chrome}
+    <div class="remix-banner">
+      <RemixBanner origin={remixOf} onbrand={brandRemix} />
+    </div>
+  {/if}
+
+  {#if frameDialog && dialogSession && dialogExtras && dialogTokens}
+    {@const nodeId = frameDialog.nodeId}
+    <FrameDialogs
+      dialog={frameDialog.dialog}
+      {nodeId}
+      projectId={page.params.projectId ?? ''}
+      canvasId={page.params.canvasId ?? ''}
+      session={dialogSession}
+      extras={dialogExtras}
+      tokens={dialogTokens}
+      frame={frameOfLive(liveOf(nodeId)!)}
+      onedit={(result, summary) => commit(nodeId, result, summary)}
+      onswitch={(next) => (frameDialog = { nodeId, dialog: next })}
+      onfocus={(id) => select([id])}
+      onimages={(rows) => props.onExportRows?.([nodeId], rows) ?? Promise.resolve('Export failed')}
+      onpreview={(doc) => showDialogDoc(nodeId, doc)}
+      onclose={() => closeDialog(nodeId)}
+    />
+  {/if}
+
+  {#if elementMenu && inside && spec.chrome}
+    {@const doc = liveOf(inside.nodeId)?.doc}
+    {#if doc}<CanvasContextMenu at={elementMenu} summaries={frameSummaries(doc, picks)} available={FRAME_ELEMENT_MENU} layers={elementLayers} onlayer={(id) => inside && pickMany(inside.nodeId, [id])} onpick={runElementMenu} onclose={() => (elementMenu = null)} />{/if}
+  {/if}
+
+  {#if spec.chrome}
+    <CommandPalette onrun={runPaletteCommand} />
   {/if}
 
   {#if menuAt && spec.chrome}
@@ -2085,6 +3672,16 @@
 </div>
 
 <style>
+  .wrap.commenting .surface {
+    cursor: crosshair;
+  }
+
+  .frame-marquee {
+    position: absolute;
+    border: 1px solid var(--ui-accent, #3b82f6);
+    background: color-mix(in srgb, var(--ui-accent, #3b82f6) 12%, transparent);
+  }
+
   :global(html.canvas-gesture),
   :global(html.canvas-gesture *) {
     user-select: none !important;
@@ -2146,6 +3743,14 @@
     z-index: 1;
     left: 0;
     top: 0;
+  }
+
+  .pick-outline {
+    position: absolute;
+    box-sizing: border-box;
+    border: 1px solid var(--ui-hover-outline, var(--ui-accent));
+    pointer-events: none;
+    transform-origin: 0 0;
   }
 
   .gpu-node {
@@ -2284,6 +3889,28 @@
     user-select: text;
   }
 
+
+  .remix-banner {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    translate: -50% 0;
+    max-width: calc(100% - 32px);
+    z-index: 5;
+  }
+
+  .name-input {
+    position: fixed;
+    z-index: 30;
+    padding: 0 6px;
+    border: 1px solid var(--ui-accent, #0a84ff);
+    border-radius: var(--ui-radius-sm);
+    background: var(--paper, #fff);
+    color: var(--ink, #1d1d1f);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+  }
 
   .edge-refusal {
     position: absolute;

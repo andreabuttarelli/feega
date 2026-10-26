@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { FORMATS, MotionFormat, newClip, newMotionDoc, parseMotionDoc } from './doc';
+import { FORMATS, MotionFormat, newClip, newMotionDoc, parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { Quality, TIMELINE_ONLY, docProblems } from './direction';
-import { ANIMATE_SECONDS, coverFrame, DocMode, animateStill, docMode, setStill, stillFrame } from './still';
-import { setCanvas } from './timeline';
-import { ImageFormat, IMAGE_FORMATS, ImageScale, stillExport } from './still-model';
+import { ANIMATE_SECONDS, coverFrame, DocMode, animateStill, docMode, setStill, stillFrame } from '@feega/motion-core/motion/still';
+import { setCanvas } from '@feega/motion-core/motion/timeline';
+import { ImageFormat, IMAGE_FORMATS, IMAGE_SCALES, ImageScale, stillExport } from '@feega/motion-core/motion/still-model';
 
 describe('a still is a motion doc pinned to one frame', () => {
   it('a new doc is a video', () => {
@@ -95,6 +95,11 @@ describe('poster formats', () => {
 });
 
 describe('image export settings', () => {
+  it('scales from 1x to 4x', () => {
+    expect([...IMAGE_SCALES]).toEqual([1, 2, 3, 4]);
+    expect(stillExport(ImageFormat.Png, ImageScale.Four).size({ width: 100, height: 50 } as never)).toEqual({ width: 400, height: 200 });
+  });
+
   it('png, jpg and webp each carry their mime and extension', () => {
     expect(IMAGE_FORMATS.map((f) => stillExport(f, ImageScale.One).mime)).toEqual(['image/png', 'image/jpeg', 'image/webp']);
     expect(stillExport(ImageFormat.Jpg, ImageScale.One).ext).toBe('jpg');
@@ -170,13 +175,13 @@ describe('a still design frame is not held to the video resolution', () => {
     expect(setCanvas(page(), { size: { width: 1440, height: 16385 } }).ok).toBe(false);
   });
 
-  it('a video keeps the 1080p cap', () => {
-    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 1440, height: 4000 } }).ok).toBe(false);
-    expect(parseMotionDoc({ ...page(), width: 1440, height: 4000, still: undefined }).ok).toBe(false);
+  it('a video keeps the 4K cap', () => {
+    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 1440, height: 5000 } }).ok).toBe(false);
+    expect(parseMotionDoc({ ...page(), width: 1440, height: 5000, still: undefined }).ok).toBe(false);
   });
 
   it('a tall design frame cannot turn into a video', () => {
-    const tall = setCanvas(page(), { size: { width: 1440, height: 4000 } });
+    const tall = setCanvas(page(), { size: { width: 1440, height: 5000 } });
 
     expect(tall.ok && setStill(tall.doc, null).ok).toBe(false);
   });

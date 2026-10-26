@@ -2,7 +2,21 @@
 
 Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa riconoscere, e la mossa che li risolve. Una sezione per tema. Una lezione nova entra qui nel commit che l'ha pagata.
 
+## Self-host
+
+### Docker on macOS hangs the database container when the clone lives in ~/Documents
+
+**Signal:** `docker compose up` stalls on the `db` service ("unhealthy"), `docker exec ... ls` on a bind-mounted path never returns, `docker kill` answers "did not receive an exit event". Nothing in the logs. **Move:** clone outside `~/Documents`, `~/Desktop` and `~/Downloads` (or grant Docker/OrbStack access to the folder), then `orbctl restart docker`. A volume left half-initialised by that run keeps failing with `password authentication failed for user "authenticator"`: `docker compose down -v` first.
+
+### A migrations folder can be a different product than the schema
+
+**Signal:** a fresh database applies every file and the app still answers `PGRST205` for `orgs`. **Move:** the new schema was never a migration; `supabase/baseline` is generated from production catalogs and `db:migrate` applies it, then only files dated after its cutoff. Never delete or rename the legacy files.
+
 ## Motion editor
+
+### A PR that adds or changes a tool fails the tool surface pins
+
+**Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. The src pin stores one fingerprint per tool/op, one entry each: PRs touching different tools do not conflict; a real conflict means the same tool changed twice. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
 
 ### An effect that publishes into a `$state` map loops once it runs per edit
 
@@ -149,6 +163,12 @@ altro worktree. Mossa: un dev server tuo su una porta tua e `E2E_BASE_URL`.
 worktree agente non vede nessun file salvato dopo l'avvio. Segnale: l'e2e fallisce su
 un comportamento appena scritto, o un doc nuovo non si apre (parse fallito, editor in `video`).
 Mossa: riavvia il dev server dopo ogni modifica, prima di ogni giro Playwright.
+
+### Il canvas core diventa vuoto o nero dopo un clic, senza errori
+Segnale: nessun `pageerror`, nessun `liveDocs.set`, `data-painted` aumenta di un `full` e poi il
+canvas è vuoto; succede solo su frame grandi. Causa vista: l'overlay passato a `setOverlay` con
+migliaia di item (un item per trattino dell'anello). Mossa: logga `overlay.length` in `paint()`
+di `CoreFrames.svelte`; un elemento di chrome è un solo item, i pezzi sono contorni.
 
 ### `backdrop-filter` che non sfoca niente
 Un antenato con `will-change: opacity` (o `filter`, `opacity < 1`, `mask`, `clip-path`,
@@ -566,6 +586,19 @@ no. Svelte 5 delega `dblclick`/`click` alla radice; un antenato (la tela, un nod
 propagazione prima. Mossa: `addEventListener('dblclick', …)` diretto sull'elemento in un
 `$effect`, e un test e2e che fa il gesto vero.
 
+### Con un `.env` copiato nel worktree la suite unitaria diventa rossa
+Segnale: dopo aver copiato `.env` per un e2e `@real`, `ai-models-sync`, `canvas-catalogue`,
+`generate.test`, `settings-actions-upgrade` e altri falliscono con `.eq(...).eq is not a function`
+o liste con un modello in più, e in CI sono verdi. Causa: i test leggono la configurazione vera
+(chiavi Kie, Stripe) invece dei default vuoti. Mossa: sposta `.env` fuori dal worktree prima di
+`vitest`, rimettilo solo per l'e2e.
+
+### Un'op nuova che il chat elenca sfora il budget di caratteri
+Segnale: `tool-budget.test.ts` rosso di poche decine di caratteri su una PR che aggiunge un'op
+`canvas_tool`. Causa: il chat elenca nome e campi di ogni op, quindi ogni op costa il suo nome.
+Mossa: prima accorcia i riepiloghi; se non basta, alza `CANVAS_CHAT_MAX_CHARS` di poco (come
+#1172) nello stesso commit. Un'op con un enum di strumenti (`image_tool`) costa meno di un'op per strumento.
+
 ## Test: distinguere il tuo difetto dal rumore
 
 ### Un test "lento a intermittenza" può non essere lento affatto
@@ -979,6 +1012,13 @@ aggiorna quella riga.** Se sì, o il trigger copre anche l'UPDATE, o il log è u
 battito in poi. Qui l'evento resta immutabile (`append_thread_event` solleva sul payload diverso, ed
 è giusto): l'aggiornamento entra come evento NUOVO con la sua `source_key`, di cui se ne tiene UNA
 sola, e il reducer sostituisce il messaggio con lo stesso id invece di accodarlo.
+
+### Un fill che la GPU non sa disegnare annerisce l'intero frame, e il modello dice «valido»
+Segnale: dopo aver scritto un'immagine come fill di una Shape (documento valido, `setProps` ok,
+suite verde) il frame sulla tela core diventa tutto nero, testo compreso. Causa: `shapePainter`
+risponde `Unsupported.Fill` a ogni fill che non sia solido o gradiente. Mossa: prima di produrre
+un tipo di fill nuovo da codice, guarda in `PAINTS` di `display-list.ts` se la GPU lo disegna;
+un giro Playwright con lo screenshot dopo l'edit lo prende, un test del documento no.
 
 ## Build e bundle
 
@@ -3166,6 +3206,13 @@ backdrop), so a rebuilt atlas recopies it; once per frame is not enough. Guarded
 `a_picture_mask_survives_frames_that_grow_the_image_atlas` and
 `a_picture_under_a_backdrop_stays_drawn_frame_after_frame`.
 
+## A core frame that draws nothing after a text edit: look for a missing glyph
+
+**Signal:** a frame or instance draws on the canvas until a text gets a symbol (→, ✓), then
+shows nothing or a black box; the HTML engine draws it fine. **Move:** one glyph no loaded face
+covers makes the text a `Glyph` gap and the whole list undrawable (`drawsWhole`). Check the
+code point against the loaded faces before suspecting the feature that changed the text.
+
 ## A GPU parity gap that both backends share is usually the reference
 
 **Signal:** two independent renderers score the same SSIM against the HTML capture (video 0.96,
@@ -3208,3 +3255,93 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## A static layer is repainted every frame
 
 **Signal:** a doc with a few moving paths and several blurred or masked layers that do not move still costs 10-50 ms per core frame. **Move:** `scripts/bench/dump-list.ts <doc> <out.json> <frames...>` and compare layered items between frames (identical JSON means a cache hit is possible); the engine keeps finished layer textures for path-only items (`LayerCache` in `engine.rs`). Pictures, text and backdrop layers must stay uncached: their inputs change without the item changing.
+
+## A capture iframe parked off screen never loads its images
+
+**Signal:** a browser export of a frame with a picture reports `the frame at 3.37s did not draw within 60s` right where the picture first appears; frames without pictures drew fine; the picture request shows `ERR_ABORTED`. **Move:** keep the hidden `MotionPreview` inside the viewport (`left: 0; top: 0; opacity: 0; z-index: -1`), never at `left: -10000px`: lazy images outside the viewport are never fetched.
+
+## A local image export times out in the server renderer
+
+**Signal:** `exportSelection` answers 502 `the images could not be drawn: Waiting failed: 20000ms exceeded` against a local `vite dev`; the dialog only says `Export failed`. **Move:** the composed page loads its libs from `PUBLIC_APP_URL` (production in `.env`), which lags the branch. Start the dev server with `PUBLIC_APP_URL=http://localhost:<port>` so the renderer loads the libs it was composed for.
+
+## A group inside a canvas frame picks as `<group>__0__<id>`
+
+**Signal:** after ⌘G inside a GPU frame the selection outline vanishes and clicks on the group select nothing the doc knows. **Move:** Precomp members compose with namespaced `data-clip`s; resolve a pick through the layer's `owners` chain to the deepest id `findClip` finds (`framePicker.pick`), never trust the leaf id.
+
+## Frame overlays stop updating while an element is picked
+
+**Signal:** selection boxes, drags and resizes inside a GPU frame look frozen (the doc changes, nothing redraws), no console error; `page.on('pageerror')` shows `each_key_duplicate`. **Move:** a keyed `{#each}` with a repeated key throws inside Svelte's flush and halts every later effect. Listen for `pageerror`, not only `console`, and dedupe lists merged from two sources (`barActions`).
+
+## A worktree dev server ignores your edits
+
+**Signal:** a `console.log` you just added never shows; `curl` of the module from vite lacks it. **Move:** vite does not watch files under `.claude/worktrees/`; restart the dev server after every edit.
+
+## `npx prettier --write` rewrites whole files
+
+**Signal:** a small diff becomes thousands of lines, single quotes turn double. **Move:** the repo has no prettier config; never run prettier. Lost edits staged once survive as unreachable blobs: `git fsck --unreachable --no-reflogs`, match by identifier set.
+
+## A tool-surface pin goes red on dev without any of your files
+
+**Signal:** CI `test` fails on `tool-surface-pin.test.ts` and `cli/mcp/tool-list-pin.test.ts` ("Snapshot ... mismatched", only a fingerprint differs) and the same two fail on `origin/dev` itself. **Move:** a tool description or schema change anywhere moves the hash; regenerate both pins in your PR (`vitest run src/lib/server/edit/tool-surface-pin.test.ts -u`; for the cli one `bun test` prints the new fingerprint, edit both entries by hand: `--update-snapshots` rewrites the file as Bun format and drops the vitest key CI reads).
+
+
+## The core canvas freezes a shape mid-gesture
+
+**Signal:** during a resize the selection follows the pointer but the shape stops at an intermediate size; `pageerror` shows `floating point \`131.25\`, expected u32`. **Move:** the wasm core rejects a display list whose `width`/`height` is fractional and the whole paint aborts. Round every size that becomes a `DisplayList` (placeholders, stand-ins) before it reaches `putGroup`.
+
+## An agent worktree's dev server serves old code for files it already loaded
+
+**Signal:** a new file shows up in the browser but your edit to an existing module (a `.svelte` the page already imported) does nothing, no error. **Cause:** `server.watch.ignored` skips `**/.claude/worktrees/**`, so Vite never invalidates anything inside a worktree. **Move:** restart the dev server after editing an existing module; new files are fine.
+
+## An `$effect` that reads the `$state` it writes loops forever
+
+**Signal:** a debug `console.info` in the effect prints a thousand times a second and the page stalls. **Cause:** logging or reading `store.value` right after assigning it subscribes the effect to its own write. **Move:** compute into a local, assign once, read nothing from the target inside the effect.
+
+## A dev server on a fixed port may be another agent's
+
+**Signal:** your e2e runs against `localhost:5199` but your new code never shows; `vite dev --strictPort` for your own copy fails with `Port 5199 is already in use`. **Cause:** parallel agents pick the same popular ports, and `reuseExistingServer` happily drives whoever got there first. **Move:** `lsof -i :PORT` then `lsof -p PID | grep cwd` to see whose worktree it serves; pick an odd port and start your own.
+
+## A fill that is right in the export and wrong on the canvas
+
+**Signal:** unit tests and the HTML/export render agree, the canvas draws the picture as plain cover (crop and tile ignored). **Cause:** the canvas core is Rust (`packages/gpu-core`, committed as `static/gpu-core/*.wasm`); a new `ImageItem` field added in `display-list.ts` is dropped by serde until Rust reads it. **Move:** change `display_list.rs` and `scene.rs` with a `cargo test` first, run `npm run build:gpu-core`, commit the wasm, and prove canvas against export with `npx playwright test image-fills` (`E2E_REAL_STACK=1`).
+
+## An e2e that finds no row after a node-shape change
+
+Signal: a `@real` spec polls `nodes` and never finds the row it just made, right after a PR changed how that node is stored (type, `data` keys). Move: check the spec's filter against the current row shape before suspecting data loss — #1212 moved free elements from `data.kind` to `type` and seven specs kept reading `data.kind`. Grep `tests/e2e` for the old shape in the same PR that changes it.
+
+## A skill doc edited in one place and red in CI
+
+**Signal:** `plugin skill mirror` fails in CI after a new tool or CLI command, or a long-running dev server does not show your new page action or tab. **Cause:** `cli/skills/feega` is mirrored byte for byte in `cli/plugins/feega/skills/feega`, and a vite dev server keeps serving the modules it loaded before a branch switch. **Move:** copy the edited skill files to the plugin dir in the same commit; restart your own dev server after switching branches.
+
+## Generating docs from app code
+
+**Signal:** a script that imports `$lib/server/...` dies on `$app/...`, `virtual:...` or a missing `.svelte-kit/tsconfig.json`; `vite-node` with the SvelteKit plugin throws "An impossible situation occurred". **Move:** run the script as a vitest file with the app's own `vite.config.ts` (`web-docs/scripts/vitest.gen.config.ts`), overriding only `test.include` and `setupFiles`. A worktree needs a `node_modules` symlink first.
+
+## An OpenRouter call that 402s with plenty of credit left
+
+Signal: `This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens` from a judge or any call that sets no `max_tokens`. Cause: OpenRouter reserves the model's maximum output against the balance before the call. Move: always pass `max_tokens` sized to the answer (a 5-axis JSON verdict needs ~1500).
+
+## A mocked canvas generation refused `moderation_unavailable`
+
+Signal: an `@real` spec with `E2E_FAKE_IMAGES=1` runs a canvas node and every run comes back `moderation_unavailable: the safety review could not run`, though the image mock is up. Cause: the prompt is screened first by an LLM judge that calls `LLM_BASE_URL/responses` (and `/chat/completions`), which the mock did not serve. Move: `fixtures/mock-images.ts` answers both with a safe verdict; start your own dev server with `LLM_BASE_URL` on the mock and `KIE_API_KEY=` blank so no discount route can reach a real provider.
+
+## A migration-only PR leaves derived files stale and `dev` red
+
+Signal: CI `test` fails on `query-tool.test.ts` (query-tables.ts), `write-tool.test.ts` (write-rules.ts) and `cli/lib/contracts.test.ts` right after a PR that only adds a migration. Cause: those files are generated from the migrations and the PR never regenerated them. Move: `node scripts/query-tables-from-migrations.mjs --write && bash cli/scripts/sync-contracts.sh`, commit the four files with the migration.
+
+## A core frame that flashes stretched after an edit
+
+Signal: on the GPU canvas a frame or free text shows its new content squeezed or stretched for a moment, then snaps right. Cause: the doc (picture) and the node box reached `CoreFrames` at different times; `screen-uses` maps the picture's `size` onto the `box` per axis, so any gap draws one over the other. A network await between showing the doc and placing the size is enough. Move: hand the doc and the box over in the same synchronous step (`applyTextFit`); to measure, screenshot the region every ~40 ms after the commit and compare ink width/height with the settled frame.
+
+## Un frame nero sulla tela: chiedi alla display list perché, prima di guardare la rete
+
+Il contenuto dei template inseriti si vedeva nero, in locale e in cloud. Rete, font, CSP e
+origini erano puliti: il difetto stava in `readClips`, che non guardava dentro i `Precomp`.
+
+**Segnale**: un frame resta nero o vuoto, `canvas.core-frames` ha `data-partial` > 0, nessun errore
+in console.
+
+**Mossa**: nella pagina, `prepare` + `drawFrame` sul `/motion/<id>/source` del frame e leggi
+`list.unsupported`. `reason: "unread"` = la lettura DOM non è partita (guardia sul doc sbagliato);
+`reason: "dom"` = CSS che gpu-core non disegna; zero item e nessun motivo = il frame scelto è vuoto
+(controlla `stillFrame`).

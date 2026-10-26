@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
-import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
+import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
 import { stateChrome, tileChrome, ChromePart, PortState, type StateTile, type Glyphs } from './chrome';
 import type { ConnectorType } from '$lib/canvas/connectors';
 
@@ -51,10 +51,18 @@ describe('tileChrome', () => {
   });
 
   it('draws the editing ring dashed at half opacity', () => {
-    const rings = ofPart(tile({ ring: NodeChrome.Editing }), ChromePart.Ring);
+    const [ring, ...rest] = ofPart(tile({ ring: NodeChrome.Editing }), ChromePart.Ring);
 
-    expect(rings.length).toBeGreaterThan(1);
-    expect(rings.every((r) => r.opacity === 0.5)).toBe(true);
+    expect(rest).toEqual([]);
+    expect(ring.contours.length).toBeGreaterThan(1);
+    expect(ring.opacity).toBe(0.5);
+  });
+
+  it('keeps the editing ring of a landing-page frame one overlay item, or the core stops drawing the canvas', () => {
+    const rings = ofPart(tile({ ring: NodeChrome.Editing, width: 1440, height: 4734 }), ChromePart.Ring);
+
+    expect(rings).toHaveLength(1);
+    expect(box(rings[0].contours)).toEqual([98, 198, 1542, 4936]);
   });
 
   it('outlines a hovered tile only while it is not selected', () => {
@@ -125,6 +133,14 @@ describe('tileChrome', () => {
     expect(box(ofPart(t, ChromePart.Label)[0].contours)).toEqual([117, 178, 177, 190]);
   });
 
+  it('draws the colour tag as a dot at the right end of the label row, even with no label', () => {
+    const [dot] = ofPart(tile({ tag: '#e5484d' }), ChromePart.Tag);
+
+    expect(dot.paint).toEqual({ kind: PaintKind.Solid, color: rgbaOf('#e5484d') });
+    expect(box(dot.contours)).toEqual([392, 182, 400, 190]);
+    expect(ofPart(tile(), ChromePart.Tag)).toHaveLength(0);
+  });
+
   it('fills the icon strokes as a union, so overlapping round joins never cancel', () => {
     const [icon] = ofPart(tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]] }), ChromePart.Icon);
 
@@ -135,7 +151,7 @@ describe('tileChrome', () => {
     const asked: (number | undefined)[] = [];
     tileChrome(tile({ label: 'Image' }), (text, size, set) => (asked.push(set?.tracking), glyphs(text, size, set)));
 
-    expect(asked).toEqual([0]);
+    expect(new Set(asked)).toEqual(new Set([0]));
   });
 
   it('dims ports a drag cannot reach and half-dims flagged ones', () => {
@@ -153,10 +169,19 @@ describe('tileChrome', () => {
     expect(ofPart(t, ChromePart.PortName)).toHaveLength(1);
   });
 
-  it('clips the label to the tile width, as the canvas masks it', () => {
-    const [label] = ofPart(tile({ label: 'A very long name for a node' }), ChromePart.Label);
+  it('truncates a long label with an ellipsis inside the tile width, with no scissor in world space', () => {
+    const [label] = ofPart(tile({ label: 'A very long name for a node that never ends' }), ChromePart.Label);
+    const [, , right] = box(label.contours);
 
-    expect(label.scissor?.[0]).toBe(100);
-    expect(label.scissor?.[2]).toBe(400);
+    expect(label.scissor).toBeUndefined();
+    expect(right).toBeLessThanOrEqual(400);
+    expect(right).toBeGreaterThan(300);
+  });
+
+  it('truncates the label after the icon, not under it', () => {
+    const t = tile({ label: 'A very long name for a node that never ends', icon: [[0, 0, 12, 0, 12, 12, 0, 12]] });
+    const [, , right] = box(ofPart(t, ChromePart.Label)[0].contours);
+
+    expect(right).toBeLessThanOrEqual(400);
   });
 });

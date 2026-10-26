@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionToolDeps, type MotionSession } from './motion-tools';
-import { TrackKind } from '$lib/motion/components';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
 const LIST_CHARS_PER_TEMPLATE = 400;

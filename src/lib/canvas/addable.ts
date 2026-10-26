@@ -32,12 +32,13 @@ export const CANVAS_ADDABLE = [
   'composition',
   'calendar',
   'motion',
-  'studio_batch'
+  'studio_batch',
+  'section'
 ] as const;
 
 export type Addable = (typeof CANVAS_ADDABLE)[number];
 
-const NOT_READY: readonly Addable[] = ['iframe'];
+const NOT_READY: readonly Addable[] = ['iframe', 'calendar'];
 
 export const CANVAS_ADD_BAR = CANVAS_ADDABLE.filter((w) => !NOT_READY.includes(w));
 
@@ -79,5 +80,6 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   audio: 'Generate audio',
   model3d: 'Generate 3D model',
   motion: 'Frame',
-  studio_batch: 'Studio batch'
+  studio_batch: 'Studio batch',
+  section: 'Section'
 };

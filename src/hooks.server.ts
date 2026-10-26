@@ -3,13 +3,15 @@ import { error, json, redirect, text } from '@sveltejs/kit';
 import * as Sentry from '@sentry/sveltekit';
 import { busyAnswer } from '$lib/db-busy';
 import { seedMetaClickCookies } from '$lib/server/meta-click-cookies';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import type { CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '$lib/server/db/connect';
 import { outlivesTurn } from '$lib/server/session-life';
 import { markRlsScoped } from '$lib/server/rls-client';
 import { createUserDb, type Db } from '$lib/server/db/client';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env as privateEnv } from '$env/dynamic/private';
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, ServerInit } from '@sveltejs/kit';
+import { localModeRefusal, localSession, localStore, serveLocal } from '$lib/server/local/local-mode';
 import { withBrandContext, withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
 import { createAdminClient } from '$lib/server/supabase-admin';
@@ -172,18 +174,20 @@ async function refuseUncensoredSection(event: RequestEvent): Promise<void> {
   }
 }
 
-async function refuseSocialPublishing(event: RequestEvent): Promise<void> {
-  const { routeRefused, SocialPublishing } = await import('$lib/social-publishing');
-  if (!routeRefused(SocialPublishing.Off, event.route.id, event.url.search)) {
-    return;
+export const init: ServerInit = () => {
+  const refusal = localModeRefusal(process.env);
+  if (refusal) {
+    throw new Error(refusal);
   }
-  const { socialPublishing } = await import('$lib/server/social-publishing');
-  if (routeRefused(await socialPublishing(), event.route.id, event.url.search)) {
-    throw error(404, 'not_available');
-  }
-}
+  localStore();
+};
 
-export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
+const localMode: Handle = ({ event, resolve }) => {
+  const local = localStore();
+  return local ? serveLocal(event, resolve, local) : resolve(event);
+};
+
+export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, localMode, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
@@ -229,7 +233,7 @@ export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentr
 
     return { session, user };
   };
-  event.locals.safeGetSession = () => (cachedSession ??= getSession());
+  event.locals.safeGetSession = () => (cachedSession ??= localStore() ? Promise.resolve(localSession()) : getSession());
 
   // Il database NUOVO, accanto al vecchio e non al posto suo: 103 file leggono ancora
   // `locals.supabase`, e spegnerlo qui vorrebbe dire non compilare più. Questo è tipizzato su
@@ -253,7 +257,6 @@ export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentr
     throw redirect(302, await rootRedirectTarget(event));
   }
 
-  await refuseSocialPublishing(event);
   await refuseUncensoredSection(event);
   await refuseSignedOutDashboard(event);
 

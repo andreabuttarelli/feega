@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { CompositionNode, CompositionTemplate } from '$lib/canvas/composition-node';
-  import { FieldType } from '$lib/motion/template/field-model';
-  import { splitFields, type KeyFields } from '$lib/motion/template/key-fields';
+  import { FieldType } from '@feega/motion-core/motion/template/field-model';
+  import { splitFields, type KeyFields } from '@feega/motion-core/motion/template/key-fields';
   import { templateFields, type Instance } from '$lib/motion/template/library';
 
   let { instance, template, keyFields, onpatch }: { instance: Instance; template: CompositionTemplate; keyFields: KeyFields; onpatch: (patch: Partial<CompositionNode>) => void } = $props();

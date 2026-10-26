@@ -2,8 +2,8 @@
   import { localStore } from '$lib/browser-storage';
   import { onMount } from 'svelte';
   import { colourDrag, type LiveGesture } from '$lib/motion/live-edit';
-  import { BRAND_COLORS } from '$lib/motion/components';
-  import { resolveColor, type BrandTokens } from '$lib/motion/brand';
+  import { BRAND_COLORS } from '@feega/motion-core/motion/components';
+  import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
   import { COLOUR_FORMATS, ColourFormat, channelsOf, colourLabel, fromChannels, parseColour, readRecent, remember, type Channels } from '$lib/motion/colour-field';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
@@ -18,7 +18,7 @@
     gesture = null,
     onchange,
     onalpha
-  }: { id?: string; gesture?: LiveGesture | null; name: string; value: unknown; tokens: BrandTokens; alpha?: number | null; onchange: (value: string) => void; onalpha?: (alpha: number) => void } = $props();
+  }: { id?: string; gesture?: LiveGesture | null; name: string; value: unknown; tokens: BrandTokens; alpha?: number | null; onchange: (value: string, alpha?: number) => void; onalpha?: (alpha: number) => void } = $props();
 
   type EyeDropperResult = { sRGBHex: string };
   type EyeDropperCtor = new () => { open: () => Promise<EyeDropperResult> };
@@ -74,11 +74,11 @@
     }
   }
 
-  function pick(next: string) {
+  function pick(next: string, nextAlpha?: number) {
     if (HEX.test(next)) {
       recent = remember(recent, next.toLowerCase(), localStore());
     }
-    onchange(next);
+    onchange(next, nextAlpha);
   }
 
   const wheel = colourDrag(gesture, (next) => onchange(next));
@@ -96,7 +96,8 @@
       input.value = colourLabel(raw);
       return;
     }
-    pick(parsed);
+    input.value = colourLabel(parsed.colour);
+    pick(parsed.colour, parsed.alpha ?? undefined);
   }
 
   function closeOutside(e: PointerEvent) {

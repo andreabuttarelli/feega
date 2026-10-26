@@ -4,8 +4,8 @@
   import X from '@lucide/svelte/icons/x';
   import { postPageAction } from '$lib/api/page-action';
   import MotionPreview from './MotionPreview.svelte';
-  import { newMotionDoc, MotionFormat, type MotionDoc } from '$lib/motion/doc';
-  import { FIELD_TYPE_LABEL } from '$lib/motion/template/field-model';
+  import { newMotionDoc, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
+  import { FIELD_TYPE_LABEL } from '@feega/motion-core/motion/template/field-model';
   import { BUILTIN_PREFIX } from '$lib/motion/template/builtins';
   import { insertTemplate, type TemplateEntry } from '$lib/motion/template/library';
 

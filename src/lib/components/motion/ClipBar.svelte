@@ -1,14 +1,14 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { Caption, type ActionId } from '$lib/motion/actions';
-  import { PickMode, clipActions } from '$lib/motion/clip-bar';
+  import { PickMode, barActions } from '$lib/motion/clip-bar';
   import IconButton from './IconButton.svelte';
 
-  type Props = { doc: MotionDoc; selection: readonly string[]; pick: PickMode; onrun: (id: ActionId) => void; ondone: () => void };
+  type Props = { doc: MotionDoc; selection: readonly string[]; pick: PickMode; extra?: readonly ActionId[]; onrun: (id: ActionId) => void; ondone: () => void };
 
-  let { doc, selection, pick, onrun, ondone }: Props = $props();
+  let { doc, selection, pick, extra = [], onrun, ondone }: Props = $props();
 
-  const actions = $derived(clipActions(doc, selection));
+  const actions = $derived(barActions(doc, selection, extra));
 </script>
 
 {#if actions.length}

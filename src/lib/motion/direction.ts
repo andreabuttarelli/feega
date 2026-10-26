@@ -1,25 +1,25 @@
-import { COMPONENTS, TrackKind, type ComponentId } from './components';
-import { clipsOf, type MotionDoc } from './doc';
-import { DEVICE, Device } from './devices';
+import { COMPONENTS, TrackKind, type ComponentId } from '@feega/motion-core/motion/components';
+import { clipsOf, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { DEVICE, Device } from '@feega/motion-core/motion/devices';
 import { Forbidden, STYLES, Script, styleOf, styleProblems } from './style';
-import { MotionStyle } from './style-model';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
 import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
-import { sampleTrack } from './sample-track';
+import { sampleTrack } from '@feega/motion-core/motion/sample-track';
 import { cursorClicks, cursorMisses, reelMisses, TARGET_SEPARATOR } from './clicks';
 import { emptyContent, interactionOf, isUiPiece, Interaction, skeletons } from './ui-kit/content';
-import { FillKind, ShapeKind } from './shape/schema';
+import { FillKind, ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { CutFault, cutProblems } from './cuts';
 import { scriptDrift } from './script-drift';
 import { contentEnd, shownSpans, type Span } from './fit-duration';
 import { liveNote, stillStandIns } from './custom/determinism';
 import { maskAt } from './ui-focus';
-import { MaskKind } from './mask';
-import { pivotBox } from './parent';
+import { MaskKind } from '@feega/motion-core/motion/mask';
+import { pivotBox } from '@feega/motion-core/motion/parent';
 import { LookMiss, lookProblems } from './reference-look';
 import { VECTOR_TOKEN } from './vector-ui/piece';
 import { structureOf } from './ui-kit/anchors';
-import { junctionProblem } from './junctions';
-import { EffectKind } from './effects/registry';
+import { junctionProblem } from '@feega/motion-core/motion/junctions';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { SHOTS, SHOT_IDS, ShotId } from './shots/library';
 import { vectorOf } from './shots/ops';
 import { FILL_MIN, showsUi, uiCoverage } from './shots/coverage';
@@ -150,6 +150,12 @@ export const severityOf = (p: QualityProblem) => SEVERITY[p.effect ?? p.kind];
 
 export const blocking = (problems: readonly QualityProblem[]) => problems.filter((p) => severityOf(p) === Severity.Blocking);
 
+export const SHORT_FILM_S = 15;
+
+const FILM_SCALE: ReadonlySet<Check> = new Set([Quality.Silent, Quality.NoScript, Quality.ScriptDrift, Quality.OneScreen, Quality.LittleUi, Quality.NoProductUi, Forbidden.MissingStoryBeat]);
+
+export const blockingFor = (problems: readonly QualityProblem[], seconds: number) => blocking(problems).filter((p) => seconds >= SHORT_FILM_S || !FILM_SCALE.has(p.effect ?? p.kind));
+
 export type FrameStat = { time: number; luma: number; lumaStd: number; whiteShare: number };
 
 const SCENE_JOIN_S = 0.5;
@@ -180,7 +186,9 @@ const side = (x: number) => (x < LEFT ? 'L' : x > RIGHT ? 'R' : 'C');
 
 const templateOf = (doc: MotionDoc, clip: Clip) => doc.comps[String(clip.props.comp)]?.template?.id;
 
-const role = (doc: MotionDoc, clip: Clip) => (MEDIA.has(clip.component) ? 'media' : (templateOf(doc, clip) ?? clip.component));
+const componentRole = (clip: Clip) => (clip.component === 'Custom' ? `Custom:${String(clip.props.name ?? '')}` : clip.component);
+
+const role = (doc: MotionDoc, clip: Clip) => (MEDIA.has(clip.component) ? 'media' : (templateOf(doc, clip) ?? componentRole(clip)));
 
 function scenes(doc: MotionDoc): Clip[][] {
   const join = SCENE_JOIN_S * doc.fps;

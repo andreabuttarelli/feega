@@ -1,4 +1,4 @@
-import { ENGINE_GLOBAL, engineScript, motionEngine, type MotionEngine } from './engine';
+import { ENGINE_GLOBAL, engineScript, motionEngine, type MotionEngine } from '@feega/motion-core/motion/engine/engine';
 
 export type TestTimeline = Record<string, (...args: unknown[]) => unknown>;
 

@@ -1,10 +1,10 @@
-import { Ease } from '../design';
-import { findClip, type MotionDoc } from '../doc';
-import { setKeyframes, setProps, type OpResult } from '../timeline';
-import { pathData } from './geometry';
-import type { ModifierKind } from './modifiers';
-import { baseOutline, type ShapeLook } from './render';
-import { MAX_MODIFIERS, MAX_MORPHS, MODIFIER_PREFIX, ShapeKind, type Modifier } from './schema';
+import { Ease } from '@feega/motion-core/motion/design';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setKeyframes, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { pathData } from '@feega/motion-core/motion/shape/geometry';
+import type { ModifierKind } from '@feega/motion-core/motion/shape/modifiers';
+import { baseOutline, type ShapeLook } from '@feega/motion-core/motion/shape/render';
+import { MAX_MODIFIERS, MAX_MORPHS, MODIFIER_PREFIX, ShapeKind, type Modifier } from '@feega/motion-core/motion/shape/schema';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 const UNIT_BOX = { w: 1, h: 1 };
@@ -52,6 +52,28 @@ export function morphTo(doc: MotionDoc, clipId: string, target: MorphTarget): Op
 }
 
 const MORPH_SECONDS = 1;
+
+function outlineOf(props: Record<string, unknown>): string {
+  const look = props as unknown as ShapeLook;
+  return shapePath({ shape: look.shape, roundness: look.roundness, sides: look.sides, points: look.points, innerRadius: look.innerRadius, path: look.path });
+}
+
+export function morphToClip(doc: MotionDoc, clipId: string, otherId: string, frame: number): OpResult {
+  if (clipId === otherId) {
+    return fail('a shape cannot morph into itself');
+  }
+  const other = shapeProps(doc, otherId);
+  if (typeof other === 'string') {
+    return fail(other);
+  }
+  const clip = findClip(doc, clipId)?.clip;
+  if (!clip) {
+    return fail(`no clip ${clipId}`);
+  }
+  const last = clip.durationInFrames - 1;
+  const from = Math.min(Math.max(frame - clip.from, 0), Math.max(last - 1, 0));
+  return morphTo(doc, clipId, { path: outlineOf(other), from, to: Math.min(from + MORPH_SECONDS * doc.fps, last) });
+}
 
 export function morphHere(doc: MotionDoc, clipId: string, kind: ShapeKind, frame: number): OpResult {
   const clip = findClip(doc, clipId)?.clip;

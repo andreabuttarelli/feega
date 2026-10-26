@@ -2,8 +2,10 @@ import { effectiveModel } from './default-models';
 import { creditsForLoop, creditsForRun, textOutputTokens, tokenCount, type RunCostInput } from './gen-cost';
 import { blockedReason, canStartRun } from './gen-history';
 import { promptTooLong, runStateOf, type GenMedium, type GenNode, type GenParams, type ModelChoice } from './gen-node';
+import { AUTO_ROUTE, PROVIDER_PARAM } from './model-routes';
 import { imageStepCredits } from './model3d-run';
 import { model3dParamsOf } from '$lib/model3d-models';
+import { effectiveVariants, variantCountsFor, variantsCredits, variantsIntoOf, type RememberedVariants, type VariantInto } from './variants';
 
 export const TOO_LONG_REASON = 'Prompt troppo lungo';
 
@@ -17,11 +19,15 @@ export type RunQuoteInput = {
   estimatedTextOutputTokens?: number;
   hasUpstreamImage?: boolean;
   imageChoices?: ModelChoice[];
+  remembered?: RememberedVariants | null;
 };
+
+export type VariantsQuote = { count: number; into: VariantInto; counts: number[] };
 
 export type RunQuote = {
   label: 'Generate' | 'Redo';
   credits: number | null;
+  variants: VariantsQuote | null;
   variable: boolean;
   enabled: boolean;
   reason: string | null;
@@ -89,9 +95,15 @@ export function runQuoteOf(input: RunQuoteInput): RunQuote {
     enhanceUnitCredits: input.enhanceUnitCredits
   };
 
+  const counts = variantCountsFor(node.medium, choice);
+  const remembered = input.remembered ?? null;
+  const count = effectiveVariants(node.medium, node.params, remembered, choice);
+  const variants = counts.length > 1 ? { count, into: variantsIntoOf(node.params, remembered), counts } : null;
+
   return {
     label: runStateOf(node, upstream) === 'done' ? 'Redo' : 'Generate',
-    credits: input.variableTextInput ? null : creditsOf(input, cost),
+    credits: input.variableTextInput ? null : variantsCredits(creditsOf(input, cost), count),
+    variants,
     variable: Boolean(priced?.variableCredits),
     enabled: canStartRun(node, choices, upstream) && !tooLong,
     reason: tooLong && choice?.maxPromptChars ? TOO_LONG_REASON : blockedReason(node, choices, upstream),
@@ -101,6 +113,30 @@ export function runQuoteOf(input: RunQuoteInput): RunQuote {
   };
 }
 
+export function runLabelOf(quote: Pick<RunQuote, 'label' | 'variants'>): string {
+  return quote.variants && quote.variants.count > 1 ? `${quote.label} ×${quote.variants.count}` : quote.label;
+}
+
 export function loopCreditsOf(quote: RunQuote, count: number, variableTextInput = false): number | null {
   return variableTextInput ? null : creditsForLoop(quote.cost, count);
+}
+
+export type ProviderQuote = { provider: string; label: string; credits: number | null; cheapest: boolean; selected: boolean };
+
+export function providerQuotesOf(input: RunQuoteInput): ProviderQuote[] {
+  const routes = runQuoteOf(input).choice?.routes ?? [];
+  const chosen = input.node.params.provider ?? AUTO_ROUTE;
+  const quotes = routes.map((route) => ({
+    provider: route.provider,
+    label: route.label,
+    credits: runQuoteOf({ ...input, node: { ...input.node, params: { ...input.node.params, [PROVIDER_PARAM]: route.provider } } }).credits,
+    cheapest: false,
+    selected: route.provider === chosen
+  }));
+  const direct = quotes.filter((quote) => quote.provider !== AUTO_ROUTE);
+  if (direct.length < 2) {
+    return [];
+  }
+  const prices = direct.flatMap((quote) => (quote.credits === null ? [] : [quote.credits]));
+  return quotes.map((quote) => ({ ...quote, cheapest: quote.provider !== AUTO_ROUTE && quote.credits !== null && quote.credits === Math.min(...prices) }));
 }

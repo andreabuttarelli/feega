@@ -12,7 +12,7 @@ const PRECISION = 100;
 const STROKE_PX_FIELDS = { width_px: 'width', dash_px: 'dash', gap_px: 'gap' } as const;
 
 export const PX_FIELDS_GUIDE =
-  'Px fields: left/top place the top-left corner of the box in px (instead of x/y, its centre); radius is the corner radius in px (instead of roundness); each stroke takes width_px, dash_px, gap_px in px (instead of fractions of the short side). Reads give box {left, top, width, height}, radius and strokes_px in px next to the stored props.';
+  'Px fields: left/top place the top-left corner of the box in px (instead of x/y, its centre); radius is the corner radius in px (instead of roundness); each stroke takes width_px, dash_px, gap_px and pattern_px (Figma dash array: dash, gap, dash, gap...) in px (instead of fractions of the short side). Reads give box {left, top, width, height}, radius and strokes_px in px next to the stored props.';
 
 const tidy = (n: number) => Math.round(n * PRECISION) / PRECISION;
 const shortSide = (frame: Frame) => Math.min(frame.width, frame.height);
@@ -31,6 +31,10 @@ function strokeFromPx(stroke: unknown, frame: Frame): unknown {
     out[key] = value / shortSide(frame);
     delete out[field];
   }
+  if (Array.isArray(out.pattern_px)) {
+    out.pattern = out.pattern_px.map((d) => Number(d) / shortSide(frame));
+    delete out.pattern_px;
+  }
   return out;
 }
 
@@ -38,7 +42,11 @@ export function strokesFromPx(strokes: unknown, frame: Frame): unknown {
   return Array.isArray(strokes) ? strokes.map((s) => strokeFromPx(s, frame)) : strokes;
 }
 
-export function propsFromPx(props: Props, shownBefore: Props, frame: Frame): Props {
+const NONE_OWNED: ReadonlySet<string> = new Set();
+
+export function propsFromPx(given: Props, shownBefore: Props, frame: Frame, owned = NONE_OWNED): Props {
+  const kept = Object.fromEntries(Object.entries(given).filter(([key]) => owned.has(key)));
+  const props = Object.fromEntries(Object.entries(given).filter(([key]) => !owned.has(key)));
   const { left, top, radius, ...rest } = props;
   const width = num(rest.width) ?? num(shownBefore.width) ?? 0;
   const height = num(rest.height) ?? num(shownBefore.height) ?? 0;
@@ -57,7 +65,7 @@ export function propsFromPx(props: Props, shownBefore: Props, frame: Frame): Pro
   if (rest.strokes !== undefined) {
     out.strokes = strokesFromPx(rest.strokes, frame);
   }
-  return out;
+  return { ...out, ...kept };
 }
 
 function boxOf(stored: Props, frame: Frame): PxBox | null {

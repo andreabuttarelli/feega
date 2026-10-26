@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from './brand';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
-import { composeHtml } from './hyperframes/compose';
-import { addClip, type OpResult } from './timeline';
-import { setClipFlags } from './organize';
-import { pathData, rectOutline } from './shape/geometry';
-import { COMPONENTS } from './components';
-import { shapeMarkup, type ShapeLook } from './shape/render';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { setClipFlags } from '@feega/motion-core/motion/organize';
+import { pathData, rectOutline } from '@feega/motion-core/motion/shape/geometry';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { shapeMarkup, type ShapeLook } from '@feega/motion-core/motion/shape/render';
 import { Flip, flipClips, flipPatch } from './layer-props';
 
 function must(r: OpResult): MotionDoc {

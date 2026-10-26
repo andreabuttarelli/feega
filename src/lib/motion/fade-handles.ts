@@ -1,6 +1,6 @@
-import type { ComponentId } from './components';
-import { findClip, type MotionClip, type MotionDoc } from './doc';
-import { setProps, type OpResult } from './timeline';
+import type { ComponentId } from '@feega/motion-core/motion/components';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum FadeEdge {
   In = 'fadeIn',

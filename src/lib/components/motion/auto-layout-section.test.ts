@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { Justify } from '$lib/motion/layout/auto-layout';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Align, Direction, Justify, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
 import { setAutoLayout, wrapInAutoLayout } from '$lib/motion/layout/ops';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import AutoLayoutSection from './AutoLayoutSection.svelte';
 
 
@@ -40,6 +40,13 @@ describe('the auto layout section', () => {
     expect(html(must(setAutoLayout(row, 'box', { justify: Justify.SpaceBetween })), 'box')).toMatch(/aria-pressed="true"[^>]*data-testid="auto-layout-space-between"|data-testid="auto-layout-space-between"[^>]*aria-pressed="true"/);
   });
 
+  it.each([
+    [Justify.SpaceAround, 'auto-layout-space-around'],
+    [Justify.SpaceEvenly, 'auto-layout-space-evenly']
+  ])('marks %s as pressed', (justify, testid) => {
+    expect(html(must(setAutoLayout(row, 'box', { justify })), 'box')).toMatch(new RegExp(`aria-pressed="true"[^>]*data-testid="${testid}"|data-testid="${testid}"[^>]*aria-pressed="true"`));
+  });
+
   it('a child offers fill, absolute, reorder and leaving', () => {
     const body = html(row, 'a');
     expect(body).toContain('>Fill<');
@@ -74,3 +81,31 @@ describe('the auto layout section', () => {
     expect(body).not.toContain('Width sizing');
   });
 });
+
+describe('grid fields', () => {
+  const grid = must(setAutoLayout(row, 'box', { direction: Direction.Grid, columnTracks: [{ type: TrackType.Fixed, value: 120 }, { type: TrackType.Hug, value: 0 }] }));
+
+  it('a grid shows its tracks and auto flow', () => {
+    const body = html(grid, 'box');
+    expect(body).toMatch(/data-testid="auto-layout-column-tracks"[^>]*value="120 hug"|value="120 hug"[^>]*data-testid="auto-layout-column-tracks"/);
+    for (const id of ['auto-layout-row-tracks', 'auto-layout-auto-flow']) {
+      expect(body).toContain(`data-testid="${id}"`);
+    }
+  });
+
+  it('a grid child shows spans and cell alignment', () => {
+    const body = html(grid, 'a');
+    for (const id of ['auto-layout-column-span', 'auto-layout-row-span', 'auto-layout-cell-x', 'auto-layout-cell-y']) {
+      expect(body).toContain(`data-testid="${id}"`);
+    }
+    expect(html(row, 'a')).not.toContain('auto-layout-column-span');
+  });
+});
+
+describe('baseline', () => {
+  it('a row offers baseline alignment and marks it', () => {
+    expect(html(must(setAutoLayout(row, 'box', { align: Align.Baseline })), 'box')).toMatch(/aria-pressed="true"[^>]*data-testid="auto-layout-baseline"|data-testid="auto-layout-baseline"[^>]*aria-pressed="true"/);
+    expect(html(must(setAutoLayout(row, 'box', { direction: Direction.Vertical })), 'box')).not.toContain('auto-layout-baseline');
+  });
+});
+

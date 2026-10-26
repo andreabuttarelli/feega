@@ -1,8 +1,8 @@
-import { newClip, type MotionDoc } from './doc';
-import { TrackKind } from './components';
-import { Space } from './camera';
+import { newClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { Space } from '@feega/motion-core/motion/camera';
 import { writeComponent } from './custom/ops';
-import type { OpResult } from './timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { anchorBox, anchorsOf, placeOf, startOf, CURSOR_PIECE, TARGET_SEPARATOR } from './clicks';
 import { UI_KIT, UiKind } from './ui-kit/kit';
 

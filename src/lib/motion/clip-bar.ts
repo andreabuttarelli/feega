@@ -1,6 +1,6 @@
-import { findClip, type MotionDoc } from './doc';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Action, type ActionId } from './actions';
-import { clipName } from './organize';
+import { clipName } from '@feega/motion-core/motion/organize';
 
 const PRECOMP = 'Precomp';
 
@@ -9,7 +9,7 @@ export enum PickMode {
   Many = 'many'
 }
 
-const BASE: ActionId[] = [Action.Split, Action.Duplicate, Action.Delete];
+const BASE: ActionId[] = [Action.Split, Action.Duplicate, Action.Delete, Action.FlipHorizontal, Action.FlipVertical];
 const TAIL: ActionId[] = [Action.ParentTo, Action.SelectSeveral, Action.ClipProperties];
 
 const isPrecomp = (doc: MotionDoc, id: string) => findClip(doc, id)?.clip.component === PRECOMP;
@@ -21,6 +21,8 @@ export function clipActions(doc: MotionDoc, selection: readonly string[]): Actio
   const open = selection.length === 1 && isPrecomp(doc, selection[0]) ? [Action.OpenComp] : [];
   return [...BASE, ...open, ...TAIL];
 }
+
+export const barActions = (doc: MotionDoc, selection: readonly string[], extra: readonly ActionId[]): ActionId[] => [...new Set([...clipActions(doc, selection), ...extra])];
 
 export type ParentChoice = { id: string | null; name: string };
 

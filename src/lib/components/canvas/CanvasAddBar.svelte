@@ -3,16 +3,18 @@
   import { localStore } from '$lib/browser-storage';
   import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
+  import Cloud from '@lucide/svelte/icons/cloud';
+    import MessageCircle from '@lucide/svelte/icons/message-circle';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
+  import Film from '@lucide/svelte/icons/film';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
   import Hash from '@lucide/svelte/icons/hash';
-  import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barHidden, barKeys, barLift, barShift, barShown, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
+  import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
   import PenTool from '@lucide/svelte/icons/pen-tool';
   import Sparkles from '@lucide/svelte/icons/sparkles';
-  import { KEY_REGION_ATTR } from '$lib/canvas/key-region.svelte';
-  import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
+  import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { Command } from '$lib/motion/shortcuts';
   import { ACTIONS, tipText } from '$lib/motion/actions';
@@ -20,8 +22,6 @@
   import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
-  import { page } from '$app/state';
-  import { SOCIAL_PUBLISHING_SURFACE, visibleUnder } from '$lib/social-publishing';
   import { MOBILE_QUERY } from '$lib/breakpoints';
   import { PhoneSheetKind, phoneSheets } from '$lib/canvas/phone-sheets.svelte';
   import PhoneSheet from './PhoneSheet.svelte';
@@ -29,22 +29,44 @@
   let {
     onpick,
     onupload,
+    oncloud,
     ontemplate,
+    techniques = [],
+    ontechnique,
     onframes,
+    ontrailer,
+    onimage,
+    onframelibrary,
+    oncomment,
+    commenting = false,
     context = BarContext.Canvas,
     zoom
-  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; context?: BarContext; zoom?: number } = $props();
+  }: {
+    onpick?: (what: Addable) => void;
+    onupload?: (file: File) => void;
+    oncloud?: () => void;
+    ontemplate?: (id: string) => void;
+    techniques?: { id: string; name: string; nodes: number }[];
+    ontechnique?: (id: string) => void;
+    onframes?: () => void;
+    ontrailer?: () => void;
+    onimage?: (file: File) => void;
+    onframelibrary?: () => void;
+    oncomment?: () => void;
+    commenting?: boolean;
+    context?: BarContext;
+    zoom?: number;
+  } = $props();
 
   const PERCENT = 100;
   const SWITCH_PX = 64;
-  const FRAME_TABS_PX = 56;
 
   let barEl = $state<HTMLElement | null>(null);
   let timelinePx = $state(0);
   $effect(() => {
     const timeline = frameBar.timeline;
     const host = barEl?.parentElement;
-    if (!frameBar.host || !host) {
+    if (!host) {
       timelinePx = 0;
       return;
     }
@@ -64,6 +86,11 @@
     showMore = false;
     showTemplates = false;
   });
+
+  function pickTechnique(id: string) {
+    showTemplates = false;
+    ontechnique?.(id);
+  }
 
   function pickTemplate(id: string) {
     showTemplates = false;
@@ -89,12 +116,33 @@
     input.value = '';
   }
 
+  let imageInput = $state<HTMLInputElement | null>(null);
+
+  function pickImage() {
+    imageInput?.click();
+  }
+
+  function imageChosen(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) {
+      onimage?.(file);
+    }
+    input.value = '';
+  }
+
   const TOOL_COMMAND: Record<Exclude<DrawTool, DrawTool.Frame>, Command> = {
     [DrawTool.Select]: Command.ToolSelect,
     [DrawTool.Text]: Command.ToolText,
     [DrawTool.Rectangle]: Command.ToolRectangle,
     [DrawTool.Ellipse]: Command.ToolEllipse,
-    [DrawTool.Pen]: Command.ToolPen
+    [DrawTool.Polygon]: Command.ToolPolygon,
+    [DrawTool.Star]: Command.ToolStar,
+    [DrawTool.Line]: Command.ToolLine,
+    [DrawTool.Arrow]: Command.ToolArrow,
+    [DrawTool.Pen]: Command.ToolPen,
+    [DrawTool.Pencil]: Command.ToolPencil,
+    [DrawTool.ShapeBuilder]: Command.ToolShapeBuilder
   };
 
   const SHAPE_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
@@ -102,7 +150,7 @@
     return { tool, name: tip.name, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[command].icon };
   });
   const FRAME_TOOL = { tool: DrawTool.Frame, name: 'Frame', label: 'Frame', icon: Hash };
-  const DRAW_TOOLS = $derived(context === BarContext.Canvas ? [...SHAPE_TOOLS, FRAME_TOOL] : SHAPE_TOOLS);
+  const DRAW_TOOLS = [...SHAPE_TOOLS, FRAME_TOOL];
 
   let drawOpen = $state(false);
 
@@ -154,25 +202,30 @@
   const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], icon: ADDABLE_ICON[what], run: () => onpick?.(what) });
   const drawTiles = $derived(DRAW_TOOLS.filter((t) => t.tool !== DrawTool.Select).map((t) => ({ id: `draw-${t.tool}`, label: t.name, icon: t.icon, run: () => (frameBar.tool = t.tool) })));
   const UPLOAD_TILE: Tile = { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile };
+  const cloudTiles = (): Tile[] => (oncloud ? [{ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: oncloud }] : []);
+  const TRAILER_LABEL = 'Start from the feega trailer';
+  const trailerTiles = $derived<Tile[]>(ontrailer ? [{ id: 'feega-trailer', label: TRAILER_LABEL, icon: Film, run: ontrailer }] : []);
+
+  const IMAGE_TILE: Tile = { id: 'image', label: 'Insert image', icon: ImagePlus, run: pickImage };
+  const frameLibraryTile = (): Tile[] => (onframelibrary ? [{ id: 'frame-library', label: 'Templates for this frame', icon: LayoutTemplate, run: onframelibrary }] : []);
+
+  const canvasSections = (): Section[] => [
+    { title: 'Design', tiles: drawTiles },
+    { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].map(addTile) },
+    { title: 'Media', tiles: [UPLOAD_TILE, ...cloudTiles()] },
+    {
+      title: 'Templates',
+      tiles: [
+        ...(ontemplate ? [{ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }] : []),
+        ...(onframes ? [{ id: 'frame-templates', label: 'Frame templates', icon: Clapperboard, run: onframes }] : []),
+        ...trailerTiles
+      ]
+    }
+  ];
 
   const INSERT_SECTIONS: Record<BarContext, () => Section[]> = {
-    [BarContext.Canvas]: () => [
-      { title: 'Design', tiles: drawTiles },
-      { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...visibleUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.addable, CANVAS_BAR_MORE)].map(addTile) },
-      { title: 'Media', tiles: [UPLOAD_TILE] },
-      {
-        title: 'Templates',
-        tiles: [
-          ...(ontemplate ? [{ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }] : []),
-          ...(onframes ? [{ id: 'frame-templates', label: 'Frame templates', icon: Clapperboard, run: onframes }] : [])
-        ]
-      }
-    ],
-    [BarContext.Frame]: () => [
-      { title: 'Design', tiles: drawTiles },
-      { title: 'Media', tiles: [{ id: 'image', label: 'Insert image', icon: ImagePlus, run: () => frameBar.host?.act(FrameAction.Image) }] },
-      { title: 'Templates', tiles: [{ id: 'frame-library', label: 'Frame templates', icon: LayoutTemplate, run: () => frameBar.host?.act(FrameAction.Library) }] }
-    ]
+    [BarContext.Canvas]: canvasSections,
+    [BarContext.Frame]: () => [...canvasSections(), { title: 'Frame', tiles: [IMAGE_TILE, ...frameLibraryTile()] }]
   };
   const insertSections = $derived(INSERT_SECTIONS[context]().filter((section) => section.tiles.length));
 
@@ -186,6 +239,7 @@
     [BarSlot.Select]: selectSlot,
     [BarSlot.Generate]: nodesSlot,
     [BarSlot.Upload]: uploadSlot,
+    [BarSlot.Comment]: commentSlot,
     [BarSlot.More]: moreSlot,
     [BarSlot.Templates]: templatesSlot,
     [BarSlot.FrameTemplates]: frameTemplatesSlot,
@@ -214,6 +268,17 @@
   </span>
 {/snippet}
 
+{#snippet commentSlot()}
+  {#if oncomment}
+    <span class="tool">
+      <button type="button" class="pick" class:on={commenting} aria-pressed={commenting} title="Comment (C)" aria-label="Comment" data-testid="comment-mode" onclick={oncomment}>
+        <MessageCircle size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Comment (C)</span>
+    </span>
+  {/if}
+{/snippet}
+
 {#snippet uploadSlot()}
   <span class="tool">
     <button type="button" title="Upload file" aria-label="Upload file" onclick={pickFile}>
@@ -221,6 +286,14 @@
     </button>
     <span class="add-tip" role="tooltip">Upload file</span>
   </span>
+  {#if oncloud}
+    <span class="tool">
+      <button type="button" title="Import from Drive or Dropbox" aria-label="Import from Drive or Dropbox" data-testid="cloud-import" onclick={oncloud}>
+        <Cloud size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Drive / Dropbox</span>
+    </span>
+  {/if}
 {/snippet}
 
 {#snippet nodesSlot()}
@@ -291,6 +364,18 @@
       <span class="add-tip" role="tooltip">Frame templates</span>
     </span>
   {/if}
+  {@render trailerSlot()}
+{/snippet}
+
+{#snippet trailerSlot()}
+  {#if ontrailer}
+    <span class="tool">
+      <button type="button" class="keys-toggle" title={TRAILER_LABEL} aria-label={TRAILER_LABEL} data-testid="feega-trailer" onclick={ontrailer}>
+        <Film size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">{TRAILER_LABEL}</span>
+    </span>
+  {/if}
 {/snippet}
 
 {#snippet drawSlot()}
@@ -308,7 +393,7 @@
 
 {#snippet imageSlot()}
   <span class="tool">
-    <button type="button" class="keys-toggle" title="Insert image" aria-label="Insert image" data-testid="frame-image" onclick={() => frameBar.host?.act(FrameAction.Image)}>
+    <button type="button" class="keys-toggle" title="Insert image" aria-label="Insert image" data-testid="frame-image" onclick={pickImage}>
       <ImagePlus size={17} strokeWidth={1.7} />
     </button>
     <span class="add-tip" role="tooltip">Insert image</span>
@@ -316,38 +401,41 @@
 {/snippet}
 
 {#snippet frameLibrarySlot()}
-  <span class="tool">
-    <button type="button" class="keys-toggle" title="Frame templates" aria-label="Frame templates" data-testid="frame-library" onclick={() => frameBar.host?.act(FrameAction.Library)}>
-      <LayoutTemplate size={17} strokeWidth={1.7} />
-    </button>
-    <span class="add-tip" role="tooltip">Frame templates</span>
-  </span>
+  {#if onframelibrary}
+    <span class="tool">
+      <button type="button" class="keys-toggle" title="Templates for this frame" aria-label="Templates for this frame" data-testid="frame-library" onclick={onframelibrary}>
+        <LayoutTemplate size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Templates for this frame</span>
+    </span>
+  {/if}
 {/snippet}
 
-<div bind:this={barEl} class="add-bar" class:phone class:covered={barHidden(context, frameBar.covered)} class:stowed={!barShown(context, frameBar.editMode)} aria-hidden={!barShown(context, frameBar.editMode)} inert={!barShown(context, frameBar.editMode)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
+<div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" style:--lift={`${timelinePx}px`}>
   {#key `${context}:${mode}`}
     <div class="group" data-testid={`bar-${context}`}>
       {#each barSlots(context, mode) as s (s)}{@render SLOT[s]()}{/each}
     </div>
   {/key}
-  {#if zoom !== undefined && context === BarContext.Canvas}
+  {#if zoom !== undefined}
     <span class="zoom" data-testid="canvas-zoom" title="Zoom · 0 fits the canvas">{Math.round(zoom * PERCENT)}%</span>
   {/if}
+  <input bind:this={imageInput} type="file" class="sr-only" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" data-testid="frame-image-input" onchange={imageChosen} />
   <input
     bind:this={fileInput}
     type="file"
     class="sr-only"
-    accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,text/html,text/csv,text/plain,text/markdown,.xml,.rss,.atom,.ipynb,.ttf,.otf,.woff,.woff2"
+    accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml,.svg,video/mp4,video/webm,video/quicktime,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,text/html,text/csv,text/plain,text/markdown,.xml,.rss,.atom,.ipynb,.ttf,.otf,.woff,.woff2"
     onchange={fileChosen}
   />
 
   {#if ontemplate}
-    <CanvasTemplateGallery bind:open={showTemplates} onpick={pickTemplate} />
+    <CanvasTemplateGallery bind:open={showTemplates} onpick={pickTemplate} {techniques} onpicktechnique={ontechnique ? pickTechnique : undefined} />
   {/if}
 
   {#if showMore}
     <div class="more">
-      {#each visibleUnder(page.data.socialPublishing, SOCIAL_PUBLISHING_SURFACE.addable, CANVAS_BAR_MORE) as what (what)}
+      {#each CANVAS_BAR_MORE as what (what)}
         {@const Icon = ADDABLE_ICON[what]}
         <button
           type="button"
@@ -367,7 +455,7 @@
 </div>
 
 {#if phone}
-  <PhoneSheet name="insert" title="Insert" open={phoneSheets.shown === PhoneSheetKind.Insert} onclose={() => phoneSheets.close(PhoneSheetKind.Insert)} floorPx={context === BarContext.Frame ? FRAME_TABS_PX : SWITCH_PX} testid="insert-sheet">
+  <PhoneSheet name="insert" title="Insert" open={phoneSheets.shown === PhoneSheetKind.Insert} onclose={() => phoneSheets.close(PhoneSheetKind.Insert)} floorPx={SWITCH_PX} testid="insert-sheet">
     {#each insertSections as section (section.title)}
       <h4 class="insert-head">{section.title}</h4>
       <div class="insert-grid">
@@ -419,20 +507,11 @@
     background: var(--ui-pressed);
   }
 
-  .add-bar.covered {
-    visibility: hidden;
-  }
-
-  .add-bar.stowed {
-    opacity: 0;
-    pointer-events: none;
-  }
-
   .add-bar {
     position: absolute;
     z-index: 61;
     bottom: var(--lift, 0px);
-    left: calc(50% - var(--shift, 0px));
+    left: 50%;
     transform: translateX(-50%);
     transition: bottom var(--chrome-move) var(--ease-expo), left var(--chrome-move) var(--ease-expo), opacity var(--chrome-move) var(--ease-expo), translate var(--chrome-move) var(--ease-expo);
     display: flex;

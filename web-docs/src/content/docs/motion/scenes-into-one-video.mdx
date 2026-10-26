@@ -1,0 +1,23 @@
+---
+title: Scenes into one video
+description: Combine several frames into one video.
+sidebar:
+  order: 3
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="combine-scenes" caption="Combine scenes into one video." />
+
+Select two or more frames and pick **Combine into video**. They play in order, left to right, and export as one video. Editing a scene updates the video.
+
+In Properties, a combined video lists its scenes:
+
+- Drag to reorder.
+- Set each scene's length.
+- Pick a transition between scenes.
+- Insert any frame as a new scene.
+
+Embeds and share links of a combined video play every scene.
+
+Storyboards (CLI `feega motion storyboard`, MCP `get_storyboard`, `write_storyboard`, `edit_storyboard_card`) are the agent-side way to plan scenes.

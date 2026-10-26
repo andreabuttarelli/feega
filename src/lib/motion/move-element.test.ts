@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
-import { addClip, setKeyframes, setTransform } from './timeline';
-import { Ease } from './design';
-import { DocMode, docMode, setStill } from './still';
-import { copyElements, frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, pasteElements, placeElement, OutputKind } from './move-element';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, setTransform } from '@feega/motion-core/motion/timeline';
+import { Ease } from '@feega/motion-core/motion/design';
+import { DocMode, docMode, setStill } from '@feega/motion-core/motion/still';
+import { copyElements, frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, pasteElements, placeElement, pasteOverElements, replaceElements, OutputKind } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const VIDEO_ID = '99999999-2222-4333-8444-555555555555';
@@ -178,12 +178,22 @@ describe('a new frame made of one element', () => {
   });
 
   it('a generated picture makes a frame its own size, within the limits', () => {
-    const element = mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'gen', width: 3000, height: 2000 });
+    const element = mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'gen', width: 6000, height: 4000 });
 
     const doc = frameOf(element, DocMode.Still, null, ids());
 
-    expect({ width: doc.width, height: doc.height }).toEqual({ width: 1620, height: 1080 });
+    expect({ width: doc.width, height: doc.height }).toEqual({ width: 3240, height: 2160 });
     expect(doc.tracks[0].clips[0].props).toMatchObject({ assetId: IMAGE_ID, width: 1, height: 1 });
+  });
+});
+
+describe('a picture inserted into a frame', () => {
+  it('spans the whole frame from time 0', () => {
+    const element = mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'gen' });
+    const doc = must(placeElement(target(), element, { at: { x: 0.5, y: 0.5 }, frame: 0 }, ids()));
+    const clip = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Image')!;
+
+    expect({ from: clip.from, end: clip.from + clip.durationInFrames }).toEqual({ from: 0, end: doc.durationInFrames });
   });
 });
 
@@ -266,5 +276,30 @@ describe('copy and paste of a multi-selection', () => {
 
     expect(pasted.ok && pasted.ids).toHaveLength(2);
     expect(pasted.ok && pasted.ids.map((id) => findClip(pasted.doc, id)!.clip.props.x)).toEqual([0.2, 0.7]);
+  });
+
+  it('paste to replace puts the copy where each selected element was, and removes them', () => {
+    let doc = two();
+    doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'ellipse', x: 0.5, y: 0.3, width: 0.05, height: 0.05 } }, 'dot'));
+    const replaced = replaceElements(doc, ['a', 'b'], copyElements(doc, ['dot']), ids());
+    if (!replaced.ok) throw new Error(replaced.error);
+
+    expect(findClip(replaced.doc, 'a')).toBeNull();
+    expect(findClip(replaced.doc, 'b')).toBeNull();
+    expect(replaced.ids.map((id) => findClip(replaced.doc, id)!.clip.props)).toMatchObject([{ shape: 'ellipse', x: 0.2, y: 0.5 }, { shape: 'ellipse', x: 0.7, y: 0.5 }]);
+    expect(replaceElements(doc, ['a'], [], ids()).ok).toBe(false);
+  });
+
+  it('paste over centres the copy on the selection and keeps the selection', () => {
+    let doc = two();
+    doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'ellipse', x: 0.5, y: 0.3, width: 0.05, height: 0.05 } }, 'dot'));
+    const over = pasteOverElements(doc, ['a'], copyElements(doc, ['dot']), ids());
+    if (!over.ok) throw new Error(over.error);
+
+    expect(findClip(over.doc, 'a')).not.toBeNull();
+    const props = findClip(over.doc, over.ids[0])!.clip.props;
+    expect([props.shape, props.x, props.y]).toEqual(['ellipse', expect.closeTo(0.2), expect.closeTo(0.5)]);
+    expect(pasteOverElements(doc, ['a'], [], ids()).ok).toBe(false);
+    expect(pasteOverElements(doc, [], copyElements(doc, ['dot']), ids()).ok).toBe(false);
   });
 });

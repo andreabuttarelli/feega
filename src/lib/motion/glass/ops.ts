@@ -1,9 +1,9 @@
-import { TrackKind } from '../components';
-import type { MotionDoc } from '../doc';
-import { Ease } from '../design';
-import { setExpression } from '../expression/ops';
-import type { Spring } from '../spring';
-import { addClip, addTrack, moveTrack, setKeyframes, type OpResult } from '../timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
+import type { Spring } from '@feega/motion-core/motion/spring';
+import { addClip, addTrack, moveTrack, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum Lens {
   Glass = 'LiquidGlass',

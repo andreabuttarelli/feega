@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { Align, Direction, Sizing } from './auto-layout';
-import { autoLayoutPatchSchema, layoutItemPatchSchema } from './model';
-import { addAutoLayout, leaveAutoLayout, reorderChild, removeAutoLayout, setAutoLayout, setLayoutItem, wrapInAutoLayout, wrapInFrame } from './ops';
-import { withAutoLayout } from './resolve';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Align, Direction, Sizing, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
+import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
+import { addAutoLayout, leaveAutoLayout, reorderChild, removeAutoLayout, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from './ops';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { layerOrder } from '../siblings';
 
 function must(r: OpResult): MotionDoc {
@@ -23,6 +23,19 @@ const row = (() => {
 })();
 
 const clip = (doc: MotionDoc, id: string) => findClip(doc, id)!.clip;
+
+describe('a new auto layout container', () => {
+  it('counts inside strokes explicitly', () => {
+    expect(clip(must(setAutoLayout(row, 'a', {})), 'a').autoLayout?.strokesIncluded).toBe(true);
+    expect(clip(must(wrapInAutoLayout(row, ['a', 'b'], 'box', 'lane')), 'box').autoLayout?.strokesIncluded).toBe(true);
+  });
+
+  it('keeps the choice of an existing container', () => {
+    const off = must(setAutoLayout(row, 'a', { strokesIncluded: false }));
+
+    expect(clip(must(setAutoLayout(off, 'a', { gap: 4 })), 'a').autoLayout?.strokesIncluded).toBe(false);
+  });
+});
 
 describe('wrapInAutoLayout', () => {
   const wrapped = must(wrapInAutoLayout(row, ['b', 'k', 'a'], 'box', 'lane'));
@@ -120,9 +133,38 @@ describe('editing a container', () => {
   });
 });
 
+describe('grid tracks', () => {
+  const grid = must(setAutoLayout(must(setLayoutItem(must(wrapInAutoLayout(row, ['a', 'b'], 'box', 'lane')), 'box', { width: Sizing.Fixed, height: Sizing.Fixed })), 'box', { direction: Direction.Grid }));
+  const flex = { type: TrackType.Flex, value: 1 };
+
+  it('stores column and row tracks, auto flow and a child cell', () => {
+    const doc = must(setAutoLayout(grid, 'box', { columnTracks: [flex, { type: TrackType.Fixed, value: 40 }], rowTracks: [{ type: TrackType.Hug, value: 0 }] }));
+    expect(clip(doc, 'box').autoLayout!.columnTracks).toHaveLength(2);
+    expect(clip(must(setLayoutItem(doc, 'a', { columnSpan: 2, cellX: Align.End })), 'a').layoutItem).toMatchObject({ columnSpan: 2, cellX: Align.End });
+  });
+
+  it('refuses a flex track on an axis where the grid hugs its content', () => {
+    const hugging = must(setLayoutItem(grid, 'box', { width: Sizing.Hug }));
+    expect(setAutoLayout(hugging, 'box', { columnTracks: [flex] }).ok).toBe(false);
+    expect(setAutoLayout(hugging, 'box', { rowTracks: [flex] }).ok).toBe(true);
+  });
+
+  it('refuses hugging an axis that has a flex track', () => {
+    const tracked = must(setAutoLayout(grid, 'box', { rowTracks: [flex] }));
+    expect(setLayoutItem(tracked, 'box', { height: Sizing.Hug }).ok).toBe(false);
+  });
+
+  it('lays a spanning child across the cells', () => {
+    const doc = must(setLayoutItem(must(setAutoLayout(grid, 'box', { columnTracks: [flex, flex], gap: 0 })), 'a', { width: Sizing.Fill, columnSpan: 2 }));
+    const box = clip(withAutoLayout(doc), 'box').props;
+    expect(clip(withAutoLayout(doc), 'a').props.width).toBeCloseTo(box.width as number, 5);
+  });
+});
+
 describe('the patch schemas', () => {
   it('fill in nothing the caller did not send', () => {
     expect(autoLayoutPatchSchema.parse({ gap: 3 })).toEqual({ gap: 3 });
+    expect(autoLayoutPatchSchema.parse({ gap: -8, justify: 'space-evenly' })).toEqual({ gap: -8, justify: 'space-evenly' });
     expect(layoutItemPatchSchema.parse({})).toEqual({});
   });
 });
@@ -156,6 +198,36 @@ describe('wrapInFrame', () => {
   it('leaves the children where they were', () => {
     expect(clip(framed, 'a').props.x).toBe(0.2);
     expect(clip(framed, 'b').layoutItem).toBeFalsy();
+  });
+});
+
+describe('resizeToFit', () => {
+  const framed = must(wrapInFrame(row, ['a', 'b'], 'box', 'lane'));
+  const moved = { ...framed, tracks: framed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'b' ? { ...c, props: { ...c.props, x: 0.9 } } : c)) })) };
+
+  it('grows the frame to the bounding box of its children', () => {
+    const box = clip(must(resizeToFit(moved, 'box')), 'box').props;
+
+    expect(box.x).toBeCloseTo(0.55, 5);
+    expect(box.width).toBeCloseTo(0.8, 5);
+  });
+
+  it('shrinks the frame to its children', () => {
+    const roomy = { ...framed, tracks: framed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'box' ? { ...c, props: { ...c.props, width: 1, height: 1 } } : c)) })) };
+    const box = clip(must(resizeToFit(roomy, 'box')), 'box').props;
+
+    expect(box.width).toBeCloseTo(0.4, 5);
+    expect(box.height).toBeCloseTo(0.1, 5);
+  });
+
+  it('makes an auto layout hug its children', () => {
+    const laid = must(wrapInAutoLayout(row, ['a', 'b'], 'box', 'lane'));
+
+    expect(clip(must(resizeToFit(laid, 'box')), 'box').layoutItem).toMatchObject({ width: Sizing.Hug, height: Sizing.Hug });
+  });
+
+  it('refuses a clip with no children', () => {
+    expect(resizeToFit(row, 'a').ok).toBe(false);
   });
 });
 

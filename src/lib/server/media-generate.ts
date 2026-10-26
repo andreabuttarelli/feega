@@ -126,10 +126,11 @@ export type GenerateMediaResult =
 async function canvasModelAccepts(
   admin: SupabaseClient,
   medium: 'image' | 'video',
-  model: string
+  model: string,
+  orgId?: string
 ): Promise<boolean> {
   const { offerableModels } = await import('$lib/server/offerable-models');
-  const { choices } = await offerableModels(admin, medium);
+  const { choices } = await offerableModels(admin, medium, undefined, orgId);
   return choices.some((c) => c.id === model);
 }
 
@@ -375,6 +376,7 @@ async function handOverImage(
 export type ImageJob = {
   /** `null` = disegno estemporaneo: nessun brand da leggere, nessuna libreria in cui archiviare. */
   brandId: string | null;
+  orgId?: string;
   userId: string;
   /** Cosa mostrare, oppure — con `baseMediaId` — cosa cambiare. */
   prompt: string;
@@ -505,7 +507,7 @@ async function runImageJob(
   const refining = !!job.baseMediaId;
   if (job.model && job.brandId === null) {
     const { createAdminClient } = await import('$lib/server/supabase-admin');
-    const accepted = await canvasModelAccepts(createAdminClient(), 'image', job.model);
+    const accepted = await canvasModelAccepts(createAdminClient(), 'image', job.model, job.orgId);
     if (!accepted) {
       return { ok: false, error: 'model_not_for_slot', allowed: [] };
     }
@@ -702,7 +704,7 @@ async function startVideo(opts: GenerateMediaOpts): Promise<VideoJobResult> {
   // Stessa distinzione della gemella immagine: il canvas valida contro `offerableModels` (nessun
   // ruolo promesso), lo slot a ruolo resta il cancello dei mestieri sotto un brand.
   if (opts.model && opts.brandId === null) {
-    const accepted = await canvasModelAccepts(admin, 'video', opts.model);
+    const accepted = await canvasModelAccepts(admin, 'video', opts.model, opts.orgId);
     if (!accepted) {
       return { ok: false, error: 'model_not_for_slot', allowed: [] };
     }

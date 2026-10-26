@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip } from './timeline';
-import { parseProps } from './components';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { parseProps } from '@feega/motion-core/motion/components';
 import { Forbidden, HOUSE_DEFAULTS, HOUSE_DEFAULTS_RULE, STYLES, TITLE_TYPE_RULE, styleProblems } from './style';
-import { FontClass, Imagery, SmallText } from './reference-look-model';
+import { FontClass, Imagery, SmallText } from '@feega/motion-core/motion/reference-look-model';
 import { SEVERITY, Severity } from './direction';
-import { MotionStyle } from './style-model';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
 import { BUILTIN_TEMPLATES } from './template/builtins';
 import { insertTemplate } from './template/library';
 

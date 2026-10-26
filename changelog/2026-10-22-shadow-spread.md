@@ -1,0 +1,3 @@
+# Drop shadow: x/y, spread, show behind
+
+Drop shadow gains `x`, `y` (added to distance/angle so old docs render unchanged), `spread` (feMorphology dilate/erode on SourceAlpha) and `behind` (0 cuts the shadow out under the layer, Figma `showShadowBehindNode=false`; default 1 keeps today's look). With spread 0 and behind 1 the plain css `drop-shadow` stays, so existing exports are byte-identical; otherwise an SVG filter built only from primitives the GPU filter graph already runs, so canvas and export match. MCP gets the params through the effect registry. Shadow blend mode not done: an SVG filter cannot see the backdrop.

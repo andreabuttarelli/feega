@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newClip, newMotionDoc, type MotionDoc } from './doc';
+import { MotionFormat, newClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { clickUi } from './cursor-ops';
 import { cursorMisses, CURSOR_PIECE } from './clicks';
-import { Space } from './camera';
+import { Space } from '@feega/motion-core/motion/camera';
 import { writeComponent } from './custom/ops';
 import { UI_KIT, UiKind } from './ui-kit/kit';
 

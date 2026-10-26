@@ -9,6 +9,10 @@ import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 import PenLine from '@lucide/svelte/icons/pen-line';
 import Combine from '@lucide/svelte/icons/combine';
+import ComponentIcon from '@lucide/svelte/icons/component';
+import Unlink from '@lucide/svelte/icons/unlink';
+import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
+import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 import Scaling from '@lucide/svelte/icons/scaling';
 import Grid3x3 from '@lucide/svelte/icons/grid-3x3';
 import VectorSquare from '@lucide/svelte/icons/vector-square';
@@ -27,7 +31,13 @@ import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
 import TypeIcon from '@lucide/svelte/icons/type';
 import SquareIcon from '@lucide/svelte/icons/square';
 import CircleIcon from '@lucide/svelte/icons/circle';
+import TriangleIcon from '@lucide/svelte/icons/triangle';
+import StarIcon from '@lucide/svelte/icons/star';
+import SlashIcon from '@lucide/svelte/icons/slash';
+import MoveUpRight from '@lucide/svelte/icons/move-up-right';
 import PenTool from '@lucide/svelte/icons/pen-tool';
+import Pencil from '@lucide/svelte/icons/pencil';
+import Merge from '@lucide/svelte/icons/merge';
 import PencilRuler from '@lucide/svelte/icons/pencil-ruler';
 import Pause from '@lucide/svelte/icons/pause';
 import Rewind from '@lucide/svelte/icons/rewind';
@@ -65,6 +75,7 @@ import ChevronsDown from '@lucide/svelte/icons/chevrons-down';
 import Maximize2 from '@lucide/svelte/icons/maximize-2';
 import RotateCw from '@lucide/svelte/icons/rotate-cw';
 import Blend from '@lucide/svelte/icons/blend';
+import Crosshair from '@lucide/svelte/icons/crosshair';
 import Diamond from '@lucide/svelte/icons/diamond';
 import ZoomIn from '@lucide/svelte/icons/zoom-in';
 import ZoomOut from '@lucide/svelte/icons/zoom-out';
@@ -94,6 +105,8 @@ import CircleDashed from '@lucide/svelte/icons/circle-dashed';
 import Group from '@lucide/svelte/icons/group';
 import Ungroup from '@lucide/svelte/icons/ungroup';
 import Frame from '@lucide/svelte/icons/frame';
+import Shrink from '@lucide/svelte/icons/shrink';
+import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
 import Columns2 from '@lucide/svelte/icons/columns-2';
 import FolderOpen from '@lucide/svelte/icons/folder-open';
 import CopyCheck from '@lucide/svelte/icons/copy-check';
@@ -105,7 +118,7 @@ import Menu from '@lucide/svelte/icons/menu';
 import Paperclip from '@lucide/svelte/icons/paperclip';
 import Contrast from '@lucide/svelte/icons/contrast';
 import CircleOff from '@lucide/svelte/icons/circle-off';
-import { Command, SHORTCUTS } from './shortcuts';
+import { Command, OPACITY_KEYS, SHORTCUTS } from './shortcuts';
 
 export enum Tool {
   Back = 'back',
@@ -145,7 +158,9 @@ export enum Tool {
   ParentTo = 'parent-to',
   SelectSeveral = 'select-several',
   ClipProperties = 'clip-properties',
-  SampleColour = 'sample-colour'
+  SampleColour = 'sample-colour',
+  LockRatio = 'lock-ratio',
+  UnlockRatio = 'unlock-ratio'
 }
 
 export const Action = { ...Command, ...Tool } as const;
@@ -191,7 +206,10 @@ const DRAG_IN_FRAME = 'Drag it in the frame';
 const PINCH_PREVIEW = 'Pinch the preview';
 const DOUBLE_TAP_PREVIEW = 'Double-tap around the preview';
 
+const OPACITY_ACTIONS = Object.fromEntries(OPACITY_KEYS.map((o) => [o.command, { name: `Opacity ${Math.round(o.opacity * 100)}%`, icon: Blend, group: GuideGroup.Edit, menu: MenuSection.Layer } satisfies ActionSpec])) as Record<(typeof OPACITY_KEYS)[number]['command'], ActionSpec>;
+
 export const ACTIONS: Record<ActionId, ActionSpec> = {
+  ...OPACITY_ACTIONS,
   [Command.TogglePlay]: { name: 'Play / pause', icon: Play, group: GuideGroup.Playback, place: Place.Transport },
   [Command.Play]: { name: 'Play', icon: Play, group: GuideGroup.Playback, place: Place.Transport },
   [Command.Pause]: { name: 'Pause', icon: Pause, group: GuideGroup.Playback, place: Place.Transport },
@@ -212,6 +230,10 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Redo]: { name: 'Redo', icon: Redo, group: GuideGroup.Edit, place: Place.Bar },
   [Command.Copy]: { name: 'Copy', icon: ClipboardCopy, group: GuideGroup.Edit, menu: MenuSection.Keyframes },
   [Command.Paste]: { name: 'Paste', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Keyframes },
+  [Command.SelectSameFill]: { name: 'Select same fill', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.SelectSameStroke]: { name: 'Select same stroke', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.SelectSameFont]: { name: 'Select same font', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.SelectSameEffect]: { name: 'Select same effect', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.SelectMatching]: { name: 'Select matching layers', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.SelectAll]: { name: 'Select all clips', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Deselect]: { name: 'Deselect', icon: X, group: GuideGroup.Edit, gesture: 'Tap an empty lane', menu: MenuSection.Layer },
@@ -223,6 +245,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Group]: { name: 'Group', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Ungroup]: { name: 'Ungroup', icon: Ungroup, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.FrameSelection]: { name: 'Frame selection', icon: Frame, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.ResizeToFit]: { name: 'Resize to fit', icon: Shrink, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.Section]: { name: 'Section selection', icon: LayoutDashboard, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
@@ -246,6 +270,16 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.AlignBottom]: { name: 'Align bottom', icon: AlignEndHorizontal, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.TidyUp]: { name: 'Tidy up', icon: LayoutGrid, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.FlipHorizontal]: { name: 'Flip horizontal', icon: FlipHorizontal2, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.ToggleHidden]: { name: 'Hide / show', icon: EyeOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.ToggleLocked]: { name: 'Lock / unlock', icon: Lock, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.CopyProperties]: { name: 'Copy properties', icon: ClipboardCopy, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.PasteOver]: { name: 'Paste over selection', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.PasteReplace]: { name: 'Paste to replace', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.PasteProperties]: { name: 'Paste properties', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.CreateComponent]: { name: 'Create component', icon: ComponentIcon, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.DetachInstance]: { name: 'Detach instance', icon: Unlink, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.PushInstance]: { name: 'Push overrides to main', icon: ArrowUpToLine, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.ResetInstance]: { name: 'Reset all overrides', icon: RotateCcw, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.FlipVertical]: { name: 'Flip vertical', icon: FlipVertical2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Tool.NullFromSelection]: { name: 'Null parent', icon: CircleDashed, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.StartHere]: { name: 'Move clip to start here', icon: AlignStart, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
@@ -293,10 +327,18 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Tool.ShowLayer]: { name: 'Show layer', icon: EyeOff, place: Place.Layer },
   [Tool.LockLayer]: { name: 'Lock layer', icon: LockOpen, group: GuideGroup.Timeline, place: Place.Layer },
   [Tool.UnlockLayer]: { name: 'Unlock layer', icon: Lock, place: Place.Layer },
+  [Tool.LockRatio]: { name: 'Lock aspect ratio', icon: LockOpen, group: GuideGroup.Edit },
+  [Tool.UnlockRatio]: { name: 'Unlock aspect ratio', icon: Lock },
   [Command.ToolSelect]: { name: 'Select tool', icon: MousePointer2, group: GuideGroup.Edit, place: Place.Draw },
   [Command.ToolText]: { name: 'Text tool', icon: TypeIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
   [Command.ToolRectangle]: { name: 'Rectangle tool', icon: SquareIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
   [Command.ToolEllipse]: { name: 'Ellipse tool', icon: CircleIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolPolygon]: { name: 'Polygon tool', icon: TriangleIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolStar]: { name: 'Star tool', icon: StarIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolLine]: { name: 'Line tool', icon: SlashIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag from end to end' },
+  [Command.ToolArrow]: { name: 'Arrow tool', icon: MoveUpRight, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag from tail to head' },
+  [Command.ToolPencil]: { name: 'Pencil tool', icon: Pencil, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag to draw, hold Shift for straight segments' },
+  [Command.ToolShapeBuilder]: { name: 'Shape builder', icon: Merge, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Click regions to merge, Alt-click to subtract, Enter to apply' },
   [Command.ToolScale]: { name: 'Scale tool', icon: Scaling, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToolPen]: { name: 'Pen tool', icon: PenTool, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Tap points, tap the first to close' },
   [Tool.FitGraph]: { name: 'Fit curves to view', icon: Maximize, group: GuideGroup.Timeline, place: Place.Graph },
@@ -307,6 +349,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.PreviewActual]: { name: 'Preview at 100%', icon: SquareDashed, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.TogglePixelGrid]: { name: 'Pixel grid', icon: Grid3x3, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleLayoutGuides]: { name: 'Layout guides', icon: LayoutGrid, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.TogglePivot]: { name: 'Rotation origin', icon: Crosshair, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleOutlines]: { name: 'Outline view', icon: VectorSquare, group: GuideGroup.View, menu: MenuSection.View },
   [Command.PreviewSelection]: { name: 'Zoom to selection', icon: Scan, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleInspector]: { name: 'Properties panel', icon: PanelRight, group: GuideGroup.View, place: Place.Bar },

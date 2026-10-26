@@ -3,8 +3,8 @@
   import { Action } from '$lib/motion/actions';
   import { onMount } from 'svelte';
   import Download from '@lucide/svelte/icons/download';
-  import type { MotionDoc } from '$lib/motion/doc';
-  import { Background, FORMATS, formatOf } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { Background, FORMATS, formatOf } from '@feega/motion-core/motion/doc';
   import { Resolution } from '$lib/motion/render-quote';
   import { eta, exportSize, outputSize, type Capabilities, type ExportScope, type Size } from '$lib/motion/export-plan';
   import { audioPlan } from '$lib/motion/audio-plan';
@@ -15,19 +15,22 @@
   import { joltNote } from '$lib/motion/smoothness';
   import type { FrameSize } from './MotionPreview.svelte';
   import { liveNote, stillStandIns, unverified } from '$lib/motion/custom/determinism';
-  import { CheckState } from '$lib/motion/custom/component';
+  import { CheckState } from '@feega/motion-core/motion/custom/component';
   import { postPageAction } from '$lib/api/page-action';
   import { HOLD_BUFFER, renderQuote } from '$lib/motion/render-quote';
-  import { EXPORT_FORMATS, ExportFormat, FORMAT, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
-  import { FRAME_RATES } from '$lib/motion/design';
+  import { EXPORT_FORMATS, ExportFormat, FORMAT, GIF_LIMITS, GifLoop, Preset, Quality, estimateBytes, exportProblem, gifOf, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
+  import { FRAME_RATES } from '@feega/motion-core/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
   import { RenderStage, STALL_AFTER_MS, Stall, framesDone, renderStall, watchProgress, type ProgressWatch, type RenderView, type ServerRender } from '$lib/motion/server-render';
-  import type { BrandTokens } from '$lib/motion/brand';
-  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
+  import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
   import InteractiveExport from './InteractiveExport.svelte';
+  import ExportRows from './ExportRows.svelte';
+  import type { ExportRow } from '$lib/motion/export-rows';
   import { ExportMode } from './export-mode';
   import Film from '@lucide/svelte/icons/film';
   import Code from '@lucide/svelte/icons/code';
+  import ImageIcon from '@lucide/svelte/icons/image';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
 
   type Renderer = (times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal) => Promise<void>;
@@ -39,14 +42,18 @@
     [ExportFormat.Mp4H264]: 'MP4',
     [ExportFormat.Mp4H265]: 'MP4 HEVC',
     [ExportFormat.Gif]: 'GIF',
+    [ExportFormat.Apng]: 'APNG',
     [ExportFormat.WebmAlpha]: 'WebM alpha',
     [ExportFormat.ProRes422]: 'ProRes',
     [ExportFormat.ProRes4444]: 'ProRes alpha',
     [ExportFormat.PngSequence]: 'PNG frames'
   };
   const RESOLUTION_LABEL: Record<Resolution, string> = { [Resolution.P720]: '720p', [Resolution.P1080]: '1080p', [Resolution.P1440]: '1440p', [Resolution.P2160]: '4K' };
+  const GIF_LOOP_LABEL: Record<GifLoop, string> = { [GifLoop.Forever]: 'Loop forever', [GifLoop.Once]: 'Play once', [GifLoop.Boomerang]: 'Boomerang' };
+  const GIF_RATES = [8, 10, 12, 15, 20, 24, 30];
+  const GIF_WIDTHS = [320, 480, 640, 800, 1080, 1280, GIF_LIMITS.maxWidth];
   const QUALITY_LABEL: Record<Quality, string> = { [Quality.Standard]: 'Standard', [Quality.High]: 'High', [Quality.Max]: 'Max' };
-  const MODE_TITLE: Record<ExportMode, string> = { [ExportMode.Video]: 'Video file', [ExportMode.Interactive]: 'Embed on a website' };
+  const MODE_TITLE: Record<ExportMode, string> = { [ExportMode.Video]: 'Video file', [ExportMode.Interactive]: 'Embed on a website', [ExportMode.Images]: 'Image files' };
 
   const STAGE_LABEL: Record<RenderStage, string> = {
     [RenderStage.Starting]: 'Starting render machines…',
@@ -92,6 +99,7 @@
     tokens,
     analyses = {},
     opening = null,
+    images = null,
     onpresets,
     onclose
   }: {
@@ -106,6 +114,7 @@
     tokens: BrandTokens;
     analyses?: Record<string, AudioAnalysis>;
     opening?: ExportMode | null;
+    images?: { count: number; onexport: (rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string> } | null;
     onpresets?: () => void;
     onclose: () => void;
   } = $props();
@@ -312,7 +321,16 @@
         <b>Embed on a website</b>
         <span class="hint">A live player you paste into your site. It can react to the cursor and scroll.</span>
       </button>
+      {#if images}
+        <button type="button" class="choice" onclick={() => (mode = ExportMode.Images)} data-testid="export-mode-images">
+          <span class="icon"><ImageIcon size={20} /></span>
+          <b>Image files</b>
+          <span class="hint">PNG, JPG, WebP, PDF or SVG, at the sizes you list.</span>
+        </button>
+      {/if}
     </div>
+  {:else if mode === ExportMode.Images && images}
+    <ExportRows count={images.count} onexport={images.onexport} />
   {:else if mode === ExportMode.Interactive}
     <InteractiveExport {doc} {tokens} {assetUrls} {analyses} {fileName} {editorUrl} {onpresets} />
   {:else}
@@ -343,6 +361,32 @@
         {/each}
       </div>
     </div>
+
+    {#if settings.format === ExportFormat.Gif}
+      {@const gif = gifOf(settings)}
+      <div class="field">
+        <span class="label">GIF loop</span>
+        <div class="seg" role="radiogroup" aria-label="GIF loop" data-testid="export-gif-loop">
+          {#each Object.values(GifLoop) as loop (loop)}
+            <button type="button" role="radio" aria-checked={gif.loop === loop} disabled={locked} onclick={() => (settings.gif = { ...gif, loop })}>{GIF_LOOP_LABEL[loop]}</button>
+          {/each}
+        </div>
+        <div class="rows">
+          <label class="row">
+            <span>GIF frame rate</span>
+            <select value={gif.fps} disabled={locked} data-testid="export-gif-fps" onchange={(e) => (settings.gif = { ...gif, fps: Number(e.currentTarget.value) })}>
+              {#each GIF_RATES as rate (rate)}<option value={rate}>{rate} fps</option>{/each}
+            </select>
+          </label>
+          <label class="row">
+            <span>GIF width</span>
+            <select value={gif.width} disabled={locked} data-testid="export-gif-width" onchange={(e) => (settings.gif = { ...gif, width: Number(e.currentTarget.value) })}>
+              {#each GIF_WIDTHS as width (width)}<option value={width}>{width} px</option>{/each}
+            </select>
+          </label>
+        </div>
+      </div>
+    {/if}
 
     <div class="summary" data-testid="export-quote">
       <span class="out">{output.width}×{output.height} · {Math.round(quote.seconds)} s · up to ~{megabytes} MB</span>

@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { BUILTIN_PREFIX, BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 import { templateFromComp, templateFromDoc, type TemplateEntry, type TemplateMeta } from '$lib/motion/template/library';
 import { deleteOrgTemplate, insertOrgTemplate, listOrgTemplates } from '$lib/server/repos/motion-templates';

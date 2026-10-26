@@ -1,11 +1,11 @@
-import { findClip, type MotionDoc } from '$lib/motion/doc';
-import { COMPONENTS, type ComponentId } from '$lib/motion/components';
-import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/timeline';
-import { setClipFlags, setTrackFlags } from '$lib/motion/organize';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/components';
+import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '@feega/motion-core/motion/timeline';
+import { renameClip, setClipFlags, setTrackFlags } from '@feega/motion-core/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
-import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '$lib/motion/poster-parts';
+import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '@feega/motion-core/motion/poster-parts';
 import { EditMode } from '$lib/motion/edit-mode';
-import { TrackKind } from '$lib/motion/components';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { joinMask, leaveMask, maskMembers, maskOf, releaseMasks, useAsMask } from '$lib/motion/mask-group';
 import { Command } from '$lib/motion/shortcuts';
 import { NODE_KIND_LABEL } from './node-label';
@@ -36,13 +36,16 @@ export enum Pick {
 
 export enum NodeIcon {
   Still = 'still',
-  Video = 'video'
+  Video = 'video',
+  Element = 'shape'
 }
 
-export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean; element?: boolean };
+export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean; element?: boolean; glyph?: string };
 export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]>; mode?: EditMode };
 
 const FRAME_TYPE = 'motion';
+
+export const elementGlyph = (clip: { component: string; props: Record<string, unknown> } | undefined): string | undefined => (clip?.component === 'Shape' ? String(clip.props.shape) : clip?.component);
 
 export const nodeIcon = (node: { type: string; still?: boolean }): string => (node.type === FRAME_TYPE ? (node.still ? NodeIcon.Still : NodeIcon.Video) : node.type);
 type Parts = Record<string, readonly string[]>;
@@ -61,6 +64,7 @@ export type LayerRow = {
   thumb?: string | null;
   foldable?: boolean;
   element?: boolean;
+  instance?: boolean;
 };
 
 type Track = MotionDoc['tracks'][number];
@@ -69,7 +73,7 @@ type Clip = Track['clips'][number];
 const NODE_DEPTH = 0;
 const TRACK_DEPTH = 1;
 
-const clipLabel = (clip: Clip) => (clip.component === CUSTOM_CLIP ? componentLabel(String(clip.props.name)) : elementName(clip));
+const clipLabel = (clip: Clip) => clip.name || (clip.component === CUSTOM_CLIP ? componentLabel(String(clip.props.name)) : elementName(clip));
 
 const KEY_SEP = '/';
 
@@ -138,7 +142,8 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     nodeId,
     hidden: !!clip.hidden,
     locked: template || !!clip.locked,
-    nested
+    nested,
+    ...(doc.comps[comp]?.component ? { instance: true } : {})
   };
   const nests = comp !== '' && !template;
   row.foldable = nests || undefined;
@@ -178,7 +183,7 @@ function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlin
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
-    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
+    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.element ? (node.glyph ?? NodeIcon.Element) : nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
     return folded.has(node.id) || node.element ? [row] : [row, ...childRows(node.id, open, outlines, folded)];
   });
 }
@@ -307,12 +312,12 @@ function stepClip(doc: MotionDoc, clip: Clip, step: typeof ABOVE | typeof BELOW,
   return restack(doc, clip.id, at.track.id, step === ABOVE ? Place.Above : Place.Below, newId);
 }
 
-const CLIP_EDIT: Record<LayerAction, (doc: MotionDoc, clip: Clip, newId: NewId) => OpResult> = {
+const CLIP_EDIT: Record<LayerAction, (doc: MotionDoc, clip: Clip, newId: NewId, name?: string) => OpResult> = {
   [LayerAction.Up]: (doc, clip, newId) => stepClip(doc, clip, ABOVE, newId),
   [LayerAction.Down]: (doc, clip, newId) => stepClip(doc, clip, BELOW, newId),
   [LayerAction.Hide]: (doc, clip) => setClipFlags(doc, clip.id, { hidden: !clip.hidden }),
   [LayerAction.Lock]: (doc, clip) => setClipFlags(doc, clip.id, { locked: !clip.locked }),
-  [LayerAction.Rename]: () => fail('clips have no name of their own: rename the track')
+  [LayerAction.Rename]: (doc, clip, _newId, name) => renameClip(doc, clip.id, name ?? '')
 };
 
 export function layerEdit(doc: MotionDoc, id: string, action: LayerAction, name?: string, newId: NewId = newTrackId): OpResult {
@@ -324,7 +329,7 @@ export function layerEdit(doc: MotionDoc, id: string, action: LayerAction, name?
   if (!found || !doc.tracks.some((t) => t.id === found.track.id)) {
     return fail(`no layer ${id} at the top level of this video`);
   }
-  return CLIP_EDIT[action](doc, found.clip, newId);
+  return CLIP_EDIT[action](doc, found.clip, newId, name);
 }
 
 type KeyPress = { key: string; mod: boolean };
@@ -365,6 +370,8 @@ export const rowPicked = (row: LayerRow, selection: LayerSelection): boolean =>
 export type LayerHover = { nodeId: string; id: string } | null;
 
 export const tileHovered = (hover: LayerHover, nodeId: string, openNodeId: string | null): boolean => !!hover && hover.nodeId === nodeId && (hover.id === nodeId || openNodeId !== nodeId);
+
+export const frameRinged = (hover: LayerHover, nodeId: string, openNodeId: string | null, pointerOn: string | null): boolean => tileHovered(hover, nodeId, openNodeId) && !(pointerOn === nodeId && hover?.id !== nodeId);
 
 export const frameHover = (hover: LayerHover, openNodeId: string | null): string | null => (hover && hover.nodeId === openNodeId && hover.id !== openNodeId ? hover.id : null);
 

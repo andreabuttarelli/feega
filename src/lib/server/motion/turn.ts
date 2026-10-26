@@ -1,9 +1,9 @@
 import { orgFontFamilies } from './font-upload';
 import { styleOf } from '$lib/motion/style';
 import { nameVersion, namedRevisions } from './version-names';
-import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
-import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs, savedPick, type PickAnswer, type PickAsk } from '$lib/reference-pick';
-import { createUIMessageStream, streamText, type ModelMessage, type Tool, type UIMessageChunk } from 'ai';
+import { promptTexts } from '$lib/motion/script-brief';
+import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, readAnswer, rejectedRounds, shownRefs, savedPick } from '$lib/reference-pick';
+import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChunk } from 'ai';
 import type { SpawnInput } from '$lib/server/agents/spawn';
 import { spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
 import { toolsWritingCode } from '$lib/server/motion/model-route';
@@ -13,14 +13,13 @@ import { fetchImageBytes, uiReader } from '$lib/server/motion/ui-read';
 import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions, toolForcing } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
-import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
+import { Tier, activeTools, openingTier, spentUsd, stepTier } from '$lib/server/motion/model-route';
 import { billedUsdInScope, billingScope, extractSdkUsage, logAiCall, withNodeContext, withOrgContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
-import { openReply, ReplyStatus, type Reply } from '$lib/server/repos/chat-reply';
+import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
 import { referencedAssets } from '$lib/motion/doc-assets';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
-import { agentStopWhen } from '$lib/server/project-agent/limits';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
@@ -32,8 +31,7 @@ import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
 import { commitDoc, revisionWriteOf } from '$lib/server/motion/frame-ops';
 import { fitNewVideo } from '$lib/motion/fit-duration';
-import { AGENT_SELF_SAVE_MS } from '$lib/server/project-agent/limits';
-import { Reserve, VIDEO_BUDGET, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
+import { Reserve, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
 import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/server/motion/critic';
 import { VIEWER_MODEL, VIEWER_SCHEMA, viewFrames } from '$lib/server/motion/viewer';
 import { CutGate, KEPT_CUT, REVIEW_CUT, cutGate, keepsCut, reviewedBefore, type CutReview } from '$lib/motion/cut-review';
@@ -41,15 +39,13 @@ import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
 import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
 import { projectMemory } from '$lib/server/motion/studio-memory';
-import type { LaunchScript } from '$lib/motion/script';
 import { DRAWS_FIX_RESERVE, REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleLooks, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { Looks, ownLook } from '$lib/server/motion/look';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { appAccountKept, liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
 import { ATTACHMENT_PORTS } from '$lib/server/chat-attachments/register';
-import { createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from '$lib/server/motion/motion-tools';
-import type { MotionAsset } from '$lib/server/motion/editor';
+import { createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
 import { embedAction } from '$lib/server/motion/embed';
 import type { ProjectMode } from '$lib/project-mode';
 import { templateLibrary } from '$lib/server/motion/templates';
@@ -62,7 +58,7 @@ import { RevisionOutcome, readRevision } from '$lib/server/repos/motion-revision
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
-import { DESCRIBE_FRAMES, SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep, type Frame } from '$lib/server/motion/frames';
+import { DESCRIBE_FRAMES, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep, type Frame } from '$lib/server/motion/frames';
 import { frameDensities, frameStats, seamLuma } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, storeAssetFile } from '$lib/server/repos/asset-storage';
@@ -80,127 +76,14 @@ import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 import type { ChatAttachment } from '$lib/chat-attachments';
 import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
 import { breakdownReader } from '$lib/server/video-reference';
+import { Client, PLATFORM_TIMING, closedByModel, landingWatch, writeText, type Stop, type TurnStep, type TurnTiming } from '$lib/server/agents/turn-core';
+import { CHECK_WAIT_MS, Browser, BROWSER_VISION, EDITOR_DRAWS, BROWSER_DRAWS, Round, MAX_DELIVERY_ATTEMPTS, STILL_OPEN_ID, LAST_LOOK_ID, CRITIC_ID, LOOP_SEAM_ID, CUT_REVIEW_ID, SHEET_FILE, awaitsUser, ROUND_ROLE, shotCrews, crewTools, crewBrief, RESEARCH_BRIEF, RESEARCH_DONE, SOUND_PASS, ROUND_STOPS, ROUND_CHOICE, importFollowed, BUDGET_ID, budgetTool, writeCard, cannedTurn, type MotionTurn, type TurnOutcome } from './motion-session';
+
+export { Browser, MAX_DELIVERY_ATTEMPTS, RESEARCH_BRIEF, crewBrief, crewTools, type MotionTurn, type TurnOutcome } from './motion-session';
+export type { TurnTiming } from '$lib/server/agents/turn-core';
 
 export const MOTION_AGENT_KEY = 'motion';
 const readFontAdvance = fontAdvance();
-const CHECK_WAIT_MS = 90_000;
-const NEEDS_EDITOR = 'this needs the motion editor open in a browser to draw frames: nobody has it open for this turn';
-
-export enum Browser {
-  Attached = 'attached',
-  Absent = 'absent'
-}
-
-const BROWSER_VISION: Record<Browser, (visionModel: string | null) => Vision> = {
-  [Browser.Attached]: (visionModel) => (visionModel ? Vision.Available : Vision.Missing),
-  [Browser.Absent]: (visionModel) => (visionModel && serverFramesOpen() ? Vision.Available : Vision.Missing)
-};
-
-const EDITOR_DRAWS: Record<Browser, boolean> = { [Browser.Attached]: true, [Browser.Absent]: false };
-
-const BROWSER_DRAWS: Record<Browser, () => void> = {
-  [Browser.Attached]: () => {},
-  [Browser.Absent]: () => {
-    throw new Error(NEEDS_EDITOR);
-  }
-};
-
-enum Client {
-  Watching = 'watching',
-  Gone = 'gone'
-}
-
-enum Round {
-  Research = 'research',
-  Sound = 'sound',
-  Edit = 'edit',
-  SelfCheck = 'self-check',
-  Summary = 'summary'
-}
-
-type Stop = ReturnType<typeof agentStopWhen>;
-
-const CLOSING_RESERVE_MS = 60_000;
-
-export type TurnTiming = { landingMs: number; stopPollMs: number };
-
-const PLATFORM_TIMING: TurnTiming = { landingMs: AGENT_SELF_SAVE_MS, stopPollMs: 3000 };
-export const MAX_DELIVERY_ATTEMPTS = 3;
-const STILL_OPEN_ID = 'still-open';
-const LAST_LOOK_ID = 'last-look';
-const CRITIC_ID = 'critic-sheet';
-const LOOP_SEAM_ID = 'loop-seam';
-const CUT_REVIEW_ID = 'cut-review';
-const SHEET_FILE = 'sheet.jpg';
-
-const oneStep: Stop = ({ steps }) => steps.length >= 1;
-
-const selfCheckSpent: Stop = ({ steps }) => steps.length >= SELF_CHECK_MAX_STEPS;
-
-const awaitsUser = (steps: readonly TurnStep[]) => briefAwaits(steps) || pickAwaits(steps);
-
-const userAsked: Stop = ({ steps }) => awaitsUser(steps as TurnStep[]);
-
-const ROUND_ROLE: Record<Round, StudioRole | null> = { [Round.Research]: StudioRole.Researcher, [Round.Sound]: StudioRole.Sound, [Round.Edit]: null, [Round.SelfCheck]: null, [Round.Summary]: null };
-
-const CREWS = 2;
-
-type Crew = { acts: string[]; from: number; to: number };
-
-function shotCrews(script: LaunchScript): Crew[] {
-  const size = Math.ceil(script.acts.length / CREWS);
-  return Array.from({ length: CREWS }, (_, i) => script.acts.slice(i * size, (i + 1) * size))
-    .filter((acts) => acts.length)
-    .map((acts) => ({ acts: acts.map((a) => a.act), from: acts[0].start, to: acts.at(-1)!.end }));
-}
-
-const PLACES_AT = ['add_shot', 'add_template'] as const;
-
-type Placing = { at: number };
-
-function inRange(tool: Tool, crew: Crew): Tool {
-  return {
-    ...tool,
-    execute: async (input: Placing, options) =>
-      input.at < crew.from || input.at >= crew.to ? { ok: false, error: `${input.at} s is outside your range ${crew.from} s to ${crew.to} s: the other crew builds that part` } : tool.execute!(input, options)
-  } as Tool;
-}
-
-export function crewTools<T extends Record<string, Tool>>(all: T, crew: Crew): T {
-  const guarded = PLACES_AT.filter((name) => all[name]?.execute).map((name) => [name, inRange(all[name], crew)]);
-  return { ...all, ...Object.fromEntries(guarded) };
-}
-
-export const crewBrief = (crew: Crew) => `Shot crew: build only the ${crew.acts.join(', ')} acts of the script, from ${crew.from} s to ${crew.to} s. Each section starts from a library template (list_templates by role, add_template inside your range, set_template_fields from the script lines); library shots only for the beats no template covers. Another crew builds the rest at the same time: never place, move or remove anything outside your range, and leave music to the sound pass.`;
-
-export const RESEARCH_BRIEF = 'Research step: gather the facts, captures and references this video needs. You do not build and you do not answer the user: the director writes the script from your findings next, and the shots are built on the next ask.';
-
-const RESEARCH_DONE = 'Research is done: the facts, captures and references are in the conversation above. Now write the script and the storyboard from them.';
-const SOUND_PASS = 'Sound pass: lay the music under the whole video if there is none, mark its beats and cut the shots onto them. Change nothing else.';
-
-const ROUND_STOPS: Record<Round, (t0: number, overBudget: Stop) => Stop[]> = {
-  [Round.Research]: (t0, overBudget) => [agentStopWhen(t0 - CLOSING_RESERVE_MS), overBudget, userAsked],
-  [Round.Sound]: (t0, overBudget) => [agentStopWhen(t0), overBudget, selfCheckSpent],
-  [Round.Edit]: (t0, overBudget) => [agentStopWhen(t0 - CLOSING_RESERVE_MS), overBudget, userAsked],
-  [Round.SelfCheck]: (t0, overBudget) => [agentStopWhen(t0), selfCheckSpent, overBudget],
-  [Round.Summary]: () => [oneStep]
-};
-
-type Choice = ForcedTool | { toolChoice: 'none' };
-
-type ChoiceInput = Parameters<typeof selfCheckChoice>[0] & { stepNumber: number };
-
-const ROUND_CHOICE: Record<Round, (input: ChoiceInput) => Choice> = {
-  [Round.Research]: () => ({}),
-  [Round.Sound]: () => ({}),
-  [Round.Edit]: () => ({}),
-  [Round.SelfCheck]: (input) => (input.stepNumber === 0 ? selfCheckChoice(input) : {}),
-  [Round.Summary]: () => ({ toolChoice: 'none' })
-};
-
-type TurnStep = Parameters<typeof finishedTurn>[0][number] & { usage: unknown; finishReason: string };
-
-const closedByModel = (last: TurnStep | undefined) => last?.finishReason === 'stop' && last.text.trim().length > 0;
 
 export type MotionTurnInput = {
   db: Db;
@@ -217,54 +100,6 @@ export type MotionTurnInput = {
   browser: Browser;
   timing?: TurnTiming;
 };
-
-type Followed = { ids: string[]; note: string };
-
-async function importFollowed(answer: PickAnswer | null, importAsset: MotionToolDeps['importAsset'], assets: MotionAsset[]): Promise<Followed> {
-  if (!answer?.follow.length || !importAsset) {
-    return { ids: [], note: '' };
-  }
-  const landed = await Promise.all(answer.follow.map(async (c) => ({ c, out: await importAsset(c.image, c.title) })));
-  const ok = landed.flatMap(({ c, out }) => (out.ok ? [{ c, asset: out.asset }] : []));
-  assets.push(...ok.map((o) => o.asset));
-  const lines = ok.map(({ c, asset }) => `- ${c.title || c.id}: asset ${asset.id}`);
-  return { ids: ok.map((o) => o.asset.id), note: lines.length ? `The references the user follows are now project assets: hang each under the storyboard beat it inspires (write_storyboard media) and take the look from them:\n${lines.join('\n')}` : '' };
-}
-
-export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null; cut: CutReview | null; budget: BudgetCard | null; scripted: boolean };
-
-export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise<TurnOutcome> };
-
-const CANNED_ID = 'canned';
-const BUDGET_ID = 'video-budget';
-
-const budgetTool = (card: BudgetCard): SavedTool => ({ toolCallId: BUDGET_ID, toolName: VIDEO_BUDGET, status: 'done', input: {}, output: card });
-
-function writeCard(writer: { write: (chunk: UIMessageChunk) => void }, card: BudgetCard): void {
-  writer.write({ type: 'tool-input-available', toolCallId: BUDGET_ID, toolName: VIDEO_BUDGET, input: {} });
-  writer.write({ type: 'tool-output-available', toolCallId: BUDGET_ID, output: card });
-}
-
-function writeText(writer: { write: (chunk: UIMessageChunk) => void }, id: string, text: string): void {
-  writer.write({ type: 'text-start', id });
-  writer.write({ type: 'text-delta', id, delta: text });
-  writer.write({ type: 'text-end', id });
-}
-
-function cannedTurn(content: string, reply: Pick<Reply, 'finish'>, card: BudgetCard | null = null): MotionTurn {
-  const done = reply.finish({ content, tools: card ? [budgetTool(card)] : [] }, ReplyStatus.Done).then((): TurnOutcome => ({ reply: content, summary: null, version: null, revision: null, costUsd: 0, pick: null, cut: null, budget: card, scripted: false }));
-  const stream = createUIMessageStream({
-    execute: ({ writer }) => {
-      writer.write({ type: 'start' });
-      writeText(writer, CANNED_ID, content);
-      if (card) {
-        writeCard(writer, card);
-      }
-      writer.write({ type: 'finish' });
-    }
-  });
-  return { stream, done };
-}
 
 export const startMotionTurn = (input: MotionTurnInput): Promise<MotionTurn | Response> => withNodeContext(input.motion.record.id, () => openMotionTurn(input));
 
@@ -592,14 +427,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     void land().then(settle, abandon);
     cut.abort();
   };
-  const wall = setTimeout(landEarly, Math.max(0, timing.landingMs - (Date.now() - startedAt)));
-  const watch = setInterval(() => {
-    void reply.stopped().then((stopped) => {
-      if (stopped) {
-        landEarly();
-      }
-    });
-  }, timing.stopPollMs);
+  const watch = landingWatch({ startedAt, timing, stopped: () => reply.stopped(), landEarly });
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
@@ -716,8 +544,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const labelOf = (modelId: string) => (modelId === roleModel(sideRole, model) && modelId !== model ? STUDIO_ROSTER[sideRole].label : modelId === model ? roleLabel : modelId === codeModel ? `${roleLabel}-code` : `${roleLabel}-vision`);
 
   async function finishTurn(steps: TurnStep[]): Promise<TurnOutcome> {
-    clearTimeout(wall);
-    clearInterval(watch);
+    watch.stop();
     session.doc = fitNewVideo(head.doc, session.doc);
     session.doc = { ...session.doc, assets: referencedAssets(session.doc, assets.map((a) => ({ id: a.id, kind: a.kind, name: a.label }))) };
     const write = session.edits.length ? await saveAgentDoc() : null;

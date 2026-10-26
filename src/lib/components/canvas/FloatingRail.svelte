@@ -2,7 +2,7 @@
   import { _ } from 'svelte-i18n';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import { cn } from '$lib/utils';
-  import { navEntriesByGroup, visibleNav, type NavEntry, type NavFamily } from '$lib/shell-nav';
+  import { navEntriesByGroup, type NavEntry, type NavFamily } from '$lib/shell-nav';
   import { prefetchEntry } from '$lib/canvas/chrome-loaders';
   import { NAV_ICONS } from './nav-icons';
   import { ProjectMode, sectionAllowed } from '$lib/project-mode';
@@ -30,7 +30,7 @@
     mode?: ProjectMode;
   } = $props();
 
-  const sheets = $derived(visibleNav(page.data.socialPublishing, navEntriesByGroup('workbench')).filter((entry) => sectionAllowed(mode, entry.id)));
+  const sheets = $derived(navEntriesByGroup('workbench').filter((entry) => sectionAllowed(mode, entry.id)));
 
   const OPEN: Record<NavFamily, (entry: NavEntry) => void> = {
     panel: (entry) => onPanel(entry),
@@ -79,7 +79,7 @@
 <Tooltip.Provider delayDuration={200}>
   <nav class="rail" data-dock="left-bar" aria-label={$_('app.shell.rail')}>
     <div class="rail-group">
-      {#each [...navEntriesByGroup('canvas'), ...visibleNav(page.data.socialPublishing, navEntriesByGroup('panel'))] as entry (entry.id)}
+      {#each [...navEntriesByGroup('canvas'), ...navEntriesByGroup('panel')] as entry (entry.id)}
         {@render railButton(entry)}
       {/each}
     </div>

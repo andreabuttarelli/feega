@@ -11,63 +11,115 @@
   <a href="https://feega.app"><img src="https://img.shields.io/badge/Get_started-feega.app-c485fe?style=flat&labelColor=131313" alt="Get started on feega.app" /></a>
 </p>
 
-![feega — Your marketing department, automated.](./docs/readme-hero.png)
+![feega](./docs/readme-hero.png)
 
-Your marketing department, automated. feega is an open-source Grok Bot
-alternative specialized in marketing, distribution, and sales. It plans, writes,
-designs, and publishes across social, blog, and SEO — nothing goes out until you
-approve. Use it hosted at [feega.app](https://feega.app), or run the complete
-stack yourself.
+**feega is an open-source infinite canvas where people and AI agents design, animate and generate
+together.** You draw frames, animate them on a timeline and export them; the chat agent, the
+[`feega` CLI and MCP server](cli/) work on the same nodes you do. Use it hosted at
+[feega.app](https://feega.app) or run the whole thing on your machine.
 
-## Features
+## What you can do
 
-- Weekly editorial plan, then on-brand posts, carousels, and video
-- Calendar and one-tap approve — from the app, email, or
-  [CLI / MCP](cli/)
-- Studio: brand kit, products, people, competitors, and voice
-- Radar: news and conversations turned into drafts and lead replies
-- Blog, SEO, and GEO — rank on Google and get cited by AI assistants
-- Multi-brand workspaces (one account, many brands)
-- Propose-approve throughout: the AI never publishes silently
-- Drive it from Cursor or Claude via MCP, or from the `feega` CLI
+- **Design**: frames, shapes, text, pen and boolean tools, auto layout, components, paste from Figma
+- **Animate**: keyframes and a timeline; export PNG, JPG, WebP, SVG, PDF, GIF, MP4, Lottie
+- **Generate**: text, images, video, audio and 3D as canvas nodes wired together
+- **Delegate**: a chat agent, an MCP server and a CLI that read and edit the canvas
+- **Collaborate**: realtime multiplayer, comments, versions, organisations
+
+## Run it locally
+
+One canvas saved in one file: no account, no database, no Docker. You need Node 22.
+
+```sh
+git clone https://github.com/andreabuttarelli/feega && cd feega && npm install
+npm run local -- my-canvas.feega        # http://localhost:5173
+```
+
+The first run builds the app (a few minutes). The file is created if it does not exist and saved
+as you work. To continue in the cloud, import it at [feega.app](https://feega.app) with
+**Import .feega**. Sharing, comments, saved versions and AI generation need the cloud and say so.
+
+## Run it locally as an agent
+
+The same command, then the [`feega` CLI or MCP server](cli/) against it. No `feega login`: they find
+the server on port 5173 and it answers as the local user. Every edit appears live in the open
+browser tab.
+
+```sh
+npm run local -- work.feega &                      # 1. server on http://localhost:5173
+curl -s localhost:5173/api/v1/version              # 2. {"localMode":true,…}
+feega projects && feega canvases <projectId>       # 3. the one project and its one canvas
+```
+
+From the MCP server, `edit` and `view` work on that canvas; `canvas_file` with `action: "save"`
+writes a copy wherever you ask. Stopping the server (Ctrl-C) saves the file. The server listens on
+127.0.0.1 only and refuses to start otherwise.
+
+## Self-host the full app (Docker)
+
+Accounts, organisations, realtime multiplayer, every project. You need Docker (or OrbStack).
+
+```sh
+git clone https://github.com/andreabuttarelli/feega && cd feega/infra/compose
+docker compose up
+```
+
+Open http://localhost:3000 and sign in with `demo@feega.local` / `feega-demo-2026`.
+
+Non-interactive, with a check at the end, from the repository root:
+
+```sh
+docker info > /dev/null                                   # 1. Docker is running, or stop here
+(cd infra/compose && docker compose up -d --wait)         # 2. Supabase + schema + demo data + app
+npm ci && npx playwright install chromium && npm run smoke:selfhost   # 3. must exit 0
+```
+
+Step 2 pulls the prebuilt app image `ghcr.io/andreabuttarelli/feega` and starts in about a minute.
+`--wait` returns 0 only after the one-shot `migrate` service exits 0 (schema applied, demo user and
+canvas seeded) and the app is healthy. Without that image (a fork, or `APP_IMAGE` pointing at a
+tag that does not exist) compose builds it from source instead: about 28 minutes on a 7.7 GB Docker
+VM, and it can run out of memory if other containers hold that memory. Give Docker 8 GB or more,
+or stop other stacks. To rebuild from your checkout: `docker compose up -d --wait --build`.
+
+Step 3 needs Node 22. It signs in as the demo user, opens the demo canvas, draws a shape, animates
+it and exports a PNG; screenshots land in the current directory. If the app is not on port 3000,
+set `PUBLIC_APP_URL` to match.
+
+| | |
+|---|---|
+| App | http://localhost:3000 |
+| Supabase API | http://localhost:8000 |
+| Postgres | `localhost:5432`, password in `infra/compose/.env` |
+| Login | `demo@feega.local` / `feega-demo-2026` |
+| Stop / reset | `docker compose down` / `docker compose down -v` |
+
+To work on the code instead of the image, use the Supabase CLI:
+
+```sh
+supabase start && npm ci && npm run setup && npm run dev    # http://localhost:5173
+```
+
+`npm run setup` is idempotent: it writes `.env` from the running stack, applies the schema and seeds
+the demo user. The CLI and MCP server find a dev server on port 5173 by themselves; for the Docker
+app set `PUBLIC_APP_URL=http://localhost:3000`. Connecting an agent:
+[`docs/agents-quickstart.md`](docs/agents-quickstart.md).
+
+When something fails:
+
+| Signal | Fix |
+|---|---|
+| First `docker compose up` failed, every later one fails too | `docker compose down -v`, then start again |
+| macOS: the database container hangs with no error | clone outside `~/Documents`, `~/Desktop`, `~/Downloads`, or grant Docker access to that folder |
+| Port 3000, 8000 or 5432 taken | in `infra/compose/.env` set `APP_PORT`, `KONG_HTTP_PORT`, `POSTGRES_PORT`, and the URLs that carry them (`PUBLIC_APP_URL`, `SITE_URL`, `SUPABASE_PUBLIC_URL`, `API_EXTERNAL_URL` ending in `/auth/v1`); for the dev server or `npm run dev -- --port 5301` with `PUBLIC_APP_URL` set to match |
+| AI feature answers "Add … to .env" | add that key; the list by feature is in [`.env.example`](.env.example) |
+
+Nothing is credit-gated (`BILLING_PROVIDER=open`). Full guide, limits and timings:
+[`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
 
 ## Stack
 
-- TypeScript and SvelteKit
-- Supabase (Postgres, Auth, Storage)
-- Node.js 22 and Docker Compose
-- MCP server and CLI in [`cli/`](cli/) — installable binary, npm, Homebrew
-
-## Quick start
-
-You need Node.js 22+, Docker with Compose, and openssl.
-
-```sh
-cp infra/compose/.env.example infra/compose/.env   # fill POSTGRES_PASSWORD, DASHBOARD_PASSWORD, SECRET_KEY_BASE
-cp .env.example .env                               # set PUBLIC_SUPABASE_URL=http://localhost:8000 and copy ANON_KEY / SERVICE_ROLE_KEY from infra/compose/.env into PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY
-(cd infra/compose && docker compose up -d --wait db kong auth rest realtime storage)
-npm install
-
-export DATABASE_URL="postgres://postgres:<POSTGRES_PASSWORD>@localhost:5432/postgres"
-npm run db:migrate
-(cd infra/compose && docker compose --profile init run --rm realtime-policies)
-npm run db:seed
-npm run dev          # http://localhost:5173 — login with the seeded demo@example.com / change-me-now-12345
-```
-
-`--wait` is required: migrate needs tables that storage and realtime create on
-startup. The `realtime-policies` init runs after Realtime health and is safe to
-repeat; it records 0226 only after both policies exist.
-
-`db:seed` prints the `TENANT_BRAND_ID` line to paste into `.env` for a
-single-brand install. The demo login comes from `SEED_DEMO_EMAIL` /
-`SEED_DEMO_PASSWORD` if you want different ones. Skip the compose step if you
-already have a hosted Supabase project — point the same keys at it.
-
-Production: `npm run build:node && npm start` (port 3000), or from
-`infra/compose/`: `docker compose up -d --build app`.
-
-Read [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md) for the complete guide.
+TypeScript, SvelteKit, Supabase (Postgres, Auth, Storage, Realtime), Node.js 22, a WebGPU canvas
+with a WebGL fallback.
 
 ## Contributing
 

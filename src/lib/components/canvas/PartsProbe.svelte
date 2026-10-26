@@ -1,6 +1,6 @@
 <script lang="ts">
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
-  import { Pose, type MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import { Pose, type MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
   import type { MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
   const TRIES = 20;

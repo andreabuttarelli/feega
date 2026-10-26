@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CANVAS_SHORTCUTS,
+  canvasGuide,
   NUDGE_STEP,
   preventable,
   NUDGE_STEP_BIG,
@@ -12,6 +13,23 @@ import {
 import { CANVAS_ADD_BAR } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { Edge } from '$lib/motion/space';
+import { FrameView } from './frame-view';
+
+describe('frame view shortcuts', () => {
+  it('toggles the pixel grid, the guides and the outlines', () => {
+    const at = { tagName: 'DIV', isContentEditable: false };
+
+    expect(matchCanvasShortcut({ key: '"', shiftKey: true, metaKey: false, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.PixelGrid });
+    expect(matchCanvasShortcut({ key: 'G', shiftKey: true, metaKey: false, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Guides });
+    expect(matchCanvasShortcut({ key: 'y', shiftKey: false, metaKey: true, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Outlines });
+  });
+
+  it('Alt R shows the rotation origin', () => {
+    const at = { tagName: 'DIV', isContentEditable: false };
+
+    expect(matchCanvasShortcut({ key: '®', code: 'KeyR', shiftKey: false, metaKey: false, ctrlKey: false, altKey: true, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Pivot });
+  });
+});
 
 /** Un evento tastiera finto: bastano i campi che il registro guarda. */
 function ev(
@@ -74,6 +92,10 @@ describe('gli strumenti di disegno sulla tela, in ogni set della barra', () => {
     expect(matchCanvasShortcut(ev('O', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Ellipse });
     expect(matchCanvasShortcut(ev('P', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Pen });
     expect(matchCanvasShortcut(ev('v'))).toEqual({ id: 'tool', tool: DrawTool.Select });
+  });
+
+  it('⇧L disegna una linea, come gli altri strumenti della tela', () => {
+    expect(matchCanvasShortcut(ev('L', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Line });
   });
 });
 
@@ -167,6 +189,10 @@ describe('quello che i tasti fanno sulla tela', () => {
     const big = nudgeOf(matchCanvasShortcut(ev('ArrowRight', { shiftKey: true })) as CanvasCommand);
     expect(big).toEqual({ dx: NUDGE_STEP_BIG, dy: 0 });
   });
+
+  it('nudges like Figma: 1px, 10px with Shift', () => {
+    expect([NUDGE_STEP, NUDGE_STEP_BIG]).toEqual([1, 10]);
+  });
 });
 
 /**
@@ -174,8 +200,36 @@ describe('quello che i tasti fanno sulla tela', () => {
  * sequenza per tutto il prodotto, `?` apre la scheda di aiuto, ⌘K la palette. Una lettera nuda qui
  * diventerebbe la SECONDA lettera di una sequenza già armata, e il gesto andrebbe a due padroni.
  */
+describe('the help card', () => {
+  it('? opens the shortcut help', () => {
+    expect(matchCanvasShortcut(ev('?', { shiftKey: true }))).toEqual({ id: 'help' });
+  });
+
+  it('? while typing stays a character', () => {
+    expect(matchCanvasShortcut(ev('?', { shiftKey: true, target: { tagName: 'TEXTAREA', isContentEditable: false } }))).toBeNull();
+  });
+
+  it('the card lists every canvas shortcut, ? included', () => {
+    const rows = canvasGuide('⌘').flatMap((s) => s.rows);
+
+    expect(rows).toHaveLength(CANVAS_SHORTCUTS.length);
+    expect(rows.some((r) => r.keys === '?')).toBe(true);
+    expect(rows.find((r) => r.name === 'Undo')?.keys).toBe('⌘ Z');
+  });
+});
+
+describe('comment mode', () => {
+  it('c toggles comment mode', () => {
+    expect(matchCanvasShortcut(ev('c'))).toEqual({ id: 'comment' });
+  });
+
+  it('c while typing is a letter', () => {
+    expect(matchCanvasShortcut(ev('c', { target: TEXTAREA }))).toBeNull();
+  });
+});
+
 describe('non pesta i piedi al registro globale', () => {
-  for (const key of ['g', '?', 'k', 'c', 'l', 's', 'r', 'd', 't', 'h', 'b', 'm', 'w', 'p', 'z']) {
+  for (const key of ['g', 'k', 'l', 's', 'r', 'd', 't', 'h', 'b', 'm', 'w', 'p', 'z']) {
     it(`"${key}" nudo resta del registro globale`, () => {
       expect(matchCanvasShortcut(ev(key))).toBeNull();
     });
@@ -251,9 +305,27 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('π', { altKey: true, code: 'KeyP' }))).toBeNull();
   });
 
+  it('⇧A stacks the selected tiles', () => {
+    expect(matchCanvasShortcut(ev('A', { shiftKey: true }))).toEqual({ id: 'stack' });
+    expect(matchCanvasShortcut(ev('a'))).toBeNull();
+  });
+
+  it('E switches between Design and Animate', () => {
+    expect(matchCanvasShortcut(ev('e'))).toEqual({ id: 'edit-mode' });
+    expect(matchCanvasShortcut(ev('e', { metaKey: true }))).toBeNull();
+  });
+
   it('zoom keys by physical digit: ⇧0 is 100%, ⇧1 fits everything, ⇧2 zooms to the selection', () => {
     expect(matchCanvasShortcut(ev(')', { shiftKey: true, code: 'Digit0' }))).toEqual({ id: 'zoom-actual' });
     expect(matchCanvasShortcut(ev('!', { shiftKey: true, code: 'Digit1' }))).toEqual({ id: 'fit' });
     expect(matchCanvasShortcut(ev('@', { shiftKey: true, code: 'Digit2' }))).toEqual({ id: 'zoom-selection' });
+  });
+});
+
+describe('the shortcut sheet', () => {
+  it('speaks English', () => {
+    const label = (id: string) => CANVAS_SHORTCUTS.find((r) => r.id === id)?.label;
+
+    expect([label('select-all'), label('deselect'), label('redo'), label('paste'), label('fit'), label('zoom-in'), label('zoom-out')]).toEqual(['Select all', 'Deselect', 'Redo', 'Paste', 'Zoom to fit', 'Zoom in', 'Zoom out']);
   });
 });

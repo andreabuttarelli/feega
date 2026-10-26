@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { diffDoc } from '$lib/motion/doc-ops';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
@@ -15,7 +15,7 @@ vi.mock('$lib/server/motion/editor', async (original) => ({
   findMotionNode: async () => ({ record: { id: 'n1' }, node: { format: 'landscape' } })
 }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/frame-editor/editor-page');
 
 const SCOPE = { orgId: 'org-a', nodeId: 'n1' };
 const user = { kind: 'user' as const, id: 'u1' };

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { PublishRefusal } from '$lib/gallery/refusals';
 import { publishToGallery, PublishError, withdrawFromGallery, type GalleryModeration } from './publish';
 import { remixGalleryItem, RemixError } from './remix';
@@ -131,7 +131,7 @@ describe('remixing a gallery item', () => {
 
     const remixed = await remixGalleryItem(db, { download }, remixInput);
 
-    expect(remixed).toMatchObject({ ok: true, title: 'Liquid glass', editorPath: expect.stringMatching(/^\/p\/p-2\/c\/c-9\/motion\//) });
+    expect(remixed).toMatchObject({ ok: true, title: 'Liquid glass', editorPath: expect.stringMatching(/^\/p\/p-2\/c\/c-9\?frame=/) });
     const stored = of(calls, 'storage:canvas-assets', 'upload').map((c) => String(c.filters[0][1]));
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatch(/^org-2\/p-2\/remix\/.+\.svg$/);

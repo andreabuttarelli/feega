@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { Interp } from './keyframes';
-import { EasePreset } from './graph';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import { Interp } from '@feega/motion-core/motion/keyframes';
+import { EasePreset } from '@feega/motion-core/motion/graph';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import {
   Direction,
   addClip,
@@ -23,7 +23,7 @@ import {
   setTransform,
   snapTargets,
   type OpResult
-} from './timeline';
+} from '@feega/motion-core/motion/timeline';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -140,6 +140,15 @@ describe('keyframe ops', () => {
     const doc = must(setKeyEase(keyed, { clipId: 't', prop: 'rotateY', frame: 0 }, [0.1, 0.7, 0.1, 1]));
 
     expect(findClip(doc, 't')!.clip.keyframes.rotateY[0].ease).toEqual([0.1, 0.7, 0.1, 1]);
+  });
+
+  it('stores the intensity of an elastic ease and drops it for any other ease', () => {
+    const ref = { clipId: 't', prop: 'rotateY', frame: 0 };
+    const springy = must(setKeyEase(keyed, ref, Ease.Elastic, 0.8));
+    const plain = must(setKeyEase(springy, ref, Ease.Standard, 0.8));
+
+    expect(findClip(springy, 't')!.clip.keyframes.rotateY[0]).toMatchObject({ ease: Ease.Elastic, intensity: 0.8 });
+    expect(findClip(plain, 't')!.clip.keyframes.rotateY[0]).not.toHaveProperty('intensity');
   });
 
   it('copies keyframes relative to the earliest and pastes them at a frame of another clip', () => {

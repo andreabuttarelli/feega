@@ -15,6 +15,8 @@ const INFLUENCER_NODE = '77777777-7777-7777-7777-777777777777';
 
 const UNCENSORED = 'wiro/wiro-partners/z-image-uncensored';
 const SAFE = 'wiro/alibaba/qwen-image-3-0-pro';
+const LAYERS = 'wiro/seedream/layers';
+const INPAINT = 'higgsfield/ideogram/edit';
 
 const REFERENCE_VIDEO = 'higgsfield/bytedance/seedance-2.5/reference-to-video';
 
@@ -47,6 +49,20 @@ const models: Record<string, TaskModel> = {
     uncensored: true,
     spec: { owner: 'wiro-partners', project: 'z-image-uncensored', fields: { prompt: 'prompt', aspectRatio: 'ratio', images: [] } },
     paramSchema: { aspect_ratio: { type: 'enum', values: ['1:1'] }, promptExtend: { type: 'enum', values: ['false', 'true'] } }
+  },
+  [INPAINT]: {
+    id: INPAINT,
+    catalogue: 'image',
+    uncensored: false,
+    spec: { path: 'ideogram/edit', fields: { prompt: 'prompt', images: ['image_url'], mask: 'mask_url' }, requiresImage: true, requiresMask: true },
+    paramSchema: {}
+  },
+  [LAYERS]: {
+    id: LAYERS,
+    catalogue: 'image',
+    uncensored: false,
+    spec: { owner: 'seedream', project: 'layers', layers: true, fields: { prompt: 'prompt', images: ['image_url'] } },
+    paramSchema: {}
   },
   [SAFE]: {
     id: SAFE,
@@ -325,6 +341,17 @@ describe('the run tick finishes a Wiro task', () => {
     expect(shown).toBeTruthy();
   });
 
+  it('a layer model lands its first output as the result and keeps every other one on the node as a layer', async () => {
+    gateway.task.mockResolvedValue({ state: 'done', costUsd: 0.12, outputs: ['base', 'one', 'two'].map((name) => ({ url: `https://cdn.wiro.test/${name}.png`, contentType: 'image/png' })) });
+    const { db, calls } = fakeDb({ node_runs: [{ ...queued, model: LAYERS }], nodes: [imageNode({ running: true, runId: RUN })], projects: [uncensoredProject] });
+
+    expect(await reconcileTaskNodeRuns(db)).toMatchObject({ done: 1 });
+
+    expect(calls.filter((c) => c.table === 'assets' && c.op === 'insert')).toHaveLength(3);
+    const shown = calls.find((c) => c.table === 'nodes' && c.op === 'update' && JSON.stringify(c.payload).includes('layerRefIds'));
+    expect((shown?.payload as { data: { layerRefIds: string[] } }).data.layerRefIds).toHaveLength(2);
+  });
+
   it('stores a Wiro png marked with the Wiro model, and records it', async () => {
     const sharp = (await import('sharp')).default;
     const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#000' } }).png().toBuffer();
@@ -377,6 +404,44 @@ describe('a video node on a model that takes video and audio references', () => 
       expect.objectContaining({ video_urls: ['https://cdn.test/clip.mp4'], audio_urls: ['https://cdn.test/voice.wav'] }),
       expect.any(String)
     );
+  });
+});
+
+describe('an image node that fills a masked area', () => {
+  const asset = (id: string, url: string) => ({ id, project_id: PROJECT, type: 'image', url, content: null, mime_type: 'image/png', bytes: 10, width: 800, height: 600, duration_s: null, source: 'generated', source_node_id: null, uncensored: false, created_at: '2026-10-24T00:00:00Z' });
+  const world = (data: Record<string, unknown>) =>
+    fakeDb(
+      { nodes: [imageNode(data)], nodes_connections: [], assets: [asset('mask-1', 'https://cdn.test/mask.png'), asset('padded-1', 'https://cdn.test/padded.png')], orgs: [paidOrg], projects: [{ id: PROJECT, org_id: ORG, mode: 'standard' }] },
+      { updateRows: { nodes: [{ ...imageNode(data), version: 2 }] } }
+    );
+
+  it('sends the wired picture and the mask the node carries, both signed', async () => {
+    upstreamMedia.current = { referenceImageUrls: ['https://cdn.test/pic.png'] };
+    const { db } = world({ maskRefId: 'mask-1' });
+
+    const out = await runGenNode(db, start(INPAINT, 'a red hat'));
+
+    expect(out.kind).toBe('queued');
+    expect(gateway.run).toHaveBeenCalledWith({ path: 'ideogram/edit' }, expect.objectContaining({ image_url: 'https://cdn.test/pic.png', mask_url: 'https://cdn.test/mask.png' }), expect.any(String));
+  });
+
+  it('sends the picture the node carries instead of the wired one when it has its own', async () => {
+    upstreamMedia.current = { referenceImageUrls: ['https://cdn.test/pic.png'] };
+    const { db } = world({ maskRefId: 'mask-1', editImageRefId: 'padded-1' });
+
+    await runGenNode(db, start(INPAINT, 'more sky'));
+
+    expect(gateway.run).toHaveBeenCalledWith({ path: 'ideogram/edit' }, expect.objectContaining({ image_url: 'https://cdn.test/padded.png' }), expect.any(String));
+  });
+
+  it('refuses without spending when the node has no mask', async () => {
+    upstreamMedia.current = { referenceImageUrls: ['https://cdn.test/pic.png'] };
+    const { db } = world({});
+
+    const out = await runGenNode(db, start(INPAINT, 'a red hat'));
+
+    expect(out).toMatchObject({ kind: 'refused', error: expect.stringContaining('mask') });
+    expect(gateway.run).not.toHaveBeenCalled();
   });
 });
 

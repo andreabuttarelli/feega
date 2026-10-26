@@ -8,7 +8,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import { motionEditorPath, motionOf } from '$lib/canvas/motion-node';
 import { progressOf } from '$lib/motion/server-render';
 import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
-import { renderPagePath } from '$lib/motion/render-link';
+import { renderPagePath, headlessUrl } from '$lib/motion/render-link';
 import type { RenderSettings } from '$lib/motion/export-formats';
 import type { RenderQuote } from '$lib/motion/render-quote';
 import { headOrNew } from './editor';
@@ -48,7 +48,7 @@ export async function requestRender(db: Db, input: RenderAskInput): Promise<Rend
 
   if (input.mode === RenderMode.Browser) {
     const link = await createRenderLink(db, { orgId: input.orgId, nodeId: input.nodeId, version: head.version, quality: input.settings.quality, actor: input.actor });
-    return { ok: true, body: { mode: RenderMode.Browser, run_id: link.runId, render_url: `${input.origin}${renderPagePath(link.token)}`, expires_at: link.expiresAt, revision: head.version, credits: BROWSER_RENDER_CREDITS } };
+    return { ok: true, body: { mode: RenderMode.Browser, run_id: link.runId, render_url: `${input.origin}${renderPagePath(link.token)}`, headless_url: headlessUrl(`${input.origin}${renderPagePath(link.token)}`), expires_at: link.expiresAt, revision: head.version, credits: BROWSER_RENDER_CREDITS } };
   }
 
   const editorUrl = motionEditorPath({ projectId: record.projectId, canvasId: record.canvasId, nodeId: record.id });

@@ -1,8 +1,8 @@
-import { FORMATS, MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { FIELD_TYPE_LABEL } from './field-model';
+import { FORMATS, MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { FIELD_TYPE_LABEL } from '@feega/motion-core/motion/template/field-model';
 import { insertTemplate, type Inserted, type Instance, type TemplateEntry } from './library';
 import PREVIEWED from './previews.json';
-import { DocMode, docMode } from '$lib/motion/still';
+import { DocMode, docMode } from '@feega/motion-core/motion/still';
 import { SectionRole } from './card';
 import { templateCard } from './cards';
 

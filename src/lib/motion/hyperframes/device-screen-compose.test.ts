@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { precompose } from '../precomp';
-import { addClip, removeClips, type OpResult } from '../timeline';
-import { composeHtml } from './compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { precompose } from '@feega/motion-core/motion/precomp';
+import { addClip, removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

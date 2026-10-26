@@ -3,11 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('$env/dynamic/public', () => ({ env: { PUBLIC_SUPABASE_URL: 'https://sb.test', PUBLIC_APP_URL: 'https://oh.feega.app' } }));
 
 const { EMBED_BUCKET, embedSlot, publishEmbed, readEmbed, readEmbedAsset, readEmbedSettings, removeEmbed, embedPublished } = await import('./embed');
-const { Chunk, chunkUrl } = await import('$lib/motion/hyperframes/runtime-chunks');
-const { MotionFormat, newMotionDoc } = await import('$lib/motion/doc');
-const { FEEGA_TOKENS } = await import('$lib/motion/brand');
+const { Chunk, chunkUrl } = await import('@feega/motion-core/motion/hyperframes/runtime-chunks');
+const { MotionFormat, newMotionDoc } = await import('@feega/motion-core/motion/doc');
+const { FEEGA_TOKENS } = await import('@feega/motion-core/motion/brand');
 const { ProjectMode } = await import('$lib/project-mode');
-const { addClip } = await import('$lib/motion/timeline');
+const { addClip } = await import('@feega/motion-core/motion/timeline');
 
 const NODE = '6f1c2a8e-0b7d-4f1e-9a3c-2d5e8f7a1b40';
 

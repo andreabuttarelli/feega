@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Horizontal, Vertical } from './model';
+import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
 import { Side, Toggle, toggleHorizontal, toggleVertical } from './sides';
 
 describe('constraint sides', () => {

@@ -1,6 +1,6 @@
 {
   "installCommand": "npm ci",
-  "ignoreCommand": "bash scripts/vercel-ignore.sh",
+  "ignoreCommand": "bash scripts/vercel-ignore.sh . ':!cli' ':!changelog' ':!docs' ':!apps' ':!imgs' ':!supabase'",
   "headers": [
     {
       "source": "/motion-libs/(.*)",
@@ -63,16 +63,30 @@
           "value": "public, max-age=31536000, immutable"
         }
       ]
+    },
+    {
+      "source": "/gpu-core/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "source": "/gpu-text/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
     }
   ],
   "crons": [
     {
       "path": "/api/v1/ai-models/sync",
       "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/v1/health/accounts/tick",
-      "schedule": "30 5 * * *"
     },
     {
       "path": "/api/v1/videos/render/work",

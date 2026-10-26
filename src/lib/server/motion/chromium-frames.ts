@@ -2,9 +2,9 @@ import { existsSync } from 'node:fs';
 import type { Browser, Page } from 'puppeteer-core';
 import shaderRuntime from 'virtual:motion-shader-fx';
 import type { ExportPage, ExportPort, PageBox, StillPage, StillPort, Viewport } from './server-frames';
-import { freezePage } from '$lib/motion/export-vector';
-import { Pose, kindsOf, measureClips } from '$lib/motion/hyperframes/measure';
+import { Pose, kindsOf, measureClips } from '@feega/motion-core/motion/hyperframes/measure';
 import type { GlPage } from '$lib/server/effects/check';
+import { extraChromiumArgs } from './chromium-args';
 
 const CHROMIUM_VERSION = '153.0.0';
 const CHROMIUM_PACK = `https://github.com/Sparticuz/chromium/releases/download/v${CHROMIUM_VERSION}/chromium-v${CHROMIUM_VERSION}-pack.x64.tar`;
@@ -46,7 +46,7 @@ async function launch(): Promise<Browser> {
   const [{ default: chromium }, { default: puppeteer }] = await Promise.all([import('@sparticuz/chromium-min'), import('puppeteer-core')]);
   const local = localChromium();
   if (local) {
-    return puppeteer.launch({ executablePath: local, headless: 'shell' });
+    return puppeteer.launch({ executablePath: local, args: extraChromiumArgs(process.env), headless: 'shell' });
   }
   const executablePath = await chromium.executablePath(process.env.CHROMIUM_PACK_URL ?? CHROMIUM_PACK);
   return puppeteer.launch({ executablePath, args: chromium.args, headless: 'shell' });
@@ -117,7 +117,6 @@ async function exportPageOf(viewport: Viewport): Promise<ExportPage> {
   const page = await openPage(viewport);
   return {
     ...stillOf(page),
-    freeze: async () => (await page.evaluate(`(${freezePage.toString()})(document)`)) as string,
     boxOf: (clipId) => boxOf(page, clipId),
     shot: async (mime, quality, clip) => Buffer.from(await page.screenshot({ type: SCREENSHOT_TYPE[mime], quality, omitBackground: true, ...(clip ? { clip: { x: clip.left, y: clip.top, width: clip.width, height: clip.height } } : {}) }))
   };

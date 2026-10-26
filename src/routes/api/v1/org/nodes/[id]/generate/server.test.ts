@@ -127,6 +127,32 @@ describe('POST /api/v1/org/nodes/:id/generate', () => {
     expect(runGenNode).toHaveBeenCalledWith({}, expect.objectContaining({ params: { resolution: '2K', provider: 'kie' } }));
   });
 
+  it('refuses a variant count off the 1, 2, 4, 8 ladder before spending anything', async () => {
+    const { res, body } = await call(NODE, { medium: 'image', prompt: 'x', model: 'm', version: 3, variants: 3, params: {} });
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe('invalid_variants');
+    expect(gateOrgAiAction).not.toHaveBeenCalled();
+    expect(runGenNode).not.toHaveBeenCalled();
+  });
+
+  it('refuses an unknown destination for variants', async () => {
+    const { res, body } = await call(NODE, { medium: 'image', prompt: 'x', model: 'm', version: 3, variants: 2, into: 'sideways', params: {} });
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe('invalid_variants_into');
+    expect(runGenNode).not.toHaveBeenCalled();
+  });
+
+  it('variants: 1 is the plain run', async () => {
+    runGenNode.mockResolvedValue({ kind: 'queued', run: { id: 'run-3' } });
+
+    const { res } = await call(NODE, { medium: 'image', prompt: 'x', model: 'm', version: 3, variants: 1, params: {} });
+
+    expect(res.status).toBe(200);
+    expect(runGenNode).toHaveBeenCalledTimes(1);
+  });
+
   it('gates on org credits before ever calling runGenNode', async () => {
     gateOrgAiAction.mockResolvedValue(new Response(JSON.stringify({ error: 'credits_exhausted' }), { status: 402 }));
 

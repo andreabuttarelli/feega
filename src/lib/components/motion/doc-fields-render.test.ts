@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import DocFields from './DocFields.svelte';
-import { AssetKind } from '$lib/motion/components';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { AssetKind } from '@feega/motion-core/motion/components';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { insertTemplate } from '$lib/motion/template/library';
 import { MEDIA_CLOUD_TEMPLATE } from '$lib/motion/template/media-cloud/template';
 

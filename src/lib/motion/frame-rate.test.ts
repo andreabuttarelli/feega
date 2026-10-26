@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { FRAME_RATES, maxFrames, setFrameRate } from './frame-rate';
-import { addClip, setKeyframes } from './timeline';
-import { setCamera, setCameraKeyframes } from './camera-ops';
-import { Ease, TransitionKind } from './design';
+import { addClip, setKeyframes } from '@feega/motion-core/motion/timeline';
+import { setCamera, setCameraKeyframes } from '@feega/motion-core/motion/camera-ops';
+import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
 
 function edited(): MotionDoc {
   const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 15, durationInFrames: 90 }, 't1');
@@ -57,6 +57,20 @@ describe('frame rate', () => {
     expect(parseMotionDoc(at60).ok).toBe(true);
     expect(parseMotionDoc({ ...at60, durationInFrames: maxFrames(60) + 1 }).ok).toBe(false);
     expect(parseMotionDoc({ ...at60, fps: 30 }).ok).toBe(false);
+  });
+
+  it('a doc can run at 120 fps and keeps the same longest length in seconds', () => {
+    const at120 = { ...newMotionDoc(MotionFormat.Square), fps: 120, durationInFrames: maxFrames(120) };
+
+    expect(parseMotionDoc(at120).ok).toBe(true);
+    expect(parseMotionDoc({ ...at120, durationInFrames: maxFrames(120) + 1 }).ok).toBe(false);
+  });
+
+  it('moving a doc to 120 fps keeps every time in seconds', () => {
+    const result = setFrameRate(edited(), 120);
+
+    expect(result.ok && [result.doc.fps, result.doc.durationInFrames, result.doc.tracks[0].clips[0].from]).toEqual([120, 15 * 120, 15 * 4]);
+    expect(result.ok && parseMotionDoc(result.doc).ok).toBe(true);
   });
 
   it('changing the rate keeps every time in seconds: clips, transitions, keyframes, camera', () => {

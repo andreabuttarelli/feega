@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { setStill } from '$lib/motion/still';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { setStill } from '@feega/motion-core/motion/still';
 
 const insertAsset = vi.fn();
 const shots: { viewport: unknown; mime: string; seek: number }[] = [];
@@ -16,7 +16,7 @@ vi.mock('$lib/server/motion/editor', async (original) => ({
   findMotionNode: async () => ({ record: { id: 'n1' }, node: {} }),
   headOrNew: async () => ({ version: 3, doc: pinned.ok ? pinned.doc : null }),
   motionAssets: async () => [],
-  motionTokens: async () => (await import('$lib/motion/brand')).FEEGA_TOKENS
+  motionTokens: async () => (await import('@feega/motion-core/motion/brand')).FEEGA_TOKENS
 }));
 vi.mock('$lib/server/motion/chromium-frames', () => ({
   serverFramesOpen: () => true,
@@ -39,7 +39,7 @@ vi.mock('$lib/server/motion/chromium-frames', () => ({
   }
 }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/frame-editor/editor-page');
 
 function fakeDb() {
   const uploads: { path: string; type: string }[] = [];

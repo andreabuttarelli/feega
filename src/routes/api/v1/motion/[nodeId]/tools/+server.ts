@@ -4,8 +4,6 @@ import { frameToolBody, runFrameTool } from '$lib/server/edit/runners';
 import { ToolRun } from '$lib/server/motion/tool-run';
 import type { RequestHandler } from './$types';
 
-export const config = { maxDuration: 60, memory: 2048 };
-
 const HTTP_BAD_REQUEST = 400;
 
 export const POST: RequestHandler = async ({ request, params, url }) => {

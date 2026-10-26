@@ -1,15 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
 
-const syncBrandAccounts = vi.fn();
-const disconnectAccount = vi.fn();
-
 vi.mock('$lib/server/tenancy', () => ({ hasManyTenants: () => true }));
-vi.mock('$lib/server/zernio', () => ({
-  syncBrandAccounts: (...a: unknown[]) => syncBrandAccounts(...a),
-  disconnectAccount: (...a: unknown[]) => disconnectAccount(...a)
-}));
-vi.mock('$lib/server/social-connections', () => ({ canAffordSeat: async () => true }));
 vi.mock('$lib/server/email', () => ({
   sendEmail: vi.fn(),
   brandInviteEmailSubject: () => 's',
@@ -18,7 +10,6 @@ vi.mock('$lib/server/email', () => ({
 }));
 
 import { actions as apiKeyActions } from '$lib/server/settings/pages/api-keys';
-import { actions as accountActions } from './connected-accounts/+page.server';
 import { actions as dangerActions } from '$lib/server/settings/pages/danger';
 
 const USER = 'user-1';
@@ -34,8 +25,7 @@ function baseRows(brandId: string | null): Rows {
     brands: [BRAND],
     orgs_members: [{ org_id: ORG, user_id: USER, role: 'owner' }],
     orgs_invites: [{ id: 'inv-1', org_id: ORG, email: 'x@y.com', role: 'member', expires_at: '', accepted_at: null, created_at: '' }],
-    orgs: [{ id: ORG, name: 'Org', stripe_customer_id: null, stripe_subscription_id: null }],
-    social_accounts: [{ id: 'acc-1', brand_id: BRAND.id, zernio_account_id: 'z-1' }]
+    orgs: [{ id: ORG, name: 'Org', stripe_customer_id: null, stripe_subscription_id: null }]
   };
 }
 
@@ -65,7 +55,6 @@ const writes = (calls: Call[], table: string, op: string) => calls.filter((c) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  disconnectAccount.mockResolvedValue(undefined);
 });
 
 describe('le azioni delle impostazioni leggono il progetto, non un params.brand che non esiste', () => {
@@ -85,31 +74,6 @@ describe('le azioni delle impostazioni leggono il progetto, non un params.brand 
 
     expect(result).toMatchObject({ apiKeyRevoked: true });
     expect(writes(calls, 'api_keys', 'delete')[0].filters).toContainEqual(['org_id', ORG]);
-  });
-
-  it('sincronizza gli account del brand del progetto', async () => {
-    const { ev } = event(baseRows(BRAND.id));
-
-    const result = await run(accountActions.sync, ev);
-
-    expect(result).toMatchObject({ synced: true });
-    expect(syncBrandAccounts).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: BRAND.id, org_id: ORG }));
-  });
-
-  it('senza brand la sincronizzazione risponde, non esplode', async () => {
-    const { ev } = event(baseRows(null));
-
-    await expect(run(accountActions.sync, ev)).resolves.toMatchObject({ error: expect.any(String) });
-  });
-
-  it('scollega un account del brand del progetto', async () => {
-    const { ev, calls } = event(baseRows(BRAND.id), { id: 'acc-1' });
-
-    const result = await run(accountActions.disconnect, ev);
-
-    expect(result).toMatchObject({ disconnected: true });
-    expect(disconnectAccount).toHaveBeenCalledWith('z-1');
-    expect(writes(calls, 'social_accounts', 'delete')[0].filters).toContainEqual(['brand_id', BRAND.id]);
   });
 
   it('cancella il brand del progetto quando il nome combacia', async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import MotionNode from './MotionNode.svelte';
-import { MotionFormat } from '$lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { LiveHost } from '$lib/canvas/frame-live';
 

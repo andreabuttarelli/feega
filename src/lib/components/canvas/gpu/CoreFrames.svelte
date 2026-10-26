@@ -1,31 +1,33 @@
 <script lang="ts">
-  import { drawFrame, prepare, type DisplayList, type Prepared } from '$lib/motion/gpu-full/display-list';
-  import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
-  import { loadFonts } from '$lib/motion/gpu-full/text/load';
-  import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
-  import { createMedia, Readiness, VideoPreload } from '$lib/motion/gpu-full/media';
+  import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+  import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
+  import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
+  import { createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+  import { createMedia, Readiness, VideoPreload } from '@feega/motion-core/motion/gpu-full/media';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
-  import { Outcome } from '$lib/motion/gpu-full/core-outcome';
+  import { Outcome } from '@feega/motion-core/motion/gpu-full/core-outcome';
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
-  import { ItemKind } from '$lib/motion/gpu-full/display-list';
+  import { ItemKind } from '@feega/motion-core/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
+  import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { cached, uncached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentOverlay, SentUses } from '$lib/canvas/core/use-diff';
-  import type { PathItem } from '$lib/motion/gpu-full/display-list';
-  import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
+  import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+  import { drawsWhole, frameOfLive, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
-  import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
-  import type { Pictures } from '$lib/motion/gpu-full/raster';
+  import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
+  import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
@@ -47,7 +49,7 @@
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
   const media = createMedia({ videoPreload: VideoPreload.Metadata });
   const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
-  const keyOf = (f: FrameAt) => `${f.id}:${f.revision}`;
+  const keyOf = (f: FrameAt) => `${f.id}:${f.revision}${f.scenes ? `:${f.scenes}` : ''}`;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
 
   let readsHost = $state<HTMLDivElement | null>(null);
@@ -63,7 +65,7 @@
     if (!host || !readClips(source.doc).read.length) {
       return null;
     }
-    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('$lib/motion/gpu-full/dom/custom'), import('$lib/motion/hyperframes/compose'), import('$lib/motion/interactive/settings')]);
+    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('@feega/motion-core/motion/gpu-full/dom/custom'), import('@feega/motion-core/motion/hyperframes/compose'), import('@feega/motion-core/motion/interactive/settings')]);
     await whenQuiet(() => gesture.active() || edited.size > 0);
     return domRead(fromView(f), async (signal) => {
       const mounting = mountCustomReads(host, (only) => composeHtml({ doc: source.doc, tokens: source.tokens, assets: source.assets, liveness: Liveness.Baked, target: Target.Screen, only }), prepared);
@@ -83,17 +85,33 @@
     return buildSource(f, (await res.json()) as FrameDoc);
   }
 
-  async function buildSource(f: FrameAt, source: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
+  async function fetchScene(id: string): Promise<FrameDoc | null> {
+    const res = await fetch(new URL(sourceUrl(id), location.href).href);
+    return res.ok ? ((await res.json()) as FrameDoc) : null;
+  }
+
+  const fetchedScenes = new Map<string, LoadScene>();
+  const fetchedAt = (stamp: string) => fetchedScenes.get(stamp) ?? fetchedScenes.set(stamp, loadOnce(fetchScene)).get(stamp)!;
+
+  const sceneSource =
+    (stamp: string): LoadScene =>
+    async (id) => {
+      const held = live.get(id);
+      return held ? { revision: 0, ...held } : fetchedAt(stamp)(id);
+    };
+
+  async function buildSource(f: FrameAt, given: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
+    const source = await withScenes(given, sceneSource(f.scenes ?? ''));
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
-    const still = stillFrame(source.doc);
+    const still = frameOfLive(source);
     const custom = await readDom(f, source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
     return { list: drawFrame(prepared, still, custom?.reads), custom };
   }
 
   async function load(f: FrameAt) {
     const url = new URL(`${sourceUrl(f.id)}?revision=${f.revision}`, location.href).href;
-    const away = await buildAway(url, smoothing).catch(() => null);
+    const away = f.scenes ? null : await buildAway(url, smoothing).catch(() => null);
     const built = away ? { list: away, custom: null } : await buildHere(f, url);
     if (!built || (await media.ready(built.list)) === Readiness.Partial) {
       return;
@@ -106,6 +124,7 @@
 
   let liveGroup = $state(new Map<string, string>());
   const liveBuilt = new Map<string, LiveDoc>();
+  const liveStamp = new Map<string, string | undefined>();
   const liveGeneration = new Map<string, number>();
   const liveAtRevision = new Map<string, number>();
   const groupOf = (f: FrameAt) => liveGroup.get(f.id) ?? keyOf(f);
@@ -126,8 +145,9 @@
   $effect(() => {
     for (const f of frames) {
       const source = live.get(f.id);
-      if (source && liveBuilt.get(f.id) !== source) {
+      if (source && (liveBuilt.get(f.id) !== source || liveStamp.get(f.id) !== f.scenes)) {
         liveBuilt.set(f.id, source);
+        liveStamp.set(f.id, f.scenes);
         void rebuildLive(f, source);
       }
     }
@@ -170,7 +190,7 @@
   const framePuts = $derived(
     frames.flatMap((f): HeldFrame[] => {
       const list = lists.get(groupOf(f));
-      return list && drawsWhole(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items) }] : [];
+      return list && drawsWhole(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
     })
   );
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));
@@ -196,7 +216,7 @@
 
   const rank = $derived(new Map(order.map((id, i) => [id, i])));
   const stacking = (id: string) => rank.get(id) ?? 0;
-  const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...frames.map((f) => ({ id: f.id, box: f.box, stand: Stand.Frame })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))].sort((a, b) => stacking(a.id) - stacking(b.id)));
+  const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...frames.map((f) => ({ id: f.id, box: f.box, stand: Stand.Frame, turn: f.turn })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))].sort((a, b) => stacking(a.id) - stacking(b.id)));
   const placeholders = $derived(new Map(standIns.map((n) => [n.id, { ...n, ...placeholder(n.stand, { width: n.box.w, height: n.box.h }, look) }])));
   const BLOCKS = ':blocks';
   const blocksGroup = (key: string) => `${key}${BLOCKS}`;
@@ -303,7 +323,26 @@
   const painted: Record<Outcome, number> = { [Outcome.Idle]: 0, [Outcome.Reused]: 0, [Outcome.Partial]: 0, [Outcome.Full]: 0 };
   let paintedLabel = $state('');
 
+  const listIfKnown = (group: string) => cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list;
+
+  function patchedFromSent(into: CoreRaster, group: string): number {
+    const layers = chains.flat();
+    const target = layers.find((f) => f.group === group);
+    const base = target && layers.find((f) => f.id === target.id && f.group !== group && put.has(f.group));
+    const [before, after] = [base && listIfKnown(base.group), listIfKnown(group)];
+    const splice = before && after && spliceOf(before, after);
+    if (!base || !splice || splice.items.length > PART_ITEMS || !into.patchGroup(base.group, group, splice, pictures)) {
+      return 0;
+    }
+    put.add(group);
+    return splice.items.length + 1;
+  }
+
   function putPart(into: CoreRaster, group: string): number {
+    const patched = putting.has(group) ? 0 : patchedFromSent(into, group);
+    if (patched) {
+      return patched;
+    }
     const job = putting.get(group) ?? { parts: parts(listOf(group), PART_ITEMS), next: 0 };
     const part = job.parts[job.next];
     if (job.next === 0) {
@@ -333,6 +372,29 @@
 
   const onScreen = (b: { x: number; y: number; w: number; h: number }) => b.x * view.zoom + view.x < area.width && (b.x + b.w) * view.zoom + view.x > 0 && b.y * view.zoom + view.y < area.height && (b.y + b.h) * view.zoom + view.y > 0;
 
+  const GRID = 3;
+  const SAMPLE_PX = 24;
+  const ALPHA_VISIBLE = 8;
+  let sampler: CanvasRenderingContext2D | null = null;
+
+  function coverage(target: HTMLCanvasElement | null): string {
+    sampler ??= Object.assign(document.createElement('canvas'), { width: GRID * SAMPLE_PX, height: GRID * SAMPLE_PX }).getContext('2d', { willReadFrequently: true });
+    if (!target || !sampler) {
+      return 'n/a';
+    }
+    sampler.clearRect(0, 0, GRID * SAMPLE_PX, GRID * SAMPLE_PX);
+    sampler.drawImage(target, 0, 0, GRID * SAMPLE_PX, GRID * SAMPLE_PX);
+    const px = sampler.getImageData(0, 0, GRID * SAMPLE_PX, GRID * SAMPLE_PX).data;
+    const cells = Array.from({ length: GRID * GRID }, () => 0);
+    for (let y = 0; y < GRID * SAMPLE_PX; y++) {
+      for (let x = 0; x < GRID * SAMPLE_PX; x++) {
+        const cell = Math.floor(y / SAMPLE_PX) * GRID + Math.floor(x / SAMPLE_PX);
+        cells[cell] += px[(y * GRID * SAMPLE_PX + x) * 4 + 3] > ALPHA_VISIBLE ? 1 : 0;
+      }
+    }
+    return cells.map((n) => (n / (SAMPLE_PX * SAMPLE_PX)).toFixed(2)).join(',');
+  }
+
   function debugFrame(outcome: string, skipped: string[], shown: HeldFrame[]) {
     const drawn = new Map(shown.map((f) => [f.id, f]));
     const readyIds = new Map(real.map((f) => [f.id, f]));
@@ -347,12 +409,12 @@
     const header = `zoom=${view.zoom.toFixed(3)} view=${Math.round(view.x)},${Math.round(view.y)} area=${Math.round(area.width)}x${Math.round(area.height)} retained=${refine} outcome=${outcome} caching=${zooming.active()} cacheBytes=${cacheBytes} held=${held.length} pictured=${pictured.size} put=${put.size}`;
     const signature = signatureOf(debugFacts);
     if (debugMoving && !moving) {
-      console.info(`[core] gesture end ${header}`);
+      console.info(`[core] gesture end ${header} coverage3x3=${coverage(canvas)} camera=${at0()}`);
       undrawn(debugFacts).slice(0, MAX_LISTED).forEach((f) => console.warn(`[core]   ${describe(f)}`));
     }
     if (signature !== debugSignature) {
       debugSignature = signature;
-      console.warn(`[core] ${signature ? 'undrawn on screen' : 'all drawn again'} ${header}`);
+      console.warn(`[core] ${signature ? 'undrawn on screen' : 'all drawn again'} ${header} coverage3x3=${coverage(canvas)}`);
       undrawn(debugFacts).slice(0, MAX_LISTED).forEach((f) => console.warn(`[core]   ${describe(f)}`));
     }
     if (skipped.length) {
@@ -361,6 +423,8 @@
     debugMoving = moving;
     hud = hudText(header);
   }
+
+  const at0 = () => `${Math.round(view.x * resolution)},${Math.round(view.y * resolution)},${(view.zoom * resolution).toFixed(3)}`;
 
   function hudText(header: string): string {
     const world = { x: (pointer.x - view.x) / view.zoom, y: (pointer.y - view.y) / view.zoom };

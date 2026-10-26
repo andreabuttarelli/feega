@@ -1,0 +1,32 @@
+---
+title: Components, variants and properties
+description: Reuse a design and override it per instance.
+sidebar:
+  order: 4
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="component-variants" caption="Add variants to a component." />
+
+Create a component from the selection with `⌥⌘K`. The Assets panel lists the components and variants on your canvas; drag one onto any frame to add an instance.
+
+## Variants
+
+A component can have variants. In Properties, switch an instance between them, or swap it for another component.
+
+## Properties
+
+A component can expose properties: show or hide a layer, edit text, swap a nested component, or surface a nested component property. Set them per instance.
+
+## Overrides
+
+Instances can override fill, stroke, image, visibility and effects, each with its own reset. Double-click into an instance to move or restyle its elements; only that instance changes and the main stays as it is.
+
+| Action | Where |
+|---|---|
+| Detach instance | Command palette (`⌘K`) |
+| Reset instance | Command palette |
+| Push instance changes to the main | Command palette, so every copy follows |
+
+**Unverified:** the exact menu location of detach, reset and push. The commands exist in the shortcut registry (`DetachInstance`, `ResetInstance`, `PushInstance`).

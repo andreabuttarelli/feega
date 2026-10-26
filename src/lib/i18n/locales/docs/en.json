@@ -19,8 +19,6 @@
     "s30": "Overview",
     "s31": "Endpoints",
     "s32": "Brands",
-    "s33": "Posts",
-    "s37": "Analytics",
     "s38": "Products",
     "s40": "Close menu",
     "s41": "On this page",
@@ -173,15 +171,6 @@
     "s23": "Internal server error",
     "s24": "Quick Start"
   },
-  "api_analytics": {
-    "s0": "Analytics — feega API",
-    "s1": "Analytics",
-    "s2": "Engagement analytics and content calendar.",
-    "s3": "Engagement analytics for published posts.",
-    "s4": "Analytics",
-    "s5": "Monthly content calendar.",
-    "s6": "Calendar"
-  },
   "api_brands": {
     "s0": "Brands — feega API",
     "s1": "Brands",
@@ -192,27 +181,6 @@
     "s6": "Full brand detail with stats, plan, kit, and recent runs.",
     "s7": "Brand detail",
     "s8": "Brand not found"
-  },
-  "api_posts": {
-    "s0": "Posts — feega API",
-    "s1": "Posts",
-    "s2": "Create, approve, schedule, publish, and manage posts.",
-    "s3": "List posts, optionally filtered by status.",
-    "s4": "Array of posts",
-    "s5": "Invalid token",
-    "s6": "Update a post.",
-    "s7": "Updated",
-    "s8": "Not found",
-    "s9": "Approve and publish a single post.",
-    "s10": "Approved",
-    "s11": "Approve all pending posts.",
-    "s12": "Bulk result",
-    "s13": "Publish immediately.",
-    "s14": "Published",
-    "s15": "Reschedule a post.",
-    "s16": "Rescheduled",
-    "s17": "Delete a post (pending_user only).",
-    "s18": "Deleted"
   },
   "api_products": {
     "s0": "Products — feega API",
@@ -591,7 +559,7 @@
     "s5": "Credits meter AI usage across feega. Paid plans also include rolling chat windows so a single burst of conversation can’t burn the whole month in one sitting.",
     "s6": "How credits work",
     "s7": "Every AI action spends credits from your brand’s monthly allowance. Credits reset with your billing period.",
-    "s10": "How much a single action spends depends on what it asks for: a short chat reply is a few credits, a long article with its images is many more. The meter follows the work itself, not a fixed price per action.",
+    "s10": "How much a single action spends depends on what it asks for: a short chat reply is a few credits, a long article with its images is many more. The meter follows the work itself, not a fixed price per action: every AI generation and chat turn costs the provider’s price plus 20%.",
     "s11": "Monthly credits by plan",
     "s12": "Plan",
     "s13": "Credits / month",

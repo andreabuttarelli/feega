@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { vectorJson, vectorRuntime, VECTOR_CSS } from '../vector-ui/piece';
 import { withinBudget, type VectorUi } from '../vector-ui/model';
-import { MAX_JS } from '../custom/component';
+import { MAX_JS } from '@feega/motion-core/motion/custom/component';
 import { CURSOR_SLOT, CursorAction, NODE_ID, cursorSource, type CursorStep } from './cursor';
 
 export enum ShotId {
@@ -624,7 +624,7 @@ drive((t) => {
 `;
 
 export const SHOTS: Record<ShotId, ShotSpec> = {
-  [ShotId.KineticTitle]: { name: 'ShotKineticTitle', about: 'a full-frame title: words punch in one by one from 134% and an 18 px blur, then hold on a slow push-in', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ text, accent_word: z.union([z.number().int().min(-1).max(12), text.max(24)]).optional() }), limits: { text: limit(6, 36) }, css: '', js: KINETIC_TITLE },
+  [ShotId.KineticTitle]: { name: 'ShotKineticTitle', about: 'a full-frame title: words punch in one by one from 134% and an 18 px blur, then hold on a slow push-in', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ text, accent_word: z.union([z.number().int().min(-1).max(12), text.max(24)]).optional().meta({ default: -1, description: 'the word drawn in accent: its 0-based index or the word itself, -1 none' }) }), limits: { text: limit(6, 36) }, css: '', js: KINETIC_TITLE },
   [ShotId.DeviceFlyIn]: { name: 'ShotDeviceFlyIn', about: 'the recreated product UI on a screen flies in from deep space turning 104°, lands and drifts: the establishing shot of the product', seconds: { min: 2.5, best: 3.5, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.None, peak: true, slots: z.object({}), limits: {}, css: UI_HOST_CSS, js: DEVICE_FLY_IN },
   [ShotId.UiFocus]: { name: 'ShotUiFocus', about: 'one flow of the recreated UI, one part at a time, driven by a cursor: it clicks the field and types, moves to the button and presses it while the camera follows, then pulls back to the result', seconds: { min: 3, best: 4, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.Scripted, peak: false, slots: z.object({ field_id: nodeId, button_id: nodeId, type_text: text.optional(), result_id: nodeId.optional(), cursor: CURSOR_SLOT.optional() }), limits: { type_text: limit(8, 48) }, css: UI_HOST_CSS, js: UI_FOCUS },
   [ShotId.FeatureGrid]: { name: 'ShotFeatureGrid', about: 'up to six feature tiles fly in exploded in depth and assemble into a grid', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: true, slots: z.object({ items: text }), limits: { items: limit(12, 96) }, css: '', js: FEATURE_GRID },
@@ -632,7 +632,7 @@ export const SHOTS: Record<ShotId, ShotSpec> = {
   [ShotId.BeforeAfter]: { name: 'ShotBeforeAfter', about: 'the pain line is struck through, then an accent divider wipes the recreated UI in beside it (under it in vertical)', seconds: { min: 3, best: 3.5, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.None, peak: false, slots: z.object({ before_text: text, before_label: text.optional(), after_label: text.optional() }), limits: { before_text: limit(6, 36), before_label: limit(2, 16), after_label: limit(2, 16) }, css: UI_HOST_CSS, js: BEFORE_AFTER },
   [ShotId.LogoResolve]: { name: 'ShotLogoResolve', about: 'the original logo, flat and untouched, resolves with a fade and a small scale; the address follows', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ logo: z.string().min(1).optional(), wordmark: text.optional(), url: text.optional() }), limits: { wordmark: limit(2, 24), url: limit(1, 40) }, css: '', js: LOGO_RESOLVE },
   [ShotId.UiMorph]: { name: 'ShotUiMorph', about: 'the cursor rests on one element of the recreated UI, travels to another with a highlight as the camera follows, clicks it and the target changes state', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.Scripted, peak: false, slots: z.object({ from_id: nodeId, to_id: nodeId, to_text: text.optional(), cursor: CURSOR_SLOT.optional() }), limits: { to_text: limit(3, 24) }, css: UI_HOST_CSS, js: UI_MORPH },
-  [ShotId.TaglineCard]: { name: 'ShotTaglineCard', about: 'the end card: the promise rises line by line out of a mask, the address fades in under it', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ lines: text, url: text.optional(), accent_line: z.number().int().min(-1).max(2).optional() }), limits: { lines: limit(6, 40), url: limit(1, 40) }, css: '', js: TAGLINE_CARD },
+  [ShotId.TaglineCard]: { name: 'ShotTaglineCard', about: 'the end card: the promise rises line by line out of a mask, the address fades in under it', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ lines: text, url: text.optional(), accent_line: z.number().int().min(-1).max(2).optional().meta({ default: -1, description: '0-based: 0 is the first of lines split by |, -1 none' }) }), limits: { lines: limit(6, 40), url: limit(1, 40) }, css: '', js: TAGLINE_CARD },
   [ShotId.WhipZoom]: { name: 'ShotWhipZoom', about: 'a transition: the camera dives into one element of the recreated UI, blurring with speed, and lands on its colour for the next shot', seconds: { min: 1, best: 1.4, max: 2 }, ui: ShotUi.Required, cursor: ShotCursor.None, peak: true, slots: z.object({ target_id: nodeId, end_colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }), limits: {}, css: UI_HOST_CSS, js: WHIP_ZOOM }
 };
 
@@ -687,6 +687,20 @@ function cut(copy: string, room: SlotLimit): string {
   }
   return words.join(' ');
 }
+
+const LINE_SEPARATOR = '|';
+
+const linesOf = (slots: Record<string, unknown>) => String(slots.lines ?? '').split(LINE_SEPARATOR).map((l) => l.trim()).filter(Boolean).length;
+
+const SLOT_RULES: Partial<Record<ShotId, (slots: Record<string, unknown>) => string | null>> = {
+  [ShotId.TaglineCard]: (slots) => {
+    const key = slots.accent_line;
+    const count = linesOf(slots);
+    return typeof key === 'number' && key >= count ? `accent_line ${key} is past the last line: lines has ${count} (split by |), so 0–${count - 1}, or -1 for none` : null;
+  }
+};
+
+export const slotRuleProblem = (id: ShotId, slots: Record<string, unknown>): string | null => SLOT_RULES[id]?.(slots) ?? null;
 
 export function overLimits(id: ShotId, slots: Record<string, unknown>): string | null {
   const over = Object.entries(SHOTS[id].limits).flatMap(([slot, room]) => {

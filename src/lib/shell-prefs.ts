@@ -19,7 +19,7 @@ const SHELL_PREF_KEYS_LEGACY = {
   chatTab: 'dazero.chatTab'
 } as const;
 
-export const CHAT_TABS = ['chat', 'guide'] as const;
+export const CHAT_TABS = ['chat', 'guide', 'properties'] as const;
 export type ChatTab = (typeof CHAT_TABS)[number];
 
 export const SIDEBAR_PANES = ['chat', 'pages', 'assets'] as const;

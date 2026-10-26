@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MotionFormat } from '$lib/motion/doc';
+  import type { MotionFormat } from '@feega/motion-core/motion/doc';
   import { glyphSize } from '$lib/gallery/model';
 
   let { format }: { format: MotionFormat } = $props();

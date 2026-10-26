@@ -1,11 +1,11 @@
-import { Ease, TransitionKind } from '$lib/motion/design';
-import { DEVICES, Device } from '$lib/motion/devices';
-import { IMAGE_ZOOM, TITLE_LOOK } from '$lib/motion/components';
-import { FontCategory, FontSource, type FontFace } from '$lib/motion/fonts/model';
-import { EASE_BEZIER } from '$lib/motion/keyframes';
+import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
+import { DEVICES, Device } from '@feega/motion-core/motion/devices';
+import { IMAGE_ZOOM, TITLE_LOOK } from '@feega/motion-core/motion/components';
+import { FontCategory, FontSource, type FontFace } from '@feega/motion-core/motion/fonts/model';
+import { EASE_BEZIER } from '@feega/motion-core/motion/keyframes';
 import { STYLES } from '$lib/motion/style';
-import { MotionStyle } from '$lib/motion/style-model';
-import { FillKind } from '$lib/motion/shape/schema';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
+import { FillKind } from '@feega/motion-core/motion/shape/schema';
 import { edge, type Beat, type Key } from '$lib/motion/template-kit';
 import { FieldType } from './fields';
 import { boxAspect, colour, text, type Design, type Field } from './design-kit';

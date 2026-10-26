@@ -1,4 +1,4 @@
-import type { ComponentId } from './components';
+import type { ComponentId } from '@feega/motion-core/motion/components';
 
 export enum ClipFamily {
   Text = 'text',

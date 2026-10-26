@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import MotionTimeline from './MotionTimeline.svelte';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import type { ComponentId } from '$lib/motion/components';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { ComponentId } from '@feega/motion-core/motion/components';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { Snap } from '$lib/motion/timeline-view';
 
 function withClip(doc: MotionDoc, component: ComponentId, assetId: string): MotionDoc {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isOwnEcho } from './node-save';
-import { drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from './optimistic-insert';
+import { FRAME_GAP, besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from './optimistic-insert';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { CANVAS_INK, CanvasTheme } from '$lib/motion/draw-create';
 
@@ -42,7 +42,7 @@ describe('a shape drawn on the canvas before the server answers', () => {
   it('stands where the saved element will, as a chromeless element showing what was drawn', () => {
     const drawn = drawnTile('e1', { tool: DrawTool.Rectangle, box: { left: 120, top: 40, width: 300, height: 100 } });
 
-    expect(drawn?.node).toMatchObject({ id: 'e1', type: 'motion', position: { x: 120, y: 40 }, size: { width: 300, height: 100 }, data: { kind: 'element', docHeadRevision: 1 } });
+    expect(drawn?.node).toMatchObject({ id: 'e1', type: 'element', position: { x: 120, y: 40 }, size: { width: 300, height: 100 }, data: { docHeadRevision: 1 } });
     expect(drawn?.look).toMatch(/^data:image\/svg\+xml,/);
   });
 
@@ -62,5 +62,21 @@ describe('a shape drawn on the canvas before the server answers', () => {
 describe('a frame drawn on the canvas before the server answers', () => {
   it('stands on the dragged box, as a frame with its bar', () => {
     expect(drawnFrameTile('f9', { left: 100, top: 50, width: 400, height: 300 })).toMatchObject({ id: 'f9', type: 'motion', position: { x: 100, y: 50 }, size: { width: 400 }, data: { docHeadRevision: 1 } });
+  });
+});
+
+describe('where a clicked frame lands and how big it is', () => {
+  const at = { x: 500, y: 300 };
+
+  it('is 100 by 100 the first time, centred on the click', () => {
+    expect(defaultFrameBox(at, null)).toEqual({ left: 450, top: 250, width: 100, height: 100 });
+  });
+
+  it('reuses the size of the last frame', () => {
+    expect(defaultFrameBox(at, { width: 400, height: 200 })).toEqual({ left: 300, top: 200, width: 400, height: 200 });
+  });
+
+  it('the plus beside a frame makes a blank one of the same size to its right', () => {
+    expect(besideBox({ x: 100, y: 50, w: 400, h: 300 })).toEqual({ left: 100 + 400 + FRAME_GAP, top: 50, width: 400, height: 300 });
   });
 });

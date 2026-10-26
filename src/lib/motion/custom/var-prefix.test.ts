@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { INPUT_MESSAGE } from '../interactive/runtime';
+import { INPUT_MESSAGE } from '@feega/motion-core/motion/interactive/runtime';
 import { installEngine, testTimeline } from '../engine/testing';
-import { ERRORS, REGISTRY, bootScript, definitionScript, seedOf, type CustomRun } from './runtime';
+import { ERRORS, REGISTRY, bootScript, definitionScript, seedOf, type CustomRun } from '@feega/motion-core/motion/custom/runtime';
 
 const BRAND = { name: 'feega', colors: {}, logoUrl: null };
 const PROBE = 'tl.to({}, { duration: 2, ease: "none", onUpdate: () => { root.dataset.seen = props.label + "|" + props.fontSize; } }, 0);';

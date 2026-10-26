@@ -1,5 +1,5 @@
-import { COMPONENTS, TrackKind } from './components';
-import type { MotionDoc } from './doc';
+import { COMPONENTS, TrackKind } from '@feega/motion-core/motion/components';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { UI_KIT } from './ui-kit/kit';
 import { settleTime } from './ui-kit/render';
 import { nestedComp } from './nested';

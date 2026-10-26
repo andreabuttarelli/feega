@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePath, pathData, type Outline } from './geometry';
+import { parsePath, pathData, type Outline } from '@feega/motion-core/motion/shape/geometry';
 import { Handle, Mirror, addPoint, insertPoint, segmentHit, deletePoint, dragHandle, movePoint, toggleClosed, toggleSmooth } from './pen';
 
 const read = (d: string): Outline => {

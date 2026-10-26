@@ -652,7 +652,7 @@ export class GpuScene {
     holder.addChild(root);
     const b: Built = { id: c.id, root: holder, skin: root, key, body: null, video: null, texts: [], skeletons: [], media: null, releases: [], loads: [], loaded: false };
     const f = c.face;
-    const BUILD: Record<Surface, () => void> = {
+    const BUILD: Partial<Record<Surface, () => void>> = {
       [Surface.Media]: () => {
         this.panel(root, c);
         if (f.media) {
@@ -712,7 +712,7 @@ export class GpuScene {
       b.media = { url: snap.key, video: false };
       queueMicrotask(() => this.markReady(b));
     } else {
-      BUILD[f.surface]();
+      (BUILD[f.surface] ?? BUILD[Surface.Blank])!();
     }
     this.cardLayer.addChild(holder);
     holder.visible = this.seen(c);

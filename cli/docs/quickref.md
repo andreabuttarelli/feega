@@ -5,7 +5,7 @@
 ```bash
 # Panoramica
 feega brands                              # Lista brand
-feega health                              # Stato API (Supabase, Gemini, Zernio)
+feega health                              # Stato API (Supabase, Gemini)
 
 # Prodotti
 feega products <slug>                     # Lista

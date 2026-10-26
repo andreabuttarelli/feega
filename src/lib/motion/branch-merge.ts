@@ -1,4 +1,4 @@
-import { findClip, type MotionDoc } from './doc';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { OpKind, applyOps, diffDoc, type DocOp } from './doc-ops';
 
 export enum Side {

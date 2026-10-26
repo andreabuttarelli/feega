@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { clipFieldGroups } from '../inspector';
-import { addClip, type OpResult } from '../timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -31,6 +31,11 @@ describe('the inspector shows only the geometry a shape kind uses', () => {
     for (const legacy of ['fillKind', 'fill', 'fill2', 'gradientAngle']) {
       expect(keysFor('ellipse')).not.toContain(legacy);
     }
+  });
+
+  it('an ellipse shows its arc, a rectangle does not', () => {
+    expect(keysFor('ellipse')).toEqual(expect.arrayContaining(['arcStart', 'arcSweep', 'arcRatio']));
+    expect(keysFor('rect')).not.toContain('arcSweep');
   });
 
   it('a rectangle has a field per corner, a star does not', () => {

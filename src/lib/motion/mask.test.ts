@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { DOC_VERSION, MotionFormat, findClip, newMotionDoc, parseMotionDoc, upgradeDoc, type MotionDoc } from './doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import { DOC_VERSION, MotionFormat, findClip, newMotionDoc, parseMotionDoc, upgradeDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { editAt, valueAt } from './inspector';
 import { keyLanes } from './timeline-view';
-import { ANIMATABLE, Source, baseValue } from './keyframes';
-import { MASK_PROPS, MaskKind, MaskMode, Matte, combineMasks, newMask } from './mask';
-import { matteSource, hiddenMattes } from './matte';
-import { addClip, addTrack, setKeyframes, setMask, setMaskStack, setTrackMatte, type OpResult } from './timeline';
-import { TrackKind } from './components';
+import { ANIMATABLE, Source, baseValue } from '@feega/motion-core/motion/keyframes';
+import { MASK_PROPS, MaskKind, MaskMode, Matte, combineMasks, newMask } from '@feega/motion-core/motion/mask';
+import { matteSource, hiddenMattes } from '@feega/motion-core/motion/matte';
+import { addClip, addTrack, setKeyframes, setMask, setMaskStack, setTrackMatte, type OpResult } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

@@ -1,8 +1,11 @@
-import { findClip, type MotionDoc } from './doc';
-import type { Transform } from './keyframes';
-import { transformAt } from './parent';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { Transform } from '@feega/motion-core/motion/keyframes';
+import { transformAt } from '@feega/motion-core/motion/parent';
 import { anchorOf, type Pt } from './scene-select';
-import { setProps, type OpResult } from './timeline';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { setEffect } from './effects/ops';
+import { EFFECTS, EffectKind } from '@feega/motion-core/motion/effects/registry';
+import type { Effect } from '@feega/motion-core/motion/effects/model';
 
 export enum ScaleMode {
   Resize = 'resize',
@@ -24,7 +27,42 @@ const SCALED: Record<string, Scaler> = {
   strokes
 };
 
+const PIXEL_PARAMS: Partial<Record<EffectKind, readonly string[]>> = {
+  [EffectKind.GaussianBlur]: ['radius'],
+  [EffectKind.DirectionalBlur]: ['length'],
+  [EffectKind.ProgressiveBlur]: ['startRadius', 'endRadius'],
+  [EffectKind.DropShadow]: ['distance', 'x', 'y', 'blur', 'spread'],
+  [EffectKind.InnerShadow]: ['distance', 'blur'],
+  [EffectKind.BackgroundBlur]: ['radius'],
+  [EffectKind.Glow]: ['radius'],
+  [EffectKind.Stroke]: ['width'],
+  [EffectKind.ChromaticAberration]: ['offset'],
+  [EffectKind.Wave]: ['amount', 'scale', 'speed']
+};
+
 const TINY = 1e-6;
+
+function scaledParams(effect: Effect, factor: number): Record<string, number> {
+  const specs = EFFECTS[effect.kind].params;
+  const patch: Record<string, number> = {};
+  for (const key of PIXEL_PARAMS[effect.kind] ?? []) {
+    const spec = specs.find((p) => p.key === key)!;
+    const current = Number(effect.params[key] ?? spec.fallback);
+    patch[key] = Math.min(spec.max, Math.max(spec.min, current * factor));
+  }
+  return patch;
+}
+
+function scaleEffects(doc: MotionDoc, id: string, factor: number): OpResult {
+  let result: OpResult = { ok: true, doc };
+  for (const effect of findClip(doc, id)?.clip.effects ?? []) {
+    if (!result.ok) {
+      return result;
+    }
+    result = setEffect(result.doc, id, effect.id, { params: scaledParams(effect, factor) });
+  }
+  return result;
+}
 
 export const flipScale = (mode: ScaleMode): ScaleMode => (mode === ScaleMode.Scale ? ScaleMode.Resize : ScaleMode.Scale);
 
@@ -56,6 +94,9 @@ export function scaleClips(doc: MotionDoc, ids: readonly string[], factor: numbe
       return { ok: false, error: `no clip ${id}` };
     }
     result = setProps(result.doc, id, scaledProps(clip.props, factor, origin, doc));
+    if (result.ok) {
+      result = scaleEffects(result.doc, id, factor);
+    }
   }
   return result;
 }

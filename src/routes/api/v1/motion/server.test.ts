@@ -41,8 +41,8 @@ describe('GET /api/v1/motion', () => {
     expect(res.status).toBe(200);
     expect(store.asked[0]).toEqual({ orgId: ORG, projectId: null });
     expect(body.videos).toEqual([
-      { node_id: 'n-1', name: 'video n-1', project_id: 'p-1', canvas_id: 'c-1', format: '16:9', version: 4, poster_url: `https://signed/${ORG}/p-1/a-poster.bin`, last_render_url: null, editor_url: '/p/p-1/c/c-1/motion/n-1' },
-      { node_id: 'n-2', name: 'video n-2', project_id: 'p-1', canvas_id: 'c-1', format: '16:9', version: 4, poster_url: null, last_render_url: `https://signed/${ORG}/p-1/a-render.bin`, editor_url: '/p/p-1/c/c-1/motion/n-2' }
+      { node_id: 'n-1', name: 'video n-1', project_id: 'p-1', canvas_id: 'c-1', format: '16:9', version: 4, poster_url: `https://signed/${ORG}/p-1/a-poster.bin`, last_render_url: null, editor_url: '/p/p-1/c/c-1?frame=n-1' },
+      { node_id: 'n-2', name: 'video n-2', project_id: 'p-1', canvas_id: 'c-1', format: '16:9', version: 4, poster_url: null, last_render_url: `https://signed/${ORG}/p-1/a-render.bin`, editor_url: '/p/p-1/c/c-1?frame=n-2' }
     ]);
   });
 

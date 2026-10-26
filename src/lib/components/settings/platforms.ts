@@ -1,5 +1,4 @@
 import { can, OrgAction, type OrgRole } from '$lib/org-roles';
-import { SOCIAL_PUBLISHING_SURFACE, visibleUnder, type SocialPublishing } from '$lib/social-publishing';
 import { siInstagram, siTiktok, siFacebook, siX, siThreads, siYoutube, siBluesky, siReddit } from 'simple-icons';
 
 export const PLATFORMS = [
@@ -51,30 +50,6 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     scope: 'brand',
     requiresBrand: true
   },
-  {
-    path: 'connected-accounts',
-    labelKey: 'app.settings.connectedAccounts',
-    scope: 'brand',
-    requiresBrand: true
-  },
-  {
-    path: 'facebook',
-    labelKey: 'app.settings.connectedAccounts',
-    scope: 'brand',
-    requiresBrand: true
-  },
-  {
-    path: 'linkedin',
-    labelKey: 'app.settings.connectedAccounts',
-    scope: 'brand',
-    requiresBrand: true
-  },
-  {
-    path: 'connect/[platform]',
-    labelKey: 'app.settings.connectedAccounts',
-    scope: 'brand',
-    requiresBrand: true
-  },
   { path: 'video', labelKey: 'app.settings.video.title', scope: 'brand', requiresBrand: true },
   { path: 'danger', labelKey: 'app.settings.del.title', scope: 'brand', requiresBrand: true },
   {
@@ -83,6 +58,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     scope: 'workspace',
     requiresBrand: false
   },
+  { path: 'models', labelKey: 'app.settings.models.title', scope: 'workspace', requiresBrand: false },
+  { path: 'spend', labelKey: 'app.settings.spend.title', scope: 'workspace', requiresBrand: false },
   { path: 'team', labelKey: 'app.settings.team.title', scope: 'workspace', requiresBrand: false },
   {
     path: 'content',
@@ -113,8 +90,6 @@ const SCOPE_LABEL_KEYS: Record<SettingsScope, string> = {
 
 const SCOPE_ORDER: readonly SettingsScope[] = ['project', 'workspace', 'brand', 'account'];
 
-/** Sotto-rotte senza voce propria in nav: solo il capofila (es. `connected-accounts`) appare. */
-const HIDDEN_FROM_NAV = new Set(['facebook', 'linkedin', 'connect/[platform]']);
 
 export type SettingsNavEntry = { section: string; labelKey: string };
 
@@ -123,7 +98,7 @@ export const SETTINGS_GROUPS: readonly {
   items: readonly SettingsNavEntry[];
 }[] = SCOPE_ORDER.map((scope) => ({
   labelKey: SCOPE_LABEL_KEYS[scope],
-  items: SETTINGS_SECTIONS.filter((s) => s.scope === scope && !HIDDEN_FROM_NAV.has(s.path)).map(
+  items: SETTINGS_SECTIONS.filter((s) => s.scope === scope).map(
     (s) => ({ section: s.path, labelKey: s.labelKey })
   )
 })).filter((group) => group.items.length > 0);
@@ -140,11 +115,4 @@ export function sectionEditable(pathname: string, role: OrgRole): boolean {
 export function sectionRequiresBrand(pathname: string): boolean {
   const trimmed = pathname.replace(/\/$/, '');
   return SETTINGS_SECTIONS.some((s) => s.requiresBrand && trimmed.endsWith(`/settings/${s.path}`));
-}
-
-export function settingsGroupsFor(publishing: SocialPublishing): typeof SETTINGS_GROUPS {
-  return SETTINGS_GROUPS.map((group) => ({
-    ...group,
-    items: visibleUnder(publishing, SOCIAL_PUBLISHING_SURFACE.settingsSections, group.items, (item) => item.section)
-  }));
 }

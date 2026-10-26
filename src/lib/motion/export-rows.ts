@@ -5,7 +5,9 @@ export enum FileFormat {
   Jpg = 'jpg',
   Webp = 'webp',
   Svg = 'svg',
-  Pdf = 'pdf'
+  Pdf = 'pdf',
+  Lottie = 'lottie',
+  DotLottie = 'dotlottie'
 }
 
 export const FILE_FORMATS = Object.values(FileFormat) as [FileFormat, ...FileFormat[]];
@@ -13,18 +15,25 @@ export const FILE_FORMATS = Object.values(FileFormat) as [FileFormat, ...FileFor
 export enum Drawing {
   Raster = 'raster',
   Vector = 'vector',
-  Pages = 'pages'
+  Pages = 'pages',
+  Animation = 'animation'
 }
 
 const LOSSY_QUALITY = 92;
 
-export const FILE: Record<FileFormat, { mime: string; drawing: Drawing; label: string; quality?: number }> = {
-  [FileFormat.Png]: { mime: 'image/png', drawing: Drawing.Raster, label: 'PNG' },
-  [FileFormat.Jpg]: { mime: 'image/jpeg', drawing: Drawing.Raster, label: 'JPG', quality: LOSSY_QUALITY },
-  [FileFormat.Webp]: { mime: 'image/webp', drawing: Drawing.Raster, label: 'WebP', quality: LOSSY_QUALITY },
-  [FileFormat.Svg]: { mime: 'image/svg+xml', drawing: Drawing.Vector, label: 'SVG' },
-  [FileFormat.Pdf]: { mime: 'application/pdf', drawing: Drawing.Pages, label: 'PDF' }
+export const FILE: Record<FileFormat, { ext: string; mime: string; drawing: Drawing; label: string; quality?: number }> = {
+  [FileFormat.Png]: { ext: 'png', mime: 'image/png', drawing: Drawing.Raster, label: 'PNG' },
+  [FileFormat.Jpg]: { ext: 'jpg', mime: 'image/jpeg', drawing: Drawing.Raster, label: 'JPG', quality: LOSSY_QUALITY },
+  [FileFormat.Webp]: { ext: 'webp', mime: 'image/webp', drawing: Drawing.Raster, label: 'WebP', quality: LOSSY_QUALITY },
+  [FileFormat.Svg]: { ext: 'svg', mime: 'image/svg+xml', drawing: Drawing.Vector, label: 'SVG' },
+  [FileFormat.Pdf]: { ext: 'pdf', mime: 'application/pdf', drawing: Drawing.Pages, label: 'PDF' },
+  [FileFormat.Lottie]: { ext: 'json', mime: 'application/json', drawing: Drawing.Animation, label: 'Lottie' },
+  [FileFormat.DotLottie]: { ext: 'lottie', mime: 'application/zip', drawing: Drawing.Animation, label: 'dotLottie' }
 };
+
+const NEEDS_BROWSER: ReadonlySet<Drawing> = new Set([Drawing.Raster, Drawing.Pages]);
+
+export const needsBrowser = (rows: readonly { format: FileFormat }[]): boolean => rows.some((row) => NEEDS_BROWSER.has(FILE[row.format].drawing));
 
 export enum SizeBy {
   Scale = 'scale',
@@ -61,6 +70,13 @@ export const exportRowsSchema = z.array(rowSchema).min(1).max(MAX_ROWS);
 
 export type ExportRow = z.infer<typeof rowSchema>;
 
+const PRESET_SCALES = [1, 2, 3, 4];
+
+export const EXPORT_PRESETS: readonly { label: string; row: ExportRow }[] = [
+  ...PRESET_SCALES.map((value) => ({ label: `${value}×`, row: { format: FileFormat.Png, by: SizeBy.Scale, value, suffix: value === 1 ? '' : `@${value}x`, transparent: true } })),
+  { label: FILE[FileFormat.Svg].label, row: { format: FileFormat.Svg, by: SizeBy.Scale, value: 1, suffix: '', transparent: true } }
+];
+
 export const exportElementsSchema = z.array(z.object({ frameId: z.string(), elementId: z.string() }).strict()).max(50);
 
 type Size = { width: number; height: number };
@@ -84,8 +100,8 @@ export function exportFiles(frames: readonly ExportFrame[], rows: readonly Expor
     seen.set(base, count);
     return { frame, base: count === 1 ? base : `${base} ${count}` };
   });
-  const paged = rows.filter((row) => FILE[row.format].drawing === Drawing.Pages).map((row) => ({ targets: [...frames], row, name: `${frames.length === 1 ? named[0].base : bundleName}${row.suffix}.${row.format}` }));
-  const single = named.flatMap(({ frame, base }) => rows.filter((row) => FILE[row.format].drawing !== Drawing.Pages).map((row) => ({ targets: [frame], row, name: `${base}${row.suffix}.${row.format}` })));
+  const paged = rows.filter((row) => FILE[row.format].drawing === Drawing.Pages).map((row) => ({ targets: [...frames], row, name: `${frames.length === 1 ? named[0].base : bundleName}${row.suffix}.${FILE[row.format].ext}` }));
+  const single = named.flatMap(({ frame, base }) => rows.filter((row) => FILE[row.format].drawing !== Drawing.Pages).map((row) => ({ targets: [frame], row, name: `${base}${row.suffix}.${FILE[row.format].ext}` })));
   return [...paged, ...single];
 }
 

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setProps, type OpResult } from '../timeline';
-import { FEEGA_TOKENS } from '../brand';
-import { composeHtml } from '../hyperframes/compose';
-import { cspPolicy } from '../hyperframes/csp';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { cspPolicy } from '@feega/motion-core/motion/hyperframes/csp';
 import { writeComponent } from '../custom/ops';
-import { extractParams } from '../custom/params';
-import { BuiltinFont, fontStack, fontsFrom, googleFontsUrl, searchFonts, usedFaces, type CatalogueFont } from './model';
+import { extractParams } from '@feega/motion-core/motion/custom/params';
+import { BuiltinFont, fontStack, fontsFrom, googleFontsUrl, searchFonts, usedFaces, type CatalogueFont } from '@feega/motion-core/motion/fonts/model';
 import { registerUpload, removeFont, setFont } from './ops';
 import { familyFromFileName, fontFamilies, fontFileOf, missingUploads } from './library';
 
@@ -155,5 +155,19 @@ describe('fonts', () => {
 
   it('reads the brand fonts out of the brand text, only names Google serves', () => {
     expect(fontsFrom('Typography: Playfair Display for titles, Inter for body. Not Helvetica.', CATALOGUE)).toEqual(['Playfair Display', 'Inter']);
+  });
+});
+
+describe('fonts a styled range asks for', () => {
+  it('are loaded with the clip font', () => {
+    const doc = {
+      tracks: [{ clips: [{ component: 'Text', props: { font: 'Inter', weight: 400, italic: false, runs: [{ start: 0, end: 2, font: 'Fraunces', weight: 700 }, { start: 3, end: 4, italic: true }] } }] }],
+      components: {}
+    } as unknown as Parameters<typeof usedFaces>[0];
+    expect(usedFaces(doc)).toEqual([
+      { family: 'Inter', weight: 400, italic: false },
+      { family: 'Fraunces', weight: 700, italic: false },
+      { family: 'Inter', weight: 400, italic: true }
+    ]);
   });
 });

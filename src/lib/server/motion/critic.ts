@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import type { ModelMessage } from 'ai';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { LlmMediaPart } from '$lib/server/llm';
 import { MAX_FRAMES_PER_VIEW, VIEW_FRAMES, type Frame, type Reference } from './frames';
-import { scriptLines } from '$lib/motion/script';
+import { scriptLines } from '@feega/motion-core/motion/script';
 import { EMPTY_EDGE_DENSITY } from '$lib/motion/emptiness';
 import { viewNote, type View } from './viewer';
 

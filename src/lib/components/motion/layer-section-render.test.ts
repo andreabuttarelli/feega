@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, type OpResult } from '$lib/motion/timeline';
-import type { ComponentId } from '$lib/motion/components';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import type { ComponentId } from '@feega/motion-core/motion/components';
 import MotionInspector from './MotionInspector.svelte';
 
 function must(r: OpResult): MotionDoc {

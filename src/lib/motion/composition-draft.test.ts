@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CAMERA_PRESETS } from '$lib/canvas/composition/camera';
-import { LAYOUTS } from '$lib/canvas/composition/index';
+import { CAMERA_PRESETS } from '@feega/motion-core/canvas/composition/camera';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
 import type { CompositionNode } from '$lib/canvas/composition-node';
-import { FPS } from './design';
-import { FORMATS, MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
-import { addClip } from './timeline';
-import { CellFit, CellTiming } from './bento/model';
+import { FPS } from '@feega/motion-core/motion/design';
+import { FORMATS, MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { CellFit, CellTiming } from '@feega/motion-core/motion/bento/model';
 import { motionCompId } from './embed';
 import {
   COMPOSITION_CLIP,

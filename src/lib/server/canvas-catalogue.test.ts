@@ -89,8 +89,8 @@ describe('i modelli che un nodo può scegliere', () => {
 
     const claude = out.text.choices.find((c) => c.id === 'anthropic/claude');
     expect(claude?.textPricing).toEqual({
-      inputCreditsPerMillion: 400,
-      outputCreditsPerMillion: 1600,
+      inputCreditsPerMillion: 240,
+      outputCreditsPerMillion: 960,
       systemPromptTokens: 0
     });
   });
@@ -139,8 +139,10 @@ describe('i modelli che un nodo può scegliere', () => {
 describe('kie text models', () => {
   it('are offered under Kie.ai, priced per token at kie\'s rates, only when kie has a key', () => {
     expect(kieTextChoices({})).toEqual([]);
-    expect(kieTextChoices({ KIE_API_KEY: 'k' })).toEqual([
-      expect.objectContaining({ id: 'kie/gpt-6-luna', providerLabel: 'Kie.ai', textPricing: { inputCreditsPerMillion: 6, outputCreditsPerMillion: 30, systemPromptTokens: 0 } })
-    ]);
+    const [luna] = kieTextChoices({ KIE_API_KEY: 'k' });
+    expect(luna).toMatchObject({ id: 'kie/gpt-6-luna', providerLabel: 'Kie.ai' });
+    expect(luna.textPricing?.inputCreditsPerMillion).toBeCloseTo(3.6, 5);
+    expect(luna.textPricing?.outputCreditsPerMillion).toBeCloseTo(18, 5);
+    expect(luna.textPricing?.systemPromptTokens).toBe(0);
   });
 });

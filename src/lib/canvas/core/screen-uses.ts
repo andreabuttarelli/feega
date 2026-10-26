@@ -1,6 +1,6 @@
-import type { Use } from '$lib/motion/gpu-full/core-web';
+import type { Use } from '@feega/motion-core/motion/gpu-full/core-web';
 import type { Box } from './canvas-scene';
-import { mul2d, type Affine } from '$lib/motion/affine';
+import { mul2d, type Affine } from '@feega/motion-core/motion/affine';
 
 const DEG = Math.PI / 180;
 

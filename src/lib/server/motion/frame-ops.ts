@@ -1,8 +1,8 @@
 import type { Db } from '$lib/server/db/client';
-import type { MotionDoc } from '$lib/motion/doc';
+import { formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { MotionNode } from '$lib/canvas/motion-node';
 import { applyOps, diffDoc, type DocOp } from '$lib/motion/doc-ops';
-import { RevisionOutcome, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
+import { RevisionOutcome, readRevision, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { headOrNew, saveMotionDoc } from './editor';
@@ -18,7 +18,7 @@ export type OpsCommit =
   | { outcome: OpsOutcome.Invalid; error: string }
   | { outcome: OpsOutcome.Busy };
 
-type FrameScope = { orgId: string; nodeId: string; node: MotionNode };
+type FrameScope = { orgId: string; nodeId: string; node: Pick<MotionNode, 'format'> };
 
 export type OpsAsk = FrameScope & { baseVersion: number; ops: readonly DocOp[]; actor: Actor; summary: string | null; checkpoint?: Checkpoint };
 
@@ -74,4 +74,15 @@ const REVISION_WRITE: { [K in OpsOutcome]: (commit: Extract<OpsCommit, { outcome
 
 export function revisionWriteOf(commit: OpsCommit): RevisionWrite {
   return (REVISION_WRITE[commit.outcome] as (commit: OpsCommit) => RevisionWrite)(commit);
+}
+
+export type OntoAsk = { orgId: string; nodeId: string; expectedVersion: number; doc: MotionDoc; actor: Actor; summary: string | null; checkpoint?: Checkpoint };
+
+export async function commitOnto(db: Db, ask: OntoAsk): Promise<RevisionWrite> {
+  const base = ask.expectedVersion > 0 ? await readRevision(db, { orgId: ask.orgId, nodeId: ask.nodeId, version: ask.expectedVersion }) : null;
+  if (!base) {
+    return saveMotionDoc(db, ask);
+  }
+  const node = { format: formatOf(ask.doc) };
+  return revisionWriteOf(await commitDoc(db, { ...ask, node, base: { version: ask.expectedVersion, doc: base.doc } }));
 }

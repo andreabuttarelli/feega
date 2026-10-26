@@ -1,7 +1,7 @@
 {
   "name": "feega-cli",
   "version": "0.1.0",
-  "description": "Command-line client for feega — the social media AI autopilot.",
+  "description": "Command-line client for feega — an infinite canvas for motion video and images.",
   "license": "Apache-2.0",
   "author": "Andrea Buttarelli",
   "repository": {

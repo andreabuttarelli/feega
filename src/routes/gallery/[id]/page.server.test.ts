@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb, type FakeDb } from '$lib/server/db/fake-db';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { OAUTH_RETURN_COOKIE } from '$lib/server/oauth';
 
 const state = vi.hoisted(() => ({ world: null as null | FakeDb, userId: null as string | null }));
@@ -72,7 +72,7 @@ describe('a gallery item page', () => {
 
   it('remixing copies the doc into the project and opens the editor on it', async () => {
     const { value } = event(true, { project: 'p-2' });
-    await expect(actions.remix(value as never)).rejects.toMatchObject({ status: 303, location: expect.stringMatching(/^\/p\/p-2\/c\/c-9\/motion\//) });
+    await expect(actions.remix(value as never)).rejects.toMatchObject({ status: 303, location: expect.stringMatching(/^\/p\/p-2\/c\/c-9\?frame=/) });
 
     const calls = state.world!.calls;
     const revision = calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')?.payload as { doc: { assets: { id: string }[]; fields: { key: string }[] } };

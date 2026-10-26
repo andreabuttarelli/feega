@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { BlendMode } from '../blend';
-import { ItemKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem } from './display-list';
-import type { Pictures } from './raster';
-import { GL_PICTURE_SIDE, glPictureSize, pictureKey, wantedPictures, warmCore, rasterOf } from './core-web';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { ItemKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
+import { GL_PICTURE_SIDE, glPictureSize, pictureKey, wantedPictures, warmCore, rasterOf } from '@feega/motion-core/motion/gpu-full/core-web';
 
 describe('glPictureSize', () => {
   it('keeps a picture that fits the WebGL atlas as it is', () => {
@@ -51,5 +51,17 @@ describe('uploading a group\'s pictures', () => {
     expect(raster.upload(list, pictures, 1)).toBe(false);
     expect(raster.upload(list, pictures, 1)).toBe(true);
     expect(sent).toEqual(['a', 'b']);
+  });
+});
+
+describe('a group sent to the core', () => {
+  it('carries a whole-pixel size, because the core reads it as an integer', () => {
+    const sent: string[] = [];
+    const attached = { put_group: (_key: string, json: string) => sent.push(json) } as unknown as Parameters<typeof rasterOf>[0];
+    const list = { width: 886.5603019630531, height: 401.2, background: null, items: [] } as unknown as DisplayList;
+
+    rasterOf(attached).putGroup('g', list);
+
+    expect(JSON.parse(sent[0])).toMatchObject({ width: 887, height: 402 });
   });
 });

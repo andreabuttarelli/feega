@@ -21,7 +21,7 @@ function groupRecord(id: string, picked: readonly Boxed[]): CanvasNodeRecord {
     id,
     canvasId: '',
     projectId: '',
-    type: 'motion',
+    type: shaped.type,
     displayName: GROUP_NAME,
     position: { x: bounds.left, y: bounds.top, z: 0 },
     size: { width: shaped.w, height: shaped.h },

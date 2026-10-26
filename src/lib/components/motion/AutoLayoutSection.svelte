@@ -9,14 +9,19 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import LogOut from '@lucide/svelte/icons/log-out';
   import SpaceBetween from '@lucide/svelte/icons/align-horizontal-space-between';
+  import Baseline from '@lucide/svelte/icons/baseline';
+  import SpaceAround from '@lucide/svelte/icons/align-horizontal-space-around';
+  import SpaceEvenly from '@lucide/svelte/icons/align-horizontal-distribute-center';
   import { FIELD_INPUT, FOCUS_RING, Field, IconButton, IconSize, Section, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
   import { cn } from '$lib/utils.js';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import type { OpResult } from '$lib/motion/timeline';
-  import { Align, Direction, Justify, Sizing } from '$lib/motion/layout/auto-layout';
-  import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '$lib/motion/layout/model';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { Align, AlignContent, AutoFlow, Direction, Justify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+  import { formatPadding, parsePadding } from '$lib/motion/layout/padding-text';
+  import { formatTracks, parseTracks } from '$lib/motion/layout/tracks-text';
+  import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '@feega/motion-core/motion/layout/model';
   import { hasBox, layoutParent, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
-  import { childrenInOrder } from '$lib/motion/layout/resolve';
+  import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
   import { Answer, YES_NO, answerOf } from '$lib/motion/segments';
   import SegmentedField from './SegmentedField.svelte';
 
@@ -43,13 +48,29 @@
   const SIDES: (keyof Padding)[] = ['top', 'right', 'bottom', 'left'];
   const SIDE_LABEL: Record<keyof Padding, string> = { top: 'T', right: 'R', bottom: 'B', left: 'L' };
   const SPOTS = [Align.Start, Align.Center, Align.End] as const;
-  const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End };
+  const SPREADS = [
+    { justify: Justify.SpaceBetween, label: 'Space between', testid: 'auto-layout-space-between', icon: SpaceBetween },
+    { justify: Justify.SpaceAround, label: 'Space around', testid: 'auto-layout-space-around', icon: SpaceAround },
+    { justify: Justify.SpaceEvenly, label: 'Space evenly', testid: 'auto-layout-space-evenly', icon: SpaceEvenly }
+  ];
+  const AUTO_FLOWS: SegmentOption[] = [
+    { value: AutoFlow.Row, label: 'Rows first' },
+    { value: AutoFlow.Column, label: 'Columns first' }
+  ];
+  const LINE_SPREADS: SegmentOption[] = [
+    { value: AlignContent.Auto, label: 'Packed' },
+    { value: AlignContent.SpaceBetween, label: 'Space between' }
+  ];
+  const CELL_ALIGNS = ['', Align.Start, Align.Center, Align.End] as const;
+  const CELL_ALIGN_LABEL: Record<(typeof CELL_ALIGNS)[number], string> = { '': 'Auto', [Align.Start]: 'Start', [Align.Center]: 'Center', [Align.End]: 'End' };
+  const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End, [Align.Baseline]: Justify.Start };
 
   const layout = $derived(clip.autoLayout ?? null);
   let splitPadding = $state(false);
   const evenPadding = $derived(!!layout && SIDES.every((side) => layout.padding[side] === layout.padding.top));
   const perSide = $derived(splitPadding || !evenPadding);
   const parent = $derived(layoutParent(doc, clip));
+  const inGrid = $derived(parent?.autoLayout?.direction === Direction.Grid);
   const item = $derived(clip.layoutItem ?? DEFAULT_LAYOUT_ITEM);
   const FLOW_OF: Record<Direction, Flow> = { [Direction.Horizontal]: Flow.Row, [Direction.Vertical]: Flow.Column, [Direction.Grid]: Flow.Grid };
   const flow = $derived(layout?.wrap ? Flow.Wrap : FLOW_OF[layout?.direction ?? Direction.Horizontal]);
@@ -61,6 +82,24 @@
   const set = (patch: Partial<AutoLayout>, summary: string) => commit(setAutoLayout(doc, clip.id, patch), summary);
   const size = (patch: Partial<LayoutItem>, summary: string) => commit(setLayoutItem(doc, clip.id, patch), summary);
   const px = (value: string) => Math.max(0, Math.round(Number(value) || 0));
+  const signedPx = (value: string) => Math.round(Number(value) || 0);
+  const span = (value: string) => Math.max(1, Math.round(Number(value) || 1));
+  const cellAlign = (value: string) => (value === '' ? undefined : (value as Align));
+
+  function setPadding(text: string) {
+    const padding = parsePadding(text);
+    if (padding) {
+      set({ padding }, 'Changed the padding');
+    }
+  }
+
+  function setTracks(key: 'columnTracks' | 'rowTracks', text: string, summary: string) {
+    const tracks = parseTracks(text);
+    if (tracks) {
+      set({ [key]: tracks }, summary);
+    }
+  }
+
   const optionalPx = (value: string) => (value.trim() === '' ? undefined : px(value));
 
   function spotPressed(layout: AutoLayout, column: Align, row: Align): boolean {
@@ -94,6 +133,15 @@
         <Field label="Columns" id="auto-layout-columns">
           <input id="auto-layout-columns" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" max={MAX_GRID_COLUMNS} value={layout.columns} data-testid="auto-layout-columns" onchange={(e) => set({ columns: Math.min(MAX_GRID_COLUMNS, Math.max(1, px(e.currentTarget.value))) }, 'Changed the columns')} />
         </Field>
+        <Field label="Column sizes" id="auto-layout-column-tracks">
+          <input id="auto-layout-column-tracks" class={cn(FIELD_INPUT, 'w-full')} placeholder="1fr 120 hug" value={formatTracks(layout.columnTracks)} data-testid="auto-layout-column-tracks" onchange={(e) => setTracks('columnTracks', e.currentTarget.value, 'Changed the column sizes')} />
+        </Field>
+        <Field label="Row sizes" id="auto-layout-row-tracks">
+          <input id="auto-layout-row-tracks" class={cn(FIELD_INPUT, 'w-full')} placeholder="hug" value={formatTracks(layout.rowTracks)} data-testid="auto-layout-row-tracks" onchange={(e) => setTracks('rowTracks', e.currentTarget.value, 'Changed the row sizes')} />
+        </Field>
+        <Field label="Fill order">
+          <div class="flex min-w-0 flex-1" data-testid="auto-layout-auto-flow"><SegmentedControl label="Fill order" options={AUTO_FLOWS} value={layout.autoFlow} onchange={(v) => set({ autoFlow: v as AutoFlow }, 'Changed the fill order')} /></div>
+        </Field>
       {/if}
       <Field label="Align">
         <div class="grid grid-cols-3 gap-1 rounded-sm bg-ui-sunken p-1.5" role="group" aria-label="Alignment" data-testid="auto-layout-align">
@@ -103,23 +151,42 @@
             {/each}
           {/each}
         </div>
-        <IconButton label="Space between" size={IconSize.Sm} pressed={layout.justify === Justify.SpaceBetween} data-testid="auto-layout-space-between" onclick={() => set({ justify: layout.justify === Justify.SpaceBetween ? Justify.Start : Justify.SpaceBetween }, 'Changed the spacing')}><SpaceBetween /></IconButton>
+        {#if layout.direction === Direction.Horizontal}
+          <IconButton label="Align baselines" size={IconSize.Sm} pressed={layout.align === Align.Baseline} data-testid="auto-layout-baseline" onclick={() => set({ align: layout.align === Align.Baseline ? Align.Start : Align.Baseline }, 'Changed the alignment')}><Baseline /></IconButton>
+        {/if}
+        {#each SPREADS as spread (spread.justify)}
+          <IconButton label={spread.label} size={IconSize.Sm} pressed={layout.justify === spread.justify} data-testid={spread.testid} onclick={() => set({ justify: layout.justify === spread.justify ? Justify.Start : spread.justify }, 'Changed the spacing')}><spread.icon /></IconButton>
+        {/each}
       </Field>
       <Field label="Gap" id="auto-layout-gap">
-        <input id="auto-layout-gap" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.gap} data-testid="auto-layout-gap" onchange={(e) => set({ gap: px(e.currentTarget.value) }, 'Changed the gap')} />
+        <input id="auto-layout-gap" class={cn(FIELD_INPUT, 'w-full')} type="number" value={layout.gap} data-testid="auto-layout-gap" onchange={(e) => set({ gap: signedPx(e.currentTarget.value) }, 'Changed the gap')} />
         {#if lined}
-          <input aria-label="Gap between lines" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.crossGap} onchange={(e) => set({ crossGap: px(e.currentTarget.value) }, 'Changed the gap between lines')} />
+          <input aria-label="Gap between lines" class={cn(FIELD_INPUT, 'w-full')} type="number" value={layout.crossGap} onchange={(e) => set({ crossGap: signedPx(e.currentTarget.value) }, 'Changed the gap between lines')} />
         {/if}
       </Field>
+      {#if layout.wrap}
+        <Field label="Lines">
+          <div class="flex min-w-0 flex-1" data-testid="auto-layout-align-content"><SegmentedControl label="Lines" options={LINE_SPREADS} value={layout.alignContent} onchange={(v) => set({ alignContent: v as AlignContent }, 'Changed how the lines spread')} /></div>
+        </Field>
+      {/if}
       <Field label="Padding">
         {#if perSide}
           {#each SIDES as side (side)}
             <input aria-label={`Padding ${side}`} title={SIDE_LABEL[side]} class={cn(FIELD_INPUT, 'w-full px-1')} type="number" min="0" value={layout.padding[side]} data-testid={`auto-layout-padding-${side}`} onchange={(e) => set({ padding: { ...layout.padding, [side]: px(e.currentTarget.value) } }, 'Changed the padding')} />
           {/each}
         {:else}
-          <input aria-label="Padding" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.padding.top} data-testid="auto-layout-padding" onchange={(e) => set({ padding: { top: px(e.currentTarget.value), right: px(e.currentTarget.value), bottom: px(e.currentTarget.value), left: px(e.currentTarget.value) } }, 'Changed the padding')} />
+          <input aria-label="Padding" placeholder="8 16" title="One to four values, like CSS: 8 · 8 16 · 8 16 24 · 8 16 24 32" class={cn(FIELD_INPUT, 'w-full')} value={formatPadding(layout.padding)} data-testid="auto-layout-padding" onchange={(e) => setPadding(e.currentTarget.value)} />
           <button type="button" class={cn('shrink-0 rounded-sm px-1.5 text-ui-label text-ui-text-2 hover:bg-ui-wash', FOCUS_RING)} data-testid="auto-layout-padding-sides" onclick={() => (splitPadding = true)}>Per side</button>
         {/if}
+      </Field>
+    {/if}
+
+    {#if layout}
+      <Field label="First on top">
+        <div class="flex min-w-0 flex-1" data-testid="auto-layout-first-on-top"><SegmentedField name="First on top" options={YES_NO} value={answerOf(layout.firstOnTop)} onchange={(v) => set({ firstOnTop: v === Answer.Yes }, 'Changed the stacking')} /></div>
+      </Field>
+      <Field label="Strokes included">
+        <div class="flex min-w-0 flex-1" data-testid="auto-layout-strokes-included"><SegmentedField name="Strokes included" options={YES_NO} value={answerOf(layout.strokesIncluded)} onchange={(v) => set({ strokesIncluded: v === Answer.Yes }, 'Changed the strokes in layout')} /></div>
       </Field>
     {/if}
 
@@ -137,6 +204,21 @@
       <Field label="Min / max H">
         <input aria-label="Min height" placeholder="min" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.minHeight ?? ''} onchange={(e) => size({ minHeight: optionalPx(e.currentTarget.value) }, 'Changed the min height')} />
         <input aria-label="Max height" placeholder="max" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.maxHeight ?? ''} onchange={(e) => size({ maxHeight: optionalPx(e.currentTarget.value) }, 'Changed the max height')} />
+      </Field>
+    {/if}
+
+    {#if inGrid}
+      <Field label="Span">
+        <input aria-label="Column span" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" value={item.columnSpan} data-testid="auto-layout-column-span" onchange={(e) => size({ columnSpan: span(e.currentTarget.value) }, 'Changed the column span')} />
+        <input aria-label="Row span" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" value={item.rowSpan} data-testid="auto-layout-row-span" onchange={(e) => size({ rowSpan: span(e.currentTarget.value) }, 'Changed the row span')} />
+      </Field>
+      <Field label="In cell">
+        <select aria-label="Horizontal in cell" class={cn(FIELD_INPUT, 'w-full')} value={item.cellX ?? ''} data-testid="auto-layout-cell-x" onchange={(e) => size({ cellX: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
+          {#each CELL_ALIGNS as value (value)}<option {value}>{CELL_ALIGN_LABEL[value]}</option>{/each}
+        </select>
+        <select aria-label="Vertical in cell" class={cn(FIELD_INPUT, 'w-full')} value={item.cellY ?? ''} data-testid="auto-layout-cell-y" onchange={(e) => size({ cellY: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
+          {#each CELL_ALIGNS as value (value)}<option {value}>{CELL_ALIGN_LABEL[value]}</option>{/each}
+        </select>
       </Field>
     {/if}
 

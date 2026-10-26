@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { EASE_BEZIER, Interp, sampleTrack, type Keyframe } from './keyframes';
-import { MotionFormat, newClip, newMotionDoc } from './doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import { EASE_BEZIER, Interp, sampleTrack, type Keyframe } from '@feega/motion-core/motion/keyframes';
+import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { graphLanes } from './timeline-view';
-import { EasePreset, GraphMode, KeyEnd, curvePoints, dragHandle, easeHandles, fitView, handlePoints, presetEase, withHandles } from './graph';
+import { EasePreset, GraphMode, KeyEnd, curvePoints, dragHandle, easeHandles, fitView, handlePoints, presetEase, withHandles } from '@feega/motion-core/motion/graph';
 
 const FPS = 30;
 const a: Keyframe = { frame: 0, value: 0, ease: [0.4, 0.1, 0.7, 0.9] };

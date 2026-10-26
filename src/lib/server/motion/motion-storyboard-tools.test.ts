@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { AssetKind } from '$lib/motion/components';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import { createMotionTools, type MotionSession, type StoryboardPort } from './motion-tools';
 
 const BEAT = { act: 'problem', kind: 'scene', title: 'Folders', intent: 'the mess', emotion: 'tense', intensity: 0.4, duration: 3 };

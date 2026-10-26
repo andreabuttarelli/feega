@@ -3,12 +3,21 @@
  * di Lucide qui, dati puri in `selection-actions.ts`, perché quella tabella la legge anche codice
  * che non disegna niente.
  */
+import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
+import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
+import Globe from '@lucide/svelte/icons/globe';
+import Eraser from '@lucide/svelte/icons/eraser';
+import Scaling from '@lucide/svelte/icons/scaling';
+import Paintbrush from '@lucide/svelte/icons/paintbrush';
+import Expand from '@lucide/svelte/icons/expand';
+import Layers from '@lucide/svelte/icons/layers';
 import Copy from '@lucide/svelte/icons/copy';
 import Download from '@lucide/svelte/icons/download';
 import Workflow from '@lucide/svelte/icons/workflow';
 import Link2 from '@lucide/svelte/icons/link-2';
-import Megaphone from '@lucide/svelte/icons/megaphone';
+import Pencil from '@lucide/svelte/icons/pencil';
 import Play from '@lucide/svelte/icons/play';
+import Clapperboard from '@lucide/svelte/icons/clapperboard';
 import ListEnd from '@lucide/svelte/icons/list-end';
 import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -31,7 +40,31 @@ import FlipHorizontal2 from '@lucide/svelte/icons/flip-horizontal-2';
 import FlipVertical2 from '@lucide/svelte/icons/flip-vertical-2';
 import SquareDashed from '@lucide/svelte/icons/square-dashed';
 import Square from '@lucide/svelte/icons/square';
+import Mic from '@lucide/svelte/icons/mic';
+import Music from '@lucide/svelte/icons/music';
+import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+import Blocks from '@lucide/svelte/icons/blocks';
+import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+import GitBranch from '@lucide/svelte/icons/git-branch';
+import History from '@lucide/svelte/icons/history';
+import MessageSquareText from '@lucide/svelte/icons/message-square-text';
 import Proportions from '@lucide/svelte/icons/proportions';
+import ListChecks from '@lucide/svelte/icons/list-checks';
+import Frame from '@lucide/svelte/icons/frame';
+import Shrink from '@lucide/svelte/icons/shrink';
+import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
+import Rows3 from '@lucide/svelte/icons/rows-3';
+import Columns2 from '@lucide/svelte/icons/columns-2';
+import SquaresUnite from '@lucide/svelte/icons/squares-unite';
+import SquaresSubtract from '@lucide/svelte/icons/squares-subtract';
+import SquaresIntersect from '@lucide/svelte/icons/squares-intersect';
+import SquaresExclude from '@lucide/svelte/icons/squares-exclude';
+import Combine from '@lucide/svelte/icons/combine';
+import ComponentIcon from '@lucide/svelte/icons/component';
+import Unlink from '@lucide/svelte/icons/unlink';
+import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+import PenLine from '@lucide/svelte/icons/pen-line';
+import TypeIcon from '@lucide/svelte/icons/type';
 import type { Component } from 'svelte';
 import type { SelectionActionId } from './selection-actions';
 
@@ -39,10 +72,19 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   duplicate: Copy,
   'connect-new': Workflow,
   'connect-existing': Link2,
-  promote: Megaphone,
   'run-workflow': Play,
+  'save-technique': BookmarkPlus,
+  'run-technique': Play,
+  'edit-technique': Pencil,
+  'detach-technique': Unlink,
   'run-downstream': ListEnd,
   'run-stale': RefreshCw,
+  'remove-background': Eraser,
+  'upscale-image': Scaling,
+  inpaint: Paintbrush,
+  outpaint: Expand,
+  'split-layers': Layers,
+  'layers-to-frame': Frame,
   'copy-id': Hash,
   report: Flag,
   group: Group,
@@ -62,7 +104,39 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'flip-vertical': FlipVertical2,
   'use-as-mask': SquareDashed,
   'release-mask': Square,
+  'select-matching': ListChecks,
+  'select-same-fill': ListChecks,
+  'select-same-stroke': ListChecks,
+  'select-same-font': ListChecks,
+  'select-same-effect': ListChecks,
+  'frame-selection': Frame,
+  'resize-to-fit': Shrink,
+  'section-selection': LayoutDashboard,
+  stack: Rows3,
+  'auto-layout': Columns2,
+  'union': SquaresUnite,
+  'subtract': SquaresSubtract,
+  'intersect': SquaresIntersect,
+  'exclude': SquaresExclude,
+  'flatten': Combine,
+  'outline-stroke': PenLine,
+  'outline-text': TypeIcon,
+  'create-component': ComponentIcon,
+  'detach-instance': Unlink,
+  'push-instance': ArrowUpToLine,
+  'reset-instance': RotateCcw,
   'create-formats': Proportions,
+  'combine-video': Clapperboard,
   export: Download,
+  'frame-voice': Mic,
+  'frame-music': Music,
+  'frame-interactive': SlidersHorizontal,
+  'frame-components': Blocks,
+  'frame-templates': LayoutTemplate,
+  'frame-branches': GitBranch,
+  'frame-history': History,
+  'frame-chat': MessageSquareText,
+  'frame-save-template': BookmarkPlus,
+  'frame-publish': Globe,
   delete: Trash2
 };

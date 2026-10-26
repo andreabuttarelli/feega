@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from './brand';
-import { findClip, parseMotionDoc, type MotionClip, type MotionDoc } from './doc';
-import { FillType, fillsSchema } from './fill/model';
-import { composeHtml } from './hyperframes/compose';
-import { partStyleTag } from './hyperframes/part-styles';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { findClip, parseMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { FillType, fillsSchema } from '@feega/motion-core/motion/fill/model';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { partStyleTag } from '@feega/motion-core/motion/hyperframes/part-styles';
 import { Colouring, partColour, partFills, setPartFills } from './part-style';
 import { TYPE_GRID_POSTER_TEMPLATE } from './template/type-grid-poster/template';
 import { DARK_TAGS_POSTER_TEMPLATE } from './template/dark-tags-poster/template';
-import type { OpResult } from './timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {

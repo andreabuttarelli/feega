@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bentoGridPatch, cardAssetIds, cardShapePatch, cellSpanPatch, staleMotions, upstreamCards, upstreamImageRefs, upstreamMedia } from './composition-node';
-import { CellFit } from '$lib/motion/bento/model';
+import { CellFit } from '@feega/motion-core/motion/bento/model';
 
 describe('upstreamImageRefs', () => {
   it('collects refIds from several image nodes wired in', () => {

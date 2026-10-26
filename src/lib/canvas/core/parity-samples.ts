@@ -13,6 +13,7 @@ const BY_KIND: Record<NodeType, Record<string, unknown>> = {
   audio: { prompt: 'Calm piano loop' },
   model3d: { prompt: 'A low poly fox', error: 'Provider timed out' },
   motion: { kind: 'frame' },
+  element: {},
   doc: { content: 'Brand voice: warm, direct, never smug. Short sentences. One idea per line.' },
   iframe: { url: 'https://example.com' },
   social_account_feed: { handle: 'studio', platform: 'instagram' },
@@ -25,7 +26,9 @@ const BY_KIND: Record<NodeType, Record<string, unknown>> = {
   effects: {},
   composition: {},
   calendar: { anchor: '2026-10', view: 'month' },
-  studio_batch: {}
+  studio_batch: {},
+  section: { title: 'Launch', fill: '#f3f3f3' },
+  technique: { techniqueId: '00000000-0000-4000-8000-000000000001', name: 'logo-flow' }
 };
 
 const MEDIA: ParitySample[] = [

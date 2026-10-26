@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { setAutoLayout } from '../layout/ops';
 import { setParent } from '../parent-ops';
-import { addClip, type OpResult } from '../timeline';
-import { composeHtml } from './compose';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Align, Direction, Justify, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -31,5 +32,26 @@ describe('auto layout in the composition', () => {
     expect(styleOf(html, 'k1')).toContain('left:0px');
     expect(styleOf(html, 'k2')).toContain('left:108px');
     expect(styleOf(html, 'k2')).toContain('top:513px');
+  });
+
+  it('exports space-evenly slots', () => {
+    const html = composeHtml({ doc: must(setAutoLayout(row, 'box', { justify: Justify.SpaceEvenly })), tokens: FEEGA_TOKENS, assets: {} });
+    expect(styleOf(html, 'k1')).toContain('left:288px');
+    expect(styleOf(html, 'k2')).toContain('left:684px');
+  });
+
+  it('exports a negative gap as overlap', () => {
+    const html = composeHtml({ doc: must(setAutoLayout(row, 'box', { gap: -20 })), tokens: FEEGA_TOKENS, assets: {} });
+    expect(styleOf(html, 'k2')).toContain('left:88px');
+  });
+
+  it('exports grid tracks', () => {
+    const grid = must(setAutoLayout(row, 'box', { direction: Direction.Grid, columnTracks: [{ type: TrackType.Fixed, value: 300 }, { type: TrackType.Hug, value: 0 }] }));
+    expect(styleOf(composeHtml({ doc: grid, tokens: FEEGA_TOKENS, assets: {} }), 'k2')).toContain('left:300px');
+  });
+
+  it('exports baseline alignment', () => {
+    const html = composeHtml({ doc: must(setAutoLayout(row, 'box', { align: Align.Baseline })), tokens: FEEGA_TOKENS, assets: {} });
+    expect(styleOf(html, 'k1')).toContain('top:513px');
   });
 });

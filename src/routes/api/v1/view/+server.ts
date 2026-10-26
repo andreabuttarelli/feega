@@ -4,8 +4,6 @@ import type { RequestHandler } from './$types';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { VIEW_OPS, ViewOp, isViewOp, runView } from '$lib/server/edit/run-view';
 
-export const config = { maxDuration: 60, memory: 2048 };
-
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
 const DESCRIBE_OP = 'describe';

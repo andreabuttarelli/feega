@@ -5,21 +5,21 @@
   import { Action } from '$lib/motion/actions';
   import { duckUnder, voicesOver } from '$lib/motion/duck';
   import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
-  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-  import { AssetKind, COMPONENTS, Control, TrackKind } from '$lib/motion/components';
-  import { DEPTH, Space } from '$lib/motion/camera';
-  import { setClipDepth } from '$lib/motion/camera-ops';
-  import { ParentOpacity, parentChoices } from '$lib/motion/parent';
+  import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
+  import { AssetKind, COMPONENTS, Control, TrackKind } from '@feega/motion-core/motion/components';
+  import { DEPTH, Space } from '@feega/motion-core/motion/camera';
+  import { setClipDepth } from '@feega/motion-core/motion/camera-ops';
+  import { ParentOpacity, parentChoices } from '@feega/motion-core/motion/parent';
   import { setParent, setParentOpacity } from '$lib/motion/parent-ops';
-  import { findClip } from '$lib/motion/doc';
-  import { TRANSITION_KINDS, type Edge } from '$lib/motion/design';
-  import { resolveColor, type BrandTokens } from '$lib/motion/brand';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+  import { clipsOf, findClip } from '@feega/motion-core/motion/doc';
+  import { TRANSITION_KINDS, type Edge } from '@feega/motion-core/motion/design';
+  import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import { EditMode, designWarning, editIn } from '$lib/motion/edit-mode';
   import { InspectorTab, clipFieldGroups, keyAt, keyedField, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
-  import { setMask, setProps, setTiming, setTrackMatte, setTransition, Side, type OpResult } from '$lib/motion/timeline';
-  import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
-  import { ANIMATABLE, Source, isAnimatable, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
+  import { setKeyframe, setMask, setProps, setTiming, setTrackMatte, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
+  import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '@feega/motion-core/motion/mask';
+  import { ANIMATABLE, Source, isAnimatable, ValueKind, type AnimProp, type KeyValue } from '@feega/motion-core/motion/keyframes';
   import NumberField from './NumberField.svelte';
   import Dial from './Dial.svelte';
   import InspectorSection from './InspectorSection.svelte';
@@ -27,7 +27,7 @@
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
   import { DIAL_KEYS, Part, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
-  import { clipName as layerName, setClipFlags } from '$lib/motion/organize';
+  import { clipName as layerName, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
   import PositionSection from '$lib/components/motion/PositionSection.svelte';
   import type { Edge as AlignEdge } from '$lib/motion/space';
@@ -46,42 +46,49 @@
   import CodeEditor from './CodeEditor.svelte';
   import MarkedLines from './MarkedLines.svelte';
   import FillStack from './FillStack.svelte';
-  import { FILLED, elementFills } from '$lib/motion/fill/elements';
-  import { FILL_LABEL, FILL_TYPES, addFill } from '$lib/motion/fill/model';
+  import { cropRequest } from '$lib/canvas/crop-request.svelte';
+  import { FILLED, elementFills } from '@feega/motion-core/motion/fill/elements';
+  import { FILL_LABEL, FILL_TYPES, addFill, type Fill } from '@feega/motion-core/motion/fill/model';
+  import { applyFillKeys, fillOfKey, splitFillEdit } from '@feega/motion-core/motion/fill/keys';
   import { Adder } from './stack-adder';
   import StrokeStack from './StrokeStack.svelte';
-  import { STROKED, elementStrokes } from '$lib/motion/stroke/elements';
-  import { addStroke, sidesShown } from '$lib/motion/stroke/model';
-  import { MarkedField, markedField } from '$lib/motion/poster-lines';
-  import { componentLabel } from '$lib/motion/poster-parts';
+  import { STROKED, elementStrokes } from '@feega/motion-core/motion/stroke/elements';
+  import { addStroke, sidesShown } from '@feega/motion-core/motion/stroke/model';
+  import { MarkedField, markedField } from '@feega/motion-core/motion/poster-lines';
+  import { componentLabel } from '@feega/motion-core/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
+  import TextCounterSection from './TextCounterSection.svelte';
+  import AnimateToSection from './AnimateToSection.svelte';
   import TextPathSection from './TextPathSection.svelte';
+  import TextPresetGallery from './TextPresetGallery.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
-  import { registerFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+  import VariablesSection from './VariablesSection.svelte';
+  import { registerFont, replaceFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+  import { isBuiltin } from '@feega/motion-core/motion/fonts/model';
   import type { FontLibrary } from '$lib/motion/fonts/library';
-  import type { CatalogueFont } from '$lib/motion/fonts/model';
-  import { withParams } from '$lib/motion/custom/params';
-  import type { CustomSource } from '$lib/motion/custom/component';
-  import { setExpression } from '$lib/motion/expression/ops';
-  import { EFFECTS, EFFECT_ALPHA, EFFECT_KINDS, editedParams, type EffectKind } from '$lib/motion/effects/registry';
+  import type { CatalogueFont } from '@feega/motion-core/motion/fonts/model';
+  import { withParams } from '@feega/motion-core/motion/custom/params';
+  import type { CustomSource } from '@feega/motion-core/motion/custom/component';
+  import { expressionToKeys, setExpression } from '@feega/motion-core/motion/expression/ops';
+  import { EFFECTS, EFFECT_ALPHA, EFFECT_KINDS, editedParams, type EffectKind } from '@feega/motion-core/motion/effects/registry';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
-  import { effectKey } from '$lib/motion/effects/model';
-  import { MODIFIERS, MODIFIER_KINDS, type ModifierKind } from '$lib/motion/shape/modifiers';
-  import { addModifier, morphHere, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
+  import { effectKey } from '@feega/motion-core/motion/effects/model';
+  import { MODIFIERS, MODIFIER_KINDS, type ModifierKind } from '@feega/motion-core/motion/shape/modifiers';
+  import { addModifier, morphHere, morphToClip, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
   import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset, type ShapePreset } from '$lib/motion/shape/presets';
-  import { SHAPE_KINDS, ShapeKind, modifierKey, type Modifier } from '$lib/motion/shape/schema';
-  import { cornerRadii, withCorner } from '$lib/motion/shape/geometry';
-  import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '$lib/motion/text-animators/model';
-  import { TEXT_COMPONENTS, TEXT_PRESETS, applyPreset as applyTextPreset, removeAnimator, setAnimator, type TextPreset } from '$lib/motion/text-animators/ops';
-  import { BLEND_MODES, blendLabel, type BlendMode } from '$lib/motion/blend';
+  import { SHAPE_KINDS, ShapeKind, modifierKey, type Modifier } from '@feega/motion-core/motion/shape/schema';
+  import { cornerRadii, withCorner } from '@feega/motion-core/motion/shape/geometry';
+  import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '@feega/motion-core/motion/text-animators/model';
+  import { TEXT_COMPONENTS, removeAnimator, setAnimator } from '@feega/motion-core/motion/text-animators/ops';
+  import { BLEND_MODES, blendLabel, type BlendMode } from '@feega/motion-core/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
-  import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
+  import { expressionErrors, expressionValue } from '@feega/motion-core/motion/expression/bake';
   import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
-  import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '$lib/motion/physics/model';
+  import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '@feega/motion-core/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
   import { MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
   import MediaPicker from './MediaPicker.svelte';
@@ -228,6 +235,16 @@
     commit(setProps(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
   }
 
+  let replacing = $state(false);
+
+  const missingFont = (family: string) => !isBuiltin(family) && !doc.fonts.some((f) => f.family === family);
+
+  function swapFont(from: string, asked: string, catalogue: CatalogueFont[]) {
+    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
+    replacing = false;
+    commit(replaceFont(base, from, family, catalogue), `Replaced ${from} with ${family}`);
+  }
+
   function pickFont(field: Field, asked: string, catalogue: CatalogueFont[]) {
     const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
     if (clip.component !== 'Custom') {
@@ -295,6 +312,10 @@
     commit(setExpression(doc, clip.id, key, source), `Edited the ${key} expression`);
   }
 
+  function bakeExpression(key: string) {
+    commit(expressionToKeys(doc, clip.id, key, analyses), `Converted the ${key} expression to keys`);
+  }
+
   function expressionNow(key: string): string {
     try {
       return String(Math.round(expressionValue(doc, clip.id, key, clip.from + Math.max(0, frame - clip.from), analyses) * 1000) / 1000);
@@ -315,15 +336,6 @@
   let effectsRoot = $state<HTMLElement | null>(null);
 
   const animatorRows = (id: string) => animated.params.filter((p) => p.source === Source.Animator && p.key.startsWith(animatorKey(id, '')));
-  const TEXT_PRESET_SECONDS = 1;
-
-  function addTextPreset(select: HTMLSelectElement) {
-    const preset = select.value as TextPreset;
-    select.value = '';
-    if (preset) {
-      commit(applyTextPreset(doc, clip.id, preset, { start: Math.max(0, frame - clip.from), duration: TEXT_PRESET_SECONDS * doc.fps }, crypto.randomUUID().slice(0, 8)), `Added ${preset}`);
-    }
-  }
 
   const addEffectOf = (kind: EffectKind) => commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${EFFECTS[kind].label.toLowerCase()}`);
 
@@ -336,6 +348,16 @@
     select.value = '';
     if (kind) {
       commit(addModifier(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${MODIFIERS[kind].label.toLowerCase()}`);
+    }
+  }
+
+  const morphSources = $derived(clip.component === 'Shape' ? clipsOf(doc).filter((c) => c.component === 'Shape' && c.id !== clip.id) : []);
+
+  function morphIntoClip(select: HTMLSelectElement) {
+    const other = select.value;
+    select.value = '';
+    if (other) {
+      commit(morphToClip(doc, clip.id, other, frame), `Morphed into ${clipName(other)}`);
     }
   }
 
@@ -392,6 +414,19 @@
   }
 
   const shown = (key: string) => valueAt(animated, key, frame, resolve);
+
+  const fillKeyed = $derived(new Set(Object.keys(clip.keyframes).filter((key) => fillOfKey(key) && clip.keyframes[key].length)));
+  const fillsShown = $derived(applyFillKeys(elementFills(clip.component, clip.props), Object.fromEntries([...fillKeyed].map((key) => [key, shown(key) as KeyValue]))));
+  const fillKeys = $derived(clip.component === 'Shape' ? { mark: (key: string) => MARK[keyState(key)], toggle } : null);
+
+  function commitFills(next: Fill[], summary: string) {
+    const { fills, keyedValues } = splitFillEdit(elementFills(clip.component, clip.props), fillsShown, next, fillKeyed);
+    let result: OpResult = setProps(doc, clip.id, { fills });
+    for (const [key, value] of Object.entries(keyedValues)) {
+      result = result.ok ? setKeyframe(result.doc, clip.id, key, frame - clip.from, value) : result;
+    }
+    commit(result, summary);
+  }
   const numberShown = (prop: AnimProp) => toShown(clip.component, prop.key, Math.round(Number(shown(prop.key)) * 1000) / 1000, doc);
   const stored = (key: string, v: number) => toStored(clip.component, key, v, doc);
   const slider = (p: Ranged) => sliderOf(clip.component, p, doc);
@@ -471,6 +506,7 @@
       </details>
     {/if}
     {#if visual}<StyleSection {doc} {clip} {commit} />{/if}
+    {#if visual}<VariablesSection {doc} {clip} {commit} />{/if}
     {#if visual}<AutoLayoutSection {doc} {clip} {commit} />{/if}
   {/if}
 
@@ -487,6 +523,7 @@
       <div class="expr-head"><span>ƒ {key}</span><IconButton action={Action.Remove} size={14} label={`Remove the ${key} expression`} onclick={() => toggleExpression(key)} /></div>
       <textarea class="code" rows="2" spellcheck="false" aria-label={`${key} expression`} value={clip.expressions[key]} onchange={(e) => editExpression(key, e.currentTarget.value)}></textarea>
       {#if faults[key]}<p class="expr-error" role="alert">{faults[key]}</p>{:else}<output class="expr-now">= {expressionNow(key)}</output>{/if}
+      <button type="button" class="expr-bake" data-testid={`expression-to-keys-${key}`} disabled={Boolean(faults[key])} onclick={() => bakeExpression(key)}>Convert to keys</button>
     </div>
   {/if}
 {/snippet}
@@ -553,7 +590,7 @@
     <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
-    <div class="stack" data-prop={field.key}><FillStack {gesture} fills={elementFills(clip.component, clip.props)} adder={Adder.Section} {assets} {tokens} {upload} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><FillStack {gesture} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} /></div>
   {:else if field.control === Control.Strokes}
     <div class="stack" data-prop={field.key}><StrokeStack {gesture} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
@@ -584,7 +621,12 @@
         {:else if field.control === Control.MediaList}
           <MediaListField label={field.label} value={value(field)} {assets} {upload} onchange={(list) => setProp(field, list)} />
         {:else if field.control === Control.Font}
-          <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} library={fonts} />
+          <div class="comp">
+            <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => (replacing ? swapFont(String(value(field)), family, catalogue) : pickFont(field, family, catalogue))} library={fonts} />
+            {#if !isBuiltin(String(value(field)))}
+              <button type="button" class:on={replacing} data-testid="replace-font" title={missingFont(String(value(field))) ? 'Missing font: pick a replacement for the whole video' : 'Pick a font to replace this one in the whole video'} aria-pressed={replacing} onclick={() => (replacing = !replacing)}>{missingFont(String(value(field))) ? 'Missing · Replace' : 'Replace all'}</button>
+            {/if}
+          </div>
         {:else if field.control === Control.Comp}
           <div class="comp">
             <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
@@ -728,6 +770,12 @@
       <option value="">Morph to…</option>
       {#each SHAPE_KINDS.filter((k) => k !== ShapeKind.Path) as kind (kind)}<option value={kind}>{kind}</option>{/each}
     </select>
+    {#if morphSources.length}
+      <select class="add" aria-label="Morph into shape" data-testid="morph-into" title="Morphs into the outline of another shape on the canvas, from the playhead over one second" value="" onchange={(e) => morphIntoClip(e.currentTarget)}>
+        <option value="">Morph into shape…</option>
+        {#each morphSources as other (other.id)}<option value={other.id}>{clipName(other.id)}</option>{/each}
+      </select>
+    {/if}
     <select class="add" aria-label="Liquid preset" data-testid="shape-preset" value="" onchange={(e) => applyShapePresetOf(e.currentTarget)}>
       <option value="">Liquid preset…</option>
       {#each SHAPE_PRESETS as preset (preset)}<option value={preset} title={SHAPE_PRESET[preset].about}>{SHAPE_PRESET[preset].label}</option>{/each}
@@ -751,6 +799,9 @@
 {/snippet}
 
 {#snippet animateBody()}
+  {#if visual && clip.component !== 'Null'}
+    <AnimateToSection {doc} {clip} {frame} {commit} />
+  {/if}
   {#if TEXT_COMPONENTS.has(clip.component)}
     <div class="stackable" data-testid="text-animators-section">
       {#each clip.animators as animator, i (animator.id)}
@@ -766,11 +817,9 @@
           {@render animList(animatorRows(animator.id).filter((p) => p.kind === ValueKind.Number), afterDot)}
         </div>
       {/each}
-      <select class="add" aria-label="Add text preset" data-testid="add-text-preset" value="" onchange={(e) => addTextPreset(e.currentTarget)}>
-        <option value="">Add text animation…</option>
-        {#each TEXT_PRESETS as preset (preset)}<option value={preset}>{preset}</option>{/each}
-      </select>
+      <TextPresetGallery {doc} {clip} {frame} {commit} />
     </div>
+    <TextCounterSection {doc} {clip} {commit} />
     <TextPathSection {doc} {clip} params={animated.params} row={animField} {commit} />
   {/if}
   {#if pulseShown}
@@ -1223,6 +1272,11 @@
     gap: var(--ui-space-1);
   }
 
+  .comp button.on {
+    background: var(--ui-ink);
+    color: var(--ui-bg);
+  }
+
   .comp select {
     flex: 1;
     min-width: 0;
@@ -1519,6 +1573,23 @@
     color: var(--ui-ink-2);
     font-size: var(--ui-text-xs);
     cursor: pointer;
+  }
+
+  .expr-bake {
+    justify-self: start;
+    height: 24px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .expr-bake:hover:not(:disabled) {
+    background: var(--ui-hover);
   }
 
   .mode-warning {

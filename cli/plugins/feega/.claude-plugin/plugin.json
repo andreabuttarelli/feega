@@ -3,7 +3,7 @@
   "name": "feega",
   "displayName": "feega",
   "version": "1.0.0",
-  "description": "Operate feega (social media AI autopilot) via MCP or CLI: brands, posts, plans, studio, SEO/GEO, and blog.",
+  "description": "Operate feega (infinite canvas for motion video and images) via MCP or CLI: canvases, nodes, generations, motion, gallery.",
   "author": {
     "name": "Andrea Buttarelli",
     "email": "andreabuttarelli.design@gmail.com",

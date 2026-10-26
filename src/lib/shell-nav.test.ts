@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode, visibleNav } from './shell-nav';
-import { SocialPublishing } from './social-publishing';
+import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode } from './shell-nav';
 
 describe('la rail: due gruppi, un comportamento a testa', () => {
   it('il gruppo "panel" è Assets, Brands e Influencers, in quest\'ordine', () => {
@@ -12,8 +11,8 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(BURGER_ENTRIES.map((e) => e.id)).not.toContain('layers');
   });
 
-  it('il gruppo "workbench" è Calendar, Ads, Studio, Settings, in quest\'ordine', () => {
-    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['calendar', 'ads', 'studio', 'settings']);
+  it('il gruppo "workbench" è Studio, Settings, in quest\'ordine', () => {
+    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['studio', 'settings']);
   });
 
   it('ogni voce del gruppo panel apre un pannello, ogni voce workbench un foglio o una pagina sua', () => {
@@ -39,9 +38,7 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
 
 describe('sheetEntryForPath: quale voce apre il foglio', () => {
   it('un path esatto apre il suo foglio', () => {
-    expect(sheetEntryForPath('/calendar')?.id).toBe('calendar');
-    expect(sheetEntryForPath('/ads')?.id).toBe('ads');
-    expect(sheetEntryForPath('/settings/connected-accounts')?.id).toBe('settings');
+    expect(sheetEntryForPath('/settings/project')?.id).toBe('settings');
   });
 
   it('una sezione diversa dello stesso foglio apre comunque lo stesso foglio', () => {
@@ -55,7 +52,7 @@ describe('sheetEntryForPath: quale voce apre il foglio', () => {
   });
 
   it('uno slash finale non cambia il verdetto', () => {
-    expect(sheetEntryForPath('/calendar/')?.id).toBe('calendar');
+    expect(sheetEntryForPath('/settings/')?.id).toBe('settings');
   });
 });
 
@@ -67,12 +64,12 @@ describe('il burger mobile legge la stessa tabella della rail', () => {
 });
 
 describe('un foglio si riconosce anche con parametri nell\'indirizzo', () => {
-  it('/promote?nodeIds=… apre il foglio Promote', () => {
-    expect(sheetEntryForPath('/promote?nodeIds=a,b&tab=paid')?.id).toBe('promote');
+  it('/settings/billing?x=… apre il foglio Settings', () => {
+    expect(sheetEntryForPath('/settings/billing?x=a')?.id).toBe('settings');
   });
 
   it('un frammento non cambia il foglio', () => {
-    expect(sheetEntryForPath('/calendar#oggi')?.id).toBe('calendar');
+    expect(sheetEntryForPath('/settings#oggi')?.id).toBe('settings');
   });
 });
 
@@ -89,41 +86,17 @@ describe('il burger su mobile', () => {
 });
 
 describe('un link diretto a un foglio su desktop apre la tela con il foglio', () => {
-  const cases: Array<[string, string, 'mobile' | 'desktop', 'sheet' | 'page']> = [
-    ['/calendar', '', 'desktop', 'sheet'],
-    ['/calendar', '?month=2026-10', 'desktop', 'sheet'],
-    ['/ads', '', 'desktop', 'sheet'],
-    ['/promote', '', 'desktop', 'sheet'],
-    ['/settings/billing', '', 'desktop', 'sheet'],
-    ['/settings/connected-accounts', '', 'desktop', 'sheet'],
-    ['/settings/connected-accounts', '?connected=instagram', 'desktop', 'page'],
-    ['/settings/facebook', '?tempToken=x', 'desktop', 'page'],
-    ['/settings/linkedin', '', 'desktop', 'page'],
-    ['/settings/connect/instagram', '', 'desktop', 'page'],
-    ['/calendar', '', 'mobile', 'page'],
-    ['/settings/billing', '', 'mobile', 'page'],
-    ['/assets', '', 'desktop', 'page'],
-    ['/brands/new', '', 'desktop', 'page'],
-    ['/c/abc', '', 'desktop', 'page'],
-    ['/studio', '', 'desktop', 'page']
+  const cases: Array<[string, 'mobile' | 'desktop', 'sheet' | 'page']> = [
+    ['/settings/billing', 'desktop', 'sheet'],
+    ['/settings/project', 'desktop', 'sheet'],
+    ['/settings/billing', 'mobile', 'page'],
+    ['/assets', 'desktop', 'page'],
+    ['/brands/new', 'desktop', 'page'],
+    ['/c/abc', 'desktop', 'page'],
+    ['/studio', 'desktop', 'page']
   ];
 
-  it.each(cases)('%s%s su %s → %s', (path, search, viewport, expected) => {
-    expect(directLoadMode(path, search, viewport)).toBe(expected);
-  });
-});
-
-describe('la rail senza pubblicazione social', () => {
-  const SOCIAL = ['calendar', 'ads'];
-
-  it('a flag spento nasconde calendario e ads', () => {
-    const ids = visibleNav(SocialPublishing.Off, BURGER_ENTRIES).map((e) => e.id);
-    expect(ids.filter((id) => SOCIAL.includes(id))).toEqual([]);
-    expect(ids).toContain('assets');
-  });
-
-  it('a flag acceso le mostra', () => {
-    const ids = visibleNav(SocialPublishing.On, BURGER_ENTRIES).map((e) => e.id);
-    expect(ids).toEqual(expect.arrayContaining(SOCIAL));
+  it.each(cases)('%s su %s → %s', (path, viewport, expected) => {
+    expect(directLoadMode(path, viewport)).toBe(expected);
   });
 });

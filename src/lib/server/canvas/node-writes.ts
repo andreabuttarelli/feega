@@ -1,9 +1,10 @@
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
-import { deleteConnection, deleteNode, findNode, listConnections, listNodes, resizeNode, writeNodeData, type CanvasNodeRecord } from '$lib/server/repos/canvas';
+import { deleteConnection, deleteNode, findNode, listConnections, listNodes, renameNode, resizeNode, writeNodeData, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { clearDocShare, setDocShare } from '$lib/server/repos/doc-share';
 import { runsOf } from '$lib/server/canvas/generate';
 import { nodeSize } from '$lib/canvas/node-size';
+import { cleanNodeName } from '$lib/canvas/node-name';
 import { docData } from '$lib/canvas-node-data';
 import { mintShareToken } from '$lib/canvas/doc-node';
 
@@ -41,6 +42,16 @@ export async function resizeOnCanvas(db: Db, input: CanvasScope & { nodeId: stri
     width: Math.max(min.w, input.width),
     height: Math.max(min.h, input.height)
   });
+  return true;
+}
+
+export async function renameOnCanvas(db: Db, input: CanvasScope & { nodeId: string; name: string }): Promise<boolean> {
+  const existing = (await listNodes(db, input)).find((node) => node.id === input.nodeId);
+  if (!existing) {
+    return false;
+  }
+
+  await renameNode(db, { orgId: input.orgId, nodeId: input.nodeId, name: cleanNodeName(input.name) });
   return true;
 }
 

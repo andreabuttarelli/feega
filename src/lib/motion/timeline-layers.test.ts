@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionClip, type MotionTrack } from './doc';
-import { Interp, type Keyframe } from './keyframes';
-import { TrackKind } from './components';
-import { Ease } from './design';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { Interp, type Keyframe } from '@feega/motion-core/motion/keyframes';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { Ease } from '@feega/motion-core/motion/design';
 import { KeyMark, KeyGlyph, ROW_PX, RowKind, keyMark, keyGlyph, layerName, layerRows, pinched, rowWindow, propValue, rulerMarks } from './timeline-layers';
 
 const clip = (id: string, over: Partial<MotionClip> = {}): MotionClip => ({ id, component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Better marketing' }, keyframes: {}, ...over }) as MotionClip;
@@ -31,6 +31,10 @@ describe('timeline layers', () => {
 
     expect(rows.filter((r) => r.kind === RowKind.Property).map((r) => r.id)).toEqual(['hook:opacity', 'hook:y']);
     expect(rows.at(-1)!.top).toBe(ROW_PX[RowKind.Group] + ROW_PX[RowKind.Layer] + ROW_PX[RowKind.Property]);
+  });
+
+  it('shows the name a layer was given, such as a Figma layer name', () => {
+    expect(layerName({ ...clip('t1'), name: 'Headline' } as Partial<MotionClip> as MotionClip, {})).toBe('Headline · t1');
   });
 
   it('names a layer by component and id, so eighteen shapes stop being called "Shape"', () => {

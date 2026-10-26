@@ -11,10 +11,11 @@ import { recordsVideo, scorecard, verdictOf, type SessionRun, type StepResult } 
 
 const PROFILE = process.env.FLUID_PROFILE;
 const VIDEO = process.env.FLUID_VIDEO !== 'off';
+const ROTATE_OUTSIDE_PX = 10;
 const ONLY = process.env.FLUID_STEPS ? new RegExp(process.env.FLUID_STEPS) : null;
 const OUT = process.env.FLUID_OUT ?? join(homedir(), 'Documents', 'feega-videos', 'fluidity');
 const SLUG = process.env.FLUID_PROJECT_SLUG ?? 'gpu-fixture-0aef6d1a';
-const RENDERERS = (process.env.FLUID_RENDERERS ?? 'gpu,dom').split(',');
+const RENDERERS = (process.env.FLUID_RENDERERS ?? 'gpu').split(',');
 const VIEWPORT = { width: 1440, height: 900 };
 const COLOURS = ['#e11d48', '#16a34a', '#2563eb', '#f59e0b', '#9333ea'];
 const SETTLE_MS = 1200;
@@ -485,10 +486,7 @@ const STEPS: Step[] = [
       await selectOnly(page, group);
       const g = await boxOf(page, group);
       await watch([boxWatch(group, 'group')]);
-      const handle = page.getByTestId('rotate-handle').first();
-      await expect(handle).toBeVisible({ timeout: 5000 });
-      const h = (await handle.boundingBox())!;
-      await drag(page, centre(h), { x: g.x + g.width + 80, y: g.y + g.height / 2 }, 10);
+      await drag(page, { x: g.x + g.width + ROTATE_OUTSIDE_PX, y: g.y + g.height + ROTATE_OUTSIDE_PX }, { x: g.x + g.width + 80, y: g.y + g.height / 2 }, 10);
       return { touched: [ids.get('box')!, ids.get('copy')!, group], watches: [boxWatch(group, 'group')] };
     }
   },
@@ -955,7 +953,7 @@ test.describe('fluidity scorecard @real', () => {
         const { db } = await testAccount();
         const { projectId, canvasId } = await fixtureCanvas(db);
         const name = `${browserName}-${renderer}-${variant}`;
-        const path = `/p/${projectId}/c/${canvasId}${renderer === 'dom' ? '?renderer=dom' : ''}`;
+        const path = `/p/${projectId}/c/${canvasId}`;
         const context = await recordedContext(browser, browserName, name);
         const page = await context.newPage();
         page.setDefaultTimeout(60_000);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FRAME_DIALOG_ACTIONS } from './frame-dialogs';
 import { CANVAS_MENU, actionsIn, enabledFor, menuFor, shownFor } from './selection-actions';
 
 describe('group and ungroup', () => {
@@ -23,6 +24,7 @@ describe('group and ungroup', () => {
       ['ungroup', 'Mod+Shift+G'],
       ['duplicate', 'Mod+D'],
       ['create-formats', null],
+      ['combine-video', null],
       ['export', null],
       ['copy', 'Mod+C'],
       ['paste', 'Mod+V'],
@@ -35,20 +37,66 @@ describe('group and ungroup', () => {
       ['align-middle', 'Alt+V'],
       ['align-bottom', 'Alt+S'],
       ['tidy-up', 'Mod+Alt+T'],
+      ['stack', 'Shift+A'],
+      ['section-selection', 'Shift+S'],
+      ['edit-technique', null],
+      ['detach-technique', null],
+      ['save-technique', null],
       ['flip-horizontal', 'Shift+H'],
       ['flip-vertical', 'Shift+V'],
       ['use-as-mask', 'Mod+Ctrl+M'],
       ['release-mask', null],
+      ['select-matching', 'Mod+Alt+A'],
+      ['select-same-fill', null],
+      ['select-same-stroke', null],
+      ['select-same-font', null],
+      ['select-same-effect', null],
+      ['frame-selection', 'Mod+Alt+G'],
+      ['resize-to-fit', 'Mod+Alt+Shift+R'],
+      ['auto-layout', 'Shift+A'],
+      ['union', 'Alt+Shift+U'],
+      ['subtract', 'Alt+Shift+S'],
+      ['intersect', 'Alt+Shift+I'],
+      ['exclude', 'Alt+Shift+E'],
+      ['flatten', 'Mod+E'],
+      ['outline-stroke', 'Mod+Alt+O'],
+      ['outline-text', 'Mod+Shift+O'],
       ['delete', 'Backspace']
     ]);
   });
 
   it('offers Export for any picked frames, one or many, and nothing else', () => {
-    const frame = { data: { format: '4:5' } };
+    const frame = { type: 'motion', data: { format: '4:5' } };
     expect(shownFor('export', [frame])).toBe(true);
     expect(shownFor('export', [frame, frame])).toBe(true);
-    expect(shownFor('export', [frame, { data: {} }])).toBe(false);
-    expect(shownFor('export', [{ data: { format: '1:1', kind: 'element' } }]), 'a free element exports on its own').toBe(true);
+    expect(shownFor('export', [frame, { type: 'image', data: {} }])).toBe(false);
+    expect(shownFor('export', [{ type: 'motion', data: { format: '1:1', kind: 'element' } }]), 'a free element exports on its own').toBe(true);
+  });
+
+  it('offers the image tools on one image that has a result, and nowhere else', () => {
+    const done = { type: 'image', data: { refId: 'a1' } };
+    for (const id of ['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'split-layers'] as const) {
+      expect(shownFor(id, [done])).toBe(true);
+      expect(shownFor(id, [done, done])).toBe(false);
+      expect(shownFor(id, [{ type: 'image', data: {} }])).toBe(false);
+      expect(shownFor(id, [{ type: 'video', data: { refId: 'a1' } }])).toBe(false);
+    }
+  });
+
+  it('offers Layers to frame only on an image that was split into layers', () => {
+    const split = { type: 'image', data: { refId: 'a1', layerRefIds: ['l1', 'l2'] } };
+
+    expect(shownFor('layers-to-frame', [split])).toBe(true);
+    expect(shownFor('layers-to-frame', [{ type: 'image', data: { refId: 'a1' } }])).toBe(false);
+    expect(shownFor('layers-to-frame', [{ type: 'image', data: { refId: 'a1', layerRefIds: [] } }])).toBe(false);
+    expect(shownFor('layers-to-frame', [split, split])).toBe(false);
+  });
+
+  it('reads an element node as a free element whatever its data holds', () => {
+    const element = { type: 'element', data: { docHeadRevision: 1 } };
+    expect(shownFor('export', [element])).toBe(true);
+    expect(shownFor('create-formats', [element])).toBe(false);
+    expect(shownFor('ungroup', [{ type: 'element', data: { docHeadRevision: 1, kind: 'group' } }])).toBe(true);
   });
 
   it('each surface shows the shared menu, in its order, limited to what it can run', () => {
@@ -58,8 +106,8 @@ describe('group and ungroup', () => {
 
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
-    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup']);
-    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['copy-id', 'report']);
+    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-technique', 'run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup', 'remove-background', 'upscale-image', 'inpaint', 'outpaint', 'split-layers', 'layers-to-frame']);
+    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['export', ...Object.keys(FRAME_DIALOG_ACTIONS), 'copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });
 
@@ -96,6 +144,25 @@ describe('enabledFor', () => {
     expect(result.reason).toBe('The selected nodes are not all connected');
   });
 
+  it('shows the technique actions for one technique node only', () => {
+    const technique = { type: 'technique', data: {} };
+
+    expect(shownFor('run-technique', [technique])).toBe(true);
+    expect(shownFor('detach-technique', [technique])).toBe(true);
+    expect(shownFor('edit-technique', [technique, technique])).toBe(false);
+    expect(shownFor('run-technique', [{ type: 'text', data: {} }])).toBe(false);
+  });
+
+  it('save-technique takes a connected flow of any node types and says why not otherwise', () => {
+    const nodes = [
+      { id: '1', type: 'text', data: {} },
+      { id: 'd', type: 'doc', data: {} }
+    ];
+
+    expect(enabledFor('save-technique', nodes, [{ sourceNodeId: '1', targetNodeId: 'd' }]).enabled).toBe(true);
+    expect(enabledFor('save-technique', nodes, [])).toEqual({ enabled: false, reason: 'The selected nodes are not all connected' });
+  });
+
   it('run-downstream needs exactly one node that runs or feeds something', () => {
     const edges = [{ sourceNodeId: 'd', targetNodeId: '2' }];
     expect(enabledFor('run-downstream', [{ id: '1', type: 'image', data: {} }]).enabled).toBe(true);
@@ -112,7 +179,7 @@ describe('enabledFor', () => {
 });
 
 describe('create formats', () => {
-  const frame = { data: { format: '16:9' } };
+  const frame = { type: 'motion', data: { format: '16:9' } };
 
   it('shows for one frame', () => {
     expect(shownFor('create-formats', [frame])).toBe(true);
@@ -121,7 +188,18 @@ describe('create formats', () => {
 
   it('hides for anything else', () => {
     expect(shownFor('create-formats', [frame, frame])).toBe(false);
-    expect(shownFor('create-formats', [{ data: { format: '16:9', kind: 'element' } }])).toBe(false);
-    expect(shownFor('create-formats', [{ data: { prompt: 'x' } }])).toBe(false);
+    expect(shownFor('create-formats', [{ type: 'motion', data: { format: '16:9', kind: 'element' } }])).toBe(false);
+    expect(shownFor('create-formats', [{ type: 'text', data: { prompt: 'x' } }])).toBe(false);
+  });
+});
+
+describe('combine into video', () => {
+  const frame = { type: 'motion', data: { format: '16:9' } };
+
+  it('is offered on two or more frames only', () => {
+    expect(shownFor('combine-video', [frame, frame])).toBe(true);
+    expect(shownFor('combine-video', [frame])).toBe(false);
+    expect(shownFor('combine-video', [frame, { type: 'motion', data: { format: '16:9', kind: 'element' } }])).toBe(false);
+    expect(CANVAS_MENU.map((a) => a.id)).toContain('combine-video');
   });
 });

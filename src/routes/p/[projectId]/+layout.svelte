@@ -1,5 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
+  import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
+  import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import { modeOf, ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
   import { page } from '$app/state';
@@ -7,7 +9,6 @@
   import CanvasTopBar from '$lib/components/canvas/CanvasTopBar.svelte';
   import FloatingRail from '$lib/components/canvas/FloatingRail.svelte';
   import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
-  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
   import RightBar from '$lib/components/brand-agent/RightBar.svelte';
   import { can, OrgAction } from '$lib/org-roles';
@@ -27,7 +28,6 @@
   import { MOBILE_QUERY, type Viewport } from '$lib/breakpoints';
   import { readChatOpen, writeChatOpen } from '$lib/shell-prefs';
   import { guideOpenRequest } from '$lib/canvas/guide-open';
-  import { chatOpenRequest } from '$lib/canvas/empty-canvas';
   import { browser } from '$app/environment';
   import { postCanvasAction } from '$lib/canvas/canvas-api';
   import type { ShareState } from '$lib/canvas/shared-view';
@@ -102,15 +102,6 @@
     }
   });
 
-  $effect(() => {
-    if (!$chatOpenRequest) {
-      return;
-    }
-    chatOpen = true;
-    writeChatOpen(true);
-    showMobile('chat');
-  });
-
   function onRailPanel(entry: NavEntry) {
     leftPanel = leftPanel === entry.id ? null : (entry.id as LeftPanelKind);
   }
@@ -126,7 +117,7 @@
   const viewport = $derived<Viewport>(isMobile ? 'mobile' : 'desktop');
   const innerPath = $derived(page.url.pathname.slice(`/p/${projectId}`.length));
   const sheetPending = $derived(
-    !onCanvasRoute && !page.state.sheet && directLoadMode(innerPath, page.url.search, viewport) === 'sheet'
+    !onCanvasRoute && !page.state.sheet && directLoadMode(innerPath, viewport) === 'sheet'
   );
 
   $effect(() => {
@@ -191,7 +182,7 @@
   }
 
   const viewSwitch = $derived(
-    onCanvasRoute && !inlineStage.editing ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView, properties: { target: $propertiesTarget?.name ?? null, onopen: openProperties }, layers: phoneSheets.shown === PhoneSheetKind.Layers, onlayers: () => phoneSheets.toggle(PhoneSheetKind.Layers), inserting: phoneSheets.shown === PhoneSheetKind.Insert, oninsert: () => phoneSheets.toggle(PhoneSheetKind.Insert) } : null
+    onCanvasRoute ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView, properties: { target: $propertiesTarget?.name ?? null, onopen: openProperties }, layers: phoneSheets.shown === PhoneSheetKind.Layers, onlayers: () => phoneSheets.toggle(PhoneSheetKind.Layers), inserting: phoneSheets.shown === PhoneSheetKind.Insert, oninsert: () => phoneSheets.toggle(PhoneSheetKind.Insert) } : null
   );
 
   const canEdit = $derived(can(data.org.role, OrgAction.Edit));
@@ -200,7 +191,7 @@
 <ChatLeaveGuard {projectId} />
 {#if browser}<RightBar {projectId} viewOnly={!canEdit} />{/if}
 
-<div class="project-shell safe-shell ui-app" class:is-editing={inlineStage.editing} class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-safe={isMobile ? 'sides' : undefined} data-mode={data.project.mode}>
+<div class="project-shell safe-shell ui-app" class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-safe={isMobile ? 'sides' : undefined} data-mode={data.project.mode}>
   {#if isMobile}
     <MobileTopBar
       {projectId}
@@ -242,6 +233,7 @@
   {:else if onCanvasRoute}
     <CanvasTopBar
       {projectId}
+      onVersions={() => versionsPanel.show()}
       projectName={data.project.name}
       projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
         id: p.id,
@@ -252,6 +244,8 @@
       }))}
       projectMode={data.project.mode}
       brandName={data.brand?.name ?? null}
+      onComments={() => commentsPanel.show()}
+      commentsUnseen={commentsPanel.unseen}
       canvasName={currentCanvas?.name ?? ''}
       canvasHref={currentCanvas?.href ?? ''}
       canvases={data.canvases}
@@ -288,7 +282,7 @@
         <CanvasSheet {projectId} />
       </div>
 
-      <CanvasChatPanel open={chatOpen || inlineStage.editing} />
+      <CanvasChatPanel open={chatOpen} />
     </div>
   {:else}
     <DesktopPageBar
@@ -308,9 +302,6 @@
 <style>
   .project-shell.is-uncensored {
     box-shadow: inset 0 3px 0 var(--color-destructive);
-  }
-  .project-shell.is-editing :global(.mobile-topbar) {
-    display: none;
   }
 
   .project-shell {
@@ -358,10 +349,6 @@
   .mobile-main.is-canvas {
     overflow: hidden;
     --mobile-stack-top: calc(var(--mobile-bar-clearance) + var(--mobile-stack-gap));
-  }
-  .project-shell.is-editing .mobile-main :global(.runs),
-  .project-shell.is-editing .mobile-main :global(.save-status) {
-    display: none;
   }
   .mobile-main.is-canvas .mobile-view {
     height: 100%;

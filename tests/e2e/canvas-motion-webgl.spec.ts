@@ -58,7 +58,7 @@ async function expectDrawn(page: Page, name: string) {
 test.describe('a three.js component in the motion editor @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
-  test('draws in the inline editor and in the full-screen editor', async ({ page, session, admin, seedNode }) => {
+  test('draws in the inline editor', async ({ page, session, admin, seedNode }) => {
     const node = await seedNode({ type: 'motion', x: 80, y: 120, data: LANDSCAPE });
     const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
     expect(error).toBeNull();
@@ -70,9 +70,5 @@ test.describe('a three.js component in the motion editor @real', () => {
     }
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
     await expectDrawn(page, 'inline editor');
-
-    await page.getByTestId('inline-full-screen').click();
-    await expect(page).toHaveURL(new RegExp(`/motion/${node.id}`), { timeout: 15_000 });
-    await expectDrawn(page, 'full-screen editor');
   });
 });

@@ -15,13 +15,14 @@
   import { runStateOf, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
   import { shownIndex } from '$lib/canvas/gen-history';
   import { PROMPT_PLACEHOLDER, RUN_LABEL, hasGenBody } from '$lib/canvas/gen-tile-view';
-  import { loopCreditsOf, runQuoteOf } from '$lib/canvas/run-quote';
+  import { loopCreditsOf, providerQuotesOf, runLabelOf, runQuoteOf } from '$lib/canvas/run-quote';
   import { effectiveModel } from '$lib/canvas/default-models';
+  import type { RememberedVariants } from '$lib/canvas/variants';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
+  import { filterSkills, insertSkill, slashQueryAt, type PromptSkill, type SlashQuery } from '$lib/canvas/prompt-skills';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { untrack } from 'svelte';
-  import FrameIcon from '@lucide/svelte/icons/frame';
-  import { CANVAS_DRAG_OUTPUT } from '$lib/canvas/drag-payload';
+  import OutputDragHandle from './OutputDragHandle.svelte';
   import { EXAMPLE_LABEL, type DemoResult } from '$lib/onboarding/demo';
 
   let {
@@ -37,6 +38,8 @@
     loopQueued = 0,
     loopVisible = false,
     loopCombinationCount = 0,
+    variantsInFlight = 0,
+    remembered = null,
     onchange,
     onrun,
     onrunloop,
@@ -47,7 +50,9 @@
     onestimate,
     result,
     references,
-    example = null
+    example = null,
+    skills = [],
+    onsaveskill
   }: {
     node: GenNode;
     /** I modelli che questo medium può usare, dal catalogo del brand. */
@@ -88,6 +93,8 @@
      *  prima, poi `run_loop`, che METTE IN CODA — il cron gira le combinazioni nei minuti
      *  successivi, non questa chiamata). */
     onrunloop?: () => void;
+    variantsInFlight?: number;
+    remembered?: RememberedVariants | null;
     /** Ferma i biglietti non ancora reclamati — quelli già in corso finiscono comunque. */
     oncancelloop?: () => void;
     /** Rimettere in vetrina un giro di prima. Il nodo non sa scrivere: chiede a chi lo usa. */
@@ -102,7 +109,59 @@
     result?: import('svelte').Snippet<[{ refId: string; text: string | null }]>;
     references?: import('svelte').Snippet;
     example?: DemoResult | null;
+    skills?: PromptSkill[];
+    onsaveskill?: (name: string, body: string) => Promise<boolean>;
   } = $props();
+
+  let slash = $state<SlashQuery | null>(null);
+  let picked = $state(0);
+  let promptEl = $state<HTMLTextAreaElement | null>(null);
+  let naming = $state<string | null>(null);
+  const SKILL_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+  const matches = $derived(slash ? filterSkills(skills, slash.query) : []);
+
+  function trackSlash(el: HTMLTextAreaElement) {
+    slash = slashQueryAt(el.value, el.selectionStart);
+    picked = 0;
+  }
+
+  function useSkill(skill: PromptSkill) {
+    if (!slash || !promptEl) {
+      return;
+    }
+    const out = insertSkill(promptEl.value, slash, skill);
+    slash = null;
+    onchange?.({ prompt: out.text });
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(out.caret, out.caret);
+    });
+  }
+
+  function pickKey(e: KeyboardEvent) {
+    if (!slash || matches.length === 0) {
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      picked = (picked + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length;
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      useSkill(matches[picked]);
+    } else if (e.key === 'Escape') {
+      slash = null;
+    }
+  }
+
+  async function saveNamed() {
+    const name = naming?.trim() ?? '';
+    if (!SKILL_NAME.test(name) || !onsaveskill) {
+      return;
+    }
+    if (await onsaveskill(name, node.prompt)) {
+      naming = null;
+    }
+  }
 
   /**
    * IL MODELLO CHE CONTA È QUELLO RISOLTO, non `node.model`: un nodo nato prima del default per
@@ -112,11 +171,14 @@
    */
   const resolvedModel = $derived(effectiveModel(node.medium, node.model, choices));
   const quote = $derived(
-    runQuoteOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens })
+    runQuoteOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens, remembered })
+  );
+  const providerQuotes = $derived(
+    providerQuotesOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens, remembered })
   );
   const choice = $derived(quote.choice);
   const upstream = $derived({ hasUpstreamText });
-  const state = $derived(runStateOf(node, upstream));
+  const runState = $derived(runStateOf(node, upstream));
   const tooLong = $derived(quote.tooLong);
   const TEXT_ESTIMATE_DELAY_MS = 400;
 
@@ -148,18 +210,8 @@
    * un corpo, il prompt riempie tutto il nodo invece di restare una striscia di due righe sopra
    * uno spazio vuoto.
    */
-  const TO_FRAME = 'Drag into a frame';
-
-  function dragOutput(e: DragEvent) {
-    e.stopPropagation();
-    e.dataTransfer?.setData(CANVAS_DRAG_OUTPUT, node.id);
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = 'copy';
-    }
-  }
-
   const shownExample = $derived(node.refId ? null : example);
-  const hasBody = $derived(hasGenBody(node.medium, state, node.refId, !!shownExample));
+  const hasBody = $derived(hasGenBody(node.medium, runState, node.refId, !!shownExample));
 
 
   /**
@@ -206,7 +258,7 @@
   }
 </script>
 
-<div class="gen" class:is-running={state === 'running' || loopQueued > 0} use:measureHeight>
+<div class="gen" class:is-running={runState === 'running' || loopQueued > 0} use:measureHeight>
   <!-- Il risultato, quando c'è. Il testo lo mostra qui perché è esso stesso il prodotto; immagine
        e video li disegna chi usa il nodo, che sa da dove viene l'URL firmato.
 
@@ -217,12 +269,12 @@
        anteprima prima di girare, non una ripetizione di quel che il prompt già dice. -->
   {#if hasBody}
     <div class="gen-body">
-      {#if state === 'running'}
+      {#if runState === 'running'}
         <div class="gen-busy">
           <span class="gen-dots" aria-label={RUN_LABEL.running}><i></i><i></i><i></i></span>
           <button type="button" class="gen-unlock" onclick={() => onunlock?.()}>Sblocca</button>
         </div>
-      {:else if state === 'failed'}
+      {:else if runState === 'failed'}
         <div class="gen-fail" role="alert">
           <p class="gen-fail-title">{RUN_LABEL.failed}</p>
           {#if node.error}
@@ -232,7 +284,7 @@
         </div>
       {:else if node.refId && result}
         {@render result({ refId: node.refId, text: node.runs.find((r) => r.mediaId === node.refId)?.text ?? null })}
-        <button type="button" class="gen-to-frame nodrag nopan" draggable="true" title={TO_FRAME} aria-label={TO_FRAME} data-testid="drag-to-frame" ondragstart={dragOutput}><FrameIcon size={14} /></button>
+        <OutputDragHandle nodeId={node.id} />
       {:else if shownExample}
         <div class="gen-example" data-testid="example-result">
           <span class="gen-example-mark">{EXAMPLE_LABEL}</span>
@@ -245,7 +297,7 @@
           {/if}
         </div>
       {:else}
-        <p class="gen-hint">{RUN_LABEL[state]}</p>
+        <p class="gen-hint">{RUN_LABEL[runState]}</p>
       {/if}
     </div>
   {/if}
@@ -293,9 +345,40 @@
       rows="2"
       placeholder={PROMPT_PLACEHOLDER[node.medium]}
       value={node.prompt}
-      oninput={(e) => onchange?.({ prompt: e.currentTarget.value })}
+      bind:this={promptEl}
+      oninput={(e) => {
+        onchange?.({ prompt: e.currentTarget.value });
+        trackSlash(e.currentTarget);
+      }}
+      onkeydown={pickKey}
+      onblur={() => setTimeout(() => (slash = null), 150)}
       use:scrollGuard
     ></textarea>
+
+    {#if slash && matches.length > 0}
+      <ul class="gen-skills nodrag" role="listbox" data-testid="skill-picker">
+        {#each matches as skill, i (skill.id)}
+          <li role="option" aria-selected={i === picked}>
+            <button type="button" class:is-picked={i === picked} onmousedown={(e) => e.preventDefault()} onclick={() => useSkill(skill)}>
+              <b>/{skill.name}</b>
+              <span>{skill.body}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
+    {#if onsaveskill && node.prompt.trim()}
+      {#if naming === null}
+        <button type="button" class="gen-skill-save nodrag" data-testid="skill-save" onclick={() => (naming = '')}>Save as skill</button>
+      {:else}
+        <form class="gen-skill-name nodrag" onsubmit={(e) => { e.preventDefault(); void saveNamed(); }}>
+          <input placeholder="skill-name" bind:value={naming} data-testid="skill-name" />
+          <button type="submit" disabled={!SKILL_NAME.test(naming.trim())}>Save</button>
+          <button type="button" onclick={() => (naming = null)}>Cancel</button>
+        </form>
+      {/if}
+    {/if}
 
     <div class="gen-actions">
       <!-- Il perché sta ACCANTO al bottone spento, non altrove: un motivo che non si vede da dove
@@ -306,7 +389,11 @@
             ({node.prompt.length}/{choice.maxPromptChars}){/if}
         </span>
       {/if}
-      {#if loopQueued > 0 && oncancelloop}
+      {#if variantsInFlight > 0 && oncancelloop}
+        <button type="button" class="gen-loop" onclick={() => oncancelloop?.()}>
+          Cancel all ({variantsInFlight})
+        </button>
+      {:else if loopQueued > 0 && oncancelloop}
         <button type="button" class="gen-loop" onclick={() => oncancelloop?.()}>
           Annulla loop ({loopQueued})
         </button>
@@ -315,9 +402,22 @@
           Loop ×{loopCombinationCount}{#if loopCredits !== null} · <CreditAmount amount={loopCredits} approx />{:else if quote.variable} · variable cost{/if}
         </button>
       {/if}
-      <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
-        {state === 'done' ? 'Redo' : 'Generate'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
-      </button>
+      <span class="gen-run">
+        <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
+          {runLabelOf(quote)}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
+        </button>
+        {#if providerQuotes.length && !variableTextInput}
+          <ul class="gen-providers" data-testid="provider-quotes">
+            {#each providerQuotes as providerQuote (providerQuote.provider)}
+              <li class:is-selected={providerQuote.selected} class:is-cheapest={providerQuote.cheapest}>
+                <span>{providerQuote.label}</span>
+                {#if providerQuote.credits !== null}<CreditAmount amount={providerQuote.credits} approx />{/if}
+                {#if providerQuote.cheapest}<em>cheapest</em>{/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </span>
     </div>
   </footer>
 </div>
@@ -506,31 +606,6 @@
     overflow-wrap: anywhere;
   }
 
-  .gen-to-frame {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    width: 28px;
-    height: 28px;
-    display: grid;
-    place-items: center;
-    border: 1px solid var(--line-2, #d2d2d7);
-    border-radius: 9999px;
-    background: var(--paper, #fff);
-    color: var(--ink, #1d1d1f);
-    cursor: grab;
-    opacity: 0;
-    transition: opacity 120ms ease;
-  }
-  .gen-body:hover .gen-to-frame,
-  .gen-to-frame:focus-visible {
-    opacity: 1;
-  }
-  @media (hover: none) {
-    .gen-to-frame {
-      opacity: 1;
-    }
-  }
   .gen-unlock {
     padding: 4px 12px;
     font: inherit;
@@ -593,6 +668,60 @@
     line-height: 1.45;
     color: var(--ink, #1d1d1f);
     background: var(--paper-2, #f9f9f9);
+  }
+  .gen-skills {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 2px;
+    max-height: 132px;
+    overflow-y: auto;
+    border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--ui-radius-md, 6px);
+    background: var(--paper, #fff);
+  }
+  .gen-skills button {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm, 4px);
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    color: var(--ink, #1d1d1f);
+    cursor: pointer;
+  }
+  .gen-skills button.is-picked {
+    background: var(--paper-2, #f2f2f2);
+  }
+  .gen-skills span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-3, #6e6e73);
+  }
+  .gen-skill-save {
+    margin-top: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 11.5px;
+    color: var(--ink-3, #6e6e73);
+    cursor: pointer;
+  }
+  .gen-skill-name {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 12px;
+  }
+  .gen-skill-name input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
   }
   .gen-prompt.is-full {
     flex: 1;
@@ -664,6 +793,42 @@
     cursor: default;
   }
   /* Secondario a "Genera": stesso posto, meno peso — il loop è l'azione meno frequente delle due. */
+  .gen-run {
+    position: relative;
+    display: inline-flex;
+  }
+  .gen-providers {
+    display: none;
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    margin: 0 0 6px;
+    padding: 6px;
+    list-style: none;
+    min-width: 220px;
+    background: var(--paper, #fff);
+    border: 1px solid var(--line-2, #d2d2d7);
+    font-size: 12px;
+    z-index: 5;
+  }
+  .gen-run:hover .gen-providers,
+  .gen-run:focus-within .gen-providers {
+    display: block;
+  }
+  .gen-providers li {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 4px;
+  }
+  .gen-providers li.is-selected {
+    font-weight: 600;
+  }
+  .gen-providers li.is-cheapest em {
+    font-style: normal;
+    color: var(--accent, #c485fe);
+  }
   .gen-loop {
     background: var(--paper, #fff);
     color: var(--ink, #1d1d1f);

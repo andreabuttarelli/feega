@@ -1,8 +1,8 @@
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { Resolution } from './render-quote';
-import { BROWSER_SAMPLES, sampleTimes } from './motion-blur';
-import { TrackKind } from './components';
-import { withJunctions } from './junctions';
+import { BROWSER_SAMPLES, sampleTimes } from '@feega/motion-core/motion/motion-blur';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { withJunctions } from '@feega/motion-core/motion/junctions';
 
 export enum Support {
   Full = 'full',

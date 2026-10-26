@@ -9,7 +9,7 @@
 
     <div class="intro">
       <p class="lead">A pricing for builders who want to scale</p>
-      <p>1 credit = $1<br />eg. 8/mo = 8 credits included, ~60 pictures</p>
+      <p>1 credit = $1<br />eg. 8/mo = 8 credits included, ~100 pictures</p>
     </div>
 
     <div class="plans">

@@ -1,14 +1,14 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import type { AssetKind } from '$lib/motion/components';
-  import { setProps, type OpResult } from '$lib/motion/timeline';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { AssetKind } from '@feega/motion-core/motion/components';
+  import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
   import Trash from '@lucide/svelte/icons/trash-2';
-  import { PartAction, PartKind, parsePart, partKind, partLabel, partText, runPart, writePartText } from '$lib/motion/poster-parts';
-  import { markedPoster, photoStack, setPhotoFills } from '$lib/motion/poster-lines';
+  import { PartAction, PartKind, parsePart, partKind, partLabel, partText, runPart, writePartText } from '@feega/motion-core/motion/poster-parts';
+  import { markedPoster, photoStack, setPhotoFills } from '@feega/motion-core/motion/poster-lines';
   import FillStack from './FillStack.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
-  import type { BrandTokens } from '$lib/motion/brand';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
   import type { MediaUploader } from './media-upload';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };

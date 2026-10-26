@@ -1,7 +1,3 @@
-import { CanvasState } from './inline-motion';
-import { Region } from './key-region.svelte';
-import { EditMode } from '$lib/motion/edit-mode';
-
 export enum BarContext {
   Canvas = 'canvas',
   Frame = 'frame'
@@ -17,6 +13,7 @@ export enum BarSlot {
   Select = 'select',
   Generate = 'generate',
   Upload = 'upload',
+  Comment = 'comment',
   More = 'more',
   Templates = 'templates',
   FrameTemplates = 'frame-templates',
@@ -25,47 +22,27 @@ export enum BarSlot {
   FrameLibrary = 'frame-library'
 }
 
-type ContextRules = { shown: Record<EditMode, boolean>; slots: Record<BarMode, readonly BarSlot[]>; followsTimeline: boolean; keys: Region; yieldsToDialogs: boolean };
-
-const FRAME_TOOLS: readonly BarSlot[] = [BarSlot.Draw, BarSlot.Image, BarSlot.FrameLibrary];
-
-const CONTEXT: Record<BarContext, ContextRules> = {
-  [BarContext.Canvas]: {
-    shown: { [EditMode.Design]: true, [EditMode.Motion]: true },
-    slots: {
-      [BarMode.Design]: [BarSlot.Mode, BarSlot.Draw, BarSlot.Upload, BarSlot.FrameTemplates],
-      [BarMode.Generate]: [BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates]
-    },
-    followsTimeline: false,
-    keys: Region.Canvas,
-    yieldsToDialogs: false
-  },
-  [BarContext.Frame]: { shown: { [EditMode.Design]: true, [EditMode.Motion]: false }, slots: { [BarMode.Design]: FRAME_TOOLS, [BarMode.Generate]: FRAME_TOOLS }, followsTimeline: true, keys: Region.Editor, yieldsToDialogs: true }
+const CANVAS_SLOTS: Record<BarMode, readonly BarSlot[]> = {
+  [BarMode.Design]: [BarSlot.Mode, BarSlot.Draw, BarSlot.Upload, BarSlot.Comment, BarSlot.FrameTemplates],
+  [BarMode.Generate]: [BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.Comment, BarSlot.FrameTemplates]
 };
 
-export const barSlots = (context: BarContext, mode: BarMode): readonly BarSlot[] => CONTEXT[context].slots[mode];
+const FRAME_SLOTS: readonly BarSlot[] = [BarSlot.Image, BarSlot.FrameLibrary];
+
+const SLOTS: Record<BarContext, Record<BarMode, readonly BarSlot[]>> = {
+  [BarContext.Canvas]: CANVAS_SLOTS,
+  [BarContext.Frame]: {
+    [BarMode.Design]: [...CANVAS_SLOTS[BarMode.Design], ...FRAME_SLOTS],
+    [BarMode.Generate]: [...CANVAS_SLOTS[BarMode.Generate], ...FRAME_SLOTS]
+  }
+};
+
+export const barSlots = (context: BarContext, mode: BarMode): readonly BarSlot[] => SLOTS[context][mode];
+
+export const barContextFor = (selectedFrame: string | null): BarContext => (selectedFrame ? BarContext.Frame : BarContext.Canvas);
 
 export const BAR_MODE_KEY = 'feega:canvas-bar-mode';
 
 const MODES = new Set<string>(Object.values(BarMode));
 
 export const readBarMode = (stored: string | null): BarMode => (stored && MODES.has(stored) ? (stored as BarMode) : BarMode.Generate);
-
-const STATE_CONTEXT: Record<CanvasState, BarContext> = {
-  [CanvasState.Browsing]: BarContext.Canvas,
-  [CanvasState.Editing]: BarContext.Frame
-};
-
-export const barContextOf = (state: CanvasState): BarContext => STATE_CONTEXT[state];
-
-export const barLift = (context: BarContext, timelinePx: number): number => (CONTEXT[context].followsTimeline ? timelinePx : 0);
-
-const HALF = 2;
-
-export const barShift = (context: BarContext, sidePx: number): number => (CONTEXT[context].followsTimeline ? sidePx / HALF : 0);
-
-export const barKeys = (context: BarContext): Region => CONTEXT[context].keys;
-
-export const barHidden = (context: BarContext, frameDialogOpen: boolean): boolean => CONTEXT[context].yieldsToDialogs && frameDialogOpen;
-
-export const barShown = (context: BarContext, mode: EditMode): boolean => CONTEXT[context].shown[mode];

@@ -55,7 +55,7 @@ describe('one right bar, claimed by whichever surface is showing it', () => {
 
     let shown = false;
     host.claim(el('editor'), { properties: { get shown() { return shown; }, onshow: (next) => (shown = next) } });
-    expect(host.tabs).toEqual([BarTab.Chat, BarTab.Guide, BarTab.Properties]);
+    expect(host.tabs).toEqual([BarTab.Properties, BarTab.Chat, BarTab.Guide]);
 
     host.select(BarTab.Properties);
     expect(shown).toBe(true);

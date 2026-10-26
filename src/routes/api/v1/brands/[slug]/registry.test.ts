@@ -140,8 +140,6 @@ const REST_ONLY = [
   // `update_product` era un update di una riga e nient'altro: `update_row` lo fa con la RLS di
   // chi chiama. Il tool esce, la rotta resta — il CLI la chiama ancora.
   'products/[id]',
-  'publishing',
-  'social/accounts',
 ];
 
 const BRAND_ROUTES = 'src/routes/api/v1/brands/[slug]';

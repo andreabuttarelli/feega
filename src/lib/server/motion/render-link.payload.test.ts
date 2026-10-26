@@ -10,7 +10,7 @@ vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ i
 vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/motion-revisions')>()),
   readCheckpoint: async () => {
-    const { newMotionDoc, MotionFormat } = await import('$lib/motion/doc');
+    const { newMotionDoc, MotionFormat } = await import('@feega/motion-core/motion/doc');
     return { version: 2, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actorKind: 'user' };
   }
 }));

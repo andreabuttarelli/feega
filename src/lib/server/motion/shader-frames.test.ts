@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser } from '@playwright/test';
 import sharp from 'sharp';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, setProps, type OpResult } from '$lib/motion/timeline';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { addShader } from '$lib/motion/shaders/ops';
 import { drawFrames, type BrowserPort } from './server-frames';
-import { MOTION_LIBS_ROUTE } from '$lib/motion/libs/catalog';
+import { MOTION_LIBS_ROUTE } from '@feega/motion-core/motion/libs/catalog';
 import { libraryPath } from '../../../../scripts/motion-libs';
 
 const LOAD_TIMEOUT_MS = 30_000;

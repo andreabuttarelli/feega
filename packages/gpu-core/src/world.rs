@@ -161,6 +161,6 @@ impl World {
     pub fn screen(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
         let uses = self.uses.iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
         let overlay = self.overlay.iter().map(|i| through(i, camera));
-        DisplayList { width, height, background: None, items: uses.chain(overlay).collect(), faces: Vec::new() }
+        DisplayList { width, height, background: None, items: uses.chain(overlay).collect(), faces: Vec::new(), fragments: Default::default() }
     }
 }

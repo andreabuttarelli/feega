@@ -1,9 +1,6 @@
-import { swallow } from '$lib/server/swallow';
 import { hasManyTenants } from '$lib/server/tenancy';
 import { fail, redirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { syncBrandAccounts, disconnectAccount } from '$lib/server/zernio';
-import { canAffordSeat } from '$lib/server/social-connections';
 import { rungFor } from '$lib/credit-ladder';
 import { generateApiKey } from '$lib/server/cli-auth';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -251,59 +248,12 @@ export async function deleteBrand(event: Ev) {
     }
   }
 
-  const { data: accounts } = await supabase
-    .from('social_accounts')
-    .select('zernio_account_id')
-    .eq('brand_id', brand.id);
-  for (const a of accounts ?? []) {
-    if (a.zernio_account_id) await disconnectAccount(a.zernio_account_id).catch(swallow('disconnect zernio account'));
-  }
-
   if (!hasManyTenants()) return fail(404, { deleteError: 'not_found' });
 
   const { error } = await supabase.from('brands').delete().eq('id', brand.id).eq('org_id', scope.orgId);
   if (error) return fail(500, { deleteError: 'failed' });
   invalidateBrandNav(brand.slug);
   throw redirect(303, `/p/${scope.projectId}/settings/brand`);
-}
-
-export async function sync(event: Ev) {
-  const brand = (await scopeOf(event))?.brand;
-  if (!brand) return { error: 'Brand not found' };
-  const { supabase } = event.locals;
-  if (!(await canAffordSeat(supabase, brand.org_id))) {
-    return { error: 'Not enough credits for this month\'s account fee' };
-  }
-  try {
-    await syncBrandAccounts(supabase, brand);
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : 'Sync failed' };
-  }
-  return { synced: true };
-}
-
-export async function disconnect(event: Ev) {
-  const id = String((await event.request.formData()).get('id') ?? '');
-  if (!id) return { error: 'Missing account' };
-
-  const brand = (await scopeOf(event))?.brand;
-  if (!brand) return { error: 'Brand not found' };
-  const { supabase } = event.locals;
-
-  const { data: acc } = await supabase
-    .from('social_accounts')
-    .select('id, zernio_account_id')
-    .eq('id', id)
-    .eq('brand_id', brand.id)
-    .maybeSingle();
-  if (!acc) return { error: 'Account not found' };
-
-  try {
-    await disconnectAccount(acc.zernio_account_id);
-  } catch (error) { swallow('disconnect zernio account', error); }
-  await supabase.from('social_accounts').delete().eq('id', acc.id).eq('brand_id', brand.id);
-  invalidateBrandNav(brand.slug);
-  return { disconnected: true };
 }
 
 export async function createApiKey(event: Ev) {

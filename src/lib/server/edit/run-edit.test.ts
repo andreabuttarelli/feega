@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Family, buildCatalogue } from './edit-catalogue';
 import { runEdit, type EditPorts } from './run-edit';
 import type { Answer } from './runners';
+import { Detail } from './compact-result';
 
 const OK: Answer = { status: 200, body: { ok: true } };
 
@@ -13,6 +14,7 @@ function ports(overrides: Partial<EditPorts> = {}) {
     catalogue: buildCatalogue({ [Family.Canvas]: ['move_node', 'move_frame_element', 'create_node'], [Family.Frame]: ['set_props', 'remove_clip', 'add_shape'], [Family.Editor]: ['save_doc'] }),
     inputKeys: async (op) => KEYS[op.source] ?? [],
     projectOf: async (nodeId) => (nodeId === 'n1' ? 'p1' : null),
+    projectOfCanvas: async (canvasId) => (canvasId === 'c1' ? 'p1' : null),
     canvas: async (ask) => (seen.canvas.push(ask), OK),
     frame: async (ask) => (seen.frame.push(ask), { status: 200, body: { tool: ask.tool, version: 7, saved: true, output: ask.tool === 'batch' ? { results: (ask.input as { ops: unknown[] }).ops.map(() => ({ ok: true })) } : { ok: true } } }),
     editor: async (ask) => (seen.editor.push(ask), OK),
@@ -103,7 +105,7 @@ describe('a batch mixes canvas and frame ops', () => {
     });
 
     expect(answer.status).toBe(404);
-    expect(answer.body).toMatchObject({ applied: 1, failed: 1 });
+    expect(answer.body).toMatchObject({ applied: 1, failed: 1, failed_at: 1, not_run: 1 });
     expect(seen.frame).toHaveLength(1);
   });
 
@@ -118,7 +120,7 @@ describe('a batch mixes canvas and frame ops', () => {
       ]
     });
 
-    expect(answer.body).toMatchObject({ applied: 0, failed: 0 });
+    expect(answer.body).toMatchObject({ applied: 0, failed: 1, failed_at: 0, not_run: 1 });
     expect(answer.status).toBe(422);
     expect(seen.frame).toHaveLength(0);
   });
@@ -129,8 +131,25 @@ describe('a batch mixes canvas and frame ops', () => {
 
       const answer = await runEdit(made, { projectId: 'p1', steps: [{ op: 'create_node' }, { op: 'create_node' }] });
 
-      expect(answer.body).toMatchObject({ applied: 0, failed: 0 });
+      expect(answer.body).toMatchObject({ applied: 0, failed: 1, failed_at: 0, not_run: 1 });
     }
+  });
+
+  it('a canvas op with a canvasId finds its project without project_id', async () => {
+    const { made, seen } = ports({});
+
+    const answer = await runEdit(made, { steps: [{ op: 'create_node', input: { canvasId: 'c1' } }] });
+
+    expect(answer.status).toBe(200);
+    expect(seen.canvas).toEqual([expect.objectContaining({ projectId: 'p1' })]);
+  });
+
+  it('top-level target is inherited by every step that has none', async () => {
+    const { made, seen } = ports({});
+
+    await runEdit(made, { target: 'f1', steps: [{ op: 'add_shape', input: { kind: 'rect' } }, { op: 'add_shape', input: { kind: 'ellipse' } }], batch: true });
+
+    expect(seen.frame).toHaveLength(1);
   });
 
   it('a refused frame group reports the op inside it that refused', async () => {
@@ -143,6 +162,30 @@ describe('a batch mixes canvas and frame ops', () => {
       ]
     });
 
-    expect(answer.body).toMatchObject({ applied: 0, failed: 1 });
+    expect(answer.body).toMatchObject({ applied: 0, failed: 1, failed_at: 1, rolled_back: 1, not_run: 0 });
+  });
+});
+
+describe('a write answers ids and changed fields; verbose gives the whole document back', () => {
+  const heavy = { status: 200, body: { node: { id: 'n1', version: 3, x: 1, y: 2, type: 'text', created_at: 'now', data: { text: 'x'.repeat(5000) } } } } satisfies Answer;
+  const heavyPorts = () => ports({ canvas: async () => heavy, catalogue: buildCatalogue({ [Family.Canvas]: ['move_node', 'list_nodes'], [Family.Frame]: [], [Family.Editor]: [] }) }).made;
+
+  it('a write drops the document and keeps id, version and what was sent', async () => {
+    const answer = await runEdit(heavyPorts(), { steps: [{ op: 'move_node', target: 'n1', input: { x: 1, y: 2 } }] });
+
+    expect(JSON.stringify(answer.body).length).toBeLessThan(300);
+    expect(answer.body).toMatchObject({ node: { id: 'n1', version: 3, x: 1, y: 2 }, trimmed: true });
+  });
+
+  it('verbose returns it whole', async () => {
+    const answer = await runEdit(heavyPorts(), { steps: [{ op: 'move_node', target: 'n1', input: { x: 1, y: 2 } }], detail: Detail.Verbose });
+
+    expect(answer).toEqual(heavy);
+  });
+
+  it('a read is never compacted', async () => {
+    const answer = await runEdit(heavyPorts(), { steps: [{ op: 'list_nodes', input: { canvasId: 'c1' }, target: 'n1' }] });
+
+    expect(answer).toEqual(heavy);
   });
 });

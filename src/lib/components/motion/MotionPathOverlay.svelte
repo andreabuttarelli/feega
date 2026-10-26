@@ -1,15 +1,16 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { pivotOf } from '$lib/motion/parent';
-  import { pathAt, pathHandles, type PathHandle } from '$lib/motion/path';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { pivotOf } from '@feega/motion-core/motion/parent';
+  import { pathAt, pathHandles, type PathHandle } from '@feega/motion-core/motion/path';
   import { setPathTangent } from '$lib/motion/path-ops';
-  import { KeyEnd as Side } from '$lib/motion/graph';
+  import { KeyEnd as Side } from '@feega/motion-core/motion/graph';
+  import { hostFraction } from '$lib/motion/host-point';
 
   let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const MIRROR: Record<Side, Side> = { [Side.In]: Side.Out, [Side.Out]: Side.In };
 
-  type Drag = { index: number; side: Side; x: number; y: number; start: PathHandle };
+  type Drag = { index: number; side: Side; at: [number, number]; start: PathHandle };
 
   let host = $state<HTMLDivElement | null>(null);
   let drag = $state<Drag | null>(null);
@@ -38,12 +39,12 @@
   function start(e: PointerEvent, index: number, side: Side) {
     e.stopPropagation();
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    drag = { index, side, x: e.clientX, y: e.clientY, start: handles[index] };
+    drag = { index, side, at: hostFraction(host!, e), start: handles[index] };
   }
 
   function tangentFor(d: Drag, e: PointerEvent) {
-    const rect = host!.getBoundingClientRect();
-    const moved: [number, number] = [d.start[d.side][0] + (e.clientX - d.x) / rect.width, d.start[d.side][1] + (e.clientY - d.y) / rect.height];
+    const [fx, fy] = hostFraction(host!, e);
+    const moved: [number, number] = [d.start[d.side][0] + fx - d.at[0], d.start[d.side][1] + fy - d.at[1]];
     const mirrored: [number, number] = [-moved[0], -moved[1]];
     return { frame: d.start.frame, [d.side]: moved, [MIRROR[d.side]]: mirrored } as { frame: number; in: [number, number]; out: [number, number] };
   }

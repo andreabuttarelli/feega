@@ -17,7 +17,8 @@
  *                                       ragione già in `SERVICE_ROLE_USES` per `cli-auth.ts`), e
  *                                       l'org è ESATTAMENTE quella della chiave — non una scelta.
  */
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '$lib/server/db/connect';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env } from '$env/dynamic/private';
 import { createUserDb, createServiceRoleDb, type Db } from '$lib/server/db/client';

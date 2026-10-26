@@ -35,6 +35,7 @@ const PORT_HIT_PX = 10;
 export const PORT_SIZE = 10;
 export const PORT_OFFSET = PORT_SIZE / 2;
 const CORNER_HIT_PX = 8;
+export const ROTATE_REACH_PX = 22;
 const EDGE_HIT_PX = 6;
 const CURVATURE = 0.25;
 const CURVE_SAMPLES = 24;
@@ -95,6 +96,25 @@ export function resizeCornerAt(b: Box, p: Point, zoom: number): Corner | null {
     }
   }
   return null;
+}
+
+const CORNER_UNIT: Record<Corner, [number, number]> = { [Corner.TopLeft]: [0, 0], [Corner.TopRight]: [1, 0], [Corner.BottomLeft]: [0, 1], [Corner.BottomRight]: [1, 1] };
+
+function sideAt(b: Box, p: Point, radius: number): [number, number] | null {
+  const acrossX = p.x >= b.x && p.x <= b.x + b.w;
+  const acrossY = p.y >= b.y && p.y <= b.y + b.h;
+  const SIDES: [boolean, [number, number]][] = [
+    [acrossX && Math.abs(p.y - b.y) <= radius, [0.5, 0]],
+    [acrossY && Math.abs(p.x - (b.x + b.w)) <= radius, [1, 0.5]],
+    [acrossX && Math.abs(p.y - (b.y + b.h)) <= radius, [0.5, 1]],
+    [acrossY && Math.abs(p.x - b.x) <= radius, [0, 0.5]]
+  ];
+  return SIDES.find(([near]) => near)?.[1] ?? null;
+}
+
+export function resizeHandleAt(b: Box, p: Point, zoom: number): [number, number] | null {
+  const corner = resizeCornerAt(b, p, zoom);
+  return corner ? CORNER_UNIT[corner] : sideAt(b, p, CORNER_HIT_PX / zoom);
 }
 
 const controlOffset = (d: number) => (d >= 0 ? 0.5 * d : CURVATURE * 25 * Math.sqrt(-d));

@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::fragments::Fragments;
+
 pub type Rgba = [f32; 4];
 pub type Affine = [f64; 6];
 
@@ -23,6 +25,8 @@ pub enum Paint {
     Solid { color: Rgba },
     Linear { from: [f64; 2], to: [f64; 2], stops: Vec<Stop> },
     Radial { center: [f64; 2], radius: f64, stops: Vec<Stop> },
+    Sweep { center: [f64; 2], start: f64, stops: Vec<Stop> },
+    Diamond { center: [f64; 2], half: [f64; 2], stops: Vec<Stop> },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -123,6 +127,8 @@ pub struct Look {
     #[serde(default)]
     pub space: Option<[f64; 4]>,
     #[serde(default)]
+    pub origin: Option<[f64; 2]>,
+    #[serde(default)]
     pub backdrop: Option<f64>,
 }
 
@@ -155,6 +161,10 @@ pub struct ImageItem {
     pub fit: String,
     pub focus: [f64; 2],
     pub zoom: f64,
+    #[serde(default)]
+    pub crop: Option<[f64; 4]>,
+    #[serde(default)]
+    pub tile_turn: f64,
     pub clipped: bool,
     pub inner: Affine,
     #[serde(flatten)]
@@ -473,14 +483,27 @@ pub struct DisplayList {
     pub items: Vec<Item>,
     #[serde(default)]
     pub faces: Vec<FaceSpec>,
+    #[serde(skip)]
+    pub fragments: Fragments,
 }
 
 impl DisplayList {
     pub fn clone_empty(&self) -> Self {
-        Self { width: self.width, height: self.height, background: self.background, items: Vec::new(), faces: self.faces.clone() }
+        Self { width: self.width, height: self.height, background: self.background, items: Vec::new(), faces: self.faces.clone(), fragments: Fragments::default() }
     }
 }
 
 pub fn parse(json: &str) -> Result<DisplayList, serde_json::Error> {
+    serde_json::from_str(json)
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Splice {
+    pub head: usize,
+    pub tail: usize,
+    pub items: Vec<Item>,
+}
+
+pub fn parse_splice(json: &str) -> Result<Splice, serde_json::Error> {
     serde_json::from_str(json)
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { CAMERA_PRESETS, cameraAt } from './camera';
-import { LAYOUTS, instanceCountFor, layoutAt } from './index';
-import { MOTION_TIME, closedExpoProgress } from './motion';
-import type { LayoutId, LayoutParams, Transform } from './types';
+import { CAMERA_PRESETS, cameraAt } from '@feega/motion-core/canvas/composition/camera';
+import { LAYOUTS, instanceCountFor, layoutAt } from '@feega/motion-core/canvas/composition';
+import { MOTION_TIME, closedExpoProgress } from '@feega/motion-core/canvas/composition/motion';
+import type { LayoutId, LayoutParams, Transform } from '@feega/motion-core/canvas/composition/types';
 
 const DURATION_SECONDS = 8;
 const FRAMES_PER_SECOND = 60;

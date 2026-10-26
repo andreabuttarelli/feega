@@ -203,7 +203,7 @@ describe('POST /api/v1/motion/[nodeId]/ask', () => {
 
     expect(run).toMatchObject({ run_id, node_id: NODE, status: 'done', reply: 'Added a red title.', version: 1, summary: 'added Title' });
     expect(run.cost_usd).toBeGreaterThan(0);
-    expect(run.editor_url).toBe(`/p/${PROJECT}/c/${CANVAS}/motion/${NODE}`);
+    expect(run.editor_url).toBe(`/p/${PROJECT}/c/${CANVAS}?frame=${NODE}`);
     expect(store.revisions).toHaveLength(1);
     expect(store.revisions[0].actor).toEqual({ kind: 'agent', id: USER, agentKey: 'motion' });
   });

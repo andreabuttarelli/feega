@@ -1,5 +1,5 @@
-import type { PathItem } from '$lib/motion/gpu-full/display-list';
-import { FillRule } from '$lib/motion/gpu-full/paint';
+import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
 import type { GenButton, GenTileView } from '$lib/canvas/gen-tile-view';
 import type { Box } from '$lib/canvas/gpu/geometry';
 import type { Glyphs, TextSet } from './chrome';

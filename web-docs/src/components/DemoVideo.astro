@@ -1,0 +1,57 @@
+---
+interface Props {
+  name: string;
+  caption: string;
+}
+
+const { name, caption } = Astro.props;
+---
+
+<figure class="demo-video">
+  <video
+    src={`/videos/${name}.mp4`}
+    poster={`/videos/${name}.jpg`}
+    autoplay
+    muted
+    loop
+    playsinline
+    preload="none"
+    width="1280"
+    height="720"
+    aria-label={caption}></video>
+  <figcaption>{caption}</figcaption>
+</figure>
+
+<script>
+  const videos = document.querySelectorAll<HTMLVideoElement>('.demo-video video');
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const video = entry.target as HTMLVideoElement;
+      if (entry.isIntersecting) {
+        video.play().catch(() => {});
+        continue;
+      }
+      video.pause();
+    }
+  });
+  videos.forEach((video) => observer.observe(video));
+</script>
+
+<style>
+  .demo-video {
+    margin: 0 0 1.5rem;
+  }
+  .demo-video video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 6px;
+  }
+  figcaption {
+    margin-top: 0.5rem;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+  }
+</style>

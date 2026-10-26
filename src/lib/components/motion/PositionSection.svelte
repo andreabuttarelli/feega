@@ -13,15 +13,18 @@
   import RotateCw from '@lucide/svelte/icons/rotate-cw-square';
   import FlipHorizontal from '@lucide/svelte/icons/flip-horizontal-2';
   import FlipVertical from '@lucide/svelte/icons/flip-vertical-2';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { setProps, setTransform, type OpResult } from '$lib/motion/timeline';
-  import { HORIZONTALS, Horizontal, VERTICALS, Vertical } from '$lib/motion/constraints/model';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+  import { setClipFlags } from '@feega/motion-core/motion/organize';
+  import { Action } from '$lib/motion/actions';
+  import IconButton from './IconButton.svelte';
+  import { HORIZONTALS, Horizontal, VERTICALS, Vertical } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { Side, Toggle, pinnedHorizontally, pinnedVertically, toggleHorizontal, toggleVertical } from '$lib/motion/constraints/sides';
   import { Edge } from '$lib/motion/space';
   import { Flip, QUARTER_TURN, flipClips, turnClips } from '$lib/motion/layer-props';
-  import { pivotBox } from '$lib/motion/parent';
-  import { TRANSFORM } from '$lib/motion/keyframes';
+  import { pivotBox } from '@feega/motion-core/motion/parent';
+  import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
 
   let { doc, clip, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
 
@@ -71,6 +74,8 @@
   const pinV = (v: Vertical) => onchange(setConstraints(doc, [clip.id], { vertical: v }), 'Changed the vertical constraint');
   const tickH = (side: Side, e: MouseEvent) => pinH(toggleHorizontal(horizontal, side, e.shiftKey ? Toggle.Both : Toggle.One));
   const tickV = (side: Side, e: MouseEvent) => pinV(toggleVertical(vertical, side, e.shiftKey ? Toggle.Both : Toggle.One));
+  const sized = $derived(typeof clip.props.width === 'number' && typeof clip.props.height === 'number');
+  const toggleRatio = () => onchange(setClipFlags(doc, clip.id, { lockRatio: !clip.lockRatio }), clip.lockRatio ? 'Unlocked the aspect ratio' : 'Locked the aspect ratio');
   const centre = () => onchange(setConstraints(doc, [clip.id], { horizontal: Horizontal.Center, vertical: Vertical.Center }), 'Centred the constraints');
 </script>
 
@@ -92,6 +97,9 @@
     <div class="row xy">
       <label class="field"><span>X</span><input type="number" step="1" value={Math.round(box.left)} data-testid="position-x" onchange={moveX} /></label>
       <label class="field"><span>Y</span><input type="number" step="1" value={Math.round(box.top)} data-testid="position-y" onchange={moveY} /></label>
+      {#if sized}
+        <IconButton action={clip.lockRatio ? Action.UnlockRatio : Action.LockRatio} size={ICON} pressed={Boolean(clip.lockRatio)} data-testid="ratio-lock" onclick={toggleRatio} />
+      {/if}
       {#if pinnable}
         <button type="button" class="toggle" class:on={showConstraints} aria-pressed={showConstraints} aria-label="Constraints" title="Constraints" data-testid="constraints-toggle" onclick={() => (showConstraints = !showConstraints)}><Move size={ICON} /></button>
       {/if}

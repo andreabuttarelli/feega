@@ -1,16 +1,18 @@
 import type { Viewport } from '$lib/breakpoints';
-import { SOCIAL_PUBLISHING_SURFACE, visibleUnder, type SocialPublishing } from '$lib/social-publishing';
+import { env as publicEnv } from '$env/dynamic/public';
+import { isLocalMode } from '$lib/local-user';
 
 export type NavFamily = 'panel' | 'sheet' | 'route';
 
 export type NavEntry = {
   id: string;
   labelKey: string;
-  icon: 'images' | 'building' | 'user-round' | 'calendar-days' | 'megaphone' | 'settings' | 'camera' | 'layers';
+  icon: 'images' | 'building' | 'user-round' | 'settings' | 'camera' | 'layers';
   family: NavFamily;
   path: string;
   mobilePath?: string;
-  group: 'canvas' | 'panel' | 'workbench' | 'hidden';
+  group: 'canvas' | 'panel' | 'workbench';
+  local?: true;
 };
 
 /**
@@ -20,15 +22,12 @@ export type NavEntry = {
  * divisore: il raggruppamento stesso dice il comportamento, senza un `if` per voce altrove.
  */
 export const NAV_ENTRIES: NavEntry[] = [
-  { id: 'assets', labelKey: 'app.nav2.materials', icon: 'images', family: 'panel', path: '/assets', group: 'panel' },
+  { id: 'assets', labelKey: 'app.nav2.materials', icon: 'images', family: 'panel', path: '/assets', group: 'panel', local: true },
   { id: 'brands', labelKey: 'app.nav2.brands', icon: 'building', family: 'panel', path: '/brands', group: 'panel' },
   { id: 'influencers', labelKey: 'app.nav2.influencers', icon: 'user-round', family: 'panel', path: '/influencers', group: 'panel' },
-  { id: 'calendar', labelKey: 'app.hub.publish.calendar', icon: 'calendar-days', family: 'sheet', path: '/calendar', group: 'workbench' },
-  { id: 'ads', labelKey: 'app.hub.ads.social', icon: 'megaphone', family: 'sheet', path: '/ads', group: 'workbench' },
   { id: 'studio', labelKey: 'app.nav2.studio', icon: 'camera', family: 'route', path: '/app/studio', group: 'workbench' },
   { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/project', mobilePath: '/settings', group: 'workbench' },
-  { id: 'promote', labelKey: 'app.hub.publish.promote', icon: 'megaphone', family: 'sheet', path: '/promote', group: 'hidden' },
-  { id: 'layers', labelKey: 'app.nav2.layers', icon: 'layers', family: 'panel', path: '', group: 'canvas' }
+  { id: 'layers', labelKey: 'app.nav2.layers', icon: 'layers', family: 'panel', path: '', group: 'canvas', local: true }
 ];
 
 export const PANEL_WIDTHS: Record<string, number> = {
@@ -39,11 +38,7 @@ export const PANEL_WIDTHS: Record<string, number> = {
 };
 
 export function navEntriesByGroup(group: NavEntry['group']): NavEntry[] {
-  return NAV_ENTRIES.filter((entry) => entry.group === group);
-}
-
-export function visibleNav(publishing: SocialPublishing, entries: readonly NavEntry[]): NavEntry[] {
-  return visibleUnder(publishing, SOCIAL_PUBLISHING_SURFACE.navEntries, entries, (entry) => entry.id);
+  return NAV_ENTRIES.filter((entry) => entry.group === group && (entry.local || !isLocalMode(publicEnv)));
 }
 
 const projectPath = (projectId: string, path: string) => `/p/${projectId}${path}`;
@@ -63,9 +58,9 @@ export function mobileNavHref(projectId: string, entry: NavEntry): string {
 }
 
 /**
- * LA RADICE DI UNA VOCE `sheet` è il suo primo segmento (`/settings`, `/calendar`, `/ads`): il
+ * LA RADICE DI UNA VOCE `sheet` è il suo primo segmento (`/settings`): il
  * foglio Settings deve restare aperto anche su `/settings/brand`, non solo sull'esatto
- * `/settings/connected-accounts` a cui la rail porta di default — la sezione dentro cambia, la
+ * `/settings/project` a cui la rail porta di default — la sezione dentro cambia, la
  * famiglia no. Una sola regola invece di un elenco di prefissi sparso fra layout e componenti.
  */
 function sheetRootOf(entry: NavEntry): string {
@@ -87,20 +82,15 @@ export const BURGER_ENTRIES: NavEntry[] = [...navEntriesByGroup('panel'), ...nav
 
 export type DirectLoadMode = 'sheet' | 'page';
 
-const PAGE_ONLY_PREFIXES = ['/settings/facebook', '/settings/linkedin', '/settings/connect/'];
-const PAGE_ONLY_QUERY_KEYS = ['connected'];
 
 const VIEWPORT_ALLOWS_SHEET: Record<Viewport, boolean> = {
   mobile: false,
   desktop: true
 };
 
-export function directLoadMode(path: string, search: string, viewport: Viewport): DirectLoadMode {
-  const params = new URLSearchParams(search);
+export function directLoadMode(path: string, viewport: Viewport): DirectLoadMode {
   const pageOnly =
     !VIEWPORT_ALLOWS_SHEET[viewport] ||
-    !sheetEntryForPath(path) ||
-    PAGE_ONLY_PREFIXES.some((prefix) => path.startsWith(prefix)) ||
-    PAGE_ONLY_QUERY_KEYS.some((key) => params.has(key));
+    !sheetEntryForPath(path);
   return pageOnly ? 'page' : 'sheet';
 }

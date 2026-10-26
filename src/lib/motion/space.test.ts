@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, setKeyframe, type OpResult } from './timeline';
-import { setClipFlags } from './organize';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframe, type OpResult } from '@feega/motion-core/motion/timeline';
+import { setClipFlags } from '@feega/motion-core/motion/organize';
 import { EditMode } from './edit-mode';
 import { aabb, quadOf } from './scene-select';
-import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes, tidySpace } from './space';
+import { Axis, Edge, alignSpace, distributeSpace, gapOf, moveBy, propBoxes, tidySpace } from './space';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -91,6 +91,28 @@ describe('distribute', () => {
     expect(b.left - a.right).toBeCloseTo(c.left - b.right, 5);
     expect(a.left).toBeCloseTo(bounds(base, 'a').left, 5);
     expect(c.right).toBeCloseTo(bounds(base, 'c').right, 5);
+  });
+
+  it('spaces the clips by an exact gap, keeping the first one in place', () => {
+    const spaced = must(distributeSpace(base, ['c', 'a', 'b'], 0, propBoxes(base), Axis.X, EditMode.Design, 40));
+    const [a, b, c] = ['a', 'b', 'c'].map((id) => bounds(spaced, id));
+
+    expect(a.left).toBeCloseTo(bounds(base, 'a').left, 5);
+    expect(b.left - a.right).toBeCloseTo(40, 5);
+    expect(c.left - b.right).toBeCloseTo(40, 5);
+  });
+
+  it('an exact gap works for two clips', () => {
+    const spaced = must(distributeSpace(base, ['a', 'b'], 0, propBoxes(base), Axis.X, EditMode.Design, 25));
+
+    expect(bounds(spaced, 'b').left - bounds(spaced, 'a').right).toBeCloseTo(25, 5);
+  });
+
+  it('reads the gap the clips share, and none when they differ', () => {
+    const spaced = must(distributeSpace(base, ['a', 'b', 'c'], 0, propBoxes(base), Axis.X, EditMode.Design, 40));
+
+    expect(gapOf(spaced, ['a', 'b', 'c'], 0, propBoxes(spaced), Axis.X)).toBeCloseTo(40, 5);
+    expect(gapOf(base, ['a', 'b', 'c'], 0, propBoxes(base), Axis.X)).toBeNull();
   });
 
   it('needs three clips', () => {

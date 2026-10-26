@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../../doc';
-import { composeHtml } from '../../hyperframes/compose';
-import { addClip, type OpResult } from '../../timeline';
-import { BUILTIN_FONTS_URL, fontLoader } from './load';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { BUILTIN_FONTS_URL, fontLoader } from '@feega/motion-core/motion/gpu-full/text/load';
 import { boxFace } from './test-face';
-import { bindVar, declareVar } from '../../interactive/vars';
-import { VarKind } from '../../interactive/var-model';
+import { bindVar, declareVar } from '@feega/motion-core/motion/interactive/vars';
+import { VarKind } from '@feega/motion-core/motion/interactive/var-model';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -80,4 +80,16 @@ describe('loadFonts', () => {
 
     expect(fetched.sort()).toEqual(['https://g.test/euro.woff2', 'https://g.test/ext.woff2', 'https://g.test/latin.woff2']);
   });
+
+  it('asks the symbol fallback only for the characters past the alphabets, a check or an arrow', async () => {
+    const asked: string[] = [];
+    const read = { text: async (url: string) => (asked.push(url), CSS), bytes: async () => new Uint8Array() };
+    await fontLoader(read)(titled, {}, FEEGA_TOKENS);
+    expect(asked.some((url) => url.includes('Symbols'))).toBe(false);
+
+    const ticked = must(addClip(titled, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Added ✓' } }, 'tick'));
+    await fontLoader(read)(ticked, {}, FEEGA_TOKENS);
+    expect(asked.find((url) => url.includes('Symbols'))).toContain(`text=${encodeURIComponent('✓')}`);
+  });
 });
+

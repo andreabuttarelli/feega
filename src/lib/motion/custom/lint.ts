@@ -1,7 +1,7 @@
 import { parse, type Node } from 'acorn';
 import { full } from 'acorn-walk';
-import { ComponentMode, type CustomSource, type SourceFile } from './component';
-import { SHADER_EFFECTS, ShaderPlay, type ShaderEffectId } from '../shader-effects/catalogue';
+import { ComponentMode, type CustomSource, type SourceFile } from '@feega/motion-core/motion/custom/component';
+import { SHADER_EFFECTS, ShaderPlay, type ShaderEffectId } from '@feega/motion-core/motion/shader-effects/catalogue';
 
 export type LintProblem = { file: SourceFile; message: string };
 

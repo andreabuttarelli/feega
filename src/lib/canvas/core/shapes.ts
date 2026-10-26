@@ -1,10 +1,10 @@
-import { rgbaOf, type Rgba } from '$lib/motion/gpu-full/rgba';
-import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
-import { ItemKind, type PathItem } from '$lib/motion/gpu-full/display-list';
-import { BlendMode } from '$lib/motion/blend';
-import { IDENTITY } from '$lib/motion/parent';
-import { Cap, Join, strokePolygons } from '$lib/motion/gpu-full/stroke';
-import { ellipseOutline, flatten, rectOutline, type Outline } from '$lib/motion/shape/geometry';
+import { rgbaOf, type Rgba } from '@feega/motion-core/motion/gpu-full/rgba';
+import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
+import { ItemKind, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { IDENTITY } from '@feega/motion-core/motion/parent';
+import { Cap, Join, strokePolygons } from '@feega/motion-core/motion/gpu-full/stroke';
+import { ellipseOutline, flatten, rectOutline, type Outline } from '@feega/motion-core/motion/shape/geometry';
 import type { Curve } from '$lib/canvas/gpu/geometry';
 
 const CURVE_STEPS = 32;

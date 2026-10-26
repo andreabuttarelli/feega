@@ -1,10 +1,11 @@
 <script lang="ts">
   import { cn } from '$lib/utils.js';
   import { FIELD_INPUT, FOCUS_RING, SECTION_LABEL } from '$lib/components/ui/shell/styles';
-  import { resolveColor, type BrandTokens } from '$lib/motion/brand';
-  import { FILL_TYPES, FillType, PAINTED_AS, PaintedAs, colourAlpha, retypeFill, withAlpha, type Fill, type Stop } from '$lib/motion/fill/model';
-  import { CAPS, JOINS } from '$lib/motion/shape/schema';
-  import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, removeStroke, setStroke, type Stroke, type StrokePatch } from '$lib/motion/stroke/model';
+  import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
+  import { FILL_TYPES, FillType, PAINTED_AS, PaintedAs, colourAlpha, retypeFill, withAlpha, type Fill, type Stop } from '@feega/motion-core/motion/fill/model';
+  import { CAPS, JOINS } from '@feega/motion-core/motion/shape/schema';
+  import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, patternPx, removeStroke, setStroke, type Stroke, type StrokePatch } from '@feega/motion-core/motion/stroke/model';
+  import { ARROW_CAPS } from '@feega/motion-core/motion/stroke/arrows';
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
@@ -83,7 +84,7 @@
 
 {#snippet colour(name: string, value: string, write: (next: string) => void)}
   {@const { base, alpha } = colourAlpha(value)}
-  <ColorField {name} {gesture} value={base} {tokens} {alpha} onchange={(next) => write(recolour(next, alpha))} onalpha={(next) => write(recolour(base, next))} />
+  <ColorField {name} {gesture} value={base} {tokens} {alpha} onchange={(next, typedAlpha) => write(recolour(next, typedAlpha ?? alpha))} onalpha={(next) => write(recolour(base, next))} />
 {/snippet}
 
 <div class="flex flex-col gap-0.5" data-testid="stroke-stack" bind:this={root}>
@@ -165,6 +166,7 @@
             {#each STROKE_ALIGNS as align (align)}<option value={align}>{ALIGN_LABEL[align]}</option>{/each}
           </select>
         </label>
+        <label class={FIELD_ROW}><span class={LABEL}>Dashes</span><input class={cn(FIELD_INPUT, 'w-28')} type="text" placeholder="10, 5, 2, 5" data-testid="stroke-pattern" value={(stroke.pattern ?? []).map(toPx).join(', ')} onchange={(e) => patch(index, { pattern: patternPx(e.currentTarget.value).map((n) => n / short) }, 'Stroke dash pattern')} /></label>
         <label class={FIELD_ROW}><span class={LABEL}>Dash</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-dash" value={toPx(stroke.dash)} onchange={(e) => patch(index, { dash: fromPx(e) }, 'Stroke dash')} /></label>
         <label class={FIELD_ROW}><span class={LABEL}>Gap</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-gap" value={toPx(stroke.gap)} onchange={(e) => patch(index, { gap: fromPx(e) }, 'Stroke gap')} /></label>
         <label class={FIELD_ROW}
@@ -173,12 +175,23 @@
             {#each CAPS as cap (cap)}<option value={cap}>{cap}</option>{/each}
           </select>
         </label>
+        {#each [['startCap', 'Start'], ['endCap', 'End']] as const as [key, label] (key)}
+          <label class={FIELD_ROW}
+            ><span class={LABEL}>{label}</span>
+            <select class={cn(FIELD_INPUT, 'w-28')} data-testid={`stroke-${key}`} value={stroke[key]} onchange={(e) => patch(index, { [key]: e.currentTarget.value }, `Stroke ${label.toLowerCase()} cap`)}>
+              {#each ARROW_CAPS as cap (cap)}<option value={cap}>{cap.replace('-', ' ')}</option>{/each}
+            </select>
+          </label>
+        {/each}
         <label class={FIELD_ROW}
           ><span class={LABEL}>Join</span>
           <select class={cn(FIELD_INPUT, 'w-28')} data-testid="stroke-join" value={stroke.join} onchange={(e) => patch(index, { join: e.currentTarget.value }, 'Stroke join')}>
             {#each JOINS as join (join)}<option value={join}>{join}</option>{/each}
           </select>
         </label>
+        {#if stroke.join === 'miter'}
+          <label class={FIELD_ROW}><span class={LABEL}>Miter limit</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="100" step="0.5" data-testid="stroke-miter" value={stroke.miter} onchange={(e) => patch(index, { miter: Number(e.currentTarget.value) }, 'Stroke miter limit')} /></label>
+        {/if}
         {#if sided}
           <label class={FIELD_ROW}><span class={LABEL}>Per side</span><input type="checkbox" data-testid="stroke-sides" checked={!!stroke.sides} onclick={() => toggleSides(index)} /></label>
           {#if stroke.sides}

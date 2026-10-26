@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
-import { Ease, TransitionKind } from '../design';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { FillType } from '../fill/model';
-import { BlendMode } from '../blend';
-import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, textCaretAt, Unsupported, type ImageItem, type PathItem } from './display-list';
-import { apply2d } from '../affine';
-import { caretRect } from './text/caret';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, textBoxesAt, textCaretAt, Unsupported, type ImageItem, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { apply2d } from '@feega/motion-core/motion/affine';
+import { caretRect } from '@feega/motion-core/motion/gpu-full/text/caret';
 import { boxBook, boxFace } from './text/test-face';
-import { Smoothing, TextOutput } from './text/painter';
-import { addAnimator } from '../text-animators/ops';
-import { setTextPath } from '../text-path/ops';
-import { PathPreset, PathSourceKind } from '../text-path/model';
-import { SelectorShape } from '../text-animators/model';
+import { Smoothing, TextOutput } from '@feega/motion-core/motion/gpu-full/text/painter';
+import { addAnimator } from '@feega/motion-core/motion/text-animators/ops';
+import { setTextPath } from '@feega/motion-core/motion/text-path/ops';
+import { PathPreset, PathSourceKind } from '@feega/motion-core/motion/text-path/model';
+import { SelectorShape } from '@feega/motion-core/motion/text-animators/model';
 
 const boxType = { fonts: boxBook(), smoothing: Smoothing.Plain };
 
@@ -90,6 +90,67 @@ describe('displayListAt', () => {
     expect(pathOf(graded, 'card')?.paint).toMatchObject({ kind: PaintKind.Linear, from: [0, 54], to: [192, 54] });
   });
 
+  it('samples a keyed gradient stop colour and angle at the frame drawn', () => {
+    const fills = [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
+    const graded = patch(withCard, 'card', { props: { ...cardProps, fills } });
+    const keyed = must(setKeyframes(graded, 'card', 'fill.0.stop.1.color', [{ frame: 0, value: '#ffffff', ease: Ease.Linear }, { frame: 60, value: '#ff0000', ease: Ease.Linear }]));
+    const turning = must(setKeyframes(keyed, 'card', 'fill.0.angle', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 60, value: 90, ease: Ease.Linear }]));
+    const end = pathOf(turning, 'card', 60)?.paint as { from: number[]; to: number[]; stops: { color: number[] }[] };
+
+    expect(pathOf(turning, 'card', 0)?.paint).toMatchObject({ kind: PaintKind.Linear, from: [0, 54], to: [192, 54] });
+    expect(end.from[0]).toBeCloseTo(96);
+    expect(end.stops[1].color.slice(0, 3)).toEqual([1, 0, 0]);
+    expect(list(turning, 60).unsupported).toEqual([]);
+  });
+
+  describe('an image fill on a shape', () => {
+    const fills = [{ type: FillType.Image, assetId: 'photo', fit: 'cover' }];
+    const pictured = patch(withCard, 'card', { props: { ...cardProps, fills } });
+    const drawnWith = (assets: Record<string, string>) => drawFrame(prepare(pictured, FEEGA_TOKENS, assets), 0);
+
+    it('draws the picture through the shape as a stencil', () => {
+      const drawn = drawnWith({ photo: 'https://cdn.test/photo.png' });
+      const image = drawn.items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(drawn.unsupported).toEqual([]);
+      expect(image).toMatchObject({ src: 'https://cdn.test/photo.png', fit: 'cover' });
+      expect(image?.matte?.items[0]).toMatchObject({ kind: ItemKind.Path });
+    });
+
+    it('carries a crop window to the picture', () => {
+      const cropped = patch(withCard, 'card', { props: { ...cardProps, fills: [{ type: FillType.Image, assetId: 'photo', fit: 'crop', crop: { x: 0.1, y: 0.2, w: 0.5, h: 0.4 } }] } });
+      const image = drawFrame(prepare(cropped, FEEGA_TOKENS, { photo: 'https://cdn.test/photo.png' }), 0).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(image).toMatchObject({ fit: 'crop', crop: [0.1, 0.2, 0.5, 0.4] });
+    });
+
+    it('carries the tile scale and rotation to the picture', () => {
+      const tiled = patch(withCard, 'card', { props: { ...cardProps, fills: [{ type: FillType.Image, assetId: 'photo', fit: 'tile', scale: 2, rotation: 30 }] } });
+      const image = drawFrame(prepare(tiled, FEEGA_TOKENS, { photo: 'https://cdn.test/photo.png' }), 0).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(image).toMatchObject({ fit: 'tile', zoom: 2, tileTurn: 30 });
+    });
+
+    it('filters the picture by its adjustments, not the shape around it', () => {
+      const adjusted = patch(withCard, 'card', { props: { ...cardProps, fills: [{ type: FillType.Image, assetId: 'photo', adjust: { exposure: 0.5 } }] } });
+      const image = drawFrame(prepare(adjusted, FEEGA_TOKENS, { photo: 'https://cdn.test/photo.png' }), 0).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(image?.filters).toHaveLength(1);
+      expect(image?.filters?.[0]).toMatchObject({ kind: 'svg', nodes: [{ tag: 'filter', attrs: { 'color-interpolation-filters': 'sRGB' } }] });
+      expect(image?.matte?.items[0].filters).toBeUndefined();
+    });
+
+    it('a picture without adjustments has no filter', () => {
+      const plain = drawnWith({ photo: 'https://cdn.test/photo.png' }).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'card');
+
+      expect(plain?.filters).toBeUndefined();
+    });
+
+    it('stays a gap while the picture has no address', () => {
+      expect(drawnWith({}).unsupported).toContainEqual({ clip: 'card', component: 'Shape', reason: Unsupported.Fill });
+    });
+  });
+
   it('reads a gaussian blur effect as a CSS blur filter', () => {
     const blurred = patch(withCard, 'card', { effects: [{ id: 'e1', kind: 'gaussian-blur', enabled: true, params: { radius: 12 } }] } as never);
 
@@ -103,6 +164,15 @@ describe('displayListAt', () => {
 
     expect(band).toMatchObject({ rule: FillRule.Union, paint: { kind: PaintKind.Solid, color: [1, 1, 1, 1] }, within: { outside: false } });
     expect(corners(band).right - corners(band).left).toBeCloseTo(192 + 21.6);
+  });
+
+  it('draws arrow heads at the ends of an open path inside its stroke band', () => {
+    const strokes = [{ paint: { type: FillType.Solid, color: '#ffffff' }, width: 0.01, endCap: 'triangle-arrow' }];
+    const plain = patch(withCard, 'card', { props: { ...cardProps, shape: 'path', path: 'M0 0.5L1 0.5', strokes: [{ ...strokes[0], endCap: 'none' }] } });
+    const arrowed = patch(withCard, 'card', { props: { ...cardProps, shape: 'path', path: 'M0 0.5L1 0.5', strokes } });
+    const band = (doc: MotionDoc) => list(doc).items.filter((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'card').at(-1)!;
+
+    expect(band(arrowed).contours.length).toBe(band(plain).contours.length + 1);
   });
 
   it('plays an entrance transition on the whole layer', () => {
@@ -169,6 +239,13 @@ describe('displayListAt', () => {
     expect(picture?.matte?.items.flatMap((i) => (i.kind === ItemKind.Path ? i.contours : []))).toHaveLength(2);
   });
 
+  it('adjusts the picture shown through the glyphs', () => {
+    const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab', fills: [{ type: 'image', assetId: 'pic', adjust: { saturation: -1 } }] } }, 'text'));
+    const picture = drawFrame(prepare(texted, FEEGA_TOKENS, { pic: 'https://x.test/p.png' }, boxType), 60).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'text');
+
+    expect(picture?.filters).toHaveLength(1);
+  });
+
   it('keeps fills the native core cannot read on the JS painter, never in a text plan', () => {
     const native = { ...boxType, native: { rules: [], registry: [] } };
     const fill = (fills: unknown[]) => must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab', fills } }, 'text'));
@@ -178,6 +255,25 @@ describe('displayListAt', () => {
     expect(kinds(fill([{ type: 'linear-gradient', angle: 0, stops }]))).toEqual([ItemKind.Text]);
     expect(new Set(kinds(fill([{ type: 'diamond-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
     expect(new Set(kinds(fill([{ type: 'angular-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
+  });
+
+  it('draws angular and diamond fills on every shape kind instead of dropping the shape', () => {
+    const stops = [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }];
+    const shapes = [{ shape: 'rect' }, { shape: 'ellipse' }, { shape: 'path', path: 'M0 0 L1 0 L1 1 Z' }];
+    const fills = [
+      { fill: { type: 'angular-gradient', angle: 90, center: { x: 0.25, y: 0.5 }, stops }, paint: { kind: PaintKind.Sweep, center: [48, 54], start: 0 } },
+      { fill: { type: 'diamond-gradient', stops }, paint: { kind: PaintKind.Diamond, center: [96, 54], half: [96, 54] } }
+    ];
+
+    for (const kind of shapes) {
+      for (const { fill, paint } of fills) {
+        const shaped = must(addClip(withBg, { component: 'Shape', from: 0, durationInFrames: 90, props: { ...square, ...kind, fills: [fill] } }, 's'));
+        const drawn = displayListAt(shaped, 0, FEEGA_TOKENS);
+
+        expect(drawn.unsupported).toEqual([]);
+        expect(pathOf(shaped, 's')?.paint).toMatchObject({ ...paint, stops: [{ at: 0 }, { at: 1 }] });
+      }
+    }
   });
 
   it('carries text as glyph runs when asked to, for the native core to outline', () => {
@@ -274,5 +370,42 @@ describe('textCaretAt', () => {
 
   it('is null for a clip that is not text', () => {
     expect(textCaretAt(prepare(withCard, FEEGA_TOKENS, {}, boxType), 0, 'card')).toBeNull();
+  });
+});
+
+describe('textBoxesAt', () => {
+  const texted = (props: Record<string, unknown>) => must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'a long line of words', size: 0.05, align: 'center', x: 0.5, y: 0.5, width: 0.1, height: 0.1, ...props } }, 'text'));
+
+  it('hugs the laid line of an auto-width text instead of the stored box', () => {
+    const doc = texted({ sizing: 'auto' });
+    const box = textBoxesAt(prepare(doc, FEEGA_TOKENS, {}, boxType), 0).text;
+    const caret = textCaretAt(prepare(doc, FEEGA_TOKENS, {}, boxType), 0, 'text')!;
+
+    expect(box.width).toBeGreaterThan(0.1 * doc.width);
+    expect(box.width).toBeCloseTo(caret.width, 3);
+    expect(box.left).toBeCloseTo(0.45 * doc.width, 3);
+    expect(caret.lines).toHaveLength(1);
+  });
+
+  it('keeps the width of an auto-height text and grows its height to the wrapped lines', () => {
+    const doc = texted({ sizing: 'auto-height' });
+    const box = textBoxesAt(prepare(doc, FEEGA_TOKENS, {}, boxType), 0).text;
+
+    expect(box.width).toBeCloseTo(0.1 * doc.width, 3);
+    expect(box.height).toBeGreaterThan(0.1 * doc.height);
+  });
+
+  it('tells the editor the laid size, anchor and wrapping', () => {
+    const fixed = textCaretAt(prepare(texted({ sizing: 'fixed' }), FEEGA_TOKENS, {}, boxType), 0, 'text')!;
+    const auto = textCaretAt(prepare(texted({ sizing: 'auto' }), FEEGA_TOKENS, {}, boxType), 0, 'text')!;
+
+    const bottom = textCaretAt(prepare(texted({ sizing: 'fixed', verticalAlign: 'bottom' }), FEEGA_TOKENS, {}, boxType), 0, 'text')!;
+
+    expect(fixed.vertical).toBe(0.5);
+    expect(bottom.vertical).toBe(1);
+    expect(fixed.flow.wraps).toBe(true);
+    expect(fixed.size).toBeLessThanOrEqual(0.05 * Math.min(withBg.width, withBg.height));
+    expect(auto.vertical).toBe(0);
+    expect(auto.flow.wraps).toBe(false);
   });
 });

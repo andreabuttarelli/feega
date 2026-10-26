@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { EASING_RULE } from '$lib/motion/style';
-import { MOTION_STYLES } from '$lib/motion/style-model';
+import { MOTION_STYLES } from '@feega/motion-core/motion/style-model';
 import { Vision } from './frames';
 import { motionAgentPrompt } from './motion-prompt';
 import { createMotionTools, type MotionSession } from './motion-tools';
@@ -42,5 +42,16 @@ describe('the motion agent prefers the house curves', () => {
 
   it.each(['add_liquid_glass', 'add_liquid_blob'])('%s keeps its spring near critical damping', (name) => {
     expect(tools()[name].description).toContain('never a visible bounce');
+  });
+});
+
+describe('write_component teaches how a component is written, without reading the source', () => {
+  it('names the param() signature, its types, the css vars and shows a whole example', () => {
+    const { description } = tools().write_component;
+
+    expect(description).toContain('param(name, default, { type');
+    for (const word of ['textarea', 'select', 'color', '--param-', 'feega.out', 'tl.from']) {
+      expect(description, word).toContain(word);
+    }
   });
 });

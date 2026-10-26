@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
-  import type { BrandTokens } from '$lib/motion/brand';
-  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
+  import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
   import { embedSource, interactiveBundle, type InteractiveBundle } from '$lib/motion/interactive/bundle';
   import { snippetsOf } from '$lib/motion/interactive/loader';
-  import { interactiveOf, type Interactive } from '$lib/motion/interactive/settings';
+  import { interactiveOf, type Interactive } from '@feega/motion-core/motion/interactive/settings';
   import { reactionsOf } from '$lib/motion/interactive/summary';
   import EmbedView from './EmbedView.svelte';
 
@@ -94,6 +94,11 @@
     updated = false;
     hosted = hosted && { ...hosted, published: false };
   }
+
+  async function viewerLink(): Promise<string | null> {
+    const res = await fetch(`${editorUrl}/share`, { method: 'POST' });
+    return res.ok ? ((await res.json()) as { url: string }).url : null;
+  }
 </script>
 
-<EmbedView {doc} {bundle} {href} {hosted} {hostedSnippet} appSnippets={snippets} {reactions} bind:settings busy={hosting} {error} {updated} onpublish={publish} onunpublish={unpublish} {onpresets} />
+<EmbedView {doc} {bundle} {href} {hosted} {hostedSnippet} appSnippets={snippets} {reactions} bind:settings busy={hosting} {error} {updated} onpublish={publish} onunpublish={unpublish} onlink={viewerLink} {onpresets} />

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
-import { HOSTED, Script } from '../libs/catalog';
+import { HOSTED, Script } from '@feega/motion-core/motion/libs/catalog';
 
 const served = () => {
   const lib = HOSTED[Script.Screenshot];

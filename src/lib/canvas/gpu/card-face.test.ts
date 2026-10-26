@@ -32,6 +32,10 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
     expect(face).toMatchObject({ surface: Surface.Graphic, label: null });
   });
 
+  it('a new shape, before its kind is saved, draws no black stage', () => {
+    expect(faceOf({ id: 'e', kind: 'element', tag: NameTag.Hidden }, {}, asset).surface).toBe(Surface.Graphic);
+  });
+
   it('a document shows its text, a display name wins over the type label', () => {
     expect(faceOf({ id: 'd', kind: 'doc', tag: NameTag.Shown, displayName: 'Brief' }, { content: '# Hi\nthere' }, asset)).toMatchObject({ surface: Surface.Doc, label: 'Brief', text: '# Hi\nthere', pills: ['Read', 'Write'], count: 'Public link' });
   });

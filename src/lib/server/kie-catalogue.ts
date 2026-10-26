@@ -4,6 +4,7 @@ import { PER_RUN, type TaskPriceLine } from './generation/task-pricing';
 import { idPrefixOf, TaskProviderName } from './generation/task-providers';
 import type { WireFields } from './canvas/task-provider';
 import { NANO_BANANA_2_MODEL, NANO_BANANA_PRO_MODEL } from '$lib/image-models';
+import { IMAGE_TOOLS_GROUP, IMAGE_TOOL_MODEL, ImageTool } from '$lib/image-tools';
 
 export enum KieBilling {
   PerRun = 'per_run',
@@ -121,6 +122,63 @@ function kieRow(model: KieModel, syncedAt: string): AiModelRow {
   };
 }
 
+type KieToolModel = {
+  tool: ImageTool;
+  kieModel: string;
+  label: string;
+  imageField: string;
+  priceBy?: { field: string; credits: Readonly<Record<string, number>> };
+  flatCredits?: number;
+  takesPrompt?: boolean;
+  keepsLayers?: boolean;
+  maskField?: string;
+};
+
+const KIE_TOOL_MODELS: readonly KieToolModel[] = [
+  { tool: ImageTool.RemoveBackground, kieModel: 'recraft/remove-background', label: 'Remove background', imageField: 'image', flatCredits: 1 },
+  { tool: ImageTool.Upscale, kieModel: 'topaz/image-upscale', label: 'Upscale image', imageField: 'image_url', priceBy: { field: 'upscale_factor', credits: { '2': 10, '4': 20 } } },
+  { tool: ImageTool.SplitLayers, kieModel: 'seedream/5-flash-layer-decomposition', label: 'Split into layers', imageField: 'image_url', flatCredits: 24, takesPrompt: true, keepsLayers: true },
+  { tool: ImageTool.Inpaint, kieModel: 'ideogram/v3-edit', label: 'Inpaint', imageField: 'image_url', maskField: 'mask_url', takesPrompt: true, priceBy: { field: 'rendering_speed', credits: { TURBO: 6, BALANCED: 12, QUALITY: 18 } } }
+];
+
+function toolPriceLines(model: KieToolModel): TaskPriceLine[] {
+  if (model.priceBy) {
+    const { field, credits } = model.priceBy;
+    return Object.entries(credits).map(([value, priced]) => line({ [field]: value }, priced));
+  }
+  return [line({}, model.flatCredits!)];
+}
+
+function kieToolRow(model: KieToolModel, syncedAt: string): AiModelRow {
+  return {
+    id: IMAGE_TOOL_MODEL[model.tool],
+    catalogue: 'image',
+    provider: TaskProviderName.Kie,
+    label: model.label,
+    input_modalities: ['image'],
+    output_modalities: ['image'],
+    supported_parameters: [model.imageField],
+    supported_resolutions: [],
+    param_schema: model.priceBy ? { [model.priceBy.field]: { type: 'enum', values: Object.keys(model.priceBy.credits) } } : {},
+    pricing: { lines: toolPriceLines(model) },
+    synced_at: syncedAt,
+    released_at: null,
+    expires_at: null,
+    context_length: null,
+    intelligence_index: null,
+    uncensored: false,
+    wire_spec: {
+      model: model.kieModel,
+      requiresImage: true,
+      ...(model.keepsLayers ? { layers: true } : {}),
+      ...(model.maskField ? { requiresMask: true } : {}),
+      menuGroup: IMAGE_TOOLS_GROUP,
+      maxRefs: 1,
+      fields: { ...(model.takesPrompt ? { prompt: 'prompt' } : {}), images: [model.imageField], ...(model.maskField ? { mask: model.maskField } : {}) }
+    }
+  };
+}
+
 export function kieModelRows(syncedAt: string): AiModelRow[] {
-  return KIE_MODELS.map((model) => kieRow(model, syncedAt));
+  return [...KIE_MODELS.map((model) => kieRow(model, syncedAt)), ...KIE_TOOL_MODELS.map((model) => kieToolRow(model, syncedAt))];
 }

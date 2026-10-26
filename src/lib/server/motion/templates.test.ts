@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { templatesDb } from './templates-testing';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { exposeField, FieldType } from '$lib/motion/template/fields';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 import { templateLibrary } from './templates';

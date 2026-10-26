@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
@@ -17,7 +17,15 @@ describe('set_canvas layout guides', () => {
     const { run, session } = setup();
 
     expect(await run('set_canvas', { layout_guides: [{ kind: 'columns', count: 12, gutter: 24, margin: 64 }] })).toMatchObject({ ok: true });
-    expect(session.doc.layoutGuides).toEqual([{ kind: 'columns', count: 12, gutter: 24, margin: 64, size: 8 }]);
+    expect(session.doc.layoutGuides).toEqual([{ kind: 'columns', count: 12, gutter: 24, margin: 64, size: 8, align: 'stretch', offset: 0, color: '#ff0000', opacity: 0.1 }]);
+  });
+
+  it('takes an auto count, an alignment, a colour and an opacity', async () => {
+    const { run, session } = setup();
+
+    await run('set_canvas', { layout_guides: [{ kind: 'columns', count: 'auto', size: 80, align: 'center', color: '#0066ff', opacity: 0.2 }] });
+
+    expect(session.doc.layoutGuides?.[0]).toMatchObject({ count: 'auto', size: 80, align: 'center', color: '#0066ff', opacity: 0.2 });
   });
 
   it('an empty list removes them', async () => {

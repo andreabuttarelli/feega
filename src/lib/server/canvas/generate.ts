@@ -1,4 +1,6 @@
 import type { Db } from '$lib/server/db/client';
+import { allowlistRefusal } from '$lib/server/model-allowlist/allowlist';
+import { capRefusal, liveCapReader } from '$lib/server/spend-caps/gate';
 import { RENDER_DEADLINE_MS } from '$lib/server/motion/farm-render';
 import { BROWSER_RENDER_DEADLINE_MS } from '$lib/motion/render-link';
 import { releaseHold } from '$lib/server/motion/render-run';
@@ -32,6 +34,7 @@ import {
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
 import { signMediaPaths } from './sign-media';
+import { editInputsOf } from './edit-inputs';
 import { peopleScreened, ReferenceMedium } from '$lib/server/moderation/people';
 import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
@@ -80,6 +83,7 @@ export type StartRun = {
    *  giro ordinario, ogni `list` a monte si comporta come un filo `fixed`. */
   iterateSelection?: Record<string, number>;
   route?: RouteRole;
+  variants?: { group: string; source: string; sharesNode: boolean };
 };
 
 export type RunOutcome =
@@ -184,15 +188,34 @@ async function land(
   return { kind: 'done', run: { ...run, status: 'done', outputAssetId: asset.id }, asset };
 }
 
+export const VARIANT_GROUP_PARAM = 'variantGroup';
+export const VARIANT_SOURCE_PARAM = 'variantSource';
+
+const IN_FLIGHT: ReadonlySet<string> = new Set(['running', 'finishing']);
+
+function variantTagOf(input: StartRun): Record<string, string> {
+  return input.variants ? { [VARIANT_GROUP_PARAM]: input.variants.group, [VARIANT_SOURCE_PARAM]: input.variants.source } : {};
+}
+
+async function siblingsInFlight(db: Db, input: { orgId: string; nodeId: string }, runId: unknown): Promise<boolean> {
+  const runs = await listNodeRuns(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => []);
+  const group = runs.find((r) => r.id === runId)?.params[VARIANT_GROUP_PARAM];
+  if (!group) {
+    return false;
+  }
+  return runs.some((r) => r.id !== runId && IN_FLIGHT.has(r.status) && r.params[VARIANT_GROUP_PARAM] === group);
+}
+
 async function showRunState(
   db: Db,
   input: { orgId: string; nodeId: string; actor?: Actor },
   patch: Record<string, unknown>
 ): Promise<boolean> {
+  const stillRunning = patch.running === false && (await siblingsInFlight(db, input, patch.runId));
   const written = await patchNodeData(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,
-    patch,
+    patch: stillRunning ? { ...patch, running: true } : patch,
     check: DataCheck.None,
     actor: input.actor
   }).catch(() => null);
@@ -314,8 +337,10 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
   ]);
   const node = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => null);
   const ttl = inputTtlOf(taskProviderOf(input.model));
-  const [imageUrls, lastFrame, videoUrls, audioUrls, provenance] = await Promise.all([
-    signMediaPaths(db, TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? [], ttl),
+  const edit = await editInputsOf(db, { orgId: input.orgId, data: node?.data, wiredImagePaths: TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? [] });
+  const [imageUrls, maskUrls, lastFrame, videoUrls, audioUrls, provenance] = await Promise.all([
+    signMediaPaths(db, edit.imagePaths, ttl),
+    signMediaPaths(db, edit.maskPath ? [edit.maskPath] : [], ttl),
     signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : [], ttl),
     signMediaPaths(db, upstream.referenceVideoUrls, ttl),
     signMediaPaths(db, upstream.referenceAudioUrls, ttl),
@@ -330,6 +355,7 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
     prompt,
     params: input.params,
     imageUrls,
+    maskUrl: maskUrls[0] ?? null,
     lastFrameUrl: lastFrame[0] ?? null,
     videoUrls,
     audioUrls,
@@ -552,6 +578,16 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   }
   const input: StartRun = { ...requested, model: pick.model };
 
+  const notAllowed = await allowlistRefusal(db, { orgId: input.orgId, medium: input.medium, model: input.model });
+  if (notAllowed) {
+    return { kind: 'refused', error: notAllowed };
+  }
+
+  const capped = await capRefusal(await liveCapReader(db), { orgId: input.orgId, userId: input.userId, projectId: input.projectId });
+  if (capped) {
+    return { kind: 'refused', error: capped };
+  }
+
   const refusal = await generationRefusal(db, { orgId: input.orgId, projectId: input.projectId, userId: input.userId, model: input.model });
   if (refusal) {
     return { kind: 'refused', error: refusal };
@@ -562,7 +598,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     nodeId: input.nodeId,
     prompt: input.prompt,
     model: input.model,
-    params: input.params,
+    params: { ...input.params, ...variantTagOf(input) },
     actorKind: input.actor?.kind ?? 'user',
     actorId: input.actor?.id ?? input.userId
   });
@@ -573,22 +609,24 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   // sparisce nell'istante in cui `running` si accende, e se il giro nuovo fallisce non c'è più un
   // `prior` che lo riporti indietro — l'immagine buona è persa per un giro che non ha prodotto
   // niente.
-  const marked = await writeNodeData(db, {
-    orgId: input.orgId,
-    nodeId: input.nodeId,
-    expectedVersion: input.expectedVersion,
-    actor: input.actor,
-    data: {
-      ...priorNode?.data,
-      prompt: input.prompt,
-      model: input.model,
-      params: input.params,
-      running: true,
-      runId: run.id,
-      routeNote: null
-    }
-  });
-  if (marked.outcome === 'conflict') {
+  const marking = {
+    prompt: input.prompt,
+    model: input.model,
+    params: input.params,
+    running: true,
+    runId: run.id,
+    routeNote: null
+  };
+  const marked = input.variants?.sharesNode
+    ? await patchNodeData(db, { orgId: input.orgId, nodeId: input.nodeId, patch: marking, check: DataCheck.None, actor: input.actor })
+    : await writeNodeData(db, {
+        orgId: input.orgId,
+        nodeId: input.nodeId,
+        expectedVersion: input.expectedVersion,
+        actor: input.actor,
+        data: { ...priorNode?.data, ...marking }
+      });
+  if (marked.outcome !== 'written') {
     await failRun(db, { orgId: input.orgId, runId: run.id, error: 'conflict' }).catch(() => {});
     return { kind: 'conflict' };
   }
@@ -1204,7 +1242,8 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
 
       await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: progress.asset.id, costUsd: progress.costUsd });
       const poster = progress.poster ? { posterRefId: progress.poster.id } : {};
-      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored, ...poster });
+      const layerRefIds = progress.layers.length ? progress.layers.map((layer) => layer.id) : null;
+      await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored, layerRefIds, ...poster });
       outcome.done += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'task_reconcile_failed';
@@ -1320,6 +1359,26 @@ const RUN_TIMED_OUT = 'timed out — the request that ran it never came back';
 function isQueuedLoopTicket(run: { params: Record<string, unknown> }): boolean {
   const loop = run.params.loop;
   return Boolean(loop && typeof loop === 'object' && (loop as { phase?: unknown }).phase === 'queued');
+}
+
+export const RUN_CANCELLED = 'cancelled';
+
+export async function cancelNodeRun(db: Db, scope: { orgId: string; nodeId: string; actor?: Actor }): Promise<{ cancelled: number }> {
+  const mine = (await listNodeRuns(db, scope)).filter((run) => run.status === 'running' && !isQueuedLoopTicket(run));
+  const node = mine.length ? await findNode(db, scope).catch(() => null) : null;
+
+  let cancelled = 0;
+  for (const run of mine) {
+    const claimed = await claimRun(db, { orgId: run.orgId, runId: run.id });
+    if (!claimed) continue;
+
+    await failRun(db, { orgId: run.orgId, runId: run.id, error: RUN_CANCELLED });
+    await ON_EXPIRE[jobKindOf(run, node?.type ?? null)]?.(run);
+    await showRunState(db, scope, { running: false, runId: run.id, error: null });
+    cancelled += 1;
+  }
+
+  return { cancelled };
 }
 
 const EXPIRE_SWEEP_LIMIT = 2000;

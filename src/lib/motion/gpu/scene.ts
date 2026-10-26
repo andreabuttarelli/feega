@@ -1,5 +1,5 @@
-import { ENGINE_GLOBAL, motionEngine } from '../engine/engine';
-import { COMPOSITION_ID } from '../hyperframes/capture';
+import { ENGINE_GLOBAL, motionEngine } from '@feega/motion-core/motion/engine/engine';
+import { COMPOSITION_ID } from '@feega/motion-core/motion/hyperframes/capture';
 import { IDENTITY_3D, cssTransform, multiply, perspective, project, scaleOf, translation, type Mat4, type Size } from './matrix';
 import { PaintKind } from './paint-of';
 
@@ -17,7 +17,7 @@ export type Paint =
 
 export type Link = { el: HTMLElement; size: Size; offset: Point; perspectiveFor: boolean };
 
-export type SceneLayer = { clip: string; paint: Paint; links: Link[]; windows: [number, number][]; z: number[]; order: number; content: Size; blend: string; covers: string[] };
+export type SceneLayer = { clip: string; paint: Paint; links: Link[]; windows: [number, number][]; z: number[]; order: number; content: Size; blend: string; covers: string[]; owners: string[]; bounds?: { links: Link[]; content: Size }[] };
 
 type Timeline = { seek: (t: number) => void };
 
@@ -60,10 +60,11 @@ export function strokePad(markup: string): number {
 }
 
 const TEXT_EXTRAS = '.tu,.tw,.tg,img,svg,video,canvas';
+const TEXT_BLOCK = '[data-fit],[data-text]';
 
 function textParts(layer: Element): { el: HTMLElement; paint: Paint }[] {
-  const block = layer.querySelector('[data-fit]') as HTMLElement | null;
-  if (!block || !boxedChild(block) || block.querySelector(TEXT_EXTRAS) || layer.querySelectorAll('[data-fit]').length !== 1) {
+  const block = layer.querySelector(TEXT_BLOCK) as HTMLElement | null;
+  if (!block || !boxedChild(block) || block.querySelector(TEXT_EXTRAS) || layer.querySelectorAll(TEXT_BLOCK).length !== 1) {
     return [];
   }
   const box = block.parentElement!.parentElement as HTMLElement;
@@ -121,12 +122,14 @@ function contentSize(paint: Paint, parent: Size): Size {
   return SIZE[paint.kind]();
 }
 
+const lengthOf = (style: string, placed: string | undefined) => (Number.isFinite(parseFloat(style)) ? px(style) : px(placed));
+
 function linksOf(chain: HTMLElement[], frame: Size, paint: Paint): Link[] {
   const links: Link[] = [];
   let parent: Size = frame;
   for (const el of chain) {
     const placed = el.style.position === 'absolute' && el.style.width;
-    const size: Size = placed ? { width: px(el.style.width), height: px(el.style.height) } : parent;
+    const size: Size = placed ? { width: lengthOf(el.style.width, el.dataset.placedWidth), height: lengthOf(el.style.height, el.dataset.placedHeight) } : parent;
     const offset: Point = placed && !insetFull(el) ? [px(el.style.left), px(el.style.top)] : [0, 0];
     links.push({ el, size, offset, perspectiveFor: false });
     parent = size;
@@ -246,11 +249,15 @@ export function compileScene(html: string): Scene {
     const clip = (layer as HTMLElement).dataset.clip ?? '';
     const native = found.filter((f) => effectFree(chainOf(f.el, root)) && !contentAnimated(f.el, chainOf(f.el, root), changes) && !(SCRIPT_DRIVEN.has(f.paint.kind) && scriptDriven(doc, clip)));
     const parts = native.length === found.length && found.length ? native : [{ el: layer as HTMLElement, paint: { kind: PaintKind.Html } as Paint }];
+    const bounds = native.length === found.length ? [] : found.map((f) => {
+      const links = linksOf(chainOf(f.el, root), frame, f.paint);
+      return { links, content: links.length ? links[links.length - 1].size : frame };
+    });
     return parts.map((part) => {
       const chain = chainOf(part.el, root);
       const links = part.paint.kind === PaintKind.Html ? [] : linksOf(chain, frame, part.paint);
       const content = links.length ? links[links.length - 1].size : frame;
-      return { clip: (layer as HTMLElement).dataset.clip ?? '', paint: part.paint, links, windows: windowsOf(outer, part.paint), z: zOf(outer), order: order++, content, blend, covers: [layer, ...layer.querySelectorAll('[data-clip]')].map((e) => (e as HTMLElement).dataset.clip ?? '') };
+      return { clip: (layer as HTMLElement).dataset.clip ?? '', paint: part.paint, links, windows: windowsOf(outer, part.paint), z: zOf(outer), order: order++, content, blend, covers: [layer, ...layer.querySelectorAll('[data-clip]')].map((e) => (e as HTMLElement).dataset.clip ?? ''), owners: outer.flatMap((el) => (el.dataset.clip ? [el.dataset.clip] : [])), ...(part.paint.kind === PaintKind.Html && bounds.length ? { bounds } : {}) };
     });
   });
   return { ...frame, background: background?.trim() ?? null, layers: layers.sort(compareZ), timeline, duration: px(root.dataset.duration), doc };
@@ -356,6 +363,13 @@ function drawnOf(layer: SceneLayer, t: number): Drawn | null {
   const focus: Point = [(parseFloat(fx) || 50) / 100, (parseFloat(fy) || 50) / 100];
   const quad: Quad = [project(m, 0, 0), project(m, width, 0), project(m, width, height), project(m, 0, height)];
   return { clip: layer.clip, layer, paint: layer.paint, quad, matrix: m, opacity, blur, blend, clips, content: layer.content, focus };
+}
+
+export function placedAt(scene: Scene, t: number): Drawn[] {
+  return frameAt(scene, t).flatMap((d) => {
+    const { bounds } = d.layer;
+    return d.paint.kind === PaintKind.Html && bounds ? bounds.flatMap((b) => drawnOf({ ...d.layer, links: b.links, content: b.content }, t) ?? []) : [d];
+  });
 }
 
 export function frameAt(scene: Scene, t: number): Drawn[] {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_SECONDS } from './design';
+import { MAX_SECONDS } from '@feega/motion-core/motion/design';
 import { RENDER_SECONDS, lengthProblem, renderSeconds } from './render-length';
 
 describe('render length by plan', () => {

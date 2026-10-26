@@ -1,9 +1,9 @@
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
-import type { PathItem } from '$lib/motion/gpu-full/display-list';
-import { dashes } from '$lib/motion/gpu-full/stroke';
-import { FillRule } from '$lib/motion/gpu-full/paint';
-import { line, rect, solid } from './shapes';
+import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
+import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
+import { circle, line, rect, solid } from './shapes';
 
 export enum ChromePart {
   Hover = 'hover',
@@ -14,7 +14,8 @@ export enum ChromePart {
   Label = 'label',
   PortName = 'port-name',
   PortRing = 'port-ring',
-  Icon = 'icon'
+  Icon = 'icon',
+  Tag = 'tag'
 }
 
 export type TextSet = { width?: number; height?: number; leading?: number; tracking?: number };
@@ -40,6 +41,7 @@ export type ChromeTile = {
   outputs: readonly PortMark[];
   label: string | null;
   icon: number[][] | null;
+  tag?: string | null;
 };
 
 export type ChromeState = { ring: NodeChrome; handles: boolean; hovered: boolean; ringColor: string; names: boolean };
@@ -64,9 +66,11 @@ const HANDLE_FILL = '#ffffff';
 const LABEL_COLOR = '#6e6e73';
 const ICON_SIZE = 12;
 const ICON_GAP = 5;
+const ELLIPSIS = '…';
 const NAME_SIZE = 11;
 const NAME_GAP = 16;
 const PORT_RING = 1;
+const TAG_RADIUS = 4;
 
 const PORT_LOOK: Record<PortState, { opacity: number; ring: boolean; named: boolean }> = {
   [PortState.Quiet]: { opacity: 1, ring: false, named: false },
@@ -94,8 +98,7 @@ function hover(t: StateTile): PathItem[] {
 const RINGS: Record<NodeChrome, (t: StateTile) => PathItem[]> = {
   [NodeChrome.None]: () => [],
   [NodeChrome.Selected]: (t) => [item(t, ChromePart.Ring, band(t, RING_WIDTH), t.ringColor)],
-  [NodeChrome.Editing]: (t) =>
-    dashes(outline(t, EDITING_WIDTH), true, DASH, DASH).map((d) => item(t, ChromePart.Ring, line(d, EDITING_WIDTH), t.ringColor, EDITING_OPACITY))
+  [NodeChrome.Editing]: (t) => [item(t, ChromePart.Ring, dashes(outline(t, EDITING_WIDTH), true, [DASH, DASH]).flatMap((d) => line(d, EDITING_WIDTH)), t.ringColor, EDITING_OPACITY)]
 };
 
 const spaced = (t: ChromeTile, i: number, n: number) => t.y + ((i + 1) / (n + 1)) * t.height;
@@ -134,6 +137,31 @@ function handles(t: StateTile): PathItem[] {
 
 const shift = (contours: number[][], dx: number, dy: number) => contours.map((c) => c.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)));
 
+const LABEL_SET: TextSet = { leading: LABEL_LEADING, tracking: 0 };
+
+function fitted(text: string, room: number, glyphs: Glyphs) {
+  const whole = glyphs(text, LABEL_SIZE, LABEL_SET);
+  if (whole.width <= room) {
+    return whole;
+  }
+  let kept = text.length;
+  let cut = whole;
+  while (kept > 0 && cut.width > room) {
+    kept -= 1;
+    cut = glyphs(text.slice(0, kept).trimEnd() + ELLIPSIS, LABEL_SIZE, LABEL_SET);
+  }
+  return cut;
+}
+
+function tag(t: ChromeTile): PathItem[] {
+  if (!t.tag) {
+    return [];
+  }
+  const row = LABEL_SIZE * LABEL_LEADING;
+  const centre = t.y - LABEL_GAP - LABEL_PAD - row / 2;
+  return [item(t, ChromePart.Tag, circle(t.x + t.width - TAG_RADIUS, centre, TAG_RADIUS), t.tag)];
+}
+
 function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   if (!t.label) {
     return [];
@@ -142,8 +170,8 @@ function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   const top = t.y - LABEL_GAP - LABEL_PAD - line;
   const icon = t.icon ? [{ ...item(t, ChromePart.Icon, shift(t.icon, t.x, top + (line - ICON_SIZE) / 2), LABEL_COLOR), rule: FillRule.Union }] : [];
   const left = t.icon ? t.x + ICON_SIZE + ICON_GAP : t.x;
-  const label = item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE, { leading: LABEL_LEADING, tracking: 0 }).contours, left, top), LABEL_COLOR);
-  return [...icon, { ...label, scissor: [t.x, top, t.x + t.width, top + line] }];
+  const text = fitted(t.label, t.x + t.width - left, glyphs);
+  return [...icon, item(t, ChromePart.Label, shift(text.contours, left, top), LABEL_COLOR)];
 }
 
 function name(t: ChromeTile, glyphs: Glyphs, m: PortMark, centre: number, side: ChromePart): PathItem {
@@ -161,6 +189,6 @@ function names(t: ChromeTile, glyphs: Glyphs, shown: (m: PortMark) => boolean): 
 
 const lit = (m: PortMark) => PORT_LOOK[m.state].named;
 
-export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...ports(t), ...names(t, glyphs, lit), ...label(t, glyphs)];
+export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...ports(t), ...names(t, glyphs, lit), ...label(t, glyphs), ...tag(t)];
 
 export const stateChrome = (t: StateTile, glyphs: Glyphs): PathItem[] => [...hover(t), ...RINGS[t.ring](t), ...(t.names ? names(t, glyphs, (m) => !lit(m)) : []), ...handles(t)];

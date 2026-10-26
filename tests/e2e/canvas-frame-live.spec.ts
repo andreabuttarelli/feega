@@ -1,10 +1,10 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
 import doc from './fixtures/motion-doc.json' with { type: 'json' };
-import { DEFAULT_INTERACTIVE } from '../../src/lib/motion/interactive/settings';
-import { INPUT_MESSAGE } from '../../src/lib/motion/interactive/runtime';
+import { DEFAULT_INTERACTIVE } from '@feega/motion-core/motion/interactive/settings';
+import { INPUT_MESSAGE } from '@feega/motion-core/motion/interactive/runtime';
 import { PLAYER_MESSAGE, PlayerEvent } from '../../src/lib/motion/interactive/protocol';
-import { InputKey } from '../../src/lib/motion/expression/inputs';
+import { InputKey } from '@feega/motion-core/motion/expression/inputs';
 
 const LIVE_TIMEOUT_MS = 30_000;
 

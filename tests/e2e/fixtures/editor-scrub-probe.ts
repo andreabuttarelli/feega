@@ -1,7 +1,7 @@
-import { FEEGA_TOKENS } from '../../../src/lib/motion/brand';
-import { composeHtml } from '../../../src/lib/motion/hyperframes/compose';
-import { listenTap, type FramePoint } from '../../../src/lib/motion/hyperframes/frame-tap';
-import { exactSeek } from '../../../src/lib/motion/hyperframes/exact-seek';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { listenTap, type FramePoint } from '@feega/motion-core/motion/hyperframes/frame-tap';
+import { exactSeek } from '@feega/motion-core/motion/hyperframes/exact-seek';
 import { splitHeadline } from './fps-probe';
 
 const INNER_PROBE = `<script>(function(){var gaps=[],work=[],last=0,on=false;var ch=new MessageChannel();var t0=0;ch.port1.onmessage=function(){if(on){work.push(performance.now()-t0);}};function tick(now){if(on&&last){gaps.push(now-last);t0=performance.now();ch.port2.postMessage(0);}last=now;requestAnimationFrame(tick);}requestAnimationFrame(tick);addEventListener('message',function(e){var m=e.data;if(!m||m.type!=='probe:frames'){return;}if(m.start){gaps=[];work=[];on=true;return;}on=false;e.source.postMessage({type:'probe:report',gaps:gaps,work:work},'*');});})();</script>`;

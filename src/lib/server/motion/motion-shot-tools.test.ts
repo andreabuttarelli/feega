@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { SHOT_IDS, ShotId } from '$lib/motion/shots/library';
 import { VectorKind, VectorRole, type VectorUi } from '$lib/motion/vector-ui/model';
 import { motionAgentPrompt } from './motion-prompt';
@@ -144,10 +144,32 @@ describe('the shot library', () => {
   it('list_shots names every shot with what it does, its slots, its length and a preview', async () => {
     const { run } = setup();
 
-    const listed = (await run('list_shots', {})) as { shots: { id: string; about: string; slots: string[]; seconds: unknown; preview: string }[] };
+    const listed = (await run('list_shots', {})) as { shots: { id: string; about: string; slots: Record<string, unknown>; seconds: unknown; preview: string }[] };
 
     expect(listed.shots.map((s) => s.id)).toEqual(SHOT_IDS);
     expect(listed.shots.every((s) => s.about && s.preview.endsWith(`${s.id}.jpg`))).toBe(true);
+  });
+
+  it('list_shots gives every slot its type, default and range, the colour slots included', async () => {
+    const { run } = setup();
+
+    const listed = (await run('list_shots', {})) as { shots: { id: string; slots: Record<string, { type: string; default?: unknown; minimum?: number; maximum?: number; required?: boolean; about?: string }> }[] };
+    const tagline = listed.shots.find((s) => s.id === ShotId.TaglineCard)!.slots;
+
+    expect(tagline.accent_line).toMatchObject({ type: 'integer', default: -1, minimum: -1, maximum: 2, about: expect.stringContaining('0-based') });
+    expect(tagline.lines).toMatchObject({ type: 'string', required: true });
+    expect(tagline.accent).toMatchObject({ type: 'string', default: '#0099ff' });
+    for (const colour of ['ink', 'paper', 'muted', 'accent', 'font']) {
+      expect(tagline[colour], colour).toBeDefined();
+    }
+  });
+
+  it('add_shot refuses an accent_line past the last line instead of drawing no accent', async () => {
+    const { run } = setup();
+
+    const made = await run('add_shot', { shot: ShotId.TaglineCard, slots: { lines: 'make it move', accent_line: 1 }, at: 0 });
+
+    expect(made).toMatchObject({ ok: false, error: expect.stringContaining('accent_line') });
   });
 
   it('add_shot places a premium shot built on the recreated UI', async () => {

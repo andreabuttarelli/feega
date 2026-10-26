@@ -1,0 +1,119 @@
+{
+ "Figma": {
+  "x": "figma",
+  "ig": "figma",
+  "tt": "figma",
+  "yt": "Figma",
+  "li": "figma",
+  "th": "figma"
+ },
+ "Jitter": {
+  "x": "jittervideo",
+  "ig": "jitter.video",
+  "tt": "jitter.video",
+  "li": "jittervideo"
+ },
+ "Flora": {
+  "x": "floraai",
+  "ig": "florafauna.ai"
+ },
+ "Framer": {
+  "x": "framer",
+  "ig": "framer",
+  "tt": "framer",
+  "yt": "Framer",
+  "li": "framer",
+  "th": "framer"
+ },
+ "Spline": {
+  "x": "splinetool",
+  "ig": "splinetool",
+  "yt": "splinetool",
+  "li": "splinetool"
+ },
+ "Rive": {
+  "x": "rive_app",
+  "ig": "rive.app",
+  "tt": "rive.app",
+  "li": "rive-app"
+ },
+ "Krea": {
+  "x": "krea_ai",
+  "ig": "krea.ai",
+  "tt": "krea.ai",
+  "li": "krea-ai"
+ },
+ "Runway": {
+  "x": "runwayml",
+  "ig": "runwayapp",
+  "tt": "runwayapp",
+  "yt": "RunwayML",
+  "li": "runwayml",
+  "th": "runwayapp"
+ },
+ "Pika": {
+  "x": "pika_labs"
+ },
+ "Recraft": {
+  "x": "recraftai",
+  "tt": "recraft.ai",
+  "li": "recraft-ai"
+ },
+ "Lovart": {
+  "x": "lovart_ai",
+  "ig": "lovart.ai",
+  "li": "lovart-ai"
+ },
+ "Kittl": {
+  "ig": "kittl",
+  "li": "kittl"
+ },
+ "Canva": {
+  "x": "canva",
+  "ig": "canva",
+  "tt": "canva",
+  "yt": "canva",
+  "li": "canva",
+  "th": "canva"
+ },
+ "Remotion": {
+  "x": "remotion",
+  "yt": "remotion_dev",
+  "li": "remotion"
+ },
+ "Jonny Burger (Remotion)": {
+  "x": "JNYBGR"
+ },
+ "Weber Wong (Flora)": {
+  "x": "weberwongwong"
+ },
+ "Victor Perez (Krea)": {
+  "x": "viccpoes"
+ },
+ "Diego Rodriguez (Krea)": {
+  "x": "asciidiego"
+ },
+ "Pieter Levels (Photo AI)": {
+  "x": "levelsio"
+ },
+ "Danny Postma (HeadshotPro)": {
+  "x": "dannypostma"
+ },
+ "Pietro Schirano (MagicPath)": {
+  "x": "skirano"
+ },
+ "Meng To (Aura)": {
+  "x": "MengTo"
+ },
+ "Cristobal Valenzuela (Runway)": {
+  "x": "c_valenzuelab"
+ },
+ "Weavy (Figma Weave)": {
+  "x": "figmaweave",
+  "li": "weavy-ai"
+ },
+ "Freepik (now Magnific)": {
+  "x": "magnific",
+  "li": "freepik-company"
+ }
+}

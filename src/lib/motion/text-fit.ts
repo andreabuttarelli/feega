@@ -1,5 +1,5 @@
-import type { MotionClip, MotionDoc } from './doc';
-import { fittedTextBox, sizingAfterResize, TextSizing } from './text-sizing';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { fittedShare, fittedTextBox, sizingAfterResize, TextSizing } from '@feega/motion-core/motion/text-sizing';
 
 type PxBox = { left: number; top: number; width: number; height: number };
 
@@ -43,8 +43,13 @@ export function freeTextFit(doc: MotionDoc, boxes: Record<string, PxBox>): HostS
   if (clips.length !== 1) {
     return null;
   }
-  const next = fitted(only, boxes[only.id], doc);
-  return next ? { width: Number(next.props.width), height: Number(next.props.height), stage: { width: doc.width, height: doc.height } } : null;
+  const box = boxes[only.id];
+  if (!SIZED.has(only.component) || !box || only.parent) {
+    return null;
+  }
+  const p = only.props as { width: number; height: number; sizing?: TextSizing };
+  const share = fittedShare(p.sizing ?? TextSizing.Fixed, p, box, doc);
+  return share ? { ...share, stage: { width: doc.width, height: doc.height } } : null;
 }
 
 const sizingOf = (clip: MotionClip) => ((clip.props as { sizing?: TextSizing }).sizing ?? TextSizing.Fixed);

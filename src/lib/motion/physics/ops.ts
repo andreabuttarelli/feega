@@ -1,6 +1,6 @@
-import { COMPONENTS, TrackKind } from '../components';
-import { findClip, type DocVerdict, type MotionDoc } from '../doc';
-import { PHYSICS_PRESET, physicsSchema, type Physics, type PhysicsPreset } from './model';
+import { COMPONENTS, TrackKind } from '@feega/motion-core/motion/components';
+import { findClip, type DocVerdict, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { PHYSICS_PRESET, physicsSchema, type Physics, type PhysicsPreset } from '@feega/motion-core/motion/physics/model';
 
 const fail = (error: string): DocVerdict => ({ ok: false, error });
 

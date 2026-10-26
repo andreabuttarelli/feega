@@ -1,4 +1,4 @@
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 export enum Direction {
   Next = 1,

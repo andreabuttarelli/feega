@@ -1,4 +1,4 @@
-import { MotionFormat } from '$lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 
 export enum SectionRole {
   Opener = 'opener',

@@ -27,11 +27,11 @@ describe('a synced Wiro row becomes a model choice', () => {
 
   it('prices every setting combination in credits before the run', () => {
     const choice = taskChoice(rowOf('Wan 3.0 Uncensored Video Generator'));
-    expect(creditsForRun({ medium: 'video', model: choice, params: { resolution: '720p', duration: 10 } })).toBe(200);
+    expect(creditsForRun({ medium: 'video', model: choice, params: { resolution: '720p', duration: 10 } })).toBe(120);
   });
 
   it('prices an image model by its extra setting', () => {
     const choice = taskChoice(rowOf('Z Image Uncensored (Wiro-Partners)'));
-    expect(creditsForRun({ medium: 'image', model: choice, params: { promptExtend: 'false' } as never })).toBe(3);
+    expect(creditsForRun({ medium: 'image', model: choice, params: { promptExtend: 'false' } as never })).toBe(2);
   });
 });

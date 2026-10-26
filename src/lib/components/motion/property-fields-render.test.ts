@@ -3,7 +3,7 @@ import { render } from 'svelte/server';
 import ColorField from './ColorField.svelte';
 import NumberField from './NumberField.svelte';
 import SegmentedField from './SegmentedField.svelte';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MIXED } from '$lib/motion/mixed';
 import { segmentsOf } from '$lib/motion/segments';
 

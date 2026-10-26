@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
 import { drawsWhole, framesOnCanvas, onStage, stillFrame } from './frame-source';
+import instance from '../../../../tests/e2e/fixtures/motion-doc-template-instance.json';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { TransitionKind } from '@feega/motion-core/motion/design';
 
 const tile = (id: string, kind = 'motion') => ({ id, kind, x: 10, y: 20, w: 300, h: 200 });
 
@@ -9,6 +12,11 @@ describe('frames on canvas', () => {
   it('a frame shows its doc in the stage above the bar, at its head revision', () => {
     const [f] = framesOnCanvas([tile('a')], () => ({ kind: FrameKind.Frame, docHeadRevision: 4 }));
     expect(f).toEqual({ id: 'a', kind: FrameKind.Frame, revision: 4, box: { x: 10, y: 20, w: 300, h: 200 - MOTION_NODE_BAR_H } });
+  });
+
+  it('a rotated tile turns its frame about the tile centre', () => {
+    const [f] = framesOnCanvas([{ ...tile('a'), rotation: 20 }], () => ({ kind: FrameKind.Element, docHeadRevision: 1 }));
+    expect(f.turn).toEqual({ degrees: 20, about: { x: 160, y: 120 } });
   });
 
   it('elements and groups have no bar', () => {
@@ -35,12 +43,49 @@ describe('handing a frame to the core', () => {
 });
 
 describe('still frame', () => {
-  it('draws a resting frame at the same instant its poster was taken', () => {
-    expect(stillFrame({ fps: 30, durationInFrames: 90 })).toBe(36);
+  it('a frame rests at time 0', () => {
+    expect(stillFrame(newMotionDoc(MotionFormat.Landscape))).toBe(0);
   });
 
   it('a still doc rests on its own still frame', () => {
-    expect(stillFrame({ fps: 30, durationInFrames: 60, still: { frame: 0 } })).toBe(0);
+    expect(stillFrame({ ...newMotionDoc(MotionFormat.Landscape), still: { frame: 7 } })).toBe(7);
+  });
+
+  it('a doc longer than its content still rests at time 0', () => {
+    expect(stillFrame(instance as unknown as MotionDoc)).toBe(0);
+  });
+
+  it('a clip from 0 to 1s in a 5s frame is drawn on the canvas', () => {
+    const doc = { fps: 30, durationInFrames: 150, tracks: [], comps: {} } as unknown as MotionDoc;
+    const clip = { from: 0, durationInFrames: 30 };
+    const at = stillFrame(doc);
+    expect(at >= clip.from && at < clip.from + clip.durationInFrames).toBe(true);
+  });
+});
+
+describe('the frame a video rests on', () => {
+  const blank = newMotionDoc(MotionFormat.Landscape);
+  const words = (id: string, frames: number, fadeIn: number) => ({ id, component: 'Text', from: 0, durationInFrames: frames, props: { text: id, x: 0.5, y: 0.5, width: 0.5, height: 0.2 }, transitionIn: { kind: fadeIn ? TransitionKind.Fade : TransitionKind.None, durationInFrames: fadeIn } });
+  const video = (...clips: object[]): MotionDoc => {
+    const verdict = parseMotionDoc({ ...blank, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips }] });
+    if (!verdict.ok) {
+      throw new Error(verdict.error);
+    }
+    return verdict.doc;
+  };
+
+  it('a title that fades in rests once it is fully shown, never invisible at time 0', () => {
+    const at = stillFrame(video(words('title', 150, 15)));
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThanOrEqual(15);
+  });
+
+  it('never rests past a clip that is on screen at time 0', () => {
+    expect(stillFrame(video(words('title', 150, 45), words('flash', 10, 0)))).toBeLessThan(10);
+  });
+
+  it('a frame with nothing fading in still rests at time 0', () => {
+    expect(stillFrame(video(words('title', 150, 0)))).toBe(0);
   });
 });
 

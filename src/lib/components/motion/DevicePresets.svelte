@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { DEVICE, type Device } from '$lib/motion/devices';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { DEVICE, type Device } from '@feega/motion-core/motion/devices';
   import { DEVICE_PRESETS, PRESET, addDeviceRow, applyDevicePreset, type DevicePreset } from '$lib/motion/device-presets';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
 
   let { doc, clip, onchange }: { doc: MotionDoc; clip: MotionClip; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 

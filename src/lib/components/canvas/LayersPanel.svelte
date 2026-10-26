@@ -9,20 +9,26 @@
   import ImageIcon from '@lucide/svelte/icons/image';
   import TypeIcon from '@lucide/svelte/icons/type';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import Circle from '@lucide/svelte/icons/circle';
+  import Minus from '@lucide/svelte/icons/minus';
+  import PenTool from '@lucide/svelte/icons/pen-tool';
+  import Hexagon from '@lucide/svelte/icons/hexagon';
+  import Star from '@lucide/svelte/icons/star';
   import Shapes from '@lucide/svelte/icons/shapes';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Music from '@lucide/svelte/icons/music';
   import Component from '@lucide/svelte/icons/component';
+  import Diamond from '@lucide/svelte/icons/diamond';
   import Rows3 from '@lucide/svelte/icons/rows-3';
   import Contrast from '@lucide/svelte/icons/contrast';
   import { ACTIONS, shortcutOf } from '$lib/motion/actions';
   import { readFolds, toggleFold } from '$lib/canvas/layer-folds';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { untrack } from 'svelte';
-  import { PART_SEP } from '$lib/motion/poster-parts';
+  import { PART_SEP } from '@feega/motion-core/motion/poster-parts';
   import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
-  import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
   import { rowWindow } from '$lib/canvas/row-window';
   import { IconButton, IconSize, Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
@@ -158,7 +164,7 @@
     landing = { key: row.key, place: dropPlace(row.kind, (e.clientY - box.top) / box.height) };
   }
 
-  const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, shape: Shapes, Audio: Music };
+  const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, shape: Shapes, Audio: Music, rect: Square, circle: Circle, ellipse: Circle, line: Minus, polygon: Hexagon, star: Star, path: PenTool, vector: PenTool, Text: TypeIcon, Title: TypeIcon, Kicker: TypeIcon, Caption: TypeIcon, Image: ImageIcon, Video: Clapperboard };
   const KIND_ICON: Partial<Record<LayerKind, typeof Square>> = { [LayerKind.Group]: Component, [LayerKind.Track]: Rows3, [LayerKind.Mask]: Contrast };
   const EYE_LABEL: Record<'mask' | 'layer', [string, string]> = { mask: ['Turn mask off', 'Turn mask on'], layer: ['Hide', 'Show'] };
   const eyeLabel = (row: LayerRow) => EYE_LABEL[row.kind === LayerKind.Mask ? 'mask' : 'layer'][row.hidden ? 1 : 0];
@@ -170,6 +176,15 @@
   const visible = $derived(shown.slice(span.start, span.end));
   const ROW_HUE: Record<string, string> = { motion: 'var(--ui-type-frame)', image: 'var(--ui-type-media)', video: 'var(--ui-type-media)', text: 'var(--ui-type-text)' };
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
+  const renamable = (row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
+
+  function enterRow(row: LayerRow, e: KeyboardEvent) {
+    if (isPicked(row) && renamable(row)) {
+      renaming = row.id;
+      return;
+    }
+    choose(row, e as unknown as MouseEvent);
+  }
 
   const pickOf = (e: MouseEvent | KeyboardEvent): Pick => pickFor({ shift: e.shiftKey, mod: e.metaKey || e.ctrlKey });
 
@@ -212,7 +227,7 @@
     [LayerAction.Down]: 'Sent a layer backward',
     [LayerAction.Hide]: 'Toggled a layer',
     [LayerAction.Lock]: 'Locked a layer',
-    [LayerAction.Rename]: 'Renamed a track'
+    [LayerAction.Rename]: 'Renamed a layer'
   };
 
   function onKey(e: KeyboardEvent) {
@@ -228,7 +243,13 @@
 
   function rename(row: LayerRow, name: string) {
     renaming = null;
-    if (name.trim() && name !== row.label) {
+    if (row.kind === LayerKind.Node) {
+      if (name.trim() !== row.label) {
+        canvas?.rename(row.id, name);
+      }
+      return;
+    }
+    if (name.trim() !== row.label) {
       run([row.id], LayerAction.Rename, SUMMARY[LayerAction.Rename], name);
     }
   }
@@ -278,7 +299,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" class:touch={density === Density.Touch} bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" style:padding-top={`${span.start * rowStep}px`} style:padding-bottom={`${(shown.length - span.end) * rowStep}px`} onkeydown={onKey}>
   {#each visible as row (`${row.nodeId}/${row.key}`)}
-    {@const RowIcon = KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square}
+    {@const RowIcon = row.instance ? Diamond : (KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square)}
     <div
       class="row"
       class:picked={isPicked(row)}
@@ -296,8 +317,8 @@
       onclick={(e) => choose(row, e)}
       onpointerenter={() => layersSource.hover({ nodeId: row.nodeId, id: row.id })}
       onpointerleave={() => layersSource.hover(null)}
-      onkeydown={(e) => e.key === 'Enter' && choose(row, e as unknown as MouseEvent)}
-      ondblclick={() => row.kind === LayerKind.Track && !row.nested && (renaming = row.id)}
+      onkeydown={(e) => e.target === e.currentTarget && e.key === 'Enter' && enterRow(row, e)}
+      ondblclick={() => renamable(row) && (renaming = row.id)}
       ondragstart={(e) => ((dragged = row.id), (block = isPicked(row) && picked.length > 1 ? [...picked] : [row.id]), e.dataTransfer?.setData('text/plain', row.id))}
       data-drop={landing?.key === row.key ? landing.place : undefined}
       ondragover={(e) => over(row, e)}
@@ -314,10 +335,10 @@
       {#if row.thumb}
         <img class="thumb" src={row.thumb} alt="" loading="lazy" decoding="async" data-testid="layer-thumb" />
       {/if}
-      <span class="icon" style:--hue={ROW_HUE[row.type]}><RowIcon size={ICON} /></span>
+      <span class="icon" class:instance={row.instance} data-instance={row.instance || undefined} style:--hue={ROW_HUE[row.type]}><RowIcon size={ICON} /></span>
       {#if renaming === row.id}
         <!-- svelte-ignore a11y_autofocus -->
-        <input class="name-input" value={row.label} autofocus aria-label="Track name" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+        <input class="name-input" value={row.label} autofocus aria-label="Layer name" data-testid="layer-rename" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => (e.stopPropagation(), e.key === 'Escape' ? ((e.currentTarget.value = row.label), e.currentTarget.blur()) : e.key === 'Enter' && e.currentTarget.blur())} onclick={(e) => e.stopPropagation()} />
       {:else}
         <span class="name">{row.label}</span>
       {/if}
@@ -468,6 +489,10 @@
     display: grid;
     place-items: center;
     color: var(--hue, var(--ui-icon-ink));
+  }
+
+  .icon.instance {
+    color: #9747ff;
   }
 
   .thumb {

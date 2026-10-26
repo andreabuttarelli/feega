@@ -1,8 +1,9 @@
-import type { ClipError } from '../hyperframes/capture';
-import { TrackKind } from '../components';
-import { TransitionKind } from '../design';
-import { clipsOf, newClip, type MotionDoc } from '../doc';
-import { CheckState, ComponentMode, checkState } from './component';
+import type { ClipError } from '@feega/motion-core/motion/hyperframes/capture';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { TransitionKind } from '@feega/motion-core/motion/design';
+import { clipsOf, newClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { CheckState, ComponentMode, checkState } from '@feega/motion-core/motion/custom/component';
+import { reflowProblems, type Boxes } from '@feega/motion-core/motion/custom/reflow';
 
 export const CHECK_POINTS = 5;
 const SPREAD = [0.1, 0.3, 0.5, 0.7, 0.92];
@@ -12,7 +13,7 @@ const JPEG_BLOCK = 8;
 const BLOCK_NOISE = 2;
 
 export type Luma = { width: number; values: Uint8Array };
-export type Shot = { time: number; image: string; luma: Luma; layout: string; errors: ClipError[] };
+export type Shot = { time: number; image: string; luma: Luma; layout: string; boxes?: Boxes; errors: ClipError[] };
 export type Verdict = { ok: boolean; problems: string[]; offending: Shot[] };
 
 export function seekPlan(seconds: number, fps: number): number[] {
@@ -73,7 +74,8 @@ export function verdictOf(shots: Shot[]): Verdict {
   }
 
   const thrown = [...new Set(shots.flatMap((s) => s.errors.map((e) => `${e.component || 'the page'} threw: ${e.message}`)))];
-  const all = [...new Set([...thrown, ...problems])].slice(0, MAX_PROBLEMS);
+  const reflows = reflowProblems(shots.flatMap((s) => (s.boxes ? [{ time: s.time, boxes: s.boxes }] : [])));
+  const all = [...new Set([...thrown, ...problems, ...reflows])].slice(0, MAX_PROBLEMS);
   return { ok: all.length === 0, problems: all, offending: offending.slice(0, 2) };
 }
 

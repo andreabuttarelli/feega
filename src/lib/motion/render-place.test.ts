@@ -26,8 +26,13 @@ describe('renderPlace', () => {
     expect(verdict.place === RenderPlace.Farm && verdict.message).toMatch(/close this tab/);
   });
 
-  it.each([ExportFormat.ProRes4444, ExportFormat.ProRes422, ExportFormat.Mp4H265, ExportFormat.WebmAlpha, ExportFormat.Gif, ExportFormat.PngSequence])('%s non si codifica nel browser', (format) => {
+  it.each([ExportFormat.ProRes4444, ExportFormat.ProRes422, ExportFormat.Mp4H265, ExportFormat.WebmAlpha, ExportFormat.Gif, ExportFormat.Apng, ExportFormat.PngSequence])('%s non si codifica nel browser', (format) => {
     expect(renderPlace(input({ settings: { ...settingsOf(Preset.Social), format } }))).toMatchObject({ reason: FarmReason.Format });
+  });
+
+  it('120 fps va al farm, 60 resta nel browser', () => {
+    expect(renderPlace(input({ settings: { ...settingsOf(Preset.Social), fps: 120 } }))).toMatchObject({ place: RenderPlace.Farm, reason: FarmReason.FrameRate });
+    expect(renderPlace(input({ settings: { ...settingsOf(Preset.Social), fps: 60 } }))).toEqual({ place: RenderPlace.Browser });
   });
 
   it('senza WebCodecs H.264 va al farm', () => {

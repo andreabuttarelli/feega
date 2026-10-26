@@ -126,6 +126,38 @@ describe('canvas_tool does what the canvas UI does', () => {
     expect(size.height).toBeGreaterThan(1);
   });
 
+  it('rename_node names the node, and an empty name gives the default back', async () => {
+    const { calls } = seed();
+
+    const named = await call('rename_node', { nodeId: SOURCE, name: '  Hero  ' });
+    const cleared = await call('rename_node', { nodeId: SOURCE, name: '' });
+
+    expect(named.body.renamed).toBe(true);
+    expect(cleared.body.renamed).toBe(true);
+    expect(updatesOf(calls, 'nodes').map((c) => (c.payload as { display_name: string | null }).display_name)).toEqual(['Hero', null]);
+  });
+
+  it('rename_node answers not found for a node that does not exist', async () => {
+    seed();
+
+    const { body } = await call('rename_node', { nodeId: '99999999-9999-9999-9999-999999999999', name: 'x' });
+
+    expect(body.error).toBe('node_not_found');
+  });
+
+  it('set_node_color tags the node, null clears it, an unknown colour is refused', async () => {
+    const { calls } = seed();
+
+    const tagged = await call('set_node_color', { nodeId: SOURCE, color: 'red' });
+    const cleared = await call('set_node_color', { nodeId: SOURCE, color: null });
+    const bad = await call('set_node_color', { nodeId: SOURCE, color: 'plaid' });
+
+    expect(tagged.body.outcome).toBe('written');
+    expect(cleared.body.outcome).toBe('written');
+    expect(JSON.stringify(updatesOf(calls, 'nodes').map((c) => c.payload))).toContain('"colorTag":"red"');
+    expect(bad.status).toBeGreaterThanOrEqual(400);
+  });
+
   it('share_canvas mints a view-only link and revokes it', async () => {
     seed();
 

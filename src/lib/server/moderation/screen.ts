@@ -10,6 +10,7 @@ import {
   type JevDecision,
   type JudgeVerdict
 } from './policy';
+import { enableHint } from '$lib/server/enable-hints';
 import { JevOutage, MODERATION_PROFILES, carriedProfile, type ProfilePolicy } from './profiles';
 
 export type ModerationRecord = {
@@ -64,7 +65,7 @@ async function escalateContent(ports: ScreenPorts, state: string, policy: Profil
     verdict = await ports.judge(state);
   } catch (error) {
     ports.record({ stage: 'llm', verdict: 'refuse', category: null, probabilities: {}, reason: errorOf(error) });
-    return { ok: false, error: `${UNAVAILABLE}: the safety review could not run`, unavailable: true };
+    return { ok: false, error: `${UNAVAILABLE}: ${enableHint(error) ?? 'the safety review could not run'}`, unavailable: true };
   }
 
   const refused = judgeRefuses(policy.categories, verdict);

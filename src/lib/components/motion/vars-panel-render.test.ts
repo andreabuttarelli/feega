@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import VarsPanel from './VarsPanel.svelte';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { VarKind, declareVar, starterVar, type VarDecl } from '$lib/motion/interactive/vars';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { VarKind, declareVar, starterVar, type VarDecl } from '@feega/motion-core/motion/interactive/vars';
 
 function docWith(decls: VarDecl[]): MotionDoc {
   return decls.reduce((doc, decl) => {

@@ -1,0 +1,209 @@
+// @vitest-environment jsdom
+import { describe, expect, it } from 'vitest';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { TransitionKind } from '@feega/motion-core/motion/design';
+import { addClip, setTransform, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { compileScene } from './scene';
+import { leafRectsAt, pickAt, pickOwnersAt, pickStackAt, quadOf, rectOf } from './pick';
+import { groupClips } from '../group';
+import { drawClip } from '../draw-create';
+import { DrawTool } from '../draw-tool';
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
+import { addEffect } from '../effects/ops';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
+
+function must(r: OpResult): MotionDoc {
+  if (!r.ok) {
+    throw new Error(r.error);
+  }
+  return r.doc;
+}
+
+const shape = (doc: MotionDoc, id: string, x: number, y: number, size: number) => must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 90, props: { shape: 'rect', x, y, width: size, height: size } }, id));
+const sceneOf = (doc: MotionDoc) => compileScene(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, origin: 'https://app.test' }));
+const empty = newMotionDoc(MotionFormat.Landscape);
+const centre = (doc: MotionDoc, id: string) => {
+  const r = rectOf(sceneOf(doc), id, 0)!;
+  return [r.left + r.width / 2, r.top + r.height / 2] as [number, number];
+};
+
+describe('pickAt on a clip with an effect', () => {
+  const shadowed = (id: string, x: number, y: number) => must(addEffect(shape(empty, id, x, y, 0.1), id, EffectKind.DropShadow, 'fx', { distance: 10, blur: 8 }));
+
+  it('picks the shadowed shape where it is', () => {
+    const doc = shadowed('a', 0.2, 0.5);
+
+    expect(pickAt(sceneOf(doc), centre(doc, 'a'), 0)).toBe('a');
+  });
+
+  it('does not pick the shadowed shape away from it', () => {
+    const doc = shadowed('a', 0.2, 0.5);
+
+    expect(pickAt(sceneOf(doc), [1800, 1000], 0)).toBeNull();
+  });
+
+  it('picks the plain shape under a shadowed one where only the lower one is', () => {
+    const doc = must(addEffect(shape(shape(empty, 'under', 0.5, 0.5, 0.5), 'over', 0.2, 0.5, 0.05), 'over', EffectKind.DropShadow, 'fx', { distance: 10, blur: 8 }));
+    const [x, y] = centre(doc, 'under');
+
+    expect(pickAt(sceneOf(doc), [x + 300, y], 0)).toBe('under');
+  });
+});
+
+describe('pickAt', () => {
+  it('returns null over empty canvas', () => {
+    expect(pickAt(sceneOf(shape(empty, 'a', 0.2, 0.2, 0.1)), [1800, 1000], 0)).toBeNull();
+  });
+
+  it('picks the shape under the point', () => {
+    const doc = shape(empty, 'a', 0.2, 0.5, 0.1);
+
+    expect(pickAt(sceneOf(doc), centre(doc, 'a'), 0)).toBe('a');
+  });
+
+  it('picks the topmost of two overlapping shapes', () => {
+    const doc = shape(shape(empty, 'under', 0.2, 0.5, 0.2), 'over', 0.2, 0.5, 0.2);
+
+    expect(pickAt(sceneOf(doc), centre(doc, 'over'), 0)).toBe('over');
+  });
+
+  it('picks the small shape nested inside a bigger one, not its container', () => {
+    const big = shape(empty, 'big', 0.5, 0.5, 0.5);
+    const doc = shape(big, 'small', 0.5, 0.5, 0.05);
+
+    expect(pickAt(sceneOf(doc), centre(doc, 'small'), 0)).toBe('small');
+  });
+
+  it('picks the container where the nested shape is not', () => {
+    const big = shape(empty, 'big', 0.5, 0.5, 0.5);
+    const doc = shape(big, 'small', 0.5, 0.5, 0.05);
+    const [x, y] = centre(doc, 'big');
+
+    expect(pickAt(sceneOf(doc), [x + 200, y], 0)).toBe('big');
+  });
+
+  it('follows a rotation: the centre hits, the unrotated corner misses', () => {
+    const doc = must(setTransform(shape(empty, 'r', 0.5, 0.5, 0.2), 'r', { rotateZ: 45 }));
+    const r = rectOf(sceneOf(doc), 'r', 0)!;
+    const [cx] = centre(doc, 'r');
+
+    expect(pickAt(sceneOf(doc), [cx, r.top + r.height / 2], 0)).toBe('r');
+    expect(pickAt(sceneOf(doc), [r.left + 2, r.top + 2], 0)).toBeNull();
+  });
+
+  it('does not pick the hidden part of a clipped reveal', () => {
+    const doc = must(setTransition(shape(empty, 'w', 0.5, 0.5, 0.2), 'w', Side.In, { kind: TransitionKind.Wipe, durationInFrames: 30 }));
+
+    expect(pickAt(sceneOf(doc), centre(doc, 'w'), 0)).toBeNull();
+    expect(pickAt(sceneOf(doc), centre(doc, 'w'), 1)).toBe('w');
+  });
+
+  it('ignores a clip outside its time window', () => {
+    const doc = must(addClip(empty, { component: 'Shape', from: 30, durationInFrames: 30, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 } }, 'late'));
+
+    expect(pickAt(sceneOf(doc), [960, 540], 0)).toBeNull();
+  });
+});
+
+describe('rectOf', () => {
+  it('is null for an unknown clip', () => {
+    expect(rectOf(sceneOf(shape(empty, 'a', 0.2, 0.2, 0.1)), 'zzz', 0)).toBeNull();
+  });
+
+  it('bounds a rotated shape wider than its box', () => {
+    const flat = rectOf(sceneOf(shape(empty, 'a', 0.5, 0.5, 0.2)), 'a', 0)!;
+    const turned = rectOf(sceneOf(must(setTransform(shape(empty, 'a', 0.5, 0.5, 0.2), 'a', { rotateZ: 45 }))), 'a', 0)!;
+
+    expect(turned.width).toBeGreaterThan(flat.width);
+  });
+});
+
+describe('quadOf', () => {
+  const DEG = Math.PI / 180;
+  const edge = (a: [number, number], b: [number, number]) => ({ length: Math.hypot(b[0] - a[0], b[1] - a[1]), degrees: Math.atan2(b[1] - a[1], b[0] - a[0]) / DEG });
+
+  it('turns with a rotated shape and keeps its own size', () => {
+    const doc = must(setTransform(shape(empty, 'r', 0.5, 0.5, 0.2), 'r', { rotateZ: 30 }));
+    const q = quadOf(sceneOf(doc), 'r', 0)!;
+
+    expect(edge(q[0], q[1]).degrees).toBeCloseTo(30, 3);
+    expect(edge(q[0], q[1]).length).toBeCloseTo(384, 1);
+    expect(edge(q[1], q[2]).length).toBeCloseTo(216, 1);
+  });
+
+  it('is the axis-aligned rect of an unrotated shape', () => {
+    const doc = shape(empty, 'a', 0.5, 0.5, 0.2);
+    const r = rectOf(sceneOf(doc), 'a', 0)!;
+
+    expect(quadOf(sceneOf(doc), 'a', 0)).toEqual([
+      [r.left, r.top],
+      [r.left + r.width, r.top],
+      [r.left + r.width, r.top + r.height],
+      [r.left, r.top + r.height]
+    ]);
+  });
+
+  it('is null for an unknown clip', () => {
+    expect(quadOf(sceneOf(shape(empty, 'a', 0.2, 0.2, 0.1)), 'zzz', 0)).toBeNull();
+  });
+});
+
+describe('a text the text tool just made', () => {
+  const REST_S = 1;
+  const made = (sizing: TextSizing) => must(drawClip(empty, DrawTool.Text, { x: 0.3, y: 0.46, width: 0.4, height: 0.12 }, 0, 'text1', sizing));
+
+  it.each([TextSizing.AutoWidth, TextSizing.AutoHeight, TextSizing.Fixed])('is picked under its glyphs (%s)', (sizing) => {
+    const doc = made(sizing);
+
+    expect(pickAt(sceneOf(doc), centre(doc, 'text1'), REST_S)).toBe('text1');
+  });
+});
+
+describe('a group', () => {
+  const grouped = () => {
+    let n = 0;
+    return must(groupClips(shape(shape(empty, 'a', 0.2, 0.5, 0.1), 'b', 0.4, 0.5, 0.1), ['a', 'b'], () => `g${++n}`));
+  };
+
+  it('has a rect, the box around its members', () => {
+    const doc = grouped();
+    const group = doc.tracks.flatMap((t) => t.clips).map((c) => c.id)[0];
+
+    expect(rectOf(sceneOf(doc), group, 0)?.width).toBeGreaterThan(0);
+  });
+
+  it('owns what is picked inside it, outermost first', () => {
+    const doc = grouped();
+    const group = doc.tracks.flatMap((t) => t.clips).map((c) => c.id)[0];
+
+    const r = rectOf(sceneOf(doc), group, 0)!;
+
+    expect(pickOwnersAt(sceneOf(doc), [r.left + 5, r.top + r.height / 2], 0)[0]).toBe(group);
+  });
+
+  it('lists its members, not itself, as the drawn leaves', () => {
+    const doc = grouped();
+    const group = doc.tracks.flatMap((t) => t.clips).map((c) => c.id)[0];
+    const leaves = leafRectsAt(sceneOf(doc), 0);
+
+    expect(Object.keys(leaves)).toHaveLength(2);
+    expect(Object.keys(leaves)).not.toContain(group);
+    expect(Object.values(leaves).every((r) => r.width > 0)).toBe(true);
+  });
+});
+
+describe('pickStackAt', () => {
+  const stacked = ['a', 'b', 'c'].reduce((doc, id) => shape(doc, id, 0.5, 0.5, 0.3), empty);
+
+  it('lists every layer under the point, top first', () => {
+    expect(pickStackAt(sceneOf(stacked), centre(stacked, 'a'), 0)).toEqual(['c', 'b', 'a']);
+  });
+
+  it('leaves out layers the point misses', () => {
+    const apart = shape(stacked, 'far', 0.9, 0.1, 0.05);
+
+    expect(pickStackAt(sceneOf(apart), centre(apart, 'a'), 0)).toEqual(['c', 'b', 'a']);
+  });
+});

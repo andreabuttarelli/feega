@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db/client';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { COMPOSITION_CLIP, applyDraft, newDraft } from '$lib/motion/composition-draft';
-import { findClip, newMotionDoc, MotionFormat, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { findClip, newMotionDoc, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { motionCompId } from '$lib/motion/embed';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 import { STRIP_TEMPLATE_ID } from '$lib/motion/template/photo-strip/template';
@@ -167,7 +167,7 @@ describe('openCanvasComposition: an existing canvas composition node becomes the
 
     const opened = await openCanvasComposition(db, d, { orgId: 'org', projectId: 'p1', canvasId: 'c1', nodeId: 'comp-node', userId: 'u1' });
 
-    expect(opened).toEqual({ ok: true, start: { projectId: 'p1', canvasId: 'c1', nodeId: 'm-new' }, editor: '/p/p1/c/c1/motion/m-new' });
+    expect(opened).toEqual({ ok: true, start: { projectId: 'p1', canvasId: 'c1', nodeId: 'm-new' }, editor: '/p/p1/c/c1?frame=m-new' });
     const doc = vi.mocked(d.saveMotionDoc).mock.calls[0][1].doc as MotionDoc;
     const comp = Object.values(doc.comps).find((c) => c.template?.id === STRIP_TEMPLATE_ID);
     expect(doc.height).toBeGreaterThan(doc.width);

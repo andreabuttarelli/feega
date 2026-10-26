@@ -1,19 +1,23 @@
 import { z } from 'zod';
-import { TEXT_SIZINGS } from '$lib/motion/text-sizing';
-import { Background, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+import { TEXT_SIZINGS } from '@feega/motion-core/motion/text-sizing';
+import { Background, formatOf, type MotionDoc, type MotionFormat } from '@feega/motion-core/motion/doc';
 import type { Db } from '$lib/server/db/client';
 import { createNode, deleteConnection, deleteNode, findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, frameChrome, motionNodeSize } from '$lib/canvas/motion-node';
+import { DocNodeType, FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, leftEmpty, motionNodeSize, type DocNodeShape } from '$lib/canvas/motion-node';
 import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
+import { gradientFillSchema } from '@feega/motion-core/motion/fill/model';
+import { FILL_RULES } from '@feega/motion-core/motion/shape/schema';
 import { frameShape } from './start';
+import { figmaPlan, type FigmaImage, type PlanItem } from '$lib/canvas/figma/figma-doc';
+import { Destination } from '$lib/canvas/figma/scene';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
-import { saveMotionDoc } from './editor';
-import { DocMode, docMode } from '$lib/motion/still';
+import { commitOnto } from './frame-ops';
+import { DocMode, docMode } from '@feega/motion-core/motion/still';
 import { DropOn, OutputKind, clipCentre, elementBox, frameOf, liftElement, linkOutput, mediaElement, placeElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
 import { RevisionOutcome, appendRevision, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { UndoItem } from '$lib/canvas/undo-plan';
@@ -62,7 +66,7 @@ export type StoredFrame = { nodeId: string; projectId: string; canvasId: string;
 
 export type Place = { projectId: string; canvasId: string };
 
-export type NodeShape = { data: Record<string, unknown>; width: number; height: number; displayName?: string };
+export type NodeShape = { type: DocNodeType; data: Record<string, unknown>; width: number; height: number; displayName?: string };
 
 export type FrameStore = {
   read: (nodeId: string) => Promise<StoredFrame | null>;
@@ -85,6 +89,7 @@ const SUMMARY = {
   movedIn: 'Moved an element in from another frame',
   copiedIn: 'Pasted an element from another frame',
   placed: 'Placed a generated output',
+  pasted: 'Pasted a picture',
   linked: 'Updated from a connected node',
   putBack: 'Put back after a failed move'
 };
@@ -161,7 +166,7 @@ async function landFree(store: FrameStore, place: Place & { id?: string }, eleme
   const shaped = elementNodeOf({ width: area.width * stage.width, height: area.height * stage.height });
   const at = { x: drop.x - shaped.w / 2, y: drop.y - shaped.h / 2 };
   const doc = STILL_AT[stillAt]({ ...frameOf(atCanvasPixels(element, area, shaped), mode, area, newId), background: Background.Transparent });
-  const frameId = await store.create({ ...place, ...at }, doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: elementName(element.clip) });
+  const frameId = await store.create({ ...place, ...at }, doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: elementName(element.clip) });
   const clipId = doc.tracks.flatMap((t) => t.clips)[0]?.id ?? element.clip.id;
   return { frameId, clipId, created: true, version: 1, undo: [created(frameId, at)], rollback: () => store.remove(frameId) };
 }
@@ -208,8 +213,6 @@ export async function landElement(store: FrameStore, from: StoredFrame & { right
   return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
 }
 
-const emptied = (source: StoredFrame, doc: MotionDoc) => !frameChrome(source.kind ?? FrameKind.Frame).takesDrops && doc.tracks.every((t) => t.clips.length === 0);
-
 function landOut(store: FrameStore, source: StoredFrame, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, box: Box | null): Promise<Landing> {
   const mode = docMode(source.doc);
   return source.stage ? landFree(store, source, element, drop, mode, box, source.stage) : landOnCanvas(store, source, element, drop, mode, box);
@@ -243,7 +246,7 @@ export async function moveElement(store: FrameStore, ask: MoveAsk): Promise<Move
     return landing;
   }
 
-  if (emptied(source, lifted.doc)) {
+  if (leftEmpty(source.kind ?? FrameKind.Frame, lifted.doc)) {
     await store.remove(source.nodeId);
     return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: [...landing.undo, deleted(source)] };
   }
@@ -360,6 +363,18 @@ export async function placeOutput(store: FrameStore, ask: OutputAsk): Promise<Mo
   return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
 }
 
+export async function placeMedia(store: FrameStore, output: Output, drop: Extract<Drop, { on: DropOn.Frame }>): Promise<Moved> {
+  const target = await targetOf(store, drop);
+  if (!target || !('doc' in target)) {
+    return target ?? refused(MoveOutcome.NotFound);
+  }
+  const landing = await landInFrame(store, target, mediaElement(output, target.doc.fps), drop, SUMMARY.pasted);
+  if (!isLanding(landing)) {
+    return landing;
+  }
+  return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: false, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
+}
+
 async function linkFrame(store: FrameStore, ask: { sourceNodeId: string; frameNodeId: string }): Promise<Moved> {
   const [found, frame] = await Promise.all([store.output(ask.sourceNodeId), store.read(ask.frameNodeId)]);
   if (!frame) {
@@ -453,10 +468,10 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
       const saved = await savedMotion(db, { orgId, nodeId });
       return inScope(saved ? { nodeId, projectId: saved.project.id, canvasId: saved.record.canvasId, version: saved.version, doc: saved.doc, kind: saved.node.kind, stage: stageOf(saved.record, saved.doc), row: rowOf(saved.record), at: { x: saved.record.position.x, y: saved.record.position.y } } : null);
     },
-    write: (nodeId, expectedVersion, doc, summary) => saveMotionDoc(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
+    write: (nodeId, expectedVersion, doc, summary) => commitOnto(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
     create: async (at, doc, shape) => {
-      const { data, ...size } = shape ?? frameShape(doc);
-      const node = await createNode(db, { id: at.id, orgId, projectId: at.projectId, canvasId: at.canvasId, type: 'motion', x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...size, data: { ...atFirstRevision(data), format: formatOf(doc) }, actor });
+      const { type, data, ...size } = shape ?? frameShape(doc);
+      const node = await createNode(db, { id: at.id, orgId, projectId: at.projectId, canvasId: at.canvasId, type, x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...size, data: { ...atFirstRevision(data), format: formatOf(doc) }, actor });
       await appendRevision(db, { orgId, nodeId: node.id, expectedVersion: 0, doc, actor, summary: SUMMARY.movedIn });
       return node.id;
     },
@@ -511,12 +526,24 @@ export function frameRequest(store: FrameStore, ask: z.infer<typeof frameRequest
 
 export const canvasBoxSchema = z.object({ left: z.number().finite(), top: z.number().finite(), width: z.number().positive(), height: z.number().positive() }).strict();
 
-export const drawnSchema = z.discriminatedUnion('tool', [
-  z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional(), sizing: z.enum(TEXT_SIZINGS).optional() }).strict(),
-  z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(1).max(20_000) }).strict()
+const PASTED_TEXT_MAX = 5000;
+const PASTED_WEIGHT = { min: 100, max: 1000 };
+const hexColour = z.string().regex(/^#[0-9a-f]{6}$/i);
+
+const drawnBox = z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse, DrawTool.Polygon, DrawTool.Star]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional(), sizing: z.enum(TEXT_SIZINGS).optional() }).strict();
+const drawnPen = z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(1).max(20_000) }).strict();
+
+const canvasPoint = z.object({ x: z.number().finite(), y: z.number().finite() }).strict();
+const drawnLine = z.object({ tool: z.enum([DrawTool.Line, DrawTool.Arrow]), from: canvasPoint, to: canvasPoint, stroke: hexColour.optional(), theme: z.enum(CanvasTheme).optional() }).strict();
+
+export const drawnSchema = z.discriminatedUnion('tool', [drawnBox, drawnPen, drawnLine]);
+
+export const pastedSchema = z.discriminatedUnion('tool', [
+  drawnBox.extend({ text: z.string().min(1).max(PASTED_TEXT_MAX).optional(), color: hexColour.optional(), weight: z.number().int().min(PASTED_WEIGHT.min).max(PASTED_WEIGHT.max).optional() }),
+  drawnPen.extend({ fill: hexColour.nullable().optional(), stroke: hexColour.nullable().optional(), gradient: gradientFillSchema.optional(), fillRule: z.enum(FILL_RULES).optional() })
 ]);
 
-export async function drawElement(store: FrameStore, place: Place & { id?: string }, wire: z.infer<typeof drawnSchema>): Promise<Moved> {
+export async function drawElement(store: FrameStore, place: Place & { id?: string }, wire: z.infer<typeof pastedSchema>): Promise<Moved> {
   const drawn = drawnOf(wire);
   if (typeof drawn === 'string') {
     return refused(MoveOutcome.Invalid, drawn);
@@ -529,7 +556,7 @@ export async function drawElement(store: FrameStore, place: Place & { id?: strin
   const shaped = elementNodeOf(made.box);
   const at = { x: made.box.left, y: made.box.top };
   const first = made.doc.tracks.flatMap((t) => t.clips)[0];
-  const frameId = await store.create({ ...place, ...at }, made.doc, { data: shaped.data, width: shaped.w, height: shaped.h, ...(first ? { displayName: elementName(first) } : {}) });
+  const frameId = await store.create({ ...place, ...at }, made.doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, ...(first ? { displayName: elementName(first) } : {}) });
   const clipId = first?.id ?? '';
   return { outcome: MoveOutcome.Done, frameId, clipId, created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
 }
@@ -537,8 +564,38 @@ export async function drawElement(store: FrameStore, place: Place & { id?: strin
 export async function drawFrameAt(store: FrameStore, place: Place & { id?: string }, box: CanvasBox, format?: MotionFormat, stillSeconds?: number): Promise<Extract<Moved, { outcome: MoveOutcome.Done }>> {
   const shaped = drawnFrameNodeOf(box);
   const at = { x: box.left, y: box.top };
-  const frameId = await store.create({ ...place, ...at }, drawnFrame(box, format, stillSeconds), { data: shaped.data, width: shaped.w, height: shaped.h });
+  const frameId = await store.create({ ...place, ...at }, drawnFrame(box, format, stillSeconds), { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h });
   return { outcome: MoveOutcome.Done, frameId, clipId: '', created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
+}
+
+export type FigmaFill = { nodeId: string; images: FigmaImage[] };
+
+export type FigmaPasteOutcome = { outcome: MoveOutcome.Done; frameIds: string[]; undo: UndoItem[]; skipped: string[]; fills: FigmaFill[]; fileKey: string | null } | null;
+
+const ITEM_SHAPE: Record<Destination, (item: PlanItem) => DocNodeShape> = {
+  [Destination.Frame]: (item) => drawnFrameNodeOf(item.size),
+  [Destination.Free]: (item) => elementNodeOf(item.size, item.kind)
+};
+
+export async function pasteFigmaAt(store: FrameStore, place: Place, html: string, centre: Point, newId: NewId): Promise<FigmaPasteOutcome> {
+  const plan = figmaPlan(html, newId);
+  if (!plan) {
+    return null;
+  }
+  const frameIds: string[] = [];
+  const undo: UndoItem[] = [];
+  const fills: FigmaFill[] = [];
+  for (const item of plan.items) {
+    const shaped = ITEM_SHAPE[item.destination](item);
+    const at = { x: Math.round(centre.x + item.centre.x - item.size.width / 2), y: Math.round(centre.y + item.centre.y - item.size.height / 2) };
+    const frameId = await store.create({ ...place, ...at }, item.doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: item.name });
+    frameIds.push(frameId);
+    undo.push(created(frameId, at));
+    if (item.images.length) {
+      fills.push({ nodeId: frameId, images: item.images });
+    }
+  }
+  return { outcome: MoveOutcome.Done, frameIds, undo, skipped: plan.skipped, fills, fileKey: plan.fileKey };
 }
 
 export async function canvasFrameInputs<T extends FrameLine>(db: Db, scope: { orgId: string; actor: Actor; projectId: string }, nodes: Array<{ id: string; type: string }>, lines: T[]): Promise<T[]> {

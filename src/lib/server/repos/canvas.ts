@@ -202,6 +202,14 @@ export async function renameCanvas(
   return data ? toCanvas(data) : null;
 }
 
+export async function canvasProject(db: Db, input: { orgId: string; canvasId: string }): Promise<string | null> {
+  const { data, error } = await db.from('canvases').select('project_id').eq('id', input.canvasId).eq('org_id', input.orgId).is('deleted_at', null).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return data?.project_id ?? null;
+}
+
 /** Soft delete: nodi, archi e post_sources sopravvivono — un post pubblicato tiene la sua origine. */
 export async function deleteCanvas(db: Db, input: { orgId: string; canvasId: string }): Promise<void> {
   const { error } = await db
@@ -348,6 +356,7 @@ export async function createNode(
     type: string;
     x: number;
     y: number;
+    z?: number;
     displayName?: string | null;
     data?: Record<string, unknown>;
     width?: number;
@@ -369,6 +378,7 @@ export async function createNode(
     display_name: input.displayName ?? null,
     x: input.x,
     y: input.y,
+    ...(input.z === undefined ? {} : { z: input.z }),
     data: input.data ?? {},
     ...(input.width === undefined ? {} : { width: input.width }),
     ...(input.height === undefined ? {} : { height: input.height }),
@@ -417,6 +427,18 @@ export async function moveNode(
     throw error;
   }
   return data ? toNode(data) : null;
+}
+
+export async function renameNode(db: Db, input: { orgId: string; nodeId: string; name: string | null }): Promise<void> {
+  const { error } = await db
+    .from('nodes')
+    .update({ display_name: input.name, updated_at: new Date().toISOString() })
+    .eq('id', input.nodeId)
+    .eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function resizeNode(

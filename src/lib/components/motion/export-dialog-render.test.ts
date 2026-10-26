@@ -3,18 +3,18 @@ import { render } from 'svelte/server';
 import ExportDialog from './ExportDialog.svelte';
 import EmbedView from './EmbedView.svelte';
 import { ExportMode } from './export-mode';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { RenderQueue } from '$lib/motion/server-render';
 import { Reaction } from '$lib/motion/interactive/summary';
-import { DEFAULT_INTERACTIVE, PlayMode } from '$lib/motion/interactive/settings';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { DEFAULT_INTERACTIVE, PlayMode } from '@feega/motion-core/motion/interactive/settings';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
-import { ComponentMode } from '$lib/motion/custom/component';
+import { ComponentMode } from '@feega/motion-core/motion/custom/component';
 
 const doc = newMotionDoc(MotionFormat.Landscape);
 
-function dialog(start: ExportMode | null = null, shown = doc) {
+function dialog(start: ExportMode | null = null, shown = doc, images: { count: number; onexport: () => Promise<string> } | null = null) {
   return render(ExportDialog, {
     props: {
       doc: shown,
@@ -26,6 +26,7 @@ function dialog(start: ExportMode | null = null, shown = doc) {
       server: { configured: true, version: 1, saved: true, latest: null, queue: RenderQueue.Ticking, assetHref: (id: string) => `/a/${id}` },
       tokens: FEEGA_TOKENS,
       opening: start,
+      images,
       onclose: () => {}
     }
   }).body;
@@ -74,6 +75,19 @@ describe('the export dialog asks what you want first', () => {
     expect(body).toContain('data-testid="export-quote"');
   });
 
+  it('offers image files only when the host can draw them', () => {
+    expect(dialog()).not.toContain('data-testid="export-mode-images"');
+    expect(dialog(null, doc, { count: 1, onexport: async () => 'no' })).toContain('data-testid="export-mode-images"');
+  });
+
+  it('the image path lists the size rows of the canvas export', () => {
+    const body = dialog(ExportMode.Images, doc, { count: 1, onexport: async () => 'no' });
+
+    expect(body).toContain('data-testid="export-row"');
+    expect(body).toContain('data-testid="export-go"');
+    expect(body).not.toContain('data-testid="export-format"');
+  });
+
   it('the embed path mounts the interactive export', () => {
     expect(dialog(ExportMode.Interactive)).toContain('data-testid="interactive-export"');
   });
@@ -98,6 +112,14 @@ describe('the embed path discloses step by step', () => {
     expect(body).toContain('data-testid="interactive-republish"');
     expect(body).toContain('data-testid="interactive-unpublish"');
     expect(body).not.toContain('data-testid="interactive-publish"');
+  });
+
+  it('once published: a link to a clean viewer of this frame, only when the host can make one', () => {
+    const published = { hosted: { published: true, url: 'https://feega.app/e/n' }, hostedSnippet: '<feega-motion src="n"></feega-motion>' };
+
+    expect(embed({ ...published, onlink: async () => null })).toContain('data-testid="interactive-copy-link"');
+    expect(embed(published)).not.toContain('data-testid="interactive-copy-link"');
+    expect(embed({ onlink: async () => null })).not.toContain('data-testid="interactive-copy-link"');
   });
 
   it('once published: the same video in a React or Flutter app', () => {

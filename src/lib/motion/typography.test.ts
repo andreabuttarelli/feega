@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, setKeyframes, setProps, type OpResult } from './timeline';
-import { FEEGA_TOKENS } from './brand';
-import { composeHtml } from './hyperframes/compose';
-import { setExpression } from './expression/ops';
-import { fitSize } from './hyperframes/fit-runtime';
-import { googleFontsUrl, usedFaces, type CatalogueFont } from './fonts/model';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
+import { fitSize } from '@feega/motion-core/motion/hyperframes/fit-runtime';
+import { googleFontsUrl, usedFaces, type CatalogueFont } from '@feega/motion-core/motion/fonts/model';
 import { setFont } from './fonts/ops';
 
 const CATALOGUE: CatalogueFont[] = [

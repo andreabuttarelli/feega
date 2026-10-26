@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { COMPONENTS } from '../components';
-import { Ease } from '../design';
-import { MotionFormat, findClip, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
-import { keyframesProblem } from '../keyframes';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { composeHtml } from '../hyperframes/compose';
-import { PARTICLE_STATE, particleBake } from '../hyperframes/particles';
-import { MAX_GLOW_PX, MIN_GLOW_PX, PARTICLE_STRIDE, drawParticles, glowTiles, particleQuads, particlesAt, type Particle, type ParticleBake } from './simulate';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { keyframesProblem } from '@feega/motion-core/motion/keyframes';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { PARTICLE_STATE, particleBake } from '@feega/motion-core/motion/hyperframes/particles';
+import { MAX_GLOW_PX, MIN_GLOW_PX, PARTICLE_STRIDE, drawParticles, glowTiles, particleQuads, particlesAt, type Particle, type ParticleBake } from '@feega/motion-core/motion/particles/simulate';
 import { PARTICLE_PRESETS, ParticlePreset, applyParticlePreset, PRESET_PROPS } from './presets';
-import { Emitter } from './model';
+import { Emitter } from '@feega/motion-core/motion/particles/model';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

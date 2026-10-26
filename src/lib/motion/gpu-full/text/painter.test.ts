@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENTS } from '../../components';
-import { boxOf } from '../../layout';
-import { FillType } from '../../fill/model';
-import { apply2d } from '../../affine';
-import { paintText, Smoothing, TextGap, TextOutput, type Ink, type TextComponent, type TextEnv } from './painter';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { boxOf } from '@feega/motion-core/motion/layout';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { apply2d } from '@feega/motion-core/motion/affine';
+import { paintText, Smoothing, TextGap, TextOutput, type Ink, type TextComponent, type TextEnv } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { boxBook, boxFace } from './test-face';
-import type { Face } from './face';
-import { FillRule, PaintKind, type Paint } from '../paint';
-import { animatorSchema, AnimatorUnit, SelectorShape } from '../../text-animators/model';
+import type { Face } from '@feega/motion-core/motion/gpu-full/text/face';
+import { FillRule, PaintKind, type Paint } from '@feega/motion-core/motion/gpu-full/paint';
+import { animatorSchema, AnimatorUnit, SelectorShape } from '@feega/motion-core/motion/text-animators/model';
 
 const stage = { width: 1920, height: 1080 };
 const FPS = 30;
@@ -240,19 +240,18 @@ describe('paintText', () => {
     const inksOf = (props: Record<string, unknown>, change: Partial<TextEnv> = {}) => drawn(paintText(env('Text', { text: 'aa', align: 'left', ...props }, change)));
     const solid = (color: string, blend = 'normal') => ({ type: FillType.Solid, color, blend });
 
-    it('draws a diamond as four linear quadrants meeting at the centre', () => {
+    it('draws a diamond as one diamond paint over the glyphs', () => {
       const inks = inksOf({ fills: [{ type: FillType.Diamond, stops }] });
 
-      expect(inks).toHaveLength(4);
-      expect(inks.every((i) => i.paint.kind === PaintKind.Linear)).toBe(true);
+      expect(inks.map((i) => i.paint.kind)).toEqual([PaintKind.Diamond]);
     });
 
-    it('draws an angular gradient as thin wedges, black just after where it starts', () => {
+    it('draws an angular gradient as one sweep starting at the top, as CSS conic does', () => {
       const inks = inksOf({ fills: [{ type: FillType.Angular, angle: 0, center: { x: 0.5, y: 0.5 }, stops }] });
-      const first = inks[0].paint as Extract<Paint, { kind: PaintKind.Linear }>;
+      const [sweep] = inks.map((i) => i.paint as Extract<Paint, { kind: PaintKind.Sweep }>);
 
-      expect(inks.length).toBeGreaterThan(8);
-      expect(first.stops[0].color[0]).toBeLessThan(0.05);
+      expect(inks).toHaveLength(1);
+      expect(sweep.start).toBeCloseTo(-Math.PI / 2);
     });
 
     it('blends solid layers into one colour like background-blend-mode', () => {

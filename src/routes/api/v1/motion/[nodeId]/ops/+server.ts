@@ -7,8 +7,6 @@ import { runEditorAction } from '$lib/server/edit/runners';
 import { z } from 'zod';
 import type { RequestHandler } from './$types';
 
-export const config = { maxDuration: 60, memory: 2048 };
-
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
 const DESCRIBE_OP = 'describe';

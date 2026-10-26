@@ -50,13 +50,7 @@ Gli endpoint che spendono AI richiedono **piano a pagamento + crediti** e scope 
 
 | Endpoint | Azione |
 |---|---|
-| `POST /brands/:slug/posts/:id/render` | Render immagine singola |
-| `POST /brands/:slug/ads/remix` | Remix brief da ad competitor |
-| `POST /brands/:slug/media/generate` | Genera media (immagine o video) |
-| `POST /brands/:slug/media/images` | Genera immagine |
-| `POST /brands/:slug/media/videos` | Genera video |
-| `POST /brands/:slug/media/carousel` | Genera carosello |
-| `POST /brands/:slug/media/refine` | Modifica un asset esistente |
+| `POST /brands/:slug/prompts/enhance` | Migliora un prompt |
 
 **Non gated, di proposito**: `POST /brands/:slug/billing/portal` e
 `POST /brands/:slug/billing/checkout` ([10-billing](10-billing.md)) non chiamano `gateAiAction` e
@@ -67,23 +61,17 @@ checkout. Restano scope `write`: il link porta anche a un bottone di disdetta.
 
 - Successo: `200` (o `201` per creazione key), quasi sempre con `{"ok": true, …}`.
 - Errore applicativo: body `{"error": "<messaggio>"}` con status 4xx/5xx. I messaggi sono stringhe stabili
-  (es. `post_not_found`, `unknown_action`, `no_credits`) su cui i client possono fare match.
+  (es. `unknown_action`, `no_credits`) su cui i client possono fare match.
 - Le risposte che includono dati AI (piani, strategie, review, captions) sono **dinamiche**: i campi
   sono stabili, i valori no.
 - I POST con `action` usano `{"error":"Unknown action: <x>"}` per azioni non riconosciute.
-
-## Timezone e date
-
-- `scheduled_for` accettato senza offset viene interpretato nel **timezone del brand**; con `Z`/`±hh:mm` viene rispettato.
-- Le risposte usano ISO 8601 UTC.
 
 ## Pagine del reference
 
 | Pagina | Area |
 |---|---|
-| [02 — Brand core](02-brands-core.md) | `brands`, detail, calendar, publishing, media |
-| [03 — Posts](03-posts.md) | Lista, edit, approve, publish, reschedule, render, revoke |
-| [08 — Ads e gestione](08-ads-voice-gtm-misc.md) | Ads, remix, products, api-keys |
+| [02 — Brand core](02-brands-core.md) | `brands`, detail, media |
+| [08 — Prodotti e API key](08-products-api-keys.md) | products, api-keys |
 
 ## Note
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
 
@@ -85,7 +85,7 @@ describe('POST /api/v1/edit routes one op or a batch to the registry that owns i
   it('describe lists the ops, and a missing op is refused', async () => {
     const listed = await (await post({ op: 'describe' })).json();
 
-    expect(listed.ops.length).toBeGreaterThan(200);
+    expect(listed.families.reduce((n: number, f: { ops: number }) => n + f.ops, 0)).toBeGreaterThan(200);
     expect((await post({})).status).toBe(400);
   });
 });

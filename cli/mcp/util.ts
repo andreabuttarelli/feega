@@ -8,7 +8,7 @@ export type ToolResult = {
 };
 
 export function ok(data: unknown): ToolResult {
-  const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  const text = typeof data === 'string' ? data : JSON.stringify(data);
   const structured =
     data !== null && typeof data === 'object' && !Array.isArray(data)
       ? (data as Record<string, unknown>)
@@ -17,6 +17,10 @@ export function ok(data: unknown): ToolResult {
     content: [{ type: 'text', text }],
     structuredContent: structured,
   };
+}
+
+export function okText(data: unknown): ToolResult {
+  return { content: [{ type: 'text', text: JSON.stringify(data) }] };
 }
 
 export function fail(message: string): ToolResult {

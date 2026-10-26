@@ -8,6 +8,12 @@ import { vercelAnalyticsDefine } from './scripts/vercel-analytics';
 import { devCrons } from './scripts/dev-crons';
 import { motionBundles } from './scripts/motion-bundles';
 import { motionLibs } from './scripts/motion-libs';
+import { changelogEntries } from './scripts/changelog-entries';
+
+const libsSource = async (id: string): Promise<string | null> => {
+  const load = motionLibs().load as (id: string) => Promise<string | null>;
+  return load(`\0${id}`);
+};
 
 /** Worktree `node_modules` is often a symlink into another checkout; Vite resolves it and
  *  rejects the real path unless it is on the allow list. */
@@ -44,8 +50,10 @@ const hmr = process.env.NO_HMR === '1' || process.env.NO_HMR === 'true' ? false 
 const TEST_TIMEOUT_MS = 120_000;
 
 const AGENT_WORKTREES = '**/.claude/worktrees/**';
+const OWN_DEPS_CACHE = '.vite-deps';
 
 export default defineConfig({
+  cacheDir: OWN_DEPS_CACHE,
   server: {
     hmr,
     fs: { allow: ['..', ...(nodeModulesReal ? [nodeModulesReal] : [])] },
@@ -57,8 +65,8 @@ export default defineConfig({
     org: "021-6z",
     project: "021-1m",
     autoInstrument: { load: false, serverLoad: true }
-  }), sveltekit(), tailwindcss(), devCrons(), motionBundles(), motionLibs()],
-  worker: { format: 'es', plugins: () => [motionBundles(), motionLibs()] },
+  }), sveltekit(), tailwindcss(), devCrons(), motionBundles(libsSource), motionLibs(), changelogEntries()],
+  worker: { format: 'es', plugins: () => [motionBundles(libsSource), motionLibs()] },
   // Modern baselines: skip legacy transforms (e.g. Array.from) that PSI flags as unused
   // on current Chrome/Safari/Firefox. Aligns with "Baseline widely available" guidance.
   build: {
@@ -73,6 +81,7 @@ export default defineConfig({
     // traces there were already minified. Want symbolication back? Set SENTRY_AUTH_TOKEN
     // first, then flip this to 'hidden'.
     sourcemap: false,
+    reportCompressedSize: false,
     rollupOptions: {
       // c2pa-node signs Content Credentials and is DELIBERATELY NOT INSTALLED: its 38 MB native
       // binary took the Vercel function past the 250 MB uncompressed limit, to carry a feature

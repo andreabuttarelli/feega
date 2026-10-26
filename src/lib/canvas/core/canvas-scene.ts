@@ -1,8 +1,8 @@
-import { mul2d, type Affine } from '$lib/motion/affine';
-import { BlendMode } from '$lib/motion/blend';
-import { ItemKind, type DisplayList, type Item, type Linear, type PathItem, type Scissor } from '$lib/motion/gpu-full/display-list';
-import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
-import type { Rgba } from '$lib/motion/gpu-full/rgba';
+import { apply2d, mul2d, type Affine } from '@feega/motion-core/motion/affine';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { ItemKind, type DisplayList, type Item, type Linear, type PathItem, type Scissor } from '@feega/motion-core/motion/gpu-full/display-list';
+import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
+import type { Rgba } from '@feega/motion-core/motion/gpu-full/rgba';
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Screen } from '$lib/canvas/gpu/camera';
 
@@ -43,7 +43,8 @@ function placed(item: Item, m: Affine, rect: Scissor, scale: number): Item {
     ...(masks ? { masks } : {}),
     ...(matte ? { matte } : {}),
     ...(item.kind === ItemKind.Group ? { items: item.items.map((i) => placed(i, m, rect, scale)) } : {}),
-    ...(item.space ? { space: linearThrough(m, item.space) } : {})
+    ...(item.space ? { space: linearThrough(m, item.space) } : {}),
+    ...(item.origin ? { origin: apply2d(m, item.origin) as [number, number] } : {})
   };
 }
 

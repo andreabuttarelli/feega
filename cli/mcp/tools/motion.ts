@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { awaitRun, motionApi } from '../../lib/motion.ts';
-import { requireAuth, withAuth, fail, type ToolResult } from '../util.ts';
+import { requireAuth, withAuth, fail, okText, type ToolResult } from '../util.ts';
 import { MAX_ATTACHMENTS } from '../../lib/attachments.ts';
 
 const MAX_FRAMES = 6;
 const MAX_FRAME_WIDTH = 960;
 
-const EDITOR_READS = 'editor_session {briefIds?} (everything the editor page loads: head, assets, tokens, templates, render state, gallery), read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render), list_fonts {} (uploaded font families of the org, with their files)';
+const EDITOR_READS = 'editor_session {briefIds?} (everything the canvas loads for a frame: head, assets, tokens, templates, render state, gallery), read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render), list_fonts {} (uploaded font families of the org, with their files)';
 const EDITOR_WRITES =
   'save_doc {version,doc,summary?} (whole doc; 409 answers the head), apply_ops {version,ops,summary?} (doc ops, rebased on newer edits), ' +
   'record_export {path,width,height,seconds} (an mp4 already in storage becomes the render asset), upload_font {path} (a TTF, OTF, WOFF or WOFF2 already in canvas-assets under the org fonts folder; joins the org library), rename_font {family,to}, delete_font {family}, analyze_sounds {assetIds} (tempo, beats, speech), ' +
@@ -90,7 +90,7 @@ export function registerMotionTools(server: McpServer) {
       description:
         'Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link ' +
         '(expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file ' +
-        'to the project. Show the link to the user. `mode: "server"` renders on the farm, the same path and credit gate as the editor Render button; while server rendering is closed for everyone it answers 403 `server_render_unavailable`. ' +
+        'to the project. Show the link to the user. With no user, open `headless_url` in any headless Chromium: it starts with no click; keep it open until `get_render` says done. `mode: "server"` renders on the farm, the same path and credit gate as the editor Render button; while server rendering is closed for everyone it answers 403 `server_render_unavailable`. ' +
         'A live component (a game or generative piece) cannot be seeked: the video shows a still of it; publish it as an embed instead. ' +
         'Poll `get_render` with the `run_id` for the file.',
       inputSchema: z.object({
@@ -98,24 +98,36 @@ export function registerMotionTools(server: McpServer) {
         node_id: z.string(),
         mode: z.enum(['browser', 'server']).optional(),
         resolution: z.enum(['720p', '1080p', '1440p', '2160p']).optional(),
-        format: z.string().optional().describe('server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif'),
+        format: z.string().optional().describe('server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif, apng'),
         quality: z.enum(['standard', 'high', 'max']).optional(),
-        fps: z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60)]).optional()
+        fps: z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60), z.literal(120)]).optional().describe('120 renders on our servers only'),
+        gif: z.object({ loop: z.enum(['forever', 'once', 'boomerang']).optional(), fps: z.number().int().min(8).max(30).optional(), width: z.number().int().min(64).max(1920).optional() }).optional().describe('format gif only: loop forever (default), once or boomerang; fps 8-30 (15); width 64-1920 px (640); the video can be up to 30 s')
       }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
-    async ({ org, node_id, mode, resolution, format, quality, fps }) => withAuth((token) => motionApi.render(token, node_id, { mode, resolution, format, quality, fps }, org))
+    async ({ org, node_id, mode, resolution, format, quality, fps, gif }) => withAuth((token) => motionApi.render(token, node_id, { mode, resolution, format, quality, fps, gif }, org))
   );
 
   server.registerTool(
     'get_render',
     {
       title: 'Read a render',
-      description: 'State of a `render_video` run: `status` (running, done, failed, expired), `mode`, and when done `asset_id` and a signed `file_url` valid one hour. Reads only.',
+      description: 'State of a `render_video` run: `status` (running, done, failed, expired), and when done `asset_id` and a signed `file_url` valid one hour; `error` when failed. Reads only.',
       inputSchema: z.object({ org, run_id: z.string() }),
       annotations: { readOnlyHint: true }
     },
-    async ({ org, run_id }) => withAuth((token) => motionApi.renderState(token, run_id, org))
+    async ({ org, run_id }) => {
+      const auth = await requireAuth();
+      if (!auth.ok) {
+        return auth.result;
+      }
+      try {
+        const { status, asset_id, file_url, error } = await motionApi.renderState(auth.session.access_token, run_id, org);
+        return okText({ status, ...(asset_id ? { asset_id } : {}), ...(file_url ? { file_url } : {}), ...(error ? { error } : {}) });
+      } catch (e) {
+        return fail(e instanceof Error ? e.message : String(e));
+      }
+    }
   );
 
   server.registerTool(
@@ -281,7 +293,7 @@ export function registerMotionTools(server: McpServer) {
       description:
         'The motion videos (`motion` canvas nodes) of the org, newest first, optionally of one project: `node_id`, `name`, ' +
         '`project_id`, `canvas_id`, `format`, saved revision `version` (0 = empty), signed `poster_url` and `last_render_url` ' +
-        '(one hour, null when none) and `editor_url`. Use it to find the `node_id` the other motion tools take. Reads only.',
+        '(one hour, null when none) and `editor_url` (the canvas with the frame selected). Use it to find the `node_id` the other motion tools take. Reads only.',
       inputSchema: z.object({ org, project_id: z.string().optional() }),
       annotations: { readOnlyHint: true }
     },
@@ -335,13 +347,27 @@ export function registerMotionTools(server: McpServer) {
         const { frames, ...notes } = await motionApi.frames(auth.session.access_token, node_id, { times, width }, org);
         const shown = { ...notes, times: frames.map((f) => f.time) };
         return {
-          content: [{ type: 'text', text: JSON.stringify(shown, null, 2) }, ...frames.map((f) => ({ type: 'image' as const, data: f.data, mimeType: f.mime }))],
+          content: [{ type: 'text', text: JSON.stringify(shown) }, ...frames.map((f) => ({ type: 'image' as const, data: f.data, mimeType: f.mime }))],
           structuredContent: shown
         };
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }
     }
+  );
+
+  server.registerTool(
+    'share_motion_frame',
+    {
+      title: 'Share one frame as a link',
+      description:
+        'Create the public viewer link of ONE frame: a clean full-screen page that plays it on a loop, with tap to play and swipe between the canvas\'s shared frames on a phone. ' +
+        'Publishes the frame\'s web embed if needed and turns the canvas share link on; returns `url` (the viewer) and `embed_url`. ' +
+        'Turning the canvas share off kills every frame link. Videos from an uncensored project are refused (403, `refusal`). Free.',
+      inputSchema: z.object({ org, node_id: z.string() }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true }
+    },
+    async ({ org, node_id }) => withAuth((token) => motionApi.share(token, node_id, org))
   );
 
   server.registerTool(

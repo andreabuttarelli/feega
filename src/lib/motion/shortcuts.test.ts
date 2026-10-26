@@ -320,3 +320,14 @@ describe('plain-letter tools in Design mode', () => {
     expect(motion('p')).toBe(Command.RevealPosition);
   });
 });
+
+describe('opacity keys', () => {
+  it('digits set the opacity in 10% steps and 0 means 100%', () => {
+    expect(commandFor({ key: '3', code: 'Digit3', mod: false, shift: false }, EditMode.Design)).toBe(Command.Opacity30);
+    expect(commandFor({ key: '0', code: 'Digit0', mod: false, shift: false }, EditMode.Design)).toBe(Command.Opacity100);
+  });
+
+  it('digits do nothing in Motion mode', () => {
+    expect(commandFor({ key: '3', code: 'Digit3', mod: false, shift: false }, EditMode.Motion)).toBeNull();
+  });
+});

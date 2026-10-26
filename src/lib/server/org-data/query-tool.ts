@@ -24,11 +24,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { ORG_TABLES, type OrgTable } from './tables';
 import { logAiCall } from '$lib/server/ai-log';
 
-export const QUERY_DEFAULT_ROWS = 20;
+export const QUERY_DEFAULT_ROWS = 10;
 export const QUERY_MAX_ROWS = 200;
-export const QUERY_MAX_CHARS = 60_000;
-export const QUERY_MAX_VALUE_CHARS = 2_000;
+export const QUERY_MAX_CHARS = 12_000;
+export const QUERY_MAX_VALUE_CHARS = 500;
 export const QUERY_MAX_DOC_CHARS = 40_000;
+export const QUERY_VERBOSE_MAX_CHARS = 60_000;
+export const QUERY_VERBOSE_MAX_VALUE_CHARS = 2_000;
 export const QUERY_ABORT_MS = 12_000;
 
 const IDENT = /^[a-z_][a-z0-9_]{0,62}$/;
@@ -69,6 +71,13 @@ const wireOp = (f: Filter): string => (f.negate ? `not.${f.op}` : f.op);
 
 const wireEmbed = (e: Embed): string =>
   `${e.table.trim()}(${e.columns?.length ? e.columns.map((c) => c.trim()).join(',') : '*'})`;
+
+export const cursorOf = (offset: number) => Buffer.from(String(offset)).toString('base64url');
+
+export const offsetOf = (cursor: string): number => {
+  const offset = Number(Buffer.from(cursor, 'base64url').toString());
+  return Number.isInteger(offset) && offset >= 0 ? offset : 0;
+};
 
 const asList = <T,>(v: T | T[] | undefined): T[] => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
@@ -142,8 +151,8 @@ export function createOrgQueryTool({ authority, orgId, userId, threadId, hidden 
           'drops whole rows to fit, and you get a short answer to a long question.',
         '',
         `CAPS, and every one that bites is named in \`limits\`: ${QUERY_DEFAULT_ROWS} rows by default, ` +
-          `${QUERY_MAX_ROWS} max, ${QUERY_MAX_CHARS} chars max, 8s statement timeout. When rows were ` +
-          `dropped, \`limits\` gives the \`offset\` that resumes exactly where it stopped.`,
+          `${QUERY_MAX_ROWS} max, ${QUERY_MAX_CHARS} chars max, values cut at ${QUERY_MAX_VALUE_CHARS}, 8s statement timeout. ` +
+          `\`verbose\` lifts the char caps. When more rows follow, \`next_cursor\` resumes exactly where it stopped: pass it as \`cursor\`.`,
         '',
         `This reads inside org ${orgId} only — every row you get back belongs to it, and a where ` +
           '`org_id` you pass yourself is ignored in favour of this org.',
@@ -182,6 +191,8 @@ export function createOrgQueryTool({ authority, orgId, userId, threadId, hidden 
             .optional(),
           embed: z.array(z.object({ table: z.string(), columns: z.array(z.string()).optional() })).optional(),
           offset: z.number().int().min(0).optional(),
+          cursor: z.string().optional().describe('`next_cursor` of the previous page.'),
+          verbose: z.boolean().optional().describe('Long values whole instead of cut, a bigger page budget.'),
           count: z.enum(['estimated', 'exact']).optional(),
           limit: z.number().int().positive().optional()
         })
@@ -193,6 +204,8 @@ export function createOrgQueryTool({ authority, orgId, userId, threadId, hidden 
         order?: Order | Order[];
         embed?: Embed[];
         offset?: number;
+        cursor?: string;
+        verbose?: boolean;
         count?: 'estimated' | 'exact';
         limit?: number;
       }) => {
@@ -286,7 +299,9 @@ export function createOrgQueryTool({ authority, orgId, userId, threadId, hidden 
         }
 
         const limit = Math.min(input.limit ?? QUERY_DEFAULT_ROWS, QUERY_MAX_ROWS);
-        const offset = Math.max(input.offset ?? 0, 0);
+        const offset = input.cursor ? offsetOf(input.cursor) : Math.max(input.offset ?? 0, 0);
+        const maxChars = input.verbose ? QUERY_VERBOSE_MAX_CHARS : QUERY_MAX_CHARS;
+        const rowValueCap = input.verbose ? QUERY_VERBOSE_MAX_VALUE_CHARS : QUERY_MAX_VALUE_CHARS;
         const countMode = input.count ?? 'estimated';
         const own = input.columns?.length ? input.columns.map((c) => c.trim()).join(',') : '*';
         const withEmbeds = (base: string) => [base, ...embeds.map(wireEmbed)].join(',');
@@ -323,14 +338,14 @@ export function createOrgQueryTool({ authority, orgId, userId, threadId, hidden 
         }
 
         const all = (data ?? []) as unknown as Array<Record<string, unknown>>;
-        const valueCap = all.length === 1 ? QUERY_MAX_DOC_CHARS : QUERY_MAX_VALUE_CHARS;
+        const valueCap = all.length === 1 ? QUERY_MAX_DOC_CHARS : rowValueCap;
         const rows: Array<Record<string, unknown>> = [];
         const cutCols = new Set<string>();
         let chars = 0;
         for (const r of all) {
           const { row, cut } = trimRow(r, valueCap);
           const size = JSON.stringify(row).length;
-          if (chars + size > QUERY_MAX_CHARS && rows.length > 0) break;
+          if (chars + size > maxChars && rows.length > 0) break;
           rows.push(row);
           for (const c of cut) cutCols.add(c);
           chars += size;
@@ -344,7 +359,7 @@ export function createOrgQueryTool({ authority, orgId, userId, threadId, hidden 
         );
         if (rows.length < all.length) {
           limits.push(
-            `Cut at ${QUERY_MAX_CHARS} chars: ${rows.length} of the ${all.length} rows the database returned are shown. Read the rest with offset: ${offset + rows.length}.`
+            `Cut at ${maxChars} chars: ${rows.length} of the ${all.length} rows the database returned are shown. Read the rest with offset: ${offset + rows.length}.`
           );
         } else if (total > offset + rows.length) {
           limits.push(`More rows follow: read them with offset: ${offset + rows.length}.`);
@@ -358,8 +373,9 @@ export function createOrgQueryTool({ authority, orgId, userId, threadId, hidden 
           limits.push(`Row total is the planner estimate — pass count: "exact" when the number is the answer.`);
         }
 
+        const more = rows.length < all.length || total > offset + rows.length;
         return finish(
-          { table, rows, returned: rows.length, total, limits: limits.join(' ') },
+          { table, rows, returned: rows.length, total, ...(more ? { next_cursor: cursorOf(offset + rows.length) } : {}), limits: limits.join(' ') },
           `org_db_query:${table}:cols=${input.columns?.length ?? 0}:where=${input.where?.length ?? 0}:rows=${rows.length}/${total}`
         );
       }

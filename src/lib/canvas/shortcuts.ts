@@ -1,53 +1,12 @@
-/**
- * LE SCORCIATOIE DELLA TELA — quale tasto significa cosa, e soprattutto QUANDO non significa
- * niente. Il riconoscimento sta qui, l'esecuzione resta di chi ha la tela: la stessa divisione di
- * `$lib/shortcuts.ts`, che è il registro globale del prodotto.
- *
- * DUE REGISTRI E NON UNO, di proposito. Quello globale decide dove si va (`g` + lettera, ⌘K); qui
- * si decide cosa si fa a ciò che è selezionato, e la differenza è che questi tasti hanno senso
- * solo mentre si guarda una tela. Metterli lassù vorrebbe dire una scheda di aiuto che elenca
- * «sposta la selezione» su ogni pagina del prodotto, dove una selezione non esiste.
- *
- * LA SCELTA DEI TASTI, e cosa è stato scartato:
- *
- *   Nessuna LETTERA NUDA. Il registro globale usa `g` come prefisso: dopo `g`, QUALUNQUE lettera
- *   è la seconda di una sequenza (`matchShortcut` lo dice esplicitamente). Una `d` nuda qui
- *   sarebbe «duplica» e insieme la seconda lettera di una `g d`, e a decidere sarebbe l'ordine in
- *   cui due ascoltatori su `window` ricevono lo stesso evento. Un gesto, due padroni: scartata.
- *
- *   DUPLICA/COPIA/INCOLLA su ⌘D/⌘C/⌘V, non su ⌘⇧D o una lettera nuda: sono i tasti che ogni altro
- *   programma usa per lo stesso gesto, e ⌘D che il browser legge come segnalibro non è mai in un
- *   campo di testo — qui `isTypingTarget` li spegne comunque, come ogni altra combinazione. La
- *   scrittura che rendeva questi tasti prematuri (una riga nuova nel database, non solo un disegno
- *   che sparisce alla prossima apertura) esiste ora in `duplicateNodes`.
- *
- *   Backspace e Delete per cancellare, com'è su ogni tela che esista. Il ritorno alla pagina
- *   precedente su Backspace è stato tolto da Chrome nel 2016 e non è mai esistito su Safari.
- *
- *   I NUMERI per aggiungere, nell'ordine in cui la barra mostra le voci: `1` è la prima. Una
- *   lettera per tipo (`t`/`i`/`v`/`p`) sarebbe più mnemonica e cadrebbe nella collisione con `g`.
- *
- * ESC NON SI INTERCETTA. Il registro globale lo dice esplicitamente: Esc lo gestisce ogni overlay
- * per sé, e un `preventDefault` centrale lo ruberebbe a menu, dropdown e campi. Qui si riconosce
- * come «deseleziona» — perché è quello che significa su una tela — ma `preventable` lo esclude,
- * così il menù del doppio clic continua a chiudersi con lo stesso tasto.
- *
- * PERCHÉ CANCELLARE NON CHIEDE CONFERMA. La conferma protegge da ciò che non si può disfare, e su
- * una tela il pentimento ha già la sua strada: il nodo si riaggiunge con un tasto, ed è lo stesso
- * gesto che l'ha creato. Una finestra modale a ogni Backspace costa un'interruzione su ogni
- * cancellazione voluta — che sono quasi tutte — per salvare quella sbagliata, che si ripara in un
- * secondo. Quello che questa scelta ESIGE è che il tasto non scatti mentre si scrive: è l'unico
- * caso in cui la cancellazione arriva senza essere stata chiesta, ed è il primo test del file.
- */
 import { isTypingTarget } from '$lib/shortcuts';
 import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { Command, commandFor } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
+import { FrameView } from './frame-view';
 
-/** Di quante unità di tela sposta una freccia, e quanto con Shift. */
-export const NUDGE_STEP = 8;
-export const NUDGE_STEP_BIG = 64;
+export const NUDGE_STEP = 1;
+export const NUDGE_STEP_BIG = 10;
 
 export type CanvasCommandId =
   | 'delete'
@@ -62,6 +21,10 @@ export type CanvasCommandId =
   | 'nudge'
   | 'align'
   | 'tidy'
+  | 'stack'
+  | 'edit-mode'
+  | 'section'
+  | 'delete-keep'
   | 'enter'
   | 'select-next'
   | 'select-previous'
@@ -73,41 +36,123 @@ export type CanvasCommandId =
   | 'group'
   | 'ungroup'
   | 'tool'
+  | 'comment'
   | 'bring-front'
-  | 'send-back';
+  | 'send-back'
+  | 'help'
+  | 'view';
 
-/**
- * Il comando riconosciuto. `add` e `nudge` portano con sé il loro argomento perché è il tasto a
- * deciderlo: `1` non è «aggiungi» più un parametro letto altrove, è «aggiungi un testo».
- */
 export type CanvasCommand =
   | { id: 'add'; what: Addable }
   | { id: 'nudge'; dx: number; dy: number }
   | { id: 'tool'; tool: DrawTool }
   | { id: 'align'; edge: Edge }
-  | { id: Exclude<CanvasCommandId, 'add' | 'nudge' | 'tool' | 'align'> };
+  | { id: 'view'; view: FrameView }
+  | { id: Exclude<CanvasCommandId, 'add' | 'nudge' | 'tool' | 'align' | 'view'> };
 
 const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolSelect]: DrawTool.Select,
   [Command.ToolText]: DrawTool.Text,
   [Command.ToolRectangle]: DrawTool.Rectangle,
   [Command.ToolEllipse]: DrawTool.Ellipse,
-  [Command.ToolPen]: DrawTool.Pen
+  [Command.ToolPolygon]: DrawTool.Polygon,
+  [Command.ToolStar]: DrawTool.Star,
+  [Command.ToolLine]: DrawTool.Line,
+  [Command.ToolArrow]: DrawTool.Arrow,
+  [Command.ToolPen]: DrawTool.Pen,
+  [Command.ToolPencil]: DrawTool.Pencil,
+  [Command.ToolShapeBuilder]: DrawTool.ShapeBuilder
 };
+
+const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
+  [Command.TogglePixelGrid]: FrameView.PixelGrid,
+  [Command.ToggleLayoutGuides]: FrameView.Guides,
+  [Command.ToggleOutlines]: FrameView.Outlines,
+  [Command.TogglePivot]: FrameView.Pivot
+};
+
+function viewFor(e: KeyboardEvent): FrameView | null {
+  const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
+  return command ? (VIEW_OF_COMMAND[command] ?? null) : null;
+}
+
+function sectionFor(e: KeyboardEvent): boolean {
+  return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.Section;
+}
+
+function stackFor(e: KeyboardEvent): boolean {
+  return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.AutoLayout;
+}
+
+function editModeFor(e: KeyboardEvent): boolean {
+  return commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey }) === Command.ToggleEditMode;
+}
 
 function toolFor(e: KeyboardEvent): DrawTool | null {
   const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey });
   return command ? (TOOL_OF_COMMAND[command] ?? null) : null;
 }
 
-const PASTE_MOD_KEYS: Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
+const nudgeBy = (dx: number, dy: number, step: number): CanvasCommand => ({ id: 'nudge', dx: dx * step, dy: dy * step });
 
-/** L'argomento di `add`, per chi ha in mano un comando e non sa ancora quale sia. */
+export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
+  [Command.Delete]: { id: 'delete' },
+  [Command.Duplicate]: { id: 'duplicate' },
+  [Command.Undo]: { id: 'undo' },
+  [Command.Redo]: { id: 'redo' },
+  [Command.Copy]: { id: 'copy' },
+  [Command.Group]: { id: 'group' },
+  [Command.Ungroup]: { id: 'ungroup' },
+  [Command.SelectAll]: { id: 'select-all' },
+  [Command.Deselect]: { id: 'deselect' },
+  [Command.SelectChild]: { id: 'enter' },
+  [Command.SelectNext]: { id: 'select-next' },
+  [Command.SelectPrevious]: { id: 'select-previous' },
+  [Command.BringToFront]: { id: 'bring-front' },
+  [Command.SendToBack]: { id: 'send-back' },
+  [Command.PreviewZoomIn]: { id: 'zoom-in' },
+  [Command.PreviewZoomOut]: { id: 'zoom-out' },
+  [Command.PreviewFit]: { id: 'fit' },
+  [Command.PreviewActual]: { id: 'zoom-actual' },
+  [Command.PreviewSelection]: { id: 'zoom-selection' },
+  [Command.Help]: { id: 'help' },
+  [Command.TidyUp]: { id: 'tidy' },
+  [Command.AutoLayout]: { id: 'stack' },
+  [Command.ToggleEditMode]: { id: 'edit-mode' },
+  [Command.Section]: { id: 'section' },
+  [Command.AlignLeft]: { id: 'align', edge: Edge.Left },
+  [Command.AlignCenter]: { id: 'align', edge: Edge.Center },
+  [Command.AlignRight]: { id: 'align', edge: Edge.Right },
+  [Command.AlignTop]: { id: 'align', edge: Edge.Top },
+  [Command.AlignMiddle]: { id: 'align', edge: Edge.Middle },
+  [Command.AlignBottom]: { id: 'align', edge: Edge.Bottom },
+  [Command.ToolSelect]: { id: 'tool', tool: DrawTool.Select },
+  [Command.ToolText]: { id: 'tool', tool: DrawTool.Text },
+  [Command.ToolRectangle]: { id: 'tool', tool: DrawTool.Rectangle },
+  [Command.ToolEllipse]: { id: 'tool', tool: DrawTool.Ellipse },
+  [Command.ToolPen]: { id: 'tool', tool: DrawTool.Pen },
+  [Command.ToolPencil]: { id: 'tool', tool: DrawTool.Pencil },
+  [Command.ToolShapeBuilder]: { id: 'tool', tool: DrawTool.ShapeBuilder },
+  [Command.TogglePixelGrid]: { id: 'view', view: FrameView.PixelGrid },
+  [Command.ToggleLayoutGuides]: { id: 'view', view: FrameView.Guides },
+  [Command.ToggleOutlines]: { id: 'view', view: FrameView.Outlines },
+  [Command.TogglePivot]: { id: 'view', view: FrameView.Pivot },
+  [Command.MoveLeft]: nudgeBy(-1, 0, NUDGE_STEP),
+  [Command.MoveRight]: nudgeBy(1, 0, NUDGE_STEP),
+  [Command.MoveUp]: nudgeBy(0, -1, NUDGE_STEP),
+  [Command.MoveDown]: nudgeBy(0, 1, NUDGE_STEP),
+  [Command.MoveLeftMore]: nudgeBy(-1, 0, NUDGE_STEP_BIG),
+  [Command.MoveRightMore]: nudgeBy(1, 0, NUDGE_STEP_BIG),
+  [Command.MoveUpMore]: nudgeBy(0, -1, NUDGE_STEP_BIG),
+  [Command.MoveDownMore]: nudgeBy(0, 1, NUDGE_STEP_BIG)
+};
+
+const PASTE_MOD_KEYS:Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
+
 export function addableOf(c: CanvasCommand): Addable | null {
   return c.id === 'add' ? c.what : null;
 }
 
-/** Di quanto spostare, in unità di tela. null se il comando non è uno spostamento. */
 export function nudgeOf(c: CanvasCommand): { dx: number; dy: number } | null {
   return c.id === 'nudge' ? { dx: c.dx, dy: c.dy } : null;
 }
@@ -121,18 +166,19 @@ const ARROWS: Record<string, { dx: number; dy: number }> = {
 
 const ZOOM_IN_KEYS = ['+', '='];
 
+const HELP_KEY = '?';
+const COMMENT_KEY = 'c';
+const MOD_KEY = 'mod';
+
 const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'> = { Digit0: 'zoom-actual', Digit1: 'fit', Digit2: 'zoom-selection' };
 
-/**
- * Da un evento al comando, o null. `null` non è «non so»: è «questo evento non è mio», e chi
- * ascolta deve lasciarlo passare intatto — dentro un campo di testo è l'unica risposta giusta.
- */
 const ALT_ALIGN: Record<string, Edge> = { KeyA: Edge.Left, KeyH: Edge.Center, KeyD: Edge.Right, KeyW: Edge.Top, KeyV: Edge.Middle, KeyS: Edge.Bottom };
 
 function altCommand(e: KeyboardEvent): CanvasCommand | null {
   if (isTypingTarget(e.target) || e.shiftKey) return null;
   const mod = e.metaKey || e.ctrlKey;
   if (mod) return e.code === 'KeyT' ? { id: 'tidy' } : null;
+  if (e.code === 'KeyR') return { id: 'view', view: FrameView.Pivot };
   const edge = ALT_ALIGN[e.code];
   return edge ? { id: 'align', edge } : null;
 }
@@ -140,26 +186,31 @@ function altCommand(e: KeyboardEvent): CanvasCommand | null {
 export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   if (e.altKey) return altCommand(e);
 
-  // Mentre si scrive nessun tasto è nostro, nemmeno quelli con modificatore: ⌘A dentro una
-  // textarea seleziona il testo, ed è quello che l'utente sta chiedendo.
   if (isTypingTarget(e.target)) return null;
 
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key;
 
+  const view = viewFor(e);
+  if (view) return { id: 'view', view };
+
   if (mod) {
-    // ⌘Z e ⇧⌘Z sono lo stesso tasto, e lo shift decide fra i due: va riconosciuto PRIMA del
-    // `return null` che lo shift porta per ogni altro comando con modificatore, o ⇧⌘Z non
-    // arriverebbe mai qui.
     if (key.toLowerCase() === 'z') return { id: e.shiftKey ? 'redo' : 'undo' };
     if (key.toLowerCase() === 'g') return { id: e.shiftKey ? 'ungroup' : 'group' };
+    if (key === 'Backspace' || key === 'Delete') return { id: 'delete-keep' };
     if (e.shiftKey) return null;
     if (key.toLowerCase() === 'a') return { id: 'select-all' };
     const command = PASTE_MOD_KEYS[key.toLowerCase()];
     if (command) return { id: command };
-    // Tutto il resto con modificatore è del browser o del registro globale (⌘K, ⌘,).
     return null;
   }
+
+  if (key === HELP_KEY) return { id: 'help' };
+  if (key === COMMENT_KEY) return { id: 'comment' };
+
+  if (stackFor(e)) return { id: 'stack' };
+  if (editModeFor(e)) return { id: 'edit-mode' };
+  if (sectionFor(e)) return { id: 'section' };
 
   const tool = toolFor(e);
   if (tool) return { id: 'tool', tool };
@@ -189,22 +240,12 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   return null;
 }
 
-/**
- * Questo comando può mangiarsi l'evento? Tutti sì tranne Esc, che appartiene agli overlay. Una
- * domanda e non un `if` dentro chi ascolta: chi esegue non deve ricordarsi l'eccezione.
- */
 export function preventable(c: CanvasCommand): boolean {
   return c.id !== 'deselect';
 }
 
 export type CanvasShortcutRow = { id: CanvasCommandId; keys: string[]; label: string };
 
-/**
- * La scheda che le elenca, DERIVATA dallo stesso elenco che i tasti usano: le voci di `add` sono
- * i tipi aggiungibili, nel loro ordine, quindi un quinto tipo compare qui da solo. Una lista
- * scritta a mano accanto al riconoscimento diverge al primo tasto cambiato, e a divergere è
- * sempre quella che l'utente legge.
- */
 export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   ...CANVAS_ADD_BAR.map((what, i) => ({
     id: 'add' as const,
@@ -212,13 +253,13 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
     label: `Add: ${ADDABLE_LABEL[what]}`
   })),
   { id: 'delete', keys: ['⌫'], label: 'Delete selection' },
-  { id: 'select-all', keys: ['mod', 'A'], label: 'Seleziona tutto' },
-  { id: 'deselect', keys: ['Esc'], label: 'Deseleziona' },
+  { id: 'select-all', keys: ['mod', 'A'], label: 'Select all' },
+  { id: 'deselect', keys: ['Esc'], label: 'Deselect' },
   { id: 'enter', keys: ['↵'], label: 'Select inside the frame' },
   { id: 'select-next', keys: ['Tab'], label: 'Select the next tile' },
   { id: 'select-previous', keys: ['⇧Tab'], label: 'Select the previous tile' },
   { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
-  { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Ripeti' },
+  { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Redo' },
   { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },
   { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P'], label: 'Select, text, box, ellipse, pen' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
@@ -226,13 +267,70 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'bring-front', keys: ['mod', ']'], label: 'Bring to front' },
   { id: 'send-back', keys: ['mod', '['], label: 'Send to back' },
   { id: 'copy', keys: ['mod', 'C'], label: 'Copy selection' },
-  { id: 'paste', keys: ['mod', 'V'], label: 'Incolla' },
+  { id: 'paste', keys: ['mod', 'V'], label: 'Paste' },
   { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
+  { id: 'stack', keys: ['⇧A'], label: 'Stack the selected tiles' },
+  { id: 'edit-mode', keys: ['E'], label: 'Design or Animate: edit the resting state or key at the playhead' },
+  { id: 'section', keys: ['⇧S'], label: 'Wrap the selection in a section' },
+  { id: 'delete-keep', keys: ['mod', '⌫'], label: 'Delete a section, keep what is in it' },
+  { id: 'view', keys: ["⇧'", '⇧G', 'mod Y'], label: 'Pixel grid, layout guides, outline view' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
-  { id: 'fit', keys: ['0', '⇧1'], label: 'Inquadra tutto' },
+  { id: 'fit', keys: ['0', '⇧1'], label: 'Zoom to fit' },
   { id: 'zoom-actual', keys: ['⇧0'], label: 'Zoom to 100%' },
   { id: 'zoom-selection', keys: ['⇧2'], label: 'Zoom to selection' },
-  { id: 'zoom-in', keys: ['+'], label: 'Ingrandisci' },
-  { id: 'zoom-out', keys: ['-'], label: 'Rimpicciolisci' }
+  { id: 'zoom-in', keys: ['+'], label: 'Zoom in' },
+  { id: 'zoom-out', keys: ['-'], label: 'Zoom out' },
+  { id: 'comment', keys: ['C'], label: 'Comment mode' },
+  { id: 'help', keys: [HELP_KEY], label: 'Keyboard shortcuts' }
 ];
+
+export type CanvasGuideRow = { id: string; name: string; keys: string; gesture: string };
+
+enum GuideGroup {
+  Add = 'Add',
+  Select = 'Select',
+  Edit = 'Edit',
+  View = 'View'
+}
+
+const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
+  add: GuideGroup.Add,
+  delete: GuideGroup.Edit,
+  'select-all': GuideGroup.Select,
+  deselect: GuideGroup.Select,
+  enter: GuideGroup.Select,
+  'select-next': GuideGroup.Select,
+  'select-previous': GuideGroup.Select,
+  tool: GuideGroup.Select,
+  comment: GuideGroup.Edit,
+  undo: GuideGroup.Edit,
+  redo: GuideGroup.Edit,
+  duplicate: GuideGroup.Edit,
+  copy: GuideGroup.Edit,
+  paste: GuideGroup.Edit,
+  group: GuideGroup.Edit,
+  ungroup: GuideGroup.Edit,
+  'bring-front': GuideGroup.Edit,
+  'send-back': GuideGroup.Edit,
+  align: GuideGroup.Edit,
+  tidy: GuideGroup.Edit,
+  stack: GuideGroup.Edit,
+  'edit-mode': GuideGroup.Edit,
+  section: GuideGroup.Edit,
+  'delete-keep': GuideGroup.Edit,
+  nudge: GuideGroup.Edit,
+  fit: GuideGroup.View,
+  'zoom-actual': GuideGroup.View,
+  'zoom-selection': GuideGroup.View,
+  'zoom-in': GuideGroup.View,
+  'zoom-out': GuideGroup.View,
+  help: GuideGroup.View,
+  view: GuideGroup.View
+};
+
+export const canvasGuide = (mod: string): { group: string; rows: CanvasGuideRow[] }[] =>
+  Object.values(GuideGroup).map((group) => ({
+    group,
+    rows: CANVAS_SHORTCUTS.flatMap((row, i) => (GUIDE_GROUP[row.id] === group ? [{ id: `${row.id}-${i}`, name: row.label, keys: row.keys.map((k) => (k === MOD_KEY ? mod : k)).join(' '), gesture: '' }] : []))
+  }));

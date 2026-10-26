@@ -5,8 +5,10 @@
 #   INCLUDED  db (official supabase/postgres image — roles/extensions the others below assume),
 #             kong (API gateway: routes /auth, /rest, /storage, /realtime with one apikey scheme),
 #             auth (GoTrue), rest (PostgREST), storage (Storage API), realtime.
-#             worker (long-lived chat queue drain), meta + studio (Dashboard UI) — the latter
-#             behind `--profile studio`, per "studio opzionale".
+#             migrate (one-shot: applies supabase/baseline, seeds the demo user and canvas, prints the
+#             login), app (the SvelteKit image, sharing kong's network so the browser and the server
+#             reach Supabase at the same http://localhost:8000), meta + studio (Dashboard UI)
+#             behind `--profile studio`.
 #
 #   NOT INCLUDED, on purpose:
 #     - imgproxy          Storage's on-the-fly image transforms. This app renders and stores its
@@ -24,12 +26,11 @@
 #   DEPLOY_TARGET=node). adapter-vercel stays the default adapter for the cloud deploy; the image
 #   exists so self-hosters don't have to run `npm run dev` to try the product.
 #
-# Usage:
-#   cp .env.example .env               # then fill every value marked "generate with"
-#   docker compose up -d               # db, kong, auth, rest, storage, realtime, app, worker, cron
-#   docker compose --profile studio up -d   # + the Dashboard UI at http://localhost:8000
-#   (from the repo root) DATABASE_URL=postgres://postgres:<POSTGRES_PASSWORD>@localhost:5432/postgres \
-#     npm run db:migrate && npm run db:seed
+# Usage (from this directory):
+#   (.env here holds public demo secrets; replace them before exposing this stack)
+#   docker compose up             # db, kong, auth, rest, realtime, storage, migrate (schema + demo
+#                                 # data, prints the login), app on http://localhost:3000
+#   docker compose --profile studio up    # + Supabase Studio on http://localhost:54323
 #
 # See ../../docs/SELF_HOSTING.md for the full walkthrough.
 
@@ -56,7 +57,7 @@ services:
       timeout: 5s
       retries: 10
     ports:
-      - '${POSTGRES_PORT:-5432}:${POSTGRES_PORT:-5432}'
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:${POSTGRES_PORT:-5432}'
     environment:
       POSTGRES_HOST: /var/run/postgresql
       PGPORT: ${POSTGRES_PORT:-5432}
@@ -80,12 +81,14 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - '${KONG_HTTP_PORT:-8000}:8000/tcp'
+      - '127.0.0.1:${KONG_HTTP_PORT:-8000}:8000/tcp'
+      - '127.0.0.1:${APP_PORT:-3000}:${APP_PORT:-3000}/tcp'
     volumes:
       - ./volumes/api/kong.yml:/home/kong/temp.yml:ro
       - ./volumes/api/kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro
     environment:
       KONG_DATABASE: 'off'
+      KONG_PROXY_LISTEN: 0.0.0.0:8000, 127.0.0.1:${KONG_HTTP_PORT:-8000}
       KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
       # kong.yml usa le expression routes (`http.path == …`): il flavor traditional le rifiuta
       # come campo sconosciuto e Kong non parte.
@@ -213,24 +216,6 @@ services:
       RUN_JANITOR: 'true'
       DISABLE_HEALTHCHECK_LOGGING: 'true'
 
-  realtime-policies:
-    profiles: ['init']
-    image: supabase/postgres:17.6.1.136
-    restart: 'no'
-    depends_on:
-      realtime:
-        condition: service_healthy
-    environment:
-      PGHOST: db
-      PGPORT: ${POSTGRES_PORT:-5432}
-      PGUSER: postgres
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: ${POSTGRES_DB:-postgres}
-    volumes:
-      - ../../supabase/migrations/0226_realtime_brand_channel_policies.sql:/0226_realtime_brand_channel_policies.sql:ro
-      - ./volumes/db/realtime-policies.sh:/realtime-policies.sh:ro
-    entrypoint: ['/bin/sh', '/realtime-policies.sh']
-
   storage:
     image: supabase/storage-api:v1.60.4
     restart: unless-stopped
@@ -309,67 +294,67 @@ services:
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
     ports:
-      - '${STUDIO_PORT:-54323}:3000'
+      - '127.0.0.1:${STUDIO_PORT:-54323}:3000'
 
-  app:
+  migrate:
     build:
       context: ../..
-      dockerfile: infra/app/Dockerfile
-    image: ${COMPOSE_PROJECT_NAME:-feega}-app
-    restart: unless-stopped
+      dockerfile: infra/setup/Dockerfile
+    restart: 'no'
     depends_on:
       kong:
         condition: service_healthy
+      auth:
+        condition: service_healthy
+      rest:
+        condition: service_healthy
+      realtime-dev:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      PUBLIC_SUPABASE_URL: http://kong:8000
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?set SERVICE_ROLE_KEY in .env}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:${APP_PORT:-3000}}
+      SEED_DEMO_EMAIL: ${SEED_DEMO_EMAIL:-demo@feega.local}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-feega-demo-2026}
+
+  app:
+    image: ${APP_IMAGE:-ghcr.io/andreabuttarelli/feega:latest}
+    build:
+      context: ../..
+      dockerfile: infra/app/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       # Not `/`: HIDE_MARKETING 303s the homepage to /app, and busybox wget treats
       # 3xx as a failed spider. robots.txt is always 200 and does not need a session.
-      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000/robots.txt']
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:${APP_PORT:-3000}/robots.txt']
       timeout: 5s
       interval: 10s
       retries: 5
       start_period: 20s
-    ports:
-      - '${APP_PORT:-3000}:3000'
-    environment: &app-environment
-      PUBLIC_SUPABASE_URL: ${SUPABASE_INTERNAL_URL:-http://kong:8000}
+    network_mode: 'service:kong'
+    environment:
+      PORT: ${APP_PORT:-3000}
+      PUBLIC_SUPABASE_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
       PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY:?set ANON_KEY in .env}
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?set SERVICE_ROLE_KEY in .env}
-      AGENT_KIT: ${AGENT_KIT:-off}
       BILLING_PROVIDER: ${BILLING_PROVIDER:-open}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:${APP_PORT:-3000}}
       ORIGIN: ${PUBLIC_APP_URL:-http://localhost:${APP_PORT:-3000}}
-      APP_SECRET: ${APP_SECRET:-}
+      APP_SECRET: ${APP_SECRET:?set APP_SECRET in .env}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://openrouter.ai/api/v1}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_DEFAULT_MODEL: ${LLM_DEFAULT_MODEL:-}
       LLM_MODELS: ${LLM_MODELS:-}
       LLM_VIDEO_REVIEWER_MODEL: ${LLM_VIDEO_REVIEWER_MODEL:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       CRON_SECRET: ${CRON_SECRET:-}
       HIDE_MARKETING: ${HIDE_MARKETING:-}
-
-  cron:
-    build:
-      context: ../../docker/cron
-    restart: unless-stopped
-    depends_on:
-      app:
-        condition: service_healthy
-    environment:
-      APP_URL: http://app:3000
-      CRON_SECRET: ${CRON_SECRET:-}
-      ALLOW_INSECURE_CRON: ${ALLOW_INSECURE_CRON:-}
-
-  worker:
-    image: ${COMPOSE_PROJECT_NAME:-feega}-app
-    restart: unless-stopped
-    depends_on:
-      app:
-        condition: service_healthy
-    command: ['node', 'build-worker/index.js']
-    environment: *app-environment
 
 # The SvelteKit app image IS the `app` service above now: adapter-vercel remains the default
 # adapter (cloud deploy unchanged), and DEPLOY_TARGET=node inside infra/app/Dockerfile selects

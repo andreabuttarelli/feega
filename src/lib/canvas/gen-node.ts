@@ -13,6 +13,7 @@
  * nodo nasce senza formato — il vuoto è onesto, un «1:1» inventato no.
  */
 import { upscaleLimitsOf } from '$lib/video-models';
+import { isPromptlessImageTool } from '$lib/image-tools';
 import { GENERATED_MEDIUMS } from './graph';
 import type { ModelParam } from './model-params';
 import type { RecommendationTier } from './recommended-models';
@@ -40,6 +41,7 @@ export type ModelChoice = {
   provider: string;
   providerLabel: string;
   maxRefs?: number;
+  maxVariants?: number;
   minDuration?: number;
   maxDuration?: number;
   /** I gradini che il selettore di durata offre — assente per l'immagine, che non ha durata. */
@@ -97,6 +99,8 @@ export type GenParams = Omit<AudioParams, 'duration'> & {
    *  CLAUDE.md — "repeat N"). Con degli assi collegati non conta: le combinazioni le dettano i
    *  valori, non questo numero. */
   repeat?: number;
+  variants?: number;
+  variantsInto?: 'nodes' | 'history';
   /** Cartesiano (default, assente) o accoppiato indice-per-indice — `loop-plan.ts::LoopCombine`. */
   combine?: 'product' | 'zip';
   /** The provider the user picked for this model; absent or `auto` = cheapest healthy. */
@@ -166,7 +170,7 @@ export function hasPrompt(node: GenNode, upstream: UpstreamTextAvailability = { 
 const PROMPT_OPTIONAL_MEDIUMS: ReadonlySet<GenMedium> = new Set(['model3d']);
 
 export function promptRequired(medium: GenMedium, model: string | null = null): boolean {
-  return !PROMPT_OPTIONAL_MEDIUMS.has(medium) && !upscaleLimitsOf(model);
+  return !PROMPT_OPTIONAL_MEDIUMS.has(medium) && !upscaleLimitsOf(model) && !isPromptlessImageTool(model);
 }
 
 export function runStateOf(node: GenNode, upstream: UpstreamTextAvailability = { hasUpstreamText: false }): RunState {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc } from './doc';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import type { Outliner } from './fonts/outliner';
 import { outlineTexts } from './text-outline-run';
-import { addClip, type OpResult } from './timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const square: Outliner = {
   advance: () => 0.5,

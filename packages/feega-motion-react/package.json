@@ -1,7 +1,7 @@
 {
   "name": "@feega/motion-react",
-  "version": "0.1.0",
-  "description": "Embed an interactive feega motion video in a React app: the hosted player, wired to scroll, visibility and your callbacks.",
+  "version": "0.2.0",
+  "description": "Embed a feega motion video in a React app: drawn inline by feega's GPU engine, wired to scroll, visibility and your callbacks.",
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/andreabuttarelli/feega.git", "directory": "packages/feega-motion-react" },
   "homepage": "https://feega.app",

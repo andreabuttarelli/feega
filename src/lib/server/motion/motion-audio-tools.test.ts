@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { AssetKind } from '$lib/motion/components';
-import { ANALYSIS_VERSION, type AudioAnalysis } from '$lib/motion/audio-analysis';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { AssetKind } from '@feega/motion-core/motion/components';
+import { ANALYSIS_VERSION, type AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;

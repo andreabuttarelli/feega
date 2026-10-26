@@ -112,7 +112,7 @@ fn a_new_use_beyond_the_raster_budget_shows_its_background_until_its_texture_exi
     let mut lib = library(&["a", "b"]);
 
     let first = lib.plan(&screen(&[("a", 1.0, 0.0), ("b", 1.0, 200.0)]), LIMITS);
-    assert_eq!(kinds(&first.screen), vec!["image", "path"]);
+    assert_eq!(kinds(&first.screen), vec!["image", "path", "path"]);
     assert!(first.pending);
 
     let second = lib.plan(&screen(&[("a", 1.0, 0.0), ("b", 1.0, 200.0)]), LIMITS);
@@ -196,9 +196,7 @@ fn a_big_group_is_rastered_a_chunk_per_draw_over_its_partial_texture() {
 
     let first = lib.plan(&at, ONE_ITEM);
     assert_eq!(kinds(&first.rasters[0].list), vec!["path"]);
-    let Item::Image(partial) = &first.screen.items[0] else { panic!() };
-    assert_eq!(partial.src, first.rasters[0].clip);
-    assert_eq!(first.screen.items.len(), 1);
+    assert_eq!(kinds(&first.screen), vec!["path", "path"]);
     assert!(first.pending);
 
     let second = lib.plan(&at, ONE_ITEM);
@@ -211,6 +209,17 @@ fn a_big_group_is_rastered_a_chunk_per_draw_over_its_partial_texture() {
     let third = lib.plan(&at, ONE_ITEM);
     assert!(third.rasters.is_empty());
     assert!(third.evicted.contains(&first.rasters[0].clip));
+}
+
+#[test]
+fn a_frame_with_no_texture_yet_stays_drawn_live_while_its_first_texture_builds() {
+    let mut lib = library(&["a"]);
+
+    let first = lib.plan(&screen(&[("a", 1.0, 0.0)]), ONE_ITEM);
+
+    assert!(first.pending);
+    assert!(first.screen.items.iter().all(|i| i.kind() != "image"));
+    assert!(!first.screen.items.is_empty());
 }
 
 #[test]

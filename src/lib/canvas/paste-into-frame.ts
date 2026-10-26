@@ -1,10 +1,9 @@
 export type SelectedTile = { id: string; takesDrops: boolean };
 
-export function pasteIntoFrame(selected: readonly SelectedTile[], freeIds: readonly string[]): string | null {
-  const only = selected.length === 1 ? selected[0] : null;
-  if (!only?.takesDrops || !freeIds.length || freeIds.includes(only.id)) {
-    return null;
+export function pasteTargets(selected: readonly SelectedTile[], freeIds: readonly string[]): string[] {
+  if (!freeIds.length) {
+    return [];
   }
 
-  return only.id;
+  return selected.filter((tile) => tile.takesDrops && !freeIds.includes(tile.id)).map((tile) => tile.id);
 }

@@ -1,0 +1,71 @@
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { DrawTool } from '$lib/motion/draw-tool';
+import { canEditPoints } from '$lib/motion/shape/vector-edit';
+import { FrameView, shows, type FrameViews } from './frame-view';
+
+export enum FrameOverlay {
+  Draw = 'draw',
+  Guides = 'guides',
+  Align = 'align',
+  Mask = 'mask',
+  Pen = 'pen',
+  ShapeBuilder = 'shape-builder',
+  Vector = 'vector',
+  AutoLayout = 'auto-layout',
+  TextPath = 'text-path',
+  Outlines = 'outlines',
+  Corners = 'corners',
+  MotionPath = 'motion-path'
+}
+
+type Context = { doc: MotionDoc; clip: MotionClip | null; picks: number; tool: DrawTool; pointEdit: string | null; active: boolean; views: FrameViews };
+
+const MIN_ALIGNED = 2;
+const ALIGN_BAR_PX = { width: 280, height: 42 };
+
+export enum AlignSide {
+  Below = 'below',
+  Right = 'right',
+  Above = 'above'
+}
+
+type Screen = { left: number; top: number; width: number; height: number };
+type Clear = { width: number; bottom: number };
+
+export function alignSide(frame: Screen, clear: Clear): AlignSide {
+  if (frame.top + frame.height + ALIGN_BAR_PX.height <= clear.bottom) {
+    return AlignSide.Below;
+  }
+  if (frame.left + frame.width + ALIGN_BAR_PX.width <= clear.width) {
+    return AlignSide.Right;
+  }
+  return AlignSide.Above;
+}
+
+const POINT_OVERLAY: Record<string, FrameOverlay> = { path: FrameOverlay.Pen, vector: FrameOverlay.Vector };
+
+const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
+  [FrameOverlay.Draw]: (c) => c.tool !== DrawTool.Select && c.tool !== DrawTool.ShapeBuilder,
+  [FrameOverlay.ShapeBuilder]: (c) => c.tool === DrawTool.ShapeBuilder && c.picks >= MIN_ALIGNED,
+  [FrameOverlay.Guides]: (c) => Boolean(c.doc.layoutGuides?.length) && shows(c.views, FrameView.Guides),
+  [FrameOverlay.Align]: (c) => c.picks >= MIN_ALIGNED,
+  [FrameOverlay.Mask]: (c) => Boolean(c.clip?.mask) && c.active,
+  [FrameOverlay.Pen]: (c) => pointsOf(c) === FrameOverlay.Pen,
+  [FrameOverlay.Vector]: (c) => pointsOf(c) === FrameOverlay.Vector,
+  [FrameOverlay.AutoLayout]: (c) => Boolean(c.clip?.autoLayout) && c.picks === 1 && c.active,
+  [FrameOverlay.TextPath]: (c) => Boolean(c.clip?.textPath),
+  [FrameOverlay.Outlines]: (c) => shows(c.views, FrameView.Outlines),
+  [FrameOverlay.Corners]: (c) => c.clip?.component === 'Shape' && c.clip.props.shape === 'rect' && c.picks === 1 && c.active,
+  [FrameOverlay.MotionPath]: (c) => Boolean(c.clip?.path) && c.picks === 1
+};
+
+function pointsOf(c: Context): FrameOverlay | undefined {
+  if (!c.clip || c.clip.id !== c.pointEdit || !c.active || !canEditPoints(c.clip)) {
+    return undefined;
+  }
+  return POINT_OVERLAY[String(c.clip.props.shape)];
+}
+
+export const shownOverlays = (c: Context): ReadonlySet<FrameOverlay> => new Set(Object.values(FrameOverlay).filter((overlay) => RULES[overlay](c)));
+
+export const activeAt = (clip: MotionClip, frame: number): boolean => frame >= clip.from && frame < clip.from + clip.durationInFrames;

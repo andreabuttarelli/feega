@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from './brand';
-import { Ease } from './design';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { animProp } from './keyframes';
-import { addClip, setKeyframes, type OpResult } from './timeline';
-import { composeHtml } from './hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { animProp } from '@feega/motion-core/motion/keyframes';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { Quality, docProblems } from './direction';
 
 function must(r: OpResult): MotionDoc {
