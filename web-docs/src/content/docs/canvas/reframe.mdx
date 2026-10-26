@@ -1,0 +1,37 @@
+---
+title: Reframe to another aspect
+description: Turn an image or a video into 9:16, 1:1, 4:5, 16:9 or any custom aspect.
+sidebar:
+  order: 8
+---
+
+Reframe changes the aspect of a finished image or video and puts the result in a new node beside the original. The original stays untouched.
+
+- **Images** grow to the new aspect. The empty area is painted in by the AI, so it spends credits and needs a paid plan.
+- **Videos** are cropped to the new aspect around a focus point you choose. No AI model is involved, so it is free.
+
+## From the canvas
+
+1. Select one image or video that has a result.
+2. Open the selection toolbar or the right-click menu and pick **Reframe…**.
+3. Pick an aspect: **9:16**, **1:1**, **4:5**, **16:9**, or **Custom** and type `w:h`, like `21:9`.
+4. For a video, drag the two focus sliders so the subject sits where the crop should centre. The default is the middle.
+5. Press **Reframe**. A new node appears to the right, wired from the original.
+
+An image that already has the aspect is refused: there is nothing to add.
+
+## From an agent, MCP or the API
+
+Images use `image_tool` with `tool: "reframe"` and an `aspect`. No prompt is needed.
+
+```json
+{ "op": "image_tool", "input": { "nodeId": "<image node>", "tool": "reframe", "aspect": "9:16" } }
+```
+
+Videos use `video_reframe`. `focus` is optional, as fractions of the frame.
+
+```json
+{ "op": "video_reframe", "input": { "nodeId": "<video node>", "aspect": "1:1", "focus": { "x": 0.3, "y": 0.5 } } }
+```
+
+Both are called through `edit` in the feega MCP server, and answer with the id of the new node.
