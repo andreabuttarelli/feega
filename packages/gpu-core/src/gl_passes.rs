@@ -465,7 +465,7 @@ vec4 run(ivec2 xy) {
   return sum / total;
 }";
 
-const SOURCES: [(Op, &str); 14] = [
+const SOURCES: [(Op, &str); 15] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
