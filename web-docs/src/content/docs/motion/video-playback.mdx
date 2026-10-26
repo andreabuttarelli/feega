@@ -5,6 +5,10 @@ sidebar:
   order: 2
 ---
 
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="webcodecs-ram-preview" caption="Scrub a video clip, press Option+Return, watch the green line fill, then play from memory." />
+
 ## Frame-accurate decoding
 
 Video clips decode with the browser's WebCodecs API. Scrubbing or playing asks for the exact frame at the playhead, not the nearest one a `<video>` element can seek to.
