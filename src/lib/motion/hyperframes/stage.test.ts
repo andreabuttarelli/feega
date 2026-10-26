@@ -7,6 +7,8 @@ import { CameraPreset, applyPreset, setCamera, setClipDepth } from '@feega/motio
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { sampleTrack } from '@feega/motion-core/motion/keyframes';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { StageLightKind } from '@feega/motion-core/motion/lights';
+import { addStageLight } from '@feega/motion-core/motion/lights-ops';
 import { seekPlan } from '../custom/determinism';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { STAGE_TIMELINE, seekDriver, stageScript } from '@feega/motion-core/motion/hyperframes/stage';
@@ -146,5 +148,34 @@ describe('the stage at runtime', () => {
     tl.totalTime(0.5, true);
 
     expect(read().layers[1]).toBe('');
+  });
+});
+
+describe('lights on the stage', () => {
+  const lit = must(addStageLight(staged, { kind: StageLightKind.Ambient, from: 0, durationInFrames: 120, props: { color: '#ff8000', intensity: 0.5 } }, 'lamp'));
+
+  it('a shaded layer is drawn through a colour filter carrying the light it receives', () => {
+    const { tl, spec } = boot(lit);
+    const bg = () => document.querySelector('[data-clip="bg"]') as HTMLElement;
+    const matrix = () => document.querySelector('feColorMatrix')?.getAttribute('values');
+
+    tl.totalTime(0.5, true);
+    const light = cameraMath(sampleTrack).frameAt(spec, 12).layers.find((l) => l.id === 'bg')!.light!;
+
+    expect(bg().style.filter).toContain('url(#feegaLit');
+    expect(matrix()).toContain(`${light[0]} 0 0 0 0`);
+    expect(light[0]).toBeCloseTo(0.5, 5);
+  });
+
+  it('a seek gives the same lit frame from any direction', () => {
+    const { tl, read } = boot(lit);
+    const first = new Map<number, string>();
+
+    for (const t of seekPlan(4, 30)) {
+      tl.totalTime(t, true);
+      const shot = JSON.stringify(read());
+      expect(first.get(t) ?? shot).toBe(shot);
+      first.set(t, shot);
+    }
   });
 });

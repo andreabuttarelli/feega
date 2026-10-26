@@ -9,6 +9,7 @@
   import { AssetKind, COMPONENTS, Control, TrackKind } from '@feega/motion-core/motion/components';
   import { DEPTH, Space } from '@feega/motion-core/motion/camera';
   import { setClipDepth } from '@feega/motion-core/motion/camera-ops';
+  import { setAcceptsLights } from '@feega/motion-core/motion/lights-ops';
   import { ParentOpacity, parentChoices } from '@feega/motion-core/motion/parent';
   import { setParent, setParentOpacity } from '$lib/motion/parent-ops';
   import { clipsOf, findClip } from '@feega/motion-core/motion/doc';
@@ -966,6 +967,9 @@
         <NumberField label={DEPTH.label} kind={FieldKind.Named} name="Depth" value={clip.depth} range={depthRange} unit={depthRange.unit ?? ''} disabled={clip.space === Space.Screen} onchange={(v) => commit(setClipDepth(doc, clip.id, { depth: v }), 'Changed depth')} />
       </div>
       <label class="check"><input type="checkbox" data-testid="screen-space" checked={clip.space === Space.Screen} onchange={(e) => commit(setClipDepth(doc, clip.id, { space: e.currentTarget.checked ? Space.Screen : Space.World }), 'Changed space')} />Screen space: ignores the camera</label>
+      {#if doc.camera && clip.component !== 'Light'}
+        <label class="check"><input type="checkbox" data-testid="accepts-lights" checked={clip.acceptsLights !== false} onchange={(e) => commit(setAcceptsLights(doc, clip.id, e.currentTarget.checked), 'Changed accepts lights')} />Accepts lights</label>
+      {/if}
       {#if !doc.camera}<p class="hint">Depth shows once the video has a camera.</p>{/if}
     </div>
   {/if}

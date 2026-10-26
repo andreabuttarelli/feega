@@ -68,6 +68,7 @@ const CLIP: Record<string, Access> = {
   matteFrom: { write: ['use_as_mask', 'release_mask'], read: 'matteFrom' },
   depth: { write: ['set_clip_depth'], read: 'depth' },
   space: { write: ['set_clip_depth'], read: 'space' },
+  acceptsLights: { write: ['set_clip_depth'], read: 'acceptsLights' },
   parent: { write: ['set_parent', 'parent_clips'], read: 'parent' },
   parentOpacity: { write: ['set_parent'], read: 'parentOpacity' },
   autoLayout: { write: ['add_auto_layout', 'set_auto_layout', 'reorder_auto_layout'], read: 'autoLayout' },
