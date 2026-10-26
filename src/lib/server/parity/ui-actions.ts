@@ -76,6 +76,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   canvasVersions: canvas('list_canvas_versions'),
   restoreCanvasVersion: canvas('restore_canvas_version'),
   canvasComments: canvas('list_canvas_comments'),
+  exportCode: canvas('export_code_frame'),
   addComment: canvas('add_canvas_comment'),
   resolveComment: canvas('resolve_canvas_comment'),
   editComment: canvas('edit_canvas_comment'),

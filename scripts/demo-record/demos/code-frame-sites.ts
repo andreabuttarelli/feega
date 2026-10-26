@@ -9,7 +9,7 @@ import './styles.css';
 
 export default function App() {
   return (
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[feega.route]}>
       <div className="min-h-screen bg-stone-50 text-stone-900">
         <Nav />
         <Routes>
@@ -49,7 +49,7 @@ export default function Nav() {
             </NavLink>
           ))}
         </div>
-        <NavLink to="/pricing" className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white">Start free</NavLink>
+        <NavLink to="/pricing" className="rounded-full px-4 py-2 text-sm text-white" style={{ background: feega.color('accent', '#1c1917') }}>Start free</NavLink>
       </nav>
     </header>
   );
@@ -58,7 +58,7 @@ export default function Nav() {
   'components/Footer.tsx': `export default function Footer() {
   return (
     <footer className="border-t border-stone-200 py-10 text-center text-sm text-stone-500">
-      © 2026 Northwind Analytics · Made in Lisbon
+      {feega.text('footer', { type: 'text', default: '© 2026 Northwind Analytics · Made in Lisbon', label: 'Footer' })}
     </footer>
   );
 }
@@ -105,13 +105,13 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.1 }}
         >
-          Know your numbers before the Monday meeting.
+          {feega.text('heroTitle', { type: 'text', default: 'Know your numbers before the Monday meeting.', label: 'Hero title' })}
         </motion.h1>
         <motion.p className="mx-auto mt-6 max-w-xl text-lg text-stone-600" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.25 }}>
           Northwind connects to Stripe, Shopify and your database, and turns them into one page your whole team reads.
         </motion.p>
         <motion.div className="mt-10 flex justify-center gap-3" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.45 }}>
-          <Link to="/pricing" className="rounded-full bg-stone-900 px-6 py-3 text-white">See pricing</Link>
+          <Link to="/pricing" className="rounded-full px-6 py-3 text-white" style={{ background: feega.color('accent', '#1c1917') }}>See pricing</Link>
           <Link to="/about" className="rounded-full border border-stone-300 px-6 py-3">Our story</Link>
         </motion.div>
       </section>
@@ -131,7 +131,7 @@ export default function Home() {
       <section className="bg-stone-900 px-6 py-28 text-center text-white">
         <Reveal>
           <blockquote className="mx-auto max-w-3xl text-3xl leading-snug">
-            "We cancelled three tools the week we moved to Northwind. Our Monday meeting is now fifteen minutes."
+            {feega.var('quote', { type: 'longtext', default: 'We cancelled three tools the week we moved to Northwind. Our Monday meeting is now fifteen minutes.', label: 'Testimonial' })}
           </blockquote>
           <p className="mt-6 text-stone-400">Marta Silva, COO at Lumen Ceramics</p>
         </Reveal>
@@ -152,14 +152,15 @@ const PLANS = [
 
 export default function Pricing() {
   const [yearly, setYearly] = useState(false);
-  const price = (monthly: number) => (yearly ? Math.round(monthly * 0.8) : monthly);
+  const discount = feega.var('yearlyDiscount', { type: 'range', min: 0, max: 50, step: 5, default: 20, label: 'Yearly discount %' });
+  const price = (monthly: number) => (yearly ? Math.round(monthly * (1 - discount / 100)) : monthly);
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-24">
       <h1 className="text-center text-5xl font-semibold tracking-tight">Simple pricing</h1>
       <div className="mt-8 flex justify-center">
         <button id="billing-toggle" onClick={() => setYearly(!yearly)} className="rounded-full border border-stone-300 bg-white px-5 py-2 text-sm">
-          {yearly ? 'Billed yearly · save 20%' : 'Billed monthly'}
+          {yearly ? \`Billed yearly · save \${discount}%\` : 'Billed monthly'}
         </button>
       </div>
       <div className="mt-14 grid gap-6 md:grid-cols-3">
@@ -301,12 +302,12 @@ export const SVELTE_SITE: Record<string, string> = {
 <main>
   <section class="px-6 pb-24 pt-28 text-center">
     <h1 id="svelte-hero" in:fly={{ y: 40, duration: 800 }} class="mx-auto max-w-3xl text-6xl font-semibold leading-tight tracking-tight">
-      Plan less. <span class="text-violet-400">Ship more.</span>
+      {feega.text('title', 'Plan less. Ship more.')}
     </h1>
     <p in:fade={{ delay: 250, duration: 800 }} class="mx-auto mt-6 max-w-xl text-lg text-zinc-400">
       Orbit is the planner that rearranges your week so the important work actually happens.
     </p>
-    <a in:fly={{ y: 20, delay: 450 }} href="#/pricing" class="mt-10 inline-block rounded-full bg-violet-500 px-6 py-3 font-medium text-white">Try Orbit free</a>
+    <a in:fly={{ y: 20, delay: 450 }} href="#/pricing" style:background={feega.color('accent', '#8b5cf6')} class="mt-10 inline-block rounded-full px-6 py-3 font-medium text-white">Try Orbit free</a>
   </section>
   <div class="h-[50vh]"></div>
   <section class="mx-auto grid max-w-6xl gap-6 px-6 pb-32 md:grid-cols-3">
@@ -322,7 +323,7 @@ export const SVELTE_SITE: Record<string, string> = {
   'pages/Pricing.svelte': `<script lang="ts">
   import { scale } from 'svelte/transition';
   let seats = $state(5);
-  const total = $derived(seats * 8);
+  const total = $derived(seats * feega.var('seatPrice', { type: 'range', min: 4, max: 20, step: 1, default: 8, label: 'Price per seat' }));
 </script>
 
 <main class="mx-auto max-w-3xl px-6 py-24 text-center">

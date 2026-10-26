@@ -486,6 +486,17 @@ canvas
   });
 
 canvas
+  .command('export-code <projectId> <nodeId>')
+  .description('Export a code frame (or a view of it) as a runnable Vite project with no feega runtime (free)')
+  .option('--config', 'Keep variable values in src/content.ts instead of inlining them')
+  .option('--out <dir>', 'Where to write the project (default: the frame name)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, nodeId: string, opts) => {
+    const { cmdCanvasExportCode } = await import('./commands/canvas.ts');
+    await cmdCanvasExportCode(projectId, nodeId, opts);
+  });
+
+canvas
   .command('save <projectId> <canvasId>')
   .description('Save a whole canvas as a .feega file: nodes, lines, frames and their media (free)')
   .option('--out <file>', 'Where to save it (default: <canvas name>.feega)')

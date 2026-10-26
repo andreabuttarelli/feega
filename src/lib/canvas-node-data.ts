@@ -1,7 +1,7 @@
 import { beatHref } from '$lib/motion/storyboard';
 import { GEN_MEDIUMS, type GenMedium, type GenNode, type GenParams } from '$lib/canvas/gen-node';
 import { sourceOf, type IframeNode } from '$lib/canvas/iframe-node';
-import { Framework, isCodeFiles, isFramework, starterFiles } from '$lib/canvas/code-frame';
+import { Framework, isCodeFiles, isFramework, isVarValues, starterFiles } from '$lib/canvas/code-frame';
 import type { DocNode } from '$lib/canvas/doc-node';
 import type { Addable } from '$lib/canvas/addable';
 import { isProductPlatform, type ProductsNode } from '$lib/canvas/products-node';
@@ -127,8 +127,10 @@ export function frameOf(row: NodeRow): IframeNode | null {
   const html = str(row.data.html) || str(row.data.content);
   const files = isCodeFiles(row.data.files) ? row.data.files : {};
   const framework = isFramework(row.data.framework) ? row.data.framework : Framework.React;
+  const sourceNodeId = str(row.data.sourceNodeId);
+  const vars = isVarValues(row.data.vars) ? row.data.vars : {};
 
-  return { id: row.id, source: sourceOf({ url, html, files }), url, html, framework, files };
+  return { id: row.id, source: sourceOf({ url, html, files, sourceNodeId }), url, html, framework, files, vars, sourceNodeId, route: str(row.data.route) || '/' };
 }
 
 const playOf = (data: Record<string, unknown>) => {
@@ -439,7 +441,11 @@ export function genPatch(node: GenNode, patch: Partial<GenNode>): Record<string,
 }
 
 export function frameData(node: IframeNode): Record<string, unknown> {
-  return { url: node.url, html: node.html, framework: node.framework, files: node.files };
+  if (node.source === 'view') {
+    return { sourceNodeId: node.sourceNodeId, route: node.route };
+  }
+
+  return { url: node.url, html: node.html, framework: node.framework, files: node.files, vars: node.vars };
 }
 
 export function docData(node: DocNode): Record<string, unknown> {

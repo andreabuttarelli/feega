@@ -1,36 +1,14 @@
 import { test, expect, type FrameLocator, type Locator, type Page } from '@playwright/test';
 import { installCursor, recordDemo } from '../record';
 import { REACT_SITE } from './code-frame-sites';
+import { CODE_FRAME as FRAME, editCanvas as edit, openLocalCanvas, pointIn as pointInHost } from './code-frame-helpers';
 
-const FRAME = '[data-testid=code-frame]';
 const SIZE = { width: 1320, height: 820 };
 
-type Point = { x: number; y: number };
-
-async function edit(page: Page, projectId: string, body: Record<string, unknown>) {
-  const res = await page.request.post('/api/v1/edit', { data: { project_id: projectId, ...body } });
-  return res.json();
-}
-
-async function pointIn(page: Page, frame: FrameLocator, target: Locator): Promise<Point> {
-  const box = (await page.locator(FRAME).boundingBox())!;
-  const inner = await frame.locator('body').evaluate(() => innerWidth);
-  const k = box.width / inner;
-  const r = await target.evaluate((e) => {
-    const b = e.getBoundingClientRect();
-    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
-  });
-  return { x: box.x + r.x * k, y: box.y + r.y * k };
-}
+const pointIn = (page: Page, frame: FrameLocator, target: Locator) => pointInHost(page, page.locator(FRAME), frame, target);
 
 test('code frames', async ({ page }) => {
-  await page.goto('/');
-  const [, projectId, canvasId] = page.url().match(/\/p\/([^/]+)\/c\/([^/?]+)/)!;
-
-  const listed = await edit(page, projectId, { op: 'list_nodes', input: { canvasId } });
-  for (const node of listed.nodes ?? []) {
-    await edit(page, projectId, { op: 'delete_node', target: node.id });
-  }
+  const { projectId, canvasId } = await openLocalCanvas(page);
   const made = await edit(page, projectId, { op: 'create_node', input: { canvasId, type: 'iframe', x: 0, y: 0, data: { framework: 'react', files: REACT_SITE } } });
   await edit(page, projectId, { op: 'resize_node', input: { nodeId: made.node.id, ...SIZE } });
 

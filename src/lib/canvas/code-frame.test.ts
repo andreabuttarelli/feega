@@ -76,3 +76,39 @@ describe('un code frame aggiunto dalla barra', () => {
     expect(validateNodeData('iframe', row).ok).toBe(true);
   });
 });
+
+describe('viste e variabili', () => {
+  it('una riga con sourceNodeId è una vista', () => {
+    expect(sourceOf({ url: '', html: '', files: {}, sourceNodeId: 'n1' })).toBe('view');
+  });
+
+  it('frameOf legge vista, rotta e variabili', () => {
+    const view = frameOf({ id: 'v1', type: 'iframe', data: { sourceNodeId: 'n1', route: '/pricing' } });
+    const source = frameOf({ id: 'n1', type: 'iframe', data: { framework: 'react', files: { 'App.tsx': 'x' }, vars: { heroTitle: 'Hi', dark: true } } });
+
+    expect(view).toMatchObject({ source: 'view', sourceNodeId: 'n1', route: '/pricing' });
+    expect(source).toMatchObject({ vars: { heroTitle: 'Hi', dark: true } });
+  });
+
+  it('il documento porta rotta e valori iniziali', () => {
+    const html = codeFrameHtml(Framework.React, starterFiles(Framework.React), { route: '/pricing', values: { heroTitle: 'Ciao' } });
+
+    expect(html).toContain('"route":"/pricing"');
+    expect(html).toContain('"heroTitle":"Ciao"');
+  });
+
+  it('lo schema accetta una vista e le variabili, rifiuta una variabile oggetto', () => {
+    expect(validateNodeData('iframe', { sourceNodeId: 'n1', route: '/about' }).ok).toBe(true);
+    expect(validateNodeData('iframe', { framework: 'svelte', files: { 'App.svelte': 'x' }, vars: { accent: '#ff5100', n: 3, on: false } }).ok).toBe(true);
+    expect(validateNodeData('iframe', { framework: 'svelte', files: { 'App.svelte': 'x' }, vars: { bad: { a: 1 } } }).ok).toBe(false);
+  });
+});
+
+describe('quali frame restano vivi sulla tela', () => {
+  it('un code frame e una vista sì, una pagina web no', async () => {
+    const { isLiveCode } = await import('./code-frame');
+    expect(isLiveCode({ files: { 'App.tsx': 'x' } })).toBe(true);
+    expect(isLiveCode({ sourceNodeId: 'n1', route: '/about' })).toBe(true);
+    expect(isLiveCode({ url: 'https://example.com' })).toBe(false);
+  });
+});

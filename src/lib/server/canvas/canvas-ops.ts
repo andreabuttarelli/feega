@@ -1,3 +1,6 @@
+import { exportCodeNode } from '$lib/server/canvas/code-export-node';
+import { ExportMode } from '$lib/canvas/code-frame';
+import { codeVarsError } from '$lib/server/canvas/code-source';
 import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { wrapInSection } from './section';
@@ -163,6 +166,13 @@ const op = <S extends z.ZodType>(o: Op<S>): Op<S> => o;
 
 const listCanvasesInput = z.object({}).strict();
 const listModelsInput = z.object({ medium: z.enum(GEN_MEDIUMS).describe('Which kind of node the models generate.') }).strict();
+const exportCodeFrameInput = z
+  .object({
+    nodeId: z.string().describe('A code frame (iframe with files) or a view of one.'),
+    mode: z.enum(ExportMode).optional().describe('inline (default): every feega variable becomes its current value. config: values go to src/content.ts.')
+  })
+  .strict();
+
 const listNodesInput = z.object({ canvasId: z.string().describe('Canvas id from list_canvases.') }).strict();
 const createNodeInput = z
   .object({
@@ -462,6 +472,15 @@ export const CANVAS_OPS = {
     run: async (ctx) => ({ canvases: await listCanvases(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId }) })
   }),
 
+  export_code_frame: op({
+    access: Access.Read,
+    input: exportCodeFrameInput,
+    run: async (ctx, input) => {
+      const out = await exportCodeNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId, mode: input.mode ?? ExportMode.Inline });
+      return out.ok ? { framework: out.framework, mode: out.mode, folder: out.folder, files: out.files } : { outcome: 'invalid', message: out.error };
+    }
+  }),
+
   list_nodes: op({
     access: Access.Read,
     input: listNodesInput,
@@ -494,6 +513,10 @@ export const CANVAS_OPS = {
       const badModel = await nodeModelError(input.type, input.data);
       if (badModel) {
         return { outcome: 'invalid', message: badModel };
+      }
+      const badVars = codeVarsError(input.type, input.data ?? {});
+      if (badVars) {
+        return { outcome: 'invalid', message: badVars };
       }
 
       const node = await createNode(ctx.db, {
