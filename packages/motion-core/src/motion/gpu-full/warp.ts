@@ -25,3 +25,16 @@ export const warpMasks = (masks: MaskLayer[] | undefined, warp: Warp) =>
         }
       : m,
   );
+
+type Warpable = { kind: string; matrix: Affine; contours?: number[][]; masks?: MaskLayer[]; items?: Warpable[]; matte?: { items: Warpable[] } };
+
+export function warpItem<T extends Warpable>(item: T, warp: Warp): T {
+  const masks = warpMasks(item.masks, warp);
+  return {
+    ...item,
+    ...(masks ? { masks } : {}),
+    ...(item.contours ? { contours: warpContours(item.contours, item.matrix, warp) } : {}),
+    ...(item.items ? { items: item.items.map((i) => warpItem(i, warp)) } : {}),
+    ...(item.matte ? { matte: { ...item.matte, items: item.matte.items.map((i) => warpItem(i, warp)) } } : {})
+  };
+}

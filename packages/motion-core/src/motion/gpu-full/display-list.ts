@@ -3,7 +3,9 @@ import { Background, type MotionClip, type MotionDoc } from '../doc';
 import { TrackKind, type ComponentId } from '../components';
 import { animProp, sampleColor, Source, TRANSFORM, ValueKind, type TransformKey } from '../keyframes';
 import { sampleTrack } from '../sample-track';
-import { IDENTITY, ParentOpacity, ancestorsOf, mul2d, transformAt, worldAt, type Affine } from '../parent';
+import { IDENTITY, ParentOpacity, ancestorsOf, localAt, mul2d, transformAt, worldAt, type Affine } from '../parent';
+import { depthOf, turnedInDepth } from './depth';
+import { warpItem } from './warp';
 import { apply2d } from '../affine';
 import { boxOf } from '../layout';
 import { junctionMovesOf, preparedDoc } from '../hyperframes/compose';
@@ -124,7 +126,6 @@ type Env = { clip: MotionClip; animators: TextAnimator[]; onPath: OnPath | null;
 type Painter = (env: Env) => Painted;
 
 const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment']);
-const DEPTH_KEYS: readonly TransformKey[] = ['z', 'rotateX', 'rotateY', 'skewX', 'skewY'];
 const DRAWN_SOURCES: ReadonlySet<Source> = new Set([Source.Transform, Source.Prop, Source.Param]);
 const SAMPLED_IN_PLACE: ReadonlySet<Source> = new Set([Source.Mask]);
 const SOLID_PATTERN = 'solid';
@@ -366,8 +367,6 @@ const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }
 
 const SELF_ANIMATED: ReadonlySet<ComponentId> = new Set(['Device3D']);
 
-const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
-
 const MASKED: ReadonlySet<string> = new Set(MASK_KEYS);
 
 const drawnKey = (clip: MotionClip, key: string) => MASKED.has(key) || effectOfKey(key) !== null || animatorOfKey(key) !== null || modifierOfKey(key) !== null || fillOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
@@ -379,7 +378,6 @@ const keyframedOutside = (clip: MotionClip) => Object.entries(clip.keyframes).so
 const CLIP_LIMITS: [Unsupported, (clip: MotionClip) => boolean][] = [
   [Unsupported.Component, (clip) => !PAINTERS[clip.component]],
   [Unsupported.Shader, (clip) => clip.shaders.length > 0],
-  [Unsupported.Space3d, (clip) => keyed(clip, DEPTH_KEYS)],
   [Unsupported.Keyframe, (clip) => !SELF_ANIMATED.has(clip.component) && keyframedOutside(clip)]
 ];
 
@@ -506,6 +504,8 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
   const items: Item[] = [];
   const unsupported: Gap[] = [];
 
+  const parentsAt = (clip: MotionClip) => ancestorsOf(doc, clip.id).reduce<Affine>((m, id) => (byId.get(id) ? mul2d(m, localAt(byId.get(id)!, frame, size)) : m), IDENTITY);
+
   function clipItems(clip: MotionClip): Item[] | Unsupported {
     const limit = CLIP_LIMITS.find(([, hit]) => hit(clip));
     if (limit) {
@@ -522,7 +522,12 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     const { content, gaps } = Array.isArray(painted) ? { content: painted, gaps: [] } : painted;
     unsupported.push(...gaps.map((detail) => ({ clip: clip.id, component: clip.component, reason: Unsupported.Dom, detail })));
     const edge = effectiveEdge(clip);
-    const world = mul2d(posed(edge, size.width, size.height), worldAt(doc, clip.id, frame, size));
+    const edged = posed(edge, size.width, size.height);
+    const depth = turnedInDepth(clip) ? depthOf(clip, frame, size, mul2d(edged, parentsAt(clip)), box) : null;
+    if (turnedInDepth(clip) && !depth) {
+      return Unsupported.Space3d;
+    }
+    const world = depth?.world ?? mul2d(edged, worldAt(doc, clip.id, frame, size));
     const masks = maskLayers(clip, frame, size, world, asset);
     const found = filtersOf(clip, frame, doc.fps, size, css);
     if (typeof found === 'string') {
@@ -553,11 +558,12 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
       return own as Content;
     };
     const grouped = content.length > 1 && (Object.keys(extras).length > 0 || alpha < 1 || blur > 0 || clip.blend !== BlendMode.Normal);
+    const projected = (items: Item[]) => (depth ? items.map((i) => warpItem(i, depth.warp)) : items);
     if (!grouped) {
-      return content.map((c) => ({ ...inner(c), opacity: alpha * c.opacity, blur: blur + ownBlur(c), blend: clip.blend, ...extras, ...ownLook(c, placed, extras), ...stenciled(c) }) as Item);
+      return projected(content.map((c) => ({ ...inner(c), opacity: alpha * c.opacity, blur: blur + ownBlur(c), blend: clip.blend, ...extras, ...ownLook(c, placed, extras), ...stenciled(c) }) as Item));
     }
     const items = content.map(inner);
-    return [{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }];
+    return projected([{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }]);
   }
 
   for (const clip of drawable) {
