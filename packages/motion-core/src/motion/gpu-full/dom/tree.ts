@@ -23,6 +23,7 @@ export const READ_STYLES = [
   "background-size",
   "background-position",
   "background-repeat",
+  "background-clip",
   "border-top-width",
   "border-right-width",
   "border-bottom-width",

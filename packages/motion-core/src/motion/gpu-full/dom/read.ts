@@ -157,7 +157,6 @@ const CORNERS = [
 ] as const;
 const REPEAT = "repeat";
 const NO_REPEAT = "no-repeat";
-const ORIGIN_POSITIONS = new Set(["", "0% 0%", "0px 0px", "left top"]);
 const URL_IMAGE = /^url\(/;
 
 const BACKDROP_BLUR = /^blur\(([\d.]+)px\)$/;
@@ -327,8 +326,8 @@ function bandsOf(
         .get(span.color.join())!;
     for (const [x, y] of tiles) {
       const box = {
-        x0: x,
-        y0: y,
+        x0: Math.max(0, x),
+        y0: Math.max(0, y),
         x1: Math.min(x + tile.w, size.w),
         y1: Math.min(y + tile.h, size.h),
       };
@@ -371,6 +370,172 @@ function radialOf(
   return path(contours, paint, mul2d(matrix, [1, 0, 0, squash, 0, 0]));
 }
 
+const offsetOf = (
+  position: string,
+  inner: Size,
+  tile: Size,
+): [number, number] => {
+  const [x, y] = position.split(/\s+/);
+  return [
+    lengthOf(x, inner.w - tile.w) ?? 0,
+    lengthOf(y, inner.h - tile.h) ?? 0,
+  ];
+};
+
+const covers = ([x, y]: [number, number], tile: Size, inner: Size) =>
+  x <= UNIT_EPSILON &&
+  y <= UNIT_EPSILON &&
+  x + tile.w >= inner.w - UNIT_EPSILON &&
+  y + tile.h >= inner.h - UNIT_EPSILON;
+
+type Rect = [number, number, number, number];
+
+const tileIn = ([x, y]: [number, number], tile: Size, size: Size): Rect => [
+  Math.max(0, x),
+  Math.max(0, y),
+  Math.min(x + tile.w, size.w),
+  Math.min(y + tile.h, size.h),
+];
+
+const rectContour = ([x0, y0, x1, y1]: Rect) => [
+  x0,
+  y0,
+  x1,
+  y0,
+  x1,
+  y1,
+  x0,
+  y1,
+];
+
+function slab(
+  rect: Rect,
+  along: (p: [number, number]) => number,
+  t0: number,
+  t1: number,
+): number[] | null {
+  const keep = (
+    points: [number, number][],
+    inside: (t: number) => boolean,
+    edge: number,
+  ) =>
+    points.flatMap((p, i): [number, number][] => {
+      const q = points[(i + 1) % points.length];
+      const [tp, tq] = [along(p), along(q)];
+      const cut: [number, number] = [
+        p[0] + ((q[0] - p[0]) * (edge - tp)) / (tq - tp),
+        p[1] + ((q[1] - p[1]) * (edge - tp)) / (tq - tp),
+      ];
+      if (inside(tp)) {
+        return inside(tq) ? [p] : [p, cut];
+      }
+      return inside(tq) ? [cut] : [];
+    });
+  const [x0, y0, x1, y1] = rect;
+  const corners: [number, number][] = [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ];
+  const clipped = keep(
+    keep(corners, (t) => t >= t0, t0),
+    (t) => t <= t1,
+    t1,
+  );
+  return clipped.length >= 3 ? clipped.flat() : null;
+}
+
+function stripesOf(
+  gradient: Gradient,
+  tile: Size,
+  tiles: [number, number][],
+  size: Size,
+  at: [number, number],
+  matrix: Affine,
+): Drawn[] | null {
+  const { from, to, stops } = gradient;
+  const first = stops[0].at;
+  const period = stops[stops.length - 1].at - first;
+  const axis = [to[0] - from[0], to[1] - from[1]];
+  const length2 = axis[0] ** 2 + axis[1] ** 2;
+  if (period < UNIT_EPSILON || length2 < UNIT_EPSILON) {
+    return null;
+  }
+  const bands = new Map<string, Band>();
+  const ramps: Drawn[] = [];
+  for (const [x, y] of tiles) {
+    const rect = tileIn([x, y], tile, size);
+    if (rect[2] <= rect[0] || rect[3] <= rect[1]) {
+      continue;
+    }
+    const origin = [from[0] + x + at[0], from[1] + y + at[1]];
+    const along = ([px, py]: [number, number]) =>
+      ((px - origin[0]) * axis[0] + (py - origin[1]) * axis[1]) / length2;
+    const point = (t: number): [number, number] => [
+      origin[0] + axis[0] * t,
+      origin[1] + axis[1] * t,
+    ];
+    const reach = [
+      [rect[0], rect[1]],
+      [rect[2], rect[1]],
+      [rect[2], rect[3]],
+      [rect[0], rect[3]],
+    ].map((p) => along(p as [number, number]));
+    const [low, high] = [Math.min(...reach), Math.max(...reach)];
+    for (
+      let k = Math.floor((low - first) / period);
+      first + k * period < high;
+      k++
+    ) {
+      for (let i = 1; i < stops.length; i++) {
+        const [a, b] = [stops[i - 1], stops[i]];
+        const [t0, t1] = [a.at + k * period, b.at + k * period];
+        const flatBand = sameColour(a.color, b.color);
+        if (
+          t1 - t0 < UNIT_EPSILON ||
+          t1 <= low ||
+          t0 >= high ||
+          (flatBand && a.color[3] <= 0)
+        ) {
+          continue;
+        }
+        const contour = slab(rect, along, t0, t1);
+        if (!contour) {
+          continue;
+        }
+        if (!flatBand) {
+          ramps.push(
+            path(
+              [contour],
+              {
+                kind: PaintKind.Linear,
+                from: point(t0),
+                to: point(t1),
+                stops: [
+                  { at: 0, color: a.color },
+                  { at: 1, color: b.color },
+                ],
+              },
+              matrix,
+            ),
+          );
+          continue;
+        }
+        const key = a.color.join();
+        const band =
+          bands.get(key) ??
+          bands.set(key, { color: a.color, contours: [] }).get(key)!;
+        band.contours.push(contour);
+      }
+    }
+  }
+  return [
+    ...[...bands.values()].map((b) => path(b.contours, solid(b.color), matrix)),
+    ...ramps,
+  ];
+}
+
 function backgroundOf(
   s: Style,
   size: Size,
@@ -407,12 +572,12 @@ function backgroundOf(
     .filter((l) => !isNone(l.image));
   const once = (l: (typeof layers)[number]) =>
     l.repeat === NO_REPEAT ||
-    (l.tile !== null && l.tile.w >= inner.w && l.tile.h >= inner.h);
+    (l.tile !== null &&
+      covers(offsetOf(l.position, inner, l.tile), l.tile, inner));
   const unsupported = layers.some(
     (l) =>
       !URL_IMAGE.test(l.image) &&
       (!l.tile ||
-        !ORIGIN_POSITIONS.has(l.position) ||
         (l.repeat !== REPEAT && l.repeat !== NO_REPEAT) ||
         (framed && !once(l))),
   );
@@ -436,21 +601,41 @@ function backgroundOf(
     }
     const tile = layer.tile as Size;
     const single = once(layer);
+    const offset = offsetOf(layer.position, inner, tile);
+    const shifted: [number, number] = [at[0] + offset[0], at[1] + offset[1]];
     const radial = layer.image.startsWith("radial-gradient(")
-      ? radialOf(layer.image, single ? inner : tile, at, size, shape, matrix)
+      ? radialOf(
+          layer.image,
+          single ? inner : tile,
+          shifted,
+          size,
+          shape,
+          matrix,
+        )
       : null;
     if (radial && single) {
       drawn.push(radial);
       continue;
     }
     const gradient = linearGradient(layer.image, tile);
-    if (!gradient || gradient.stops.length > MAX_STOPS) {
+    if (
+      !gradient ||
+      (!gradient.repeating && gradient.stops.length > MAX_STOPS)
+    ) {
       return { drawn, gaps: [DomGap.Background] };
     }
-    if (!single && !squared(shape)) {
+    if ((!single || gradient.repeating) && !squared(shape)) {
       return { drawn, gaps: [DomGap.Radius] };
     }
-    const tiles = single ? [[0, 0]] : grid(size, tile);
+    const tiles = single ? [offset] : grid(size, tile, offset);
+    if (gradient.repeating) {
+      const stripes = stripesOf(gradient, tile, tiles, size, at, matrix);
+      if (!stripes) {
+        return { drawn, gaps: [DomGap.Background] };
+      }
+      drawn.push(...stripes);
+      continue;
+    }
     const bands =
       squared(shape) && !framed
         ? bandsOf(gradient, tile, tiles as [number, number][], size)
@@ -460,27 +645,10 @@ function backgroundOf(
       continue;
     }
     for (const [x, y] of tiles) {
-      const contours = single
-        ? flat(
-            outlineOf(
-              shape,
-              framed
-                ? size
-                : { w: Math.min(tile.w, size.w), h: Math.min(tile.h, size.h) },
-            ),
-          )
-        : [
-            [
-              x,
-              y,
-              Math.min(x + tile.w, size.w),
-              y,
-              Math.min(x + tile.w, size.w),
-              Math.min(y + tile.h, size.h),
-              x,
-              Math.min(y + tile.h, size.h),
-            ],
-          ];
+      const contours =
+        single && covers([x, y], tile, inner)
+          ? flat(outlineOf(shape, size))
+          : [rectContour(tileIn([x, y], tile, size))];
       const paint: Paint = {
         kind: PaintKind.Linear,
         from: [gradient.from[0] + x + at[0], gradient.from[1] + y + at[1]],
@@ -493,10 +661,21 @@ function backgroundOf(
   return { drawn, gaps: [] };
 }
 
-function grid(size: Size, tile: Size): [number, number][] {
+const firstTile = (offset: number, tile: number) =>
+  offset - Math.ceil(offset / tile - UNIT_EPSILON) * tile;
+
+function grid(
+  size: Size,
+  tile: Size,
+  [ox, oy]: [number, number],
+): [number, number][] {
   const out: [number, number][] = [];
-  for (let y = 0; y < size.h - UNIT_EPSILON; y += tile.h) {
-    for (let x = 0; x < size.w - UNIT_EPSILON; x += tile.w) {
+  for (let y = firstTile(oy, tile.h); y < size.h - UNIT_EPSILON; y += tile.h) {
+    for (
+      let x = firstTile(ox, tile.w);
+      x < size.w - UNIT_EPSILON;
+      x += tile.w
+    ) {
       out.push([x, y]);
     }
   }
@@ -691,6 +870,36 @@ function shadowsOf(
   return { drawn, gaps: [] };
 }
 
+const TEXT_CLIP = "text";
+
+const clipsText = (s: Style) => s["background-clip"] === TEXT_CLIP;
+
+type Ink = (x: number) => Paint;
+
+const textInk = (node: RawNode, matrix: Affine): Ink | null => {
+  const size = { w: node.size[0], h: node.size[1] };
+  const shape = boxShapeOf(node.style, size);
+  const { drawn, gaps } = shape
+    ? backgroundOf(
+        { ...node.style, "background-color": "" },
+        size,
+        shape,
+        matrix,
+        NO_INDEX,
+      )
+    : nothing(DomGap.Radius);
+  const paths = drawn.filter((d): d is DrawnPath => d.kind === DrawnKind.Path);
+  if (!paths.length || gaps.length || paths.length < drawn.length) {
+    return null;
+  }
+  const spans = paths.map((p) => {
+    const xs = p.contours.flatMap((c) => c.filter((_, i) => i % 2 === 0));
+    return { left: Math.min(...xs), right: Math.max(...xs), paint: p.paint };
+  });
+  return (x) =>
+    (spans.find((s) => x >= s.left && x < s.right) ?? spans[0]).paint;
+};
+
 const boxPainter: Painter = (node, scope) => {
   const size = { w: node.size[0], h: node.size[1] };
   const shape = boxShapeOf(node.style, size);
@@ -700,7 +909,9 @@ const boxPainter: Painter = (node, scope) => {
   const matrix = scope.projected
     ? scope.matrix
     : pixelSnapped(scope.matrix, size);
-  const background = backgroundOf(node.style, size, shape, matrix, node.layer);
+  const background = clipsText(node.style)
+    ? nothing()
+    : backgroundOf(node.style, size, shape, matrix, node.layer);
   const border = borderOf(node.style, size, shape, matrix);
   const shadow = shadowsOf(node.style, size, shape, matrix, ShadowSide.Outer);
   const inset = shadowsOf(node.style, size, shape, matrix, ShadowSide.Inner);
@@ -965,7 +1176,10 @@ function textOf(node: RawNode, scope: Scope): Own {
       gaps: [],
     };
   }
-  if (!node.lines.length || !cased || !color) {
+  const ink: Ink | null = clipsText(s)
+    ? textInk(node, scope.matrix)
+    : color && (() => solid(color));
+  if (!node.lines.length || !cased || !ink) {
     return nothing(DomGap.Text);
   }
   const size = px(s["font-size"]);
@@ -1004,7 +1218,7 @@ function textOf(node: RawNode, scope: Scope): Own {
           x,
           baseline,
         ),
-        solid(color),
+        ink(x),
         scope.matrix,
       ),
     );
@@ -1323,7 +1537,7 @@ const maskImageEffect: GroupEffect = ({ node, items, matrix }) => {
   }
   const size = { w: node.size[0], h: node.size[1] };
   const gradient = linearGradient(value ?? "", size);
-  const fades = gradient && edgeFades(gradient);
+  const fades = gradient && !gradient.repeating && edgeFades(gradient);
   if (!gradient || !fades) {
     return DomGap.Mask;
   }

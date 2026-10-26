@@ -1532,3 +1532,93 @@ describe("readTree, CSS a motion template draws with", () => {
     ).toEqual([0, 0, 0, 0].map(() => expect.closeTo(0, 1)));
   });
 });
+
+describe("backgrounds the reader used to refuse", () => {
+  const box = (style: RawNode["style"]) =>
+    tree(root(), el({ parent: 0, at: [0, 0], size: [90, 40], style }));
+  const area = (c: number[]) =>
+    Math.abs(
+      c.reduce((s, _, i) => (i % 2 ? s : s + c[i] * c[(i + 3) % c.length] - c[(i + 2) % c.length] * c[i + 1]), 0) / 2,
+    );
+
+  it("spells out the colour before the first stop and after the last, which the core would otherwise stretch", () => {
+    const [disc] = readTree(
+      box({ "background-image": "radial-gradient(20px 20px at 30px 20px, rgb(58, 58, 58) 98%, rgba(0, 0, 0, 0) 100%)" }),
+    ).drawn as DrawnPath[];
+
+    expect(disc.paint.kind === PaintKind.Radial && disc.paint.stops.map((s) => s.at)).toEqual([0, expect.closeTo(0.98), 1]);
+  });
+
+  it("draws a repeating stripe as one band per period, merged into one path", () => {
+    const read = readTree(
+      box({
+        "background-image":
+          "repeating-linear-gradient(90deg, rgb(255, 0, 0) 0px, rgb(255, 0, 0) 2px, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0) 9px)",
+      }),
+    );
+    const [stripes] = read.drawn as DrawnPath[];
+
+    expect(read.gaps).toEqual([]);
+    expect(stripes.paint).toEqual({ kind: PaintKind.Solid, color: [1, 0, 0, 1] });
+    expect(stripes.contours).toHaveLength(10);
+    expect(stripes.contours.reduce((s, c) => s + area(c), 0)).toBeCloseTo(10 * 2 * 40, 0);
+  });
+
+  it("draws a slanted repeating stripe inside its box", () => {
+    const read = readTree(
+      box({
+        "background-image":
+          "repeating-linear-gradient(-62deg, rgb(0, 0, 0) 0px, rgb(0, 0, 0) 3px, rgba(0, 0, 0, 0) 3px, rgba(0, 0, 0, 0) 12px)",
+      }),
+    );
+    const [stripes] = read.drawn as DrawnPath[];
+
+    expect(read.gaps).toEqual([]);
+    expect(bounds(stripes)).toMatchObject({ left: expect.closeTo(0, 3), right: expect.closeTo(90, 3) });
+    expect(stripes.contours.reduce((s, c) => s + area(c), 0)).toBeCloseTo((90 * 40 * 3) / 12, -2);
+  });
+
+  it("shifts a gradient by its background position", () => {
+    const read = readTree(
+      box({
+        "background-image": "linear-gradient(90deg, rgb(0, 0, 0) 0%, rgb(255, 255, 255) 100%)",
+        "background-size": "200% 100%",
+        "background-position": "-50% 0px",
+        "background-repeat": "repeat",
+      }),
+    );
+    const tiles = read.drawn as DrawnPath[];
+
+    expect(read.gaps).toEqual([]);
+    expect(tiles.map((t) => [t.paint.kind === PaintKind.Linear && t.paint.from[0], bounds(t).left, bounds(t).right])).toEqual([
+      [-135, 0, 45],
+      [45, 45, 90],
+    ]);
+  });
+
+  it("paints text clipped to its background with the background, and no box", () => {
+    const read = readTree(
+      tree(
+        root(),
+        el({
+          parent: 0,
+          size: [60, 20],
+          style: {
+            color: "rgba(0, 0, 0, 0)",
+            "font-family": '"Inter Tight", system-ui',
+            "font-size": "10px",
+            "background-image": "linear-gradient(90deg, rgb(0, 0, 0) 0%, rgb(255, 255, 255) 100%)",
+            "background-clip": "text",
+          },
+          text: "ab",
+          lines: [{ chars: ["a", "b"], xs: [0, 10], top: 0, height: 10 }],
+        }),
+      ),
+      { fonts: boxBook(new Set()), smoothing: Smoothing.Plain },
+    );
+
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn).toHaveLength(2);
+    expect(read.drawn.every((d) => d.kind === DrawnKind.Path && d.paint.kind === PaintKind.Linear)).toBe(true);
+  });
+});
