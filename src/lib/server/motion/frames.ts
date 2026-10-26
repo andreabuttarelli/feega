@@ -53,6 +53,24 @@ export function keyFrameTimes(doc: MotionDoc, max = SELF_CHECK_FRAMES): number[]
   return picked.map((f) => Math.round((f / doc.fps) * SECONDS_PRECISION) / SECONDS_PRECISION);
 }
 
+const CUT_PROBE_OFFSETS_S = [0, 0.25, 0.5, 0.8, 1.2];
+const MAX_PROBED_CUTS = 8;
+
+export function cutProbeTimes(doc: MotionDoc): number[] {
+  const starts = doc.tracks
+    .filter((t) => t.kind === TrackKind.Visual)
+    .flatMap((t) => t.clips.filter((c) => isScene(c, doc)).map((c) => c.from))
+    .filter((f) => f > 0);
+  const cuts = [...new Set(starts)].sort((a, b) => a - b).slice(0, MAX_PROBED_CUTS);
+  const end = doc.durationInFrames / doc.fps;
+  const round = (t: number) => Math.round(t * SECONDS_PRECISION) / SECONDS_PRECISION;
+
+  return cuts.flatMap((cut) => {
+    const at = cut / doc.fps;
+    return [at - 1 / doc.fps, ...CUT_PROBE_OFFSETS_S.map((o) => at + o)].filter((t) => t < end).map(round);
+  });
+}
+
 const FRAMES_ASK = 'Look for clipped or overflowing text, overlaps, poor contrast and anything outside the safe area.';
 
 function framesOutput(output: unknown, frames: readonly Frame[] = [], refs: readonly Reference[] = []) {

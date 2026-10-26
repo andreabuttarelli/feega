@@ -129,11 +129,11 @@ import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, e
 import type { MotionAsset } from './editor';
 import { referenceLookSchema, type ReferenceLook } from '@feega/motion-core/motion/reference-look-model';
 import type { PickAnswer } from '$lib/reference-pick';
-import { DESCRIBE_FRAMES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame, type Reference } from './frames';
+import { DESCRIBE_FRAMES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, cutProbeTimes, withFrames, type Frame, type Reference } from './frames';
 import { loopJump, seamChecked } from '$lib/motion/loop';
 import { DESCRIBE_ASK, describeFramesTool, gateBlock, lookFirst, type Looks, type Viewing } from './look';
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
-import { Quality, blocking, docProblems, frameProblems, softPictures, uiRecolour, uiShrink, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
+import { Quality, blocking, docProblems, frameProblems, vanishes, softPictures, uiRecolour, uiShrink, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '@feega/motion-core/motion/custom/component';
 import { PARAM_GUIDE } from '@feega/motion-core/motion/custom/params';
 import { Occurrence, recordCheck, removeComponent, updateComponent, writeComponent } from '$lib/motion/custom/ops';
@@ -279,6 +279,7 @@ export type MotionToolDeps = {
   fontAdvance?: (fontUrl: string) => Promise<Advance | null>;
   fontOutliner?: OutlinerLoader;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
+  probe?: (times: number[]) => Promise<FrameStat[]>;
   seam?: () => Promise<number | null>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
@@ -2795,7 +2796,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const pixels = assetPixels();
         const seam = deps.seam && seamChecked(session.doc) ? await deps.seam() : null;
         const jump = seam === null ? null : loopJump(session.doc, seam);
-        session.gate = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos], referencesSeen: Boolean(session.references?.length) }), ...frameProblems(stats), ...(jump ? [{ kind: Quality.LoopJump, at: end, detail: jump }] : [])];
+        const cutTimes = cutProbeTimes(session.doc);
+        const blinks = deps.probe && cutTimes.length ? vanishes(await deps.probe(cutTimes)) : [];
+        session.gate = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos], referencesSeen: Boolean(session.references?.length) }), ...frameProblems(stats), ...blinks, ...(jump ? [{ kind: Quality.LoopJump, at: end, detail: jump }] : [])];
         session.look = { times: frames.map((f) => f.time), described: false };
         const quality = session.gate.map((p) => p.detail);
         const open = blocking(session.gate).map((p) => p.detail);

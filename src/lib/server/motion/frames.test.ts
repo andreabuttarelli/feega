@@ -4,7 +4,7 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/m
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import { finalReply } from './frames';
-import { FrameUpload, MAX_SELF_CHECK_REFS, checkMessage, viewedReferences, MAX_FRAME_BYTES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, decodeFrame, docTexts, keyFrameTimes, selfCheckDue, usageByModel, Vision, visionStep } from './frames';
+import { FrameUpload, MAX_SELF_CHECK_REFS, checkMessage, viewedReferences, MAX_FRAME_BYTES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, decodeFrame, docTexts, keyFrameTimes, cutProbeTimes, selfCheckDue, usageByModel, Vision, visionStep } from './frames';
 
 const jpeg = (bytes: number) => `data:image/jpeg;base64,${Buffer.alloc(bytes, 1).toString('base64')}`;
 
@@ -175,5 +175,19 @@ describe('the closing summary does not reopen what the user settled', () => {
       expect(prompt).not.toContain('anything left to decide');
       expect(prompt).toContain('never ask again what the user already answered');
     }
+  });
+});
+
+describe('the cut probe looks either side of every scene cut', () => {
+  it('the last frame before each cut, the cut itself and the second after it', () => {
+    let doc = newMotionDoc(MotionFormat.Landscape);
+    doc = must(addClip(doc, { component: 'Title', from: 0, durationInFrames: 60 }, 'a'));
+    doc = must(addClip(doc, { component: 'Title', from: 60, durationInFrames: 60 }, 'b'));
+
+    expect(cutProbeTimes(doc)).toEqual([1.97, 2, 2.25, 2.5, 2.8, 3.2]);
+  });
+
+  it('a single scene has no cut to probe', () => {
+    expect(cutProbeTimes(must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 60 }, 'a')))).toEqual([]);
   });
 });

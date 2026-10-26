@@ -58,7 +58,8 @@ export enum Quality {
   RecolouredUi = 'recoloured-ui',
   ShrunkUi = 'shrunk-ui',
   SmallUi = 'small-ui',
-  HiddenInStill = 'hidden-in-still'
+  HiddenInStill = 'hidden-in-still',
+  VanishingCut = 'vanishing-cut'
 }
 
 export enum Severity {
@@ -73,6 +74,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.SmallTitle]: Severity.Warning,
   [Quality.Silent]: Severity.Blocking,
   [Quality.BlankFrame]: Severity.Blocking,
+  [Quality.VanishingCut]: Severity.Blocking,
   [Quality.WhiteArea]: Severity.Blocking,
   [Quality.OffStyle]: Severity.Warning,
   [Quality.SoftPicture]: Severity.Blocking,
@@ -693,6 +695,29 @@ function timelineProblems(doc: MotionDoc, input: { audioAssets: number; pixels?:
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
   return [...unscripted(doc), ...productUiMissing(doc), ...uiShare(doc), ...smallUi(doc), ...alteredUi(doc), ...kitBesideRealUi(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...deadJunctions(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];
+}
+
+const ADJACENT_S = 0.1;
+const VANISH_SHARE = 0.5;
+const RETURN_SHARE = 0.8;
+const RETURN_WITHIN_S = 1.5;
+
+export function vanishes(stats: readonly FrameStat[]): QualityProblem[] {
+  const found: QualityProblem[] = [];
+  for (let i = 1; i < stats.length; i++) {
+    const before = stats[i - 1];
+    const dip = stats[i];
+    if (dip.time - before.time > ADJACENT_S || dip.lumaStd >= before.lumaStd * VANISH_SHARE) {
+      continue;
+    }
+
+    const back = stats.slice(i + 1).find((s) => s.time - dip.time <= RETURN_WITHIN_S && s.lumaStd >= before.lumaStd * RETURN_SHARE);
+    if (!back) {
+      continue;
+    }
+    found.push({ kind: Quality.VanishingCut, at: dip.time, detail: `the picture vanishes at ${dip.time}s and comes back at ${back.time}s: the viewer sees the canvas blink out. Keep what is on screen across the cut (no fade from 0 right after it) or give the outgoing scene a short exit` });
+  }
+  return found;
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
