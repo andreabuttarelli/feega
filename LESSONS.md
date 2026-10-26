@@ -3359,3 +3359,13 @@ in console.
 ### A template frame renders white only when it holds an image
 Signal: a poster is a white card on gpu-core; the console shows `UNSUPPORTED ... "unread"` and `core DOM read failed ... DataCloneError: Non-origin-clean ImageBitmap`. Cause: an element the DOM read cannot draw (SVG `<image>`) makes the whole frame undrawable, and a remote image drawn to a canvas without CORS taints the bitmap so it cannot leave the reader iframe. Move: log `list.unsupported` in `drawsWhole` to see which gap; load probe images with `crossOrigin = "anonymous"`; a data URL hides the taint, so test with a real storage URL.
 
+
+## Desktop native canvas
+
+### A render thread that reads the camera, then waits for a drawable, shows a stale frame
+
+**Signal:** native pan intervals at 32 ms while the thread is idle; `get_current_texture` takes ~14 ms per frame. **Move:** acquire the drawable first, then drain the inbox for the latest camera, then paint (`worker.rs`). A timed-out or occluded surface is a skipped frame, never an error: the spike's `?` ended the thread and the canvas froze.
+
+### The bench cannot tell native from wasm on a 60 Hz display
+
+**Signal:** both engines read 57-60 fps. **Move:** compare late-frame percentages and CPU, and say which display refresh the run had; the spike's 120 Hz numbers do not carry over. `screencapture` and `capturePage` do not see the Metal layer: read the retained texture back with the addon `snapshot` (needs `FEEGA_NATIVE_DEBUG=1`).

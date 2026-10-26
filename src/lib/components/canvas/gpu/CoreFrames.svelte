@@ -3,6 +3,7 @@
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+  import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
   import { createMedia, Readiness, VideoPreload } from '@feega/motion-core/motion/gpu-full/media';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Outcome } from '@feega/motion-core/motion/gpu-full/core-outcome';
@@ -37,7 +38,7 @@
 
   const MAX_RESOLUTION = 2;
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
-  const BACKENDS = [createCore, createCoreGl];
+  const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let backend = $state(0);
@@ -568,7 +569,9 @@
   <pre class="core-hud">{hud}</pre>
 {/if}
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
-<div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
+{#if !raster?.behindPage}
+  <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
+{/if}
 {#key backend}
   <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
 {/key}

@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>feega canvas bench</title>
+<style>
+  html, body { margin: 0; height: 100%; font: 13px -apple-system, system-ui, sans-serif; overflow: hidden; background: #f6f6f7; }
+  body { display: grid; grid-template-rows: 40px 1fr; }
+  header { background: #fff; border-bottom: 1px solid #e4e4e7; display: flex; align-items: center; padding: 0 12px; gap: 16px; }
+  #stage { position: relative; background: #e9e9ec; }
+  #stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+</style>
+</head>
+<body>
+<header><b id="mode"></b><span id="status"></span></header>
+<main id="stage"><canvas id="canvas"></canvas></main>
+<script type="module" src="/bench.js"></script>
+</body>
+</html>

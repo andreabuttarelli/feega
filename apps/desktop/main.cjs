@@ -1,11 +1,17 @@
-const { app, BrowserWindow, shell, dialog, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, nativeTheme } = require('electron');
+const path = require('node:path');
 const { autoUpdater } = require('electron-updater');
 const { watchUpdates } = require('./updates.cjs');
 const { frameless, overlay } = require('./chrome.cjs');
 const { start, authReturn, staysInside, DEEP_LINK_SCHEME } = require('./routing.cjs');
+const nativeCanvas = require('./native-canvas.cjs');
 
 const START_URL_ENV = 'FEEGA_URL';
 const home = start(process.env[START_URL_ENV]);
+const PRELOAD_FILE = 'preload.cjs';
+const TRANSPARENT = '#00000000';
+const nativeCanvasOn = nativeCanvas.wanted(process.env, process.platform);
+const NativeCanvas = nativeCanvasOn ? nativeCanvas.loadAddon(__dirname) : null;
 const userAgent = (window) => `${window.webContents.getUserAgent()} FeegaNative/${app.getVersion()}`;
 
 let window = null;
@@ -27,8 +33,28 @@ function deepLinkIn(argv) {
   return argv.find((arg) => arg.startsWith(DEEP_LINK_SCHEME));
 }
 
+function windowOptions() {
+  const base = { width: 1440, height: 900, minWidth: 800, minHeight: 600, title: 'feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) };
+  if (!NativeCanvas) {
+    return base;
+  }
+  return { ...base, transparent: true, backgroundColor: TRANSPARENT, webPreferences: { preload: path.join(__dirname, PRELOAD_FILE) } };
+}
+
+function installNativeCanvas() {
+  if (!NativeCanvas) {
+    return;
+  }
+  nativeCanvas.install({
+    ipcMain,
+    NativeCanvas,
+    handleOf: (contents) => BrowserWindow.fromWebContents(contents).getNativeWindowHandle(),
+    trusted: (event) => staysInside(event.senderFrame.url, home.href)
+  });
+}
+
 function open() {
-  window = new BrowserWindow({ width: 1440, height: 900, minWidth: 800, minHeight: 600, title: 'feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) });
+  window = new BrowserWindow(windowOptions());
   if (process.platform !== 'darwin') {
     nativeTheme.on('updated', () => window?.setTitleBarOverlay(overlay(nativeTheme.shouldUseDarkColors)));
   }
@@ -73,6 +99,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(() => {
+    installNativeCanvas();
     open();
     if (app.isPackaged) {
       watchUpdates({ updater: autoUpdater, ask: (options) => dialog.showMessageBox(window, options), every: setInterval });
