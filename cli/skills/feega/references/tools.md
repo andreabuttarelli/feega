@@ -111,6 +111,10 @@ enforce on `nodes.data`, per `type` (`text`, `image`, `video`, `doc`, `iframe`,
 — call `run_node_generation` and read its refusal, or check the model's own docs, since those are
 a fact of the model, not the node.
 
+An `iframe` node is also a **code frame**: `data.framework` (`react` | `svelte`) and `data.files`
+(path → source, entry `App.tsx` or `App.svelte` with a default export) render live React/Svelte on
+the canvas, with relative imports between files and bare npm imports from esm.sh.
+
 `effects` holds a stack of image filters (pixelate, posterize, duotone, dither, halftone, noise,
 rgb-shift, glitch, wave, swirl, pinch, ascii, random-colors, shape-mosaic, shape-cutout) over an
 upstream image — the schema returned for it lists every effect's params with their

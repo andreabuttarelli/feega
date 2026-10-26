@@ -3360,6 +3360,12 @@ in console.
 Signal: a poster is a white card on gpu-core; the console shows `UNSUPPORTED ... "unread"` and `core DOM read failed ... DataCloneError: Non-origin-clean ImageBitmap`. Cause: an element the DOM read cannot draw (SVG `<image>`) makes the whole frame undrawable, and a remote image drawn to a canvas without CORS taints the bitmap so it cannot leave the reader iframe. Move: log `list.unsupported` in `drawsWhole` to see which gap; load probe images with `crossOrigin = "anonymous"`; a data URL hides the taint, so test with a real storage URL.
 
 
+## A Playwright click inside a canvas iframe hits the wrong element
+Signal: `frameLocator(...).click()` on a link in a code frame passes, but nothing happens; a capture listener in the frame logs the click on a parent (`NAV`). Cause: the tile is CSS-scaled with the canvas zoom and Playwright places in-iframe points without that scale. Move: compute the point yourself: `frame.boundingBox().x + rect.x * (frame.width / innerWidth)`, then `page.mouse.click`. Real clicks are fine.
+
+## A link `#/page` in a srcdoc iframe blanks the frame
+Signal: clicking `<a href="#/pricing">` in a code frame leaves an empty page at `about:blank#/pricing`. Cause: srcdoc documents resolve relative URLs against the parent's base, so the hash link is a cross-document navigation. Move: `<base href="about:srcdoc">` in the srcdoc head. `new URL('/x', location.href)` still throws there, so react-router's HashRouter/BrowserRouter cannot work: use MemoryRouter.
+
 ## Landing
 
 ### A below-the-fold image collage costs Lighthouse mobile points even with `loading="lazy"`

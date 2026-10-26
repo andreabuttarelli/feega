@@ -173,6 +173,8 @@
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { sourceOf } from '$lib/canvas/iframe-node';
+  import { codeFilesOf } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
@@ -319,12 +321,15 @@
     }
   });
   const LIVE_POSTER_CAP = 3;
+  const LIVE_CODE_CAP = 4;
+  const IFRAME_TYPE = 'iframe';
   let settledView = $state<Viewport | null>(null);
+  const liveCode = $derived([...visibleIds(placed.filter((t) => t.kind === IFRAME_TYPE && sourceOf({ files: codeFilesOf(summaries.get(t.id)?.data) }) === 'code'), view, area)].slice(0, LIVE_CODE_CAP));
   const domIds = $derived.by(() => {
     const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => holdsDoc(t.kind ?? '') && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
     const posters = placed.filter((t) => holdsDoc(t.kind ?? '') && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
     const sharp = !coreOn && BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
-    const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
+    const next = new Set([...editIds, ...sticky.keys(), ...liveCode, ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
