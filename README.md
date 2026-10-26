@@ -37,7 +37,11 @@ npm run local -- my-canvas.feega        # http://localhost:5173
 
 The first run builds the app (a few minutes). The file is created if it does not exist and saved
 as you work. To continue in the cloud, import it at [feega.app](https://feega.app) with
-**Import .feega**. Sharing, comments, saved versions and AI generation need the cloud and say so.
+**Import .feega**. Sharing, comments and saved versions need the cloud and say so.
+
+To generate with your own provider keys, set `KIE_API_KEY` and/or `LLM_API_KEY` (OpenRouter) in the
+environment or in `.env`: the text, image and video nodes appear, no plan or credits. Keys never
+enter the `.feega` file.
 
 ## Run it locally as an agent
 

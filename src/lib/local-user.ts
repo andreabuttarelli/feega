@@ -19,13 +19,38 @@ export enum LocalOff {
   Brand = 'brand',
   CloudImport = 'cloud_import',
   CloudNodes = 'cloud_nodes',
+  AiNodes = 'ai_nodes',
   TermsNotice = 'terms_notice',
   PublicLinks = 'public_links',
   NextSteps = 'next_steps'
 }
 
-const OFF_IN_LOCAL_MODE: ReadonlySet<LocalOff> = new Set(Object.values(LocalOff));
+type Env = Record<string, string | undefined>;
 
-export const localOff = (feature: LocalOff, env: Record<string, string | undefined>) => isLocalMode(env) && OFF_IN_LOCAL_MODE.has(feature);
+export const LOCAL_AI_FLAG = 'PUBLIC_FEEGA_LOCAL_AI';
+
+const always = () => true;
+const withoutAiKey = (env: Env) => env[LOCAL_AI_FLAG] !== '1';
+
+const OFF_IN_LOCAL_MODE: Record<LocalOff, (env: Env) => boolean> = {
+  [LocalOff.CookieBanner]: always,
+  [LocalOff.Analytics]: always,
+  [LocalOff.Chat]: always,
+  [LocalOff.Share]: always,
+  [LocalOff.Credits]: always,
+  [LocalOff.Comments]: always,
+  [LocalOff.Versions]: always,
+  [LocalOff.NewCanvas]: always,
+  [LocalOff.ImportCanvas]: always,
+  [LocalOff.Brand]: always,
+  [LocalOff.CloudImport]: always,
+  [LocalOff.CloudNodes]: always,
+  [LocalOff.AiNodes]: withoutAiKey,
+  [LocalOff.TermsNotice]: always,
+  [LocalOff.PublicLinks]: always,
+  [LocalOff.NextSteps]: always
+};
+
+export const localOff = (feature: LocalOff, env: Env) => isLocalMode(env) && OFF_IN_LOCAL_MODE[feature](env);
 
 export const isOff = (feature: LocalOff) => localOff(feature, publicEnv);

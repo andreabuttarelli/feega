@@ -5,6 +5,7 @@ import { json } from '@sveltejs/kit';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { markRlsScoped } from '$lib/server/rls-client';
 import { LOCAL_AI_MESSAGE, localStore } from '$lib/server/local/local-mode';
+import { hasAiKey } from '$lib/local-ai-keys';
 
 /**
  * The new `api_keys` (org_id NOT NULL, scopes: string[]) has no per-brand scoping column — a key
@@ -231,7 +232,7 @@ const CREDITS_EXHAUSTED_MESSAGE = 'AI credits are exhausted for this billing per
 
 async function creditGateOutcome(spend: () => Promise<void>): Promise<CreditGateDenial | undefined> {
   if (localStore()) {
-    return { status: 403, data: { error: 'local_mode', message: LOCAL_AI_MESSAGE } };
+    return hasAiKey(process.env) ? undefined : { status: 403, data: { error: 'local_mode', message: LOCAL_AI_MESSAGE } };
   }
   const { CreditsExhaustedError } = await import('./credits');
   try {

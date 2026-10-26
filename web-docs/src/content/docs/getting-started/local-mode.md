@@ -23,10 +23,29 @@ The [CLI](/integrations/cli/) and the [MCP server](/integrations/mcp/) find the 
 port 5173 and need no `feega login`. What an agent adds or changes appears live in your browser.
 `canvas_file` with `action: "save"` writes a copy of the file wherever you ask.
 
+## AI generation with your own keys
+
+Put a provider key in the process environment or in the `.env` file in the repo folder, then start
+local mode:
+
+| Variable | Provider |
+|---|---|
+| `KIE_API_KEY` | kie |
+| `OPENROUTER_API_KEY` or `LLM_API_KEY` (and `LLM_BASE_URL` for a gateway other than OpenRouter) | OpenRouter |
+
+With at least one key the text, image and video nodes appear and generate straight against the
+provider: no plan, no credits. The model picker lists only models whose provider key you set. Each
+run is billed by the provider to your own account.
+
+Keys are read from the environment only. They are never written to the `.feega` file, sent to the
+browser or logged. Generated images and videos are stored inside the `.feega` file, so the canvas
+stays one portable file. Without a key the nodes stay hidden and generation answers with a message.
+Safety screening runs on `LLM_API_KEY`: set it, or generation is refused with a hint.
+
 ## What needs the cloud
 
-Sharing, comments, saved versions, voices and AI generation answer with a message instead of
-running. Import the file at feega.app to use them: canvas menu or home page, **Import .feega**.
+Sharing, comments, saved versions and voices answer with a message instead of running. Import the
+file at feega.app to use them: canvas menu or home page, **Import .feega**.
 
 Chat, Share, credits, comments, saved versions and Drive/Dropbox import are not shown.
 

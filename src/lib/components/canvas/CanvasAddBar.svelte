@@ -20,7 +20,7 @@
   import { Command } from '$lib/motion/shortcuts';
   import { ACTIONS, tipText } from '$lib/motion/actions';
   import CanvasTemplateGallery from './CanvasTemplateGallery.svelte';
-  import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, CLOUD_ADDABLE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
+  import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, CLOUD_ADDABLE, AI_ADDABLE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { MOBILE_QUERY } from '$lib/breakpoints';
@@ -98,7 +98,7 @@
     ontemplate?.(id);
   }
 
-  const offered = (what: Addable) => !(isOff(LocalOff.CloudNodes) && CLOUD_ADDABLE.has(what));
+  const offered = (what: Addable) => !(isOff(LocalOff.CloudNodes) && CLOUD_ADDABLE.has(what)) && !(isOff(LocalOff.AiNodes) && AI_ADDABLE.has(what));
   const slot = (what: Addable) => CANVAS_ADD_BAR.indexOf(what) + 1;
 
   function pickMore(what: Addable) {
