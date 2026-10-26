@@ -3,7 +3,7 @@ import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
-import { stateChrome, tileChrome, ChromePart, PortState, type StateTile, type Glyphs } from './chrome';
+import { stateChrome, tileChrome, ChromePart, ADD_BESIDE, PortState, type StateTile, type Glyphs } from './chrome';
 import type { ConnectorType } from '$lib/canvas/connectors';
 
 const marks = (...types: ConnectorType[]) => types.map((type) => ({ type, state: PortState.Quiet }));
@@ -124,6 +124,13 @@ describe('tileChrome', () => {
       [416, 270, 482, 281]
     ]);
     expect(ofPart(tile({ inputs: marks('text') }), ChromePart.PortName)).toHaveLength(0);
+  });
+
+  it('keeps the output name clear of the add-beside button', () => {
+    const t = tile({ outputs: [{ type: 'videos', state: PortState.Lit }], addBeside: true });
+    const [left] = box(ofPart(t, ChromePart.PortName)[0].contours);
+
+    expect(left).toBeGreaterThanOrEqual(400 + ADD_BESIDE.offset + ADD_BESIDE.size);
   });
 
   it('puts the kind icon before the label and shifts the label past it', () => {

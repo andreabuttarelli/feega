@@ -50,12 +50,12 @@
 
 {#if tile.connectable !== false && tile.output}
   <div class="svelte-flow__handle typed-port port-out source" data-nodeid={tile.id} style={`top:50%;--port:${CONNECTOR_STYLE[tile.output].color}`} title={CONNECTOR_STYLE[tile.output].label} aria-label={CONNECTOR_STYLE[tile.output].label}></div>
-  <span class="port-name port-name-out" style={`top:50%;--port:${CONNECTOR_STYLE[tile.output].color}`}>{CONNECTOR_STYLE[tile.output].label}</span>
+  <span class="port-name port-name-out" class:beside-plus={onaddbeside && (showAdd || overPlus)} style={`top:50%;--port:${CONNECTOR_STYLE[tile.output].color}`}>{CONNECTOR_STYLE[tile.output].label}</span>
 {/if}
 
 {#each outputs as out, i (out.handle)}
   <div class="svelte-flow__handle typed-port port-out source" data-handleid={out.handle} data-nodeid={tile.id} style={`top:${spaced(i, outputs.length)};--port:${CONNECTOR_STYLE[out.port].color}`} title={out.label} aria-label={out.label}></div>
-  <span class={`port-name port-name-out ${out.incompatible ? 'port-name-flagged' : ''}`} style={`top:${spaced(i, outputs.length)};--port:${CONNECTOR_STYLE[out.port].color}`}>{out.label}</span>
+  <span class={`port-name port-name-out ${out.incompatible ? 'port-name-flagged' : ''} ${onaddbeside && (showAdd || overPlus) ? 'beside-plus' : ''}`} style={`top:${spaced(i, outputs.length)};--port:${CONNECTOR_STYLE[out.port].color}`}>{out.label}</span>
 {/each}
 </div>
 {/if}
@@ -145,6 +145,9 @@
   }
   .port-name-out {
     left: calc(100% + 16px);
+  }
+  .port-name-out.beside-plus {
+    left: calc(100% + 40px);
   }
   .port-name-flagged {
     opacity: 0.5;
