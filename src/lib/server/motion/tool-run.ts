@@ -20,6 +20,7 @@ import { createMotionTools, type MotionSession, type MotionToolDeps } from './mo
 import { frameMover } from './move-element';
 import { drawFrames, firstFrames } from './server-frames';
 import { fontAdvance } from './font-advance';
+import { ffmpegLumas } from './track-frames';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
 import type { Frame } from './frames';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -54,7 +55,7 @@ export enum FrameToolAccess {
   Editor = 'editor'
 }
 
-const READ_TOOLS = ['get_motion_doc', 'measure_text', 'list_components', 'list_assets', 'beat_times', 'list_effects', 'list_layouts', 'list_fields', 'list_fonts', 'read_component', 'list_shots', 'list_templates', 'get_template', 'list_revisions', 'view_frames', 'describe_frames', 'list_ui_kinds'];
+const READ_TOOLS = ['get_motion_doc', 'measure_text', 'list_components', 'list_assets', 'beat_times', 'list_effects', 'list_layouts', 'list_fields', 'list_fonts', 'read_component', 'list_shots', 'list_templates', 'get_template', 'list_revisions', 'view_frames', 'describe_frames', 'list_ui_kinds', 'track_point'];
 
 const EDITOR_ONLY_TOOLS = ['read_video_reference', 'render_batch', 'spawn_agent', 'render_video', 'analyze_site', 'write_storyboard', 'read_storyboard', 'update_storyboard_card', 'link_storyboard_beat', 'use_brand', 'import_asset', 'recreate_ui', 'add_music'];
 
@@ -84,7 +85,7 @@ const freshSession = (doc: MotionSession['doc'], version: number): MotionSession
 const noFrames: MotionToolDeps['frames'] = async () => null;
 
 function toolsFor(deps: Omit<MotionToolDeps, 'voiceover' | 'frames' | 'check' | 'newId'> & { voiceover?: MotionToolDeps['voiceover'] }, frames = noFrames): Record<string, Tool> {
-  return createMotionTools({ ...deps, newId, voiceover: deps.voiceover ?? offTurn, frames, check: async () => null, fontAdvance: readFontAdvance });
+  return createMotionTools({ ...deps, newId, voiceover: deps.voiceover ?? offTurn, frames, check: async () => null, fontAdvance: readFontAdvance, trackReader: ffmpegLumas });
 }
 
 function carried(turn: ToolRunTurn | undefined, nodeId: string, doc: MotionDoc, version: number): MotionSession {

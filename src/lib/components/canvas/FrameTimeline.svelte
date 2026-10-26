@@ -3,6 +3,7 @@
   import IconButton from '$lib/components/motion/IconButton.svelte';
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import TimeRemap from '$lib/components/motion/TimeRemap.svelte';
+  import TrackPanel from '$lib/components/motion/TrackPanel.svelte';
   import { advance } from '$lib/canvas/frame-playhead';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -29,8 +30,9 @@
     onpin,
     ram = [],
     onram = () => {},
+    assetUrl,
     onchange
-  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; marks?: CommentMark[]; onmark?: (id: string, frame: number) => void; onpin?: () => void; ram?: FrameRange[]; onram?: () => void; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; marks?: CommentMark[]; onmark?: (id: string, frame: number) => void; onpin?: () => void; ram?: FrameRange[]; onram?: () => void; assetUrl?: (assetId: string) => string; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const MODE_LABEL: Record<EditMode, string> = { [EditMode.Design]: 'Design: edits set the resting state', [EditMode.Motion]: 'Animate: edits key at the playhead' };
 
@@ -121,6 +123,7 @@
     </div>
   {/if}
   {#if remapped}<TimeRemap {doc} clip={remapped} {frame} {onchange} />{/if}
+  {#if remapped && assetUrl}<TrackPanel {doc} clip={remapped} {frame} {assetUrl} {onchange} />{/if}
   <div class="body">
     {#if graphOpen}
       <GraphEditor {doc} {frame} {selection} bind:keySelection {camera} {onchange} />
