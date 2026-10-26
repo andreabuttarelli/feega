@@ -3359,3 +3359,9 @@ in console.
 ### A template frame renders white only when it holds an image
 Signal: a poster is a white card on gpu-core; the console shows `UNSUPPORTED ... "unread"` and `core DOM read failed ... DataCloneError: Non-origin-clean ImageBitmap`. Cause: an element the DOM read cannot draw (SVG `<image>`) makes the whole frame undrawable, and a remote image drawn to a canvas without CORS taints the bitmap so it cannot leave the reader iframe. Move: log `list.unsupported` in `drawsWhole` to see which gap; load probe images with `crossOrigin = "anonymous"`; a data URL hides the taint, so test with a real storage URL.
 
+
+## Landing
+
+### A below-the-fold image collage costs Lighthouse mobile points even with `loading="lazy"`
+
+**Signal:** home mobile score drops from 90 to 87 and LCP from 3.2 s to 3.7 s after adding a section of images a viewport below the hero; the LCP element is still the hero poster. **Move:** native lazy loading fetches within about a viewport and a half, and those requests compete with the poster and the hero video. Mount the tiles from an `IntersectionObserver` (`Collage.svelte`) and reserve the height with `aspect-ratio` so CLS stays 0. Measure against a build of `origin/dev`, not against the target alone.
