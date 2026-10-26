@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 const SCRIPT = resolve('scripts/vercel-ignore.sh');
 const BUILD = 1;
 const SKIP = 0;
-const APP_EXCLUDED = [':!cli', ':!changelog', ':!docs', ':!apps', ':!imgs', ':!supabase'].map((p) => `'${p}'`).join(' ');
+const APP_EXCLUDED = [':!cli', ':!changelog', ':!docs', ':!apps', ':!imgs', ':!supabase', ':!landing'].map((p) => `'${p}'`).join(' ');
 
 function repoTouching(path: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'vercel-ignore-'));

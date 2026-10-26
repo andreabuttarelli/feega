@@ -18,7 +18,7 @@ describe('the root page', () => {
     expect(() => load()).toThrow(expect.objectContaining({ location: '/app' }));
   });
 
-  it('on the web stays the homepage', () => {
+  it('on the web leaves the root to the server redirect', () => {
     expect(load()).toBeUndefined();
     state.browser = false;
     state.apiBase = 'https://feega.app';

@@ -24,6 +24,7 @@
   import { REPORT_PATH } from '$lib/reports/report-link';
   import { BILLING_PATH } from '$lib/billing-path';
   import { FOOTER_LEGAL_LINKS, LEGAL_LINKS, legalHref } from '$lib/legal-links';
+  import { marketingUrl } from '$lib/marketing';
 
   type RailPages = 'include' | 'omit';
 
@@ -80,7 +81,6 @@
     sheet?: string;
     sub?: true;
     danger?: true;
-    marketingPage?: true;
     desktopOnly?: true;
     local?: true;
   }> = [
@@ -88,7 +88,7 @@
     { id: 'settings', group: 'navigate', labelKey: 'app.shell.menu.settings', icon: Settings, sheet: '/settings/project' },
     { id: 'billing', group: 'navigate', labelKey: 'app.shell.menu.billing', icon: CreditCard, href: BILLING_PATH },
     { id: 'shortcuts', group: 'help', labelKey: 'app.shell.menu.shortcuts', icon: Keyboard, sub: true, desktopOnly: true, local: true },
-    { id: 'changelog', group: 'help', labelKey: 'app.shell.menu.changelog', icon: Sparkles, href: '/changelog', marketingPage: true },
+    { id: 'changelog', group: 'help', labelKey: 'app.shell.menu.changelog', icon: Sparkles, href: marketingUrl('/changelog') },
     { id: 'report', group: 'help', labelKey: 'app.shell.menu.report', icon: Flag, href: REPORT_PATH },
     { id: 'legal', group: 'help', labelKey: 'legal.menuLabel', icon: Scale, sub: true },
     { id: 'logout', group: 'account', labelKey: 'app.shell.menu.logout', icon: LogOut, danger: true }
@@ -227,7 +227,7 @@
         {:else}
           <DropdownMenu.Item class="menu-row">
             {#snippet child({ props })}
-              <a {...props} href={item.href} data-sveltekit-reload={item.marketingPage ? '' : undefined}>
+              <a {...props} href={item.href}>
                 <item.icon size={16} />
                 <span>{$_(item.labelKey)}</span>
               </a>

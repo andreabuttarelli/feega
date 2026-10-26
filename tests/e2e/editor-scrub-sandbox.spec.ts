@@ -13,7 +13,7 @@ const reach = (read: () => unknown) => {
 
 test('the preview stays an opaque, script-only sandbox before and after a tap reaches it', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/changelog');
+  await page.goto('/login');
   await page.evaluate(() => (document.cookie = 'feega_probe=1; path=/'));
   await page.evaluate((path) => import(path), PROBE);
   await page.evaluate(() => window.editorScrub.mount());

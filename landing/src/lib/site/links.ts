@@ -1,3 +1,4 @@
+export const SITE_URL = 'https://www.feega.app';
 export const APP_URL = 'https://oh.feega.app';
 export const GITHUB_URL = 'https://github.com/andreabuttarelli/feega';
 

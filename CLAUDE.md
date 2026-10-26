@@ -220,7 +220,8 @@ entry** — two PRs in parallel touch different files and the changelogs never c
    customer reads. It is **English only**, one `ChangelogEntry` as export default; the loader
    (`src/lib/content/changelog/index.ts`) sorts them newest first. One line per feature, few
    words, release-note style ("Motion videos now have voice-over and music by default"), not a
-   paragraph. The page `src/routes/[[lang=locale]]/changelog/+page.svelte` is not touched: it
+   paragraph. The page `landing/src/routes/changelog/+page.svelte` (the
+   standalone marketing site, `landing/`) reads this folder at build: it is not touched, it
    already shows everything.
 
 They are two different texts, not the same text translated. The public one doesn't name files,

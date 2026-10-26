@@ -1,13 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Embed from './Embed.svelte';
+  import { SITE_URL } from '../links';
   import { MOTION_EMBED_ID, SHOWCASE_NARROW, SHOWCASE_WIDE, type ShowcaseVideo } from '../home';
 
   const HERO = `<feega-liquid-glass style="height:100vh">
   <h1>Make your<br>brand move.</h1>
   <p>Launch films, product demos and animated ads, made by you and your agents.</p>
   <a class="lg-cta" target="_blank" rel="noopener noreferrer" href="https://oh.feega.app/login">Start for free</a>
-  <a class="lg-link" target="_parent" href="/#mcp">Or connect your agents</a>
+  <a class="lg-link" target="_parent" href="${SITE_URL}/#mcp">Or connect your agents</a>
 </feega-liquid-glass>`;
 
   const WIDE_QUERY = '(min-width: 1200px)';
