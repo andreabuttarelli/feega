@@ -18,3 +18,17 @@ A generation node holds a prompt, a model and its result. Its `type` is one of `
 - **Uncensored models** run only in an uncensored project that the org owner turned on in Settings.
 
 Node data shapes per type: MCP `describe_node_types`. Tool details: [MCP tools](/reference/generated/mcp-tools/).
+
+## Where the model list comes from
+
+The model menu of a node is a catalogue that feega refreshes on a schedule, so new models appear without a release. Kie.ai models come from Kie's own sources, Wiro models from its live tool list, and Higgsfield models from the public Higgsfield docs: each model page gives its endpoint and input schema, and a model is added only if feega can fill every input it requires (a prompt and image or video URLs). Prices come from the provider's own estimate call, so a new model arrives with a credit price.
+
+- A model that feega wires by hand keeps priority over the same endpoint found in the docs: the hand entry carries what the docs do not say, such as reference limits.
+- If the Higgsfield docs cannot be reached, the models already known stay as they are.
+- A model that leaves the docs is expired, never deleted.
+
+To see what a project can run now, open the model menu of a node, or ask an agent: `list_models` with the medium (`image`, `video`, ...) lists the models with provider, credits and routes.
+
+```bash
+feega canvas models $PROJECT --medium video
+```
