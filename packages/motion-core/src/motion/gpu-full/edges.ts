@@ -54,6 +54,9 @@ export function edgeAt(clip: Edged, frame: number): Pose {
 
 export function moveAt(clip: Edged, frame: number): Pose {
   const move = MOVES[(clip.props.move as keyof typeof MOVES) ?? 'none'] ?? MOVES.none;
+  if (move === MOVES.none) {
+    return SHOWN;
+  }
   return between(poseOf(move.from, SHOWN), poseOf(move.to, SHOWN), frame, clip.from, clip.durationInFrames, String(clip.props.easing ?? Ease.Standard));
 }
 
