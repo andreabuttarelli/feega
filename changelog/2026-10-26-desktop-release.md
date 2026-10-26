@@ -14,12 +14,16 @@ The Electron shell (#1331) built only unsigned local packages. Now:
 
 ## Frameless window
 
-- No native title bar; window controls stay. macOS: traffic lights at
-  (12, 8) inside the strip. Windows/Linux: `titleBarOverlay` 28px high,
-  colours follow the system theme. Cmd/Ctrl+Q/W/M via the default menu.
-- `app.html` marks `data-window="frameless"` only when the UA has both
-  `FeegaNative/` and `Electron/` (Capacitor stays out). Not
-  `data-shell`: the root layout already owns it (app/site).
-- `safe-area.css`: a fixed 28px drag strip, and `--safe-top` = 28px so
-  `.safe-shell` layouts start below it instead of under it.
+- No title bar, no reserved band: the UI starts at y=0. Window controls
+  float over the app's own 48px bar (canvas bar, sidebar wordmark row),
+  centred on it: macOS traffic lights at (16, 17), Windows/Linux
+  `titleBarOverlay` 48px, theme-coloured. Bars get 80px left (mac) or
+  140px right (overlay) and are the drag regions; controls are no-drag.
+  All rules in `src/lib/styles/desktop-window.css`.
+- `app.html` sets `data-window="mac"|"overlay"` only when the UA has
+  `FeegaNative/` and `Electron/`; Capacitor and browsers untouched.
+- Marketing routes (`/(site)`, `/(public)`) redirect to `/app` in the
+  desktop shell via one table in `hooks.server.ts`; `/changelog` and
+  `/docs` links are hidden. Legal links are absolute `feega.app` URLs
+  and already open in the system browser.
 - Icon rebuilt from `static/icon-512.png` (was 256px).

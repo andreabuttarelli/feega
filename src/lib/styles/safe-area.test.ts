@@ -68,10 +68,16 @@ describe('desktop window without a title bar', () => {
     expect(await style('mac', '<header class="canvas-topbar"><button id="probe">x</button></header>', 'app-region')).toBe('no-drag');
   });
 
-  it('gives the sidebar a draggable top under the traffic lights', async () => {
-    const side = '<nav id="probe" class="app-sidebar"></nav>';
-    expect(await style('mac', side, 'app-region', '::before')).toBe('drag');
-    expect(await style('mac', side, 'height', '::before')).toBe('28px');
+  it('turns the sidebar wordmark into a bar as tall as the canvas bar, clear of the traffic lights', async () => {
+    const side = '<nav class="app-sidebar"><a id="probe" class="wordmark" href="/app">feega</a></nav>';
+    expect(await style('mac', side, 'app-region')).toBe('drag');
+    expect(await style('mac', side, 'height')).toBe('48px');
+    expect(await style('mac', side, 'padding-left')).toBe('80px');
+  });
+
+  it('hides links to marketing pages', async () => {
+    expect(await style('mac', '<a id="probe" href="/changelog">Changelog</a>', 'display')).toBe('none');
+    expect(await style('mac', '<a id="probe" href="/docs/x">Docs</a>', 'display')).toBe('none');
   });
 
   it('marks only the Electron shell, by platform, never the mobile one or the browser', async () => {

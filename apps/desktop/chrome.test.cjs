@@ -1,19 +1,19 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { frameless, overlay, STRIP } = require('./chrome.cjs');
+const { frameless, overlay, BAR_HEIGHT, LIGHT_SIZE } = require('./chrome.cjs');
 
-test('macOS keeps the traffic lights inside the drag strip', () => {
+test('macOS centres the traffic lights on the app bar', () => {
   const mac = frameless('darwin', true);
   assert.equal(mac.titleBarStyle, 'hidden');
-  assert.ok(mac.trafficLightPosition.y < STRIP);
+  assert.equal(mac.trafficLightPosition.y + LIGHT_SIZE / 2, BAR_HEIGHT / 2);
   assert.equal(mac.titleBarOverlay, undefined);
 });
 
-test('Windows and Linux keep native controls as a strip-high overlay', () => {
+test('Windows and Linux keep native controls as tall as the app bar', () => {
   for (const os of ['win32', 'linux']) {
     const win = frameless(os, true);
     assert.equal(win.titleBarStyle, 'hidden');
-    assert.equal(win.titleBarOverlay.height, STRIP);
+    assert.equal(win.titleBarOverlay.height, BAR_HEIGHT);
   }
 });
 

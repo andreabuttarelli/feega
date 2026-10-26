@@ -8,10 +8,13 @@ vi.mock('$env/dynamic/public', () => ({ env: publicEnv }));
 
 const { siteGate } = await import('./hooks.server');
 
-const request = async (routeId: string) => {
+const DESKTOP_UA = 'Mozilla/5.0 (Macintosh) Chrome/140 Electron/38.2.0 FeegaNative/0.1.0';
+const MOBILE_UA = 'Mozilla/5.0 (iPhone) AppleWebKit/605 FeegaNative/1.0';
+
+const request = async (routeId: string, userAgent = 'Mozilla/5.0 Chrome/140') => {
   try {
     const res = await siteGate({
-      event: { url: new URL('https://oh.feega.app/terms'), route: { id: routeId } },
+      event: { url: new URL('https://oh.feega.app/terms'), route: { id: routeId }, request: new Request('https://oh.feega.app/terms', { headers: { 'user-agent': userAgent } }) },
       resolve: async () => new Response('site')
     } as never);
     return res.status;
@@ -43,5 +46,25 @@ describe('the rebuilt marketing site stays hidden in production', () => {
     Object.assign(privateEnv, { VERCEL_ENV: 'preview' });
     Object.assign(publicEnv, { PUBLIC_SITE_ENABLED: undefined });
     expect(await request('/(site)/[doc=legal]')).toBe(200);
+  });
+});
+
+describe('the desktop app has no marketing pages', () => {
+  it('sends every marketing route to the app, even where the site is on', async () => {
+    Object.assign(privateEnv, { VERCEL_ENV: 'preview' });
+    for (const route of ['/(site)', '/(site)/[page=landing]', '/(site)/[doc=legal]', '/(public)/changelog', '/(public)/docs/[...slug]']) {
+      expect(await request(route, DESKTOP_UA)).toBe('303 /app');
+    }
+  });
+
+  it('keeps the app routes', async () => {
+    expect(await request('/login', DESKTOP_UA)).toBe(200);
+    expect(await request('/p/[projectId]', DESKTOP_UA)).toBe(200);
+  });
+
+  it('leaves the browser and the mobile app alone', async () => {
+    Object.assign(privateEnv, { VERCEL_ENV: 'preview' });
+    expect(await request('/(public)/changelog')).toBe(200);
+    expect(await request('/(public)/changelog', MOBILE_UA)).toBe(200);
   });
 });

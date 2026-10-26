@@ -1,4 +1,5 @@
 import {sequence} from '@sveltejs/kit/hooks';
+import { isDesktopShell } from '$lib/native-shell';
 import { error, json, redirect, text } from '@sveltejs/kit';
 import * as Sentry from '@sentry/sveltekit';
 import { busyAnswer } from '$lib/db-busy';
@@ -114,7 +115,12 @@ const hostRedirect: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
-const SITE_ROUTES = '/(site)';
+type HiddenWhen = (userAgent: string | null) => boolean;
+
+const HIDDEN_ROUTE_GROUPS: Record<string, HiddenWhen> = {
+  '/(site)': (userAgent) => !siteShown() || isDesktopShell(userAgent),
+  '/(public)': isDesktopShell
+};
 const SEE_OTHER = 303;
 const APP_HOME = '/app';
 
@@ -127,7 +133,9 @@ export function siteShown(): boolean {
 }
 
 export const siteGate: Handle = async ({ event, resolve }) => {
-  if (event.route.id?.startsWith(SITE_ROUTES) && !siteShown()) {
+  const routeId = event.route.id ?? '';
+  const group = Object.keys(HIDDEN_ROUTE_GROUPS).find((prefix) => routeId.startsWith(prefix));
+  if (group && HIDDEN_ROUTE_GROUPS[group](event.request.headers.get('user-agent') ?? null)) {
     throw redirect(SEE_OTHER, APP_HOME);
   }
   return resolve(event);
