@@ -19,6 +19,7 @@ import {
   type PatchWrite
 } from '$lib/server/repos/canvas';
 import { cancelNodeRun, runsOf } from '$lib/server/canvas/generate';
+import { diffRuns } from '$lib/canvas/run-diff';
 import { runGeneration, type GenerationOutcome } from '$lib/server/canvas/variants';
 import { cancelBatch } from '$lib/server/canvas/cancel-batch';
 import { parseVariantsAsk } from '$lib/canvas/variants';
@@ -331,6 +332,7 @@ const addFrameInput = z
     y: z.number()
   })
   .strict();
+const compareRunsInput = z.object({ nodeId: z.string(), runA: z.string().describe('from list_runs'), runB: z.string().describe('from list_runs') }).strict();
 const showRunInput = z.object({ nodeId: z.string(), runId: z.string().describe('from list_runs') }).strict();
 const retryComboInput = z.object({ nodeId: z.string(), outputListNodeId: z.string(), label: z.string(), runId: z.string().optional() }).strict();
 const workflowIdInput = z.object({ workflowId: z.string() }).strict();
@@ -897,6 +899,22 @@ export const CANVAS_OPS = {
     access: Access.Read,
     input: nodeIdInput,
     run: async (ctx, input) => ({ runs: await runsOf(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId }) })
+  }),
+
+  compare_runs: op({
+    access: Access.Read,
+    input: compareRunsInput,
+    run: async (ctx, input) => {
+      const runs = await runsOf(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId });
+      const a = runs.find((r) => r.id === input.runA);
+      const b = runs.find((r) => r.id === input.runB);
+      if (!a || !b) {
+        return { error: 'run_not_found', message: 'Both runs must belong to the node (list_runs).' };
+      }
+
+      const side = (r: typeof a) => ({ runId: r.id, assetId: r.outputAssetId, prompt: r.prompt, model: r.model, params: r.params, costUsd: r.costUsd, startedAt: r.startedAt });
+      return { a: side(a), b: side(b), diff: diffRuns(a, b) };
+    }
   }),
 
   preview_node_loop: op({

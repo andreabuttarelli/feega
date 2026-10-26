@@ -209,7 +209,7 @@ through the same code (op `describe` `{}` lists them all, `{ op }` gives one inp
 `connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,
 `rename_canvas`, `delete_canvas`, `rename_project`, `share_canvas`, `share_doc`,
 `insert_template`, `list_techniques`, `save_technique`, `place_technique`, `run_technique_node`, `detach_technique`, `open_technique`, `run_technique`, `delete_technique`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
-`show_run`, `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
+`compare_runs` (what differs between two runs), `show_run` (pins a past run as the node output), `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
 `retry_loop_combination`, `preview_workflow`, `run_workflow`, `cancel_workflow`,
 `preview_run_graph`, `run_graph`, `cancel_render`, `withdraw_from_gallery`, `request_upload`,
 `register_upload`, `import_link`, `list_voices`, `voice_library`, `use_library_voice`, `design_voice`,

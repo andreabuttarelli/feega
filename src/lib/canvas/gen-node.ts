@@ -122,6 +122,7 @@ export type GenRun = {
   createdAt: string;
   /** Il testo generato, quando il giro ha prodotto testo: l'immagine non ha nulla da mettere qui. */
   text?: string | null;
+  params?: Record<string, unknown> | null;
 };
 
 export type GenNode = {
