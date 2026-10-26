@@ -97,6 +97,41 @@ describe("domProbe", () => {
     expect(nodes.find((n) => n.tag === "image")?.layer).not.toBe(NO_INDEX);
   });
 
+  it("loads a data url background whole, even with a url() and quotes inside it", async () => {
+    const loaded: string[] = [];
+    class Loading {
+      crossOrigin: string | null = null;
+      naturalWidth = 1;
+      naturalHeight = 1;
+      set src(value: string) {
+        loaded.push(value);
+      }
+      decode = async () => undefined;
+    }
+    vi.stubGlobal("Image", Loading);
+    const noise = "data:image/svg+xml,%3Csvg%3E%3Crect filter='url(%23n)'/%3E%3C/svg%3E";
+    const image = `url("${noise}")`;
+    const computed = window.getComputedStyle.bind(window);
+    vi.stubGlobal("getComputedStyle", (el: Element, pseudo?: string) => {
+      const real = computed(el, pseudo);
+      return el.classList.contains("noise")
+        ? new Proxy(real, {
+            get: (target, key) =>
+              key === "backgroundImage"
+                ? image
+                : key === "getPropertyValue"
+                  ? (k: string) => (k === "background-image" ? image : target.getPropertyValue(k))
+                  : Reflect.get(target, key),
+          })
+        : real;
+    });
+
+    await asked('<div class="noise"></div>');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(loaded).toEqual([noise]);
+  });
+
   it("loads a remote svg image with CORS, so its bitmap can leave the frame", async () => {
     const loaded: string[] = [];
     class Loading {

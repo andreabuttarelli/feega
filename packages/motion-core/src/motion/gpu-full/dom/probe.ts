@@ -290,8 +290,36 @@ export function domProbe(cfg: ProbeConfig) {
     ];
   };
 
-  const splitLayers = (value: string) =>
-    value.split(/,(?![^(]*\))/).map((v) => v.trim());
+  const splitLayers = (value: string) => {
+    const layers: string[] = [];
+    let [depth, quote, start] = [0, "", 0];
+    for (let i = 0; i < value.length; i++) {
+      const c = value[i];
+      if (quote) {
+        i += c === "\\" ? 1 : 0;
+        quote = c === quote ? "" : quote;
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        quote = c;
+      }
+      depth += c === "(" ? 1 : c === ")" ? -1 : 0;
+      if (c === "," && depth === 0) {
+        layers.push(value.slice(start, i).trim());
+        start = i + 1;
+      }
+    }
+    return [...layers, value.slice(start).trim()];
+  };
+
+  const QUOTED_URL = /^url\(\s*(["'])((?:(?!\1)[^\\]|\\.)*)\1\s*\)$/;
+  const BARE_URL = /^url\(\s*([^)\s]*)\s*\)$/;
+  const urlOf = (layer: string) => {
+    const quoted = QUOTED_URL.exec(layer);
+    return quoted
+      ? quoted[2].replace(/\\(.)/g, "$1")
+      : (BARE_URL.exec(layer)?.[1] ?? null);
+  };
 
   const bitmapOf = async (
     size: [number, number],
@@ -316,7 +344,7 @@ export function domProbe(cfg: ProbeConfig) {
       const positions = splitLayers(computed.backgroundPosition);
       const repeats = splitLayers(computed.backgroundRepeat);
       for (let i = images.length - 1; i >= 0; i--) {
-        const src = URL_IMAGE.exec(images[i])?.[1];
+        const src = urlOf(images[i]);
         if (!src) {
           continue;
         }
