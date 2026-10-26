@@ -5,7 +5,7 @@
   import { FACES_PARAM } from '@feega/motion-core/motion/gpu-full/text/engines';
   import type { FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
   import type { Compose } from '@feega/motion-core/motion/gpu-full/dom/reader';
-  import { sharedFrames } from '$lib/motion/gpu/webcodecs-decoder';
+  import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { mountPlayer, type Player } from '@feega/motion-core/motion/gpu-full/play';
 
   let { backend, doc, tokens, assets, compose, time, onfallback }: { backend: FullBackend; doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; compose: Compose; time: () => number; onfallback: (reason: unknown) => void } = $props();

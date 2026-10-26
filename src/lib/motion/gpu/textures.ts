@@ -6,7 +6,7 @@ import { PaintKind } from './paint-of';
 import type { Placement } from './renderer';
 import type { Drawn, Paint, SceneLayer } from './scene';
 import type { TextRaster } from './text-layout';
-import { sharedFrames } from './webcodecs-decoder';
+import { sharedFrames } from './shared-frames';
 import type { Frame, VideoFrames } from '@feega/motion-core/motion/gpu-full/video-frames';
 
 type Of<K extends PaintKind> = Extract<Paint, { kind: K }>;
