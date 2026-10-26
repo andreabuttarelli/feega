@@ -1,5 +1,5 @@
 import { FillType } from '@feega/motion-core/motion/fill/model';
-import { flatten, parsePath } from '@feega/motion-core/motion/shape/geometry';
+import { cubicAt, distance, parsePath, segmentsOf, type Contour } from '@feega/motion-core/motion/shape/geometry';
 import { ClipOp, clipPolygons } from '@feega/motion-core/motion/shape/polygon-clip';
 
 type Matrix = [a: number, b: number, c: number, d: number, e: number, f: number];
@@ -427,6 +427,49 @@ const boundsOfSegments = (segments: Segment[]): Box => {
 const unit = (n: number, side: number) => (side > 0 ? n / side : 0);
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
+const HEX_CHANNELS = [1, 3, 5];
+
+function mixed(from: Stop, to: Stop, at: number): string {
+  if (from.color.length !== 7 || to.color.length !== 7) {
+    return at < 0.5 ? from.color : to.color;
+  }
+  const channels = HEX_CHANNELS.map((i) => {
+    const [a, b] = [parseInt(from.color.slice(i, i + 2), 16), parseInt(to.color.slice(i, i + 2), 16)];
+    return Math.round(a + (b - a) * at).toString(16).padStart(2, '0');
+  });
+  return `#${channels.join('')}`;
+}
+
+function stopsAt(stops: Stop[], at: number): Stop {
+  const last = stops[stops.length - 1];
+  if (at <= stops[0].pos) {
+    return { color: stops[0].color, pos: at };
+  }
+  const next = stops.findIndex((s) => s.pos >= at);
+  if (next < 0) {
+    return { color: last.color, pos: at };
+  }
+  const [a, b] = [stops[next - 1] ?? stops[next], stops[next]];
+  return { color: mixed(a, b, b.pos === a.pos ? 0 : (at - a.pos) / (b.pos - a.pos)), pos: at };
+}
+
+function stopsWithin(stops: Stop[], from: number, to: number): Stop[] {
+  const inside = stops.filter((s) => s.pos > from && s.pos < to).map((s) => ({ color: s.color, pos: (s.pos - from) / (to - from) }));
+  return [{ color: stopsAt(stops, from).color, pos: 0 }, ...inside, { color: stopsAt(stops, to).color, pos: 1 }];
+}
+
+function coveredStops(stops: Stop[], [x1, y1, x2, y2]: number[], bounds: Box): Stop[] {
+  const [vx, vy] = [x2 - x1, y2 - y1];
+  const reach = vx * vx + vy * vy;
+  if (!reach) {
+    return stops;
+  }
+  const [w, h] = [bounds.right - bounds.left, bounds.bottom - bounds.top];
+  const centre = ((bounds.left + w / 2 - x1) * vx + (bounds.top + h / 2 - y1) * vy) / reach;
+  const half = (Math.abs(vx) * w + Math.abs(vy) * h) / (2 * reach);
+  return half > 0 ? stopsWithin(stops, centre - half, centre + half) : stops;
+}
+
 function gradientOf(def: GradientDef, bounds: Box): SvgGradient {
   const [w, h] = [bounds.right - bounds.left, bounds.bottom - bounds.top];
   const absolute = def.attrs.gradientunits?.toLowerCase() === USER_SPACE;
@@ -435,7 +478,8 @@ function gradientOf(def: GradientDef, bounds: Box): SvgGradient {
     const [x1, y1, x2, y2] = [fraction(def.attrs.x1, 0), fraction(def.attrs.y1, 0), fraction(def.attrs.x2, 1), fraction(def.attrs.y2, 0)];
     const [dx, dy] = absolute ? [x2 - x1, y2 - y1] : [(x2 - x1) * w, (y2 - y1) * h];
     const css = (Math.atan2(dx, -dy) * 180) / Math.PI;
-    return { type: FillType.Linear, stops, angle: Math.round((css - CSS_ANGLE_OFFSET) * ANGLE_DIGITS) / ANGLE_DIGITS };
+    const covered = absolute ? coveredStops(stops, [x1, y1, x2, y2], bounds) : stops;
+    return { type: FillType.Linear, stops: covered, angle: Math.round((css - CSS_ANGLE_OFFSET) * ANGLE_DIGITS) / ANGLE_DIGITS };
   }
   const [cx, cy, r] = [fraction(def.attrs.cx, 0.5), fraction(def.attrs.cy, 0.5), fraction(def.attrs.r, 0.5)];
   const center = absolute ? { x: unit(cx - bounds.left, w), y: unit(cy - bounds.top, h) } : { x: cx, y: cy };
@@ -532,9 +576,24 @@ function holds(poly: Polygon, [x, y]: Pt): boolean {
   return odd;
 }
 
+const FLATTEN_STEP = 3;
+const MIN_SAMPLES = 4;
+
+function flattenFine(contour: Contour): Polygon {
+  const points: Polygon = [];
+  for (const [a, b] of segmentsOf(contour)) {
+    const reach = distance(a.p, a.out) + distance(a.out, b.in) + distance(b.in, b.p);
+    const samples = reach === distance(a.p, b.p) ? 1 : Math.max(MIN_SAMPLES, Math.ceil(reach / FLATTEN_STEP));
+    for (let i = 0; i < samples; i++) {
+      points.push([...cubicAt(a.p, a.out, b.in, b.p, i / samples)] as Pt);
+    }
+  }
+  return points;
+}
+
 function polygonsOf(path: string, rule: SvgFillRule): Polygon[] {
   const outline = parsePath(path);
-  const polys = typeof outline === 'string' ? [] : outline.map(flatten).filter((poly) => poly.length > 2);
+  const polys = typeof outline === 'string' ? [] : outline.map(flattenFine).filter((poly) => poly.length > 2);
   if (rule === 'nonzero') {
     return polys;
   }
