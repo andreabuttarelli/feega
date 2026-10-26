@@ -571,9 +571,21 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
 const REST_WINDOW_SECONDS = 2;
 const PEAK_SHARE = 0.99;
 
+function textFadeAt({ doc, tokens, assets, typeset }: Prepared, frame: number, clip: MotionClip): number {
+  if (!isText(clip)) {
+    return 1;
+  }
+  const size = { width: doc.width, height: doc.height };
+  const css = (v: string) => resolveColor(v, tokens);
+  const props = propsAt(clip, frame, css);
+  const { box } = unturned(props, size);
+  const plan = planOf({ component: clip.component as TextComponent, ...typeset, props, box, stage: size, colour: css, time: (frame - clip.from) / doc.fps, trim: clip.trimStart / doc.fps, fps: doc.fps, still: stillSeconds(doc), animators: animatorsAt(clip, frame, css), asset: textAsset((id) => (typeof id === 'string' && id ? (assets[id] ?? null) : null)) });
+  return typeof plan === 'string' ? 1 : Math.min(plan.fade, ...(plan.rises ?? []));
+}
+
 function shownOpacity(prepared: Prepared, frame: number): number {
   const { css, size, drawable, effectiveEdge, alphaOf } = stageAt(prepared, frame);
-  const opacityOf = (clip: MotionClip) => PAINTERS[clip.component]?.place(propsAt(clip, frame, css), size).opacity ?? 1;
+  const opacityOf = (clip: MotionClip) => (PAINTERS[clip.component]?.place(propsAt(clip, frame, css), size).opacity ?? 1) * textFadeAt(prepared, frame, clip);
   return drawable.reduce((sum, clip) => sum + alphaOf(clip, opacityOf(clip), effectiveEdge(clip)), 0);
 }
 

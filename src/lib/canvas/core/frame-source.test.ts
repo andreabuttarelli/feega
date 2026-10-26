@@ -51,8 +51,8 @@ describe('still frame', () => {
     expect(stillFrame({ ...newMotionDoc(MotionFormat.Landscape), still: { frame: 7 } })).toBe(7);
   });
 
-  it('a doc longer than its content still rests at time 0', () => {
-    expect(stillFrame(instance as unknown as MotionDoc)).toBe(0);
+  it('a doc longer than its content rests once its text has faded in', () => {
+    expect(stillFrame(instance as unknown as MotionDoc)).toBe(12);
   });
 
   it('a clip from 0 to 1s in a 5s frame is drawn on the canvas', () => {
@@ -85,7 +85,8 @@ describe('the frame a video rests on', () => {
   });
 
   it('a frame with nothing fading in still rests at time 0', () => {
-    expect(stillFrame(video(words('title', 150, 0)))).toBe(0);
+    const shape = { id: 'card', component: 'Shape', from: 0, durationInFrames: 150, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.1, height: 0.1, fill: '#ff0000' } };
+    expect(stillFrame(video(shape))).toBe(0);
   });
 });
 

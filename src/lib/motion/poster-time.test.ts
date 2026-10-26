@@ -22,3 +22,10 @@ describe('the frame a doc rests on', () => {
     expect(restFrameOf(template)).toBe(coverFrame(template));
   });
 });
+
+describe('the frame a text doc rests on', () => {
+  it('a text that fades in rests after the fade, not on its invisible opening', () => {
+    const text = must(addClip(blank, { component: 'Text', from: 0, durationInFrames: blank.durationInFrames, props: { text: 'VIDEO', color: '#ff0000', size: 0.1, x: 0.5, y: 0.2, width: 0.4, height: 0.15 } }, 'title'));
+    expect(restFrameOf(text)).toBeGreaterThan(0);
+  });
+});
