@@ -8,6 +8,8 @@ import { rgbaOf, type Rgba } from './rgba';
 import { LATTICE, latticeOf, stitchedFrequency } from './turbulence';
 
 const MAX_TABLE = 32;
+const TRANSFER_KINDS: Record<string, number> = { table: 1, linear: 2, discrete: 3 };
+const TABLED: ReadonlySet<string> = new Set(['table', 'discrete']);
 const MAX_MORPH = 64;
 const SOURCE_GRAPHIC = 'SourceGraphic';
 const SOURCE_ALPHA = 'SourceAlpha';
@@ -69,6 +71,10 @@ out vec4 outColor;
 ${UNPREMULTIPLIED}
 float lookup(int ch, float c) {
   if (u_kind[ch] == 2) { return u_slope[ch] * c + u_intercept[ch]; }
+  if (u_kind[ch] == 3) {
+    int steps = u_count[ch];
+    return u_table[ch * ${MAX_TABLE} + clamp(int(floor(c * float(steps))), 0, max(steps - 1, 0))];
+  }
   if (u_kind[ch] != 1) { return c; }
   int n = u_count[ch] - 1;
   if (n <= 0) { return u_table[ch * ${MAX_TABLE}]; }
@@ -402,9 +408,9 @@ export function createFilters(gl: WebGL2RenderingContext, width: number, height:
   function table(src: WebGLTexture, funcs: SvgNode[]): WebGLTexture {
     const CHANNELS = ['feFuncR', 'feFuncG', 'feFuncB', 'feFuncA'];
     const of = CHANNELS.map((tag) => funcs.find((f) => f.tag === tag));
-    const values = of.map((f) => (f?.attrs.type === 'table' ? String(f.attrs.tableValues).trim().split(/[\s,]+/).map(Number).slice(0, MAX_TABLE) : []));
+    const values = of.map((f) => (TABLED.has(String(f?.attrs.type)) ? String(f?.attrs.tableValues).trim().split(/[\s,]+/).map(Number).slice(0, MAX_TABLE) : []));
     return run(programs.table, [src], () => {
-      gl.uniform1iv(u(programs.table, 'u_kind'), of.map((f) => (f?.attrs.type === 'table' ? 1 : f?.attrs.type === 'linear' ? 2 : 0)));
+      gl.uniform1iv(u(programs.table, 'u_kind'), of.map((f) => TRANSFER_KINDS[String(f?.attrs.type)] ?? 0));
       gl.uniform1iv(u(programs.table, 'u_count'), values.map((v) => v.length));
       gl.uniform1fv(u(programs.table, 'u_table'), Float32Array.from({ length: MAX_TABLE * 4 }, (_, i) => values[Math.floor(i / MAX_TABLE)][i % MAX_TABLE] ?? 0));
       gl.uniform1fv(u(programs.table, 'u_slope'), of.map((f) => num(f?.attrs.slope, 1)));

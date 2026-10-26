@@ -54,9 +54,13 @@ const TABLE: &str = "
 float lookup(int ch, float c) {
   int kind = int(p(ch));
   if (kind == 2) { return p(8 + ch) * c + p(12 + ch); }
+  int base = 16 + ch * 32;
+  if (kind == 3) {
+    int steps = int(p(4 + ch));
+    return p(base + clamp(int(floor(c * float(steps))), 0, max(steps - 1, 0)));
+  }
   if (kind != 1) { return c; }
   int n = int(p(4 + ch)) - 1;
-  int base = 16 + ch * 32;
   if (n <= 0) { return p(base); }
   int k = clamp(int(floor(c * float(n))), 0, n - 1);
   float lo = p(base + k);

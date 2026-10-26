@@ -64,9 +64,13 @@ const TABLE: &str = r#"
 fn lookup(ch: u32, c: f32) -> f32 {
   let kind = u32(p[ch]);
   if (kind == 2u) { return p[8u + ch] * c + p[12u + ch]; }
+  let base = 16u + ch * 32u;
+  if (kind == 3u) {
+    let steps = i32(p[4u + ch]);
+    return p[base + u32(clamp(i32(floor(c * f32(steps))), 0, max(steps - 1, 0)))];
+  }
   if (kind != 1u) { return c; }
   let n = i32(p[4u + ch]) - 1;
-  let base = 16u + ch * 32u;
   if (n <= 0) { return p[base]; }
   let k = clamp(i32(floor(c * f32(n))), 0, n - 1);
   let lo = p[base + u32(k)];
