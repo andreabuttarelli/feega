@@ -1549,6 +1549,22 @@ describe("backgrounds the reader used to refuse", () => {
     expect(disc.paint.kind === PaintKind.Radial && disc.paint.stops.map((s) => s.at)).toEqual([0, expect.closeTo(0.98), 1]);
   });
 
+  it("blends background layers onto the ones below, inside the element", () => {
+    const read = readTree(
+      box({
+        "background-color": "rgb(100, 100, 100)",
+        "background-image":
+          "linear-gradient(rgb(255, 0, 0), rgb(255, 0, 0)), linear-gradient(rgb(0, 0, 255), rgb(0, 0, 255))",
+        "background-blend-mode": "multiply, normal",
+      }),
+    );
+    const [group] = read.drawn;
+
+    expect(read.gaps).toEqual([]);
+    expect(group.kind).toBe(DrawnKind.Group);
+    expect(group.kind === DrawnKind.Group && group.items.map((i) => i.blend ?? BlendMode.Normal)).toEqual([BlendMode.Normal, BlendMode.Normal, BlendMode.Multiply]);
+  });
+
   it("draws a repeating stripe as one band per period, merged into one path", () => {
     const read = readTree(
       box({

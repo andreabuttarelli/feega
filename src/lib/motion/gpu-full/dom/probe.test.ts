@@ -117,4 +117,35 @@ describe("domProbe", () => {
 
     expect(loaded).toEqual(["anonymous"]);
   });
+
+  it("reads a ::before and an ::after as elements in their place, with their styles, and puts the page back", async () => {
+    const declared = (style: Record<string, string>) =>
+      Object.assign(Object.keys(style), {
+        content: style.content,
+        display: style.display ?? "inline",
+        getPropertyValue: (k: string) => style[k] ?? "",
+      });
+    const PSEUDO: Record<string, Record<string, string>> = {
+      "::before": { content: '""', position: "absolute", "background-color": "rgb(1, 2, 3)" },
+      "::after": { content: '""', color: "rgb(4, 5, 6)" },
+    };
+    const computed = window.getComputedStyle.bind(window);
+    vi.stubGlobal("getComputedStyle", (el: Element, pseudo?: string) =>
+      pseudo
+        ? declared(el.classList.contains("grain") ? PSEUDO[pseudo] : { content: "none" })
+        : computed(el),
+    );
+
+    const { reply } = await asked('<div class="grain"><i></i></div>');
+    const nodes = (
+      reply.trees[CLIP] as { nodes: { tag: string; parent: number; style: Record<string, string>; text: string }[] }
+    ).nodes;
+    const grain = nodes.findIndex((n, i) => i > 0 && n.tag === "div");
+    const kids = nodes.filter((n) => n.parent === grain);
+
+    expect(kids.map((n) => n.tag)).toEqual(["span", "i", "span"]);
+    expect(kids[0].style["background-color"]).toBe("rgb(1, 2, 3)");
+    expect(kids[2].style.color).toBe("rgb(4, 5, 6)");
+    expect(document.querySelectorAll(".grain span")).toHaveLength(0);
+  });
 });

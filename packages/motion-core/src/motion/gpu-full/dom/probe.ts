@@ -73,6 +73,61 @@ export function domProbe(cfg: ProbeConfig) {
     return out;
   };
 
+  const PSEUDOS = ["::before", "::after"];
+  const UNPSEUDO = "feega-dom-read-unpseudo";
+  const SHOWN_CONTENT = /^"(.*)"$/s;
+  const EMPTY_CONTENT = new Set(["", "none", "normal"]);
+
+  const pseudoOf = (el: Element, which: string) => {
+    const computed = getComputedStyle(el, which);
+    if (EMPTY_CONTENT.has(computed.content) || computed.display === "none") {
+      return null;
+    }
+    const style: [string, string][] = [];
+    for (let i = 0; i < computed.length; i++) {
+      style.push([computed[i], computed.getPropertyValue(computed[i])]);
+    }
+    return {
+      which,
+      style,
+      text: SHOWN_CONTENT.exec(computed.content)?.[1] ?? "",
+    };
+  };
+
+  const materialized = (root: HTMLElement) => {
+    const hosts = [root, ...root.querySelectorAll("*")]
+      .filter((el) => el instanceof HTMLElement)
+      .map((el) => ({
+        el,
+        pseudos: PSEUDOS.flatMap((w) => pseudoOf(el, w) ?? []),
+      }))
+      .filter((h) => h.pseudos.length);
+    const sheet = document.createElement("style");
+    sheet.textContent = `.${UNPSEUDO}::before,.${UNPSEUDO}::after{content:none!important}`;
+    document.head.appendChild(sheet);
+    const made = hosts.flatMap(({ el, pseudos }) => {
+      el.classList.add(UNPSEUDO);
+      return pseudos.map(({ which, style, text }) => {
+        const span = document.createElement("span");
+        style
+          .filter(([k]) => k !== "content")
+          .forEach(([k, v]) => span.style.setProperty(k, v));
+        span.textContent = text;
+        if (which === PSEUDOS[0]) {
+          el.prepend(span);
+        } else {
+          el.append(span);
+        }
+        return span;
+      });
+    });
+    return () => {
+      made.forEach((span) => span.remove());
+      hosts.forEach(({ el }) => el.classList.remove(UNPSEUDO));
+      sheet.remove();
+    };
+  };
+
   const linesOf = (el: Element, box: DOMRect): TextLine[] => {
     const lines: TextLine[] = [];
     const range = document.createRange();
@@ -321,7 +376,10 @@ export function domProbe(cfg: ProbeConfig) {
       const aspect = el.getAttribute("preserveAspectRatio") ?? "";
       const scale = NONE.test(aspect)
         ? NaN
-        : (SLICE.test(aspect) ? Math.max : Math.min)(size[0] / iw, size[1] / ih);
+        : (SLICE.test(aspect) ? Math.max : Math.min)(
+            size[0] / iw,
+            size[1] / ih,
+          );
       const [w, h] = Number.isNaN(scale) ? size : [iw * scale, ih * scale];
       pen.drawImage(image, (size[0] - w) / 2, (size[1] - h) / 2, w, h);
     });
@@ -353,6 +411,18 @@ export function domProbe(cfg: ProbeConfig) {
   };
 
   const read = (root: HTMLElement, layers: Promise<ImageBitmap>[]): RawTree => {
+    const restore = materialized(root);
+    try {
+      return readNow(root, layers);
+    } finally {
+      restore();
+    }
+  };
+
+  const readNow = (
+    root: HTMLElement,
+    layers: Promise<ImageBitmap>[],
+  ): RawTree => {
     const nodes: RawNode[] = [];
     const elements: Element[] = [];
     const visit = (el: Element, parent: number) => {

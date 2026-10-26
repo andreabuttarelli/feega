@@ -536,6 +536,23 @@ function stripesOf(
   ];
 }
 
+const blendOf = (value: string | undefined) =>
+  BLENDS.has(value ?? "") ? (value as BlendMode) : BlendMode.Normal;
+
+function blended(drawn: Drawn[], marks: [number, BlendMode][]): Drawn[] {
+  if (marks.every(([, blend]) => blend === BlendMode.Normal)) {
+    return drawn;
+  }
+  const blendAt = (i: number) =>
+    marks.findLast(([start]) => start <= i)?.[1] ?? BlendMode.Normal;
+  const items = drawn.map((d, i) =>
+    blendAt(i) === BlendMode.Normal ? d : { ...d, blend: blendAt(i) },
+  );
+  return [
+    { kind: DrawnKind.Group, items, opacity: 1, matrix: [1, 0, 0, 1, 0, 0] },
+  ];
+}
+
 function backgroundOf(
   s: Style,
   size: Size,
@@ -555,6 +572,7 @@ function backgroundOf(
   const sizes = splitTop(s["background-size"] ?? "auto");
   const positions = splitTop(s["background-position"] ?? "");
   const repeats = splitTop(s["background-repeat"] ?? REPEAT);
+  const blends = splitTop(s["background-blend-mode"] || BlendMode.Normal);
   const [top, right, bottom, left] = sidesOf(s).map((side) => side.width);
   const inner: Size = {
     w: Math.max(0, size.w - left - right),
@@ -568,6 +586,7 @@ function backgroundOf(
       tile: tileOf(sizes[i % sizes.length], inner),
       position: positions[i % (positions.length || 1)] ?? "",
       repeat: repeats[i % repeats.length],
+      blend: blendOf(blends[i % blends.length]),
     }))
     .filter((l) => !isNone(l.image));
   const once = (l: (typeof layers)[number]) =>
@@ -595,7 +614,9 @@ function backgroundOf(
       matrix,
     });
   }
+  const marks: [number, BlendMode][] = [];
   for (const layer of [...layers].reverse()) {
+    marks.push([drawn.length, layer.blend]);
     if (URL_IMAGE.test(layer.image)) {
       continue;
     }
@@ -658,7 +679,7 @@ function backgroundOf(
       drawn.push(path(contours, paint, matrix));
     }
   }
-  return { drawn, gaps: [] };
+  return { drawn: blended(drawn, marks), gaps: [] };
 }
 
 const firstTile = (offset: number, tile: number) =>

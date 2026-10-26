@@ -24,6 +24,7 @@ export const READ_STYLES = [
   "background-position",
   "background-repeat",
   "background-clip",
+  "background-blend-mode",
   "border-top-width",
   "border-right-width",
   "border-bottom-width",
