@@ -1198,6 +1198,41 @@ describe("readTree, CSS a motion template draws with", () => {
     expect(corners.map(miss).every((d) => d < 0.05)).toBe(true);
   });
 
+  it("projects a bitmap under a 3D transform in tiles, each placed where the browser puts it", () => {
+    const tilt =
+      "matrix3d(0.9, 0.05, 0, 0.0004, -0.04, 0.95, 0, 0.0002, 0, 0, 1, 0, 30, 20, 0, 1)";
+    const screen = box({ transform: tilt, "transform-origin": "0px 0px" }, { tag: "canvas", layer: 0 });
+    const projected = ([x, y]: [number, number]): [number, number] => {
+      const w = 0.0004 * x + 0.0002 * y + 1;
+      return [(0.9 * x - 0.04 * y + 30) / w, (0.05 * x + 0.95 * y + 20) / w];
+    };
+    const inside = (quad: number[], [x, y]: [number, number]) =>
+      [0, 2, 4, 6].every((i) => {
+        const [x0, y0, x1, y1] = [quad[i], quad[i + 1], quad[(i + 2) % 8], quad[(i + 3) % 8]];
+        return (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0) >= -1;
+      });
+
+    const read = readTree(tree(root(), screen));
+    const tiles = read.drawn.filter((d) => d.kind === DrawnKind.Layer);
+    const placedAt = (p: [number, number]) => {
+      const tile = tiles.find((t) => t.masks?.[0].cover.kind === CoverKind.Path && inside(t.masks[0].cover.contours[0], projected(p)))!;
+      return apply2d(tile.matrix, p);
+    };
+
+    expect(read.gaps).toEqual([]);
+    expect(tiles.length).toBeGreaterThan(1);
+    for (const p of [[100, 50], [37, 81], [180, 12]] as [number, number][]) {
+      expect(Math.hypot(placedAt(p)[0] - projected(p)[0], placedAt(p)[1] - projected(p)[1])).toBeLessThan(0.5);
+    }
+  });
+
+  it("keeps a bitmap whole when its box fit already lands within half a pixel", () => {
+    const faint = "matrix3d(1, 0, 0, 0.000001, 0, 1, 0, 0, 0, 0, 1, 0, 30, 20, 0, 1)";
+    const screen = box({ transform: faint, "transform-origin": "0px 0px" }, { tag: "canvas", layer: 0 });
+
+    expect(readTree(tree(root(), screen)).drawn).toHaveLength(1);
+  });
+
   it("projects a child through the perspective its parent sets", () => {
     const stage = el({
       parent: 0,
@@ -1333,7 +1368,7 @@ describe("readTree, CSS a motion template draws with", () => {
 
   it("draws an svg the probe rasterised as its bitmap, and nothing inside it", () => {
     const svg = el({ parent: 0, tag: "svg", svg: true, at: [10, 20], size: [50, 40], layer: 2 });
-    const masked = el({ parent: 1, tag: "rect", svg: true, at: null, attrs: { width: "50", height: "40", mask: "url(#m)" }, style: { fill: 'url("#dots")' } });
+    const masked = el({ parent: 1, tag: "rect", svg: true, at: null, attrs: { width: "50", height: "40" }, style: { fill: 'url("#dots")' } });
 
     expect(readTree(tree(root(), svg, masked))).toEqual({
       drawn: [{ kind: DrawnKind.Layer, layer: 2, width: 50, height: 40, opacity: 1, matrix: [1, 0, 0, 1, 10, 20] }],

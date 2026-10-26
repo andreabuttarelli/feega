@@ -1,6 +1,6 @@
 import { apply2d, mul2d, type Affine } from "../../affine";
 import { invert2d } from "../../parent";
-import { warpContours, warpMasks, type Warp } from "../warp";
+import { projectedTiles, warpContours, warpMasks, type Warp } from "../warp";
 import {
   ellipseOutline,
   flatten,
@@ -13,6 +13,7 @@ import { rgbaOf, type Rgba } from "../rgba";
 import {
   affineOf,
   cornerOf,
+  fitCorners,
   flattened,
   isNone,
   lengthOf,
@@ -1791,19 +1792,29 @@ function overlapping(items: Drawn[]): boolean {
   );
 }
 
-function warpOne(d: Drawn, warp: Warp): Drawn {
+function warpOne(d: Drawn, warp: Warp): Drawn[] {
   const masks = warpMasks(d.masks, warp);
   const look = masks ? { masks } : {};
   if (d.kind === DrawnKind.Path) {
-    return {
-      ...d,
-      ...look,
-      contours: warpContours(d.contours, d.matrix, warp),
-    };
+    return [
+      {
+        ...d,
+        ...look,
+        contours: warpContours(d.contours, d.matrix, warp),
+      },
+    ];
   }
-  return d.kind === DrawnKind.Group
-    ? { ...d, ...look, items: d.items.map((i) => warpOne(i, warp)) }
-    : { ...d, ...look };
+  if (d.kind === DrawnKind.Layer) {
+    const parts = projectedTiles(d.matrix, d.width, d.height, warp);
+    return parts
+      ? parts.map(({ matrix, cut }) => ({
+          ...d,
+          matrix,
+          masks: [...(masks ?? []), cut],
+        }))
+      : [{ ...d, ...look }];
+  }
+  return [{ ...d, ...look, items: d.items.flatMap((i) => warpOne(i, warp)) }];
 }
 
 function warped(
@@ -1817,7 +1828,7 @@ function warped(
     const q = project(apply2d(toElement, p));
     return q ? apply2d(placed, q) : p;
   };
-  return items.map((d) => warpOne(d, warp));
+  return items.flatMap((d) => warpOne(d, warp));
 }
 
 export function readTree(

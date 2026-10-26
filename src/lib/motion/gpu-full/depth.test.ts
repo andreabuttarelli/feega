@@ -42,6 +42,17 @@ describe('a clip turned in depth', () => {
     expect(height).toBeLessThan(1080 * 0.4);
   });
 
+  it('projects a picture turned in depth in tiles, each cut to its own corner of the trapezoid', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Image', from: 0, durationInFrames: 30, props: { assetId: 'a1', x: 0.5, y: 0.5, width: 0.4, height: 0.4 } }, 'shot'));
+    doc.tracks.flatMap((t) => t.clips)[0].transform = { rotateX: 30, perspective: 800 } as never;
+
+    const { items, unsupported } = drawFrame(prepare(doc, FEEGA_TOKENS, { a1: 'https://files.example/a.jpg' }), 0);
+
+    expect(unsupported).toEqual([]);
+    expect(items.length).toBeGreaterThan(1);
+    expect(items.every((i) => i.kind === ItemKind.Image && i.masks?.length === 1)).toBe(true);
+  });
+
   it('refuses a clip turned behind the eye rather than drawing it inside out', () => {
     expect(drawFrame(prepare(tilted({ z: 2000, perspective: 800 }), FEEGA_TOKENS), 0).unsupported).toMatchObject([{ clip: 'card', reason: Unsupported.Space3d }]);
   });
