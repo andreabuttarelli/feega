@@ -43,4 +43,10 @@ describe('studioApi', () => {
 
     expect(seen.at(-1)?.path).toBe('/api/v1/studio/b-1');
   });
+
+  it('runs an action on a batch with its items', async () => {
+    await studioApi.act('t', 'b-1', 'retry', { itemIds: ['i1'] });
+
+    expect(seen.at(-1)).toEqual({ method: 'POST', path: '/api/v1/studio/b-1?action=retry', body: { itemIds: ['i1'] } });
+  });
 });

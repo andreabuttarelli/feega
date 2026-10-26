@@ -143,6 +143,8 @@ workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists
 
 Photo studio batches: `studio_quote` prices a selection (count, credits, a `quoteId`), `studio_start` starts it
 and spends credits only with that `quoteId` (a changed selection or price is a 409), `studio_status` follows the batch.
+`studio_run`, `studio_more` (`variations`), `studio_cancel`, `studio_retry`, `studio_regenerate`,
+`studio_approve` and `studio_reject` act on a batch (`batch_id`, `item_ids`); run, more, retry and regenerate spend credits.
 
 Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
 

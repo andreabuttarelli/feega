@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { loadSession } from '../lib/auth.ts';
-import { studioApi } from '../lib/studio.ts';
+import { studioApi, type BatchAction } from '../lib/studio.ts';
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -27,4 +27,9 @@ export async function cmdStudioStart(opts: { file: string; quote: string; projec
 
 export async function cmdStudioStatus(batchId: string) {
   console.log(JSON.stringify(await studioApi.status(await token(), batchId), null, 2));
+}
+
+export async function cmdStudioAct(action: BatchAction, batchId: string, opts: { items?: string[]; variations?: string }) {
+  const body = { itemIds: opts.items, variations: opts.variations ? Number(opts.variations) : undefined };
+  console.log(JSON.stringify(await studioApi.act(await token(), batchId, action, body)));
 }

@@ -3,12 +3,12 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**62 tool** — 27 in lettura, 29 in scrittura, 6 che distruggono.
-Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3690 caratteri**, circa **923 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 65.077 caratteri.
+**69 tool** — 27 in lettura, 35 in scrittura, 7 che distruggono.
+Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3690 caratteri**, circa **923 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 68.504 caratteri.
 
 | gruppo | tool |
 |---|---:|
-| Altro | 34 |
+| Altro | 41 |
 | Video motion | 16 |
 | Accesso diretto al database | 5 |
 | Nodi e generazione | 4 |
@@ -318,6 +318,42 @@ The spend caps of the org. Without `scope` it reads them. With `scope` (org_memb
 | `cap_usd`? | number \| null |  |
 | `reset`? | `none` \| `monthly` |  |
 
+### `studio_approve` · W
+
+*Approve a photo studio item*
+
+Approves the first of `item_ids` in a Photo studio batch. Free. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_cancel` · D
+
+*Cancel a photo studio batch*
+
+Stops the items of a Photo studio batch still queued; finished ones stay. Returns how many it stopped. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_more` · W
+
+*Add photo studio variations*
+
+Adds `variations` per cell to a Photo studio batch and renders them. Spends credits. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
 ### `studio_quote` · R
 
 *Quote a photo studio batch*
@@ -328,6 +364,54 @@ Prices a Photo studio batch before it starts: image count, credits per image and
 |---|---|---|
 | `selection` | object | `{ name, productIds, modelIds?, environments, shots, variations, model, styleRefs?, noPeopleConfirmed? }`, the same selection the Photo studio page builds. |
 | `project`? | string | Which project; the most recent one when omitted. |
+
+### `studio_regenerate` · W
+
+*Regenerate photo studio items*
+
+Requeues finished `item_ids` of a Photo studio batch for a new render. Spends credits. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_reject` · W
+
+*Reject a photo studio item*
+
+Rejects the first of `item_ids` in a Photo studio batch. Free. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_retry` · W
+
+*Retry photo studio items*
+
+Requeues the failed or cancelled `item_ids` of a Photo studio batch. Spends credits. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_run` · W
+
+*Run a photo studio batch*
+
+Renders the rest of a Photo studio batch after its previews. Spends credits. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
 
 ### `studio_start` · W
 

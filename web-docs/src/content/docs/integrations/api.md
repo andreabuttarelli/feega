@@ -33,6 +33,7 @@ The surface changes with the app. Prefer the MCP tools or the CLI; the routes be
 | `POST` | `/api/v1/studio/quote` | Price a Photo studio batch: count, credits, `quoteId` |
 | `POST` | `/api/v1/studio/start` | Start a batch; needs the `quoteId` of the same selection, 409 if stale |
 | `GET` | `/api/v1/studio/{batchId}` | Batch items and state |
+| `POST` | `/api/v1/studio/{batchId}?action=` | `run`, `more`, `cancel`, `retry`, `regenerate`, `approve`, `reject` on a batch; body `{itemIds?, variations?}` |
 | `POST` | `/api/v1/prompts/enhance` | Rewrite a prompt for a model |
 | `GET` | `/api/v1/org/media` | Signed media links |
 

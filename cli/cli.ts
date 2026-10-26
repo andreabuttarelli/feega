@@ -654,6 +654,67 @@ studio
   });
 
 studio
+  .command('run <batchId>')
+  .description('Render the rest of a batch after its previews, spends credits')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('run', batchId, opts);
+  });
+
+studio
+  .command('more <batchId>')
+  .description('Add variations per cell and render them, spends credits')
+  .option('--variations <n>', 'Variations per cell')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('more', batchId, opts);
+  });
+
+studio
+  .command('cancel <batchId>')
+  .description('Stop the items still queued, free')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('cancel', batchId, opts);
+  });
+
+studio
+  .command('retry <batchId>')
+  .description('Requeue failed or cancelled items, spends credits')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('retry', batchId, opts);
+  });
+
+studio
+  .command('regenerate <batchId>')
+  .description('Requeue finished items for a new render, spends credits')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('regenerate', batchId, opts);
+  });
+
+studio
+  .command('approve <batchId>')
+  .description('Approve an item, free')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('approve', batchId, opts);
+  });
+
+studio
+  .command('reject <batchId>')
+  .description('Reject an item, free')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('reject', batchId, opts);
+  });
+
+studio
   .command('status <batchId>')
   .description('Show a batch: its items and their state, free')
   .action(async (batchId: string) => {

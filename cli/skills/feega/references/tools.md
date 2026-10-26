@@ -180,6 +180,9 @@ Free.
 combinations and a `quoteId`. Free. `studio_start` (`{ selection, quoteId, project? }`) starts it and spends
 credits; the `quoteId` must belong to the same selection and price, else 409. `studio_status` (`{ batch_id }`)
 reads the batch. CLI: `feega studio quote|start|status`.
+`studio_run`, `studio_more` (`variations`), `studio_cancel`, `studio_retry`, `studio_regenerate`,
+`studio_approve` and `studio_reject` act on a batch (`batch_id`, `item_ids`); run, more, retry and regenerate spend credits.
+CLI: `feega studio run|more|cancel|retry|regenerate|approve|reject <batchId>`.
 
 `get_app_account` (`{ project_id }`) shows the TEST login of the user's app the project chat remembers
 (login url, email, session expiry; never the password). `forget_app_account` (`{ project_id }`) deletes it
