@@ -1019,21 +1019,33 @@ function numbers(...values: (number | null)[]): number[] | null {
     : (values as number[]);
 }
 
-const pointsOf: Geometry = (attrs) => {
-  const values = (attrs.points ?? "")
-    .trim()
-    .split(/[\s,]+/)
-    .filter(Boolean)
-    .map(Number);
-  if (values.some((v) => !Number.isFinite(v))) {
-    return null;
-  }
-  const pts = Array.from(
-    { length: Math.floor(values.length / 2) },
-    (_, i) => [values[2 * i], values[2 * i + 1]] as const,
-  );
-  return [{ vertices: pts.map((p) => ({ p, in: p, out: p })), closed: true }];
-};
+enum Ends {
+  Closed = "closed",
+  Open = "open",
+}
+
+const pointsOf =
+  (ends: Ends): Geometry =>
+  (attrs) => {
+    const values = (attrs.points ?? "")
+      .trim()
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map(Number);
+    if (values.some((v) => !Number.isFinite(v))) {
+      return null;
+    }
+    const pts = Array.from(
+      { length: Math.floor(values.length / 2) },
+      (_, i) => [values[2 * i], values[2 * i + 1]] as const,
+    );
+    return [
+      {
+        vertices: pts.map((p) => ({ p, in: p, out: p })),
+        closed: ends === Ends.Closed,
+      },
+    ];
+  };
 
 const lineOf: Geometry = (attrs, vp) => {
   const v = numbers(
@@ -1254,8 +1266,8 @@ function textOf(node: RawNode, scope: Scope): Own {
 
 const GEOMETRY: Record<string, Geometry> = {
   line: lineOf,
-  polygon: pointsOf,
-  polyline: pointsOf,
+  polygon: pointsOf(Ends.Closed),
+  polyline: pointsOf(Ends.Open),
   rect: rectOf,
   circle: circleOf,
   ellipse: ellipseOf,
@@ -1652,8 +1664,8 @@ const PAINTERS: Record<string, Painter> = {
   svg: (node, scope) =>
     sealed(node) ? layerPainter(node, scope) : groupPainter(node, scope),
   g: groupPainter,
-  polygon: shapePainter(pointsOf),
-  polyline: shapePainter(pointsOf),
+  polygon: shapePainter(pointsOf(Ends.Closed)),
+  polyline: shapePainter(pointsOf(Ends.Open)),
   line: shapePainter(lineOf),
   rect: shapePainter(rectOf),
   circle: shapePainter(circleOf),

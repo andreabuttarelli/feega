@@ -534,6 +534,33 @@ describe("readTree", () => {
     });
   });
 
+  it("strokes a polyline open, without the segment back to its start", () => {
+    const svg = el({ parent: 0, tag: "svg", svg: true, size: [100, 100] });
+    const chevron = el({
+      parent: 1,
+      tag: "polyline",
+      svg: true,
+      at: null,
+      attrs: { points: "0,0 10,0 10,10" },
+      style: { fill: "none", stroke: "rgb(0, 0, 0)", "stroke-width": "2px" },
+    });
+    const [stroke] = readTree(tree(root(), svg, chevron)).drawn as DrawnPath[];
+    const winding = (x: number, y: number) =>
+      stroke.contours.reduce((w, c) => {
+        let turns = 0;
+        for (let i = 0; i < c.length; i += 2) {
+          const [x0, y0, x1, y1] = [c[i], c[i + 1], c[(i + 2) % c.length], c[(i + 3) % c.length]];
+          if (y0 <= y !== y1 <= y && x < x0 + ((y - y0) * (x1 - x0)) / (y1 - y0)) {
+            turns += y1 > y0 ? 1 : -1;
+          }
+        }
+        return w + turns;
+      }, 0);
+
+    expect(winding(5, 0)).not.toBe(0);
+    expect(winding(5, 5)).toBe(0);
+  });
+
   it("draws an svg stroke with a dash pattern of any length", () => {
     const svg = el({ parent: 0, tag: "svg", svg: true, size: [100, 100] });
     const rect = el({
