@@ -28,7 +28,8 @@ import { DEFAULT_WIRO_BASE_URL } from './wiro';
 import { kieModelRows } from './kie-catalogue';
 import { fetchKieSpecs } from './kie-docs';
 import { fetchKiePrices } from './kie-pricing';
-import { higgsfieldModelRows, sourceWith } from './higgsfield-catalogue';
+import { HIGGSFIELD_MODELS, higgsfieldModelRows, sourceWith } from './higgsfield-catalogue';
+import { fetchHiggsfieldModels, withDiscovered } from './higgsfield-docs';
 import { higgsfieldConfig } from './higgsfield';
 import { configuredIn, TaskProviderName } from './generation/task-providers';
 
@@ -380,9 +381,13 @@ async function keepImagePricing(admin: SupabaseClient, rows: AiModelRow[]): Prom
   );
 }
 
-async function higgsfieldRows(syncedAt: string): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
+async function higgsfieldRows(doFetch: typeof fetch, syncedAt: string): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
   const config = higgsfieldConfig(env);
-  return config ? higgsfieldModelRows(sourceWith(config), syncedAt) : { rows: [], ok: true };
+  if (!config) {
+    return { rows: [], ok: true };
+  }
+  const discovered = await fetchHiggsfieldModels(doFetch).catch(() => []);
+  return higgsfieldModelRows(sourceWith(config), syncedAt, withDiscovered(HIGGSFIELD_MODELS, discovered));
 }
 
 async function kieRows(doFetch: typeof fetch, syncedAt: string): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
@@ -412,7 +417,7 @@ export async function syncAiModels(
     fetchCatalogue(doFetch, baseUrl, VIDEO_CATALOGUE, syncedAt),
     fetchWiroCatalogue(doFetch, opts.wiroBaseUrl ?? env.WIRO_BASE_URL?.trim() ?? DEFAULT_WIRO_BASE_URL, syncedAt),
     kieRows(doFetch, syncedAt),
-    higgsfieldRows(syncedAt)
+    higgsfieldRows(doFetch, syncedAt)
   ]);
 
   const rows = await keepImagePricing(admin, results.flatMap((result) => result.rows));

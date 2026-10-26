@@ -21,11 +21,11 @@ export type HiggsfieldModel = {
   wire?: Pick<TaskWireSpec, 'requiresImage' | 'requiresVideo' | 'caps' | 'quotedAtSubmit' | 'requiredParams' | 'menuGroup'>;
 };
 
-const ESTIMATE_PROMPT = 'price estimate';
-const ESTIMATE_IMAGE = 'https://higgsfield.ai/estimate.png';
+export const ESTIMATE_PROMPT = 'price estimate';
+export const ESTIMATE_IMAGE = 'https://higgsfield.ai/estimate.png';
 const SOUL_ASPECTS = ['9:16', '16:9', '4:3', '3:4', '1:1', '2:3', '3:2'];
 
-const ESTIMATE_VIDEO = 'https://higgsfield.ai/estimate.mp4';
+export const ESTIMATE_VIDEO = 'https://higgsfield.ai/estimate.mp4';
 
 const SEEDANCE_PATH = 'bytedance/seedance-2.5';
 const SEEDANCE_DURATIONS = [4, 5, 6, 8, 10, 12, 15, 20, 25, 30];
