@@ -79,3 +79,13 @@ export function onlyUnsupported(): FigmaMessage {
   next = 10;
   return { meta: {}, blobs: [], nodes: [pageNode(), node('STICKY', PAGE, { w: 200, h: 200, slot: 'a' })] };
 }
+
+export function nestedAutoLayout(): FigmaMessage {
+  next = 10;
+  const stack = { stackMode: 'VERTICAL', stackSpacing: 12, stackHorizontalPadding: 16, stackVerticalPadding: 16 };
+  const page = node('FRAME', PAGE, { w: 1440, h: 900, fillPaints: [solid(1, 1, 1)], frameMaskDisabled: false, ...stack, slot: 'a' });
+  const section = node('FRAME', page.id, { w: 600, h: 300, fillPaints: [solid(0.9, 0.9, 0.9)], frameMaskDisabled: false, ...stack, slot: 'a' });
+  const row = node('FRAME', section.id, { w: 400, h: 100, fillPaints: [solid(0.8, 0.8, 1)], frameMaskDisabled: false, ...stack, stackMode: 'HORIZONTAL', slot: 'a' });
+  const label = node('TEXT', row.id, { w: 80, h: 20, fontName: { family: 'Inter', style: 'Regular', postscript: '' }, fontSize: 16, fillPaints: [solid(0, 0, 0)], textData: { characters: 'Nested' }, slot: 'a' });
+  return { meta: {}, blobs: [], nodes: [pageNode(), page, section, row, label] };
+}

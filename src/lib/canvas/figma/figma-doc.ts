@@ -189,7 +189,8 @@ function frameBackground(doc: MotionDoc, layer: FrameLayer, p: Place, need: Back
   if (NOTHING_TO_DRAW[need](layer)) {
     return { doc, ids: [], roots: [] };
   }
-  return shapeClip(doc, { name: layer.name, path: layer.outline, fillRule: 'nonzero', fills: layer.fills, strokes: layer.strokes, opacity: 1, effects: layer.effects, rotation: 0 }, p);
+  const drawn = shapeClip(doc, { name: layer.name, path: layer.outline, fillRule: 'nonzero', fills: layer.fills, strokes: layer.strokes, opacity: 1, effects: layer.effects, rotation: 0 }, p);
+  return { ...drawn, roots: drawn.roots.map((r) => ({ ...r, layer })) };
 }
 
 const BUILD: Record<LayerKind, (doc: MotionDoc, layer: Layer, p: Place) => Built> = {

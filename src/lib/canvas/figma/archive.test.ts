@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardOverElements, elementsOnly, landingWithUnsupported, onlyUnsupported, unsupportedBesideElement } from '../../../../tests/fixtures/figma/elements';
+import { cardOverElements, elementsOnly, nestedAutoLayout, landingWithUnsupported, onlyUnsupported, unsupportedBesideElement } from '../../../../tests/fixtures/figma/elements';
 import { figmaClipboardHtml } from '../../../../tests/fixtures/figma/clipboard';
 import { figmaMessage } from './archive';
 import { figmaPlan } from './figma-doc';
@@ -37,5 +37,12 @@ describe('a synthetic Figma clipboard', () => {
 
   it('a paste of only unsupported layers still lands', () => {
     expect(figmaPlan(figmaClipboardHtml(onlyUnsupported()), newId)?.items).toHaveLength(1);
+  });
+
+  it('auto-layout frames nested inside a frame with a background land as one frame', () => {
+    const plan = figmaPlan(figmaClipboardHtml(nestedAutoLayout()), newId);
+    expect(plan?.items).toHaveLength(1);
+    expect(plan?.items[0].destination).toBe(Destination.Frame);
+    expect(plan?.items[0].doc.tracks.flatMap((t) => t.clips).length).toBeGreaterThan(3);
   });
 });
