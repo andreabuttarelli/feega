@@ -28,6 +28,19 @@ Drop or upload an SVG file to get editable vector layers, not a flat image. Grad
 
 ## Lottie import
 
+<DemoVideo name="lottie-import" caption="Upload a Lottie file: it lands as an editable animated frame, and what could not be carried over is listed." />
+
+1. Drag a `.json` or `.lottie` file onto the canvas, or choose it with the canvas upload.
+2. A frame appears where you dropped it, with the size and frame rate of the animation. Press play on the timeline to watch it.
+3. A notice lists what could not be carried over, for example *trim path*.
+4. Every shape, mask and keyframe is now a layer you can edit, retime or restyle.
+
 Drop or upload a Lottie file (.json or .lottie) to get an editable animated frame with the size and frame rate of the animation. Shapes, gradients, strokes, solids, text, nested compositions, masks and mattes come across as layers with their keyframes and easing. Images land as grey placeholders. Anything that cannot be carried over (trim paths, repeaters, animated paths, effects, time remap) is listed.
 
-Agents do the same with the `import_lottie` canvas op, from the JSON or from an https URL.
+Agents do the same with the `import_lottie` canvas op, from the JSON or from an https URL:
+
+```bash
+feega canvas $PROJECT import_lottie --input '{"canvasId":"<canvas>","x":0,"y":0,"url":"https://example.com/payment-success.json"}'
+```
+
+`x` and `y` are the canvas position of the frame centre. The answer lists the new frame and `skipped`, what the file used that was not carried over. Over MCP: `canvas_tool({ project_id, op: "import_lottie", input })`.
