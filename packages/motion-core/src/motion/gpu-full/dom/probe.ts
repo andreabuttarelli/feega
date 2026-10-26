@@ -359,16 +359,13 @@ export function domProbe(cfg: ProbeConfig) {
           pen.drawImage(image, x, y, tw, th);
           continue;
         }
-        const pattern = pen.createPattern(image, "repeat");
+        const tile = document.createElement("canvas");
+        tile.width = Math.max(1, Math.round(tw));
+        tile.height = Math.max(1, Math.round(th));
+        tile.getContext("2d")?.drawImage(image, 0, 0, tile.width, tile.height);
+        const pattern = pen.createPattern(tile, "repeat");
         pattern?.setTransform(
-          new DOMMatrix([
-            tw / (image.naturalWidth || tw),
-            0,
-            0,
-            th / (image.naturalHeight || th),
-            x,
-            y,
-          ]),
+          new DOMMatrix([tw / tile.width, 0, 0, th / tile.height, x, y]),
         );
         pen.fillStyle = pattern ?? "transparent";
         pen.fillRect(0, 0, size[0], size[1]);
