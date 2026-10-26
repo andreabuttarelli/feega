@@ -147,13 +147,17 @@ describe('readTree', () => {
     expect(readTree(tree(root(), canvas)).drawn).toEqual([{ kind: DrawnKind.Layer, layer: 0, width: 320, height: 180, opacity: 0.5, matrix: [1, 0, 0, 1, 10, 0] }]);
   });
 
-  it('refuses a rounded clipping box whose content spills out of it', () => {
+  it('clips what spills out of a rounded box to its rounded outline', () => {
     const clip = el({ parent: 0, size: [50, 50], style: { overflow: 'hidden', 'border-top-left-radius': '8px' } });
     const inside = el({ parent: 1, size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
     const outside = el({ parent: 1, at: [45, 0], size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
 
+    const read = readTree(tree(root(), clip, inside, outside));
+    const cover = read.drawn[0].masks?.[0].cover as { contours: number[][] };
+
     expect(readTree(tree(root(), clip, inside)).drawn).toHaveLength(1);
-    expect(readTree(tree(root(), clip, inside, outside)).gaps.map((g) => g.reason)).toEqual([DomGap.Clip]);
+    expect(read.gaps).toEqual([]);
+    expect(cover.contours[0].length).toBeGreaterThan(8);
   });
 
   it('multiplies opacity into a single painted leaf', () => {
@@ -502,5 +506,37 @@ describe('readTree, CSS a motion template draws with', () => {
     const mixed = box({ 'background-image': 'radial-gradient(color(srgb 1 0 0 / 0.38) 0%, rgba(0, 0, 0, 0) 72%)', 'box-shadow': 'color(srgb 0 0 1 / 0.45) 0px 4px 8px 0px' });
 
     expect(readTree(tree(root(), mixed)).gaps).toEqual([]);
+  });
+
+  it('fades the edges a gradient mask-image fades, one ramp per edge', () => {
+    const fade = 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(0, 0, 0) 10%, rgb(0, 0, 0) 90%, rgba(0, 0, 0, 0) 100%)';
+    const rows = box({ 'mask-image': fade, 'background-color': 'rgb(255, 0, 0)' });
+
+    const read = readTree(tree(root(), rows));
+    const ramps = (read.drawn[0].masks ?? []).map((m) => m.cover as { kind: CoverKind; matrix: [number, number, number, number, number, number] });
+
+    expect(read.gaps).toEqual([]);
+    expect(ramps.map((r) => r.kind)).toEqual([CoverKind.Ramp, CoverKind.Ramp]);
+    expect(ramps.map((r) => [apply2d(r.matrix, [0, 0])[0], apply2d(r.matrix, [1, 0])[0]].map(Math.round))).toEqual([[20, 0], [180, 200]]);
+  });
+
+  it('still refuses a mask-image it cannot split into edge fades', () => {
+    const striped = box({ 'mask-image': 'linear-gradient(rgb(0, 0, 0), rgba(0, 0, 0, 0.5), rgb(0, 0, 0))', 'background-color': 'rgb(255, 0, 0)' });
+
+    expect(readTree(tree(root(), striped)).gaps).toMatchObject([{ reason: DomGap.Mask }]);
+  });
+
+  it('rounds a box with percent corners into elliptical ones', () => {
+    const corners = Object.fromEntries(['top-left', 'top-right', 'bottom-right', 'bottom-left'].map((c) => [`border-${c}-radius`, '6%']));
+    const card = box({ ...corners, 'background-color': 'rgb(255, 255, 255)' });
+
+    const read = readTree(tree(root(), card));
+    const [item] = read.drawn as DrawnPath[];
+    const points = Array.from({ length: item.contours[0].length / 2 }, (_, i) => apply2d(item.matrix, [item.contours[0][2 * i], item.contours[0][2 * i + 1]]));
+
+    expect(read.gaps).toEqual([]);
+    expect(near(bounds(item))).toEqual({ left: 0, top: 0, right: 200, bottom: 100 });
+    expect(points.some(([x, y]) => Math.abs(x - 12) < 0.01 && Math.abs(y) < 0.01)).toBe(true);
+    expect(points.some(([x, y]) => Math.abs(x) < 0.01 && Math.abs(y - 6) < 0.01)).toBe(true);
   });
 });

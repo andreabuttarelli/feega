@@ -10,7 +10,7 @@ import { glyphContours, moved, NO_TYPESET, SMOOTHING, Smoothing, type Typeset } 
 import type { SvgNode } from '../../effects/registry';
 import { BlendMode } from '../../blend';
 import { MaskMode } from '../../mask';
-import { CoverKind, type MaskLayer } from '../mask-layers';
+import { CoverKind, RampKind, type MaskLayer } from '../mask-layers';
 import { PaintGap, svgFill, svgStroke, type Fill } from './svg-paint';
 import { cssFunctions, FilterKind, unsupportedPrimitive, type Filter, type Linear } from '../filters';
 
@@ -52,7 +52,7 @@ export type DomRead = { drawn: Drawn[]; gaps: DomGapCount[] };
 type Own = { drawn: Drawn[]; gaps: DomGap[] };
 type Scope = { matrix: Affine; viewport: Size; typeset: Typeset; defs: RawTree['defs']; perspective: ReturnType<typeof perspectiveOf> };
 type Style = RawNode['style'];
-type BoxShape = { round: true; radii: number[] } | { round: false; ellipse: true };
+type BoxShape = { round: true; radii: number[]; squash?: number } | { round: false; ellipse: true };
 type Painter = (node: RawNode, scope: Scope) => Own;
 
 const CASES: Record<string, (c: string) => string> = { '': (c) => c, none: (c) => c, uppercase: (c) => c.toUpperCase(), lowercase: (c) => c.toLowerCase() };
@@ -77,7 +77,6 @@ const URL_IMAGE = /^url\(/;
 
 const REFUSALS: [DomGap, (s: Style) => boolean][] = [
   [DomGap.Filter, (s) => !isNone(s['backdrop-filter'])],
-  [DomGap.Mask, (s) => !isNone(s['mask-image'])],
 ];
 
 const flat = (outline: Outline, dx = 0, dy = 0): number[][] => outline.map((c) => flatten(c).flatMap(([x, y]) => [x + dx, y + dy]));
@@ -99,6 +98,12 @@ function boxShapeOf(s: Style, size: Size): BoxShape | null {
   if (scaled.every(([x, y]) => Math.abs(x - y) < UNIT_EPSILON)) {
     return { round: true, radii: scaled.map(([x]) => x) };
   }
+  const curved = scaled.filter(([x, y]) => x > UNIT_EPSILON && y > UNIT_EPSILON);
+  const squash = curved.length ? curved[0][1] / curved[0][0] : 1;
+  const even = scaled.every(([x, y]) => Math.abs(x * squash - y) < UNIT_EPSILON);
+  if (even && !scaled.every(([x, y]) => Math.abs(x - size.w / 2) < UNIT_EPSILON && Math.abs(y - size.h / 2) < UNIT_EPSILON)) {
+    return { round: true, radii: scaled.map(([x]) => x), squash };
+  }
   const elliptical = scaled.every(([x, y]) => Math.abs(x - size.w / 2) < UNIT_EPSILON && Math.abs(y - size.h / 2) < UNIT_EPSILON);
   return elliptical ? { round: false, ellipse: true } : null;
 }
@@ -107,8 +112,11 @@ function outlineOf(shape: BoxShape, size: Size): Outline {
   if (!shape.round) {
     return ellipseOutline(size);
   }
-  const side = Math.min(size.w, size.h);
-  return rectOutline(shape.radii.map((r) => (side > 0 ? r / side : 0)) as [number, number, number, number], size);
+  const squash = shape.squash ?? 1;
+  const tall = { w: size.w, h: size.h / squash };
+  const side = Math.min(tall.w, tall.h);
+  const outline = rectOutline(shape.radii.map((r) => (side > 0 ? r / side : 0)) as [number, number, number, number], tall);
+  return squash === 1 ? outline : outline.map((c) => ({ ...c, vertices: c.vertices.map((v) => ({ p: [v.p[0], v.p[1] * squash] as const, in: [v.in[0], v.in[1] * squash] as const, out: [v.out[0], v.out[1] * squash] as const })) }));
 }
 
 const squared = (shape: BoxShape) => shape.round && shape.radii.every((r) => r === 0);
@@ -246,7 +254,7 @@ function borderOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Own {
   if (!squared(shape) && !uniform) {
     return nothing(DomGap.Border);
   }
-  const innerShape: BoxShape = shape.round ? { round: true, radii: shape.radii.map((r) => Math.max(0, r - top)) } : shape;
+  const innerShape: BoxShape = shape.round ? { ...shape, radii: shape.radii.map((r) => Math.max(0, r - top)) } : shape;
   const contours = [...flat(outlineOf(shape, size)), ...flat(outlineOf(innerShape, inner), left, top)];
   return { drawn: [path(contours, solid(color), matrix, FillRule.EvenOdd)], gaps: [] };
 }
@@ -276,7 +284,7 @@ function shadowsOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Own {
     }
     const [dx, dy, blur, spread] = [Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5] ?? 0)];
     const grown: Size = { w: Math.max(0, size.w + 2 * spread), h: Math.max(0, size.h + 2 * spread) };
-    const grownShape: BoxShape = shape.round ? { round: true, radii: shape.radii.map((r) => Math.max(0, r + spread)) } : shape;
+    const grownShape: BoxShape = shape.round ? { ...shape, radii: shape.radii.map((r) => Math.max(0, r + spread)) } : shape;
     if (color[3] <= 0 || !grown.w || !grown.h) {
       continue;
     }
@@ -548,7 +556,46 @@ const blendEffect: GroupEffect = ({ node, items }) => {
   return BLENDS.has(mode) && items.length <= 1 ? items.map((d) => ({ ...d, blend: mode as BlendMode })) : DomGap.Blend;
 };
 
-const GROUP_EFFECTS: GroupEffect[] = [filterEffect, clipEffect, blendEffect];
+const OPAQUE = 1;
+const CLEAR = 0;
+
+function edgeFades(gradient: Gradient): [number, number][] | null {
+  const alphas = gradient.stops.map((s) => s.color[3]);
+  if (alphas.some((a) => a !== OPAQUE && a !== CLEAR)) {
+    return null;
+  }
+  const first = alphas.indexOf(OPAQUE);
+  const last = alphas.lastIndexOf(OPAQUE);
+  if (first < 0 || alphas.slice(first, last + 1).includes(CLEAR)) {
+    return null;
+  }
+  const at = (i: number) => gradient.stops[i].at;
+  const fades = [...(first > 0 ? [[at(first), at(first - 1)] as [number, number]] : []), ...(last < alphas.length - 1 ? [[at(last), at(last + 1)] as [number, number]] : [])];
+  return fades.some(([t0, t1]) => Math.abs(t0 - t1) < UNIT_EPSILON) ? null : fades;
+}
+
+const maskImageEffect: GroupEffect = ({ node, items, matrix }) => {
+  const value = node.style['mask-image'];
+  if (isNone(value)) {
+    return items;
+  }
+  const size = { w: node.size[0], h: node.size[1] };
+  const gradient = linearGradient(value ?? '', size);
+  const fades = gradient && edgeFades(gradient);
+  if (!gradient || !fades) {
+    return DomGap.Mask;
+  }
+  const along = ([t0, t1]: [number, number]) => gradient.from.map((f, i) => f + (gradient.to[i] - f) * t0).concat(gradient.from.map((f, i) => f + (gradient.to[i] - f) * t1));
+  return fades.reduce((drawn, fade) => {
+    const [ox, oy, ex, ey] = along(fade);
+    const [ux, uy] = [ex - ox, ey - oy];
+    const ramp: Affine = [ux, uy, -uy, ux, ox, oy];
+    const corners = [[0, 0], [size.w, 0], [size.w, size.h], [0, size.h]].flatMap((p) => apply2d(invert2d(ramp), p as [number, number]));
+    return masked(drawn, { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Ramp, ramp: RampKind.Linear, contours: [corners], matrix: mul2d(matrix, ramp) } });
+  }, items);
+};
+
+const GROUP_EFFECTS: GroupEffect[] = [filterEffect, clipEffect, maskImageEffect, blendEffect];
 
 function grouped(group: Group): Drawn[] | DomGap {
   let items = group.items;
@@ -616,10 +663,11 @@ function spills(items: Drawn[], matrix: Affine, size: Size): boolean {
 function boxClip(node: RawNode, kids: Drawn[], matrix: Affine): Drawn[] | null {
   const size = { w: node.size[0], h: node.size[1] };
   const shape = boxShapeOf(node.style, size);
-  if (!shape || !squared(shape)) {
+  if (!shape) {
     return null;
   }
-  const mask: MaskLayer = { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [[0, 0, size.w, 0, size.w, size.h, 0, size.h]], matrix } };
+  const contours = squared(shape) ? [[0, 0, size.w, 0, size.w, size.h, 0, size.h]] : flat(outlineOf(shape, size));
+  const mask: MaskLayer = { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours, matrix } };
   return kids.map((d) => ({ ...d, masks: [...(d.masks ?? []), mask] }));
 }
 
