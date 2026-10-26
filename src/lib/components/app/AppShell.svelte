@@ -40,7 +40,6 @@
   <AppSidebar
     pathname={page.url.pathname}
     {projectId}
-    projects={data.projects}
     profile={data.profile}
     org={data.org}
     workspaces={data.workspaces}
@@ -150,15 +149,18 @@
     .app-shell {
       display: grid;
       grid-template-columns: var(--app-side-w) minmax(0, 1fr);
-      --app-side-w: 220px;
+      --app-side-w: 236px;
     }
 
     .app-side {
       display: block;
       position: sticky;
-      top: 0;
-      height: 100dvh;
+      top: var(--ui-space-2);
+      height: calc(100dvh - 2 * var(--ui-space-2));
+      margin: var(--ui-space-2) 0 var(--ui-space-2) var(--ui-space-2);
+      border-radius: var(--ui-radius-lg);
       background: var(--ui-panel-sunken);
+      box-shadow: var(--ui-shadow-float);
     }
 
     .app-bar {
