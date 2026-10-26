@@ -193,6 +193,81 @@ describe("domProbe", () => {
     expect(nodes.filter((n) => n.tag === "svg").map((n) => n.layer !== NO_INDEX)).toEqual([true, false]);
   });
 
+  it("leaves an svg with text or pictures to the reader, since an svg image loads neither fonts nor files", async () => {
+    const filtered = (inner: string) =>
+      `<svg width="40" height="40"><defs><filter id="soft"><feGaussianBlur></feGaussianBlur></filter></defs><g filter="url(#soft)">${inner}</g></svg>`;
+    const { reply } = await asked(filtered("<text>a</text>") + filtered('<image href="https://files.example/a.jpg"></image>'));
+    const nodes = (reply.trees[CLIP] as { nodes: { tag: string; layer: number }[] }).nodes;
+
+    expect(nodes.filter((n) => n.tag === "svg").map((n) => n.layer)).toEqual([NO_INDEX, NO_INDEX]);
+  });
+
+  it("carries the defs a rasterised svg borrows from another svg on the page", async () => {
+    const loaded: string[] = [];
+    class Loading {
+      crossOrigin: string | null = null;
+      naturalWidth = 1;
+      naturalHeight = 1;
+      set src(value: string) {
+        loaded.push(value);
+      }
+      decode = async () => undefined;
+    }
+    vi.stubGlobal("Image", Loading);
+
+    await asked(
+      '<svg width="1" height="1"><defs><filter id="dither"><feTurbulence></feTurbulence></filter></defs></svg><svg width="40" height="40"><g filter="url(#dither)"><rect width="40" height="40"></rect></g></svg>',
+    );
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(loaded.map(decodeURIComponent).some((src) => src.includes('<g filter="url(#dither)"') && src.includes('<filter id="dither"'))).toBe(true);
+  });
+
+  it("keeps a rasterised svg's own url references rather than the page-absolute ones the browser computes", async () => {
+    const loaded: string[] = [];
+    class Loading {
+      crossOrigin: string | null = null;
+      naturalWidth = 1;
+      naturalHeight = 1;
+      set src(value: string) {
+        loaded.push(value);
+      }
+      decode = async () => undefined;
+    }
+    vi.stubGlobal("Image", Loading);
+    const computed = window.getComputedStyle.bind(window);
+    vi.stubGlobal("getComputedStyle", (el: Element, pseudo?: string) => {
+      const real = computed(el, pseudo);
+      return el.tagName === "rect"
+        ? new Proxy(real, { get: (t, k) => (k === "getPropertyValue" ? (name: string) => (name === "fill" ? 'url("about:srcdoc#glow")' : t.getPropertyValue(name)) : Reflect.get(t, k)) })
+        : real;
+    });
+
+    await asked('<svg width="40" height="40"><defs><mask id="m"></mask><radialGradient id="glow"></radialGradient></defs><rect width="40" height="40" fill="url(#glow)" mask="url(#m)"></rect></svg>');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(loaded.map(decodeURIComponent).join()).not.toContain("about:srcdoc");
+  });
+
+  it("draws a rasterised svg in its own box, not at the page offset its style places it", async () => {
+    const loaded: string[] = [];
+    class Loading {
+      crossOrigin: string | null = null;
+      naturalWidth = 1;
+      naturalHeight = 1;
+      set src(value: string) {
+        loaded.push(value);
+      }
+      decode = async () => undefined;
+    }
+    vi.stubGlobal("Image", Loading);
+
+    await asked('<svg style="position:absolute;left:360px;top:20px" width="40" height="40"><defs><mask id="m"></mask></defs><rect width="40" height="40" mask="url(#m)"></rect></svg>');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(decodeURIComponent(loaded[0])).not.toMatch(/position: ?absolute/);
+  });
+
   it("places svg text by its characters in the text's own user space, without a raster", async () => {
     const extents: Record<string, DOMRect> = { 0: { x: 5, y: 8, width: 6, height: 14 } as DOMRect, 1: { x: 11, y: 8, width: 6, height: 14 } as DOMRect };
     Object.assign(window.SVGElement.prototype, {

@@ -470,10 +470,14 @@ export function domProbe(cfg: ProbeConfig) {
     return id ? document.getElementById(id)?.tagName.toLowerCase() : undefined;
   };
 
+  const UNEMBEDDED = "text, image, foreignObject";
+
   const rasterisedSvg = (svg: Element) =>
+    !svg.querySelector(UNEMBEDDED) &&
     [...svg.querySelectorAll("*")].some(
       (e) =>
         e.hasAttribute("mask") ||
+        referencedTag(e.getAttribute("filter") ?? "") === "filter" ||
         PAINTED_BY.some(
           (k) => referencedTag(e.getAttribute(k) ?? "") === "pattern",
         ),
@@ -484,17 +488,34 @@ export function domProbe(cfg: ProbeConfig) {
     const copies = [clone, ...clone.querySelectorAll("*")] as SVGElement[];
     [svg, ...svg.querySelectorAll("*")].forEach((source, i) => {
       const computed = getComputedStyle(source);
-      SVG_LOOKS.forEach((k) =>
-        copies[i].style?.setProperty(k, computed.getPropertyValue(k)),
-      );
+      SVG_LOOKS.map((k) => [k, computed.getPropertyValue(k)])
+        .filter(([, v]) => !v.includes("url("))
+        .forEach(([k, v]) => copies[i].style?.setProperty(k, v));
     });
+    const borrowed = [
+      ...new Set(
+        [svg, ...svg.querySelectorAll("*")].flatMap((e) =>
+          [...e.attributes].map((a) => REFERENCE.exec(a.value)?.[1] ?? ""),
+        ),
+      ),
+    ]
+      .map((id) => (id ? document.getElementById(id) : null))
+      .filter((def): def is HTMLElement => def !== null && !svg.contains(def))
+      .map((def) => def.cloneNode(true));
+    if (borrowed.length) {
+      const defs = document.createElementNS(SVG_NS, "defs");
+      defs.append(...borrowed);
+      clone.prepend(defs);
+    }
     clone.style.transform = "none";
+    clone.style.position = "static";
     clone.setAttribute("xmlns", SVG_NS);
     clone.setAttribute("width", String(size[0]));
     clone.setAttribute("height", String(size[1]));
     const src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(clone))}`;
     return bitmapOf(size, async (pen) => {
-      pen.drawImage(await loadImage(src), 0, 0, size[0], size[1]);
+      const image = await loadImage(src);
+      pen.drawImage(image, 0, 0, size[0], size[1]);
     });
   };
 

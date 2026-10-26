@@ -819,7 +819,7 @@ describe("readTree", () => {
         { tag: "rect", attrs: { x: "10", y: "20", width: "30", height: "40" } },
       ],
     };
-    const goo = {
+    const goo: SvgNode = {
       tag: "filter",
       attrs: { id: "goo" },
       children: [
