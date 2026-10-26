@@ -230,19 +230,22 @@ const framing = (props: Record<string, unknown>): [number, number] => [Number(pr
 
 const picture = (src: string, size: Size, look: Partial<Omit<ImageItem, 'kind' | 'clip' | 'blur' | 'blend' | 'src' | 'size'>>): Content => ({ kind: ItemKind.Image, src, size, video: false, mediaTime: 0, fit: 'cover', focus: [CENTRE, CENTRE], zoom: 1, clipped: true, inner: IDENTITY, opacity: 1, matrix: IDENTITY, ...look });
 
-const imagePainter = ({ props, size, asset }: Env): Painted => {
+const imagePainter = (env: Env): Painted => {
+  const { props, size, asset } = env;
   const src = asset(props.assetId);
-  return src ? [picture(src, size, { fit: String(props.fit), focus: framing(props), zoom: Number(props.zoom ?? 1) })] : Unsupported.Component;
+  return src ? [picture(src, size, { fit: String(props.fit), focus: framing(props), zoom: Number(props.zoom ?? 1) })] : customPainter(env);
 };
 
-const videoPainter = ({ props, size, asset, media }: Env): Painted => {
+const videoPainter = (env: Env): Painted => {
+  const { props, size, asset, media } = env;
   const src = asset(props.assetId);
-  return src ? [picture(src, size, { video: true, mediaTime: media, fit: String(props.fit), focus: framing(props) })] : Unsupported.Component;
+  return src ? [picture(src, size, { video: true, mediaTime: media, fit: String(props.fit), focus: framing(props) })] : customPainter(env);
 };
 
-const logoPainter = ({ props, size, asset, logo }: Env): Painted => {
+const logoPainter = (env: Env): Painted => {
+  const { props, size, asset, logo } = env;
   const src = asset(props.assetId) ?? logo;
-  return src ? [picture(src, size, { fit: 'width', clipped: false })] : Unsupported.Text;
+  return src ? [picture(src, size, { fit: 'width', clipped: false })] : customPainter(env);
 };
 
 const NATIVE_FILLS: ReadonlySet<string> = new Set([PaintKind.Solid, PaintKind.Linear, PaintKind.Radial]);
@@ -327,12 +330,12 @@ function ownLook(content: object, placed: Affine, clip: Looked): Looked {
   };
 }
 
-const customPainter =({ read, clip }: Env): Painted => {
+function customPainter({ read, clip }: Env): Painted {
   if (!read) {
     return Unsupported.Unread;
   }
   return { content: read.drawn.map((d) => contentOf(d, clip.id)), gaps: read.gaps.map((g) => `${g.reason} ${g.element} ×${g.count}`) };
-};
+}
 
 const lensPainter = ({ clip, stage, fps, time, css }: Env): Painted => [{ kind: ItemKind.Lens, lens: lensAt(clip, { ...stage, fps }, Math.round(time * fps), css), opacity: 1, matrix: IDENTITY }];
 
@@ -356,6 +359,7 @@ const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }
   Logo: { place: boxed, paint: logoPainter },
   ...Object.fromEntries(TEXT_COMPONENTS.map((c) => [c, { place: unturned, paint: textPainter }])),
   Custom: { place: fullFrame, paint: customPainter },
+  Composition: { place: fullFrame, paint: customPainter },
   LiquidBlob: { place: fullFrame, paint: lensPainter },
   Device3D: { place: fullFrame, paint: devicePainter }
 };
