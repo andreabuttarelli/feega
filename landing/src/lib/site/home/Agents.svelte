@@ -24,7 +24,7 @@
         <button type="button" role="tab" aria-selected={s.id === current} class:is-active={s.id === current} onclick={() => (current = s.id)}>{s.label}</button>
       {/each}
     </div>
-    <pre role="tabpanel"><code>{setup.code}</code></pre>
+    <div role="tabpanel" tabindex="0"><pre><code>{setup.code}</code></pre></div>
     <button type="button" class="copy" onclick={copy}>{copied ? 'Copied' : 'Copy'}</button>
   </div>
 </section>

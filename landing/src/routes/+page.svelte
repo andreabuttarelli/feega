@@ -1,6 +1,9 @@
 <script lang="ts">
-  import Intro from '$lib/site/home/Intro.svelte';
-  import Disciplines from '$lib/site/home/Disciplines.svelte';
+  import Hero from '$lib/site/home/Hero.svelte';
+  import Collage from '$lib/site/home/Collage.svelte';
+  import Tools from '$lib/site/home/Tools.svelte';
+  import Imagine from '$lib/site/home/Imagine.svelte';
+  import Canvas from '$lib/site/home/Canvas.svelte';
   import Models from '$lib/site/home/Models.svelte';
   import Scene from '$lib/site/home/Scene.svelte';
   import Pricing from '$lib/site/home/Pricing.svelte';
@@ -21,8 +24,11 @@
   {@html HOME_JSON_LD}
 </svelte:head>
 
-<Intro />
-<Disciplines />
+<Hero />
+<Collage />
+<Tools />
+<Imagine />
+<Canvas />
 <Models />
 <Scene image="scene-1" />
 <Scene image="scene-2" />
