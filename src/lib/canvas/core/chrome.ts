@@ -42,6 +42,7 @@ export type ChromeTile = {
   label: string | null;
   icon: number[][] | null;
   tag?: string | null;
+  addBeside?: boolean;
 };
 
 export type ChromeState = { ring: NodeChrome; handles: boolean; hovered: boolean; ringColor: string; names: boolean };
@@ -69,6 +70,7 @@ const ICON_GAP = 5;
 const ELLIPSIS = '…';
 const NAME_SIZE = 11;
 const NAME_GAP = 16;
+export const ADD_BESIDE = { offset: 8, size: 24, gap: 8 };
 const PORT_RING = 1;
 const TAG_RADIUS = 4;
 
@@ -177,7 +179,8 @@ function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
 function name(t: ChromeTile, glyphs: Glyphs, m: PortMark, centre: number, side: ChromePart): PathItem {
   const type = m.type;
   const { contours, width } = glyphs(m.label ?? CONNECTOR_STYLE[type].label, NAME_SIZE, { leading: NAME_LEADING });
-  const left = side === ChromePart.PortIn ? t.x - NAME_GAP - width : t.x + t.width + NAME_GAP;
+  const outGap = t.addBeside ? ADD_BESIDE.offset + ADD_BESIDE.size + ADD_BESIDE.gap : NAME_GAP;
+  const left = side === ChromePart.PortIn ? t.x - NAME_GAP - width : t.x + t.width + outGap;
   return item(t, ChromePart.PortName, shift(contours, left, centre - NAME_SIZE / 2), CONNECTOR_STYLE[type].color);
 }
 
