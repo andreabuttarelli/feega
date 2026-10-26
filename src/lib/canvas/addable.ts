@@ -46,7 +46,9 @@ export const CANVAS_BAR_MAIN: readonly Addable[] = [...GEN_MEDIUMS];
 
 export const CANVAS_BAR_MORE = CANVAS_ADD_BAR.filter((w) => !CANVAS_BAR_MAIN.includes(w));
 
-export const CLOUD_ADDABLE: ReadonlySet<Addable> = new Set<Addable>(['text', 'image', 'video', 'products', 'social_account_feed', 'studio_batch']);
+export const AI_ADDABLE: ReadonlySet<Addable> = new Set<Addable>(['text', 'image', 'video']);
+
+export const CLOUD_ADDABLE: ReadonlySet<Addable> = new Set<Addable>(['products', 'social_account_feed', 'studio_batch']);
 
 export function isAddable(x: string): x is Addable {
   return (CANVAS_ADDABLE as readonly string[]).includes(x);
