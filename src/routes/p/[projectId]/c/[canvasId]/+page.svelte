@@ -3472,7 +3472,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   const FIGMA_PASTE = 'These Figma layers could not be read. In Figma use Copy as → Copy as SVG, then paste here.';
-  const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
+  const FIGMA_SKIPPED = 'Pasted from Figma. Approximated or skipped:';
 
   async function pasteFigma(html: string, at: { x: number; y: number }) {
     const res = await post('pasteFigma', { html, at: JSON.stringify(at) });
