@@ -1,10 +1,15 @@
 import { FillType } from '@feega/motion-core/motion/fill/model';
+import { flatten, parsePath } from '@feega/motion-core/motion/shape/geometry';
+import { ClipOp, clipPolygons } from '@feega/motion-core/motion/shape/polygon-clip';
 
 type Matrix = [a: number, b: number, c: number, d: number, e: number, f: number];
 type Pt = [number, number];
 type Segment = { cmd: 'M' | 'L' | 'C' | 'Z'; pts: Pt[] };
 type Attrs = Record<string, string>;
 type Paint = { fill: string | null; stroke: string | null; fillRule: SvgFillRule };
+
+type Polygon = Pt[];
+type Referable = { tag: string; attrs: Attrs };
 
 type Box = { left: number; top: number; right: number; bottom: number };
 type Stop = { color: string; pos: number };
@@ -56,6 +61,7 @@ const MIDDLE = 0.5;
 const GRADIENT = /<(linearGradient|radialGradient)\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/\1\s*>/gi;
 const STOP = /<stop\b((?:[^>"']|"[^"]*"|'[^']*')*?)\/?>/gi;
 const CLIP = /<clipPath\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/clipPath\s*>/gi;
+const MASK = /<mask\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/mask\s*>/gi;
 const URL_REF = /^url\(\s*['"]?#([^'")\s]+)/;
 const LINE_TSPAN = /<tspan\b(?=[^>]*\s(?:y|dy)\s*=)[^>]*>/gi;
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
@@ -515,6 +521,63 @@ function clippedTo(segments: Segment[], clip: Box): Segment[] | null {
   return segments.map((s) => ({ cmd: s.cmd, pts: s.pts.map(([x, y]): Pt => [clamp(x, clip.left, clip.right), clamp(y, clip.top, clip.bottom)]) }));
 }
 
+const signedArea = (poly: Polygon) => poly.reduce((sum, p, i) => sum + p[0] * poly[(i + 1) % poly.length][1] - poly[(i + 1) % poly.length][0] * p[1], 0);
+
+function holds(poly: Polygon, [x, y]: Pt): boolean {
+  let odd = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const crosses = poly[i][1] > y !== poly[j][1] > y && x < ((poly[j][0] - poly[i][0]) * (y - poly[i][1])) / (poly[j][1] - poly[i][1]) + poly[i][0];
+    odd = crosses ? !odd : odd;
+  }
+  return odd;
+}
+
+function polygonsOf(path: string, rule: SvgFillRule): Polygon[] {
+  const outline = parsePath(path);
+  const polys = typeof outline === 'string' ? [] : outline.map(flatten).filter((poly) => poly.length > 2);
+  if (rule === 'nonzero') {
+    return polys;
+  }
+  return polys.map((poly, i) => {
+    const depth = polys.filter((other, j) => j !== i && holds(other, poly[0])).length;
+    const wantPositive = depth % 2 === 0;
+    return signedArea(poly) > 0 === wantPositive ? poly : [...poly].reverse();
+  });
+}
+
+const polygonPath = (polys: Polygon[]) => polys.map((poly) => `M${poly.map((p) => p.map(round).join(' ')).join('L')}Z`).join('');
+
+function maskedPath(path: string, rule: SvgFillRule, mask: Polygon[]): { path: string; fillRule: SvgFillRule } | null {
+  const cut = clipPolygons(polygonsOf(path, rule), mask, ClipOp.Intersection);
+  return cut.length ? { path: polygonPath(cut), fillRule: 'nonzero' } : null;
+}
+
+function masksOf(svg: string): Map<string, Polygon[]> {
+  const found = new Map<string, Polygon[]>();
+  for (const m of svg.matchAll(MASK)) {
+    const id = attrsOf(m[1]).id;
+    const polygons = svgShapes(`<svg>${m[2]}</svg>`).shapes.flatMap((sh) => polygonsOf(sh.path, sh.fillRule));
+    if (id && polygons.length) {
+      found.set(id, polygons);
+    }
+  }
+  return found;
+}
+
+function referablesOf(svg: string): Map<string, Referable> {
+  const found = new Map<string, Referable>();
+  for (const m of svg.matchAll(TAG)) {
+    const tag = m[2].toLowerCase();
+    const attrs = attrsOf(m[3]);
+    if (!m[1] && attrs.id && SHAPE_PATH[tag]) {
+      found.set(attrs.id, { tag, attrs });
+    }
+  }
+  return found;
+}
+
+const hrefOf = (a: Attrs) => (a.href ?? a['xlink:href'])?.trim().replace(/^#/, '');
+
 const decoded = (s: string) =>
   s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (whole, name: string) => {
     if (name.startsWith('#')) {
@@ -553,9 +616,9 @@ function textAt(svg: string, o: TextOrigin): SvgText | null {
   return { text, x: round(x), y: round(y), size: round(num(a['font-size'], DEFAULT_TEXT_SIZE) * scale), fill: o.fill, weight: weightOf(a['font-weight']), anchor: ANCHORS[a['text-anchor']] ?? 'start' };
 }
 
-type Frame = { tag: string; matrix: Matrix; paint: Paint; clip: Box | null };
+type Frame = { tag: string; matrix: Matrix; paint: Paint; clip: Box | null; mask: Polygon[] | null };
 
-const ROOT_FRAME: Frame = { tag: '', matrix: IDENTITY, paint: { fill: NAMED.black, stroke: null, fillRule: 'nonzero' }, clip: null };
+const ROOT_FRAME: Frame = { tag: '', matrix: IDENTITY, paint: { fill: NAMED.black, stroke: null, fillRule: 'nonzero' }, clip: null, mask: null };
 
 export function svgShapes(svg: string): SvgRead {
   const shapes: SvgShape[] = [];
@@ -563,6 +626,8 @@ export function svgShapes(svg: string): SvgRead {
   const empty: SvgRead = { size: { width: DEFAULT_SIDE, height: DEFAULT_SIDE }, shapes, texts };
   const gradients = gradientsOf(svg);
   const clips = clipsOf(svg);
+  const masks = masksOf(svg);
+  const referables = referablesOf(svg);
   const stack: Frame[] = [];
   let size = empty.size;
   let hidden = 0;
@@ -612,29 +677,40 @@ export function svgShapes(svg: string): SvgRead {
     const own = clipBox ? movedBox(clipBox, matrix) : null;
     const clip = own && parent.clip ? overlap(own, parent.clip) : (own ?? parent.clip);
 
-    const make = SHAPE_PATH[tag];
-    const local = make ? pathSegments(make(a)) : [];
-    const fill = OPEN_SHAPES.has(tag) ? null : paint.fill;
-    if (local.length > 1 && (fill || paint.stroke) && a.display !== 'none' && a.visibility !== 'hidden') {
-      const world = local.map((s) => ({ cmd: s.cmd, pts: s.pts.map((p) => apply(matrix, p)) }));
+    const used = tag === 'use' ? referables.get(hrefOf(a) ?? '') : undefined;
+    const drawTag = used?.tag ?? tag;
+    const drawAttrs = used?.attrs ?? a;
+    const drawMatrix = used ? multiply(multiply(matrix, [1, 0, 0, 1, num(a.x), num(a.y)]), transformOf(used.attrs.transform)) : matrix;
+    const drawPaint = used ? paintOf(used.attrs, paint) : paint;
+
+    const maskShape = masks.get(refOf(a.mask) ?? '');
+    const ownMask = maskShape ? maskShape.map((poly) => poly.map((p) => apply(matrix, p))) : null;
+    const mask = ownMask && parent.mask ? clipPolygons(ownMask, parent.mask, ClipOp.Intersection) : (ownMask ?? parent.mask);
+
+    const make = SHAPE_PATH[drawTag];
+    const local = make ? pathSegments(make(drawAttrs)) : [];
+    const fill = OPEN_SHAPES.has(drawTag) ? null : drawPaint.fill;
+    if (local.length > 1 && (fill || drawPaint.stroke) && drawAttrs.display !== 'none' && drawAttrs.visibility !== 'hidden') {
+      const world = local.map((s) => ({ cmd: s.cmd, pts: s.pts.map((p) => apply(drawMatrix, p)) }));
       const kept = clip ? clippedTo(world, clip) : world;
       const ref = refOf(fill);
       const def = ref ? gradients.get(ref) : undefined;
-      const figma = a[FIGMA_GRADIENT] ? figmaGradient(a[FIGMA_GRADIENT], conic, boundsOfSegments(world)) : null;
+      const figma = drawAttrs[FIGMA_GRADIENT] ? figmaGradient(drawAttrs[FIGMA_GRADIENT], conic, boundsOfSegments(world)) : null;
       const gradient = figma ?? (def ? gradientOf(def, boundsOfSegments(local)) : null);
       conic = null;
-      if (kept) {
+      const visible = kept && mask ? maskedPath(placed(kept, IDENTITY), drawPaint.fillRule, mask) : kept && { path: placed(kept, IDENTITY), fillRule: drawPaint.fillRule };
+      if (visible) {
         shapes.push({
-          path: placed(kept, IDENTITY),
+          path: visible.path,
           fill: figma ? figma.stops[0].color : fill === null ? null : solid(fill),
-          stroke: paint.stroke === null ? null : solid(paint.stroke),
-          fillRule: paint.fillRule,
+          stroke: drawPaint.stroke === null ? null : solid(drawPaint.stroke),
+          fillRule: visible.fillRule,
           ...(gradient ? { gradient } : {})
         });
       }
     }
-    if (!selfClosing && !make) {
-      stack.push({ tag, matrix, paint, clip });
+    if (!selfClosing && !SHAPE_PATH[tag]) {
+      stack.push({ tag, matrix, paint, clip, mask });
     }
   }
   return stack.length || shapes.length || texts.length ? { size, shapes, texts } : empty;

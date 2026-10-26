@@ -190,3 +190,25 @@ describe('svgShapes fill rule and real-world paths', () => {
     expect(shorthand.path).toBe(explicit.path);
   });
 });
+
+describe('a Figma export with masks and <use>', () => {
+  const read = svgShapes(readFileSync('tests/fixtures/svg/figma-masked-ribbon.svg', 'utf8'));
+  const ribbons = read.shapes.filter((s) => s.fillRule === 'evenodd');
+  const slivers = read.shapes.filter((s) => s.fillRule === 'nonzero');
+
+  it('draws the use of a defs path, white then gradient, evenodd', () => {
+    expect(ribbons.map((s) => s.fill)).toEqual(['#ffffff', '#22d3b6']);
+    expect(ribbons.every((s) => s.fillRule === 'evenodd')).toBe(true);
+    expect(ribbons[1].gradient).toMatchObject({ type: 'linear-gradient' });
+    expect(ribbons[1].gradient?.stops).toHaveLength(5);
+  });
+
+  it('keeps only the part of a masked group inside the mask', () => {
+    expect(slivers.length).toBeGreaterThan(0);
+    for (const sliver of slivers) {
+      expect(sliver.path).not.toContain('C');
+      const b = box(sliver.path);
+      expect(Math.hypot(b.left - 514, b.top - 529)).toBeGreaterThan(250);
+    }
+  });
+});
