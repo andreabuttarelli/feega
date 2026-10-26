@@ -28,7 +28,7 @@ function deepLinkIn(argv) {
 }
 
 function open() {
-  window = new BrowserWindow({ width: 1440, height: 900, minWidth: 800, minHeight: 600, title: 'feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) });
+  window = new BrowserWindow({ width: 1440, height: 900, minWidth: 800, minHeight: 600, title: 'Feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) });
   if (process.platform !== 'darwin') {
     nativeTheme.on('updated', () => window?.setTitleBarOverlay(overlay(nativeTheme.shouldUseDarkColors)));
   }
