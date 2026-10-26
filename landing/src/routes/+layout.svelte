@@ -3,12 +3,12 @@
   import SiteHeader from '$lib/site/SiteHeader.svelte';
   import SiteFooter from '$lib/site/SiteFooter.svelte';
   import { page } from '$app/state';
+  import { SITE_URL } from '$lib/site/links';
 
   let { children } = $props();
 
-  const SITE = 'https://www.feega.app';
-  const OG_IMAGE = `${SITE}/og.png`;
-  const canonical = $derived(SITE + page.url.pathname);
+  const OG_IMAGE = `${SITE_URL}/og.png`;
+  const canonical = $derived(SITE_URL + page.url.pathname);
 </script>
 
 <svelte:head>

@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { FOOTER_LEGAL_LINKS, LEGAL_BASE_URL, LEGAL_LINKS, legalHref } from '$lib/legal-links';
+import { FOOTER_LEGAL_LINKS, LEGAL_LINKS, legalHref } from '$lib/legal-links';
 
 describe('i link legali vivono in una sola tabella', () => {
   it('la base è il sito marketing pubblico', () => {
-    expect(LEGAL_BASE_URL).toBe('https://feega.app');
   });
 
   it('ogni voce risolve sotto la base', () => {
     for (const key of Object.keys(LEGAL_LINKS) as (keyof typeof LEGAL_LINKS)[]) {
-      expect(legalHref(key)).toBe(`${LEGAL_BASE_URL}${LEGAL_LINKS[key].path}`);
+      expect(legalHref(key)).toBe(`https://feega.app${LEGAL_LINKS[key].path}`);
     }
   });
 

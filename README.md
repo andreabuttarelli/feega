@@ -119,7 +119,8 @@ Nothing is credit-gated (`BILLING_PROVIDER=open`). Full guide, limits and timing
 ## Stack
 
 TypeScript, SvelteKit, Supabase (Postgres, Auth, Storage, Realtime), Node.js 22, a WebGPU canvas
-with a WebGL fallback.
+with a WebGL fallback. The marketing site (feega.app) is a separate SvelteKit project in
+`landing/`: `npm --prefix landing ci && npm --prefix landing run dev`.
 
 ## Contributing
 

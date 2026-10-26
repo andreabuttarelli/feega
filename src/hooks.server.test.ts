@@ -214,13 +214,13 @@ describe('la radice manda dove dice la regola di ingresso', () => {
 		expect(redirected?.location).toBe('/p/proj1/c/canvas1');
 	});
 
-	it('su un deploy di anteprima la radice è il sito, non un redirect', async () => {
+	it('su un deploy di anteprima la radice resta un redirect: il sito vive in landing/', async () => {
 		const { env } = await import('$env/dynamic/private');
 		Object.assign(env, { VERCEL_ENV: 'preview' });
-		mockSession = { session: { access_token: 'tok' }, user: { id: 'user-1', email: 'chi@esempio.it' } };
+		mockSession = { session: null, user: null };
 		const redirected = await rootRequestTo('https://www.feega.app');
 		Object.assign(env, { VERCEL_ENV: 'production' });
-		expect(redirected).toBeNull();
+		expect(redirected?.location).toBe('/login');
 	});
 });
 

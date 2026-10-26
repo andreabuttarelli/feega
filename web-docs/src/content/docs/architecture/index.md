@@ -6,6 +6,7 @@ sidebar:
 ---
 
 - App: SvelteKit in `src/`. REST API under `src/routes/api/v1/`.
+- Marketing site: a separate SvelteKit project in `landing/` (home, landing pages, legal, changelog), deployed as its own Vercel project on feega.app. The app 301s those paths there (`src/lib/marketing.ts`) and its `/` goes to the dashboard or `/login`.
 - CLI and MCP server: `cli/`, thin HTTP clients of the API.
 - Packages in `packages/`: `api-contracts`, `gpu-core`, `gpu-text`, `shader-fx`, `feega-motion-react`, `site-analysis`. A package never imports the app (`packages/no-app-imports.test.ts`).
 - Database: Supabase Postgres with row-level security. See [Data model](/architecture/data-model/).
