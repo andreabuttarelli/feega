@@ -178,7 +178,7 @@ async function run(target: Target, renderer: string) {
   const panMb = rssMb(mine());
   const zooming = await zoomMotion(page);
   const painted = (await core.count()) ? await core.getAttribute('data-painted') : null;
-  const coreFrames = (await core.count()) ? `${await core.getAttribute('data-frames')} whole, ${await core.getAttribute('data-partial')} partial` : null;
+  const coreFrames = (await core.count()) ? `${await core.getAttribute('data-frames')} drawn, ${await core.getAttribute('data-partial')} with gaps` : null;
   const cacheKb = (await core.count()) ? Math.round(Number(await core.getAttribute('data-cache-bytes')) / BYTES_PER_KB) : null;
   const backend = await page.locator('[data-renderer]').first().getAttribute('data-renderer');
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer}.png` });
