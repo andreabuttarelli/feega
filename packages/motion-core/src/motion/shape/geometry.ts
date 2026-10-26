@@ -290,7 +290,19 @@ type Cursor = { tokens: string[]; i: number };
 
 const angleBetween = (u: Pt, v: Pt) => Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]);
 
-function arcCurves(from: Pt, [rx0, ry0]: Pt, turn: number, large: boolean, sweep: boolean, to: Pt): [Pt, Pt, Pt][] {
+enum ArcSize {
+  Small = 'small',
+  Large = 'large'
+}
+
+enum ArcSweep {
+  Backward = 'backward',
+  Forward = 'forward'
+}
+
+function arcCurves(from: Pt, [rx0, ry0]: Pt, turn: number, size: ArcSize, direction: ArcSweep, to: Pt): [Pt, Pt, Pt][] {
+  const large = size === ArcSize.Large;
+  const sweep = direction === ArcSweep.Forward;
   if (same(from, to)) {
     return [];
   }
@@ -426,10 +438,10 @@ export function parsePath(d: string): Outline | string {
     a: (rel) => {
       const radii: Pt = [read(), read()];
       const turn = read();
-      const large = flag();
-      const sweep = flag();
+      const size = flag() ? ArcSize.Large : ArcSize.Small;
+      const direction = flag() ? ArcSweep.Forward : ArcSweep.Backward;
       const p = point(rel);
-      arcCurves(pen, radii, turn, large, sweep, p).forEach(([c1, c2, end]) => curveTo(c1, c2, end));
+      arcCurves(pen, radii, turn, size, direction, p).forEach(([c1, c2, end]) => curveTo(c1, c2, end));
     },
     z: () => close()
   };
