@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const { USER } = vi.hoisted(() => ({ USER: { id: 'u', email: 'ada@x.it' } }));
-
-vi.mock('$lib/server/db/client', async (original) => ({ ...(await original<object>()), createUserDb: () => ({}) }));
-vi.mock('$lib/server/nav-cache', async (original) => ({ ...(await original<object>()), verifiedToken: async (_db: unknown, token: string) => (token === 'jwt' ? USER : null) }));
-vi.mock('$lib/server/dashboard/tool-scope', () => ({ toolScope: async () => ({ db: {}, orgId: 'org', projectId: 'proj', userId: 'u' }) }));
+const callers: Record<string, unknown> = {
+  jwt: { db: {}, orgId: 'org', userId: 'u', writeAllowed: true },
+  feega_key: { db: {}, orgId: 'org', userId: 'u', apiKeyId: 'k', writeAllowed: true },
+  feega_readonly: { db: {}, orgId: 'org', userId: 'u', apiKeyId: 'k', writeAllowed: false }
+};
+vi.mock('$lib/server/org-data/auth', () => ({
+  resolveOrgCaller: async (token: string) => (callers[token] ? { caller: callers[token] } : { error: { status: 401, body: { error: 'invalid_token' } } })
+}));
+vi.mock('$lib/server/repos/projects', () => ({ listProjects: async () => [{ id: 'proj', mode: 'standard' }] }));
 vi.mock('$lib/server/studio/studio-options', () => ({ studioOptions: async () => ({}) }));
 
 const quoteSelection = vi.fn();
@@ -78,6 +82,16 @@ describe('a photo studio batch started over bearer', () => {
 
     expect(res.status).toBe(402);
     expect(startBatch).not.toHaveBeenCalled();
+  });
+
+  it('starts for an API key too, and refuses a read-only one', async () => {
+    quoteSelection.mockReturnValue(priced(4));
+    const { quoteId } = await (await call(quoteRoute.POST, 'quote', { selection }, 'feega_key')).json();
+    startBatch.mockClear();
+
+    expect((await call(startRoute.POST, 'start', { selection, quoteId }, 'feega_key')).status).toBe(200);
+    expect((await call(startRoute.POST, 'start', { selection, quoteId }, 'feega_readonly')).status).toBe(403);
+    expect(startBatch).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a bad token', async () => {

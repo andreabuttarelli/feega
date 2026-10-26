@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { startBatch } from '$lib/server/studio/studio-batch';
 import { studioOptions } from '$lib/server/studio/studio-options';
-import { HTTP_BAD_REQUEST, HTTP_CONFLICT, HTTP_UNPROCESSABLE, studioRequest } from '$lib/server/studio/studio-api';
+import { HTTP_BAD_REQUEST, HTTP_CONFLICT, HTTP_UNPROCESSABLE, readOnly, studioRequest } from '$lib/server/studio/studio-api';
 import { quoteIdOf, summarize } from '$lib/server/studio/studio-quote';
 
 const HTTP_PAYMENT_REQUIRED = 402;
@@ -14,7 +14,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return resolved;
   }
 
-  const { scope, selection, quote, body } = resolved;
+  const { caller, scope, selection, quote, body } = resolved;
+  if (!caller.writeAllowed) {
+    return readOnly();
+  }
   if (typeof body.quoteId !== 'string') {
     return json({ error: 'quote_required' }, { status: HTTP_BAD_REQUEST });
   }
