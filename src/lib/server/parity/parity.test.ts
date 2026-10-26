@@ -5,10 +5,11 @@ import { SELECTION_ACTIONS } from '$lib/canvas/selection-actions';
 import { isCanvasOp } from '$lib/server/canvas/canvas-ops';
 import { isEditorOp } from '$lib/server/frame-editor/editor-ops';
 import { motionToolList } from '$lib/server/motion/tool-run';
-import { CANVAS_PAGE_ACTIONS, EDITOR_ACTIONS, FRAME_PAGE_ACTIONS, PARITY_TABLES, SELECTION_TOOLBAR, type Parity, type Route } from './ui-actions';
+import { CANVAS_PAGE_ACTIONS, EDITOR_ACTIONS, FRAME_PAGE_ACTIONS, PARITY_TABLES, SELECTION_TOOLBAR, STUDIO_PAGE_ACTIONS, type Parity, type Route } from './ui-actions';
 
 const CANVAS_PAGE = 'src/lib/server/canvas/canvas-page.ts';
 const FRAME_PAGE = 'src/lib/server/frame-editor/editor-page.ts';
+const STUDIO_PAGE = 'src/lib/server/dashboard/pages/studio.ts';
 const MCP_DOCS = 'docs/mcp-tools.md';
 
 const KNOWN_GAPS = [
@@ -37,6 +38,10 @@ const rows = Object.entries(PARITY_TABLES).flatMap(([table, entries]) => Object.
 describe('every change a person makes in the app, an agent can make over MCP', () => {
   it('maps every action of the canvas page, or says why it is ui-only', () => {
     expect(formActions(CANVAS_PAGE).sort()).toEqual(Object.keys(CANVAS_PAGE_ACTIONS).sort());
+  });
+
+  it('maps every action of the photo studio page, or says why it is ui-only', () => {
+    expect(formActions(STUDIO_PAGE).sort()).toEqual(Object.keys(STUDIO_PAGE_ACTIONS).sort());
   });
 
   it('maps every action of the frame editor page, or says why it is ui-only', () => {

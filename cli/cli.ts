@@ -630,6 +630,37 @@ layouts
     await cmdLayoutsPatch(layoutId, opts);
   });
 
+const studio = program.command('studio').description('Photo studio batches: quote, start and follow them');
+
+studio
+  .command('quote')
+  .description('Price a batch selection: image count, credits and a quote id, free')
+  .requiredOption('--file <path>', 'JSON selection: { name, productIds, environments, shots, variations, model, ... }')
+  .option('--project <id>', 'Which project')
+  .action(async (opts) => {
+    const { cmdStudioQuote } = await import('./commands/studio.ts');
+    await cmdStudioQuote(opts);
+  });
+
+studio
+  .command('start')
+  .description('Start a batch from a quoted selection, spends credits')
+  .requiredOption('--file <path>', 'The same JSON selection you quoted')
+  .requiredOption('--quote <id>', 'The quote id `studio quote` printed')
+  .option('--project <id>', 'Which project')
+  .action(async (opts) => {
+    const { cmdStudioStart } = await import('./commands/studio.ts');
+    await cmdStudioStart(opts);
+  });
+
+studio
+  .command('status <batchId>')
+  .description('Show a batch: its items and their state, free')
+  .action(async (batchId: string) => {
+    const { cmdStudioStatus } = await import('./commands/studio.ts');
+    await cmdStudioStatus(batchId);
+  });
+
 program
   .command('app-account <projectId>')
   .description('Show the TEST account of your app the project chat logs in with, or --forget it')

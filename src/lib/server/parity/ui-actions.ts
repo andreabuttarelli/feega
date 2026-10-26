@@ -444,8 +444,15 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'set template fields': motion('set_template_fields')
 };
 
+export const STUDIO_PAGE_ACTIONS: Record<string, Parity> = {
+  upload: uiOnly('browser file picker straight to storage; an agent brings images with its own import tools'),
+  quote: tool('studio_quote'),
+  generate: tool('studio_start')
+};
+
 export const PARITY_TABLES = {
   CANVAS_PAGE_ACTIONS,
+  STUDIO_PAGE_ACTIONS,
   FRAME_PAGE_ACTIONS,
   EDITOR_ACTIONS,
   SELECTION_TOOLBAR,

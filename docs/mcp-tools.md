@@ -3,12 +3,12 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**59 tool** — 25 in lettura, 28 in scrittura, 6 che distruggono.
-Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3690 caratteri**, circa **923 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 63.218 caratteri.
+**62 tool** — 27 in lettura, 29 in scrittura, 6 che distruggono.
+Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3690 caratteri**, circa **923 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 65.077 caratteri.
 
 | gruppo | tool |
 |---|---:|
-| Altro | 31 |
+| Altro | 34 |
 | Video motion | 16 |
 | Accesso diretto al database | 5 |
 | Nodi e generazione | 4 |
@@ -317,6 +317,39 @@ The spend caps of the org. Without `scope` it reads them. With `scope` (org_memb
 | `project_id`? | string |  |
 | `cap_usd`? | number \| null |  |
 | `reset`? | `none` \| `monthly` |  |
+
+### `studio_quote` · R
+
+*Quote a photo studio batch*
+
+Prices a Photo studio batch before it starts: image count, credits per image and in total, skipped combinations, and a `quoteId`. Pass that `quoteId` to `studio_start`. Free, spends nothing.
+
+| campo | tipo | |
+|---|---|---|
+| `selection` | object | `{ name, productIds, modelIds?, environments, shots, variations, model, styleRefs?, noPeopleConfirmed? }`, the same selection the Photo studio page builds. |
+| `project`? | string | Which project; the most recent one when omitted. |
+
+### `studio_start` · W
+
+*Start a photo studio batch*
+
+Starts a Photo studio batch and spends credits. Needs the `quoteId` of `studio_quote` for the SAME selection: a changed selection or price is a 409, ask the person again with a new quote. Returns the `batchId`; follow it with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `selection` | object | `{ name, productIds, modelIds?, environments, shots, variations, model, styleRefs?, noPeopleConfirmed? }`, the same selection the Photo studio page builds. |
+| `quoteId` | string |  |
+| `project`? | string | Which project; the most recent one when omitted. |
+
+### `studio_status` · R
+
+*Photo studio batch status*
+
+The items of a Photo studio batch and their state. Free, reads only.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
 
 ### `team_op` · W
 

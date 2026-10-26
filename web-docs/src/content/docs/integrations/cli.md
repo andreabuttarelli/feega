@@ -31,6 +31,7 @@ Local dev servers on `localhost:5173` are auto-detected; override with `PUBLIC_A
 | `gallery [query]` (`remix`, `publish`, `withdraw`) | The public gallery |
 | `effects`, `effects write <name>`, `effects patch <effectId>` | Image effects and custom shader effects |
 | `layouts`, `layouts write <name>`, `layouts patch <layoutId>` | Custom composition layouts |
+| `studio quote`, `studio start`, `studio status <batchId>` | Photo studio batches: price, start with the quote id, follow |
 | `allowlist`, `allowlist set <medium> [ids...]` | [Model allow-list](/ai/model-allow-list/) |
 | `caps`, `caps set <scope> <usd>` | [Spend limits](/ai/spend-limits/) |
 | `app-account <projectId>` | The test app account a project remembers |
