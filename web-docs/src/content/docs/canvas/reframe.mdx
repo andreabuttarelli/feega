@@ -5,10 +5,14 @@ sidebar:
   order: 8
 ---
 
+import DemoVideo from '../../../components/DemoVideo.astro';
+
 Reframe changes the aspect of a finished image or video and puts the result in a new node beside the original. The original stays untouched.
 
 - **Images** grow to the new aspect. The empty area is painted in by the AI, so it spends credits and needs a paid plan.
 - **Videos** are cropped to the new aspect around a focus point you choose. No AI model is involved, so it is free.
+
+<DemoVideo name="reframe" caption="Reframe a video to 9:16 around a chosen focus point, then open the image dialog: the video stops before the paid image fill." />
 
 ## From the canvas
 
@@ -34,4 +38,10 @@ Videos use `video_reframe`. `focus` is optional, as fractions of the frame.
 { "op": "video_reframe", "input": { "nodeId": "<video node>", "aspect": "1:1", "focus": { "x": 0.3, "y": 0.5 } } }
 ```
 
-Both are called through `edit` in the feega MCP server, and answer with the id of the new node.
+Both are called through `edit` in the feega MCP server, and answer with the id of the new node. From the CLI:
+
+```bash
+feega canvas $PROJECT video_reframe --input '{"nodeId":"<video node>","aspect":"9:16","focus":{"x":0.25,"y":0.5}}'
+```
+
+The video crop is free. The image reframe spends credits, so quote it with the person first.
