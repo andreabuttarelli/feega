@@ -85,4 +85,36 @@ describe("domProbe", () => {
 
     expect(nodes.map((n) => n.layer)).toEqual([NO_INDEX, 0, 1, NO_INDEX]);
   });
+
+  it("hands an svg image a bitmap of its own, as it does an img", async () => {
+    const { reply } = await asked(
+      '<svg width="10" height="10"><image href="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="10" height="10" preserveAspectRatio="xMidYMid slice"></image></svg>',
+    );
+    const nodes = (
+      reply.trees[CLIP] as { nodes: { tag: string; layer: number }[] }
+    ).nodes;
+
+    expect(nodes.find((n) => n.tag === "image")?.layer).not.toBe(NO_INDEX);
+  });
+
+  it("loads a remote svg image with CORS, so its bitmap can leave the frame", async () => {
+    const loaded: string[] = [];
+    class Loading {
+      crossOrigin: string | null = null;
+      naturalWidth = 1;
+      naturalHeight = 1;
+      set src(_: string) {
+        loaded.push(String(this.crossOrigin));
+      }
+      decode = async () => undefined;
+    }
+    vi.stubGlobal("Image", Loading);
+
+    await asked(
+      '<svg width="10" height="10"><image href="https://files.example/a.jpg" width="10" height="10"></image></svg>',
+    );
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(loaded).toEqual(["anonymous"]);
+  });
 });

@@ -47,8 +47,13 @@ export function domProbe(cfg: ProbeConfig) {
     "metadata",
   ]);
   const UNTRANSFORMED = "feega-dom-read-untransformed";
+  const isSvgImage = (el: Element) =>
+    !(el instanceof HTMLElement) && el.tagName.toLowerCase() === "image";
+
   const boxed = (el: Element) =>
-    el instanceof HTMLElement || el.tagName.toLowerCase() === "svg";
+    el instanceof HTMLElement ||
+    el.tagName.toLowerCase() === "svg" ||
+    isSvgImage(el);
 
   const ownText = (el: Element) =>
     [...el.childNodes]
@@ -191,6 +196,7 @@ export function domProbe(cfg: ProbeConfig) {
       return known;
     }
     const image = new Image();
+    image.crossOrigin = "anonymous";
     image.src = src;
     const ready = image.decode().then(() => image);
     loaded.set(src, ready);
@@ -305,6 +311,21 @@ export function domProbe(cfg: ProbeConfig) {
       pen.drawImage(image, (size[0] - w) / 2, (size[1] - h) / 2, w, h);
     });
 
+  const SLICE = /\bslice\b/;
+  const NONE = /^none\b/;
+
+  const svgImageLayer = (el: Element, size: [number, number]) =>
+    bitmapOf(size, async (pen) => {
+      const image = await loadImage(el.getAttribute("href") ?? "");
+      const [iw, ih] = [image.naturalWidth, image.naturalHeight];
+      const aspect = el.getAttribute("preserveAspectRatio") ?? "";
+      const scale = NONE.test(aspect)
+        ? NaN
+        : (SLICE.test(aspect) ? Math.max : Math.min)(size[0] / iw, size[1] / ih);
+      const [w, h] = Number.isNaN(scale) ? size : [iw * scale, ih * scale];
+      pen.drawImage(image, (size[0] - w) / 2, (size[1] - h) / 2, w, h);
+    });
+
   const REFERENCE = /url\(\s*["']?#([^"')]+)["']?\s*\)/;
   const REFERRING = ["clip-path", "filter", "fill", "stroke", "mask-image"];
 
@@ -406,6 +427,10 @@ export function domProbe(cfg: ProbeConfig) {
     });
     nodes.forEach((node, i) => {
       const el = elements[i];
+      if (node.layer === cfg.none && isSvgImage(el)) {
+        node.layer = layers.push(svgImageLayer(el, node.size)) - 1;
+        return;
+      }
       if (node.layer !== cfg.none || !(el instanceof HTMLElement)) {
         return;
       }
