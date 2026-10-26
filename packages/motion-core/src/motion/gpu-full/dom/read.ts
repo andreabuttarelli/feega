@@ -1285,6 +1285,7 @@ const SPREADING = new Set([
   "feFuncB",
   "feFuncA",
 ]);
+const BLUR_STEP = "feGaussianBlur";
 const SPREADING_CSS = new Set([
   "blur",
   "grayscale",
@@ -1333,7 +1334,10 @@ function filterOf(
     return node.tag === "filter" && !unsupportedPrimitive([node])
       ? {
           filter: { kind: FilterKind.Svg, nodes: [node] },
-          spreads: steps.every((c) => SPREADING.has(c.tag)),
+          spreads:
+            steps.every((c) => SPREADING.has(c.tag)) &&
+            (steps.every((c) => c.tag === BLUR_STEP) ||
+              steps.every((c) => c.tag !== BLUR_STEP)),
         }
       : null;
   }

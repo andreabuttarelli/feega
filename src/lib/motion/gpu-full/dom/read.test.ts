@@ -819,9 +819,17 @@ describe("readTree", () => {
         { tag: "rect", attrs: { x: "10", y: "20", width: "30", height: "40" } },
       ],
     };
+    const goo = {
+      tag: "filter",
+      attrs: { id: "goo" },
+      children: [
+        { tag: "feGaussianBlur", attrs: { stdDeviation: "8" } },
+        { tag: "feColorMatrix", attrs: { values: "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 20 -9" } },
+      ],
+    };
     const withDefs = (t: RawTree): RawTree => ({
       ...t,
-      defs: { soft: blur, noise, tiles: clip },
+      defs: { soft: blur, noise, tiles: clip, goo },
     });
 
     it("clips every item of a group to its clip path", () => {
@@ -918,6 +926,18 @@ describe("readTree", () => {
       expect(read.drawn.map((d) => d.filters)).toEqual([
         [{ kind: FilterKind.Svg, nodes: [blur] }],
         [{ kind: FilterKind.Svg, nodes: [blur] }],
+      ]);
+    });
+
+    it("filters a gooey group as one, so its shapes melt into each other", () => {
+      const read = readTree(
+        withDefs(
+          tree(root(), svg(), g({ filter: 'url("#goo")' }), rect(2), rect(2)),
+        ),
+      );
+
+      expect(read.drawn).toMatchObject([
+        { kind: DrawnKind.Group, filters: [{ kind: FilterKind.Svg }] },
       ]);
     });
 
