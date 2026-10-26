@@ -4,11 +4,14 @@
   import SiteFooter from '$lib/site/SiteFooter.svelte';
   import { page } from '$app/state';
   import { SITE_URL } from '$lib/site/links';
+  import { pageTitle } from '$lib/site/llms';
+  import { breadcrumbJsonLd } from '$lib/site/structured-data';
 
   let { children } = $props();
 
   const OG_IMAGE = `${SITE_URL}/og.png`;
   const canonical = $derived(SITE_URL + page.url.pathname);
+  const crumb = $derived(page.url.pathname === '/' ? undefined : pageTitle(page.url.pathname));
 </script>
 
 <svelte:head>
@@ -17,6 +20,8 @@
   <link rel="icon" href="/site/favicon.png" />
   <link rel="apple-touch-icon" href="/site/favicon.png" />
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="feega" />
+  {#if crumb}{@html breadcrumbJsonLd(crumb, page.url.pathname)}{/if}
   <meta property="og:url" content={canonical} />
   <meta property="og:image" content={OG_IMAGE} />
   <meta property="og:image:width" content="1200" />

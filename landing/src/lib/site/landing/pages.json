@@ -79,7 +79,7 @@
   "exampleHeight": 180
  },
  "ai-video-styles": {
-  "title": "AI Video Styles – 3D, Anime, Claymation, Retro & More | feega",
+  "title": "AI Video Styles: 3D, Anime, Claymation, Retro | feega",
   "description": "One canvas for every AI video style: 3D animation, anime, claymation, paper cutout, 80s VHS, cinematic, fantasy and more. Text to video and image to video.",
   "heading": "AI video styles",
   "intro": "feega generates video in any visual style you can describe: 3D animation, anime, claymation, paper cutout, 80s VHS, watercolour, cinematic trailers, time-lapse, drone shots. It supports text-to-video and image-to-video with Seedance 2.5, Kling 3.0 and Grok Imagine, with first and last frame control.",
@@ -219,7 +219,7 @@
   "exampleHeight": 180
  },
  "3d-animation-maker": {
-  "title": "AI 3D Animation Maker – Text or Image to 3D-Style Video | feega",
+  "title": "AI 3D Animation Maker: Text or Image to Video | feega",
   "description": "Make 3D animated videos from a prompt or a still image with Seedance, Kling and Grok Imagine on one canvas. No 3D software, no rigging.",
   "heading": "AI 3D animation maker",
   "intro": "feega makes 3D-style animated clips from a text prompt or a still image: describe the scene, pick a video model such as Seedance 2.5 or Kling 3.0, and get a clip of up to 15 seconds. It generates rendered-looking video, not an editable 3D model or scene file.",
@@ -585,7 +585,7 @@
  },
  "spotify-canvas-maker": {
   "title": "Spotify Canvas Maker – AI Vertical Loops for Songs | feega",
-  "description": "Make a Spotify Canvas with AI: a vertical 9:16 looping video for your track, generated from a prompt or your cover art. Download it and upload it in Spotify for Artists.",
+  "description": "Make a Spotify Canvas with AI: a vertical 9:16 looping video for your track, from a prompt or your cover art. Download it, upload it in Spotify for Artists.",
   "heading": "Spotify Canvas maker",
   "intro": "feega makes Spotify Canvas videos with AI: generate a vertical 9:16 clip of 4 to 8 seconds from a prompt or from your cover art, download it, and upload it in Spotify for Artists. Spotify loops it behind your track.",
   "cta": {
@@ -657,7 +657,7 @@
   "exampleHeight": 420
  },
  "ai-node-editor": {
-  "title": "AI Node Editor – Node-Based Canvas for Image, Video & Audio | feega",
+  "title": "AI Node Editor: Node-Based Canvas for Media | feega",
   "description": "feega is a node-based AI canvas: connect text, image, video and audio nodes, run them, and reuse the workflow. Works with a chat and with agents over MCP.",
   "heading": "AI node editor for images, video and audio",
   "intro": "feega is a node-based AI canvas: every prompt, image, video and sound is a node, and connections carry one node’s output into the next. You build a workflow once — prompt to image to video to voice-over — and run it again with new inputs, by hand, from the built-in chat, or from an external agent over MCP.",

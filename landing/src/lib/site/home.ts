@@ -132,7 +132,27 @@ Server URL: ${MCP_URL}
 export const FAQ = [
   {
     q: 'What is feega?',
-    a: 'feega is an AI creative workspace: an infinite canvas where creators and brands generate and edit images, video, audio and text, then plan and publish their social content. Google Sign-In is used only for authentication; no Google API is used to generate or edit content.'
+    a: 'feega is an open-source infinite canvas where people and AI agents design, animate and generate together. Frames, motion, images, video, audio and text live as connected nodes on one canvas. Google Sign-In is used only for authentication; no Google API is used to generate or edit content.'
+  },
+  {
+    q: 'Is feega open source?',
+    a: 'Yes. feega is licensed under Apache-2.0 and the full source is on <a href="https://github.com/andreabuttarelli/feega">GitHub</a>, including the app, the command-line tool and the MCP server.'
+  },
+  {
+    q: 'Can I run feega locally or offline?',
+    a: 'Yes. Clone the repository, run npm install and then npm run local -- my-canvas.feega. The canvas runs on your machine with no account, database or Docker, and is saved in one .feega file. AI generation, sharing and comments need the cloud app.'
+  },
+  {
+    q: 'How do I use feega with my AI agent?',
+    a: 'Tell Claude Code or Codex to clone the repository and start it locally: the CLI and MCP server find the local canvas automatically and every edit shows live in your browser. For the cloud app, connect the MCP server at https://mcp.feega.app/mcp.'
+  },
+  {
+    q: 'How much does feega cost?',
+    a: 'Running feega locally is free. The cloud app has monthly plans from 8 to 256 credits, where 1 credit = $1 of generations; you can top up when you need more. See <a href="#pricing">pricing</a>.'
+  },
+  {
+    q: 'How is feega different from Figma, Jitter and Flora?',
+    a: 'Figma is a design tool, Jitter is a motion design tool and Flora is an AI generation canvas. feega puts design frames, a keyframe timeline and AI image, video and audio generation on one canvas, is open source, and can be driven by an AI agent through its CLI and MCP server.'
   },
   {
     q: 'How does the canvas work?',
@@ -175,13 +195,15 @@ export const FAQ = [
     a: 'feega must never be used to create non-consensual intimate imagery (NCII), sexual deepfakes or any sexual content of real people. Sexual content involving minors is forbidden and reported to the authorities. Prompts and reference images are screened automatically, real or identifiable people are blocked in sensitive contexts, and AI outputs are labelled as AI-generated. Anyone can report content to <a href="mailto:support@feega.app">support@feega.app</a>: we remove it and suspend the accounts responsible. Read our <a href="/acceptable-use">Acceptable Use Policy</a>, <a href="/terms">Terms</a> and <a href="/ai-transparency">AI Transparency</a>.'
   },
   {
-    q: 'How do credits and pricing work?',
-    a: 'Plans include monthly credits (1 credit = $1) that you spend on generations; you can top up when you need more. See <a href="#pricing">pricing</a>.'
-  },
-  {
     q: 'Who is behind feega?',
     a: 'feega is built in Italy by Andrea Buttarelli. Company details are in our <a href="/legal-notice">Legal Notice</a>; you can reach us at <a href="mailto:hi@feega.app">hi@feega.app</a>.'
   }
 ] as const;
+
+export const LOCAL_COMMANDS = `git clone https://github.com/andreabuttarelli/feega && cd feega && npm install
+npm run local -- my-canvas.feega`;
+
+export const AGENT_PROMPT =
+  'Use feega locally: clone https://github.com/andreabuttarelli/feega, run npm install, start it with npm run local -- my-canvas.feega, then use the feega CLI or MCP server on http://localhost:5173 to design on the canvas.';
 
 export const MOTION_EMBED_ID = 'c76b6d3b-8262-4b68-ad58-3cb51a6190a9';

@@ -1,15 +1,28 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Embed from './Embed.svelte';
-  import { SITE_URL } from '../links';
+  import Hero from './Hero.svelte';
   import { MOTION_EMBED_ID, SHOWCASE_NARROW, SHOWCASE_WIDE, type ShowcaseVideo } from '../home';
 
-  const HERO = `<feega-liquid-glass style="height:100vh">
-  <h1>Make your<br>brand move.</h1>
-  <p>Launch films, product demos and animated ads, made by you and your agents.</p>
-  <a class="lg-cta" target="_blank" rel="noopener noreferrer" href="https://oh.feega.app/login">Start for free</a>
-  <a class="lg-link" target="_parent" href="${SITE_URL}/#mcp">Or connect your agents</a>
-</feega-liquid-glass>`;
+  const NEAR_VIEWPORT = '400px';
+
+  function lazyPlay(video: HTMLVideoElement) {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          video.pause();
+          return;
+        }
+
+        video.src ||= video.dataset.src ?? '';
+        video.play().catch(() => {});
+      },
+      { rootMargin: NEAR_VIEWPORT }
+    );
+    observer.observe(video);
+
+    return { destroy: () => observer.disconnect() };
+  }
 
   const WIDE_QUERY = '(min-width: 1200px)';
 
@@ -29,21 +42,19 @@
 {#snippet column(videos: readonly ShowcaseVideo[])}
   <div class="site-col">
     {#each videos as v (v.file)}
-      <video src={v.file} style:aspect-ratio={v.aspect} autoplay muted loop playsinline preload="metadata"></video>
+      <video data-src={v.file} style:aspect-ratio={v.aspect} muted loop playsinline preload="none" use:lazyPlay></video>
     {/each}
   </div>
 {/snippet}
 
-<section class="site-hero" id="hero">
-  <Embed title="feega" script="/embed/liquid-glass.js" body={HERO} loading="eager" />
-</section>
+<Hero />
 
 <div class="fade">
   <div class="site-shot">
-    <img src="/site/home/screenshot.webp" alt="The feega motion editor" width="1600" height="1039" fetchpriority="high" />
+    <img src="/site/home/screenshot.webp" alt="The feega motion editor" width="1600" height="1039" loading="lazy" decoding="async" />
   </div>
 
-  <h1 class="claim">Like an autopilot for motion.<br />Less tokens, higher quality</h1>
+  <h2 class="claim">Like an autopilot for motion.<br />Less tokens, higher quality</h2>
 
   <section class="grid" id="showcase" aria-label="Showcase" style:grid-template-columns="repeat({columns.length}, 1fr)">
     {#each columns as videos, i (i)}
@@ -58,13 +69,9 @@
 </section>
 
 <style>
-  .site-hero {
-    height: 550px;
-  }
-
   .fade {
     padding: 0 20px 100px;
-    background: linear-gradient(#fff 0%, #141414 10%);
+    background: #141414;
   }
 
   .site-shot {
@@ -135,13 +142,9 @@
   }
 
   @media (min-width: 1200px) {
-    .site-hero {
-      height: 780px;
-    }
-
     .fade {
       padding-bottom: 99px;
-      background: linear-gradient(#fff 12%, #262626 36%);
+      background: #141414;
     }
 
     .site-shot {

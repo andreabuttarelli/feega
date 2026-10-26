@@ -8,17 +8,16 @@
   import Faq from '$lib/site/home/Faq.svelte';
   import { HOME_JSON_LD } from '$lib/site/structured-data';
 
-  const TITLE = 'Feega - Better marketing on canvas';
-  const DESCRIPTION = 'An infinite canvas where agents plan, create and ship your organic content & ads, and you stay in control of everything.';
+  import { HOME_META } from '$lib/site/seo';
 </script>
 
 <svelte:head>
-  <title>{TITLE}</title>
-  <meta name="description" content={DESCRIPTION} />
-  <meta property="og:title" content={TITLE} />
-  <meta property="og:description" content={DESCRIPTION} />
-  <meta name="twitter:title" content={TITLE} />
-  <meta name="twitter:description" content={DESCRIPTION} />
+  <title>{HOME_META.title}</title>
+  <meta name="description" content={HOME_META.description} />
+  <meta property="og:title" content={HOME_META.title} />
+  <meta property="og:description" content={HOME_META.description} />
+  <meta name="twitter:title" content={HOME_META.title} />
+  <meta name="twitter:description" content={HOME_META.description} />
   {@html HOME_JSON_LD}
 </svelte:head>
 
