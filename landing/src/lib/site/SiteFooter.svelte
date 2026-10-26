@@ -7,8 +7,6 @@
 </script>
 
 <footer class="site-foot">
-  <hr class="rule" />
-
   <div class="grid">
     <div class="site-ready">
       <h2>Ready?</h2>
@@ -58,11 +56,6 @@
     padding: 20px var(--site-gutter) var(--site-gutter);
   }
 
-  .rule {
-    border: 0;
-    border-top: 1px solid var(--site-line);
-  }
-
   .grid {
     container-type: inline-size;
     display: grid;
@@ -73,21 +66,20 @@
 
   .site-ready {
     grid-column: 1 / -1;
-    padding-top: 2px;
-    background: var(--site-accent);
     font-size: 37px;
     line-height: 1;
     letter-spacing: -0.04em;
   }
 
   .site-ready h2 {
+    margin: 0;
     font: inherit;
-    color: var(--site-bg);
+    color: #fff;
   }
 
   .site-ready a {
     display: block;
-    margin-top: 1px;
+    margin-top: 0;
   }
 
   .site-ready span {
@@ -121,11 +113,12 @@
 
   .mark {
     grid-column: 1 / -1;
-    margin-top: 324px;
+    margin: 120px 0 0;
     font-family: 'DM Sans', sans-serif;
     font-variation-settings: normal;
-    font-size: 44.8cqw;
-    line-height: 53.85cqw;
+    color: var(--site-accent);
+    font-size: 46.5cqw;
+    line-height: 36cqw;
     letter-spacing: -0.08em;
   }
 
@@ -134,7 +127,7 @@
     display: grid;
     grid-template-columns: subgrid;
     align-items: end;
-    margin-top: 23px;
+    margin-top: 40px;
   }
 
   .to-top {
@@ -190,30 +183,21 @@
     }
 
     .mark {
-      grid-column: 2;
+      grid-column: 1 / -1;
       grid-row: 2;
-      font-size: 20.93cqw;
-      line-height: 25.14cqw;
+      margin-top: 100px;
+      font-size: 43.4cqw;
+      line-height: 34cqw;
       letter-spacing: -0.05em;
     }
 
     .base {
-      grid-column: 1;
-      grid-row: 2;
-      grid-template-columns: 1fr 1fr;
-      column-gap: var(--site-gutter);
-      align-items: start;
-      align-self: end;
-      margin-top: 0;
-    }
-
-    .to-top {
-      grid-column: 1;
-      text-align: left;
+      grid-column: 1 / -1;
+      grid-row: 3;
+      margin-top: 60px;
     }
 
     .copy {
-      grid-column: 2;
       white-space: nowrap;
     }
 

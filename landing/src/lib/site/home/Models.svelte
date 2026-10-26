@@ -27,9 +27,11 @@
 <section class="models" id="models">
   <div class="site-wrap">
     <div class="head">
-      <h2>Powered by the best models</h2>
-      <p>Text, image, video, audio models.<br />The largest model catalog on Earth.</p>
-      <p class="right">Switch seamlessly <br />between models.</p>
+      <h2>“Well, Idk. I already use Higgsfield.”</h2>
+      <div class="reply">
+        <h2>Well, keep using it alongside other providers.</h2>
+        <p>You don’t have to replace your favorite tools.<br />Feega brings your creative workflow together in one place.</p>
+      </div>
     </div>
 
     <div class="featured">
@@ -71,14 +73,13 @@
     line-height: 0.9;
     letter-spacing: -0.04em;
     font-weight: 400;
+    max-width: 920px;
+    margin: 0 0 40px;
   }
 
-  .head p {
-    margin-top: 48px;
-  }
-
-  .head .right {
-    margin-top: 23px;
+  .reply p {
+    margin-top: 12px;
+    color: #000;
   }
 
   .featured {
@@ -160,27 +161,26 @@
       padding: 0 20px;
     }
 
-    .head {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      column-gap: 20px;
-      align-items: start;
-    }
-
     h2 {
-      grid-row: 1 / 3;
       font-size: 78px;
+      line-height: 70.2px;
     }
 
-    .head p {
-      grid-column: 2;
-      grid-row: 1;
-      margin-top: 51px;
+    .reply {
+      display: flex;
+      align-items: flex-end;
+      column-gap: 20px;
     }
 
-    .head .right {
-      justify-self: end;
-      margin-top: 51px;
+    .reply h2 {
+      flex: none;
+      width: 920px;
+      margin-bottom: 0;
+    }
+
+    .reply p {
+      width: 460px;
+      margin-top: 0;
     }
 
     .featured {
