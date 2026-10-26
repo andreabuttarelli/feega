@@ -26,6 +26,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchWiroCatalogue } from './wiro-catalogue';
 import { DEFAULT_WIRO_BASE_URL } from './wiro';
 import { kieModelRows } from './kie-catalogue';
+import { fetchKieSpecs } from './kie-docs';
+import { fetchKiePrices } from './kie-pricing';
 import { higgsfieldModelRows, sourceWith } from './higgsfield-catalogue';
 import { higgsfieldConfig } from './higgsfield';
 import { configuredIn, TaskProviderName } from './generation/task-providers';
@@ -383,6 +385,18 @@ async function higgsfieldRows(syncedAt: string): Promise<{ rows: AiModelRow[]; o
   return config ? higgsfieldModelRows(sourceWith(config), syncedAt) : { rows: [], ok: true };
 }
 
+async function kieRows(doFetch: typeof fetch, syncedAt: string): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
+  if (!configuredIn(env).has(TaskProviderName.Kie)) {
+    return { rows: [], ok: true };
+  }
+  try {
+    const [prices, specs] = await Promise.all([fetchKiePrices(doFetch), fetchKieSpecs(doFetch)]);
+    return { rows: kieModelRows(prices, specs, syncedAt), ok: true };
+  } catch (error) {
+    return { rows: [], ok: false, reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 export async function syncAiModels(
   admin: SupabaseClient,
   opts: { fetchImpl?: typeof fetch; baseUrl?: string; wiroBaseUrl?: string } = {}
@@ -397,7 +411,7 @@ export async function syncAiModels(
     fetchImageCatalogue(doFetch, baseUrl, syncedAt),
     fetchCatalogue(doFetch, baseUrl, VIDEO_CATALOGUE, syncedAt),
     fetchWiroCatalogue(doFetch, opts.wiroBaseUrl ?? env.WIRO_BASE_URL?.trim() ?? DEFAULT_WIRO_BASE_URL, syncedAt),
-    { rows: configuredIn(env).has(TaskProviderName.Kie) ? kieModelRows(syncedAt) : [], ok: true as const },
+    kieRows(doFetch, syncedAt),
     higgsfieldRows(syncedAt)
   ]);
 
