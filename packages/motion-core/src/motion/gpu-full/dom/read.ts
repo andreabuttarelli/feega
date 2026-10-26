@@ -1,6 +1,6 @@
 import { apply2d, mul2d, type Affine } from "../../affine";
 import { invert2d } from "../../parent";
-import { warpContours, warpMasks, type Warp } from "../warp";
+import { projectedTiles, warpContours, warpMasks, type Warp } from "../warp";
 import {
   ellipseOutline,
   flatten,
@@ -13,6 +13,7 @@ import { rgbaOf, type Rgba } from "../rgba";
 import {
   affineOf,
   cornerOf,
+  fitCorners,
   flattened,
   isNone,
   lengthOf,
@@ -1019,21 +1020,33 @@ function numbers(...values: (number | null)[]): number[] | null {
     : (values as number[]);
 }
 
-const pointsOf: Geometry = (attrs) => {
-  const values = (attrs.points ?? "")
-    .trim()
-    .split(/[\s,]+/)
-    .filter(Boolean)
-    .map(Number);
-  if (values.some((v) => !Number.isFinite(v))) {
-    return null;
-  }
-  const pts = Array.from(
-    { length: Math.floor(values.length / 2) },
-    (_, i) => [values[2 * i], values[2 * i + 1]] as const,
-  );
-  return [{ vertices: pts.map((p) => ({ p, in: p, out: p })), closed: true }];
-};
+enum Ends {
+  Closed = "closed",
+  Open = "open",
+}
+
+const pointsOf =
+  (ends: Ends): Geometry =>
+  (attrs) => {
+    const values = (attrs.points ?? "")
+      .trim()
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map(Number);
+    if (values.some((v) => !Number.isFinite(v))) {
+      return null;
+    }
+    const pts = Array.from(
+      { length: Math.floor(values.length / 2) },
+      (_, i) => [values[2 * i], values[2 * i + 1]] as const,
+    );
+    return [
+      {
+        vertices: pts.map((p) => ({ p, in: p, out: p })),
+        closed: ends === Ends.Closed,
+      },
+    ];
+  };
 
 const lineOf: Geometry = (attrs, vp) => {
   const v = numbers(
@@ -1180,7 +1193,7 @@ const quartered = (x: number, m: Affine) =>
 function textOf(node: RawNode, scope: Scope): Own {
   const s = node.style;
   const cased = CASES[s["text-transform"] ?? ""];
-  const color = rgbaOf(s.color ?? "");
+  const color = rgbaOf((node.svg ? s.fill : s.color) ?? "");
   if (node.raster) {
     const { layer, width, height } = node.raster;
     return {
@@ -1254,8 +1267,8 @@ function textOf(node: RawNode, scope: Scope): Own {
 
 const GEOMETRY: Record<string, Geometry> = {
   line: lineOf,
-  polygon: pointsOf,
-  polyline: pointsOf,
+  polygon: pointsOf(Ends.Closed),
+  polyline: pointsOf(Ends.Open),
   rect: rectOf,
   circle: circleOf,
   ellipse: ellipseOf,
@@ -1272,6 +1285,7 @@ const SPREADING = new Set([
   "feFuncB",
   "feFuncA",
 ]);
+const BLUR_STEP = "feGaussianBlur";
 const SPREADING_CSS = new Set([
   "blur",
   "grayscale",
@@ -1320,7 +1334,10 @@ function filterOf(
     return node.tag === "filter" && !unsupportedPrimitive([node])
       ? {
           filter: { kind: FilterKind.Svg, nodes: [node] },
-          spreads: steps.every((c) => SPREADING.has(c.tag)),
+          spreads:
+            steps.every((c) => SPREADING.has(c.tag)) &&
+            (steps.every((c) => c.tag === BLUR_STEP) ||
+              steps.every((c) => c.tag !== BLUR_STEP)),
         }
       : null;
   }
@@ -1529,26 +1546,35 @@ const blendEffect: GroupEffect = ({ node, items }) => {
 const OPAQUE = 1;
 const CLEAR = 0;
 
-function edgeFades(gradient: Gradient): [number, number][] | null {
-  const alphas = gradient.stops.map((s) => s.color[3]);
+type Profile = { fades: [number, number][]; hidden: [number, number][] };
+
+function alphaProfile(gradient: Gradient): Profile | null {
+  const { stops } = gradient;
+  const alphas = stops.map((s) => s.color[3]);
   if (alphas.some((a) => a !== OPAQUE && a !== CLEAR)) {
     return null;
   }
-  const first = alphas.indexOf(OPAQUE);
-  const last = alphas.lastIndexOf(OPAQUE);
-  if (first < 0 || alphas.slice(first, last + 1).includes(CLEAR)) {
-    return null;
+  const profile: Profile = { fades: [], hidden: [] };
+  for (let i = 1; i < stops.length; i++) {
+    const [t0, t1] = [stops[i - 1].at, stops[i].at];
+    const [a, b] = [alphas[i - 1], alphas[i]];
+    if (t1 - t0 < UNIT_EPSILON || (a === OPAQUE && b === OPAQUE)) {
+      continue;
+    }
+    if (a === CLEAR && b === CLEAR) {
+      profile.hidden.push([t0, t1]);
+      continue;
+    }
+    const outward =
+      a === OPAQUE
+        ? alphas.slice(i).every((x) => x === CLEAR)
+        : alphas.slice(0, i).every((x) => x === CLEAR);
+    if (!outward) {
+      return null;
+    }
+    profile.fades.push(a === OPAQUE ? [t0, t1] : [t1, t0]);
   }
-  const at = (i: number) => gradient.stops[i].at;
-  const fades = [
-    ...(first > 0 ? [[at(first), at(first - 1)] as [number, number]] : []),
-    ...(last < alphas.length - 1
-      ? [[at(last), at(last + 1)] as [number, number]]
-      : []),
-  ];
-  return fades.some(([t0, t1]) => Math.abs(t0 - t1) < UNIT_EPSILON)
-    ? null
-    : fades;
+  return profile;
 }
 
 const maskImageEffect: GroupEffect = ({ node, items, matrix }) => {
@@ -1558,10 +1584,31 @@ const maskImageEffect: GroupEffect = ({ node, items, matrix }) => {
   }
   const size = { w: node.size[0], h: node.size[1] };
   const gradient = linearGradient(value ?? "", size);
-  const fades = gradient && !gradient.repeating && edgeFades(gradient);
-  if (!gradient || !fades) {
+  const profile = gradient && !gradient.repeating && alphaProfile(gradient);
+  if (!gradient || !profile) {
     return DomGap.Mask;
   }
+  const { fades, hidden } = profile;
+  const axis: [number, number] = [
+    gradient.to[0] - gradient.from[0],
+    gradient.to[1] - gradient.from[1],
+  ];
+  const reach = (p: [number, number]) =>
+    ((p[0] - gradient.from[0]) * axis[0] +
+      (p[1] - gradient.from[1]) * axis[1]) /
+    (axis[0] ** 2 + axis[1] ** 2);
+  const bands = hidden
+    .map(([t0, t1]) => slab([0, 0, size.w, size.h], reach, t0, t1))
+    .filter((b): b is number[] => b !== null);
+  const cut = bands.length
+    ? masked(items, {
+        mode: MaskMode.Intersect,
+        invert: true,
+        level: 1,
+        feather: 0,
+        cover: { kind: CoverKind.Path, contours: bands, matrix },
+      })
+    : items;
   const along = ([t0, t1]: [number, number]) =>
     gradient.from
       .map((f, i) => f + (gradient.to[i] - f) * t0)
@@ -1588,7 +1635,7 @@ const maskImageEffect: GroupEffect = ({ node, items, matrix }) => {
         matrix: mul2d(matrix, ramp),
       },
     });
-  }, items);
+  }, cut);
 };
 
 const GROUP_EFFECTS: GroupEffect[] = [
@@ -1615,12 +1662,15 @@ const PAINT_GAP: Record<PaintGap, DomGap> = {
   [PaintGap.Stroke]: DomGap.Stroke,
 };
 
+const sealed = (node: RawNode) => node.tag === "svg" && node.layer !== NO_INDEX;
+
 const PAINTERS: Record<string, Painter> = {
   canvas: layerPainter,
-  svg: groupPainter,
+  svg: (node, scope) =>
+    sealed(node) ? layerPainter(node, scope) : groupPainter(node, scope),
   g: groupPainter,
-  polygon: shapePainter(pointsOf),
-  polyline: shapePainter(pointsOf),
+  polygon: shapePainter(pointsOf(Ends.Closed)),
+  polyline: shapePainter(pointsOf(Ends.Open)),
   line: shapePainter(lineOf),
   rect: shapePainter(rectOf),
   circle: shapePainter(circleOf),
@@ -1746,19 +1796,29 @@ function overlapping(items: Drawn[]): boolean {
   );
 }
 
-function warpOne(d: Drawn, warp: Warp): Drawn {
+function warpOne(d: Drawn, warp: Warp): Drawn[] {
   const masks = warpMasks(d.masks, warp);
   const look = masks ? { masks } : {};
   if (d.kind === DrawnKind.Path) {
-    return {
-      ...d,
-      ...look,
-      contours: warpContours(d.contours, d.matrix, warp),
-    };
+    return [
+      {
+        ...d,
+        ...look,
+        contours: warpContours(d.contours, d.matrix, warp),
+      },
+    ];
   }
-  return d.kind === DrawnKind.Group
-    ? { ...d, ...look, items: d.items.map((i) => warpOne(i, warp)) }
-    : { ...d, ...look };
+  if (d.kind === DrawnKind.Layer) {
+    const parts = projectedTiles(d.matrix, d.width, d.height, warp);
+    return parts
+      ? parts.map(({ matrix, cut }) => ({
+          ...d,
+          matrix,
+          masks: [...(masks ?? []), cut],
+        }))
+      : [{ ...d, ...look }];
+  }
+  return [{ ...d, ...look, items: d.items.flatMap((i) => warpOne(i, warp)) }];
 }
 
 function warped(
@@ -1772,7 +1832,7 @@ function warped(
     const q = project(apply2d(toElement, p));
     return q ? apply2d(placed, q) : p;
   };
-  return items.map((d) => warpOne(d, warp));
+  return items.flatMap((d) => warpOne(d, warp));
 }
 
 export function readTree(
@@ -1856,7 +1916,7 @@ export function readTree(
       depth: preserved && chain ? { chain, base } : null,
       projected: !preserved && (!exact || outer.projected),
     };
-    const kids = order.flatMap((c) => visit(c, inner));
+    const kids = sealed(node) ? [] : order.flatMap((c) => visit(c, inner));
     const size = { w: node.size[0], h: node.size[1] };
     const clipped =
       CLIPPING.has(node.style.overflow ?? "") &&

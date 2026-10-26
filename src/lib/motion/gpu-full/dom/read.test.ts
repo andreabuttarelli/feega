@@ -534,6 +534,33 @@ describe("readTree", () => {
     });
   });
 
+  it("strokes a polyline open, without the segment back to its start", () => {
+    const svg = el({ parent: 0, tag: "svg", svg: true, size: [100, 100] });
+    const chevron = el({
+      parent: 1,
+      tag: "polyline",
+      svg: true,
+      at: null,
+      attrs: { points: "0,0 10,0 10,10" },
+      style: { fill: "none", stroke: "rgb(0, 0, 0)", "stroke-width": "2px" },
+    });
+    const [stroke] = readTree(tree(root(), svg, chevron)).drawn as DrawnPath[];
+    const winding = (x: number, y: number) =>
+      stroke.contours.reduce((w, c) => {
+        let turns = 0;
+        for (let i = 0; i < c.length; i += 2) {
+          const [x0, y0, x1, y1] = [c[i], c[i + 1], c[(i + 2) % c.length], c[(i + 3) % c.length]];
+          if (y0 <= y !== y1 <= y && x < x0 + ((y - y0) * (x1 - x0)) / (y1 - y0)) {
+            turns += y1 > y0 ? 1 : -1;
+          }
+        }
+        return w + turns;
+      }, 0);
+
+    expect(winding(5, 0)).not.toBe(0);
+    expect(winding(5, 5)).toBe(0);
+  });
+
   it("draws an svg stroke with a dash pattern of any length", () => {
     const svg = el({ parent: 0, tag: "svg", svg: true, size: [100, 100] });
     const rect = el({
@@ -639,6 +666,26 @@ describe("readTree", () => {
         },
         ...part,
       });
+
+    it("inks svg text with its fill", () => {
+      const svg = el({ parent: 0, tag: "svg", svg: true, size: [100, 40] });
+      const text = el({
+        parent: 1,
+        tag: "text",
+        svg: true,
+        at: null,
+        text: "ab",
+        lines: [line(["a", "b"], [20, 26])],
+        style: { fill: "rgb(0, 0, 255)", "font-family": '"Inter Tight", system-ui', "font-size": "10px", "font-weight": "600" },
+      });
+      const read = readTree(tree(root(), svg, text), typeset());
+
+      expect(read.gaps).toEqual([]);
+      expect((read.drawn as DrawnPath[]).map((g) => g.paint)).toEqual([
+        { kind: PaintKind.Solid, color: [0, 0, 1, 1] },
+        { kind: PaintKind.Solid, color: [0, 0, 1, 1] },
+      ]);
+    });
 
     it("draws every glyph where the browser placed it, on the line baseline", () => {
       const read = readTree(tree(root(), label()), typeset());
@@ -772,9 +819,17 @@ describe("readTree", () => {
         { tag: "rect", attrs: { x: "10", y: "20", width: "30", height: "40" } },
       ],
     };
+    const goo: SvgNode = {
+      tag: "filter",
+      attrs: { id: "goo" },
+      children: [
+        { tag: "feGaussianBlur", attrs: { stdDeviation: "8" } },
+        { tag: "feColorMatrix", attrs: { values: "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 20 -9" } },
+      ],
+    };
     const withDefs = (t: RawTree): RawTree => ({
       ...t,
-      defs: { soft: blur, noise, tiles: clip },
+      defs: { soft: blur, noise, tiles: clip, goo },
     });
 
     it("clips every item of a group to its clip path", () => {
@@ -871,6 +926,18 @@ describe("readTree", () => {
       expect(read.drawn.map((d) => d.filters)).toEqual([
         [{ kind: FilterKind.Svg, nodes: [blur] }],
         [{ kind: FilterKind.Svg, nodes: [blur] }],
+      ]);
+    });
+
+    it("filters a gooey group as one, so its shapes melt into each other", () => {
+      const read = readTree(
+        withDefs(
+          tree(root(), svg(), g({ filter: 'url("#goo")' }), rect(2), rect(2)),
+        ),
+      );
+
+      expect(read.drawn).toMatchObject([
+        { kind: DrawnKind.Group, filters: [{ kind: FilterKind.Svg }] },
       ]);
     });
 
@@ -1151,6 +1218,41 @@ describe("readTree, CSS a motion template draws with", () => {
     expect(corners.map(miss).every((d) => d < 0.05)).toBe(true);
   });
 
+  it("projects a bitmap under a 3D transform in tiles, each placed where the browser puts it", () => {
+    const tilt =
+      "matrix3d(0.9, 0.05, 0, 0.0004, -0.04, 0.95, 0, 0.0002, 0, 0, 1, 0, 30, 20, 0, 1)";
+    const screen = box({ transform: tilt, "transform-origin": "0px 0px" }, { tag: "canvas", layer: 0 });
+    const projected = ([x, y]: [number, number]): [number, number] => {
+      const w = 0.0004 * x + 0.0002 * y + 1;
+      return [(0.9 * x - 0.04 * y + 30) / w, (0.05 * x + 0.95 * y + 20) / w];
+    };
+    const inside = (quad: number[], [x, y]: [number, number]) =>
+      [0, 2, 4, 6].every((i) => {
+        const [x0, y0, x1, y1] = [quad[i], quad[i + 1], quad[(i + 2) % 8], quad[(i + 3) % 8]];
+        return (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0) >= -1;
+      });
+
+    const read = readTree(tree(root(), screen));
+    const tiles = read.drawn.filter((d) => d.kind === DrawnKind.Layer);
+    const placedAt = (p: [number, number]) => {
+      const tile = tiles.find((t) => t.masks?.[0].cover.kind === CoverKind.Path && inside(t.masks[0].cover.contours[0], projected(p)))!;
+      return apply2d(tile.matrix, p);
+    };
+
+    expect(read.gaps).toEqual([]);
+    expect(tiles.length).toBeGreaterThan(1);
+    for (const p of [[100, 50], [37, 81], [180, 12]] as [number, number][]) {
+      expect(Math.hypot(placedAt(p)[0] - projected(p)[0], placedAt(p)[1] - projected(p)[1])).toBeLessThan(0.5);
+    }
+  });
+
+  it("keeps a bitmap whole when its box fit already lands within half a pixel", () => {
+    const faint = "matrix3d(1, 0, 0, 0.000001, 0, 1, 0, 0, 0, 0, 1, 0, 30, 20, 0, 1)";
+    const screen = box({ transform: faint, "transform-origin": "0px 0px" }, { tag: "canvas", layer: 0 });
+
+    expect(readTree(tree(root(), screen)).drawn).toHaveLength(1);
+  });
+
   it("projects a child through the perspective its parent sets", () => {
     const stage = el({
       parent: 0,
@@ -1282,6 +1384,32 @@ describe("readTree, CSS a motion template draws with", () => {
       [20, 0],
       [180, 200],
     ]);
+  });
+
+  it("draws an svg the probe rasterised as its bitmap, and nothing inside it", () => {
+    const svg = el({ parent: 0, tag: "svg", svg: true, at: [10, 20], size: [50, 40], layer: 2 });
+    const masked = el({ parent: 1, tag: "rect", svg: true, at: null, attrs: { width: "50", height: "40" }, style: { fill: 'url("#dots")' } });
+
+    expect(readTree(tree(root(), svg, masked))).toEqual({
+      drawn: [{ kind: DrawnKind.Layer, layer: 2, width: 50, height: 40, opacity: 1, matrix: [1, 0, 0, 1, 10, 20] }],
+      gaps: [],
+    });
+  });
+
+  it("cuts out the band a hard-stopped mask-image hides", () => {
+    const stencil = box({
+      "mask-image":
+        "linear-gradient(90deg, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 40%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0) 60%, rgb(0, 0, 0) 60%)",
+      "background-color": "rgb(255, 0, 0)",
+    });
+
+    const read = readTree(tree(root(), stencil));
+    const [layer] = read.drawn[0].masks ?? [];
+    const xs = layer.cover.kind === CoverKind.Path ? layer.cover.contours.flat().filter((_, i) => i % 2 === 0).map((x) => apply2d(layer.cover.matrix, [x, 0])[0]) : [];
+
+    expect(read.gaps).toEqual([]);
+    expect(layer).toMatchObject({ invert: true, cover: { kind: CoverKind.Path, contours: [expect.any(Array)] } });
+    expect([Math.min(...xs), Math.max(...xs)].map(Math.round)).toEqual([80, 120]);
   });
 
   it("still refuses a mask-image it cannot split into edge fades", () => {

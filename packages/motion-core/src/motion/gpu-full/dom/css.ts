@@ -180,7 +180,10 @@ export function flattened(m: Matrix4, size: Size): Affine | null {
   if (projected.some((p) => p === null)) {
     return null;
   }
-  const points = projected as number[][];
+  return fitCorners(projected as Point[], box);
+}
+
+export function fitCorners(points: Point[], box: Size): Affine {
   const [hx, hy] = [box.w / 2, box.h / 2];
   const signs = [
     [-1, -1],

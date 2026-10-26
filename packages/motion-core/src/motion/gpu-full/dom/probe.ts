@@ -163,6 +163,38 @@ export function domProbe(cfg: ProbeConfig) {
     return lines;
   };
 
+  type SvgText = Element & {
+    getNumberOfChars: () => number;
+    getExtentOfChar: (i: number) => DOMRect;
+  };
+  const charsPlaced = (el: Element): el is SvgText =>
+    typeof (el as Partial<SvgText>).getExtentOfChar === "function";
+
+  const svgLinesOf = (el: SvgText): TextLine[] => {
+    const chars = [...(el.textContent ?? "").replace(/\s+/g, " ").trim()];
+    if (chars.length !== el.getNumberOfChars()) {
+      return [];
+    }
+    const lines: TextLine[] = [];
+    chars.forEach((char, i) => {
+      const at = el.getExtentOfChar(i);
+      if (!char.trim() || !at.width) {
+        return;
+      }
+      const last = lines[lines.length - 1];
+      const line =
+        last && Math.abs(last.top - at.y) < at.height / 2
+          ? last
+          : lines[
+              lines.push({ chars: [], xs: [], top: at.y, height: at.height }) -
+                1
+            ];
+      line.chars.push(char);
+      line.xs.push(at.x);
+    });
+    return lines;
+  };
+
   const CASES: Record<string, (c: string) => string> = {
     uppercase: (c) => c.toUpperCase(),
     lowercase: (c) => c.toLowerCase(),
@@ -412,6 +444,81 @@ export function domProbe(cfg: ProbeConfig) {
   const REFERENCE = /url\(\s*["']?#([^"')]+)["']?\s*\)/;
   const REFERRING = ["clip-path", "filter", "fill", "stroke", "mask-image"];
 
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const PAINTED_BY = ["fill", "stroke"];
+  const SVG_LOOKS = [
+    "fill",
+    "fill-opacity",
+    "fill-rule",
+    "stroke",
+    "stroke-width",
+    "stroke-opacity",
+    "stroke-linecap",
+    "stroke-linejoin",
+    "stroke-dasharray",
+    "opacity",
+    "visibility",
+    "transform",
+    "transform-origin",
+    "font-family",
+    "font-size",
+    "font-weight",
+  ];
+
+  const referencedTag = (value: string) => {
+    const id = REFERENCE.exec(value)?.[1];
+    return id ? document.getElementById(id)?.tagName.toLowerCase() : undefined;
+  };
+
+  const UNEMBEDDED = "text, image, foreignObject";
+
+  const rasterisedSvg = (svg: Element) =>
+    !svg.querySelector(UNEMBEDDED) &&
+    [...svg.querySelectorAll("*")].some(
+      (e) =>
+        e.hasAttribute("mask") ||
+        referencedTag(e.getAttribute("filter") ?? "") === "filter" ||
+        PAINTED_BY.some(
+          (k) => referencedTag(e.getAttribute(k) ?? "") === "pattern",
+        ),
+    );
+
+  const svgLayer = (svg: Element, size: [number, number]) => {
+    const clone = svg.cloneNode(true) as SVGElement;
+    const copies = [clone, ...clone.querySelectorAll("*")] as SVGElement[];
+    [svg, ...svg.querySelectorAll("*")].forEach((source, i) => {
+      const computed = getComputedStyle(source);
+      SVG_LOOKS.map((k) => [k, computed.getPropertyValue(k)])
+        .filter(([, v]) => !v.includes("url("))
+        .forEach(([k, v]) => copies[i].style?.setProperty(k, v));
+    });
+    const borrowed = [
+      ...new Set(
+        [svg, ...svg.querySelectorAll("*")].flatMap((e) =>
+          [...e.attributes].map((a) => REFERENCE.exec(a.value)?.[1] ?? ""),
+        ),
+      ),
+    ]
+      .map((id) => (id ? document.getElementById(id) : null))
+      .filter((def): def is HTMLElement => def !== null && !svg.contains(def))
+      .map((def) => def.cloneNode(true));
+    if (borrowed.length) {
+      const defs = document.createElementNS(SVG_NS, "defs");
+      defs.append(...borrowed);
+      clone.prepend(defs);
+    }
+    clone.style.transform = "none";
+    clone.style.position = "static";
+    clone.setAttribute("xmlns", SVG_NS);
+    clone.setAttribute("width", String(size[0]));
+    clone.setAttribute("height", String(size[1]));
+    const src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(clone))}`;
+    return bitmapOf(size, async (pen) => {
+      const image = await loadImage(src);
+      pen.drawImage(image, 0, 0, size[0], size[1]);
+    });
+  };
+
   const serialized = (el: Element): SvgNode => ({
     tag: el.tagName,
     attrs: Object.fromEntries([...el.attributes].map((a) => [a.name, a.value])),
@@ -496,7 +603,14 @@ export function domProbe(cfg: ProbeConfig) {
       const boxes = elements.map((el) => el.getBoundingClientRect());
       const web = webFaces();
       elements.forEach((el, i) => {
-        if (!(el instanceof HTMLElement) || !nodes[i].text) {
+        if (!nodes[i].text) {
+          return;
+        }
+        if (charsPlaced(el)) {
+          nodes[i].lines = svgLinesOf(el);
+          return;
+        }
+        if (!(el instanceof HTMLElement)) {
           return;
         }
         const computed = getComputedStyle(el);
@@ -524,6 +638,10 @@ export function domProbe(cfg: ProbeConfig) {
       const el = elements[i];
       if (node.layer === cfg.none && isSvgImage(el)) {
         node.layer = layers.push(svgImageLayer(el, node.size)) - 1;
+        return;
+      }
+      if (node.tag === "svg" && rasterisedSvg(el)) {
+        node.layer = layers.push(svgLayer(el, node.size)) - 1;
         return;
       }
       if (node.layer !== cfg.none || !(el instanceof HTMLElement)) {

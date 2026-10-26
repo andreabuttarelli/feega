@@ -233,10 +233,11 @@ impl<R: Runner> Fx<'_, R> {
         for (ch, tag) in ["feFuncR", "feFuncG", "feFuncB", "feFuncA"].iter().enumerate() {
             let Some(f) = funcs.iter().find(|f| f.tag == *tag) else { continue };
             let kind = text(f.attrs.get("type"));
-            let values: Vec<f32> = if kind == "table" { numbers(f.attrs.get("tableValues")).into_iter().take(MAX_TABLE).collect() } else { vec![] };
+            let values: Vec<f32> = if kind == "table" || kind == "discrete" { numbers(f.attrs.get("tableValues")).into_iter().take(MAX_TABLE).collect() } else { vec![] };
             params[ch] = match kind.as_str() {
                 "table" => 1.0,
                 "linear" => 2.0,
+                "discrete" => 3.0,
                 _ => 0.0,
             };
             params[4 + ch] = values.len() as f32;
