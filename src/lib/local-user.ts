@@ -18,7 +18,10 @@ export enum LocalOff {
   ImportCanvas = 'import_canvas',
   Brand = 'brand',
   CloudImport = 'cloud_import',
-  CloudNodes = 'cloud_nodes'
+  CloudNodes = 'cloud_nodes',
+  TermsNotice = 'terms_notice',
+  PublicLinks = 'public_links',
+  NextSteps = 'next_steps'
 }
 
 const OFF_IN_LOCAL_MODE: ReadonlySet<LocalOff> = new Set(Object.values(LocalOff));

@@ -4330,7 +4330,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <OutputViewer runs={viewing.runs} start={viewing.start} kind={viewing.kind} urlFor={(assetId) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full)} onclose={() => (viewing = null)} />
   {/if}
 
-  {#if selectedIds.length}
+  {#if selectedIds.length && !isOff(LocalOff.PublicLinks)}
     <button type="button" class="copy-link" data-testid="copy-selection-link" onclick={copySelectionLink}>{linkCopied ? 'Link copied' : 'Copy link to selection'}</button>
   {/if}
 

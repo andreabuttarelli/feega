@@ -19,3 +19,11 @@ it on the client). No second table: each surface asks the enum once.
 Not touched: AI Generate tiles in the add bar and the node context menu
 (local editing actions only). Generate nodes still exist as containers; the
 run answers with the cloud message.
+
+Second pass: add bar tiles that generate or import through the cloud (text,
+image, video, products, social feed, studio batch: `CLOUD_ADDABLE`), the
+next-step chips (Create post, Translate), the doc Public link, Copy link to
+selection and the Terms notice are off too. Command palette audit: it lists
+design commands only, all local; the chat shortcut (Cmd+B) is a no-op because
+the bar has no Chat tab. Remaining, not hidden: the gpu-drawn link icon in the
+selection toolbar.

@@ -3604,7 +3604,7 @@
       oncompare={() => props.onCompareOutputs?.(selected)}
       onexportcloud={(provider) => props.onCloud?.(provider, CloudMode.Export, selected[0], viewCentre())}
     />
-    {#if props.postAction}
+    {#if props.postAction && !isOff(LocalOff.NextSteps)}
       <NextStepChips postAction={props.postAction} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
     {/if}
   {/if}
