@@ -1,4 +1,5 @@
-import type { Quote } from './studio-batch';
+import { createHash } from 'node:crypto';
+import type { Quote, Selection } from './studio-batch';
 import { SHOTS } from '$lib/studio/shots';
 import { SKIP_TEXT } from '$lib/studio/plan';
 
@@ -21,4 +22,8 @@ export function summarize(quote: Quote): QuoteSummary {
     droppedRefs: quote.droppedRefs,
     skipped: quote.plan.skipped.map((s) => `${s.productTitle} · ${SHOTS[s.shot].label}: ${SKIP_TEXT[s.reason]}`)
   };
+}
+
+export function quoteIdOf(selection: Selection, summary: QuoteSummary): string {
+  return createHash('sha256').update(JSON.stringify({ selection, perImage: summary.perImage, count: summary.count })).digest('hex');
 }
