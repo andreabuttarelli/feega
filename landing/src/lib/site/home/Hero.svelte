@@ -2,6 +2,7 @@
   import { APP_URL, GITHUB_URL } from '../links';
   import { LOCAL_COMMANDS, AGENT_PROMPT } from '../home';
 
+  const POSTER = '/site/home/hero-poster.webp';
   const COPIED_MS = 1500;
 
   let copied = $state('');
@@ -13,8 +14,18 @@
   }
 </script>
 
+<svelte:head>
+  <link rel="preload" as="image" href={POSTER} type="image/webp" fetchpriority="high" />
+</svelte:head>
+
 <section class="hero" id="hero">
-  <h1>The open-source infinite canvas for design, motion and AI generation.</h1>
+  <h1>The smart canvas for smarter ideas</h1>
+
+  <video autoplay muted loop playsinline preload="metadata" poster={POSTER} width="1920" height="1080" aria-label="feega canvas overview">
+    <source src="/site/home/hero-720.mp4" type="video/mp4" media="(max-width: 800px)" />
+    <source src="/site/home/hero-1080.mp4" type="video/mp4" />
+  </video>
+
   <p class="lead">One canvas where you and your AI agents draw, animate and generate. Run it on your machine, or in the cloud.</p>
 
   <div class="block">
@@ -53,6 +64,16 @@
     line-height: 0.95;
     letter-spacing: -0.04em;
     font-weight: 400;
+  }
+
+  video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    margin-top: 24px;
+    background: #000;
+    border-radius: 10px;
   }
 
   .lead {
