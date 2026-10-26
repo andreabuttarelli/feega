@@ -3,9 +3,13 @@ import { IMAGE_MODEL_CHOICES } from '$lib/image-models';
 import { IMAGE_TOOLS_GROUP, IMAGE_TOOL_MODEL, ImageTool } from '$lib/image-tools';
 import { KIE_CREDIT_USD } from './kie';
 import { KieBilling, KIE_MODELS, kieModelRows } from './kie-catalogue';
+import { KIE_FIXTURE_PRICES } from './kie-pricing.fixtures';
+import type { KieSpec } from './kie-docs';
 import { taskUsdFor } from './generation/task-pricing';
 
-const rows = kieModelRows('2026-10-15T00:00:00.000Z');
+const SPEC = (over: Partial<KieSpec>): KieSpec => ({ model: 'acme/text-to-video', label: 'Acme Video', fields: { prompt: 'prompt', aspectRatio: 'aspect_ratio', resolution: 'resolution', duration: 'duration', images: [] }, aspectRatios: ['16:9'], resolutions: ['720p'], durations: [5, 10], numericDuration: true, maxRefs: 0, ...over });
+
+const rows = kieModelRows(KIE_FIXTURE_PRICES, [], '2026-10-15T00:00:00.000Z');
 
 describe('the kie catalogue', () => {
   it('only discounts models the picker already offers', () => {
@@ -13,13 +17,56 @@ describe('the kie catalogue', () => {
     expect(KIE_MODELS.filter((model) => model.discountFor).every((model) => offered.has(model.discountFor!))).toBe(true);
   });
 
-  it('prices every line at kie credits times the credit price, the same sum the adapter bills', () => {
-    for (const model of KIE_MODELS.filter((m) => m.billing === KieBilling.PerRun)) {
-      const row = rows.find((r) => r.wire_spec.model === model.kieModel)!;
-      for (const [resolution, credits] of Object.entries(model.creditsByResolution)) {
-        expect(taskUsdFor(row.pricing, { resolution })).toBeCloseTo(credits * KIE_CREDIT_USD, 6);
-      }
-    }
+  it('prices every line at the live kie credits times the credit price, the same sum the adapter bills', () => {
+    const banana = rows.find((r) => r.id === 'kie/nano-banana-2')!;
+
+    expect(banana.supported_resolutions).toEqual(['1K', '2K', '4K']);
+    expect(taskUsdFor(banana.pricing, { resolution: '1K' })).toBeCloseTo(8 * KIE_CREDIT_USD, 6);
+    expect(taskUsdFor(banana.pricing, { resolution: '4K' })).toBeCloseTo(18 * KIE_CREDIT_USD, 6);
+  });
+
+  it('prices nano banana pro from the shared 1/2K line and the 4K line', () => {
+    const pro = rows.find((r) => r.id === 'kie/nano-banana-pro')!;
+
+    expect(taskUsdFor(pro.pricing, { resolution: '2K' })).toBeCloseTo(18 * KIE_CREDIT_USD, 6);
+    expect(taskUsdFor(pro.pricing, { resolution: '4K' })).toBeCloseTo(24 * KIE_CREDIT_USD, 6);
+  });
+
+  it('leaves a curated model out when the price list no longer has it, so its stored row stays', () => {
+    const without = kieModelRows(new Map(), [], '2026-10-15T00:00:00.000Z');
+
+    expect(without).toEqual([]);
+  });
+
+  it('adds a kie-only model from its doc and price, wired by the doc and priced per second', () => {
+    const added = kieModelRows(KIE_FIXTURE_PRICES, [SPEC({})], '2026-10-15T00:00:00.000Z').find((r) => r.id === 'kie/acme/text-to-video')!;
+
+    expect(added.catalogue).toBe('video');
+    expect(added.wire_spec).toMatchObject({ model: 'acme/text-to-video', numeric: ['duration'], defaults: { resolution: '720p' } });
+    expect(added.wire_spec.discountFor).toBeUndefined();
+    expect(taskUsdFor(added.pricing, { resolution: '720p', duration: '10' })).toBeCloseTo(30 * KIE_CREDIT_USD, 6);
+    expect(added.param_schema).toMatchObject({ aspect_ratio: { values: ['16:9'] }, duration: { values: ['5', '10'] } });
+  });
+
+  it('routes a kie twin of an offered model as its discount, and leaves other kie-only models alone', () => {
+    const twin = kieModelRows(KIE_FIXTURE_PRICES, [SPEC({ model: 'qwen3/pro-text-to-image', fields: { prompt: 'prompt', images: [] }, resolutions: [], durations: [], aspectRatios: [] })], '2026-10-15T00:00:00.000Z');
+
+    expect(twin.find((r) => r.id === 'kie/qwen3/pro-text-to-image')?.wire_spec.discountFor).toBe('qwen3-pro');
+  });
+
+  it('prices a model with no resolution input by one flat line', () => {
+    const qwen = kieModelRows(KIE_FIXTURE_PRICES, [SPEC({ model: 'qwen/text-to-image', fields: { prompt: 'prompt', images: [] }, resolutions: [], durations: [], aspectRatios: [] })], '2026-10-15T00:00:00.000Z').find((r) => r.id === 'kie/qwen/text-to-image')!;
+
+    expect(qwen.catalogue).toBe('image');
+    expect(qwen.supported_resolutions).toEqual([]);
+    expect(taskUsdFor(qwen.pricing, {})).toBeCloseTo(2 * KIE_CREDIT_USD, 6);
+  });
+
+  it('skips a doc whose model the price list does not know, and never doubles a curated model', () => {
+    const extra = kieModelRows(KIE_FIXTURE_PRICES, [SPEC({ model: 'ghost/model' }), SPEC({ model: 'nano-banana-2' })], '2026-10-15T00:00:00.000Z');
+
+    expect(extra.map((r) => r.id).filter((id) => id === 'kie/ghost/model')).toEqual([]);
+    expect(extra.filter((r) => r.id === 'kie/nano-banana-2')).toHaveLength(1);
   });
 
   it('offers Grok Imagine text-to-video on kie alone, priced per second from kie\'s price list', () => {

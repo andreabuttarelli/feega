@@ -5,6 +5,7 @@ import { billedCreditsFor } from '$lib/credit-ladder';
 import { kie } from '../kie';
 import { KIE_SUCCESS } from '../kie.fixtures';
 import { kieModelRows } from '../kie-catalogue';
+import { KIE_FIXTURE_PRICES } from '../kie-pricing.fixtures';
 import { discountCandidateOf, RouteHealth, type DiscountCandidate } from './discount-route';
 import { routeFor, withDiscountPrices, type DiscountBook } from './discount-routes';
 import { TaskProviderName } from './task-providers';
@@ -12,7 +13,7 @@ import { TaskProviderName } from './task-providers';
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
 
 const candidates = new Map(
-  kieModelRows('2026-10-15T00:00:00.000Z')
+  kieModelRows(KIE_FIXTURE_PRICES, [], '2026-10-15T00:00:00.000Z')
     .map(discountCandidateOf)
     .filter((c): c is DiscountCandidate => c !== null)
     .map((c) => [c.discountFor, c])
@@ -56,8 +57,8 @@ describe('the price the picker shows is the price the route that runs charges', 
   it('primary route for a resolution kie does not price: no kie number is shown for it', () => {
     const choice = withDiscountPrices(book(), nanoBanana2, 'image');
 
-    expect(routeFor(book(), nanoBanana2, 'image', { resolution: '4K' })).toBeNull();
-    expect(creditsForRun({ medium: 'image', model: choice, params: { resolution: '4K' } })).toBeNull();
+    expect(routeFor(book(), nanoBanana2, 'image', { resolution: '512' })).toBeNull();
+    expect(creditsForRun({ medium: 'image', model: choice, params: { resolution: '512' } })).toBeNull();
   });
 
   it('kie demoted: Auto keeps the primary price and names no discount', () => {

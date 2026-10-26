@@ -4,6 +4,7 @@ import type { Db } from '$lib/server/db/client';
 import type { ModelChoice } from '$lib/canvas/gen-node';
 import { computeCostUsd } from '$lib/server/ai-log';
 import { kieModelRows } from '$lib/server/kie-catalogue';
+import { KIE_FIXTURE_PRICES } from '$lib/server/kie-pricing.fixtures';
 import { discountCandidateOf, RouteHealth, type DiscountCandidate } from '$lib/server/generation/discount-route';
 import type { DiscountBook } from '$lib/server/generation/discount-routes';
 import { TaskProviderName } from '$lib/server/generation/task-providers';
@@ -19,7 +20,7 @@ const CANVAS = '66666666-6666-6666-6666-666666666666';
 const PRIMARY = 'nano-banana-2';
 const KIE_MODEL = 'kie/nano-banana-2';
 
-const kieRow = kieModelRows('2026-10-15T00:00:00.000Z').find((row) => row.id === KIE_MODEL)!;
+const kieRow = kieModelRows(KIE_FIXTURE_PRICES, [], '2026-10-15T00:00:00.000Z').find((row) => row.id === KIE_MODEL)!;
 const kieModel: TaskModel = {
   id: KIE_MODEL,
   catalogue: 'image',

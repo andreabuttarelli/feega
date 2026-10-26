@@ -12,6 +12,12 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** a fresh database applies every file and the app still answers `PGRST205` for `orgs`. **Move:** the new schema was never a migration; `supabase/baseline` is generated from production catalogs and `db:migrate` applies it, then only files dated after its cutoff. Never delete or rename the legacy files.
 
+## Providers
+
+### Kie publishes its price list and its request schemas, you just have to find them
+
+**Signal:** a Kie price in `ai_models` differs from the billed one, or a Kie model exists that the picker lacks. **Move:** do not edit a table. Prices: `POST api.kie.ai/client/v1/model-pricing/page` (no key, 100 rows max per page; a bigger page answers 422). Wires: the OpenAPI block in `docs.kie.ai/market/*.md`, listed by `docs.kie.ai/llms.txt`. A price line joins a model through `?model=` in its `anchor`, else the page slug; lines on a shared page (Seedream 5) cannot be joined.
+
 ## Motion editor
 
 ### A PR that adds or changes a tool fails the tool surface pins
