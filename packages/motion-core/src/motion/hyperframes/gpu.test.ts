@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { GPU_GLOBAL, Scaling, SCREEN_GPU, VIDEO_GPU, gpuScript, paced, startScale, type GpuProfile } from './gpu';
+import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
+import { GPU_GLOBAL, GPU_PACE, Scaling, SCREEN_GPU, VIDEO_GPU, gpuScript, paced, startScale, type GpuProfile } from './gpu';
 
 type Made = { options: Record<string, unknown>; ratio: number; renders: number };
 
@@ -110,7 +112,7 @@ describe('sullo schermo il renderer è tarato sul dispositivo', () => {
 
 describe('startScale', () => {
   it('non supera mai la risoluzione di uscita', () => {
-    expect(startScale({ dpr: 3, coarse: false, long: 3000 }, 1920)).toBe(1);
+    expect(startScale({ dpr: 3, coarse: false, long: 3000 }, 1920, GPU_PACE)).toBe(1);
   });
 });
 
@@ -118,7 +120,7 @@ describe('paced', () => {
   it('scende per gradini e non sotto il pavimento', () => {
     let p = { scale: 1, slow: 0, fast: 0 };
     for (let i = 0; i < 10_000; i++) {
-      p = paced(p, 100, 1);
+      p = paced(p, 100, 1, GPU_PACE);
     }
     expect(p.scale).toBeGreaterThanOrEqual(0.4);
     expect(p.scale).toBeLessThan(0.5);
@@ -127,8 +129,22 @@ describe('paced', () => {
   it('non sale oltre il tetto di sessione', () => {
     let p = { scale: 0.5, slow: 0, fast: 0 };
     for (let i = 0; i < 10_000; i++) {
-      p = paced(p, 5, 0.6);
+      p = paced(p, 5, 0.6, GPU_PACE);
     }
     expect(p.scale).toBe(0.6);
+  });
+});
+
+describe('lo script del renderer sopravvive alla minificazione della build', () => {
+  it('un bundle minificato installa ancora il renderer nella pagina', async () => {
+    const entry = fileURLToPath(new URL('./gpu.ts', import.meta.url));
+    const out = await build({ entryPoints: [entry], bundle: true, minify: true, format: 'esm', write: false, logLevel: 'silent' });
+    const minified = (await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`)) as typeof import('./gpu');
+    const win: Record<string, unknown> = { devicePixelRatio: 1, screen: { width: 1920, height: 1080 }, matchMedia: () => ({ matches: false }), requestAnimationFrame: () => 0 };
+    const doc = { getElementById: () => ({ dataset: { width: '1920', height: '1080' } }) };
+
+    new Function('window', 'document', minified.gpuScript(minified.SCREEN_GPU))(win, doc);
+
+    expect(win[GPU_GLOBAL]).toMatchObject({ renderer: expect.any(Function) });
   });
 });

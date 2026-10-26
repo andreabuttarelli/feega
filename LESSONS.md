@@ -3345,3 +3345,7 @@ in console.
 `list.unsupported`. `reason: "unread"` = la lettura DOM non è partita (guardia sul doc sbagliato);
 `reason: "dom"` = CSS che gpu-core non disegna; zero item e nessun motivo = il frame scelto è vuoto
 (controlla `stillFrame`).
+
+## A page script works in dev and throws `X is not defined` in a build
+
+**Signal:** a `fn.toString()` injected into a composed page (gpu, probe, runtime) runs under `vite dev` and `bench:gpu-parity`, but the built app's iframe throws `ReferenceError: J1 is not defined`; three.js templates draw nothing on the canvas. **Move:** the minifier renames module-level names the serialized function closes over, so a `const NAME=` re-declared in the template string no longer matches. Pass every constant and helper as a parameter of the serialized function; `gpu.test.ts` minifies the module with esbuild and runs the script to prove it.
