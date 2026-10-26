@@ -190,3 +190,29 @@ describe('svgShapes fill rule and real-world paths', () => {
     expect(shorthand.path).toBe(explicit.path);
   });
 });
+
+describe('a Figma export with masks and <use>', () => {
+  const read = svgShapes(readFileSync('tests/fixtures/svg/figma-masked-ribbon.svg', 'utf8'));
+  const fills = read.shapes.map((s) => (s.gradient ? 'gradient' : s.fillRule === 'evenodd' ? 'ribbon' : 'slice'));
+
+  it('draws the use of a defs path, white then gradient, evenodd', () => {
+    const ribbons = read.shapes.filter((s) => s.fillRule === 'evenodd');
+    expect(ribbons.map((s) => s.fill)).toEqual(['#ffffff', '#22d3b6']);
+    expect(ribbons[1].gradient).toMatchObject({ type: 'linear-gradient' });
+    expect(ribbons[1].gradient?.stops[0]).toMatchObject({ color: '#22d3b6', pos: 0 });
+    expect(ribbons[1].gradient?.stops.at(-1)?.pos).toBe(1);
+  });
+
+  it('keeps the document order, so five slices lie under the ribbon and five over it', () => {
+    expect(fills).toEqual([...Array(5).fill('slice'), 'ribbon', 'gradient', ...Array(5).fill('slice')]);
+  });
+
+  it('cuts each slice to the ring, leaving the middle of the ring empty', () => {
+    const slices = read.shapes.filter((s) => s.fillRule === 'nonzero');
+    expect(slices).toHaveLength(10);
+    for (const slice of slices) {
+      const b = box(slice.path);
+      expect(Math.hypot(b.left - 514, b.top - 529)).toBeGreaterThan(250);
+    }
+  });
+});
