@@ -2979,7 +2979,7 @@
     [Pasted.Figma]: ({ html }) => ({ figma: html })
   };
   const PASTED_SUMMARY = 'Pasted';
-  const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
+  const FIGMA_SKIPPED = 'Pasted from Figma. Approximated or skipped:';
 
   function pasteInFrame(data: PasteData<File>, at: Point): boolean {
     const paste = (IN_FRAME[data.kind] as ((d: PasteData<File>) => FramePaste) | undefined)?.(data);

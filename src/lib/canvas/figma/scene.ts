@@ -449,6 +449,20 @@ function childrenOf(n: FigmaRawNode, ctx: Ctx): FigmaRawNode[] {
   return ctx.children.get(keyOf(symbol.guid)) ?? [];
 }
 
+const PLACEHOLDER_FILL: Fill = { kind: FillKind.Solid, color: '#d9d9d9', opacity: 1 };
+
+function placeholderOf(n: FigmaRawNode, m: Matrix, ctx: Ctx, note: string): Layer | null {
+  const size = n.size ?? { x: 0, y: 0 };
+  ctx.report(note);
+  if (size.x <= 0 || size.y <= 0) {
+    return null;
+  }
+  const path = transformedPath(roundedRect(size, [0, 0, 0, 0]), m);
+  const shaped = common(n, m, ctx);
+  const box = isRotated(m) ? pathBox(path) : shaped.box;
+  return { kind: LayerKind.Shape, ...shaped, box, rotation: 0, path, fillRule: FillRule.NonZero, fills: [PLACEHOLDER_FILL], strokes: [] };
+}
+
 function layerOf(n: FigmaRawNode, parent: Matrix, ctx: Ctx): Layer | null {
   if (n.visible === false) {
     return null;
@@ -464,16 +478,14 @@ function layerOf(n: FigmaRawNode, parent: Matrix, ctx: Ctx): Layer | null {
   if (VECTORS.has(type) || type === 'RECTANGLE' || type === 'ROUNDED_RECTANGLE' || type === 'ELLIPSE') {
     const local = shapePath(n, ctx);
     if (!local.path) {
-      ctx.report(`${type.toLowerCase()} ${n.name ?? ''} without geometry`);
-      return null;
+      return placeholderOf(n, m, ctx, `${type.toLowerCase()} ${n.name ?? ''} without geometry, shown as a placeholder`);
     }
     const path = transformedPath(local.path, m);
     const shaped = common(n, m, ctx);
     const box = isRotated(m) ? pathBox(path) : shaped.box;
     return { kind: LayerKind.Shape, ...shaped, box, rotation: 0, path, fillRule: local.rule, fills: fillsOf(n.fillPaints, ctx.report), strokes: strokesOf(n, ctx.report) };
   }
-  ctx.report(`${type.toLowerCase()} ${n.name ?? ''}`);
-  return null;
+  return placeholderOf(n, m, ctx, `${type.toLowerCase()} ${n.name ?? ''} shown as a placeholder`);
 }
 
 function frameLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): FrameLayer {

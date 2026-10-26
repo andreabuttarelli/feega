@@ -55,3 +55,27 @@ export function cardOverElements(): FigmaMessage {
   const title = node('TEXT', card.id, { x: 76, y: 20, w: 80, h: 20, fontName: { family: 'Inter', style: 'Regular', postscript: '' }, fontSize: 16, fillPaints: [solid(0, 0, 0)], textData: { characters: 'Card' }, stackChildPrimaryGrow: 1, slot: 'b' });
   return { ...base, nodes: [...base.nodes, card, avatar, title] };
 }
+
+const pageNode = (): FigmaRawNode => ({ guid: { sessionID: 0, localID: PAGE }, type: 'CANVAS', name: 'Page' });
+
+export function landingWithUnsupported(): FigmaMessage {
+  next = 10;
+  const landing = node('FRAME', PAGE, { w: 1440, h: 900, fillPaints: [solid(1, 1, 1)], frameMaskDisabled: false, slot: 'a' });
+  const hero = node('TEXT', landing.id, { x: 80, y: 80, w: 400, h: 60, fontName: { family: 'Inter', style: 'Bold', postscript: '' }, fontSize: 48, fillPaints: [solid(0, 0, 0)], textData: { characters: 'Hello' }, slot: 'a' });
+  const sticky = node('STICKY', landing.id, { x: 600, y: 80, w: 200, h: 200, slot: 'b' });
+  const table = node('TABLE', landing.id, { x: 80, y: 400, w: 600, h: 300, slot: 'c' });
+  const cta = node('ROUNDED_RECTANGLE', landing.id, { x: 80, y: 200, w: 160, h: 48, cornerRadius: 8, fillPaints: [solid(0, 0.4, 1)], slot: 'e' });
+  return { meta: {}, blobs: [], nodes: [pageNode(), landing, hero, sticky, table, cta] };
+}
+
+export function unsupportedBesideElement(): FigmaMessage {
+  next = 10;
+  const sticky = node('STICKY', PAGE, { w: 200, h: 200, slot: 'a' });
+  const dot = node('ELLIPSE', PAGE, { x: 400, w: 80, h: 80, fillPaints: [solid(0, 0.4, 1)], slot: 'b' });
+  return { meta: {}, blobs: [], nodes: [pageNode(), sticky, dot] };
+}
+
+export function onlyUnsupported(): FigmaMessage {
+  next = 10;
+  return { meta: {}, blobs: [], nodes: [pageNode(), node('STICKY', PAGE, { w: 200, h: 200, slot: 'a' })] };
+}
