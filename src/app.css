@@ -1,4 +1,5 @@
 @import './lib/styles/safe-area.css';
+@import './lib/styles/desktop-window.css';
 /* ============================================================
    feega — shared app shell + components.
    This is the design system for the product surface. When this

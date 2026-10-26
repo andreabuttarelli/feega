@@ -1,4 +1,7 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, dialog, nativeTheme } = require('electron');
+const { autoUpdater } = require('electron-updater');
+const { watchUpdates } = require('./updates.cjs');
+const { frameless, overlay } = require('./chrome.cjs');
 const { start, authReturn, staysInside, DEEP_LINK_SCHEME } = require('./routing.cjs');
 
 const START_URL_ENV = 'FEEGA_URL';
@@ -25,7 +28,10 @@ function deepLinkIn(argv) {
 }
 
 function open() {
-  window = new BrowserWindow({ width: 1440, height: 900, minWidth: 800, minHeight: 600, title: 'feega', backgroundColor: '#0c0c0c' });
+  window = new BrowserWindow({ width: 1440, height: 900, minWidth: 800, minHeight: 600, title: 'feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) });
+  if (process.platform !== 'darwin') {
+    nativeTheme.on('updated', () => window?.setTitleBarOverlay(overlay(nativeTheme.shouldUseDarkColors)));
+  }
   window.webContents.setUserAgent(userAgent(window));
 
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -68,6 +74,9 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     open();
+    if (app.isPackaged) {
+      watchUpdates({ updater: autoUpdater, ask: (options) => dialog.showMessageBox(window, options), every: setInterval });
+    }
     const deep = deepLinkIn(process.argv);
     if (deep) {
       follow(deep);
