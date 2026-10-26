@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { page } from '$app/state';
+  import { APP_URL } from '../links';
 
   let { title, script, body, loading = 'lazy' }: { title: string; script: string; body: string; loading?: 'lazy' | 'eager' } = $props();
 
-  const srcdoc = $derived(`<!doctype html><html><head><base href="${page.url.origin}/"><style>html,body{margin:0;padding:0;height:100%}body{display:flex;justify-content:center;align-items:center}*{box-sizing:border-box}h1,h2,p{margin:0}body,a{font-family:sans-serif;font-size:12px}</style></head><body><script src="${script}" defer><\/script>${body}</body></html>`);
+  const srcdoc = $derived(`<!doctype html><html><head><base href="${APP_URL}/"><style>html,body{margin:0;padding:0;height:100%}body{display:flex;justify-content:center;align-items:center}*{box-sizing:border-box}h1,h2,p{margin:0}body,a{font-family:sans-serif;font-size:12px}</style></head><body><script src="${script}" defer><\/script>${body}</body></html>`);
 </script>
 
 <iframe {title} {srcdoc} {loading}></iframe>
