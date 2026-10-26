@@ -5,6 +5,7 @@
   import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
   import Cloud from '@lucide/svelte/icons/cloud';
+  import Frame from '@lucide/svelte/icons/frame';
     import MessageCircle from '@lucide/svelte/icons/message-circle';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
@@ -31,6 +32,7 @@
     onpick,
     onupload,
     oncloud,
+    onfigma,
     ontemplate,
     techniques = [],
     ontechnique,
@@ -46,6 +48,7 @@
     onpick?: (what: Addable) => void;
     onupload?: (file: File) => void;
     oncloud?: () => void;
+    onfigma?: () => void;
     ontemplate?: (id: string) => void;
     techniques?: { id: string; name: string; nodes: number }[];
     ontechnique?: (id: string) => void;
@@ -205,6 +208,7 @@
   const drawTiles = $derived(DRAW_TOOLS.filter((t) => t.tool !== DrawTool.Select).map((t) => ({ id: `draw-${t.tool}`, label: t.name, icon: t.icon, run: () => (frameBar.tool = t.tool) })));
   const UPLOAD_TILE: Tile = { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile };
   const cloudTiles = (): Tile[] => (oncloud ? [{ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: oncloud }] : []);
+  const figmaTiles = (): Tile[] => (onfigma ? [{ id: 'figma', label: 'Import from Figma', icon: Frame, run: onfigma }] : []);
   const TRAILER_LABEL = 'Start from the feega trailer';
   const trailerTiles = $derived<Tile[]>(ontrailer ? [{ id: 'feega-trailer', label: TRAILER_LABEL, icon: Film, run: ontrailer }] : []);
 
@@ -214,7 +218,7 @@
   const canvasSections = (): Section[] => [
     { title: 'Design', tiles: drawTiles },
     { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].filter(offered).map(addTile) },
-    { title: 'Media', tiles: [UPLOAD_TILE, ...cloudTiles()] },
+    { title: 'Media', tiles: [UPLOAD_TILE, ...cloudTiles(), ...figmaTiles()] },
     {
       title: 'Templates',
       tiles: [
@@ -294,6 +298,14 @@
         <Cloud size={17} strokeWidth={1.7} />
       </button>
       <span class="add-tip" role="tooltip">Drive / Dropbox</span>
+    </span>
+  {/if}
+  {#if onfigma}
+    <span class="tool">
+      <button type="button" title="Import from Figma" aria-label="Import from Figma" data-testid="figma-import" onclick={onfigma}>
+        <Frame size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Figma</span>
     </span>
   {/if}
 {/snippet}
