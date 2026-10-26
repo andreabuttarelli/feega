@@ -1,51 +1,87 @@
 // @vitest-environment jsdom
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { domProbe } from '@feega/motion-core/motion/gpu-full/dom/probe';
-import { CUSTOM_ROOT_PREFIX, DOM_READ_REPLY, DOM_READ_REQUEST, NO_INDEX, READ_ATTRS, READ_STYLES, TEXT_PAD } from '@feega/motion-core/motion/gpu-full/dom/tree';
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { domProbe } from "@feega/motion-core/motion/gpu-full/dom/probe";
+import {
+  CUSTOM_ROOT_PREFIX,
+  DOM_READ_REPLY,
+  DOM_READ_REQUEST,
+  NO_INDEX,
+  READ_ATTRS,
+  READ_STYLES,
+  TEXT_PAD,
+} from "@feega/motion-core/motion/gpu-full/dom/tree";
 
-const CLIP = 'poster';
-const CONFIG = { request: DOM_READ_REQUEST, reply: DOM_READ_REPLY, timeline: 'main', prefix: CUSTOM_ROOT_PREFIX, none: NO_INDEX, pad: TEXT_PAD, styles: READ_STYLES, attrs: READ_ATTRS };
+const CLIP = "poster";
+const CONFIG = {
+  request: DOM_READ_REQUEST,
+  reply: DOM_READ_REPLY,
+  timeline: "main",
+  prefix: CUSTOM_ROOT_PREFIX,
+  none: NO_INDEX,
+  pad: TEXT_PAD,
+  styles: READ_STYLES,
+  attrs: READ_ATTRS,
+};
 
-type Reply = { type: string; id: string; trees: Record<string, unknown>; error?: string };
+type Reply = {
+  type: string;
+  id: string;
+  trees: Record<string, unknown>;
+  error?: string;
+};
 
 function asked(body: string): Promise<{ reply: Reply; frames: number }> {
   document.body.innerHTML = `<div id="${CUSTOM_ROOT_PREFIX}${CLIP}">${body}</div>`;
   let frames = 0;
-  vi.stubGlobal('requestAnimationFrame', (run: () => void) => {
+  vi.stubGlobal("requestAnimationFrame", (run: () => void) => {
     frames += 1;
     setTimeout(run, 0);
     return frames;
   });
-  vi.stubGlobal('createImageBitmap', async () => ({ width: 1, height: 1 }));
-  Object.defineProperty(document, 'fonts', { configurable: true, value: Object.assign([], { ready: Promise.resolve() }) });
+  vi.stubGlobal("createImageBitmap", async () => ({ width: 1, height: 1 }));
+  Object.defineProperty(document, "fonts", {
+    configurable: true,
+    value: Object.assign([], { ready: Promise.resolve() }),
+  });
   return new Promise((resolve) => {
-    const source = { postMessage: (reply: Reply) => resolve({ reply, frames }) } as unknown as Window;
-    window.dispatchEvent(new MessageEvent('message', { data: { type: DOM_READ_REQUEST, id: 'a', time: 0, clips: [CLIP] }, source }));
+    const source = {
+      postMessage: (reply: Reply) => resolve({ reply, frames }),
+    } as unknown as Window;
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { type: DOM_READ_REQUEST, id: "a", time: 0, clips: [CLIP] },
+        source,
+      }),
+    );
   });
 }
 
-describe('domProbe', () => {
+describe("domProbe", () => {
   beforeAll(() => domProbe(CONFIG));
   afterEach(() => vi.unstubAllGlobals());
 
-  it('answers a page of plain elements without waiting for an animation frame', async () => {
-    const { reply, frames } = await asked('<div></div>');
+  it("answers a page of plain elements without waiting for an animation frame", async () => {
+    const { reply, frames } = await asked("<div></div>");
 
     expect(reply.error).toBeUndefined();
     expect(Object.keys(reply.trees)).toEqual([CLIP]);
     expect(frames).toBe(0);
   });
 
-  it('does not wait for an animation frame to read a clip with a canvas', async () => {
-    const { reply, frames } = await asked('<canvas></canvas>');
+  it("does not wait for an animation frame to read a clip with a canvas", async () => {
+    const { reply, frames } = await asked("<canvas></canvas>");
 
     expect(reply.error).toBeUndefined();
     expect(frames).toBe(0);
   });
 
-  it('hands an image and a url background a bitmap of their own', async () => {
-    const { reply } = await asked('<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="><div style="background-image: url(data:image/gif;base64,R0lGODlhAQABAAAAACw=)"></div><div></div>');
-    const nodes = (reply.trees[CLIP] as { nodes: { tag: string; layer: number }[] }).nodes;
+  it("hands an image and a url background a bitmap of their own", async () => {
+    const { reply } = await asked(
+      '<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="><div style="background-image: url(data:image/gif;base64,R0lGODlhAQABAAAAACw=)"></div><div></div>',
+    );
+    const nodes = (
+      reply.trees[CLIP] as { nodes: { tag: string; layer: number }[] }
+    ).nodes;
 
     expect(nodes.map((n) => n.layer)).toEqual([NO_INDEX, 0, 1, NO_INDEX]);
   });

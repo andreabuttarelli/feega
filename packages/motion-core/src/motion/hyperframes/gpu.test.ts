@@ -1,9 +1,23 @@
-import { describe, expect, it } from 'vitest';
-import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
-import { GPU_GLOBAL, GPU_PACE, Scaling, SCREEN_GPU, VIDEO_GPU, gpuScript, paced, startScale, type GpuProfile } from './gpu';
+import { describe, expect, it } from "vitest";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
+import {
+  GPU_GLOBAL,
+  GPU_PACE,
+  Scaling,
+  SCREEN_GPU,
+  VIDEO_GPU,
+  gpuScript,
+  paced,
+  startScale,
+  type GpuProfile,
+} from "./gpu";
 
-type Made = { options: Record<string, unknown>; ratio: number; renders: number };
+type Made = {
+  options: Record<string, unknown>;
+  ratio: number;
+  renders: number;
+};
 
 class FakeRenderer {
   static made: Made[] = [];
@@ -20,37 +34,70 @@ class FakeRenderer {
   }
 }
 
-type Gpu = { renderer: (three: unknown, canvas: object, extra?: object, scaling?: Scaling) => FakeRenderer; scale: () => number };
+type Gpu = {
+  renderer: (
+    three: unknown,
+    canvas: object,
+    extra?: object,
+    scaling?: Scaling,
+  ) => FakeRenderer;
+  scale: () => number;
+};
 
-function boot(profile: GpuProfile, device: { dpr: number; coarse: boolean; screen: [number, number] }, comp: [number, number] = [1080, 1920]) {
+function boot(
+  profile: GpuProfile,
+  device: { dpr: number; coarse: boolean; screen: [number, number] },
+  comp: [number, number] = [1080, 1920],
+) {
   FakeRenderer.made = [];
   const frames: ((t: number) => void)[] = [];
   const win: Record<string, unknown> = {
     devicePixelRatio: device.dpr,
     screen: { width: device.screen[0], height: device.screen[1] },
-    matchMedia: (q: string) => ({ matches: q.includes('coarse') ? device.coarse : false }),
-    requestAnimationFrame: (fn: (t: number) => void) => frames.push(fn)
+    matchMedia: (q: string) => ({
+      matches: q.includes("coarse") ? device.coarse : false,
+    }),
+    requestAnimationFrame: (fn: (t: number) => void) => frames.push(fn),
   };
-  const doc = { getElementById: () => ({ dataset: { width: String(comp[0]), height: String(comp[1]) } }) };
-  new Function('window', 'document', gpuScript(profile))(win, doc);
+  const doc = {
+    getElementById: () => ({
+      dataset: { width: String(comp[0]), height: String(comp[1]) },
+    }),
+  };
+  new Function("window", "document", gpuScript(profile))(win, doc);
   const gpu = win[GPU_GLOBAL] as Gpu;
-  const make = (scaling = Scaling.Adaptive) => gpu.renderer({ WebGLRenderer: FakeRenderer }, { width: comp[0], height: comp[1] }, {}, scaling);
+  const make = (scaling = Scaling.Adaptive) =>
+    gpu.renderer(
+      { WebGLRenderer: FakeRenderer },
+      { width: comp[0], height: comp[1] },
+      {},
+      scaling,
+    );
   const tick = (now: number) => frames.splice(0).forEach((fn) => fn(now));
   return { gpu, make, tick };
 }
 
 const PHONE = { dpr: 3, coarse: true, screen: [390, 844] as [number, number] };
-const LAPTOP = { dpr: 2, coarse: false, screen: [1512, 982] as [number, number] };
+const LAPTOP = {
+  dpr: 2,
+  coarse: false,
+  screen: [1512, 982] as [number, number],
+};
 
-describe('il video esce identico a prima', () => {
-  it('pixel ratio 1, antialias acceso, nessuna preferenza di potenza', () => {
+describe("il video esce identico a prima", () => {
+  it("pixel ratio 1, antialias acceso, nessuna preferenza di potenza", () => {
     const { make } = boot(VIDEO_GPU, PHONE);
     make();
     expect(FakeRenderer.made[0].ratio).toBe(1);
-    expect(FakeRenderer.made[0].options).toEqual({ canvas: expect.any(Object), alpha: true, antialias: true, preserveDrawingBuffer: true });
+    expect(FakeRenderer.made[0].options).toEqual({
+      canvas: expect.any(Object),
+      alpha: true,
+      antialias: true,
+      preserveDrawingBuffer: true,
+    });
   });
 
-  it('il frame lento non abbassa la risoluzione del video', () => {
+  it("il frame lento non abbassa la risoluzione del video", () => {
     const { make, tick } = boot(VIDEO_GPU, PHONE);
     const r = make();
     for (let i = 0; i < 200; i++) {
@@ -61,28 +108,31 @@ describe('il video esce identico a prima', () => {
   });
 });
 
-describe('sullo schermo il renderer è tarato sul dispositivo', () => {
-  it('telefono: risoluzione limitata a DPR 1.25 dello schermo e antialias spento', () => {
+describe("sullo schermo il renderer è tarato sul dispositivo", () => {
+  it("telefono: risoluzione limitata a DPR 1.25 dello schermo e antialias spento", () => {
     const { make } = boot(SCREEN_GPU, PHONE);
     make();
     expect(FakeRenderer.made[0].ratio).toBeCloseTo((844 * 1.25) / 1920, 2);
-    expect(FakeRenderer.made[0].options).toMatchObject({ antialias: false, powerPreference: 'high-performance' });
+    expect(FakeRenderer.made[0].options).toMatchObject({
+      antialias: false,
+      powerPreference: "high-performance",
+    });
   });
 
-  it('laptop: risoluzione piena, antialias acceso', () => {
+  it("laptop: risoluzione piena, antialias acceso", () => {
     const { make } = boot(SCREEN_GPU, LAPTOP);
     make();
     expect(FakeRenderer.made[0].ratio).toBe(1);
     expect(FakeRenderer.made[0].options).toMatchObject({ antialias: true });
   });
 
-  it('un renderer Fixed resta a risoluzione piena', () => {
+  it("un renderer Fixed resta a risoluzione piena", () => {
     const { make } = boot(SCREEN_GPU, PHONE);
     make(Scaling.Fixed);
     expect(FakeRenderer.made[0].ratio).toBe(1);
   });
 
-  it('frame lenti abbassano la risoluzione, il margine la riporta su', () => {
+  it("frame lenti abbassano la risoluzione, il margine la riporta su", () => {
     const { make, tick } = boot(SCREEN_GPU, LAPTOP);
     const r = make();
     let now = 0;
@@ -100,7 +150,7 @@ describe('sullo schermo il renderer è tarato sul dispositivo', () => {
     expect(FakeRenderer.made[0].ratio).toBe(1);
   });
 
-  it('a riposo, senza render, la risoluzione non cambia', () => {
+  it("a riposo, senza render, la risoluzione non cambia", () => {
     const { make, tick } = boot(SCREEN_GPU, LAPTOP);
     make();
     for (let i = 0; i < 200; i++) {
@@ -110,14 +160,16 @@ describe('sullo schermo il renderer è tarato sul dispositivo', () => {
   });
 });
 
-describe('startScale', () => {
-  it('non supera mai la risoluzione di uscita', () => {
-    expect(startScale({ dpr: 3, coarse: false, long: 3000 }, 1920, GPU_PACE)).toBe(1);
+describe("startScale", () => {
+  it("non supera mai la risoluzione di uscita", () => {
+    expect(
+      startScale({ dpr: 3, coarse: false, long: 3000 }, 1920, GPU_PACE),
+    ).toBe(1);
   });
 });
 
-describe('paced', () => {
-  it('scende per gradini e non sotto il pavimento', () => {
+describe("paced", () => {
+  it("scende per gradini e non sotto il pavimento", () => {
     let p = { scale: 1, slow: 0, fast: 0 };
     for (let i = 0; i < 10_000; i++) {
       p = paced(p, 100, 1, GPU_PACE);
@@ -126,7 +178,7 @@ describe('paced', () => {
     expect(p.scale).toBeLessThan(0.5);
   });
 
-  it('non sale oltre il tetto di sessione', () => {
+  it("non sale oltre il tetto di sessione", () => {
     let p = { scale: 0.5, slow: 0, fast: 0 };
     for (let i = 0; i < 10_000; i++) {
       p = paced(p, 5, 0.6, GPU_PACE);
@@ -135,15 +187,34 @@ describe('paced', () => {
   });
 });
 
-describe('lo script del renderer sopravvive alla minificazione della build', () => {
-  it('un bundle minificato installa ancora il renderer nella pagina', async () => {
-    const entry = fileURLToPath(new URL('./gpu.ts', import.meta.url));
-    const out = await build({ entryPoints: [entry], bundle: true, minify: true, format: 'esm', write: false, logLevel: 'silent' });
-    const minified = (await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`)) as typeof import('./gpu');
-    const win: Record<string, unknown> = { devicePixelRatio: 1, screen: { width: 1920, height: 1080 }, matchMedia: () => ({ matches: false }), requestAnimationFrame: () => 0 };
-    const doc = { getElementById: () => ({ dataset: { width: '1920', height: '1080' } }) };
+describe("lo script del renderer sopravvive alla minificazione della build", () => {
+  it("un bundle minificato installa ancora il renderer nella pagina", async () => {
+    const entry = fileURLToPath(new URL("./gpu.ts", import.meta.url));
+    const out = await build({
+      entryPoints: [entry],
+      bundle: true,
+      minify: true,
+      format: "esm",
+      write: false,
+      logLevel: "silent",
+    });
+    const minified = (await import(
+      `data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString("base64")}`
+    )) as typeof import("./gpu");
+    const win: Record<string, unknown> = {
+      devicePixelRatio: 1,
+      screen: { width: 1920, height: 1080 },
+      matchMedia: () => ({ matches: false }),
+      requestAnimationFrame: () => 0,
+    };
+    const doc = {
+      getElementById: () => ({ dataset: { width: "1920", height: "1080" } }),
+    };
 
-    new Function('window', 'document', minified.gpuScript(minified.SCREEN_GPU))(win, doc);
+    new Function("window", "document", minified.gpuScript(minified.SCREEN_GPU))(
+      win,
+      doc,
+    );
 
     expect(win[GPU_GLOBAL]).toMatchObject({ renderer: expect.any(Function) });
   });
