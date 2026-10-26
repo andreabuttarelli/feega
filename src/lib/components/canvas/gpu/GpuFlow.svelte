@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LocalOff, isOff } from '$lib/local-user';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
@@ -3564,7 +3565,7 @@
     <CanvasAddBar
       onpick={addAtCentre}
       onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) ? viewCentre() : undefined) : undefined}
-      oncloud={props.onCloud ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
+      oncloud={props.onCloud && !isOff(LocalOff.CloudImport) ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
       techniques={props.techniques}
       ontechnique={props.onTechnique ? (id) => props.onTechnique?.(id, viewCentre()) : undefined}
@@ -3604,7 +3605,7 @@
       oncompare={() => props.onCompareOutputs?.(selected)}
       onexportcloud={(provider) => props.onCloud?.(provider, CloudMode.Export, selected[0], viewCentre())}
     />
-    {#if props.postAction}
+    {#if props.postAction && !isOff(LocalOff.NextSteps)}
       <NextStepChips postAction={props.postAction} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
     {/if}
   {/if}

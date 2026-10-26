@@ -70,6 +70,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { adoptCommitted, commitHub, rowsOf } from '$lib/canvas/commit-note';
   import { peerTracks } from '$lib/realtime/peer-tracks';
   import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
+  import { LocalOff, isOff } from '$lib/local-user';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
   import CanvasShortcutHelp from '$lib/components/canvas/CanvasShortcutHelp.svelte';
@@ -4019,7 +4020,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }}
     onUserPan={() => (following = null)}
     commenting={commentsPanel.placing}
-    onCommenting={(on) => commentsPanel.place(on)}
+    onCommenting={isOff(LocalOff.Comments) ? undefined : (on) => commentsPanel.place(on)}
     onComment={(at) => commentsPanel.drop(at)}
     commentMarks={(nodeId, fps) => marksFor(commentThreads ?? [], nodeId, fps)}
     onMark={(id) => commentsPanel.focus(id)}
@@ -4329,7 +4330,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <OutputViewer runs={viewing.runs} start={viewing.start} kind={viewing.kind} urlFor={(assetId) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full)} onclose={() => (viewing = null)} />
   {/if}
 
-  {#if selectedIds.length}
+  {#if selectedIds.length && !isOff(LocalOff.PublicLinks)}
     <button type="button" class="copy-link" data-testid="copy-selection-link" onclick={copySelectionLink}>{linkCopied ? 'Link copied' : 'Copy link to selection'}</button>
   {/if}
 

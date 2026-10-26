@@ -17,7 +17,7 @@
   import { BURGER_ENTRIES, mobileNavHref } from '$lib/shell-nav';
   import { page } from '$app/state';
   import { env as publicEnv } from '$env/dynamic/public';
-  import { isLocalMode } from '$lib/local-user';
+  import { LocalOff, isLocalMode, isOff } from '$lib/local-user';
   import { NAV_ICONS } from './nav-icons';
   import Scale from '@lucide/svelte/icons/scale';
   import Flag from '@lucide/svelte/icons/flag';
@@ -135,7 +135,7 @@
       <span class="menu-identity">
         <span class="menu-name">{profile.name ?? profile.email}</span>
         <span class="menu-email">{profile.email}</span>
-        {#if org}
+        {#if org && !isOff(LocalOff.Brand)}
           <span class="menu-org">{org.name}</span>
         {/if}
       </span>

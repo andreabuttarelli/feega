@@ -12,11 +12,26 @@ describe('in modalità locale niente tracciamento', () => {
     expect(localOff(LocalOff.Analytics, { PUBLIC_FEEGA_LOCAL: '1' })).toBe(true);
   });
 
+  it('la chat è spenta in locale e accesa nel cloud', () => {
+    expect(localOff(LocalOff.Chat, { PUBLIC_FEEGA_LOCAL: '1' })).toBe(true);
+    expect(localOff(LocalOff.Chat, {})).toBe(false);
+  });
+
   it('nel cloud restano accesi', () => {
     expect(localOff(LocalOff.CookieBanner, {})).toBe(false);
   });
 
   it('nessun tracker parte, nemmeno su un host di produzione', () => {
     expect(trackingAllowed('feega.app')).toBe(false);
+  });
+});
+
+describe('in locale niente nodi che chiedono il cloud', () => {
+  it('testo, immagine, video e sorgenti online sono spenti, il documento resta', async () => {
+    const { CLOUD_ADDABLE } = await import('./canvas/addable');
+
+    expect(localOff(LocalOff.CloudNodes, { PUBLIC_FEEGA_LOCAL: '1' })).toBe(true);
+    expect(CLOUD_ADDABLE.has('video')).toBe(true);
+    expect(CLOUD_ADDABLE.has('doc')).toBe(false);
   });
 });
