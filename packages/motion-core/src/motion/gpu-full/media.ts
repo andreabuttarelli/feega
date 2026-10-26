@@ -1,5 +1,6 @@
 import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item } from './display-list';
 import type { Picture, Pictures } from './raster';
+import type { VideoFrames } from './video-frames';
 
 const SEEK_SLACK_S = 0.001;
 
@@ -52,7 +53,13 @@ function needed(items: Item[]): ImageItem[] {
   ]);
 }
 
-export function createMedia({ videoPreload = VideoPreload.Auto }: { videoPreload?: VideoPreload } = {}): Media {
+type Options = { videoPreload?: VideoPreload; frames?: VideoFrames };
+
+export type VideoUse = { src: string; time: number; width: number };
+
+export const videoUses = (items: Item[]): VideoUse[] => needed(items).filter((i) => i.video).map((i) => ({ src: i.src, time: i.mediaTime, width: Math.ceil(i.size.width) }));
+
+export function createMedia({ videoPreload = VideoPreload.Auto, frames }: Options = {}): Media {
   const images = new Map<string, Promise<HTMLImageElement>>();
   const videos = new Map<string, Promise<HTMLVideoElement>>();
   const loaded = new Map<string, Picture>();
@@ -64,6 +71,11 @@ export function createMedia({ videoPreload = VideoPreload.Auto }: { videoPreload
     if (!item.video) {
       const img = await imageOf(item.src);
       loaded.set(item.clip, { source: img, size: { width: img.naturalWidth, height: img.naturalHeight } });
+      return;
+    }
+    const decoded = await frames?.at(item.src, item.mediaTime, Math.ceil(item.size.width));
+    if (decoded) {
+      loaded.set(item.clip, { source: decoded.image, size: { width: decoded.width, height: decoded.height } });
       return;
     }
     const video = await videoOf(item.clip, item.src);

@@ -155,6 +155,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   ...OPACITY_PARITY,
   [Command.TogglePlay]: VIEW,
   [Command.Play]: VIEW,
+  [Command.RamPreview]: VIEW,
   [Command.Pause]: VIEW,
   [Command.Rewind]: VIEW,
   [Command.GoStart]: VIEW,

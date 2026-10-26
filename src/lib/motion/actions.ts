@@ -1,5 +1,6 @@
 import type { Component } from 'svelte';
 import Play from '@lucide/svelte/icons/play';
+import MemoryStick from '@lucide/svelte/icons/memory-stick';
 import AlignStartVertical from '@lucide/svelte/icons/align-start-vertical';
 import AlignCenterVertical from '@lucide/svelte/icons/align-center-vertical';
 import AlignEndVertical from '@lucide/svelte/icons/align-end-vertical';
@@ -212,6 +213,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   ...OPACITY_ACTIONS,
   [Command.TogglePlay]: { name: 'Play / pause', icon: Play, group: GuideGroup.Playback, place: Place.Transport },
   [Command.Play]: { name: 'Play', icon: Play, group: GuideGroup.Playback, place: Place.Transport },
+  [Command.RamPreview]: { name: 'RAM preview', icon: MemoryStick, group: GuideGroup.Playback, place: Place.Transport },
   [Command.Pause]: { name: 'Pause', icon: Pause, group: GuideGroup.Playback, place: Place.Transport },
   [Command.Rewind]: { name: 'Back one second', icon: Rewind, group: GuideGroup.Playback, gesture: DRAG_PLAYHEAD, menu: MenuSection.Time },
   [Command.GoStart]: { name: 'Go to start', icon: SkipBack, group: GuideGroup.Playback, place: Place.Transport },
