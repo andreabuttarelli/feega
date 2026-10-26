@@ -39,30 +39,42 @@ describe('safe area shell', () => {
   });
 });
 
-describe('desktop shell without a title bar', () => {
-  async function desktop(probe: (page: import('playwright').Page) => Promise<string>): Promise<string> {
+describe('desktop window without a title bar', () => {
+  const WINDOW_CSS = read('src/lib/styles/desktop-window.css');
+
+  async function style(window: string, markup: string, probe: string, pseudo?: string): Promise<string> {
     const page = await browser.newPage();
-    await page.setContent(`<html data-window="frameless"><style>${SAFE_AREA_CSS}</style><div id="shell" class="safe-shell"></div></html>`);
-    const value = await probe(page);
+    await page.setContent(`<html data-window="${window}"><style>${SAFE_AREA_CSS}${WINDOW_CSS}</style>${markup}</html>`);
+    const value = await page.locator('#probe').evaluate(
+      (el, [prop, pseudoEl]) => getComputedStyle(el, pseudoEl ?? null).getPropertyValue(prop),
+      [probe, pseudo] as const
+    );
     await page.close();
     return value;
   }
 
-  it('keeps shell content below the drag strip', async () => {
-    expect(await desktop((p) => p.locator('#shell').evaluate((el) => getComputedStyle(el).paddingTop))).toBe('28px');
+  it('starts the UI at the top, like the browser', async () => {
+    expect(await style('mac', '<div id="probe" class="safe-shell"></div>', 'padding-top')).toBe('0px');
   });
 
-  it('draws a draggable strip across the top', async () => {
-    const strip = await desktop((p) =>
-      p.evaluate(() => {
-        const s = getComputedStyle(document.body, '::before');
-        return [s.position, s.top, s.height, s.getPropertyValue('app-region')].join(' ');
-      })
-    );
-    expect(strip).toBe('fixed 0px 28px drag');
+  it('drags the window from the canvas bar, clear of the traffic lights', async () => {
+    const bar = '<header id="probe" class="canvas-topbar"><button>x</button></header>';
+    expect(await style('mac', bar, 'app-region')).toBe('drag');
+    expect(await style('mac', bar, 'padding-left')).toBe('80px');
+    expect(await style('overlay', bar, 'padding-right')).toBe('140px');
   });
 
-  it('marks only the Electron shell, never the mobile one or the browser', async () => {
+  it('keeps controls inside a drag area clickable', async () => {
+    expect(await style('mac', '<header class="canvas-topbar"><button id="probe">x</button></header>', 'app-region')).toBe('no-drag');
+  });
+
+  it('gives the sidebar a draggable top under the traffic lights', async () => {
+    const side = '<nav id="probe" class="app-sidebar"></nav>';
+    expect(await style('mac', side, 'app-region', '::before')).toBe('drag');
+    expect(await style('mac', side, 'height', '::before')).toBe('28px');
+  });
+
+  it('marks only the Electron shell, by platform, never the mobile one or the browser', async () => {
     const marker = read('src/app.html').match(/<script>(\(function\(u\)[^<]*data-window[^<]*)<\/script>/)![1];
     const shell = async (userAgent: string) => {
       const context = await browser.newContext({ userAgent });
@@ -72,7 +84,8 @@ describe('desktop shell without a title bar', () => {
       await context.close();
       return value;
     };
-    expect(await shell('Mozilla/5.0 Chrome/140 Electron/38.2.0 Safari/537.36 FeegaNative/0.1.0')).toBe('frameless');
+    expect(await shell('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/140 Electron/38.2.0 FeegaNative/0.1.0')).toBe('mac');
+    expect(await shell('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140 Electron/38.2.0 FeegaNative/0.1.0')).toBe('overlay');
     expect(await shell('Mozilla/5.0 (iPhone) AppleWebKit/605 FeegaNative/1.0')).toBe('browser');
     expect(await shell('Mozilla/5.0 Chrome/140 Safari/537.36')).toBe('browser');
   });

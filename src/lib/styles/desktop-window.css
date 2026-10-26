@@ -1,0 +1,29 @@
+:root[data-window] {
+  --window-drag-h: 28px;
+  --window-lights-w: 80px;
+  --window-controls-w: 140px;
+}
+
+:root[data-window] :is(.canvas-topbar, .app-bar, .visual-pane) {
+  app-region: drag;
+}
+
+:root[data-window] .app-sidebar::before {
+  content: '';
+  flex: 0 0 var(--window-drag-h);
+  height: var(--window-drag-h);
+  margin-bottom: calc(-1 * var(--ui-space-6, 0px));
+  app-region: drag;
+}
+
+:root[data-window] :is(a, button, input, select, textarea, label, [role='button'], [contenteditable]) {
+  app-region: no-drag;
+}
+
+:root[data-window='mac'] :is(.canvas-topbar, .app-bar) {
+  padding-left: var(--window-lights-w);
+}
+
+:root[data-window='overlay'] :is(.canvas-topbar, .app-bar) {
+  padding-right: var(--window-controls-w);
+}
