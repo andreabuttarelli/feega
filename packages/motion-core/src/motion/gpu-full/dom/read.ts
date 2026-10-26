@@ -1,5 +1,6 @@
 import { apply2d, mul2d, type Affine } from "../../affine";
 import { invert2d } from "../../parent";
+import { warpContours, warpMasks, type Warp } from "../warp";
 import {
   ellipseOutline,
   flatten,
@@ -1509,30 +1510,6 @@ function overlapping(items: Drawn[]): boolean {
       ),
   );
 }
-
-type Warp = (p: [number, number]) => [number, number];
-
-const warpContours = (contours: number[][], local: Affine, warp: Warp) => {
-  const back = invert2d(local);
-  return contours.map((c) =>
-    c.flatMap((_, i) =>
-      i % 2 ? [] : apply2d(back, warp(apply2d(local, [c[i], c[i + 1]]))),
-    ),
-  );
-};
-
-const warpMasks = (masks: MaskLayer[] | undefined, warp: Warp) =>
-  masks?.map((m) =>
-    m.cover.kind === CoverKind.Path
-      ? {
-          ...m,
-          cover: {
-            ...m.cover,
-            contours: warpContours(m.cover.contours, m.cover.matrix, warp),
-          },
-        }
-      : m,
-  );
 
 function warpOne(d: Drawn, warp: Warp): Drawn {
   const masks = warpMasks(d.masks, warp);

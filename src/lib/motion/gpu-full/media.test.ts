@@ -38,10 +38,10 @@ describe('image items', () => {
     expect(imageOf(doc, 0, { ...FEEGA_TOKENS, logoUrl: 'https://cdn.test/logo.svg' })).toMatchObject({ src: 'https://cdn.test/logo.svg', fit: 'width', clipped: false });
   });
 
-  it('names a logo with no picture at all, which the HTML engine sets as text', () => {
+  it('waits for the read of a logo with no picture at all, which the HTML engine sets as text', () => {
     const doc = must(addClip(blank, { component: 'Logo', from: 0, durationInFrames: 30 }, 'logo'));
 
-    expect(drawFrame(prepared(doc), 0).unsupported).toContainEqual({ clip: 'logo', component: 'Logo', reason: Unsupported.Text });
+    expect(drawFrame(prepared(doc), 0).unsupported).toContainEqual({ clip: 'logo', component: 'Logo', reason: Unsupported.Unread });
   });
 });
 

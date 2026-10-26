@@ -33,7 +33,14 @@ export const stillFrame = (doc: MotionDoc): number => docStill(doc) ?? restFrame
 
 export const frameOfLive = (live: { doc: Parameters<typeof stillFrame>[0]; playhead?: number }): number => live.playhead ?? stillFrame(live.doc);
 
-export const drawsWhole = (list: DisplayList): boolean => list.unsupported.length === 0 && list.items.length > 0;
+export const drawsAny = (list: DisplayList): boolean => list.items.length > 0;
+
+export function logGaps(id: string, list: DisplayList) {
+  if (!list.unsupported.length) {
+    return;
+  }
+  console.warn('[canvas] core left out of frame', id, list.unsupported.map((g) => `${g.clip} (${g.component}): ${g.detail ?? g.reason}`).join('; '));
+}
 
 const STAGE: Record<FrameKind, Rgba | null> = {
   [FrameKind.Frame]: [0, 0, 0, 1],

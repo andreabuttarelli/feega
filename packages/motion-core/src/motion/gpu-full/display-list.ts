@@ -3,7 +3,9 @@ import { Background, type MotionClip, type MotionDoc } from '../doc';
 import { TrackKind, type ComponentId } from '../components';
 import { animProp, sampleColor, Source, TRANSFORM, ValueKind, type TransformKey } from '../keyframes';
 import { sampleTrack } from '../sample-track';
-import { IDENTITY, ParentOpacity, ancestorsOf, mul2d, transformAt, worldAt, type Affine } from '../parent';
+import { IDENTITY, ParentOpacity, ancestorsOf, localAt, mul2d, transformAt, worldAt, type Affine } from '../parent';
+import { depthOf, turnedInDepth } from './depth';
+import { warpItem } from './warp';
 import { apply2d } from '../affine';
 import { boxOf } from '../layout';
 import { junctionMovesOf, preparedDoc } from '../hyperframes/compose';
@@ -124,7 +126,6 @@ type Env = { clip: MotionClip; animators: TextAnimator[]; onPath: OnPath | null;
 type Painter = (env: Env) => Painted;
 
 const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment']);
-const DEPTH_KEYS: readonly TransformKey[] = ['z', 'rotateX', 'rotateY', 'skewX', 'skewY'];
 const DRAWN_SOURCES: ReadonlySet<Source> = new Set([Source.Transform, Source.Prop, Source.Param]);
 const SAMPLED_IN_PLACE: ReadonlySet<Source> = new Set([Source.Mask]);
 const SOLID_PATTERN = 'solid';
@@ -230,19 +231,22 @@ const framing = (props: Record<string, unknown>): [number, number] => [Number(pr
 
 const picture = (src: string, size: Size, look: Partial<Omit<ImageItem, 'kind' | 'clip' | 'blur' | 'blend' | 'src' | 'size'>>): Content => ({ kind: ItemKind.Image, src, size, video: false, mediaTime: 0, fit: 'cover', focus: [CENTRE, CENTRE], zoom: 1, clipped: true, inner: IDENTITY, opacity: 1, matrix: IDENTITY, ...look });
 
-const imagePainter = ({ props, size, asset }: Env): Painted => {
+const imagePainter = (env: Env): Painted => {
+  const { props, size, asset } = env;
   const src = asset(props.assetId);
-  return src ? [picture(src, size, { fit: String(props.fit), focus: framing(props), zoom: Number(props.zoom ?? 1) })] : Unsupported.Component;
+  return src ? [picture(src, size, { fit: String(props.fit), focus: framing(props), zoom: Number(props.zoom ?? 1) })] : customPainter(env);
 };
 
-const videoPainter = ({ props, size, asset, media }: Env): Painted => {
+const videoPainter = (env: Env): Painted => {
+  const { props, size, asset, media } = env;
   const src = asset(props.assetId);
-  return src ? [picture(src, size, { video: true, mediaTime: media, fit: String(props.fit), focus: framing(props) })] : Unsupported.Component;
+  return src ? [picture(src, size, { video: true, mediaTime: media, fit: String(props.fit), focus: framing(props) })] : customPainter(env);
 };
 
-const logoPainter = ({ props, size, asset, logo }: Env): Painted => {
+const logoPainter = (env: Env): Painted => {
+  const { props, size, asset, logo } = env;
   const src = asset(props.assetId) ?? logo;
-  return src ? [picture(src, size, { fit: 'width', clipped: false })] : Unsupported.Text;
+  return src ? [picture(src, size, { fit: 'width', clipped: false })] : customPainter(env);
 };
 
 const NATIVE_FILLS: ReadonlySet<string> = new Set([PaintKind.Solid, PaintKind.Linear, PaintKind.Radial]);
@@ -327,12 +331,12 @@ function ownLook(content: object, placed: Affine, clip: Looked): Looked {
   };
 }
 
-const customPainter =({ read, clip }: Env): Painted => {
+function customPainter({ read, clip }: Env): Painted {
   if (!read) {
     return Unsupported.Unread;
   }
   return { content: read.drawn.map((d) => contentOf(d, clip.id)), gaps: read.gaps.map((g) => `${g.reason} ${g.element} ×${g.count}`) };
-};
+}
 
 const lensPainter = ({ clip, stage, fps, time, css }: Env): Painted => [{ kind: ItemKind.Lens, lens: lensAt(clip, { ...stage, fps }, Math.round(time * fps), css), opacity: 1, matrix: IDENTITY }];
 
@@ -356,13 +360,12 @@ const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }
   Logo: { place: boxed, paint: logoPainter },
   ...Object.fromEntries(TEXT_COMPONENTS.map((c) => [c, { place: unturned, paint: textPainter }])),
   Custom: { place: fullFrame, paint: customPainter },
+  Composition: { place: fullFrame, paint: customPainter },
   LiquidBlob: { place: fullFrame, paint: lensPainter },
   Device3D: { place: fullFrame, paint: devicePainter }
 };
 
 const SELF_ANIMATED: ReadonlySet<ComponentId> = new Set(['Device3D']);
-
-const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
 
 const MASKED: ReadonlySet<string> = new Set(MASK_KEYS);
 
@@ -375,7 +378,6 @@ const keyframedOutside = (clip: MotionClip) => Object.entries(clip.keyframes).so
 const CLIP_LIMITS: [Unsupported, (clip: MotionClip) => boolean][] = [
   [Unsupported.Component, (clip) => !PAINTERS[clip.component]],
   [Unsupported.Shader, (clip) => clip.shaders.length > 0],
-  [Unsupported.Space3d, (clip) => keyed(clip, DEPTH_KEYS)],
   [Unsupported.Keyframe, (clip) => !SELF_ANIMATED.has(clip.component) && keyframedOutside(clip)]
 ];
 
@@ -502,6 +504,8 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
   const items: Item[] = [];
   const unsupported: Gap[] = [];
 
+  const parentsAt = (clip: MotionClip) => ancestorsOf(doc, clip.id).reduce<Affine>((m, id) => (byId.get(id) ? mul2d(m, localAt(byId.get(id)!, frame, size)) : m), IDENTITY);
+
   function clipItems(clip: MotionClip): Item[] | Unsupported {
     const limit = CLIP_LIMITS.find(([, hit]) => hit(clip));
     if (limit) {
@@ -518,7 +522,12 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     const { content, gaps } = Array.isArray(painted) ? { content: painted, gaps: [] } : painted;
     unsupported.push(...gaps.map((detail) => ({ clip: clip.id, component: clip.component, reason: Unsupported.Dom, detail })));
     const edge = effectiveEdge(clip);
-    const world = mul2d(posed(edge, size.width, size.height), worldAt(doc, clip.id, frame, size));
+    const edged = posed(edge, size.width, size.height);
+    const depth = turnedInDepth(clip) ? depthOf(clip, frame, size, mul2d(edged, parentsAt(clip)), box) : null;
+    if (turnedInDepth(clip) && !depth) {
+      return Unsupported.Space3d;
+    }
+    const world = depth?.world ?? mul2d(edged, worldAt(doc, clip.id, frame, size));
     const masks = maskLayers(clip, frame, size, world, asset);
     const found = filtersOf(clip, frame, doc.fps, size, css);
     if (typeof found === 'string') {
@@ -549,11 +558,12 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
       return own as Content;
     };
     const grouped = content.length > 1 && (Object.keys(extras).length > 0 || alpha < 1 || blur > 0 || clip.blend !== BlendMode.Normal);
+    const projected = (items: Item[]) => (depth ? items.map((i) => warpItem(i, depth.warp)) : items);
     if (!grouped) {
-      return content.map((c) => ({ ...inner(c), opacity: alpha * c.opacity, blur: blur + ownBlur(c), blend: clip.blend, ...extras, ...ownLook(c, placed, extras), ...stenciled(c) }) as Item);
+      return projected(content.map((c) => ({ ...inner(c), opacity: alpha * c.opacity, blur: blur + ownBlur(c), blend: clip.blend, ...extras, ...ownLook(c, placed, extras), ...stenciled(c) }) as Item));
     }
     const items = content.map(inner);
-    return [{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }];
+    return projected([{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }]);
   }
 
   for (const clip of drawable) {

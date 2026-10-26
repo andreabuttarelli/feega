@@ -16,7 +16,7 @@
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentOverlay, SentUses } from '$lib/canvas/core/use-diff';
   import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
-  import { drawsWhole, frameOfLive, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, logGaps, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
@@ -119,6 +119,7 @@
     if (built.custom) {
       customPictures.set(keyOf(f), built.custom.picture);
     }
+    logGaps(f.id, built.list);
     lists = new Map(lists).set(keyOf(f), onStage(built.list, f.kind));
   }
 
@@ -137,6 +138,7 @@
       return;
     }
     const key = `${f.id}:live${generation}`;
+    logGaps(f.id, built.list);
     lists = new Map(lists).set(key, onStage(built.list, f.kind));
     liveGroup = new Map(liveGroup).set(f.id, key);
     liveAtRevision.set(f.id, f.revision);
@@ -190,7 +192,7 @@
   const framePuts = $derived(
     frames.flatMap((f): HeldFrame[] => {
       const list = lists.get(groupOf(f));
-      return list && drawsWhole(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
+      return list && drawsAny(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
     })
   );
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));
@@ -568,7 +570,7 @@
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
 <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {#key backend}
-  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
 {/key}
 
 <style>

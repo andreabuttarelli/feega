@@ -17,10 +17,10 @@ export type BuildAnswer = { id: number; list: DisplayList | null } | { id: numbe
 
 export type BuildWorker = { postMessage: (ask: BuildAsk) => void; onmessage: ((e: MessageEvent<BuildAnswer>) => void) | null; onerror: ((e: ErrorEvent) => void) | null };
 
-const MAIN_THREAD_ONLY: ((doc: MotionDoc) => boolean)[] = [(doc) => readClips(doc).read.length > 0, (doc) => sceneNodeIds(doc).length > 0];
+const MAIN_THREAD_ONLY: ((source: FrameDoc) => boolean)[] = [(source) => readClips(source.doc, source.tokens.logoUrl).read.length > 0, (source) => sceneNodeIds(source.doc).length > 0];
 
 export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: Fonts): Promise<DisplayList | null> {
-  if (MAIN_THREAD_ONLY.some((needs) => needs(source.doc))) {
+  if (MAIN_THREAD_ONLY.some((needs) => needs(source))) {
     return null;
   }
   const faces = await fonts(source.doc, source.assets, source.tokens);
