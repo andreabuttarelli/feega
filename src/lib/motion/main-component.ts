@@ -17,7 +17,10 @@ export enum ComponentAction {
   DefineProp = 'define-prop',
   RemoveProp = 'remove-prop',
   SetProp = 'set-prop',
-  ResetPropValue = 'reset-prop-value'
+  ResetPropValue = 'reset-prop-value',
+  DefineVariant = 'define-variant',
+  SetVariant = 'set-variant',
+  SetPreferred = 'set-preferred'
 }
 
 export const COMPONENT_ACTIONS = Object.values(ComponentAction) as [ComponentAction, ...ComponentAction[]];
