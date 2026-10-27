@@ -219,7 +219,7 @@
           {/if}
           {#if runQuote}
             {#if runQuote.credits !== null}
-              <span class="run-price" data-testid="run-price">{formatPrice(runQuote.credits)}</span>
+              <span class="run-price" data-testid="run-price">{runQuote.variable ? "~" : ""}{formatPrice(runQuote.credits)}</span>
             {:else if runQuote.variable}
               <span class="run-price">variable</span>
             {/if}
