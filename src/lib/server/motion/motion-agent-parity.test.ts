@@ -28,6 +28,7 @@ const DOC: Record<string, Access> = {
   shaders: { write: ['add_custom_effect'], read: 'shaders' },
   markers: { write: ['set_marker', 'remove_marker', 'mark_beats'], read: 'markers' },
   workArea: { write: ['set_work_area'], read: 'workArea' },
+  pointTracks: { write: ['track_point'], read: 'pointTracks' },
   interactive: { write: ['set_interactive', 'apply_interactive_preset', 'declare_var', 'remove_var', 'bind_var', 'unbind_var'], read: 'interactive' },
   style: { write: ['set_style'], read: 'style' },
   script: { write: ['write_script'], read: 'script' },

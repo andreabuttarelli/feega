@@ -131,6 +131,8 @@ import { putInteraction, removeInteraction } from '$lib/motion/prototype/ops';
 import { setFlow } from '$lib/motion/prototype/flows';
 import { MAX_FLOW_NAME } from '@feega/motion-core/motion/prototype/flow';
 import { animateTo } from '$lib/motion/animate-to';
+import { DEFAULT_TRACK } from '@feega/motion-core/motion/tracking/point-tracker';
+import { ApplyMode, applyTrack, trackClip, type LumaReader } from '@feega/motion-core/motion/tracking/track-clip';
 import { IN_OUT_PRESETS, InOutPreset, PresetSide, applyInOut } from '$lib/motion/in-out-presets';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '@feega/motion-core/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '@feega/motion-core/motion/keyframes';
@@ -269,6 +271,8 @@ const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']
 
 const copyTexts = (slots: Record<string, unknown>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
 
+const MAX_SAVED_TRACKS = 20;
+
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing; looks?: Looks };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
@@ -298,6 +302,7 @@ export type MotionToolDeps = {
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   videoBreakdown?: (assetId: string) => Promise<BreakdownAnswer>;
+  trackReader?: (src: string) => LumaReader;
   spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
   renderLink?: (quality: ExportQuality) => Promise<Record<string, unknown>>;
@@ -485,6 +490,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
     flow: doc.flow ?? null,
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
+    pointTracks: Object.fromEntries(Object.entries(doc.pointTracks ?? {}).map(([id, t]) => [id, { clip_id: t.clipId, points: t.points.length, lost: t.lost }])),
     interactive: interactiveOf(doc),
     style: styleOf(doc),
     script: doc.script ?? null,
@@ -1229,6 +1235,51 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const owner = ownerOf(input.clip_id);
         const targets = Object.fromEntries(Object.entries(input.to).map(([prop, value]) => [prop, typeof value === 'number' ? toStored(owner, prop, value, session.doc) : value]));
         return apply(animateTo(session.doc, input.clip_id, targets, { start: frames(input.start), duration: Math.max(1, frames(input.duration)), ease: input.ease }, (c) => c), `animated ${input.clip_id} to ${Object.keys(input.to).join(', ')}`);
+      }
+    }),
+
+    track_point: tool({
+      description: 'Track a point on a Video clip through its frames (normalised cross-correlation on luminance). x and y are px of the video frame as it fills the canvas; time is the second (from the clip start) where the point sits. It follows the point forward to `to` and backward to `from` (default: the whole clip) and returns a track_id for apply_track. feature is the half-size px of the patch matched, search the px it may move between frames.',
+      inputSchema: z.object({ clip_id: z.string(), time: z.number().min(0).default(0), x: z.number(), y: z.number(), from: z.number().min(0).optional(), to: z.number().min(0).optional(), feature: z.number().positive().optional(), search: z.number().positive().optional() }),
+      execute: async (input) => {
+        if (!deps.trackReader) {
+          return UNREADABLE('tracking');
+        }
+        const clip = findClip(session.doc, input.clip_id)?.clip;
+        const src = clip?.component === 'Video' ? deps.assets.find((a) => a.id === clip.props.assetId)?.url : null;
+        if (clip?.component === 'Video' && !src) {
+          return { ok: false, error: `${input.clip_id} has no video asset with a file yet` };
+        }
+        const { width, height } = session.doc;
+        const request = {
+          clipId: input.clip_id,
+          frame: frames(input.time),
+          point: { x: input.x / width, y: input.y / height },
+          range: { from: frames(input.from ?? 0), to: input.to === undefined ? Number.MAX_SAFE_INTEGER : frames(input.to) },
+          options: { feature: input.feature === undefined ? DEFAULT_TRACK.feature : input.feature / width, search: input.search === undefined ? DEFAULT_TRACK.search : input.search / width }
+        };
+        const out = await trackClip(session.doc, request, deps.trackReader(src ?? '')).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }));
+        if (!out.ok) {
+          return out;
+        }
+        const id = deps.newId();
+        const { points } = out.track;
+        const px = (p: { x: number; y: number }) => ({ x: Math.round(p.x * width), y: Math.round(p.y * height) });
+        const kept = Object.entries(session.doc.pointTracks ?? {}).slice(1 - MAX_SAVED_TRACKS);
+        session.doc = { ...session.doc, pointTracks: { ...Object.fromEntries(kept), [id]: out.track } };
+        return { ok: true, track_id: id, frames: points.length, lost: out.track.lost, from: points[0].frame / session.doc.fps, to: points[points.length - 1].frame / session.doc.fps, first: px(points[0]), last: px(points[points.length - 1]), weakest: Math.round(Math.min(...points.map((p) => p.score)) * 100) / 100 };
+      }
+    }),
+
+    apply_track: tool({
+      description: 'Attach a track from track_point to a layer as x/y keyframes. follow: the target sits on the tracked point (plus offset_x/offset_y px), like After Effects Track Motion with an Edit Target. stabilise: use the video clip itself as target and it moves against the point so the point holds still.',
+      inputSchema: z.object({ track_id: z.string(), target_clip_id: z.string(), mode: z.enum(ApplyMode).default(ApplyMode.Follow), offset_x: z.number().default(0), offset_y: z.number().default(0) }),
+      execute: async (input) => {
+        const track = session.doc.pointTracks?.[input.track_id];
+        if (!track) {
+          return { ok: false, error: `no track ${input.track_id}: run track_point first` };
+        }
+        return apply(applyTrack(session.doc, track, { targetClipId: input.target_clip_id, mode: input.mode, offset: { x: input.offset_x, y: input.offset_y } }), `${input.mode} track on ${input.target_clip_id}`);
       }
     }),
 
