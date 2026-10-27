@@ -325,6 +325,9 @@ Viewers see everything and change nothing; free organisations have limited edito
 `model_allowlist` reads which image, video and 3D models the org offers (an empty list means every
 model) and, for admins and only when the user asks, replaces one medium's list: `feega allowlist
 [set <medium> [ids...]]`.
+`org_fonts` lists the fonts uploaded once per org (usable in every frame, code frame and export),
+uploads a local TTF/OTF/WOFF/WOFF2 file and, only when the user asks, deletes a family: `feega fonts
+[upload <file>|delete <family>]`. A deleted font falls back to a system font.
 `spend_caps` reads the org's spend caps (`org_member`, `project_member`, `project_total`, each with an
 optional monthly reset) and, for admins and only when the user asks, sets or removes one: `feega caps
 [set <scope> <usd|off> [--project <id>] [--reset monthly]]`. A run a cap refuses answers `cap_reached`.

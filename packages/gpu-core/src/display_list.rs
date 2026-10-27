@@ -13,13 +13,13 @@ pub enum FillRule {
     Union,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Stop {
     pub at: f32,
     pub color: Rgba,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Paint {
     Solid { color: Rgba },
@@ -184,6 +184,8 @@ pub struct UseItem {
     pub cache: bool,
     #[serde(default)]
     pub hold: bool,
+    #[serde(default)]
+    pub reach: Option<[f64; 4]>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
