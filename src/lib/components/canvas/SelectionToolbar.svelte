@@ -1,12 +1,12 @@
 <script lang="ts">
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
-  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import Maximize2 from '@lucide/svelte/icons/maximize-2';
   import Columns2 from '@lucide/svelte/icons/columns-2';
   import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
   import Square from '@lucide/svelte/icons/square';
   import { isFrameDialogAction } from '$lib/canvas/frame-dialogs';
-  import { actionsIn, enabledFor, shownFor, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import { actionsIn, enabledFor, shownFor, toolbarSlots, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
   import { commonPropertiesOf, dynamicParamsOf, type GenPropertyType } from '$lib/canvas/common-properties';
@@ -19,7 +19,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-  import CreditAmount from '$lib/components/CreditAmount.svelte';
+  import { formatPrice } from '$lib/components/credit-amount-format';
   import { cn } from '$lib/utils.js';
   import ModelMenu from './ModelMenu.svelte';
   import VariantsMenu from './VariantsMenu.svelte';
@@ -130,6 +130,7 @@
   const secondary = $derived(actionsIn('secondary', count).filter((a) => shownFor(a.id, nodeSummaries)));
   const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameDialogAction(a.id))));
   const danger = $derived(actionsIn('danger', count));
+  const slots = $derived(toolbarSlots([...secondary, ...overflow, ...danger]));
 
   function gateOf(action: SelectionAction) {
     return enabledFor(action.id, nodeSummaries, edges, stale);
@@ -217,21 +218,20 @@
             <VariantsMenu quote={runQuote.variants} onchange={(patch) => onpropertychange?.(patch)} />
           {/if}
           {#if runQuote}
+            {#if runQuote.credits !== null}
+              <span class="run-price" data-testid="run-price">{formatPrice(runQuote.credits)}</span>
+            {:else if runQuote.variable}
+              <span class="run-price">variable</span>
+            {/if}
             <Tooltip.Root>
               <Tooltip.Trigger>
                 {#snippet child({ props })}
-                  <Button {...props} size="sm" class="h-11 md:h-8" data-control="run" disabled={!runQuote.enabled} onclick={() => onrun?.()}>
-                    <Sparkles strokeWidth={1.8} />
-                    {runLabelOf(runQuote)}
-                    {#if runQuote.credits !== null}
-                      <span class="opacity-70">· <CreditAmount amount={runQuote.credits} approx /></span>
-                    {:else if runQuote.variable}
-                      <span class="opacity-70">· variable cost</span>
-                    {/if}
+                  <Button {...props} size="icon-sm" class="size-11 rounded-full md:size-8" data-control="run" aria-label={runLabelOf(runQuote)} disabled={!runQuote.enabled} onclick={() => onrun?.()}>
+                    <ArrowUp strokeWidth={2.25} />
                   </Button>
                 {/snippet}
               </Tooltip.Trigger>
-              <Tooltip.Content side="top">{runQuote.reason ?? 'Run this node'}</Tooltip.Content>
+              <Tooltip.Content side="top">{runQuote.reason ?? runLabelOf(runQuote)}</Tooltip.Content>
             </Tooltip.Root>
             {#if variantsInFlight > 0}
               <Button size="sm" variant="secondary" class="h-11 md:h-8" data-control="cancel-variants" onclick={() => oncancelvariants?.()}>
@@ -255,82 +255,74 @@
           <span class="count">{count} selected</span>
         {/if}
         {#if viewable}
-          <Button variant="ghost" size="sm" class="h-11 md:h-8" data-testid="view-output" onclick={() => onview?.()}>
+          <Button variant="ghost" size="icon-sm" class={ICON_BUTTON} aria-label="View" title="View" data-testid="view-output" onclick={() => onview?.()}>
             <Maximize2 strokeWidth={1.7} />
-            View
           </Button>
         {/if}
         {#if comparable}
-          <Button variant="ghost" size="sm" class="h-11 md:h-8" data-testid="compare-outputs" onclick={() => oncompare?.()}>
+          <Button variant="ghost" size="icon-sm" class={ICON_BUTTON} aria-label="Compare" title="Compare" data-testid="compare-outputs" onclick={() => oncompare?.()}>
             <Columns2 strokeWidth={1.7} />
-            Compare
           </Button>
         {/if}
-        {#each secondary as action (action.id)}
+        {#each slots.pinned as action (action.id)}
           {@render iconAction(action, '')}
         {/each}
-        {#if exportable}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger>
-              {#snippet child({ props })}
-                <Button {...props} variant="ghost" size="icon-sm" class={ICON_BUTTON} aria-label="Export to cloud" data-testid="export-cloud-menu">
-                  <Cloud strokeWidth={1.7} />
-                </Button>
-              {/snippet}
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end" class="w-48">
-              {#each CLOUD_PROVIDERS as provider (provider)}
-                <DropdownMenu.Item class="min-h-11 md:min-h-8" data-testid={`export-${provider}`} onSelect={() => onexportcloud?.(provider)}>Export to {PROVIDER_LABEL[provider]}</DropdownMenu.Item>
-              {/each}
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
-        {/if}
-        {#if oncolourchange}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger>
-              {#snippet child({ props })}
-                <Button {...props} variant="ghost" size="icon-sm" class={ICON_BUTTON} aria-label="Colour tag" data-testid="colour-tag-menu">
-                  <span class="tag-dot" style={`--tag:${sharedColour ? COLOUR_TAG_HEX[sharedColour] : 'transparent'}`}></span>
-                </Button>
-              {/snippet}
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end" class="w-auto p-2">
-              <div class="tag-row">
-                {#each COLOUR_TAGS as tag (tag)}
-                  <DropdownMenu.Item class="tag-pick" aria-label={`Tag ${tag}`} data-testid={`colour-tag-${tag}`} onSelect={() => oncolourchange(tag)}>
-                    <span class="tag-dot" style={`--tag:${COLOUR_TAG_HEX[tag]}`}></span>
-                  </DropdownMenu.Item>
-                {/each}
-                <DropdownMenu.Item class="tag-pick" aria-label="Clear tag" data-testid="colour-tag-clear" onSelect={() => oncolourchange(null)}>
-                  <span class="tag-dot"></span>
-                </DropdownMenu.Item>
-              </div>
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
-        {/if}
-        {#if overflow.length}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger>
-              {#snippet child({ props })}
-                <Button {...props} variant="ghost" size="icon-sm" class={ICON_BUTTON} aria-label="More actions">
-                  <Ellipsis strokeWidth={1.7} />
-                </Button>
-              {/snippet}
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end" class="w-48">
-              {#each overflow as action (action.id)}
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger>
+            {#snippet child({ props })}
+              <Button {...props} variant="ghost" size="icon-sm" class={ICON_BUTTON} aria-label="More actions" data-testid="more-actions">
+                <Ellipsis strokeWidth={1.7} />
+              </Button>
+            {/snippet}
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content align="end" class="w-56">
+            {#each slots.overflow as action (action.id)}
+              {@const Icon = SELECTION_ACTION_ICON[action.id]}
+              {@const gate = gateOf(action)}
+              <DropdownMenu.Item class="min-h-11 md:min-h-8" disabled={!gate.enabled} title={gate.reason} onSelect={() => onaction?.(action.id)}>
+                <Icon strokeWidth={1.7} />
+                {action.label}
+              </DropdownMenu.Item>
+            {/each}
+            {#if exportable}
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger class="min-h-11 md:min-h-8" data-testid="export-cloud-menu"><Cloud strokeWidth={1.7} />Export to cloud</DropdownMenu.SubTrigger>
+                <DropdownMenu.SubContent class="z-50 w-48 rounded-md bg-ui-raised p-1 shadow-ui-float">
+                  {#each CLOUD_PROVIDERS as provider (provider)}
+                    <DropdownMenu.Item class="min-h-11 md:min-h-8" data-testid={`export-${provider}`} onSelect={() => onexportcloud?.(provider)}>{PROVIDER_LABEL[provider]}</DropdownMenu.Item>
+                  {/each}
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
+            {/if}
+            {#if oncolourchange}
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger class="min-h-11 md:min-h-8" data-testid="colour-tag-menu"><span class="tag-dot" style={`--tag:${sharedColour ? COLOUR_TAG_HEX[sharedColour] : 'transparent'}`}></span>Colour tag</DropdownMenu.SubTrigger>
+                <DropdownMenu.SubContent class="z-50 w-auto rounded-md bg-ui-raised p-2 shadow-ui-float">
+                  <div class="tag-row">
+                    {#each COLOUR_TAGS as tag (tag)}
+                      <DropdownMenu.Item class="tag-pick" aria-label={`Tag ${tag}`} data-testid={`colour-tag-${tag}`} onSelect={() => oncolourchange(tag)}>
+                        <span class="tag-dot" style={`--tag:${COLOUR_TAG_HEX[tag]}`}></span>
+                      </DropdownMenu.Item>
+                    {/each}
+                    <DropdownMenu.Item class="tag-pick" aria-label="Clear tag" data-testid="colour-tag-clear" onSelect={() => oncolourchange(null)}>
+                      <span class="tag-dot"></span>
+                    </DropdownMenu.Item>
+                  </div>
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
+            {/if}
+            {#if slots.danger.length}
+              <DropdownMenu.Separator />
+              {#each slots.danger as action (action.id)}
                 {@const Icon = SELECTION_ACTION_ICON[action.id]}
-                <DropdownMenu.Item class="min-h-11 md:min-h-8" disabled={!gateOf(action).enabled} onSelect={() => onaction?.(action.id)}>
+                <DropdownMenu.Item class="min-h-11 md:min-h-8" variant="destructive" data-testid={`action-${action.id}`} onSelect={() => onaction?.(action.id)}>
                   <Icon strokeWidth={1.7} />
                   {action.label}
                 </DropdownMenu.Item>
               {/each}
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
-        {/if}
-        {#each danger as action (action.id)}
-          {@render iconAction(action, 'hover:text-destructive')}
-        {/each}
+            {/if}
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
       </div>
     </Tooltip.Provider>
   </div>
@@ -348,9 +340,38 @@
     transform: translate(-50%, calc(-100% - var(--toolbar-gap))) scale(var(--toolbar-scale, 1));
     padding: 4px;
     font-family: var(--sans);
-    background: var(--ui-panel);
-    border: 1px solid var(--ui-divider-strong);
-    box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
+    background: var(--ui-raised);
+    border: 1px solid var(--ui-divider);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-float);
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 4px;
+    max-width: min(560px, calc(100vw - 16px));
+  }
+
+  .group {
+    min-height: 32px;
+  }
+
+  .group[aria-label='Actions'] {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    padding: 4px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--ui-divider);
+  }
+
+  .toolbar :global(button:disabled) {
+    opacity: 0.35;
+  }
+
+  .toolbar :global(button),
+  .toolbar :global([data-control]) {
+    border-radius: var(--ui-radius-md);
   }
 
   @media (max-width: 767px) {
@@ -400,6 +421,14 @@
     .group[aria-label='Actions'] {
       justify-content: space-between;
     }
+  }
+
+  .run-price {
+    padding: 0 2px 0 4px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ui-text-secondary);
+    white-space: nowrap;
   }
 
   .tag-row {

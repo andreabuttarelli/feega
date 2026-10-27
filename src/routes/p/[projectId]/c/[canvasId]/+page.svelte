@@ -195,6 +195,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
   import { snapAspectRatio, snapResolution } from '$lib/canvas/gen-node';
+  import { outputTabUrl } from '$lib/canvas/open-output';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import { snapDynamicParams } from '$lib/canvas/model-params';
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
@@ -3865,6 +3867,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   const canvasMode = $derived(canvasModeFor(data.org.role));
   const viewOnly = $derived(canvasMode === CanvasMode.View);
+
+  function openOutput(id: string) {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const url = gen ? outputTabUrl({ projectId: data.projectId, canvasId: data.canvas.id }, gen) : null;
+    if (url) {
+      window.open(url, '_blank', 'noopener');
+    }
+  }
 </script>
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
@@ -3977,6 +3988,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onResize={resize}
     onPlace={storeSize}
     onRename={renameNode}
+    onNodeDoubled={openOutput}
     onConnect={connect}
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}
@@ -4147,6 +4159,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             example={exampleFor(row)}
             skills={skillShelf.list}
             onsaveskill={(name, body) => saveSkill(data.projectId, name, body)}
+            {selected}
+            thumbUrl={(mediaId) => canvasAssetUrl(data.projectId, data.canvas.id, mediaId, AssetSize.Thumb)}
           >
             {#snippet result({ refId, text })}
               <!-- `/c/<tela>/assets/<id>` firma lo storage al volo: un URL firmato messo qui
@@ -4155,7 +4169,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
               {#if row.data.outputUncensored === true}
                 <span class="uncensored-output" data-testid="uncensored-output">Uncensored</span>
               {/if}
-              <span class="ai-generated-mark" data-testid="ai-generated-mark">AI-generated</span>
               {#if gen.medium === 'text'}
                 <div class="gen-text-wrap">
                   <div class="gen-text-toggle" role="group" aria-label="Vista del testo">
@@ -4192,11 +4205,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
               {:else if gen.medium === 'video'}
                 <LiveVideo src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} {selected} controls />
                 <div class="gen-download">
+                  <a class="gen-open nodrag" href={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} target="_blank" rel="noopener" aria-label="Open full size in a new tab" title="Open full size in a new tab" data-testid="open-output"><ExternalLink size={14} strokeWidth={1.75} /></a>
                   <NodeDownload kind="video" sourceUrl={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {:else}
                 <TieredImage src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} alt={gen.prompt} />
                 <div class="gen-download">
+                  <a class="gen-open nodrag" href={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} target="_blank" rel="noopener" aria-label="Open full size in a new tab" title="Open full size in a new tab" data-testid="open-output"><ExternalLink size={14} strokeWidth={1.75} /></a>
                   <NodeDownload kind="image" sourceUrl={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {/if}
@@ -4453,9 +4468,32 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   .gen-download {
     position: absolute;
-    top: 6px;
-    right: 6px;
+    top: 8px;
+    right: 8px;
     z-index: 5;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity var(--ui-dur-fast) ease;
+  }
+  :global(.gen:hover) .gen-download,
+  .gen-download:focus-within {
+    opacity: 1;
+  }
+  .gen-open {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--ui-radius-md);
+    background: color-mix(in srgb, var(--ui-raised) 88%, transparent);
+    color: var(--ui-text);
+    box-shadow: var(--ui-shadow-float);
+    backdrop-filter: blur(8px);
+  }
+  .gen-open:hover {
+    background: var(--ui-raised);
   }
 
   .gen-text-wrap {
@@ -4584,18 +4622,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     border: none;
     text-decoration: underline;
     cursor: pointer;
-  }
-  .ai-generated-mark {
-    position: absolute;
-    bottom: 6px;
-    left: 6px;
-    z-index: 2;
-    padding: 0 4px;
-    font-size: 0.625rem;
-    line-height: 1rem;
-    color: var(--paper, #fff);
-    background: rgb(0 0 0 / 0.6);
-    pointer-events: none;
   }
   .uncensored-output {
     position: absolute;

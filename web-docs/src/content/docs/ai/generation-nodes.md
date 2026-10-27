@@ -13,6 +13,7 @@ A generation node holds a prompt, a model and its result. Its `type` is one of `
 - **Video is queued.** A video comes back `queued` and lands later; the node stays `running`.
 - **Models.** `wiro/` and `higgsfield/` models run on those providers and are always queued. An organization can restrict models: see [Model allow-list](/ai/model-allow-list/).
 - **Model menu.** Makers come first (Google, ByteDance, Black Forest Labs…); hover or arrow into one to see its models. When more than one API serves a model, a third level lets you pick Auto or a specific provider, each marked `$`, `$$` or `$$$` relative to the others at your current settings. Search filters models directly.
+- **Full size.** Double-click a generated image or video, or use the open button next to download, to open the original file in a new tab.
 - **Cost preview.** The Generate button shows the credits the run will cost with the chosen model, provider, duration, resolution and variants, and updates as you change them. Each provider is priced at its own rate for that resolution; Auto shows the price of the provider it will actually use.
 - **Loops.** `run_node_loop` queues every combination of a node's inputs; `preview_node_loop` is free; more than 50 needs confirmation and more than 1000 is refused.
 - **Images.** Remove background and 2×/4× upscale from the image toolbar.

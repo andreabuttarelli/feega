@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Check from '@lucide/svelte/icons/check';
+  import Search from '@lucide/svelte/icons/search';
   import type { GenMedium, GenParams, ModelChoice } from '$lib/canvas/gen-node';
   import { modelGroupsOf, RECOMMENDED_GROUP, TIER_LABEL } from '$lib/canvas/model-picker';
   import { AUTO_ROUTE, routeOf, routeStatsLabel } from '$lib/canvas/model-routes';
@@ -27,7 +28,8 @@
     onselect: (id: string, provider: string | null) => void;
   } = $props();
 
-  const SUB_MENU = 'z-50 w-64 max-h-96 overflow-y-auto rounded-md bg-ui-raised text-ui-text shadow-ui-float';
+  const ROW = 'data-highlighted:bg-foreground/10 data-[state=open]:bg-foreground/10';
+  const SUB_MENU = 'z-50 w-64 max-h-96 overflow-y-auto rounded-md bg-ui-raised p-1 text-ui-text shadow-ui-float';
 
   let open = $state(false);
   let query = $state('');
@@ -77,11 +79,15 @@
   {@const tiers = medium ? routeTiers(choice, medium, params) : {}}
   {#each choice.routes ?? [] as route (route.provider)}
     {@const chosen = choice.id === value && (provider ?? AUTO_ROUTE) === route.provider}
-    <DropdownMenu.Item class="items-start" data-testid={`route-${route.provider}`} onSelect={() => pick(choice.id, route.provider)}>
+    <DropdownMenu.Item class="items-start {ROW}" data-testid={`route-${route.provider}`} onSelect={() => pick(choice.id, route.provider)}>
       <span class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span class="flex items-center gap-2">
           <span class="truncate font-medium">{route.provider === AUTO_ROUTE ? 'Auto' : route.label}</span>
-          <span class="ml-auto font-mono text-[0.6875rem] text-muted-foreground" data-testid={`tier-${route.provider}`}>{tiers[route.provider] ?? ''}</span>
+          {#if tiers[route.provider]}
+            <span class="ml-auto font-mono text-[0.6875rem] tracking-wide" data-testid={`tier-${route.provider}`} aria-label={`Price tier ${tiers[route.provider]}`}>
+              <span class="text-foreground">{tiers[route.provider]}</span><span class="text-muted-foreground/40">{'$$$'.slice(tiers[route.provider].length)}</span>
+            </span>
+          {/if}
         </span>
         {#if routeStatsLabel(route)}
           <span class="truncate text-[0.6875rem] {route.stats?.healthy === false ? 'text-destructive' : 'text-muted-foreground'}">{routeStatsLabel(route)}</span>
@@ -96,20 +102,20 @@
   {@const chosen = choice.id === value}
   {#if routed(choice)}
     <DropdownMenu.Sub>
-      <DropdownMenu.SubTrigger data-testid={`model-${choice.id}`}>
+      <DropdownMenu.SubTrigger class={ROW} data-testid={`model-${choice.id}`}>
         <span class="truncate">{choice.label}</span>
         {@render badges(choice)}
         {#if chosen}<Check class="ml-auto size-3.5" aria-hidden="true" />{/if}
       </DropdownMenu.SubTrigger>
       <DropdownMenu.Portal>
         <DropdownMenu.SubContent class={SUB_MENU} data-testid="route-menu">
-          <DropdownMenu.Label class="text-[0.6875rem] text-muted-foreground">Run {choice.label} on</DropdownMenu.Label>
+            <DropdownMenu.Label class="px-2 pt-1.5 pb-1 text-[0.6875rem] font-medium tracking-wide text-muted-foreground uppercase">Run on</DropdownMenu.Label>
           {@render routes(choice)}
         </DropdownMenu.SubContent>
       </DropdownMenu.Portal>
     </DropdownMenu.Sub>
   {:else}
-    <DropdownMenu.Item data-testid={`model-${choice.id}`} onSelect={() => pick(choice.id, null)}>
+    <DropdownMenu.Item class={ROW} data-testid={`model-${choice.id}`} onSelect={() => pick(choice.id, null)}>
       <span class="truncate">{choice.label}</span>
       {@render badges(choice)}
       <Check class="ml-auto size-3.5 {chosen ? '' : 'invisible'}" aria-hidden="true" />
@@ -121,7 +127,7 @@
   <DropdownMenu.Trigger
     aria-label="Model"
     data-control="model"
-    class="{CONTROL_HEIGHT} inline-flex max-w-72 min-w-0 items-center gap-1.5 rounded-sm border border-line-2 bg-background px-2 text-left text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-expanded:bg-muted"
+    class="{CONTROL_HEIGHT} inline-flex max-w-56 min-w-0 items-center gap-1.5 rounded-sm border border-line-2 bg-background px-2 text-left text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-expanded:bg-muted"
   >
     {#if mixed}
       <span class="truncate">{MIXED_TEXT}</span>
@@ -129,21 +135,23 @@
       <ProviderIcon provider={current.provider} />
       <span class="truncate font-medium">{current.label}</span>
       {#if currentRoute}<span class="shrink-0 text-muted-foreground" data-testid="route-trigger">· {currentRoute.provider === AUTO_ROUTE ? 'Auto' : currentRoute.label}</span>{/if}
-      {@render badges(current)}
     {:else}
       <span class="truncate text-muted-foreground">Choose model</span>
     {/if}
     <ChevronDown class="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
   </DropdownMenu.Trigger>
-  <DropdownMenu.Content class="w-64 max-h-[28rem]" data-testid="model-menu">
-    <input
-      type="search"
-      class="mb-1 h-9 w-full rounded-sm border border-line-2 bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      aria-label="Search model"
-      placeholder="Search model…"
-      bind:value={query}
-      onkeydown={searchKeys}
-    />
+  <DropdownMenu.Content class="w-64 max-h-[28rem] p-1.5" data-testid="model-menu">
+    <label class="mb-1 flex h-9 items-center gap-2 rounded-sm bg-muted/60 px-2 text-muted-foreground focus-within:ring-2 focus-within:ring-ring">
+      <Search class="size-3.5 shrink-0" aria-hidden="true" />
+      <input
+        type="search"
+        class="h-full w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+        aria-label="Search model"
+        placeholder="Search models…"
+        bind:value={query}
+        onkeydown={searchKeys}
+      />
+    </label>
     {#if query.trim()}
       {#each matches as choice (choice.id)}
         {@render model(choice)}
@@ -153,12 +161,13 @@
     {:else}
       {#each groups as group (group.id)}
         <DropdownMenu.Sub>
-          <DropdownMenu.SubTrigger data-testid={`family-${group.id}`}>
+          <DropdownMenu.SubTrigger class={ROW} data-testid={`family-${group.id}`}>
             {#if group.id !== RECOMMENDED_GROUP}<ProviderIcon provider={group.id} />{/if}
             <span class="truncate">{group.label}</span>
           </DropdownMenu.SubTrigger>
           <DropdownMenu.Portal>
             <DropdownMenu.SubContent class={SUB_MENU}>
+              <DropdownMenu.Label class="px-2 pt-1.5 pb-1 text-[0.6875rem] font-medium tracking-wide text-muted-foreground uppercase">{group.label}</DropdownMenu.Label>
               {#each group.items as entry (entry.value)}
                 {@const choice = byId.get(entry.value)}
                 {#if choice}{@render model(choice)}{/if}

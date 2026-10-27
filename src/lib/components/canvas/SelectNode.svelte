@@ -337,6 +337,7 @@
     flex: none;
     width: 8px;
     height: 8px;
+    border-radius: var(--ui-radius-full, 9999px);
     background: var(--port);
   }
   .select-output-label {

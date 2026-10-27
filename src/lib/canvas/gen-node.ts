@@ -265,8 +265,8 @@ export function promptTooLong(prompt: string, choice: ModelChoice): boolean {
  */
 const GEN_NODE_SIZES: Record<GenMedium, { w: number; h: number }> = {
   text: { w: 360, h: 220 },
-  image: { w: 360, h: 460 },
-  video: { w: 360, h: 460 },
+  image: { w: 360, h: 360 },
+  video: { w: 448, h: 252 },
   audio: { w: 360, h: 320 },
   model3d: { w: 360, h: 420 }
 };
