@@ -27,7 +27,7 @@ export type PlayerConfig = {
   keys: { x: string; y: string; down: string; hover: string; tiltX: string; tiltY: string; scroll: string; time: string };
 };
 
-type PlayerEl = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; iframeElement?: HTMLIFrameElement };
+type PlayerEl = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; iframeElement?: HTMLIFrameElement; drive?: (inputs: { values: Record<string, number | undefined>; vars: VarValues }) => void; linkAt?: (x: number, y: number) => string | null };
 type Bridge = { postMessage: (message: string) => void };
 type Orientation = typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> };
 
@@ -37,6 +37,7 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
   const el = document.getElementById('player') as PlayerEl;
   const pad = document.getElementById('pad') as HTMLElement;
   const values: Record<string, number> = {};
+  const blank = Object.fromEntries(Object.values(cfg.keys).map((k) => [k, undefined]));
   let vars: VarValues = Object.fromEntries(cfg.vars.map((d) => [d.name, d.default]));
   const started = performance.now();
   let ready = false;
@@ -47,7 +48,10 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
   let pending: (() => void) | null = null;
 
   const clamp = (v: number) => Math.max(-1, Math.min(1, v));
-  const post = () => el.iframeElement?.contentWindow?.postMessage({ type: cfg.inputMessage, values, vars }, '*');
+  const post = () => {
+    el.iframeElement?.contentWindow?.postMessage({ type: cfg.inputMessage, values, vars }, '*');
+    el.drive?.({ values: { ...blank, ...values }, vars });
+  };
   const send = (event: object) => el.iframeElement?.contentWindow?.postMessage({ type: cfg.eventMessage, ...event }, '*');
   const play = () => {
     if (ready && !playing) {
@@ -87,6 +91,7 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
     values[cfg.keys.y] = (e.clientY - box.top) / box.height;
     values[cfg.keys.hover] = 1;
     send({ kind: e.type, x: values[cfg.keys.x], y: values[cfg.keys.y] });
+    pad.style.cursor = el.linkAt?.(values[cfg.keys.x], values[cfg.keys.y]) ? 'pointer' : '';
   };
   const key = (e: KeyboardEvent) => send({ kind: e.type, key: e.key, code: e.code });
   const askTilt = () => {
@@ -112,7 +117,15 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
   });
   addEventListener('keydown', key);
   addEventListener('keyup', key);
+  pad.addEventListener('click', (e) => {
+    const box = content();
+    const url = el.linkAt?.((e.clientX - box.left) / box.width, (e.clientY - box.top) / box.height);
+    if (url) {
+      openLink(url);
+    }
+  });
   pad.addEventListener('pointerleave', () => {
+    pad.style.cursor = '';
     delete values[cfg.keys.x];
     delete values[cfg.keys.y];
     values[cfg.keys.hover] = 0;

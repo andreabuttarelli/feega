@@ -209,3 +209,114 @@ describe('runtime variables from the host', () => {
     expect(events(PlayerEvent.Vars)).toHaveLength(0);
   });
 });
+
+describe('a gpu-core player element', () => {
+  type Driven = { values: Record<string, number>; vars: Record<string, unknown> };
+  let tick: FrameRequestCallback = () => undefined;
+  let drive: Spy;
+  let linkAt: Spy;
+  const driven = () => drive.mock.lastCall?.[0] as Driven;
+
+  function mountGpu(playback: string = PlayMode.Paused): void {
+    document.body.innerHTML = '<div id="stage"><div id="player"></div><div id="pad"></div></div>';
+    el = document.getElementById('player') as Fake;
+    drive = vi.fn();
+    linkAt = vi.fn(() => null);
+    Object.assign(el, { seek: vi.fn(), play: vi.fn(), pause: vi.fn(), drive, linkAt });
+    vi.spyOn(document.getElementById('pad')!, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 1920, height: 1080, right: 1920, bottom: 1080, x: 0, y: 0, toJSON: () => ({}) });
+    playerMain(config(playback), readHost, selfScroll, fitBox, gestureScrub, coerceVars);
+  }
+
+  const pad = () => document.getElementById('pad')!;
+  const pointer = (type: string, x: number, y: number) => pad().dispatchEvent(Object.assign(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true }), { pointerId: 1 }));
+
+  beforeEach(() => {
+    vi.mocked(window.requestAnimationFrame).mockImplementation((fn) => ((tick = fn), 0));
+  });
+
+  it('hands hover and the pointer position to the element, not to an iframe', () => {
+    mountGpu();
+    pointer('pointermove', 960, 270);
+    tick(0);
+
+    expect(driven().values).toMatchObject({ 'pointer.x': 0.5, 'pointer.y': 0.25, hover: 1 });
+  });
+
+  it('hands a press and its release to the element', () => {
+    mountGpu();
+    pointer('pointerdown', 100, 100);
+    tick(0);
+    expect(driven().values['pointer.down']).toBe(1);
+
+    pointer('pointerup', 100, 100);
+    tick(16);
+    expect(driven().values['pointer.down']).toBe(0);
+  });
+
+  it('clears hover when the pointer leaves', () => {
+    mountGpu();
+    pointer('pointermove', 100, 100);
+    pointer('pointerleave', 100, 100);
+    tick(0);
+
+    expect(driven().values.hover).toBe(0);
+    expect(driven().values['pointer.x']).toBeUndefined();
+  });
+
+  it('hands the scroll story progress to the element and seeks the timeline', () => {
+    mountGpu(PlayMode.Scrub);
+    ready();
+    host({ progress: 0.4 });
+    tick(0);
+
+    expect(driven().values.scroll).toBe(0.4);
+    expect(el.seek).toHaveBeenLastCalledWith(4);
+  });
+
+  it('hands the variables to the element', () => {
+    mountGpu();
+    host({ vars: { speed: 3 } });
+    tick(0);
+
+    expect(driven().vars).toEqual({ speed: 3, label: 'Hi' });
+  });
+
+  it('feeds real time to the element', () => {
+    mountGpu();
+    tick(0);
+
+    expect(driven().values.time).toBeGreaterThanOrEqual(0);
+  });
+
+  it('opens the link under a click, and shows a pointer cursor over it', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    mountGpu();
+    linkAt.mockReturnValue('https://feega.app/pricing');
+    pointer('pointermove', 960, 540);
+    pointer('click', 960, 540);
+
+    expect(linkAt).toHaveBeenLastCalledWith(0.5, 0.5);
+    expect(pad().style.cursor).toBe('pointer');
+    expect(open).toHaveBeenCalledWith('https://feega.app/pricing', '_blank', 'noopener');
+  });
+
+  it('hands the link to a host that claimed links', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    mountGpu();
+    host({ links: 'host' });
+    linkAt.mockReturnValue('https://feega.app/pricing');
+    pointer('click', 960, 540);
+
+    expect(open).not.toHaveBeenCalled();
+    expect(events(PlayerEvent.Link)).toEqual([expect.objectContaining({ url: 'https://feega.app/pricing' })]);
+  });
+
+  it('does nothing on a click over no link', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    mountGpu();
+    pointer('click', 10, 10);
+
+    expect(open).not.toHaveBeenCalled();
+    expect(pad().style.cursor).toBe('');
+  });
+});

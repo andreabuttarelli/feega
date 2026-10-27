@@ -36,6 +36,10 @@ seedNode }`: `page` è già loggato, `session` porta `orgId`/`projectId`/`canvas
 `admin` è un client service-role per scrivere una precondizione (un nodo, un asset) prima che il
 browser apra la pagina, `seedNode` è la scorciatoia per un nodo canvas.
 
+## Interactive embed
+
+`interactive-embed.spec.ts` opens a landing page whose hero is an interactive video in the hosted embed, and checks hover, click, scroll and a link. It needs the page built outside Playwright (Playwright cannot import motion-core): `npx vite-node tests/e2e/fixtures/build-lumen.ts <dir> http://localhost:<port>`, then `E2E_BASE_URL=http://localhost:<port> LUMEN_DIR=<dir> npx playwright test interactive-embed`. `HERO_ENGINE=hyperframes` with a page built from an older `bundle.ts` runs the same checks on the previous engine. Without `LUMEN_DIR` it skips.
+
 ## What is covered
 
 | Target | Assertion style |

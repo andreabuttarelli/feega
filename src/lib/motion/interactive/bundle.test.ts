@@ -8,10 +8,11 @@ import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { LIVE_GLOBAL } from '@feega/motion-core/motion/interactive/runtime';
 import { Liveness, PlayMode } from '@feega/motion-core/motion/interactive/settings';
 import { InteractivePreset, applyInteractivePreset } from './presets';
-import { SELF_SCROLL, STANDALONE_MS, embedSettings, hostedPage, interactiveBundle, livePage, upgradePlayer } from './bundle';
+import { GPU_PLAYER_ROUTE, SELF_SCROLL, STANDALONE_MS, embedSettings, gpuSource, hostedPage, interactiveBundle, livePage, upgradePlayer } from './bundle';
 import { LIVE_MESSAGE } from './live-bridge';
 import { HOST_MESSAGE } from './host';
-import { HOSTED, MOTION_LIBS_ROUTE, Script, scriptUrl } from '@feega/motion-core/motion/libs/catalog';
+import { MOTION_LIBS_ROUTE } from '@feega/motion-core/motion/libs/catalog';
+import { INLINE_CORE_GLOBAL, unzipBase64 } from '@feega/motion-core/motion/gpu-full/inline-core';
 import { writeComponent } from '../custom/ops';
 import { ComponentMode } from '@feega/motion-core/motion/custom/component';
 import { EVENT_MESSAGE } from '@feega/motion-core/motion/custom/runtime';
@@ -32,8 +33,19 @@ function card(): MotionDoc {
 }
 
 const ORIGIN = 'https://app.test';
-const libraryCode = (url: string) => `window.__loaded=(window.__loaded||[]).concat(${JSON.stringify(url)});`;
-const fetchBlob = async (url: string) => (url.includes(MOTION_LIBS_ROUTE) ? new Blob([libraryCode(url)], { type: 'text/javascript' }) : new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }));
+const PLAYER_CODE = 'window.__player=true;';
+const CORE_CODE = 'export default async () => {};';
+const WASM_BYTES = new Uint8Array(Array.from({ length: 4096 }, (_, i) => (i * 7) % 251));
+const FONT_FILE = 'https://fonts.gstatic.com/s/dmsans/v1/dm.woff2';
+const FONT_CSS = `@font-face{font-family:'DM Sans';font-style:normal;font-weight:400;src:url(${FONT_FILE}) format('woff2');unicode-range:U+0000-00FF;}`;
+const SERVED: Record<string, () => Blob> = {
+  '/css2': () => new Blob([FONT_CSS], { type: 'text/css' }),
+  '/s/dmsans/v1/dm.woff2': () => new Blob([WASM_BYTES.slice(0, 64)], { type: 'font/woff2' }),
+  [GPU_PLAYER_ROUTE]: () => new Blob([PLAYER_CODE], { type: 'text/javascript' }),
+  '/gpu-core/gpu_core.js': () => new Blob([CORE_CODE], { type: 'text/javascript' }),
+  '/gpu-core/gpu_core_bg.wasm': () => new Blob([WASM_BYTES], { type: 'application/wasm' })
+};
+const fetchBlob = async (url: string) => (SERVED[new URL(url).pathname]?.() ?? new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }));
 
 describe('interactive web export', () => {
   it('ships the live runtime only when asked and only when an expression reads input', () => {
@@ -106,75 +118,70 @@ describe('interactive web export', () => {
 });
 
 describe('a self-contained file', () => {
-  const sketch = { source: { html: '', css: '', js: 'p5((p) => { p.draw = () => p.circle(0, 0, 9); });' }, propsSchema: { type: 'object' as const, properties: {} } };
-  const sketched = () => ok(addClip(ok(writeComponent(newMotionDoc(MotionFormat.Square), 'Sketch', sketch)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Sketch' } }, 's1'));
-  const inlined = (html: string) => Object.values(Script).filter((s) => html.includes(JSON.stringify(libraryCode(scriptUrl(ORIGIN, s))).slice(1, -1)) || html.includes(libraryCode(scriptUrl(ORIGIN, s))));
+  const bundled = (doc = card(), fetch = fetchBlob) => interactiveBundle({ doc, tokens: FEEGA_TOKENS, assetUrls: { pic: SIGNED }, title: 'Card', fetchBlob: fetch, origin: ORIGIN });
 
-  it('inlines the player, the runtime and exactly the libraries its components use', async () => {
-    const bundle = await interactiveBundle({ doc: sketched(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Sketch', fetchBlob, origin: ORIGIN });
+  it('plays with gpu-core, not the HTML player', async () => {
+    const { html } = await bundled();
 
-    expect(inlined(bundle.html).sort()).toEqual([Script.P5, Script.Player, Script.Runtime].sort());
+    expect(html).toContain('<feega-gpu-player id="player" source="feega-source">');
+    expect(html).not.toContain('<hyperframes-player');
+    expect(html).not.toContain('hyperframes-player.global');
   });
 
-  it('loads no script from the network, so it opens from a file with no connection', async () => {
-    const bundle = await interactiveBundle({ doc: sketched(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Sketch', fetchBlob, origin: ORIGIN });
+  it('carries the video itself, so the file needs no session', async () => {
+    const { html } = await bundled();
 
-    expect(bundle.html).not.toMatch(/<script[^>]* src=/);
-    expect(bundle.html).not.toMatch(/<script[^>]* src=\\"/);
-    expect(bundle.html).not.toContain('jsdelivr');
+    expect(html).toContain('<script type="application/json" id="feega-source">');
+    expect(html).toContain('"durationInFrames"');
+    expect(html).toContain('input.pointer.x');
   });
 
-  it('carries the licence of every library it inlines', async () => {
-    const bundle = await interactiveBundle({ doc: sketched(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Sketch', fetchBlob, origin: ORIGIN });
-    const head = bundle.html.slice(0, bundle.html.indexOf('<html'));
+  it('inlines the player and the gpu-core engine, so it opens from a file with no connection', async () => {
+    const { html } = await bundled();
 
-    for (const script of [Script.P5, Script.Player, Script.Runtime]) {
-      expect(head).toContain(`${HOSTED[script].name}@${HOSTED[script].version} (${HOSTED[script].licence})`);
-    }
-    expect(head).toContain(`${scriptUrl(ORIGIN, Script.P5).replace(HOSTED[Script.P5].file, HOSTED[Script.P5].licenceFile)}`);
-    expect(head).not.toContain('d3@');
+    expect(html).toContain(PLAYER_CODE);
+    expect(html).toContain(`window.${INLINE_CORE_GLOBAL}=`);
+    expect(html).toContain(JSON.stringify(CORE_CODE).slice(1, -1));
+    expect(html).not.toMatch(/<script[^>]* src=/);
+    expect(html).not.toContain(`${ORIGIN}${GPU_PLAYER_ROUTE}`);
   });
 
-  const model = () => ok(addClip(newMotionDoc(MotionFormat.Square), { component: 'Model3D', from: 0, durationInFrames: 60, props: { assetId: 'glb' } }, 'm'));
-  const matted = () => {
-    const below = ok(addClip(newMotionDoc(MotionFormat.Square), { component: 'Image', from: 0, durationInFrames: 60, props: { assetId: 'pic' } }, 'img'));
-    const above = ok(addClip(ok(addTrack(below, TrackKind.Visual, 'top')), { component: 'Title', from: 0, durationInFrames: 60, trackId: 'top', props: { text: 'GO' } }, 'src'));
-    return ok(setTrackMatte(above, 'img', Matte.Alpha));
-  };
+  it('stores the wasm compressed, and it comes back byte for byte', async () => {
+    const { html } = await bundled();
+    const wasm = /"wasm":"([A-Za-z0-9+/=]+)"/.exec(html)![1];
 
-  it('inlines the three.js modules of a built-in 3D clip instead of importing them from our origin', async () => {
-    const bundle = await interactiveBundle({ doc: model(), tokens: FEEGA_TOKENS, assetUrls: { glb: 'https://x.test/a.glb' }, title: '3D', fetchBlob, origin: ORIGIN });
-
-    expect(bundle.html).not.toContain(`${ORIGIN}${MOTION_LIBS_ROUTE}/three@`);
-    expect(bundle.html).toContain('\\"three\\":\\"data:text/javascript;base64,');
+    expect(wasm.length).toBeLessThan(Math.ceil((WASM_BYTES.length * 4) / 3));
+    expect(Array.from(await unzipBase64(wasm))).toEqual(Array.from(WASM_BYTES));
   });
 
-  it('inlines the screenshot library a matte needs', async () => {
-    const bundle = await interactiveBundle({ doc: matted(), tokens: FEEGA_TOKENS, assetUrls: { pic: 'https://x.test/p.png' }, title: 'Matte', fetchBlob, origin: ORIGIN });
+  it('keeps a closing script tag in the player from ending the script early', async () => {
+    const tricky = async (url: string) => (new URL(url).pathname === GPU_PLAYER_ROUTE ? new Blob(['const s = "</script><b>";'], { type: 'text/javascript' }) : fetchBlob(url));
+    const { html } = await bundled(card(), tricky);
+    const module = html.slice(html.indexOf('<script type="module">'));
 
-    expect(inlined(bundle.html)).toContain(Script.Screenshot);
-    expect(bundle.html).not.toMatch(/script-src[^;]*html-to-image/);
-    expect(bundle.html).not.toContain(`\\"lib\\":\\"${scriptUrl(ORIGIN, Script.Screenshot)}`);
+    expect(module.slice(0, module.indexOf('</script>'))).toContain('const s = "<\\/script><b>";');
   });
 
-  it('refuses to export when a library cannot be fetched, instead of inlining the error page', async () => {
-    const broken = async (url: string) => (url.includes('/p5@') ? new Blob(['<!doctype html><h1>404</h1>'], { type: 'text/html' }) : fetchBlob(url));
-    const offline = async (url: string) => (url.includes('/p5@') ? Promise.reject(new TypeError('Failed to fetch')) : fetchBlob(url));
+  it('carries the fonts the video uses, so text still draws with no connection', async () => {
+    const { html } = await bundled();
+    const core = JSON.parse(/window\.__feegaGpuCore=(\{.*?\});<\/script>/s.exec(html)![1].replace(/\\u003c/g, '<'));
 
-    await expect(interactiveBundle({ doc: sketched(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Sketch', fetchBlob: broken, origin: ORIGIN })).rejects.toThrow(/p5@1\.11\.11 could not be loaded/);
-    await expect(interactiveBundle({ doc: sketched(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Sketch', fetchBlob: offline, origin: ORIGIN })).rejects.toThrow(/could not be loaded: Failed to fetch/);
+    expect(Object.values(core.fonts.text)).toContain(FONT_CSS);
+    expect(Object.keys(core.fonts.bytes)).toEqual([FONT_FILE]);
   });
-});
 
-describe('a live component in the embed', () => {
-  const game = { source: { html: '', css: '', js: 'requestAnimationFrame(function f() { requestAnimationFrame(f); });' }, propsSchema: { type: 'object' as const, properties: {} }, mode: ComponentMode.Live };
-  const played = () => ok(addClip(ok(writeComponent(newMotionDoc(MotionFormat.Square), 'Game', game)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Game' } }, 'g1'));
+  it('tells the player where the app is, so layers that need a library can load it', async () => {
+    const { html } = await bundled();
 
-  it('runs live and gets the keys and taps the player forwards', async () => {
-    const bundle = await interactiveBundle({ doc: played(), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Game', fetchBlob });
+    expect(html).toContain(`"origin":"${ORIGIN}"`);
+  });
 
-    expect(bundle.html).toContain('\\"play\\":\\"live\\"');
-    expect(bundle.html).toContain(`"eventMessage":"${EVENT_MESSAGE}"`);
+  it('refuses to export when the engine cannot be fetched, instead of inlining the error page', async () => {
+    const broken = async (url: string) => (new URL(url).pathname === '/gpu-core/gpu_core.js' ? new Blob(['<!doctype html><h1>404</h1>'], { type: 'text/html' }) : fetchBlob(url));
+    const offline = async (url: string) => (new URL(url).pathname === GPU_PLAYER_ROUTE ? Promise.reject(new TypeError('Failed to fetch')) : fetchBlob(url));
+
+    await expect(bundled(card(), broken)).rejects.toThrow(/gpu-core could not be loaded/);
+    await expect(bundled(card(), offline)).rejects.toThrow(/player could not be loaded: Failed to fetch/);
   });
 });
 
@@ -193,11 +200,12 @@ describe('a page published from the minified editor', () => {
 
 
 describe('a frame running live on the canvas', () => {
-  it('is the hosted player page plus a bridge that hands wheel and Esc back to the canvas', () => {
+  it('is the gpu-core player page plus a bridge that hands wheel and Esc back to the canvas', () => {
     const doc = card();
     const page = livePage({ doc, tokens: FEEGA_TOKENS, assets: {}, title: 'Clip' }, ORIGIN);
 
-    expect(page).toContain('<hyperframes-player id="player"');
+    expect(page).toContain('<feega-gpu-player id="player" source="feega-source">');
+    expect(page).not.toContain('<hyperframes-player');
     expect(page).toContain('(function playerMain(');
     expect(page).toContain(LIVE_MESSAGE);
   });
@@ -215,10 +223,27 @@ describe('the hosted embed page', () => {
     expect(page).not.toContain('<hyperframes-player');
   });
 
-  it('keeps the HTML player for an interactive video, which reads live input', async () => {
+  it('plays an interactive video with gpu-core, not the HTML player', async () => {
+    const scrubbing = ok(applyInteractivePreset(card(), InteractivePreset.ScrollScrub, null));
+    const page = hostedPage(await sourcePage(scrubbing), ORIGIN) ?? '';
+
+    expect(page).toContain('<feega-gpu-player id="player" source="feega-source">');
+    expect(page).toContain(`<script type="module" src="${ORIGIN}/motion-player.js">`);
+    expect(page).not.toContain('<hyperframes-player');
+  });
+
+  it('plays a video whose expressions read live input with gpu-core', async () => {
     const page = hostedPage(await sourcePage(card()), ORIGIN) ?? '';
 
-    expect(page).toContain('<hyperframes-player id="player"');
-    expect(page).not.toContain('<feega-gpu-player');
+    expect(page).toContain('<feega-gpu-player id="player" source="feega-source">');
+    expect(page).toContain('input.pointer.x');
+    expect(page).not.toContain('<hyperframes-player');
+  });
+
+  it('hands source.json the interactive video too, so React draws it inline', async () => {
+    const source = gpuSource(await sourcePage(card()));
+
+    expect(source?.doc.width).toBe(card().width);
+    expect(source?.playback).toBe(PlayMode.Autoplay);
   });
 });
