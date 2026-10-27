@@ -23,3 +23,13 @@ describe('node media never starts a native drag', () => {
     });
   }
 });
+
+describe('node video presses reach the canvas', () => {
+  it('GpuFlow decides pointer ownership with ownsPress, not a blanket video selector', () => {
+    const source = readFileSync(join(dir, 'gpu/GpuFlow.svelte'), 'utf8');
+    const body = source.slice(source.indexOf('function onDown('), source.indexOf('function startGesture('));
+
+    expect(body).toContain('ownsPress(target, e.clientY)');
+    expect(body).not.toContain('closest(INTERACTIVE)');
+  });
+});
