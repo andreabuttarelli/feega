@@ -97,6 +97,8 @@ describe('fetching the Wiro catalogue', () => {
       expect.arrayContaining([
         expect.objectContaining({ categories: ['text-to-image'] }),
         expect.objectContaining({ categories: ['text-to-video'] }),
+        expect.objectContaining({ categories: ['image-to-video'] }),
+        expect.objectContaining({ categories: ['video-to-video'] }),
         expect.objectContaining({ search: 'uncensored' })
       ])
     );
