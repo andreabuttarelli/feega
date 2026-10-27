@@ -7,7 +7,7 @@
   import OutputViewer from '$lib/components/canvas/OutputViewer.svelte';
   import { OUTPUT_KIND_OF, viewableRuns, type OutputKind, type ViewerRun } from '$lib/canvas/run-info';
   import CloudPicker from '$lib/components/canvas/CloudPicker.svelte';
-  import { CloudMode, type CloudProviderId } from '$lib/canvas/cloud-picker';
+  import { CloudMode, cloudFailure, type CloudProviderId } from '$lib/canvas/cloud-picker';
   import NodeSearch from '$lib/components/canvas/NodeSearch.svelte';
   import { NODES_PARAM, idsFromLink, selectionLink } from '$lib/canvas/selection-link';
   import type { CommentThread } from '$lib/canvas/comment-threads';
@@ -274,7 +274,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { BILLING_PATH } from '$lib/billing-path';
   import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
   import type { FigmaJob } from '$lib/canvas/figma/images';
-  import { ImagesOutcome } from '$lib/canvas/figma/fetch-images';
+  import { ImagesOutcome, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
+  import { connectionMessage } from '$lib/canvas/connection-messages';
 
   const LINK_COPIED_MS = 1500;
 
@@ -365,7 +366,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       const res = await fetch(`${base}/import`, { method: 'POST', body: JSON.stringify({ fileId: target, place: { canvasId: data.canvas.id, x: at.x, y: at.y } }) });
       const body = (await res.json().catch(() => ({}))) as { node?: CanvasNodeRecord | null; error?: string };
       if (!res.ok || !body.node) {
-        failed = body.error ?? 'Import failed';
+        failed = cloudFailure(mode, body.error);
         return;
       }
       const created = body.node;
@@ -380,7 +381,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const res = await fetch(`${base}/export`, { method: 'POST', body: JSON.stringify({ assetId, folder: target }) });
     if (!res.ok) {
-      failed = 'Export failed';
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      failed = cloudFailure(mode, body.error);
       return;
     }
     cloud = null;
@@ -3625,8 +3627,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let figmaJobs = $state<FigmaJob[]>([]);
   let figmaTokenMissing = $state(false);
 
-  function figmaImagesAnswered(outcome: ImagesOutcome) {
-    figmaTokenMissing = outcome === ImagesOutcome.NoToken;
+  function figmaImagesAnswered(answer: ImagesAnswer) {
+    figmaTokenMissing = answer.outcome === ImagesOutcome.NoToken;
+    if (answer.outcome === ImagesOutcome.Failed) {
+      failed = connectionMessage(answer.error);
+    }
   }
 
   async function pasteSvg(svg: string, at: { x: number; y: number }) {

@@ -3,12 +3,12 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**69 tool** — 27 in lettura, 35 in scrittura, 7 che distruggono.
-Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3690 caratteri**, circa **923 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 70.498 caratteri.
+**71 tool** — 28 in lettura, 35 in scrittura, 8 che distruggono.
+Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3690 caratteri**, circa **923 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 72.235 caratteri.
 
 | gruppo | tool |
 |---|---:|
-| Altro | 41 |
+| Altro | 43 |
 | Video motion | 16 |
 | Accesso diretto al database | 5 |
 | Nodi e generazione | 4 |
@@ -56,6 +56,26 @@ Deprecated, use `edit`. The canvas ops of the project chat, on one project (`pro
 | `project_id` | string |  |
 | `op` | string |  |
 | `input`? | object |  |
+
+### `cloud` · D
+
+*Google Drive and Dropbox files*
+
+Cloud files of a project, for the signed-in person. `action` status: which providers (google_drive, dropbox) are connected and set up. files: list a folder of `provider` (`folder`, `cursor` from the previous `next` for more). import: `file_id` into the project, placed on `canvas_id` at `x`,`y`. export: `asset_id` into `folder` of the provider, `name` optional (Drive: empty folder is the root). disconnect: forget the connection and revoke it at the provider. Connecting is a browser sign-in in the app; a provider that is not connected answers `not_connected` or `reconnect`. Google Docs, Sheets and Slides import as PDF, Drawings as PNG. Spends no credits.
+
+| campo | tipo | |
+|---|---|---|
+| `project_id` | string | The project id. |
+| `action` | `status` \| `files` \| `import` \| `export` \| `disconnect` |  |
+| `provider`? | `google_drive` \| `dropbox` |  |
+| `folder`? | string |  |
+| `cursor`? | string |  |
+| `file_id`? | string |  |
+| `canvas_id`? | string |  |
+| `x`? | number |  |
+| `y`? | number |  |
+| `asset_id`? | string |  |
+| `name`? | string |  |
 
 ### `describe` · R
 
@@ -112,6 +132,16 @@ Rewrites a brief into the SHAPE the model you are about to render with wants —
 | `prompt` | string |  |
 | `model` | string |  |
 | `shot_mode`? | `hero` \| `flat-lay` \| `on-model` \| `close-up` \| `lifestyle` \| `studio` |  |
+
+### `figma_token_status` · R
+
+*Is a Figma token saved*
+
+Whether the signed-in person saved a Figma personal access token, which lets a Figma paste bring its images. Never returns the token; it is set in the app only. Reads only, spends nothing.
+
+| campo | tipo | |
+|---|---|---|
+| `project_id` | string | The project id. |
 
 ### `find_tools` · R
 

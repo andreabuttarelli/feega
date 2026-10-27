@@ -2,6 +2,7 @@ import { Command, OPACITY_KEYS } from '$lib/motion/shortcuts';
 import { Tool, type ActionId } from '$lib/motion/actions';
 import { LayerAction } from '$lib/canvas/layers';
 import { CanvasAction } from '$lib/canvas/canvas-list';
+import { CloudAction, FigmaTokenAction } from '$lib/canvas/cloud-picker';
 import { ClipOp } from '$lib/motion/clip-ops';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
 import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
@@ -455,6 +456,22 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'set template fields': motion('set_template_fields')
 };
 
+export const CLOUD_ACTIONS: Record<CloudAction, Parity> = {
+  [CloudAction.Connect]: uiOnly('the provider sign-in happens in a browser'),
+  [CloudAction.Status]: tool('cloud'),
+  [CloudAction.ListFiles]: tool('cloud'),
+  [CloudAction.Import]: tool('cloud'),
+  [CloudAction.Export]: tool('cloud'),
+  [CloudAction.Disconnect]: tool('cloud')
+};
+
+export const FIGMA_TOKEN: Record<FigmaTokenAction, Parity> = {
+  [FigmaTokenAction.Save]: uiOnly('a secret the person pastes; agents never hold it'),
+  [FigmaTokenAction.Test]: uiOnly('calls Figma with the secret; agents read only whether it is saved'),
+  [FigmaTokenAction.Remove]: uiOnly('the person removes a secret they pasted'),
+  [FigmaTokenAction.Status]: tool('figma_token_status')
+};
+
 export const STUDIO_PAGE_ACTIONS: Record<string, Parity> = {
   upload: uiOnly('browser file picker straight to storage; an agent brings images with its own import tools'),
   quote: tool('studio_quote'),
@@ -482,5 +499,7 @@ export const PARITY_TABLES = {
   LAYER_PANEL,
   CANVAS_LIST,
   CLIP_BUTTONS,
-  FRAME_CONTENT
+  FRAME_CONTENT,
+  CLOUD_ACTIONS,
+  FIGMA_TOKEN
 } as const;

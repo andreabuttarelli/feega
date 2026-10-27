@@ -742,6 +742,63 @@ program
     await cmdAppAccount(projectId, opts);
   });
 
+const cloud = program.command('cloud').description('Google Drive and Dropbox files of a project');
+
+cloud
+  .command('status <projectId>')
+  .description('Show whether Google Drive and Dropbox are connected')
+  .action(async (projectId: string) => {
+    const { cmdCloud } = await import('./commands/cloud.ts');
+    await cmdCloud(projectId);
+  });
+
+cloud
+  .command('files <projectId> <provider>')
+  .description('List a folder (provider: google_drive or dropbox)')
+  .option('--folder <id>', 'Folder id or path; the root when missing')
+  .option('--cursor <cursor>', 'The cursor of the previous page')
+  .action(async (projectId: string, provider: string, opts) => {
+    const { cmdCloudFiles } = await import('./commands/cloud.ts');
+    await cmdCloudFiles(projectId, provider as 'dropbox', opts);
+  });
+
+cloud
+  .command('import <projectId> <provider> <fileId>')
+  .description('Import a file into the project, optionally placed on a canvas')
+  .option('--canvas <id>', 'Place it on this canvas')
+  .option('--x <n>', 'Canvas x')
+  .option('--y <n>', 'Canvas y')
+  .action(async (projectId: string, provider: string, fileId: string, opts) => {
+    const { cmdCloudImport } = await import('./commands/cloud.ts');
+    await cmdCloudImport(projectId, provider as 'dropbox', fileId, opts);
+  });
+
+cloud
+  .command('export <projectId> <provider> <assetId>')
+  .description('Export an asset into a folder of the provider')
+  .option('--folder <id>', 'Destination folder; the root when missing')
+  .option('--name <name>', 'File name')
+  .action(async (projectId: string, provider: string, assetId: string, opts) => {
+    const { cmdCloudExport } = await import('./commands/cloud.ts');
+    await cmdCloudExport(projectId, provider as 'dropbox', assetId, opts);
+  });
+
+cloud
+  .command('disconnect <projectId> <provider>')
+  .description('Forget the connection and revoke it at the provider')
+  .action(async (projectId: string, provider: string) => {
+    const { cmdCloudDisconnect } = await import('./commands/cloud.ts');
+    await cmdCloudDisconnect(projectId, provider as 'dropbox');
+  });
+
+program
+  .command('figma-token <projectId>')
+  .description('Show whether a Figma token is saved (it is set in the app)')
+  .action(async (projectId: string) => {
+    const { cmdFigmaToken } = await import('./commands/cloud.ts');
+    await cmdFigmaToken(projectId);
+  });
+
 program
   .command('upgrade <slug>')
   .description('Open Stripe checkout: a monthly plan (--credits 8|16|32|64|128|256) or a one-time top-up (--top-up)')

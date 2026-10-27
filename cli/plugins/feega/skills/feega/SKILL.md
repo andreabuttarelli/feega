@@ -148,6 +148,8 @@ and spends credits only with that `quoteId` (a changed selection or price is a 4
 
 Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
 
+Cloud files: `cloud` lists, imports and exports Google Drive and Dropbox files and disconnects a provider; `figma_token_status` says whether a Figma token is saved. CLI: `feega cloud status|files|import|export|disconnect`, `feega figma-token`.
+
 ## Edit and see a canvas: `edit` and `view`
 
 `edit` is the one way to change a canvas, its nodes, free elements, frames and what is inside a frame.
