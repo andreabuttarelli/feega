@@ -14,19 +14,24 @@
 
 :root[data-window] .app-sidebar {
   padding-top: 0;
+  --window-side-inset: calc(2 * var(--ui-space-2));
+}
+
+:root[data-window] .app-sidebar .scroll {
+  padding-top: 0;
 }
 
 :root[data-window] .app-sidebar .wordmark {
   display: flex;
   align-items: center;
-  flex: 0 0 var(--window-bar-h);
-  height: var(--window-bar-h);
+  flex: 0 0 calc(var(--window-bar-h) - var(--window-side-inset));
+  height: calc(var(--window-bar-h) - var(--window-side-inset));
   padding-top: 0;
   app-region: drag;
 }
 
 :root[data-window='mac'] .app-sidebar .wordmark {
-  padding-left: var(--window-lights-w);
+  padding-left: calc(var(--window-lights-w) - var(--window-side-inset));
 }
 
 :root[data-window] :is(a, button, input, select, textarea, label, [role='button'], [contenteditable]) {

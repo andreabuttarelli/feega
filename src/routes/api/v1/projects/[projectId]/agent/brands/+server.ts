@@ -25,13 +25,14 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 
   const { orgId } = found;
 
-  const [brandsRes, postsRes, accountsRes] = await Promise.all([
+  const [brandsRes, postsRes, accountsRes, pinsRes] = await Promise.all([
     db.from('brands').select(BRAND_COLUMNS).eq('org_id', orgId).order('name', { ascending: true }),
     db.from('posts').select('brand_id, status, planned_for').eq('org_id', orgId).eq('status', 'ready'),
-    db.from('social_accounts').select('brand_id, status').eq('org_id', orgId)
+    db.from('social_accounts').select('brand_id, status').eq('org_id', orgId),
+    db.from('brand_pins').select('brand_id').eq('org_id', orgId).eq('user_id', user.id).order('created_at', { ascending: true })
   ]);
 
-  if (brandsRes.error || postsRes.error || accountsRes.error) {
+  if (brandsRes.error || postsRes.error || accountsRes.error || pinsRes.error) {
     return json({ error: 'query_failed' }, { status: 500 });
   }
 
@@ -56,5 +57,5 @@ export const GET: RequestHandler = async ({ params, locals }) => {
     })
   );
 
-  return json({ brands, projectBrandId: found.project.brandId ?? null });
+  return json({ brands, projectBrandId: found.project.brandId ?? null, pinned: (pinsRes.data ?? []).map((p) => p.brand_id) });
 };

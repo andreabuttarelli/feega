@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { start, authReturn, staysInside, PRODUCTION_URL } = require('./routing.cjs');
+const { EventEmitter } = require('node:events');
+const { start, authReturn, staysInside, keepInside, PRODUCTION_URL } = require('./routing.cjs');
 
 test('production is the default start', () => {
   assert.equal(start(undefined).href, new URL(PRODUCTION_URL).href);
@@ -26,4 +27,26 @@ test('only the app origin stays in the window', () => {
   assert.ok(staysInside('https://oh.feega.app/login', 'https://oh.feega.app'));
   assert.ok(!staysInside('https://accounts.google.com/o/oauth2', 'https://oh.feega.app'));
   assert.ok(staysInside('about:blank', 'https://oh.feega.app'));
+});
+
+function leave(event, url) {
+  const contents = new EventEmitter();
+  const opened = [];
+  keepInside(contents, 'https://oh.feega.app/', (target) => opened.push(target));
+  let prevented = false;
+  contents.emit(event, { preventDefault: () => { prevented = true; } }, url);
+  return { prevented, opened };
+}
+
+test('a server redirect to the oauth provider opens the browser', () => {
+  const google = 'https://accounts.google.com/o/oauth2/auth';
+  assert.deepEqual(leave('will-redirect', google), { prevented: true, opened: [google] });
+});
+
+test('a link to another site opens the browser', () => {
+  assert.deepEqual(leave('will-navigate', 'https://x.com/feega'), { prevented: true, opened: ['https://x.com/feega'] });
+});
+
+test('a redirect inside the app stays in the window', () => {
+  assert.deepEqual(leave('will-redirect', 'https://oh.feega.app/app'), { prevented: false, opened: [] });
 });

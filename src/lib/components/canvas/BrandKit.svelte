@@ -17,6 +17,8 @@
     void load();
   });
 
+  const KIT_KINDS = new Set<BrandPiece['kind']>(['content', 'handle', 'store', 'website']);
+
   const PIECE_LABEL: Record<BrandPiece['kind'], (piece: BrandPiece) => string> = {
     logo: () => 'Logo',
     name: (p) => (p.kind === 'name' ? p.text : ''),
@@ -56,7 +58,7 @@
   <button type="button" class="retry" onclick={load}>Retry</button>
 {:else}
   <div class="pieces">
-    {#each brandPieces(brand, details) as piece, i (i)}
+    {#each brandPieces(brand, details).filter((piece) => KIT_KINDS.has(piece.kind)) as piece, i (i)}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="piece" data-piece={piece.kind} draggable="true" ondragstart={(e) => startDrag(e, pieceDrag(piece))}>
         <span class="piece-kind">{PIECE_GROUP[piece.kind]}</span>

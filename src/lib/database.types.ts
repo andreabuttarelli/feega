@@ -642,6 +642,8 @@ export type Database = {
       assets: {
         Row: {
           ai_marked: boolean | null
+          approved_at: string | null
+          brand_id: string | null
           bytes: number | null
           content: string | null
           created_at: string
@@ -664,6 +666,8 @@ export type Database = {
         }
         Insert: {
           ai_marked?: boolean | null
+          approved_at?: string | null
+          brand_id?: string | null
           bytes?: number | null
           content?: string | null
           created_at?: string
@@ -686,6 +690,8 @@ export type Database = {
         }
         Update: {
           ai_marked?: boolean | null
+          approved_at?: string | null
+          brand_id?: string | null
           bytes?: number | null
           content?: string | null
           created_at?: string
@@ -742,17 +748,115 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_fonts: {
+        Row: {
+          brand_id: string
+          created_at: string
+          google_family: string | null
+          id: string
+          org_font_id: string | null
+          org_id: string
+          role: string
+        }
+        Insert: {
+          brand_id: string
+          created_at?: string
+          google_family?: string | null
+          id?: string
+          org_font_id?: string | null
+          org_id: string
+          role: string
+        }
+        Update: {
+          brand_id?: string
+          created_at?: string
+          google_family?: string | null
+          id?: string
+          org_font_id?: string | null
+          org_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_fonts_org_font_fk"
+            columns: ["org_font_id"]
+            isOneToOne: false
+            referencedRelation: "org_fonts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brand_fonts_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brand_fonts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_pins: {
+        Row: {
+          brand_id: string
+          created_at: string
+          org_id: string
+          user_id: string
+        }
+        Insert: {
+          brand_id: string
+          created_at?: string
+          org_id: string
+          user_id: string
+        }
+        Update: {
+          brand_id?: string
+          created_at?: string
+          org_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_pins_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brand_pins_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brand_pins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           content: string | null
           created_at: string
           id: string
           logo_url: string | null
+          logos: Json
           name: string
           org_id: string
+          palette: Json
           short_description: string | null
           slug: string
           updated_at: string
+          voice: Json
           website: string | null
           zernio_profile_id: string | null
         }
@@ -761,11 +865,14 @@ export type Database = {
           created_at?: string
           id?: string
           logo_url?: string | null
+          logos?: Json
           name: string
           org_id: string
+          palette?: Json
           short_description?: string | null
           slug: string
           updated_at?: string
+          voice?: Json
           website?: string | null
           zernio_profile_id?: string | null
         }
@@ -774,11 +881,14 @@ export type Database = {
           created_at?: string
           id?: string
           logo_url?: string | null
+          logos?: Json
           name?: string
           org_id?: string
+          palette?: Json
           short_description?: string | null
           slug?: string
           updated_at?: string
+          voice?: Json
           website?: string | null
           zernio_profile_id?: string | null
         }
@@ -3110,6 +3220,7 @@ export type Database = {
       }
       social_posts: {
         Row: {
+          brand_id: string | null
           caption: string | null
           created_at: string
           external_id: string
@@ -3126,6 +3237,7 @@ export type Database = {
           project_id: string | null
         }
         Insert: {
+          brand_id?: string | null
           caption?: string | null
           created_at?: string
           external_id: string
@@ -3142,6 +3254,7 @@ export type Database = {
           project_id?: string | null
         }
         Update: {
+          brand_id?: string | null
           caption?: string | null
           created_at?: string
           external_id?: string

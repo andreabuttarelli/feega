@@ -117,6 +117,7 @@
   import { editableIds } from '$lib/canvas/frame-live';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { elementGlyph } from '$lib/canvas/layers';
+  import { imageSourceTile } from '$lib/canvas/free-image';
   import { frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
@@ -287,11 +288,11 @@
   const tierUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, tier);
 
   let turning = $state<{ id: string; degrees: number } | null>(null);
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning?.id === t.id ? { rotation: turning.degrees } : {}) })));
+  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning?.id === t.id ? { rotation: turning.degrees } : {}) }, liveOf(t.id)?.doc ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
-  const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
+  const nodeOf = $derived(new Map(placed.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
   let sticky = $state(new Map<string, number>());
@@ -2046,7 +2047,7 @@
           return;
         }
         const c = candidate(a.from, w);
-        const why = c ? connectionRefusal(tiles, edges, lookup, c) : '';
+        const why = c ? connectionRefusal(placed, edges, lookup, c) : '';
         refusal = why || null;
         ghost = { from: a.from, at: w, ok: c !== null && why === null };
       },
@@ -2133,10 +2134,10 @@
         const c = candidate(a.from, w);
         ghost = null;
         refusal = null;
-        if (!c || connectionRefusal(tiles, edges, lookup, c) !== null) {
+        if (!c || connectionRefusal(placed, edges, lookup, c) !== null) {
           return;
         }
-        const landing = landingOf(tiles, lookup, c);
+        const landing = landingOf(placed, lookup, c);
         if (landing) {
           props.onConnect?.(landing.source, landing.target, landing.kind, landing.targetHandle, landing.sourceHandle);
         }

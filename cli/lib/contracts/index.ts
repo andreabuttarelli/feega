@@ -3,6 +3,7 @@ import { BILLING_PORTAL_LINK, CHECKOUT_LINK, ONE_TIME_CHECKOUT_LINK } from './bi
 import { QUERY_DATABASE } from './query';
 import { INSERT_ROW, UPDATE_ROW, DELETE_ROW } from './write';
 import { IMPORT_MEDIA_URL } from './posts';
+import { GET_BRAND_LIBRARY } from './library';
 import { GET_MEDIA_MODELS, SET_MEDIA_MODEL } from './media-models';
 import { ENHANCE_PROMPT } from './prompts';
 import { UPDATE_PRODUCT } from './studio';
@@ -70,6 +71,7 @@ export const BRAND_ENDPOINTS: readonly BrandEndpoint[] = [
   CHECKOUT_LINK,
   ONE_TIME_CHECKOUT_LINK,
   ENHANCE_PROMPT,
+  GET_BRAND_LIBRARY,
   GET_MEDIA_MODELS,
   IMPORT_MEDIA_URL,
   DELETE_ROW,
@@ -111,6 +113,7 @@ export function statusForFailure(
 
 export {
   IMPORT_MEDIA_URL,
+  GET_BRAND_LIBRARY,
 };
 /**
  * Gli schemi delle letture ritirate da MCP. La rotta REST resta e continua a validare con questi;

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BlendMode } from '@feega/motion-core/motion/blend';
 import { ItemKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-import { GL_PICTURE_SIDE, glPictureSize, pictureKey, wantedPictures, warmCore, rasterOf } from '@feega/motion-core/motion/gpu-full/core-web';
+import { GL_PICTURE_SIDE, glPictureSize, pictureKey, pictureSize, wantedPictures, warmCore, rasterOf } from '@feega/motion-core/motion/gpu-full/core-web';
 
 describe('glPictureSize', () => {
   it('keeps a picture that fits the WebGL atlas as it is', () => {
@@ -63,5 +63,46 @@ describe('a group sent to the core', () => {
     rasterOf(attached).putGroup('g', list);
 
     expect(JSON.parse(sent[0])).toMatchObject({ width: 887, height: 402 });
+  });
+});
+
+describe('dropping a group', () => {
+  const image = (clip: string) => ({ kind: ItemKind.Image, clip, src: clip, video: false }) as unknown as Item;
+  const listOf = (...clips: string[]) => ({ width: 1, height: 1, background: null, items: clips.map(image) }) as DisplayList;
+  const source = {};
+  const pictures = () => ({ source, size: { width: 1, height: 1 } }) as unknown as ReturnType<Pictures>;
+
+  function wired() {
+    const forgot: string[] = [];
+    const sent: string[] = [];
+    const attached = { picture: (clip: string) => sent.push(clip), put_group: () => undefined, drop_group: () => undefined, forget_picture: (clip: string) => forgot.push(clip) } as unknown as Parameters<typeof rasterOf>[0];
+    return { raster: rasterOf(attached), forgot, sent };
+  }
+
+  it('frees the pictures no other group still shows', () => {
+    const { raster, forgot } = wired();
+    raster.putGroup('g1', listOf('a', 'b'), pictures);
+    raster.putGroup('g2', listOf('b'), pictures);
+
+    raster.dropGroup('g1');
+
+    expect(forgot).toEqual(['a']);
+  });
+
+  it('uploads a freed picture again when its group comes back', () => {
+    const { raster, sent } = wired();
+    const list = listOf('a');
+    raster.putGroup('g', list, pictures);
+    raster.dropGroup('g');
+    raster.putGroup('g', list);
+
+    expect(raster.upload(list, pictures, 1)).toBe(true);
+    expect(sent).toEqual(['a', 'a']);
+  });
+});
+
+describe('pictureSize', () => {
+  it('fits a picture inside the side the device budget allows', () => {
+    expect(pictureSize(1024)({ width: 4000, height: 2000 })).toEqual({ width: 1024, height: 512 });
   });
 });

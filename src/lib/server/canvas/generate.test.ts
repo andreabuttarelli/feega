@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { MotionFormat, newClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { fakeDb } from '$lib/server/db/fake-db';
 import type { Db } from '$lib/server/db/client';
 import { cancelNodeRun, expireStuckRuns, reconcileVideoNodeRuns, runGenNode, RUN_STALE_MS } from './generate';
@@ -1846,6 +1847,52 @@ describe('la foto di un prodotto del negozio arriva al render immagine', () => {
         baseMediaId: undefined,
         referenceImageUrls: [expect.stringMatching(new RegExp(`^https://signed\\.example/.+/${UPLOAD_PATH}$`))]
       })
+    );
+  });
+});
+
+describe('a free image element wired into a generative node', () => {
+  const ELEMENT = 'element-node';
+  const ASSET_ID = 'free-1';
+  const FREE_PATH = `${ORG}/${PROJECT}/free-mug.png`;
+
+  const elementDoc = () => {
+    const doc = newMotionDoc(MotionFormat.Landscape);
+    doc.tracks[0].clips = [newClip({ id: 'c1', from: 0, durationInFrames: 30, component: 'Image' as never, props: { assetId: ASSET_ID } })];
+    return doc;
+  };
+
+  const runWith = async (targetHandle: string | null) => {
+    const imageNode = { ...freshNodeRow, data: { prompt: 'packshot' } };
+    const { db } = fakeDb(
+      {
+        nodes: [imageNode, { ...freshNodeRow, id: ELEMENT, type: 'element', data: { docHeadRevision: 1 } }],
+        nodes_connections: [{ id: 'e1', canvas_id: CANVAS, source_node_id: ELEMENT, target_node_id: NODE, source_handle: null, target_handle: targetHandle }],
+        motion_revisions: [{ org_id: ORG, node_id: ELEMENT, version: 1, doc: elementDoc(), summary: null, actor_kind: 'user' }],
+        assets: [{ id: ASSET_ID, org_id: ORG, project_id: PROJECT, type: 'image', source: 'upload', url: FREE_PATH, mime_type: 'image/png' }]
+      },
+      { updateRows: { nodes: [{ ...imageNode, version: 2 }] } }
+    );
+
+    return runGenNode(db, { orgId: ORG, projectId: PROJECT, canvasId: CANVAS, nodeId: NODE, userId: USER, medium: 'image', prompt: 'packshot', model: 'qwen3-pro', params: {}, expectedVersion: 1 });
+  };
+
+  beforeEach(() => {
+    generateImagesWithoutBrand.mockReset();
+    generateImagesWithoutBrand.mockResolvedValue({
+      ok: true,
+      media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }],
+      costUsd: 0.02
+    });
+  });
+
+  it('reaches the provider as a signed reference', async () => {
+    const result = await runWith('images');
+
+    expect(result.kind).toBe('done');
+    expect(generateImagesWithoutBrand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ referenceImageUrls: [expect.stringMatching(new RegExp(`^https://signed\\.example/.+/${FREE_PATH}$`))] })
     );
   });
 });

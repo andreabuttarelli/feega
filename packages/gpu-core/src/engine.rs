@@ -88,6 +88,7 @@ pub struct Engine {
     pub blending: Blending,
     filters: FilterPasses,
     cache: LayerCache,
+    held: HashMap<String, wgpu::Texture>,
 }
 
 pub type EngineError = vello::Error;
@@ -209,7 +210,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default() })
+        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new() })
     }
 
     pub fn cached_layers(&self) -> usize {
@@ -230,26 +231,39 @@ impl Engine {
         drawn.map(|_| skipped)
     }
 
-    pub fn raster(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures) -> Result<(ImageData, Vec<Skipped>), EngineError> {
+    fn raster(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures) -> Result<(ImageData, wgpu::Texture, Vec<Skipped>), EngineError> {
         let texture = layer_texture(device, list.width, list.height);
         let skipped = self.draw(device, queue, list, pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default()))?;
-        Ok((self.vello.register_texture(texture), skipped))
+        Ok((self.vello.register_texture(texture.clone()), texture, skipped))
+    }
+
+    pub fn held(&self, clip: &str) -> Option<&wgpu::Texture> {
+        self.held.get(clip)
+    }
+
+    fn release(&mut self, clip: &str, image: ImageData) {
+        self.vello.unregister_texture(image);
+        if let Some(texture) = self.held.remove(clip) {
+            texture.destroy();
+        }
     }
 
     pub fn hold(&mut self, held: &mut Pictures, plan: Plan, pictures: &Pictures, device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(DisplayList, Vec<Skipped>), EngineError> {
         for clip in &plan.evicted {
             if let Some(old) = held.remove(clip) {
-                self.vello.unregister_texture(old);
+                self.release(clip, old);
             }
         }
         let mut skipped = plan.skipped;
         for raster in plan.rasters {
             let both: Pictures = pictures.iter().chain(held.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
-            let (image, missed) = self.raster(device, queue, &raster.list, &both)?;
+            let (image, texture, missed) = self.raster(device, queue, &raster.list, &both)?;
             skipped.extend(missed);
-            if let Some(old) = held.insert(raster.clip, image) {
-                self.vello.unregister_texture(old);
+            if let Some(old) = held.remove(&raster.clip) {
+                self.release(&raster.clip, old);
             }
+            held.insert(raster.clip.clone(), image);
+            self.held.insert(raster.clip, texture);
         }
         Ok((plan.screen, skipped))
     }

@@ -5,18 +5,26 @@ export enum Device {
   Phone = 'phone'
 }
 
-type Budget = { textureBytes: number };
+type Budget = { textureBytes: number; pictureSide: number; resolution: number };
 
 export const BUDGET: Record<Device, Budget> = {
-  [Device.Desktop]: { textureBytes: 256 * MB },
-  [Device.Phone]: { textureBytes: 128 * MB }
+  [Device.Desktop]: { textureBytes: 256 * MB, pictureSide: 4096, resolution: 2 },
+  [Device.Phone]: { textureBytes: 128 * MB, pictureSide: 2048, resolution: 2 }
 };
+
+const LOW_MEMORY_GB = 4;
 
 const COARSE_POINTER = '(pointer: coarse)';
 
 const touchFirst = () => (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) || (typeof matchMedia === 'function' && matchMedia(COARSE_POINTER).matches);
 
-export const currentDevice = (): Device => (touchFirst() ? Device.Phone : Device.Desktop);
+type Traits = { touch: boolean; memoryGb?: number };
+
+export const deviceOf = ({ touch, memoryGb }: Traits): Device => (touch || (memoryGb ?? Infinity) <= LOW_MEMORY_GB ? Device.Phone : Device.Desktop);
+
+const memoryGb = () => (typeof navigator !== 'undefined' ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory : undefined);
+
+export const currentDevice = (): Device => deviceOf({ touch: touchFirst(), memoryGb: memoryGb() });
 
 const FLAT_LAYERS = '<style>*{will-change:auto!important}</style>';
 const HEAD_END = '</head>';
