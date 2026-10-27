@@ -549,12 +549,15 @@ impl Drop for Slot {
         let mut shelves = self.shelves.borrow_mut();
         let size = (self.texture.width(), self.texture.height());
         if shelves.len() >= POOL_SIZES && !shelves.contains_key(&size) {
+            self.texture.destroy();
             return;
         }
         let shelf = shelves.entry(size).or_default();
-        if shelf.len() < POOL_PER_SIZE {
-            shelf.push(self.texture.clone());
+        if shelf.len() >= POOL_PER_SIZE {
+            self.texture.destroy();
+            return;
         }
+        shelf.push(self.texture.clone());
     }
 }
 
@@ -667,6 +670,7 @@ impl FilterPasses {
             pass.dispatch_workgroups(out.width().div_ceil(GROUP), out.height().div_ceil(GROUP), 1);
         }
         queue.submit([encoder.finish()]);
+        buffer.destroy();
         out
     }
 }
