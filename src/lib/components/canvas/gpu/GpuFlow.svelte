@@ -377,13 +377,14 @@
       return [];
     }
     return placed.flatMap((t) => {
-      if (!coreDrawn.has(t.id)) {
+      const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
+      if (!coreDrawn.has(t.id) && !handed) {
         return [];
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
-      const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : ChromeLayers.State;
+      const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
       }
