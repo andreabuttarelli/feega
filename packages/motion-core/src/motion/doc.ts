@@ -34,6 +34,7 @@ import { stillSchema } from './still-model';
 import { partStylesSchema } from './part-style-model';
 import { autoLayoutSchema, layoutItemSchema } from './layout/model';
 import { constraintsSchema } from './constraints/model';
+import { interactionsSchema } from './prototype/model';
 import { layoutGuidesSchema } from './layout-guides/model';
 
 export enum MotionFormat {
@@ -122,6 +123,7 @@ const clipSchema = z.object({
   autoLayout: autoLayoutSchema.nullable().optional(),
   layoutItem: layoutItemSchema.optional(),
   constraints: constraintsSchema.optional(),
+  interactions: interactionsSchema.optional(),
   lockRatio: z.boolean().optional(),
   partStyles: partStylesSchema.optional(),
   styleRef: z.string().min(1).optional(),
