@@ -16,6 +16,8 @@ import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { scaleClips } from '$lib/motion/scale-tool';
 import { setLayoutGuides } from '$lib/motion/layout-guides/guides';
+import { addGuide, removeGuide } from '$lib/canvas/user-guides';
+import { GuideAxis, MAX_USER_GUIDES } from '@feega/motion-core/motion/user-guides/model';
 import { MAX_LAYOUT_GUIDES, layoutGuideSchema } from '@feega/motion-core/motion/layout-guides/model';
 import { HORIZONTALS, VERTICALS } from '@feega/motion-core/motion/constraints/model';
 import { setConstraints, withConstraints } from '$lib/motion/constraints/constraints';
@@ -251,6 +253,9 @@ import { pivotBox } from '@feega/motion-core/motion/parent';
 import { propsFromPx, pxRead, strokesFromPx, PX_FIELDS_GUIDE } from '$lib/motion/px-fields';
 import { UNITS_GUIDE, unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
+const GUIDE_AXES = ['vertical', 'horizontal'] as const;
+const AXIS_OF: Record<(typeof GUIDE_AXES)[number], GuideAxis> = { vertical: GuideAxis.Vertical, horizontal: GuideAxis.Horizontal };
+
 const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
 
 const copyTexts = (slots: Record<string, unknown>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
@@ -462,6 +467,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     fields: doc.fields,
     referenceLook: doc.referenceLook ?? null,
     layoutGuides: doc.layoutGuides ?? [],
+    userGuides: doc.userGuides ?? [],
     fonts: doc.fonts,
     styles: stylesOf(doc),
     variables: doc.variables ?? {},
@@ -2406,6 +2412,24 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         const guided = pinned.ok && input.layout_guides ? setLayoutGuides(pinned.doc, input.layout_guides) : pinned;
         return apply(guided, 'changed the canvas');
+      }
+    }),
+
+    add_guide: tool({
+      description: `Pull a guide onto the frame, as the rulers do in the editor: a vertical guide at x px from the left edge or a horizontal one at y px from the top, inside the frame. Layers snap to it while they move; it is drawn in the editor, never in the export. Up to ${MAX_USER_GUIDES} per frame. remove_guide takes it away.`,
+      inputSchema: z.object({ axis: z.enum(GUIDE_AXES), at: z.number().describe('px from the left edge (vertical) or the top edge (horizontal)') }),
+      execute: async (input) => apply(addGuide(session.doc, { axis: AXIS_OF[input.axis], at: input.at }), `added a ${input.axis} guide at ${Math.round(input.at)}`)
+    }),
+
+    remove_guide: tool({
+      description: 'Take a guide off the frame: give its axis and position, or nothing to clear every guide the frame holds.',
+      inputSchema: z.object({ axis: z.enum(GUIDE_AXES).optional(), at: z.number().optional() }),
+      execute: async (input) => {
+        if (input.axis === undefined || input.at === undefined) {
+          const { userGuides: _, ...rest } = session.doc;
+          return apply({ ok: true, doc: rest }, 'cleared the guides');
+        }
+        return apply(removeGuide(session.doc, { axis: AXIS_OF[input.axis], at: input.at }), `removed the ${input.axis} guide at ${Math.round(input.at)}`);
       }
     }),
 
