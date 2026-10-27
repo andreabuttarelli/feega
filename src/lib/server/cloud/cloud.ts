@@ -37,6 +37,8 @@ type Spec = {
   list: (token: string, folder: string | null, cursor: string | null, fetchFn: Fetch) => Promise<CloudPage>;
   download: (token: string, id: string, fetchFn: Fetch) => Promise<CloudFile | null>;
   upload: (token: string, file: Upload, fetchFn: Fetch) => Promise<boolean>;
+  revoke: (token: string, fetchFn: Fetch) => Promise<boolean>;
+  revokes: 'refreshToken' | 'accessToken';
 };
 
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -123,6 +125,19 @@ async function dropboxUpload(token: string, file: Upload, fetchFn: Fetch): Promi
   return res.ok;
 }
 
+const DRIVE_REVOKE = 'https://oauth2.googleapis.com/revoke';
+const DROPBOX_REVOKE = 'https://api.dropboxapi.com/2/auth/token/revoke';
+
+async function driveRevoke(token: string, fetchFn: Fetch): Promise<boolean> {
+  const res = await fetchFn(DRIVE_REVOKE, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }).toString() }).catch(() => null);
+  return Boolean(res?.ok);
+}
+
+async function dropboxRevoke(token: string, fetchFn: Fetch): Promise<boolean> {
+  const res = await fetchFn(DROPBOX_REVOKE, { method: 'POST', headers: bearer(token) }).catch(() => null);
+  return Boolean(res?.ok);
+}
+
 const PROVIDERS: Record<CloudProvider, Spec> = {
   [CloudProvider.Drive]: {
     label: 'Google Drive',
@@ -132,7 +147,9 @@ const PROVIDERS: Record<CloudProvider, Spec> = {
     offline: { access_type: 'offline', prompt: 'consent' },
     list: driveList,
     download: driveDownload,
-    upload: driveUpload
+    upload: driveUpload,
+    revoke: driveRevoke,
+    revokes: 'refreshToken'
   },
   [CloudProvider.Dropbox]: {
     label: 'Dropbox',
@@ -142,7 +159,9 @@ const PROVIDERS: Record<CloudProvider, Spec> = {
     offline: { token_access_type: 'offline' },
     list: dropboxList,
     download: dropboxDownload,
-    upload: dropboxUpload
+    upload: dropboxUpload,
+    revoke: dropboxRevoke,
+    revokes: 'accessToken'
   }
 };
 
@@ -203,3 +222,7 @@ export const listFiles = (provider: CloudProvider, token: string, folder: string
 export const downloadFile = (provider: CloudProvider, token: string, id: string, fetchFn: Fetch = fetch) => PROVIDERS[provider].download(token, id, fetchFn);
 
 export const uploadFile = (provider: CloudProvider, token: string, file: Upload, fetchFn: Fetch = fetch) => PROVIDERS[provider].upload(token, file, fetchFn);
+
+export const revokeAccess = (provider: CloudProvider, token: string, fetchFn: Fetch = fetch) => PROVIDERS[provider].revoke(token, fetchFn);
+
+export const revocableToken = (provider: CloudProvider, tokens: TokenSet): string | null => tokens[PROVIDERS[provider].revokes];

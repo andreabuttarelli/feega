@@ -63,6 +63,15 @@
     busy = false;
   }
 
+  async function disconnect() {
+    busy = true;
+    await fetch(`/api/v1/projects/${projectId}/cloud/${provider}`, { method: 'DELETE' });
+    busy = false;
+    entries = [];
+    next = null;
+    problem = 'not_connected';
+  }
+
   function open(entry: Entry) {
     trail = [...trail, { id: entry.id, name: entry.name }];
   }
@@ -102,7 +111,12 @@
         <button type="button" class="crumb" onclick={() => up(i)}>{step.name}</button>
       {/each}
     </nav>
-    <button type="button" onclick={onclose}>Close</button>
+    <span>
+      {#if !problem}
+        <button type="button" disabled={busy} data-testid="cloud-disconnect" onclick={disconnect}>Disconnect</button>
+      {/if}
+      <button type="button" onclick={onclose}>Close</button>
+    </span>
   </header>
 
   {#if problem === 'not_connected' || problem === 'reconnect'}

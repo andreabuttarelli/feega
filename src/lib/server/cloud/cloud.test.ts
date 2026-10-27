@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$env/dynamic/private', () => ({ env: { APP_SECRET: 'test-secret-for-cloud' } }));
 
-const { CloudProvider, authorizeUrl, downloadFile, exchangeCode, freshAccess, listFiles, openState, sealState, uploadFile } = await import('./cloud');
+const { CloudProvider, revokeAccess, authorizeUrl, downloadFile, exchangeCode, freshAccess, listFiles, openState, sealState, uploadFile } = await import('./cloud');
 
 const CREDS = { clientId: 'cid', clientSecret: 'csecret' };
 const REDIRECT = 'https://feega.test/api/v1/cloud/callback';
@@ -228,5 +228,30 @@ describe('uploadFile', () => {
 
     const sent = await (seen[0].init?.body as Blob).text();
     expect(sent).toContain('"parents":["root"]');
+  });
+});
+
+describe('revokeAccess', () => {
+  it('asks Google to revoke the token', async () => {
+    const { fn, seen } = fetcher([new Response('{}')]);
+
+    expect(await revokeAccess(CloudProvider.Drive, 'rt', fn)).toBe(true);
+
+    expect(seen[0].url).toBe('https://oauth2.googleapis.com/revoke');
+    expect(String(seen[0].init?.body)).toBe('token=rt');
+  });
+
+  it('asks Dropbox to revoke the access token it is called with', async () => {
+    const { fn, seen } = fetcher([new Response('null')]);
+
+    expect(await revokeAccess(CloudProvider.Dropbox, 'at', fn)).toBe(true);
+
+    expect(seen[0].url).toBe('https://api.dropboxapi.com/2/auth/token/revoke');
+    expect((seen[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer at');
+  });
+
+  it('answers false when the provider refuses or is unreachable', async () => {
+    expect(await revokeAccess(CloudProvider.Drive, 'x', fetcher([new Response('no', { status: 400 })]).fn)).toBe(false);
+    expect(await revokeAccess(CloudProvider.Dropbox, 'x', (async () => Promise.reject(new Error('offline'))) as unknown as typeof fetch)).toBe(false);
   });
 });
