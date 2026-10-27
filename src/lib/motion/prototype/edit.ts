@@ -4,7 +4,8 @@ export const TRANSITION_FIELDS: Record<TransitionKind, { direction: boolean; tim
   [TransitionKind.Instant]: { direction: false, timing: false },
   [TransitionKind.Dissolve]: { direction: false, timing: true },
   [TransitionKind.Slide]: { direction: true, timing: true },
-  [TransitionKind.Push]: { direction: true, timing: true }
+  [TransitionKind.Push]: { direction: true, timing: true },
+  [TransitionKind.SmartAnimate]: { direction: false, timing: true }
 };
 
 export function retriggered(interaction: Interaction, kind: TriggerKind): Interaction {
