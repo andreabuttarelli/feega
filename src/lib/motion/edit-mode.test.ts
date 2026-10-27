@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Ease } from '@feega/motion-core/motion/design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
-import { EDIT_MODE_KEY, EditMode, designWarning, editIn, nextMode, readMode, recalledMode, rememberMode } from './edit-mode';
+import { EDIT_MODE_KEY, EditMode, designWarning, editIn, nextMode, readMode, recalledMode, rememberMode, shownMode } from './edit-mode';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -73,6 +73,17 @@ describe('Design and Motion modes', () => {
     expect(readMode('nonsense')).toBe(EditMode.Design);
     expect(readMode(null)).toBe(EditMode.Design);
     expect(readMode('motion')).toBe(EditMode.Motion);
+  });
+});
+
+describe('the mode a frame shows', () => {
+  it('is the mode the session starts in until the person toggles it, not the timeline default', () => {
+    expect(shownMode({}, 't', doc, null)).toBe(EditMode.Design);
+  });
+
+  it('follows the toggle of its own frame', () => {
+    expect(shownMode({ t: EditMode.Motion }, 't', doc, null)).toBe(EditMode.Motion);
+    expect(shownMode({ other: EditMode.Motion }, 't', doc, null)).toBe(EditMode.Design);
   });
 });
 
