@@ -1,5 +1,3 @@
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { createClient, type RealtimeChannel } from '@supabase/supabase-js';
 import { test, expect } from '../../../tests/e2e/fixtures/session';
 import { installCursor, recordDemo } from '../record';
@@ -13,8 +11,6 @@ const PAN_STEPS = 60;
 const FOLLOW_ZOOM = 1.3;
 const FONT_QUERY = 'Avenir Next';
 const WHEEL_PX = 160;
-const SHOTS = '/private/tmp/claude-501/follow-shots';
-const MORE = 'More actions';
 
 type View = { cx: number; cy: number; zoom: number };
 
@@ -39,8 +35,6 @@ async function joinAsTeammate(email: string, password: string, session: { projec
     close: () => client.removeChannel(channel)
   };
 }
-
-mkdirSync(SHOTS, { recursive: true });
 
 test('follow a teammate and local fonts', async ({ page, context, session, admin, seedNode }) => {
   await context.grantPermissions(['local-fonts']).catch(() => {});
@@ -75,12 +69,7 @@ test('follow a teammate and local fonts', async ({ page, context, session, admin
     await expect(page.getByTestId('font-installed')).toBeVisible({ timeout: 90_000 });
     await d.type(page.getByRole('searchbox', { name: 'Search fonts' }), FONT_QUERY);
     await d.click(page.getByTestId('font-installed').getByRole('button', { name: /^Avenir Next\s*local$/ }));
-    await d.wait(1500);
+    await d.look(box, 2200);
   });
-  await page.screenshot({ path: join(SHOTS, 'picked.png') });
-  await page.getByRole('button', { name: MORE }).click();
-  await page.getByRole('menuitem', { name: 'Export…' }).click();
-  await expect(page.getByTestId('export-local-fonts')).toBeVisible({ timeout: 15_000 });
-  await page.screenshot({ path: join(SHOTS, 'export.png') });
   await bruno.close();
 });

@@ -8,6 +8,14 @@ export function keepLocalFiles(family: string, list: LocalFile[]): void {
   files.set(family, list);
 }
 
+export type LocalFilesSnapshot = [family: string, files: LocalFile[]][];
+
+export const localFilesSnapshot = (): LocalFilesSnapshot => [...files];
+
+export function restoreLocalFiles(snapshot: LocalFilesSnapshot): void {
+  snapshot.forEach(([family, list]) => files.set(family, list));
+}
+
 export function forgetLocalFiles(): void {
   files.clear();
 }
