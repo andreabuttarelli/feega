@@ -86,7 +86,7 @@
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
-  import { EditMode, recalledMode, rememberMode, startMode } from '$lib/motion/edit-mode';
+  import { EditMode, recalledMode, rememberMode, shownMode, startMode } from '$lib/motion/edit-mode';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
   import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
   import FrameTimeline from '../FrameTimeline.svelte';
@@ -1133,6 +1133,7 @@
   });
 
   const modeStore = () => (typeof localStorage === 'undefined' ? null : localStorage);
+  let toggledModes = $state.raw<Partial<Record<string, EditMode>>>({});
 
   function saverOf(nodeId: string) {
     const held = savers.get(nodeId);
@@ -1147,7 +1148,10 @@
       {
         viewPath: () => [],
         playhead: () => frameOfLive(liveOf(nodeId) ?? live),
-        moded: (mode) => rememberMode(modeStore(), mode),
+        moded: (mode) => {
+          rememberMode(modeStore(), mode);
+          toggledModes = { ...toggledModes, [nodeId]: mode };
+        },
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
         recorded: () => autosize(nodeId),
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
@@ -2902,7 +2906,7 @@
         doc={timeline.doc}
         frame={timeline.frame}
         selection={picks.length > 1 ? picks : inside?.level.clip ? [inside.level.clip] : []}
-        mode={savers.get(nodeId)?.mode}
+        mode={shownMode(toggledModes, nodeId, timeline.doc, recalledMode(modeStore()))}
         onmode={() => savers.get(nodeId)?.toggleMode()}
         onframe={(f) => scrubTo(nodeId, f)}
         onselect={(ids) => (ids.length > 1 ? pickMany(nodeId, ids) : goInside(nodeId, Gesture.Click, ids[0] ?? null))}

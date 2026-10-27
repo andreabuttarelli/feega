@@ -3430,3 +3430,6 @@ Signal: inpaint keeps the painted area and regenerates the rest; reframe returns
 ### The bench cannot tell native from wasm on a 60 Hz display
 
 **Signal:** both engines read 57-60 fps. **Move:** compare late-frame percentages and CPU, and say which display refresh the run had; the spike's 120 Hz numbers do not carry over. `screencapture` and `capturePage` do not see the Metal layer: read the retained texture back with the addon `snapshot` (needs `FEEGA_NATIVE_DEBUG=1`).
+
+### Un valore letto da una `Map` non reattiva resta quello del primo render
+Segnale: l'etichetta della modalità (Design/Motion) non cambia al clic e le modifiche si comportano diversamente da ciò che dice. Causa: `savers.get(id)?.mode` in un template, con `savers` una `Map` semplice. Mossa: uno `$state` che riceve le notifiche della sessione, mai la mappa nel template.

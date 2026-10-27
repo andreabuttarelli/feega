@@ -19,6 +19,7 @@ const PRESS_MS = 90;
 const DWELL_MS = 900;
 const BADGE_LEAD_MS = 250;
 const DRAG_STEPS = 72;
+const SKIP_PLAY_S = 1.2;
 const DRAG_PLAY_S = 0.8;
 const LOCATE_MS = 15_000;
 
@@ -153,6 +154,12 @@ export async function demo(page: Page, dir: string) {
       await page.mouse.up();
       events.push({ kind: 'drag', t, end: now(), from: a, to: mouse, fit });
       await page.waitForTimeout(BEAT_MS);
+    },
+
+    async skip(work: () => Promise<void>) {
+      const t = now();
+      await work();
+      warps.push({ t, end: now(), play: SKIP_PLAY_S });
     },
 
     async look(fit: Rect, ms: number) {
