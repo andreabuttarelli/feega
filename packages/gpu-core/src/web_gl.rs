@@ -293,7 +293,7 @@ impl WebGlCore {
     }
 
     pub fn set_overlay(&mut self, items_json: &str) -> Result<(), JsValue> {
-        self.compositor.set_overlay(parse_overlay(items_json).map_err(failed)?);
+        self.compositor.set_overlay(parse_overlay(items_json).map_err(failed)?, &mut self.library);
         Ok(())
     }
 

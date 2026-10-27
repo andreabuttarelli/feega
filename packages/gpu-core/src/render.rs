@@ -49,6 +49,10 @@ impl Renderer {
         self
     }
 
+    pub fn cached_layers(&self) -> usize {
+        self.engine.cached_layers()
+    }
+
     pub fn compose_encodings(&mut self) {
         self.library.compose_encodings();
     }

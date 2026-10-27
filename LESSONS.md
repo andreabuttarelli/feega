@@ -3366,6 +3366,9 @@ in console.
 Signal: a poster is a white card on gpu-core; the console shows `UNSUPPORTED ... "unread"` and `core DOM read failed ... DataCloneError: Non-origin-clean ImageBitmap`. Cause: an element the DOM read cannot draw (SVG `<image>`) makes the whole frame undrawable, and a remote image drawn to a canvas without CORS taints the bitmap so it cannot leave the reader iframe. Move: log `list.unsupported` in `drawsWhole` to see which gap; load probe images with `crossOrigin = "anonymous"`; a data URL hides the taint, so test with a real storage URL.
 
 
+### A heavy-looking frame is not always the heavy thing in the profile
+**Signal:** the core renderer is slow zoomed in, the profile is wasm path encoding (`PathEncoder`, `polygon`, `Vec<Vec<f64>>::clone`), and the two path-heavy SVG frames get the blame. **Move:** dump what the wasm module is fed (wrap `put_group` and `set_overlay` through `page.route` on `gpu_core.js`) and count points per caller before building a cache. Here the overlay (57k points, cloned twice per region) outweighed the frames, and a native `encode_cost` timing showed encoding the 1.5 MB groups costs 2.5 ms, so the "250 ms first appearance" was never the encode. Also check any cache key built with `format!("{:?}", item)`: on a large group it is the hitch.
+
 ## A Playwright click inside a canvas iframe hits the wrong element
 Signal: `frameLocator(...).click()` on a link in a code frame passes, but nothing happens; a capture listener in the frame logs the click on a parent (`NAV`). Cause: the tile is CSS-scaled with the canvas zoom and Playwright places in-iframe points without that scale. Move: compute the point yourself: `frame.boundingBox().x + rect.x * (frame.width / innerWidth)`, then `page.mouse.click`. Real clicks are fine.
 

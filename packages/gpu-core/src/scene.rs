@@ -304,7 +304,8 @@ pub fn bounds<C: Canvas>(item: &Item, pictures: &Shelf<C::Picture>) -> Option<Re
         }
         Item::Layer(layer) => hull(corners(Affine::new(layer.look.matrix), Rect::new(0.0, 0.0, layer.size.width, layer.size.height))),
         Item::Group(group) => group.items.iter().filter_map(|i| bounds::<C>(i, pictures)).reduce(|a, b| a.union(b)),
-        Item::Use(_) | Item::Glyphs(_) | Item::Text(_) | Item::Lens(_) | Item::Other { .. } => None,
+        Item::Use(u) => u.reach.and_then(|[x0, y0, x1, y1]| hull(corners(Affine::new(u.matrix), Rect::new(x0, y0, x1, y1)))),
+        Item::Glyphs(_) | Item::Text(_) | Item::Lens(_) | Item::Other { .. } => None,
     }
 }
 

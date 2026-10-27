@@ -16,7 +16,7 @@ const STABLE_POLLS = 2;
 const FLAT_STDEV = 2;
 const MIN_NODE_PX = 6;
 const BG_TOLERANCE = 3;
-const TARGET_ZOOM = 0.5;
+const TARGET_ZOOM = Number(process.env.PERF_ZOOM ?? 0.5);
 const ZOOM_TOLERANCE = 0.08;
 const ZOOM_STEP_LIMIT = 40;
 const THROTTLE_PHONE = 4;
@@ -42,10 +42,12 @@ type Run = {
   longTaskMs: number;
 };
 
+const ONLY = process.env.PERF_ONLY?.split(',');
+const THROTTLES = (process.env.PERF_THROTTLES ?? `1,${THROTTLE_PHONE}`).split(',').map(Number);
 const RENDERERS = [
   { renderer: 'default', query: '' },
   { renderer: 'webgpu', query: 'renderer=webgpu' }
-];
+].filter((r) => !ONLY || ONLY.includes(r.renderer));
 
 const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0;
 const mb = (bytes: number) => Math.round(bytes / 1024 / 1024);
@@ -319,7 +321,7 @@ async function main() {
   }
 
   for (const r of RENDERERS) {
-    for (const throttle of [1, THROTTLE_PHONE]) {
+    for (const throttle of THROTTLES) {
       const key = `${r.renderer}-x${throttle}`;
       if (existsSync(`${OUT}/cfg-${key}.json`)) {
         continue;
@@ -340,7 +342,7 @@ async function main() {
 
   const results: Record<string, Saved> = {};
   for (const r of RENDERERS) {
-    for (const t of [1, THROTTLE_PHONE]) {
+    for (const t of THROTTLES) {
       const key = `${r.renderer}-x${t}`;
       results[key] = JSON.parse(readFileSync(`${OUT}/cfg-${key}.json`, 'utf8'));
     }

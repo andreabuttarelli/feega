@@ -15,6 +15,7 @@ use crate::Skipped;
 
 const KEPT_LAYERS: usize = 32;
 const KEPT_FRAMES: u64 = 240;
+const KEYED_POINTS_MAX: usize = 1000;
 
 struct Cached {
     image: ImageData,
@@ -58,6 +59,27 @@ fn plain_content(item: &Item) -> bool {
         Item::Group(group) => clips(std::slice::from_ref(item)).is_empty() && group.items.iter().all(plain_content),
         _ => false,
     }
+}
+
+fn corners(contours: &[Vec<f64>]) -> usize {
+    contours.iter().map(|c| c.len() / 2).sum()
+}
+
+fn points(item: &Item) -> usize {
+    let own = match item {
+        Item::Path(p) => corners(&p.contours) + p.within.iter().map(|w| corners(&w.contours)).sum::<usize>(),
+        Item::Group(g) => g.items.iter().map(points).sum(),
+        _ => 0,
+    };
+    let covers = item.look().and_then(|l| l.masks.as_ref()).into_iter().flatten().map(|m| match &m.cover {
+        Cover::Path { contours, .. } | Cover::Ramp { contours, .. } => corners(contours),
+        Cover::Picture { .. } => 0,
+    });
+    own + covers.sum::<usize>()
+}
+
+fn keyed(item: &Item) -> bool {
+    plain_content(item) && points(item) <= KEYED_POINTS_MAX
 }
 
 pub struct Engine {
@@ -142,7 +164,7 @@ impl<'a> Surface for Gpu<'a> {
     }
 
     fn recall(&mut self, item: &Item) -> Option<Placed> {
-        if !plain_content(item) || item.look().is_some_and(|l| l.backdrop.is_some()) {
+        if !keyed(item) || item.look().is_some_and(|l| l.backdrop.is_some()) {
             return None;
         }
         let tick = self.cache.tick;
@@ -153,7 +175,7 @@ impl<'a> Surface for Gpu<'a> {
     }
 
     fn remember(&mut self, item: &Item, placed: &Placed) {
-        if !plain_content(item) || item.look().is_some_and(|l| l.backdrop.is_some()) {
+        if !keyed(item) || item.look().is_some_and(|l| l.backdrop.is_some()) {
             return;
         }
         if let Some(texture) = self.last.take() {
@@ -181,6 +203,10 @@ impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
         Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default() })
+    }
+
+    pub fn cached_layers(&self) -> usize {
+        self.cache.entries.len()
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
