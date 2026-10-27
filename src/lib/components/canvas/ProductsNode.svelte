@@ -6,7 +6,7 @@
   import { saleLabel } from '$lib/canvas/product-discount';
   import { productThumb } from '$lib/canvas/source-thumbs';
 
-  let { node, products = [], total = 0 }: { node: ProductsNode; products?: Product[]; total?: number } = $props();
+  let { node, nodeId = null, products = [], total = 0 }: { node: ProductsNode; nodeId?: string | null; products?: Product[]; total?: number } = $props();
 
   const priceOf = (p: Product): string | null =>
     p.price === null ? null : `${p.price.toFixed(2)}${p.currency ? ` ${p.currency}` : ''}`;
@@ -14,6 +14,7 @@
   const tiles = $derived<PreviewTile[]>(
     products.map((product) => ({
       key: product.id,
+      itemId: product.id,
       thumb: productThumb(product),
       label: product.title,
       caption: priceOf(product),
@@ -29,6 +30,7 @@
   icon={ShoppingBag}
   title={node.url.trim() ? hostOf(node.url) : 'Products'}
   {tiles}
+  {nodeId}
   {total}
   syncStatus={node.syncStatus}
   syncError={node.syncError}

@@ -104,6 +104,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   import_canvas_file: 'Open an uploaded .feega file as a new canvas in this project.',
   register_upload: 'Turn an uploaded file into a node and an asset.',
   import_link: 'Copy a picture or video from a link into the project library.',
+  import_feed_image: 'Pull one picture out of a social feed or products node into an image node, or into a frame.',
   list_voices: 'Custom voices of the org.',
   voice_library: 'Search the shared voice library.',
   use_library_voice: 'Add a library voice to the org.',

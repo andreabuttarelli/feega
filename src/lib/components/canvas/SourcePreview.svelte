@@ -3,6 +3,8 @@
   import Layers from '@lucide/svelte/icons/layers';
   import Play from '@lucide/svelte/icons/play';
   import type { SyncStatus } from '$lib/canvas/sync-state';
+  import { CANVAS_DRAG_FEED_IMAGE, feedImageSize, serializeFeedImageDrag } from '$lib/canvas/feed-image';
+  import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
 
   export type PreviewTile = {
     key: string;
@@ -11,6 +13,7 @@
     caption: string | null;
     badge: 'carousel' | 'video' | null;
     sale?: string | null;
+    itemId?: string;
   };
 
   let {
@@ -20,7 +23,8 @@
     total,
     syncStatus,
     syncError,
-    empty
+    empty,
+    nodeId = null
   }: {
     icon: Component<{ size?: number; strokeWidth?: number }>;
     title: string;
@@ -29,7 +33,29 @@
     syncStatus: SyncStatus;
     syncError: string | null;
     empty: string;
+    nodeId?: string | null;
   } = $props();
+
+  const SQUARE = 1;
+
+  function endDrag() {
+    feedImageHover.size = null;
+    feedImageHover.over = null;
+  }
+
+  function startDrag(e: DragEvent, tile: PreviewTile) {
+    const img = e.currentTarget as HTMLImageElement;
+    if (!nodeId || !tile.itemId || !tile.thumb || !e.dataTransfer) {
+      e.preventDefault();
+      return;
+    }
+    const w = img.naturalWidth || SQUARE;
+    const h = img.naturalHeight || SQUARE;
+    feedImageHover.size = feedImageSize({ w, h });
+    e.dataTransfer.setData(CANVAS_DRAG_FEED_IMAGE, serializeFeedImageDrag({ nodeId, itemId: tile.itemId, imageIndex: 0, thumb: tile.thumb, w, h }));
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setDragImage(img, img.width / 2, img.height / 2);
+  }
 
   const BADGES = { carousel: { icon: Layers, label: 'Carosello' }, video: { icon: Play, label: 'Video' } } as const;
 </script>
@@ -55,7 +81,19 @@
       {#each tiles as tile (tile.key)}
         <li class="preview-tile" title={tile.caption ?? tile.label}>
           {#if tile.thumb}
-            <img class="preview-img" src={tile.thumb} alt={tile.label} loading="lazy" decoding="async" />
+            <img
+              class="preview-img"
+              class:nodrag={nodeId && tile.itemId}
+              class:draggable={nodeId && tile.itemId}
+              src={tile.thumb}
+              alt={tile.label}
+              loading="lazy"
+              decoding="async"
+              draggable={nodeId && tile.itemId ? 'true' : undefined}
+              ondragstart={(e) => startDrag(e, tile)}
+              ondragend={endDrag}
+              data-testid="feed-image"
+            />
           {:else}
             <div class="preview-img preview-img-empty"><Icon size={16} strokeWidth={1.5} /></div>
           {/if}
@@ -135,6 +173,17 @@
     height: 100%;
     object-fit: cover;
     display: block;
+  }
+  .preview-badge,
+  .preview-sale,
+  .preview-caption {
+    pointer-events: none;
+  }
+  .preview-img.draggable {
+    cursor: grab;
+  }
+  .preview-img.draggable:active {
+    cursor: grabbing;
   }
   .preview-img-empty {
     display: grid;

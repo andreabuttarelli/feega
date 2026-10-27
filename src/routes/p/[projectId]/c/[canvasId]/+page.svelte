@@ -127,7 +127,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
   import { frameHolding, type FrameHold } from '$lib/canvas/frame-holding';
-  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
+  import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
@@ -697,6 +699,37 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+  }
+
+  function feedImageOver(client: PointerPoint | null) {
+    markFrame(client, null);
+    feedImageHover.over = client && !frameUnderPointer(client, null) ? (toFlow?.(client) ?? null) : null;
+  }
+
+  async function dropFeedImage(drag: FeedImageDrag, client: PointerPoint) {
+    feedImageOver(null);
+    feedImageHover.size = null;
+    const drop = dropAt(client, null);
+    if (!drop) {
+      return;
+    }
+
+    const ask = { source: drag.nodeId, item_id: drag.itemId, image_index: drag.imageIndex, drop: JSON.stringify(drop) };
+    if (drop.on !== DropOn.Canvas) {
+      landed(await post('importFeedImage', ask));
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    catalogPosters.set(id, drag.thumb);
+    nodes = [...nodes, toTile(pendingPicture(id, drop, feedImageSize(drag)))];
+    const res = await post('importFeedImage', { ...ask, node_id: id });
+    const created = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    catalogPosters.delete(id);
+    nodes = settle(nodes, id, created ? toTile(created, { select: true }) : null);
+    if (created) {
+      pushGesture(createGesture(created));
+    }
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -4144,6 +4177,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCreate={create}
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
+    onDropFeedImage={dropFeedImage}
+    onFeedImageOver={feedImageOver}
     onDraw={drawElement}
     onDrawFrame={drawFrame}
     onRotate={rotateGroupBy}
@@ -4223,6 +4258,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     follow={followView}
   >
     {#snippet canvasOver()}
+      {#if feedImageHover.over && feedImageHover.size}
+        <div class="feed-drop" data-testid="feed-drop" style={`transform: translate(${feedImageHover.over.x - feedImageHover.size.w / 2}px, ${feedImageHover.over.y - feedImageHover.size.h / 2}px);width:${feedImageHover.size.w}px;height:${feedImageHover.size.h}px`}></div>
+      {/if}
       {#if commentsPanel.pending && !commentsPanel.pending.nodeId}
         <CommentPin ghost at={commentsPanel.pending} />
       {/if}
@@ -4407,7 +4445,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onfield={(patch) => write(id, patch)}
             onsync={() => sync(id)}
           >
-            <ProductsNode node={catalog} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
+            <ProductsNode node={catalog} nodeId={id} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
           </SourceSettingsFrame>
         {:else if feed}
           <SourceSettingsFrame
@@ -4417,7 +4455,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onfield={(patch) => write(id, patch)}
             onsync={() => sync(id)}
           >
-            <SocialFeedNode node={feed} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
+            <SocialFeedNode node={feed} nodeId={id} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
           </SourceSettingsFrame>
         {:else if influencer}
           <InfluencerNode
@@ -4576,6 +4614,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     height: 100%;
     background: var(--muted);
     animation: pending-pulse 1.2s ease-in-out infinite alternate;
+  }
+
+  .feed-drop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    border: 1.5px dashed var(--ink, #1d1d1f);
+    background: rgb(0 0 0 / 0.05);
   }
 
   .pending-frame.shown {
