@@ -86,7 +86,7 @@ import { nextStepsFor, nodeTextCost } from '$lib/server/canvas/node-hints';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { makeEffectsPair } from '$lib/server/canvas/effects-actions';
 import { nodeAcceptsConnection } from '$lib/canvas/connector-ports';
-import { connectVerdict } from '$lib/server/canvas/node-model';
+import { connectVerdict, elementSourceRefusal } from '$lib/server/canvas/node-model';
 import { ShareState, readCanvasShare, setCanvasShare } from '$lib/server/canvas/canvas-share';
 import { referenceLibrary } from '$lib/server/canvas/reference-library';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
@@ -1230,7 +1230,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'an effects node takes a single media' });
     }
 
-    const refusal = connectVerdict(sourceNode ?? null, targetNode ?? null);
+    const refusal = connectVerdict(sourceNode ?? null, targetNode ?? null) ?? (await elementSourceRefusal(scope.db, { orgId: scope.orgId, source: sourceNode ?? null }));
     if (refusal) {
       return fail(400, { error: refusal });
     }

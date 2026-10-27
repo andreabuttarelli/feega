@@ -1,6 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { listConnections, listNodes, type CanvasNodeRecord, type Connection } from '$lib/server/repos/canvas';
 import { findAsset, findAssets } from '$lib/server/repos/assets';
+import { freeImageAssetOf } from './free-image';
 import { listInfluencerViews, signInfluencerViewFiles } from '$lib/server/repos/influencers';
 import { listItems } from '$lib/server/repos/product-batches';
 import { studioBatchOf, studioBatchSummary } from '$lib/canvas/studio-batch-node';
@@ -351,6 +352,10 @@ async function toUpstreamNode(
     return audioUpstreamNode(db, orgId, node);
   }
 
+  if (node.type === 'element') {
+    return freeImageUpstreamNode(db, orgId, node, connections);
+  }
+
   const shownId = typeof node.data.refId === 'string' ? node.data.refId : uploadedAssetIdOf(node.data);
   const asset = shownId ? await findAsset(db, { orgId, assetId: shownId }) : null;
 
@@ -361,6 +366,14 @@ async function toUpstreamNode(
     text: sourceText(node, asset),
     mediaUrl: sourceMediaUrl(asset)
   };
+}
+
+async function freeImageUpstreamNode(db: Db, orgId: string, node: CanvasNodeRecord, connections: Connection[]): Promise<UpstreamNode> {
+  const feeds = connections.some((c) => c.sourceNodeId === node.id);
+  const assetId = feeds ? await freeImageAssetOf(db, { orgId, node }) : null;
+  const asset = assetId ? await findAsset(db, { orgId, assetId }) : null;
+
+  return { id: node.id, type: node.type, medium: 'image', model: null, text: null, mediaUrl: sourceMediaUrl(asset) };
 }
 
 function uploadedAssetIdOf(data: Record<string, unknown>): string | null {
