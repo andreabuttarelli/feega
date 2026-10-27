@@ -36,10 +36,24 @@ export function edgeLook(edge: Wire, selected: readonly string[], selectedEdge: 
 
 const turnedBy = (items: PathItem[], turn: Turn | undefined): PathItem[] => (turn ? items.map((i) => ({ ...i, matrix: mul2d(turned(turn), i.matrix) })) : items);
 
+type Fixed = Pick<WorldOverlay, 'curves' | 'chrome' | 'selected' | 'selectedEdge' | 'theme' | 'glyphs'>;
+const FIXED_KEYS = ['curves', 'chrome', 'selected', 'selectedEdge', 'theme', 'glyphs'] as const;
+
+let fixedFor: Fixed | null = null;
+let fixedItems: PathItem[] = [];
+
+function zoomFree(o: Fixed): PathItem[] {
+  if (fixedFor && FIXED_KEYS.every((k) => fixedFor![k] === o[k])) {
+    return fixedItems;
+  }
+  fixedFor = o;
+  fixedItems = [...o.curves.flatMap((c) => edgeItems(c.edge.id, c.curve, edgeLook(c.edge, o.selected, o.selectedEdge), o.theme)), ...o.chrome.flatMap((t) => turnedBy(chromeOf(t, o.glyphs), t.turn))];
+  return fixedItems;
+}
+
 export function overlayOf(o: WorldOverlay): PathItem[] {
   return [
-    ...o.curves.flatMap((c) => edgeItems(c.edge.id, c.curve, edgeLook(c.edge, o.selected, o.selectedEdge), o.theme)),
-    ...o.chrome.flatMap((t) => turnedBy(chromeOf(t, o.glyphs), t.turn)),
+    ...zoomFree(o),
     ...o.running.flatMap((b) => runningItems(b, o.zoom, o.theme)),
     ...(o.hovered ? hoverItems(o.hovered, o.zoom, o.theme) : []),
     ...(o.marquee ? marqueeItems(o.marquee, o.zoom, o.theme) : []),
