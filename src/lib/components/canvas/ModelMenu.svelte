@@ -127,7 +127,7 @@
   <DropdownMenu.Trigger
     aria-label="Model"
     data-control="model"
-    class="{CONTROL_HEIGHT} inline-flex max-w-56 min-w-0 items-center gap-1.5 rounded-sm border border-line-2 bg-background px-2 text-left text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-expanded:bg-muted"
+    class="{CONTROL_HEIGHT} inline-flex max-w-56 min-w-0 items-center gap-1.5 rounded-sm bg-transparent px-2 text-left text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-expanded:bg-muted"
   >
     {#if mixed}
       <span class="truncate">{MIXED_TEXT}</span>
