@@ -121,14 +121,18 @@
   }
 
   ol {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
     list-style: none;
     margin: 0;
     padding: 4px 0;
-    width: 280px;
-    max-height: 260px;
+    width: min(280px, calc(100vw - 24px));
+    max-height: min(260px, calc(100dvh - 140px));
     overflow-y: auto;
-    border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
-    background: var(--ui-panel);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   li {
