@@ -14,6 +14,8 @@
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
   import PrototypeArrows from '../PrototypeArrows.svelte';
+  import PrototypePlayerHost from '../PrototypePlayerHost.svelte';
+  import { prototypePlayer } from '$lib/canvas/prototype-player.svelte';
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { prototypeLinks } from '$lib/motion/prototype/links';
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
@@ -356,6 +358,10 @@
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   const prototypeDocs = $derived(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   const arrowLinks = $derived(prototypeLinks(prototypeDocs));
+  const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: liveOf(f.id)! })));
+  $effect(() => {
+    prototypePlayer.editing = inside?.nodeId ?? null;
+  });
   $effect(() => {
     prototypeLink.docs = prototypeDocs;
     prototypeLink.targets = coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!) }));
@@ -3481,6 +3487,7 @@
         {/if}
       {/snippet}
     </FrameOverlays>
+    <PrototypePlayerHost frames={playerFrames} />
     <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} />
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom});--zoom:${view.zoom}`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">

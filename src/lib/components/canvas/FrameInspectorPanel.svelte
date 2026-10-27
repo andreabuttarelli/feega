@@ -10,6 +10,7 @@
   import InstanceInspector from '$lib/components/motion/InstanceInspector.svelte';
   import RangeTextInspector from '$lib/components/motion/RangeTextInspector.svelte';
   import PrototypeSection from '$lib/components/motion/PrototypeSection.svelte';
+  import FlowSection from '$lib/components/motion/FlowSection.svelte';
   import VariablesLibrarySection from '$lib/components/motion/VariablesLibrarySection.svelte';
   import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
   import { textRange } from '$lib/canvas/text-range.svelte';
@@ -98,6 +99,7 @@
     <FramePresetSection {doc} onchange={editGuides} />
     <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
     <LayoutGuidesSection {doc} onchange={editGuides} />
+    <FlowSection {doc} onchange={editGuides} />
     <StyleLibrarySection {tokens} />
     <VariablesLibrarySection {doc} onchange={editGuides} />
   </aside>
