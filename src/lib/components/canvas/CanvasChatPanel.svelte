@@ -144,7 +144,7 @@
 
   @media (max-width: 1180px) {
     .chat-pane {
-      bottom: 76px;
+      bottom: calc(var(--dock-lift, 0px) + 76px);
     }
   }
 

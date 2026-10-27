@@ -40,7 +40,7 @@ describe('the canvas shell: a full-bleed canvas under floating rounded groups (D
 
   it('the canvas stage spans the whole row, the chrome sits on top of it', () => {
     const top = shell.indexOf('<CanvasTopBar');
-    const row = shell.indexOf('<div class="canvas-row">');
+    const row = shell.indexOf('<div class="canvas-row"');
     const rail = shell.indexOf('<FloatingRail');
     const panel = shell.indexOf('<CanvasLeftPanel');
     const stage = shell.indexOf('<div class="canvas-stage">');
@@ -50,5 +50,14 @@ describe('the canvas shell: a full-bleed canvas under floating rounded groups (D
     expect(rail).toBeLessThan(panel);
     expect(panel).toBeLessThan(stage);
     expect(rule(shell, '.canvas-row')).toMatch(/position:\s*relative/);
+  });
+
+  it('the frame timeline floats between the side panels instead of sliding under them', () => {
+    expect(shell).toMatch(/style:--shell-left=/);
+    expect(shell).toMatch(/style:--shell-right=/);
+    const timeline = read('FrameTimeline.svelte');
+    expect(timeline).toMatch(/left:\s*var\(--shell-left/);
+    expect(timeline).toMatch(/right:\s*var\(--shell-right/);
+    expect(timeline).toMatch(/border-radius:\s*var\(--ui-radius-lg\)/);
   });
 });

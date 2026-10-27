@@ -89,7 +89,7 @@
 
   @media (max-width: 1180px) {
     .left-panel {
-      bottom: 76px;
+      bottom: calc(var(--dock-lift, 0px) + 76px);
     }
   }
 

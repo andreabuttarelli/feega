@@ -77,7 +77,9 @@ These rules apply to every panel, including the Properties inspector:
   `--ui-panel-raised` with `--ui-shadow-float`: top-bar zones and the left rail are `full` pills,
   the left panel (Layers / Assets) and the right bar are `lg` cards inset 12px from the edges.
   Side panels are closed by default; the right bar opens on its own when an element in a frame is
-  selected (the inspector) and otherwise only from its toggle.
+  selected (the inspector) and otherwise only from its toggle. The frame timeline floats as an
+  `lg` card between the open side panels; under 1180px it spans the canvas and the panels stop
+  above it.
 - **Collaborators:** cursors carry a coloured name pill; avatars sit in the top bar, right.
 - **Type colours:** layer icons use `--ui-type-frame` / `--ui-type-text` / `--ui-type-media`.
 - **Top bar** (canvas and inline frame editor, 48px, one row):

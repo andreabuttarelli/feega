@@ -3887,7 +3887,7 @@
 
   .remix-banner {
     position: absolute;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     translate: -50% 0;
     max-width: calc(100% - 32px);
@@ -3910,7 +3910,7 @@
   .edge-refusal {
     position: absolute;
     z-index: 12;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     transform: translateX(-50%);
     margin: 0;

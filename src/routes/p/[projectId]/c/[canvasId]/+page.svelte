@@ -4490,7 +4490,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   .warning {
     position: absolute;
     z-index: 10;
-    top: 10px;
+    top: var(--chrome-top, 10px);
     left: 50%;
     transform: translateX(-50%);
     margin: 0;
@@ -4503,14 +4503,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   .warning.reload {
-    top: 40px;
+    top: calc(var(--chrome-top, 10px) + 30px);
     color: inherit;
   }
 
   .workflow-chip {
     position: absolute;
     z-index: 10;
-    top: 10px;
+    top: var(--chrome-top, 10px);
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -4558,15 +4558,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   .copy-link {
     position: absolute;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     z-index: 5;
     transform: translateX(-50%);
     height: 28px;
-    padding: 0 10px;
-    border: 1px solid var(--ui-line-strong);
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-surface, var(--background));
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
     color: var(--ui-ink);
     font-size: var(--ui-text-xs);
     cursor: pointer;
