@@ -445,8 +445,27 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'set template fields': motion('set_template_fields')
 };
 
+export const STUDIO_PAGE_ACTIONS: Record<string, Parity> = {
+  upload: uiOnly('browser file picker straight to storage; an agent brings images with its own import tools'),
+  quote: tool('studio_quote'),
+  generate: tool('studio_start')
+};
+
+export const BATCH_PAGE_ACTIONS: Record<string, Parity> = {
+  run: tool('studio_run'),
+  more: tool('studio_more'),
+  cancel: tool('studio_cancel'),
+  retry: tool('studio_retry'),
+  regenerate: tool('studio_regenerate'),
+  approve: tool('studio_approve'),
+  reject: tool('studio_reject'),
+  drain: uiOnly('background tick the page triggers while it is open; the server drains on its own')
+};
+
 export const PARITY_TABLES = {
   CANVAS_PAGE_ACTIONS,
+  STUDIO_PAGE_ACTIONS,
+  BATCH_PAGE_ACTIONS,
   FRAME_PAGE_ACTIONS,
   EDITOR_ACTIONS,
   SELECTION_TOOLBAR,

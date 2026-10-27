@@ -1,0 +1,83 @@
+---
+title: CLI
+description: The feega command line.
+sidebar:
+  order: 2
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+The CLI is a thin HTTP client: it never touches the database and only calls `/api/v1`.
+
+```bash
+curl -sSL https://raw.githubusercontent.com/andreabuttarelli/feega/main/cli/scripts/install.sh | bash
+feega login
+```
+
+Local dev servers on `localhost:5173` are auto-detected; override with `PUBLIC_APP_URL`.
+
+## Commands (from `cli/cli.ts`)
+
+| Command | Does |
+|---|---|
+| `login`, `logout` | Sign in and out |
+| `orgs` (`create`, `use`), `team` | Organizations and members |
+| `projects`, `canvases <projectId>` | List |
+| `canvas op <projectId> <op>` | Run a canvas op |
+| `canvas models`, `canvas export`, `canvas frame`, `canvas upload` | Models, export, frames, file upload |
+| `motion ask <nodeId> <prompt>` | Ask the frame editor agent |
+| `motion render`, `render-status`, `run` | Render and poll |
+| `motion list`, `shaders`, `templates`, `new`, `add-template` | Videos, shader effects, templates |
+| `motion embed`, `share`, `still`, `frames`, `storyboard`, `revisions`, `budget` | Publish, share, inspect |
+| `motion tool`, `op`, `tools`, `move`, `place` | Editor tools and ops |
+| `gallery [query]` (`remix`, `publish`, `withdraw`) | The public gallery |
+| `effects`, `effects write <name>`, `effects patch <effectId>` | Image effects and custom shader effects |
+| `layouts`, `layouts write <name>`, `layouts patch <layoutId>` | Custom composition layouts |
+| `studio quote`, `studio start`, `studio status <batchId>` | Photo studio batches: price, start with the quote id, follow |
+| `studio run`, `more`, `cancel`, `retry`, `regenerate`, `approve`, `reject <batchId>` | Act on a batch or its items (`--items`, `--variations`) |
+| `allowlist`, `allowlist set <medium> [ids...]` | [Model allow-list](/ai/model-allow-list/) |
+| `caps`, `caps set <scope> <usd>` | [Spend limits](/ai/spend-limits/) |
+| `app-account <projectId>` | The test app account a project remembers |
+| `media` | Signed links to node, run or asset media |
+| `health`, `update` | API status, self-update |
+
+`feega <command> --help` shows flags. Direction of change is app, then CLI, then MCP.
+
+## Photo studio batches from the CLI
+
+<DemoVideo name="studio-batch-cli" caption="Set up a studio batch in the app, then price the same selection from the terminal. Nothing is spent." />
+
+The Photo studio turns a product photo into a set of styled shots. An agent prices and starts the same batch a person does, with one safeguard: starting needs the quote of the same selection.
+
+**In the app**
+
+1. Open the Photo studio (`/app/studio`) and add a product photo, at least 500 px on a side.
+2. Pick a model or skip, pick one or more styles, choose how many versions of each.
+3. The last step shows the price before anything is spent. **Generate** starts the batch.
+
+**From the terminal**
+
+1. Write the selection as JSON: `name`, `productIds`, `environments`, `shots`, `variations`, `model`. An uploaded photo is `upload:<assetId>`; products from a connected store use their product id.
+
+   ```json
+   { "name": "Mug launch", "productIds": ["upload:<assetId>"], "environments": ["marble"], "shots": ["packshot"], "variations": 1, "model": "nano-banana-pro" }
+   ```
+
+2. Price it. Free, nothing is spent:
+
+   ```bash
+   feega studio quote --file selection.json --project $PROJECT
+   # 1 images, 11 credits (11 each)
+   # quote id: a2d7ad6d...
+   ```
+
+3. Start it with the quote id. This spends credits, so ask the person first. A changed selection or price answers 409: quote again.
+
+   ```bash
+   feega studio start --file selection.json --quote <quote id> --project $PROJECT
+   feega studio status <batchId>
+   ```
+
+4. Act on the batch: `studio run`, `more`, `cancel`, `retry`, `regenerate`, `approve`, `reject <batchId>` (`--items`, `--variations`).
+
+**Over MCP** the tools are `studio_quote`, `studio_start`, `studio_status` and `studio_run`, `studio_more`, `studio_cancel`, `studio_retry`, `studio_regenerate`, `studio_approve`, `studio_reject`. Over HTTP: `POST /api/v1/studio/quote`, `POST /api/v1/studio/start`, `GET /api/v1/studio/{batchId}`, see [API](/integrations/api/). API keys (`feega_`) work; read-only keys cannot start or act.
