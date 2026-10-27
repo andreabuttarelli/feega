@@ -102,6 +102,7 @@
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
   import CoreFrames from './CoreFrames.svelte';
+  import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
@@ -331,6 +332,19 @@
   });
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
+  let core = $state.raw<ReturnType<typeof CoreFrames> | null>(null);
+  let ramRuns = $state<FrameRange[]>([]);
+  let ramRun: AbortController | null = null;
+  let ramNode = $state('');
+
+  function cacheRam(nodeId: string, doc: MotionDoc) {
+    ramRun?.abort();
+    ramRun = new AbortController();
+    ramRuns = [];
+    ramNode = nodeId;
+    const range = doc.workArea ?? { from: 0, to: doc.durationInFrames };
+    void core?.cache(nodeId, range, ramRun.signal, (runs) => (ramRuns = runs));
+  }
   let coreDrawn = $state(new Set<string>());
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
   const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
@@ -3355,6 +3369,8 @@
         onaction={(id) => void runFrameAction(id)}
         marks={props.commentMarks?.(nodeId, timeline.doc.fps) ?? []}
         onmark={(id) => props.onMark?.(id)}
+        ram={ramNode === nodeId ? ramRuns : []}
+        onram={() => cacheRam(nodeId, timeline!.doc)}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
       />
@@ -3382,7 +3398,7 @@
   >
     {#if coreOn}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>

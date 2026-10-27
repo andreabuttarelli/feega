@@ -9,6 +9,8 @@
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { frameBarActions } from '$lib/canvas/frame-inspector';
   import { EditMode } from '$lib/motion/edit-mode';
+  import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
+  import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { Snap } from '$lib/motion/timeline-view';
   import type { KeyRef } from '@feega/motion-core/motion/timeline';
   import type { CommentMark } from '$lib/canvas/comment-marks';
@@ -25,8 +27,10 @@
     marks = [],
     onmark = () => {},
     onpin,
+    ram = [],
+    onram = () => {},
     onchange
-  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; marks?: CommentMark[]; onmark?: (id: string, frame: number) => void; onpin?: () => void; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; marks?: CommentMark[]; onmark?: (id: string, frame: number) => void; onpin?: () => void; ram?: FrameRange[]; onram?: () => void; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const MODE_LABEL: Record<EditMode, string> = { [EditMode.Design]: 'Design: edits set the resting state', [EditMode.Motion]: 'Animate: edits key at the playhead' };
 
@@ -83,12 +87,25 @@
     onframe(next);
   }
 
+  function onKey(e: KeyboardEvent) {
+    if (isTyping(e.target as Parameters<typeof isTyping>[0])) {
+      return;
+    }
+    if (commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }) === Command.RamPreview) {
+      e.preventDefault();
+      onram();
+    }
+  }
+
   $effect(() => () => cancelAnimationFrame(raf));
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <section bind:this={section} class="timeline" data-testid="frame-timeline" data-dock="timeline">
   <div class="bar">
     <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" data-testid="frame-timeline-play" onclick={toggle} />
+    <IconButton action={Command.RamPreview} size={14} data-testid="frame-timeline-ram" onclick={onram} />
     <span class="time" data-testid="frame-timeline-time">{(frame / doc.fps).toFixed(2)}s</span>
     {#each grouping as id (id)}<IconButton action={id} size={14} data-testid={`frame-timeline-${id}`} onclick={() => onaction(id)} />{/each}
     {#if onpin}<button type="button" class="pin-here" data-testid="frame-timeline-pin" onclick={onpin}>Comment here</button>{/if}
@@ -108,7 +125,7 @@
     {#if graphOpen}
       <GraphEditor {doc} {frame} {selection} bind:keySelection {camera} {onchange} />
     {:else}
-      <MotionTimeline {doc} bind:frame={() => frame, scrub} bind:selection={() => selection, onselect} bind:keySelection bind:camera bind:zoom snap={Snap.On} {onchange} />
+      <MotionTimeline {doc} bind:frame={() => frame, scrub} bind:selection={() => selection, onselect} bind:keySelection bind:camera bind:zoom snap={Snap.On} cached={ram} {onchange} />
     {/if}
   </div>
 </section>

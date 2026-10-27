@@ -3,6 +3,7 @@ export enum Command {
   TogglePlay = 'toggle-play',
   Play = 'play',
   Pause = 'pause',
+  RamPreview = 'ram-preview',
   Rewind = 'rewind',
   GoStart = 'go-start',
   GoEnd = 'go-end',
@@ -176,6 +177,7 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: ' ', command: Command.TogglePlay, label: 'Space', does: 'Play / pause', group: ShortcutGroup.Playback },
   { key: 'l', command: Command.Play, label: 'L', does: 'Play', group: ShortcutGroup.Playback },
   { key: 'k', command: Command.Pause, label: 'K', does: 'Pause', group: ShortcutGroup.Playback },
+  { key: 'Enter', alt: true, command: Command.RamPreview, label: '⌥↵', does: 'RAM preview: cache the work area so it plays at full speed', group: ShortcutGroup.Playback },
   { key: 'j', command: Command.Rewind, label: 'J', does: 'Pause and go back one second', group: ShortcutGroup.Playback },
 
   { key: 'Home', command: Command.GoStart, label: 'Home', does: 'Go to the start', group: ShortcutGroup.Time },
