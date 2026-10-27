@@ -421,6 +421,8 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'font family and weight': motion('set_font'),
   'apply or detach a named style': motion('named_style'),
   'save a clip look as a named style': motion('named_style'),
+  'bind a field to a variable with its chip': motion('bind_variable'),
+  'unbind a field from its variable': motion('unbind_variable'),
   'pen path points and handles': motion('edit_path_points'),
   'align and distribute': motion('arrange_space'),
   'reorder layers': motion('set_track'),
