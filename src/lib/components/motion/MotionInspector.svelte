@@ -26,7 +26,7 @@
   import InspectorSection from './InspectorSection.svelte';
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
-  import { DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
+  import { ADVANCED_TEXT_KEYS, DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
   import { clipName as layerName, renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
@@ -42,6 +42,8 @@
   import { IconButton as ShellIconButton, Menu, MenuContent, MenuItem, MenuTrigger } from '$lib/components/ui/shell';
   import { hasSegments, segmentsOf } from '$lib/motion/segments';
   import SegmentedField from './SegmentedField.svelte';
+  import { snappedValue, steppedRange } from '$lib/motion/weight-steps';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import FamilyIcon from './FamilyIcon.svelte';
   import { CLIP_FAMILIES, familyOf } from '$lib/motion/track-style';
   import { KeyMark } from '$lib/motion/timeline-layers';
@@ -170,6 +172,7 @@
 
   const family = $derived(familyOf(clip.component));
   let sections = $state<SectionState>({});
+  let advancedOpen = $state(false);
 
   onMount(() => {
     sections = readSections(localStore());
@@ -450,12 +453,12 @@
   }
   const numberShown = (prop: AnimProp) => toShown(clip.component, prop.key, Math.round(Number(shown(prop.key)) * 1000) / 1000, doc);
   const stored = (key: string, v: number) => toStored(clip.component, key, v, doc);
-  const slider = (p: Ranged) => sliderOf(clip.component, p, doc);
+  const slider = (p: Ranged) => steppedRange(p.key, sliderOf(clip.component, p, doc));
   const depthRange = $derived(slider({ key: 'depth', ...DEPTH }));
   const fieldRange = (field: Field): Ranged => ({ key: field.key, min: field.min ?? 0, max: field.max ?? 0, step: field.step ?? 1 });
   const fieldShown = (field: Field) => toShown(propsOwner(clip.component), field.key, Number(value(field)), doc);
   const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, v, doc);
-  const fieldSlider = (field: Field) => sliderOf(propsOwner(clip.component), fieldRange(field), doc);
+  const fieldSlider = (field: Field) => steppedRange(field.key, sliderOf(propsOwner(clip.component), fieldRange(field), doc));
   const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
 
   const pulseShown = $derived(pulsable.length > 0 && shows(Part.Pulse, family) && doc.tracks.some((t) => t.clips.some((c) => c.component === 'Audio')));
@@ -569,7 +572,7 @@
     fill={look.fill}
     mark={MARK[keyState(prop.key)]}
     expression={clip.expressions[prop.key] !== undefined}
-    onchange={(v) => animate(prop.key, stored(prop.key, v))}
+    onchange={(v) => animate(prop.key, stored(prop.key, snappedValue(prop.key, v)))}
     onkey={() => toggle(prop.key)}
     onexpression={() => toggleExpression(prop.key)}
   />
@@ -606,7 +609,7 @@
     fill={look.fill}
     mark={keyed ? MARK[keyState(field.key)] : null}
     expression={clip.expressions[field.key] !== undefined}
-    onchange={(v) => setProp(field, fieldStored(field, v))}
+    onchange={(v) => setProp(field, fieldStored(field, snappedValue(field.key, v)))}
     onkey={() => toggle(field.key)}
     onexpression={keyed ? () => toggleExpression(field.key) : undefined}
   />
@@ -747,7 +750,16 @@
 {/snippet}
 
 {#snippet textBody()}
-  {@render groupFields(Section.Text)}
+  {@const advanced = fieldsIn(Section.Text).filter((f) => ADVANCED_TEXT_KEYS.has(f.key))}
+  {@render groupFields(Section.Text, ADVANCED_TEXT_KEYS)}
+  {#if advanced.length}
+    <button type="button" class="advanced" data-testid="text-advanced" aria-expanded={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}>
+      <ChevronRight size={12} class={advancedOpen ? 'turned' : ''} />Advanced
+    </button>
+    {#if advancedOpen}
+      {@render groupFields(Section.Text, new Set(fieldsIn(Section.Text).map((f) => f.key).filter((k) => !ADVANCED_TEXT_KEYS.has(k))))}
+    {/if}
+  {/if}
 {/snippet}
 
 {#snippet layoutBody()}
@@ -1096,6 +1108,20 @@
 {/snippet}
 
 <style>
+  .advanced {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ui-ink-2);
+  }
+
+  .advanced :global(.turned) {
+    transform: rotate(90deg);
+  }
+
   .inspector {
     display: flex;
     flex: 1 0 auto;
