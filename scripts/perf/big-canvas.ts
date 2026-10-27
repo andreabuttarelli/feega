@@ -22,6 +22,7 @@ const ZOOM_STEP_LIMIT = 40;
 const THROTTLE_PHONE = 4;
 const PROFILE_TOP = 15;
 const CLOSE_TIMEOUT_MS = 10_000;
+const CORE_OFF = '[canvas] core off';
 const TSX_NAME_SHIM = 'window.__name = (f) => f;';
 const TRACE = process.env.PERF_TRACE === '1';
 const TRACE_CATEGORIES = ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame', 'v8', 'v8.execute', 'disabled-by-default-v8.cpu_profiler', 'disabled-by-default-v8.gc', 'blink.user_timing', 'gpu', 'viz', 'webgpu', 'disabled-by-default-webgpu', 'gpu.dawn', 'disabled-by-default-gpu.dawn'];
@@ -166,6 +167,11 @@ async function oneRun(browser: Browser, state: string, config: Config, index: nu
   await page.addInitScript({ content: TSX_NAME_SHIM });
   await page.addInitScript(instrument);
   await page.addInitScript(installProbes);
+  page.on('console', (m) => {
+    if (m.text().includes(CORE_OFF)) {
+      throw new Error(`core renderer fell back: ${m.text()}`);
+    }
+  });
   const cdp = await context.newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: config.throttle });
 
