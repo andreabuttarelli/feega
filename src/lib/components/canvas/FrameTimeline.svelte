@@ -128,6 +128,27 @@
     z-index: 5;
   }
 
+  @media (min-width: 768px) {
+    .timeline {
+      left: var(--shell-left, 0px);
+      right: var(--shell-right, 0px);
+      bottom: 12px;
+      overflow: hidden;
+      border-top: 0;
+      border-radius: var(--ui-radius-lg);
+      background: var(--ui-panel-raised);
+      box-shadow: var(--ui-shadow-float);
+      transition: left var(--ui-dur-fast) var(--ui-ease), right var(--ui-dur-fast) var(--ui-ease);
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1180px) {
+    .timeline {
+      left: 68px;
+      right: 12px;
+    }
+  }
+
   .bar {
     display: flex;
     align-items: center;

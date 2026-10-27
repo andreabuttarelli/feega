@@ -168,7 +168,7 @@
 </script>
 
 <header class="canvas-topbar">
-  <div class="top-box left">
+  <div class="top-box top-group left">
     <CanvasMenu {projectId} {profile} {org} {creditBalance} />
 
     {#if renamingProject}
@@ -214,7 +214,7 @@
     </DropdownMenu.Root>
     {/if}
 
-    <div class="canvas-title centred" data-testid="canvas-title">
+    <div class="canvas-title top-group centred" data-testid="canvas-title">
     <span class="sep">/</span>
 
     {#if renaming}
@@ -369,7 +369,7 @@
   />
 
   <div class="top-slot" data-top-slot></div>
-  <div class="top-box right">
+  <div class="top-box top-group right">
     <div class="top-peers" data-top-peers></div>
     {#if $canvasLink}
       <ConnectionDot state={$canvasLink} />
@@ -407,16 +407,25 @@
   }
 
   .canvas-topbar {
-    position: relative;
-    z-index: 20;
-    flex: 0 0 auto;
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 40;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
     height: 48px;
-    padding: 0 8px;
-    background: var(--ui-surface);
+    padding: 0 10px;
+    pointer-events: none;
+  }
+
+  .top-group {
+    pointer-events: auto;
+    height: 38px;
+    padding: 0 3px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .top-slot {
@@ -438,10 +447,8 @@
   .top-box {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     min-width: 0;
-    height: 44px;
-    padding: 0 4px;
   }
 
   .sep {
@@ -479,6 +486,11 @@
     .canvas-title.centred .sep {
       display: inline;
     }
+    .canvas-title.top-group {
+      height: auto;
+      background: transparent;
+      box-shadow: none;
+    }
   }
 
   :global(.switcher-btn) {
@@ -491,8 +503,8 @@
     border: 0;
     background: transparent;
     height: var(--ui-control-h);
-    padding: 0 8px;
-    border-radius: var(--ui-radius-sm);
+    padding: 0 10px;
+    border-radius: var(--ui-radius-full);
     font: inherit;
     font-size: var(--ui-type-body);
     font-weight: var(--ui-weight-semibold);
@@ -550,7 +562,7 @@
     flex-shrink: 0;
     appearance: none;
     border: 0;
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-full);
     background: transparent;
     color: var(--ui-icon-ink);
     cursor: pointer;

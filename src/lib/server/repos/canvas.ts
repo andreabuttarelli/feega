@@ -1,3 +1,4 @@
+import { codeVarsError } from '$lib/server/canvas/code-source';
 import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
 import type { NarrowedDatabase } from '$lib/server/db/typed-database';
@@ -582,6 +583,10 @@ export async function patchNodeData(
       const verdict = validateNodeData(before.type, data);
       if (!verdict.ok) {
         return { outcome: 'invalid', error: verdict.error };
+      }
+      const badVars = codeVarsError(before.type, data);
+      if (badVars) {
+        return { outcome: 'invalid', error: badVars };
       }
     }
 

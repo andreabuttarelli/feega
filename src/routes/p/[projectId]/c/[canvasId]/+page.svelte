@@ -84,7 +84,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { CoachStep, ONBOARDING_EVENT, OnboardingStatus, chainOf, stepOf, type CoachChain } from '$lib/onboarding/coach';
   import { DEMO_PRESET, exampleFor, isDemoMedium } from '$lib/onboarding/demo';
   import OnboardingCoach from '$lib/components/canvas/OnboardingCoach.svelte';
-  import { offCentre, placeBeside, placeNear, type Rect } from '$lib/canvas/placement';
+  import { offCentre, placeBeside, placeInRow, placeNear, type Rect } from '$lib/canvas/placement';
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
@@ -95,6 +95,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
+  import type { ExportMode } from '$lib/canvas/code-frame';
   import DocNode from '$lib/components/canvas/DocNode.svelte';
   import ProductsNode from '$lib/components/canvas/ProductsNode.svelte';
   import SocialFeedNode from '$lib/components/canvas/SocialFeedNode.svelte';
@@ -195,6 +196,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
   import { snapAspectRatio, snapResolution } from '$lib/canvas/gen-node';
+  import { outputTabUrl } from '$lib/canvas/open-output';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import { snapDynamicParams } from '$lib/canvas/model-params';
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
@@ -2153,6 +2156,48 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return { items: [{ kind: 'node.create', nodeId: node.id, after: { type: node.type, position: node.position, data: node.data } }] };
   }
 
+  async function openCodeView(sourceId: string, route: string) {
+    const source = nodes.find((n) => n.id === sourceId);
+    if (!source) {
+      return;
+    }
+
+    const spot = placeInRow({ x: source.x, y: source.y, w: source.w, h: source.h }, occupiedRects());
+    const res = await post('create', {
+      type: 'iframe',
+      x: spot.x,
+      y: spot.y,
+      width: source.w,
+      height: source.h,
+      data: JSON.stringify({ sourceNodeId: sourceId, route })
+    });
+    const created = (res?.node ?? null) as CanvasNodeRecord | null;
+    if (!created) {
+      return;
+    }
+
+    nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })];
+    pushGesture(createGesture(created));
+    focusOn([created.id]);
+  }
+
+  async function exportCode(id: string, mode: ExportMode) {
+    const res = await post('exportCode', { node_id: id, mode });
+    const files = res?.files as Record<string, string> | undefined;
+    if (!files) {
+      return;
+    }
+
+    const folder = String(res?.folder ?? 'code-frame');
+    const { zipFolder } = await import('$lib/canvas/code-zip');
+    const zip = zipFolder(folder, files);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([zip as BlobPart], { type: 'application/zip' }));
+    link.download = `${folder}.zip`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
   async function create(what: Addable, at: { x: number; y: number }) {
     const size = sizeForAddable(what);
     const spot = placeNear(at, size, occupiedRects());
@@ -3824,6 +3869,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   const canvasMode = $derived(canvasModeFor(data.org.role));
   const viewOnly = $derived(canvasMode === CanvasMode.View);
+
+  function openOutput(id: string) {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const url = gen ? outputTabUrl({ projectId: data.projectId, canvasId: data.canvas.id }, gen) : null;
+    if (url) {
+      window.open(url, '_blank', 'noopener');
+    }
+  }
 </script>
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
@@ -3936,6 +3990,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onResize={resize}
     onPlace={storeSize}
     onRename={renameNode}
+    onNodeDoubled={openOutput}
     onConnect={connect}
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}
@@ -4106,6 +4161,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             example={exampleFor(row)}
             skills={skillShelf.list}
             onsaveskill={(name, body) => saveSkill(data.projectId, name, body)}
+            {selected}
+            thumbUrl={(mediaId) => canvasAssetUrl(data.projectId, data.canvas.id, mediaId, AssetSize.Thumb)}
           >
             {#snippet result({ refId, text })}
               <!-- `/c/<tela>/assets/<id>` firma lo storage al volo: un URL firmato messo qui
@@ -4114,7 +4171,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
               {#if row.data.outputUncensored === true}
                 <span class="uncensored-output" data-testid="uncensored-output">Uncensored</span>
               {/if}
-              <span class="ai-generated-mark" data-testid="ai-generated-mark">AI-generated</span>
               {#if gen.medium === 'text'}
                 <div class="gen-text-wrap">
                   <div class="gen-text-toggle" role="group" aria-label="Vista del testo">
@@ -4151,11 +4207,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
               {:else if gen.medium === 'video'}
                 <LiveVideo src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} {selected} controls />
                 <div class="gen-download">
+                  <a class="gen-open nodrag" href={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} target="_blank" rel="noopener" aria-label="Open full size in a new tab" title="Open full size in a new tab" data-testid="open-output"><ExternalLink size={14} strokeWidth={1.75} /></a>
                   <NodeDownload kind="video" sourceUrl={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {:else}
                 <TieredImage src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} alt={gen.prompt} />
                 <div class="gen-download">
+                  <a class="gen-open nodrag" href={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} target="_blank" rel="noopener" aria-label="Open full size in a new tab" title="Open full size in a new tab" data-testid="open-output"><ExternalLink size={14} strokeWidth={1.75} /></a>
                   <NodeDownload kind="image" sourceUrl={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {/if}
@@ -4188,7 +4246,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             {/snippet}
           </GenNode>
         {:else if frame}
-          <IframeNode node={frame} onchange={(patch) => write(id, frameData({ ...frame, ...patch }))} />
+          {@const codeRow = frame.source === 'view' ? nodes.find((n) => n.id === frame.sourceNodeId) : null}
+          {@const code = codeRow ? frameOf(codeRow) : null}
+          {@const owner = frame.source === 'view' ? code : frame}
+          <IframeNode
+            node={frame}
+            {code}
+            {selected}
+            onchange={(patch) => write(id, frameData({ ...frame, ...patch }))}
+            onvars={(vars) => owner && write(owner.id, frameData({ ...owner, vars }))}
+            onview={(route) => void openCodeView(id, route)}
+            onexport={(mode) => void exportCode(owner?.id ?? id, mode)}
+          />
         {:else if doc}
           <DocNode
             node={doc}
@@ -4401,9 +4470,32 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   .gen-download {
     position: absolute;
-    top: 6px;
-    right: 6px;
+    top: 8px;
+    right: 8px;
     z-index: 5;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity var(--ui-dur-fast) ease;
+  }
+  :global(.gen:hover) .gen-download,
+  .gen-download:focus-within {
+    opacity: 1;
+  }
+  .gen-open {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--ui-radius-md);
+    background: color-mix(in srgb, var(--ui-raised) 88%, transparent);
+    color: var(--ui-text);
+    box-shadow: var(--ui-shadow-float);
+    backdrop-filter: blur(8px);
+  }
+  .gen-open:hover {
+    background: var(--ui-raised);
   }
 
   .gen-text-wrap {
@@ -4492,7 +4584,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   .warning {
     position: absolute;
     z-index: 10;
-    top: 10px;
+    top: var(--chrome-top, 10px);
     left: 50%;
     transform: translateX(-50%);
     margin: 0;
@@ -4505,14 +4597,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   .warning.reload {
-    top: 40px;
+    top: calc(var(--chrome-top, 10px) + 30px);
     color: inherit;
   }
 
   .workflow-chip {
     position: absolute;
     z-index: 10;
-    top: 10px;
+    top: var(--chrome-top, 10px);
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -4533,18 +4625,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     text-decoration: underline;
     cursor: pointer;
   }
-  .ai-generated-mark {
-    position: absolute;
-    bottom: 6px;
-    left: 6px;
-    z-index: 2;
-    padding: 0 4px;
-    font-size: 0.625rem;
-    line-height: 1rem;
-    color: var(--paper, #fff);
-    background: rgb(0 0 0 / 0.6);
-    pointer-events: none;
-  }
   .uncensored-output {
     position: absolute;
     top: 6px;
@@ -4560,15 +4640,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   .copy-link {
     position: absolute;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     z-index: 5;
     transform: translateX(-50%);
     height: 28px;
-    padding: 0 10px;
-    border: 1px solid var(--ui-line-strong);
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-surface, var(--background));
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
     color: var(--ui-ink);
     font-size: var(--ui-text-xs);
     cursor: pointer;

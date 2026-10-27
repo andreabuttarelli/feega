@@ -68,7 +68,7 @@
           onmouseenter={() => prefetchEntry(entry.id)}
           onfocusin={() => prefetchEntry(entry.id)}
         >
-          <Icon size={17} />
+          <Icon size={18} />
         </button>
       {/snippet}
     </Tooltip.Trigger>
@@ -84,27 +84,33 @@
       {/each}
     </div>
 
-    <div class="rail-divider" role="separator"></div>
+    {#if sheets.length}
+      <div class="rail-divider" role="separator"></div>
 
-    <div class="rail-group">
-      {#each sheets as entry (entry.id)}
-        {@render railButton(entry)}
-      {/each}
-    </div>
+      <div class="rail-group">
+        {#each sheets as entry (entry.id)}
+          {@render railButton(entry)}
+        {/each}
+      </div>
+    {/if}
   </nav>
 </Tooltip.Provider>
 
 <style>
   .rail {
-    flex: 0 0 auto;
-    align-self: stretch;
-    z-index: 20;
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    translate: 0 -50%;
+    z-index: 30;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    padding: 8px 6px;
-    background: var(--ui-surface);
+    gap: 6px;
+    padding: 4px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .rail-group {
@@ -114,7 +120,7 @@
   }
 
   .rail-divider {
-    width: 20px;
+    width: 16px;
     height: 1px;
     background: var(--ui-divider-strong);
     margin: 2px 0;
@@ -123,11 +129,11 @@
   .rail-btn {
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     appearance: none;
     border: 0;
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-full);
     background: transparent;
     color: var(--ui-icon-ink);
     cursor: pointer;

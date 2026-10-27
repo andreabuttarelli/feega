@@ -6,6 +6,7 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { tileHovered } from '$lib/canvas/layers';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
+  import { cardRadiusOf } from '$lib/canvas/core/gen-card';
 
   let { tile, selected, full, painted = false, resizable = false, onaddbeside, showAdd = false }: { tile: Tile; selected: boolean; full: boolean; painted?: boolean; resizable?: boolean; onaddbeside?: (id: string) => void; showAdd?: boolean } = $props();
 
@@ -20,6 +21,7 @@
   const ports = $derived(tile.connectable === false ? [] : (tile.connectors ?? []));
   const chrome = $derived(nodeChrome(tile.id, selected, layersSource.video));
   const ringColor = $derived(tile.output ? CONNECTOR_STYLE[tile.output].color : 'var(--accent, #7c5cff)');
+  const radius = $derived(cardRadiusOf(tile.kind ?? '') ?? 0);
   const outputs = $derived(tile.connectable === false ? [] : (tile.outputs ?? []));
 </script>
 
@@ -34,11 +36,11 @@
 {/if}
 
 {#if !painted && !selected && tileHovered(layersSource.hovered, tile.id, layersSource.video?.nodeId ?? null)}
-  <div class="tile-hover" data-testid="tile-hover" aria-hidden="true"></div>
+  <div class="tile-hover" data-testid="tile-hover" style={`border-radius:${radius}px`} aria-hidden="true"></div>
 {/if}
 
 {#if chrome.ring !== NodeChrome.None && !painted}
-  <div class={`tile-selection ring-${chrome.ring}`} data-testid="tile-selection" data-ring={chrome.ring} style={`outline-color:${ringColor}`} aria-hidden="true"></div>
+  <div class={`tile-selection ring-${chrome.ring}`} data-testid="tile-selection" data-ring={chrome.ring} style={`outline-color:${ringColor};border-radius:${radius}px`} aria-hidden="true"></div>
 {/if}
 
 {#if full}
@@ -210,15 +212,15 @@
     transform: translate(-50%, -50%);
   }
   .handle.left {
-    left: 0;
+    left: -2px;
   }
   .handle.right {
-    left: 100%;
+    left: calc(100% + 2px);
   }
   .handle.top {
-    top: 0;
+    top: -2px;
   }
   .handle.bottom {
-    top: 100%;
+    top: calc(100% + 2px);
   }
 </style>
