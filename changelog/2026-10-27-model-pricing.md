@@ -27,5 +27,10 @@ $0.05 on Auto, OpenRouter and Kie.ai alike, Pro $0.11. Causes:
   tiers from `route-tiers.ts`, computed with `creditsForRun` at the node's params. Exact numbers
   live only on the Generate button.
 
+- A node with no resolution set showed the first option (512 for Nano Banana 2) while the
+  provider rendered 1K. `defaultResolution` in `gen-node.ts` is now the one answer: 1K when the
+  model offers it, else its first option. The toolbar, the quote and the server request
+  (`generate.ts` snaps before calling the provider) all read it.
+
 **Not done.** Token-priced models other than Gemini (GPT Image, MAI) stay "variable": no
 published token count per image. FLUX video upscale (per megapixel-second) keeps the flat price.

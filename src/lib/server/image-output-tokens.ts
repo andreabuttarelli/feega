@@ -1,4 +1,6 @@
-export const DEFAULT_IMAGE_RESOLUTION = '1K';
+import { PROVIDER_DEFAULT_RESOLUTION } from '$lib/canvas/gen-node';
+
+export const DEFAULT_IMAGE_RESOLUTION = PROVIDER_DEFAULT_RESOLUTION;
 
 const NANO_BANANA_2_TOKENS = { '512': 747, '1K': 1120, '2K': 1680, '4K': 2520 };
 const NANO_BANANA_PRO_TOKENS = { '1K': 1120, '2K': 1120, '4K': 2000 };

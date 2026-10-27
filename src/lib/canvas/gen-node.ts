@@ -230,11 +230,18 @@ export function defaultParamsFor(choice: ModelChoice): GenParams {
  * gradino di snap per i due medium che hanno risoluzioni — `ModelChoice.resolutions` non dice da
  * quale medium viene.
  */
+export const PROVIDER_DEFAULT_RESOLUTION = '1K';
+
+export function defaultResolution(choice: ModelChoice): string | undefined {
+  const options = choice.resolutions;
+  return options?.includes(PROVIDER_DEFAULT_RESOLUTION) ? PROVIDER_DEFAULT_RESOLUTION : options?.[0];
+}
+
 export function snapResolution(choice: ModelChoice, saved: string | undefined): string | undefined {
   const options = choice.resolutions;
   if (!options?.length) return undefined;
   if (saved && options.includes(saved)) return saved;
-  return options[0];
+  return defaultResolution(choice);
 }
 
 export function snapAspectRatio(choice: ModelChoice, saved: string | undefined): string | undefined {

@@ -136,6 +136,10 @@ describe('la risoluzione video dopo un cambio di modello', () => {
     expect(snapResolution(m, undefined)).toBe('720p');
   });
 
+  it('without a saved resolution an image model starts at 1K, the resolution providers render by default', () => {
+    expect(snapResolution(choice({ resolutions: ['512', '1K', '2K', '4K'] }), undefined)).toBe('1K');
+  });
+
   it('un modello senza selettore non ha nessuna risoluzione da imporre', () => {
     expect(snapResolution(choice(), '480p')).toBeUndefined();
   });

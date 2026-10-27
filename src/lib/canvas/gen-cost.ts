@@ -93,8 +93,13 @@ function perSecondRunCredits(input: RunCostInput, model: ModelChoice): number | 
   return Math.round(perSecond * seconds) + enhanceCredits(input);
 }
 
+function withResolution(params: GenParams, model: ModelChoice | null): GenParams {
+  const resolution = model ? snapResolution(model, params.resolution) : params.resolution;
+  return resolution ? { ...params, resolution } : params;
+}
+
 export function creditsForRun(raw: RunCostInput): number | null {
-  const input = { ...raw, model: pricedFor(raw.model, raw.params) };
+  const input = { ...raw, params: withResolution(raw.params, raw.model), model: pricedFor(raw.model, raw.params) };
   if (input.model?.perSecondCredits) {
     return perSecondRunCredits(input, input.model);
   }
