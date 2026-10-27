@@ -78,8 +78,10 @@ const range = (min: number, max: number, step: number, fallback: number, label: 
 const choice = <T extends readonly [string, ...string[]]>(values: T, fallback: T[number], label: string, group: Group) =>
   z.enum(values).default(fallback as never).meta({ control: Control.Select, label, group });
 
+export const TEXT_MAX_CHARS = { line: 500, block: 20000 } as const;
+
 const text = (fallback: string, label: string, multiline = false) =>
-  z.string().max(500).default(fallback).meta({ control: multiline ? Control.Textarea : Control.Text, label, group: Group.Content });
+  z.string().max(multiline ? TEXT_MAX_CHARS.block : TEXT_MAX_CHARS.line).default(fallback).meta({ control: multiline ? Control.Textarea : Control.Text, label, group: Group.Content });
 
 const asset = (kind: AssetKind, label: string) =>
   z.string().nullable().default(null).meta({ control: Control.Asset, assetKind: kind, label, group: Group.Content });

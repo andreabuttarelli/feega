@@ -1,4 +1,4 @@
-import type { ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, Paint, Rgba, Vec } from './archive';
+import type { ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, NodePatch, Paint, Rgba, Vec } from './archive';
 import { geometryPath } from './commands';
 import { FillRule, networkPath } from './vector-network';
 
@@ -271,11 +271,7 @@ const FILLS: Record<string, (p: Paint, report: Report) => Fill | null> = {
   GRADIENT_RADIAL: (p) => ({ kind: FillKind.Radial, stops: stopsOf(p.stops), opacity: round(p.opacity ?? 1) }),
   GRADIENT_DIAMOND: (p) => ({ kind: FillKind.Diamond, stops: stopsOf(p.stops), opacity: round(p.opacity ?? 1) }),
   GRADIENT_ANGULAR: (p) => ({ kind: FillKind.Angular, stops: stopsOf(p.stops), angle: gradientAngle(p.transform), center: gradientCentre(p.transform), opacity: round(p.opacity ?? 1) }),
-  IMAGE: (p, report) => {
-    const hash = hashHex(p.image?.hash);
-    report(`image ${hash.slice(0, 12)} placed as a placeholder`);
-    return { kind: FillKind.Image, hash, opacity: round(p.opacity ?? 1) };
-  }
+  IMAGE: (p) => ({ kind: FillKind.Image, hash: hashHex(p.image?.hash), opacity: round(p.opacity ?? 1) })
 };
 
 function fillsOf(paints: Paint[] | undefined, report: Report): Fill[] {
@@ -372,7 +368,7 @@ function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: num
       if (style.fontName && /italic/i.test(style.fontName.style)) {
         run.italic = true;
       }
-      if (style.fontSize && style.fontSize !== base.size) {
+      if (positive(style.fontSize) && style.fontSize !== base.size) {
         run.size = style.fontSize;
       }
       if (fill && fill.color !== base.color) {
@@ -391,7 +387,59 @@ const UNIT_SUFFIX: Record<string, (v: number) => string> = { PIXELS: (v) => `${r
 
 const unitOf = (u: { value: number; units: string } | undefined, fallback: string) => (u && UNIT_SUFFIX[u.units] ? UNIT_SUFFIX[u.units](u.value) : fallback);
 
-type Ctx = { byKey: Map<string, FigmaRawNode>; children: Map<string, FigmaRawNode[]>; blobs: Uint8Array[]; report: Report };
+type Scope = { inside: boolean; trail: string[]; patches: Map<string, NodePatch[]> };
+
+type Ctx = { byKey: Map<string, FigmaRawNode>; children: Map<string, FigmaRawNode[]>; blobs: Uint8Array[]; report: Report; scope: Scope };
+
+const OUTSIDE: Scope = { inside: false, trail: [], patches: new Map() };
+const PATH_SEPARATOR = '/';
+
+function patchesIn(n: FigmaRawNode, prefix: string[]): Map<string, NodePatch[]> {
+  const found = new Map<string, NodePatch[]>();
+  for (const patch of [...(n.derivedSymbolData ?? []), ...(n.symbolData?.symbolOverrides ?? [])]) {
+    const key = [...prefix, ...(patch.guidPath?.guids ?? []).map(keyOf)].join(PATH_SEPARATOR);
+    found.set(key, [...(found.get(key) ?? []), patch]);
+  }
+  return found;
+}
+
+function mergedPatches(...maps: Map<string, NodePatch[]>[]): Map<string, NodePatch[]> {
+  const out = new Map<string, NodePatch[]>();
+  for (const map of maps) {
+    for (const [key, list] of map) {
+      out.set(key, [...(out.get(key) ?? []), ...list]);
+    }
+  }
+  return out;
+}
+
+function withPatch(n: FigmaRawNode, patch: NodePatch): FigmaRawNode {
+  const { guidPath: _path, overriddenSymbolID, textData, ...fields } = patch;
+  const retyped = textData && textData.characters !== n.textData?.characters && !textData.characterStyleIDs;
+  const merged = textData ? { ...n.textData, ...textData, ...(retyped ? { characterStyleIDs: [], styleOverrideTable: [] } : {}) } : n.textData;
+  const swapped = overriddenSymbolID ? { symbolData: { ...n.symbolData, symbolID: overriddenSymbolID } } : {};
+  return { ...n, ...fields, ...(merged ? { textData: merged } : {}), ...swapped };
+}
+
+function patchedNode(n: FigmaRawNode, ctx: Ctx): FigmaRawNode {
+  if (!ctx.scope.inside) {
+    return n;
+  }
+  const key = [...ctx.scope.trail, keyOf(n.guid)].join(PATH_SEPARATOR);
+  return (ctx.scope.patches.get(key) ?? []).reduce(withPatch, n);
+}
+
+const hasOverrides = (n: FigmaRawNode, symbol: FigmaRawNode) =>
+  Boolean(n.symbolData?.symbolOverrides?.length) || n.size?.x !== symbol.size?.x || n.size?.y !== symbol.size?.y;
+
+function scopeOf(n: FigmaRawNode, ctx: Ctx, flattened: boolean): Ctx {
+  const here = ctx.scope.inside ? [...ctx.scope.trail, keyOf(n.guid)] : [];
+  if (flattened) {
+    const own = patchesIn(n, here);
+    return { ...ctx, scope: { inside: true, trail: here, patches: ctx.scope.inside ? mergedPatches(ctx.scope.patches, own) : own } };
+  }
+  return ctx.scope.inside ? { ...ctx, scope: { ...ctx.scope, trail: here } } : ctx;
+}
 
 function shapePath(n: FigmaRawNode, ctx: Ctx): { path: string; rule: FillRule } {
   const size = n.size ?? { x: 0, y: 0 };
@@ -414,10 +462,17 @@ function common(n: FigmaRawNode, m: Matrix, ctx: Ctx): Common {
   return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n) };
 }
 
+const DEFAULT_TEXT_SIZE = 12;
+
+const positive = (v: number | undefined): v is number => v !== undefined && v > 0;
+
+const effectiveSize = (n: FigmaRawNode): number =>
+  [n.fontSize, ...(n.textData?.styleOverrideTable ?? []).map((s) => s.fontSize)].find(positive) ?? DEFAULT_TEXT_SIZE;
+
 function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
   const font = n.fontName?.family ?? 'Inter';
   const weight = weightOf(n.fontName?.style ?? '');
-  const size = n.fontSize ?? 12;
+  const size = effectiveSize(n);
   const fills = fillsOf(n.fillPaints, ctx.report);
   const color = fills.find((f) => f.kind === FillKind.Solid);
   const base = { font, weight, size, color: color?.kind === FillKind.Solid ? color.color : '#000000' };
@@ -436,18 +491,17 @@ function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
   };
 }
 
-function childrenOf(n: FigmaRawNode, ctx: Ctx): FigmaRawNode[] {
+function childrenOf(n: FigmaRawNode, ctx: Ctx): { kids: FigmaRawNode[]; within: Ctx } {
   const own = ctx.children.get(keyOf(n.guid)) ?? [];
   if (own.length || n.type !== 'INSTANCE' || !n.symbolData?.symbolID) {
-    return own;
+    return { kids: own, within: scopeOf(n, ctx, false) };
   }
   const symbol = ctx.byKey.get(keyOf(n.symbolData.symbolID));
   if (!symbol) {
     ctx.report(`component of instance ${n.name ?? ''} not in the clipboard`);
-    return [];
+    return { kids: [], within: ctx };
   }
-  ctx.report(`instance ${n.name ?? ''} flattened, overrides ignored`);
-  return ctx.children.get(keyOf(symbol.guid)) ?? [];
+  return { kids: ctx.children.get(keyOf(symbol.guid)) ?? [], within: scopeOf(n, ctx, true) };
 }
 
 const PLACEHOLDER_FILL: Fill = { kind: FillKind.Solid, color: '#d9d9d9', opacity: 1 };
@@ -470,10 +524,12 @@ function componentOf(n: FigmaRawNode, ctx: Ctx): ComponentRef | null {
     return null;
   }
   const main = ctx.byKey.get(keyOf(id));
-  return { key: keyOf(id), name: main?.name ?? n.name ?? 'Component', inPaste: Boolean(main) };
+  const linked = Boolean(main) && !hasOverrides(n, main!);
+  return { key: keyOf(id), name: main?.name ?? n.name ?? 'Component', inPaste: linked };
 }
 
-function layerOf(n: FigmaRawNode, parent: Matrix, ctx: Ctx): Layer | null {
+function layerOf(raw: FigmaRawNode, parent: Matrix, ctx: Ctx): Layer | null {
+  const n = patchedNode(raw, ctx);
   if (n.visible === false) {
     return null;
   }
@@ -505,6 +561,7 @@ function frameLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): FrameLayer {
     ctx.report(`auto layout of rotated frame ${n.name ?? ''} kept as fixed positions`);
   }
   const clips = n.type !== 'GROUP' && !n.resizeToFit && n.frameMaskDisabled === false;
+  const { kids, within } = childrenOf(n, ctx);
   return {
     kind: LayerKind.Frame,
     component: componentOf(n, ctx),
@@ -515,7 +572,7 @@ function frameLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): FrameLayer {
     outline: transformedPath(roundedRect(n.size ?? { x: 0, y: 0 }, radiiOf(n)), m),
     clip: clips ? Clip.Content : Clip.None,
     autoLayout: upright ? stacked : null,
-    children: childrenOf(n, ctx).flatMap((c) => layerOf(c, m, ctx) ?? [])
+    children: kids.flatMap((c) => layerOf(c, m, within) ?? [])
   };
 }
 
@@ -581,7 +638,7 @@ export function figmaScene(message: FigmaMessage): FigmaScene | null {
   for (const list of children.values()) {
     list.sort(byPosition);
   }
-  const ctx: Ctx = { byKey, children, blobs: message.blobs, report: (what) => skipped.add(what.trim()) };
+  const ctx: Ctx = { byKey, children, blobs: message.blobs, report: (what) => skipped.add(what.trim()), scope: OUTSIDE };
   const internal = new Set(message.nodes.filter((n) => n.type === 'CANVAS' && n.internalOnly).map((n) => keyOf(n.guid)));
   const nodes = message.nodes.filter((n) => !PAGES.has(n.type ?? '') && n.parentIndex && PAGES.has(byKey.get(keyOf(n.parentIndex.guid))?.type ?? '') && !internal.has(keyOf(n.parentIndex.guid))).sort(byPosition);
   const tops: Top[] = nodes.flatMap((node) => {
