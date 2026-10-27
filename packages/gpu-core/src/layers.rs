@@ -77,7 +77,7 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
         }
         let recalled = if layer_worthy(item) { surface.recall(item) } else { None };
         if let (Item::Group(group), None) = (item, &recalled) {
-            let inner = prepare_items(surface, &group.items, None, pictures, blending, &Fragments::default())?;
+            let inner = prepare_items(surface, &group.items, None, pictures, blending, fragments)?;
             layers.groups.insert(i, inner);
         }
         if layer_worthy(item) {
