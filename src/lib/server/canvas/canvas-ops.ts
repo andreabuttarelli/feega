@@ -65,6 +65,11 @@ import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { undoGesture } from '$lib/server/canvas/undo';
+import { arrangeNodes } from '$lib/server/canvas/arrange';
+import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileBox, type TileMove } from '$lib/canvas/align';
+import { Axis, Edge } from '$lib/motion/space';
+import { listCanvasEvents } from '$lib/server/repos/canvas-events';
+import { lastGesture } from '$lib/canvas/undo-last';
 import { parseUndoItem, type UndoItem } from '$lib/canvas/undo-plan';
 import { endOnboarding, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
@@ -374,6 +379,13 @@ const pasteNodesInput = z
 const undoGestureInput = z
   .object({ canvasId: z.string(), items: z.array(z.unknown()).min(1).describe('the gesture items the canvas recorded, newest write first') })
   .strict();
+const arrangeInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2) }).strict();
+const alignNodesInput = arrangeInput.extend({ edge: z.enum(Object.values(Edge) as [Edge, ...Edge[]]).describe('left|center|right align x, top|middle|bottom align y, to the bounds of the selection') }).strict();
+const distributeNodesInput = arrangeInput.extend({ axis: z.enum(Object.values(Axis) as [Axis, ...Axis[]]).describe('x spreads left to right, y top to bottom; equal gaps, the outer nodes stay') }).strict();
+const stackNodesInput = arrangeInput.extend({ gap: z.number().min(0).default(STACK_GAP).describe('space between nodes in canvas units') }).strict();
+const undoLastInput = z.object({ canvasId: z.string() }).strict();
+const UNDO_LOOKBACK = 50;
+const NOTHING_TO_UNDO = { outcome: 'nothing_to_undo' };
 const endOnboardingInput = z.object({ status: z.enum([OnboardingStatus.Dismissed, OnboardingStatus.Completed]) }).strict();
 const textCostInput = z
   .object({ canvasId: z.string(), nodeId: z.string(), prompt: z.string().default(''), model: z.string().optional().describe('Omit for the default text model.') })
@@ -463,6 +475,13 @@ async function uploadAnswer(work: () => Promise<unknown>): Promise<unknown> {
 
 async function inProject(ctx: CanvasCtx, canvasId: string): Promise<boolean> {
   return (await listCanvases(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId })).some((c) => c.id === canvasId);
+}
+
+async function arranged(ctx: CanvasCtx, input: { canvasId: string; nodeIds: string[] }, plan: (tiles: TileBox[]) => TileMove[]) {
+  if (!(await inProject(ctx, input.canvasId))) {
+    return NOT_IN_PROJECT;
+  }
+  return arrangeNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, nodeIds: input.nodeIds, actor: ctx.actor, plan });
 }
 
 export const CANVAS_OPS = {
@@ -590,6 +609,30 @@ export const CANVAS_OPS = {
     }
   }),
 
+  align_nodes: op({
+    access: Access.Write,
+    input: alignNodesInput,
+    run: async (ctx, input) => arranged(ctx, input, (tiles) => alignTiles(tiles, input.edge))
+  }),
+
+  distribute_nodes: op({
+    access: Access.Write,
+    input: distributeNodesInput.extend({ nodeIds: z.array(z.string()).min(3) }).strict(),
+    run: async (ctx, input) => arranged(ctx, input, (tiles) => distributeTiles(tiles, input.axis))
+  }),
+
+  tidy_nodes: op({
+    access: Access.Write,
+    input: arrangeInput,
+    run: async (ctx, input) => arranged(ctx, input, tidyTiles)
+  }),
+
+  stack_nodes: op({
+    access: Access.Write,
+    input: stackNodesInput,
+    run: async (ctx, input) => arranged(ctx, input, (tiles) => stackTiles(tiles, input.gap))
+  }),
+
   write_nodes: op({
     access: Access.Write,
     input: writeNodesInput,
@@ -645,6 +688,23 @@ export const CANVAS_OPS = {
       }
       const result = await undoGesture(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, gesture: { items: items as UndoItem[] }, actor: ctx.actor });
       return result.outcome === 'refused' ? { outcome: 'refused', reason: result.reason } : { outcome: 'undone', redo: result.redo };
+    }
+  }),
+
+  undo_last: op({
+    access: Access.Write,
+    input: undoLastInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const events = await listCanvasEvents(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, limit: UNDO_LOOKBACK });
+      const gesture = lastGesture(events, ctx.actor);
+      if (!gesture) {
+        return NOTHING_TO_UNDO;
+      }
+      const result = await undoGesture(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, gesture, actor: ctx.actor });
+      return result.outcome === 'refused' ? { outcome: 'refused', reason: result.reason } : { outcome: 'undone', reverted: gesture.items.map((item) => item.kind) };
     }
   }),
 
