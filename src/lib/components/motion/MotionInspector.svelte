@@ -65,7 +65,8 @@
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
-  import { registerFont, replaceFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+  import { registerFont, replaceFont, setFont } from '$lib/motion/fonts/ops';
+  import { FontOrigin, withPicked } from '$lib/motion/fonts/local';
   import { isBuiltin } from '@feega/motion-core/motion/fonts/model';
   import type { FontLibrary } from '$lib/motion/fonts/library';
   import type { CatalogueFont } from '@feega/motion-core/motion/fonts/model';
@@ -239,14 +240,14 @@
 
   const missingFont = (family: string) => !isBuiltin(family) && !doc.fonts.some((f) => f.family === family);
 
-  function swapFont(from: string, asked: string, catalogue: CatalogueFont[]) {
-    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
+  function swapFont(from: string, asked: string, catalogue: CatalogueFont[], origin: FontOrigin) {
+    const { doc: base, family } = withPicked(doc, asked, origin, fonts?.families ?? []);
     replacing = false;
     commit(replaceFont(base, from, family, catalogue), `Replaced ${from} with ${family}`);
   }
 
-  function pickFont(field: Field, asked: string, catalogue: CatalogueFont[]) {
-    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
+  function pickFont(field: Field, asked: string, catalogue: CatalogueFont[], origin: FontOrigin) {
+    const { doc: base, family } = withPicked(doc, asked, origin, fonts?.families ?? []);
     if (clip.component !== 'Custom') {
       commit(setFont(base, clip.id, { family }, catalogue), `Set the font to ${family}`);
       return;
@@ -622,7 +623,7 @@
           <MediaListField label={field.label} value={value(field)} {assets} {upload} onchange={(list) => setProp(field, list)} />
         {:else if field.control === Control.Font}
           <div class="comp">
-            <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => (replacing ? swapFont(String(value(field)), family, catalogue) : pickFont(field, family, catalogue))} library={fonts} />
+            <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue, origin) => (replacing ? swapFont(String(value(field)), family, catalogue, origin) : pickFont(field, family, catalogue, origin))} library={fonts} />
             {#if !isBuiltin(String(value(field)))}
               <button type="button" class:on={replacing} data-testid="replace-font" title={missingFont(String(value(field))) ? 'Missing font: pick a replacement for the whole video' : 'Pick a font to replace this one in the whole video'} aria-pressed={replacing} onclick={() => (replacing = !replacing)}>{missingFont(String(value(field))) ? 'Missing · Replace' : 'Replace all'}</button>
             {/if}
