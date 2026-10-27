@@ -79,6 +79,10 @@ const fake: Server = createServer((req, res) => {
       send(200, { url: `https://feega.app/s/tok/${NODE}`, embed_url: `https://feega.app/e/${NODE}` });
       return;
     }
+    if (route === `/api/v1/motion/${NODE}/play`) {
+      send(200, { url: `https://feega.app/play/tok?frame=${NODE}`, frames: [NODE], flows: [{ frame_id: NODE, name: 'Onboarding' }] });
+      return;
+    }
     if (route === `/api/v1/motion/${NODE}/budget`) {
       send(200, { ok: true, spent_usd: 2.04, cap_usd: req.method === 'POST' ? 3 : 2, raise_usd: 1 });
       return;
@@ -238,6 +242,12 @@ describe('the motion agent over MCP', () => {
     const result = await callTool('share_motion_frame', { node_id: NODE });
     expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/share` });
     expect(result?.structuredContent).toMatchObject({ url: `https://feega.app/s/tok/${NODE}` });
+  });
+
+  test('get_play_link returns the play link of a prototype with its flows', async () => {
+    const result = await callTool('get_play_link', { node_id: NODE });
+    expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/play` });
+    expect(result?.structuredContent).toMatchObject({ url: `https://feega.app/play/tok?frame=${NODE}`, flows: [{ name: 'Onboarding' }] });
   });
 
   test('motion_budget reads what a video spent across all its turns', async () => {

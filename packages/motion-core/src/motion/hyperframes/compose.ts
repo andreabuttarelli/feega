@@ -608,7 +608,7 @@ function zoomed(doc: MotionDoc, scale: number): string {
   return `#root{width:${doc.width}px;height:${doc.height}px${scale === 1 ? '' : `;zoom:${scale}`}}`;
 }
 
-const SKELETON: ReadonlySet<ComponentId> = new Set(['Precomp', 'Null', 'Audio']);
+const SKELETON: ReadonlySet<ComponentId> = new Set(['Precomp', 'Null', 'Audio', 'Light']);
 
 function onlyClips(doc: MotionDoc, only: ReadonlySet<string> | undefined): MotionDoc {
   if (!only) {

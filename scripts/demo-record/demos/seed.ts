@@ -63,8 +63,8 @@ type Box = { x: number; y: number; w: number; h: number };
 export const asset = (path: string) => `${process.env.E2E_BASE_URL ?? 'http://localhost:5173'}${path}`;
 
 const frac = (b: Box) => ({ x: (b.x + b.w / 2) / W, y: (b.y + b.h / 2) / H, width: b.w / W, height: b.h / H });
-const block = (id: string, b: Box, color: string, from = 0) => ({ id, from, durationInFrames: SPAN - from, component: 'Shape', props: { shape: 'rect', ...frac(b), fills: solid(color) } });
-const words = (id: string, text: string, b: Box, px: number, color: string, from = 0) => ({ id, from, durationInFrames: SPAN - from, component: 'Text', props: { text, size: px / H, ...frac(b), color, font: 'sans' } });
+export const block = (id: string, b: Box, color: string, from = 0) => ({ id, from, durationInFrames: SPAN - from, component: 'Shape', props: { shape: 'rect', ...frac(b), fills: solid(color) } });
+export const words = (id: string, text: string, b: Box, px: number, color: string, from = 0) => ({ id, from, durationInFrames: SPAN - from, component: 'Text', props: { text, size: px / H, ...frac(b), color, font: 'sans' } });
 const picture = (id: string, src: string, b: Box) => ({ id, from: 0, durationInFrames: SPAN, component: 'Shape', props: { shape: 'rect', ...frac(b), fills: [{ type: 'image', src, fit: 'cover' }] } });
 
 export const HERO_PHOTO = { x: 1000, y: 180, w: 820, h: 600 };

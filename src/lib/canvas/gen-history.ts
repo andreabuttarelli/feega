@@ -104,6 +104,13 @@ export function showRun(node: GenNode, runId: string): GenNode {
   return { ...node, refId: run.mediaId };
 }
 
+export function shownOutput(data: Record<string, unknown>, run: { id: string; mediaId: string }): Record<string, unknown> {
+  if (data.running) {
+    return { ...data, refId: run.mediaId };
+  }
+  return { ...data, refId: run.mediaId, runId: run.id, error: null };
+}
+
 /** Quale delle miniature è quella accesa. `-1` quando non si sta guardando niente. */
 export function shownIndex(node: GenNode): number {
   return node.refId ? node.runs.findIndex((r) => r.mediaId === node.refId) : -1;
