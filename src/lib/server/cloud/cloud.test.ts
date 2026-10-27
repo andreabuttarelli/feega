@@ -92,23 +92,86 @@ describe('listFiles', () => {
   it('maps a Drive folder', async () => {
     const { fn, seen } = fetcher([jsonOf({ files: [{ id: 'f1', name: 'Shots', mimeType: 'application/vnd.google-apps.folder' }, { id: 'f2', name: 'a.png', mimeType: 'image/png' }] })]);
 
-    const entries = await listFiles(CloudProvider.Drive, 'at', null, fn);
+    const page = await listFiles(CloudProvider.Drive, 'at', null, null, fn);
 
-    expect(entries).toEqual([
-      { id: 'f1', name: 'Shots', folder: true, mime: null },
-      { id: 'f2', name: 'a.png', folder: false, mime: 'image/png' }
-    ]);
-    expect(seen[0].url).toContain("'root'");
+    expect(page).toEqual({
+      entries: [
+        { id: 'f1', name: 'Shots', folder: true, mime: null, importable: true },
+        { id: 'f2', name: 'a.png', folder: false, mime: 'image/png', importable: true }
+      ],
+      next: null
+    });
+    expect(new URL(seen[0].url).searchParams.get('q')).toContain("'root'");
     expect((seen[0].init?.headers as Record<string, string>).Authorization).toBe('Bearer at');
   });
 
   it('maps a Dropbox folder', async () => {
     const { fn, seen } = fetcher([jsonOf({ entries: [{ '.tag': 'folder', id: 'id:1', name: 'Shots', path_lower: '/shots' }, { '.tag': 'file', id: 'id:2', name: 'a.png', path_lower: '/a.png' }] })]);
 
-    const entries = await listFiles(CloudProvider.Dropbox, 'at', null, fn);
+    const { entries } = await listFiles(CloudProvider.Dropbox, 'at', null, null, fn);
 
     expect(entries.map((e) => [e.id, e.folder])).toEqual([['/shots', true], ['/a.png', false]]);
-    expect(JSON.parse(String(seen[0].init?.body))).toEqual({ path: '' });
+    expect(JSON.parse(String(seen[0].init?.body))).toEqual({ path: '', limit: 200 });
+  });
+});
+
+describe('listFiles pages', () => {
+  it('hands back the Drive page token and sends it for the next page', async () => {
+    const { fn, seen } = fetcher([jsonOf({ files: [], nextPageToken: 'pt2' }), jsonOf({ files: [{ id: 'f9', name: 'z.png', mimeType: 'image/png' }] })]);
+
+    const first = await listFiles(CloudProvider.Drive, 'at', null, null, fn);
+    const second = await listFiles(CloudProvider.Drive, 'at', null, first.next, fn);
+
+    expect(first.next).toBe('pt2');
+    expect(new URL(seen[1].url).searchParams.get('pageToken')).toBe('pt2');
+    expect(second).toMatchObject({ entries: [{ id: 'f9' }], next: null });
+  });
+
+  it('continues a Dropbox listing from its cursor', async () => {
+    const { fn, seen } = fetcher([jsonOf({ entries: [], has_more: true, cursor: 'c1' }), jsonOf({ entries: [{ '.tag': 'file', name: 'b.png', path_lower: '/b.png' }], has_more: false, cursor: 'c2' })]);
+
+    const first = await listFiles(CloudProvider.Dropbox, 'at', null, null, fn);
+    const second = await listFiles(CloudProvider.Dropbox, 'at', null, first.next, fn);
+
+    expect(first.next).toBe('c1');
+    expect(seen[1].url).toBe('https://api.dropboxapi.com/2/files/list_folder/continue');
+    expect(JSON.parse(String(seen[1].init?.body))).toEqual({ cursor: 'c1' });
+    expect(second).toMatchObject({ entries: [{ id: '/b.png' }], next: null });
+  });
+});
+
+describe('native Google files', () => {
+  const doc = { id: 'd1', name: 'Plan', mimeType: 'application/vnd.google-apps.document' };
+  const form = { id: 'd2', name: 'Survey', mimeType: 'application/vnd.google-apps.form' };
+
+  it('lists a Doc as importable and a Form as not', async () => {
+    const { fn } = fetcher([jsonOf({ files: [doc, form] })]);
+
+    const { entries } = await listFiles(CloudProvider.Drive, 'at', null, null, fn);
+
+    expect(entries.map((e) => [e.name, e.importable])).toEqual([['Plan', true], ['Survey', false]]);
+  });
+
+  it('exports a Doc to PDF instead of downloading it', async () => {
+    const { fn, seen } = fetcher([jsonOf({ name: 'Plan', mimeType: doc.mimeType }), new Response(new Uint8Array([7]))]);
+
+    const file = await downloadFile(CloudProvider.Drive, 'at', 'd1', fn);
+
+    expect(new URL(seen[1].url).pathname).toMatch(/\/d1\/export$/);
+    expect(new URL(seen[1].url).searchParams.get('mimeType')).toBe('application/pdf');
+    expect(file).toMatchObject({ name: 'Plan.pdf', mime: 'application/pdf' });
+  });
+
+  it('exports a Drawing to PNG', async () => {
+    const { fn } = fetcher([jsonOf({ name: 'Sketch', mimeType: 'application/vnd.google-apps.drawing' }), new Response(new Uint8Array([7]))]);
+
+    expect(await downloadFile(CloudProvider.Drive, 'at', 'd3', fn)).toMatchObject({ name: 'Sketch.png', mime: 'image/png' });
+  });
+
+  it('refuses a Form', async () => {
+    const { fn } = fetcher([jsonOf({ name: 'Survey', mimeType: form.mimeType })]);
+
+    expect(await downloadFile(CloudProvider.Drive, 'at', 'd2', fn)).toBeNull();
   });
 });
 

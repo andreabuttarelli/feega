@@ -48,7 +48,7 @@ describe('GET cloud files', () => {
     const { res, body } = await call(files.GET, 'dropbox', { method: 'GET' });
 
     expect(res.status).toBe(200);
-    expect(body.entries).toEqual([{ id: '/a.png', name: 'a.png', folder: false, mime: null }]);
+    expect(body).toEqual({ entries: [{ id: '/a.png', name: 'a.png', folder: false, mime: null, importable: true }], next: null });
     expect(dropbox).toHaveBeenCalledWith('https://api.dropboxapi.com/2/files/list_folder', expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer at' }) }));
   });
 

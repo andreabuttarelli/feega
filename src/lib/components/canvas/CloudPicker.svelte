@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { CLOUD_PROVIDERS, CloudMode, PROVIDER_LABEL, type CloudProviderId } from '$lib/canvas/cloud-picker';
 
-  type Entry = { id: string; name: string; folder: boolean; mime: string | null };
+  type Entry = { id: string; name: string; folder: boolean; mime: string | null; importable: boolean };
 
   let {
     provider: initial,
@@ -23,6 +23,7 @@
   let provider = $state<CloudProviderId>(untrack(() => initial));
   let trail = $state<{ id: string | null; name: string }[]>([{ id: null, name: untrack(() => PROVIDER_LABEL[initial]) }]);
   let entries = $state<Entry[]>([]);
+  let next = $state<string | null>(null);
   let problem = $state<string | null>(null);
   let busy = $state(false);
 
@@ -30,22 +31,30 @@
   const connectUrl = $derived(`/api/v1/cloud/${provider}/connect?return=${encodeURIComponent(returnTo)}`);
   const shown = $derived(mode === CloudMode.Export ? entries.filter((e) => e.folder) : entries);
 
-  async function load() {
+  async function load(cursor: string | null) {
     problem = null;
-    const folder = here.id ? `?folder=${encodeURIComponent(here.id)}` : '';
-    const res = await fetch(`/api/v1/projects/${projectId}/cloud/${provider}/files${folder}`);
-    const body = (await res.json().catch(() => ({}))) as { entries?: Entry[]; error?: string };
+    const query = new URLSearchParams();
+    if (here.id) {
+      query.set('folder', here.id);
+    }
+    if (cursor) {
+      query.set('cursor', cursor);
+    }
+    const res = await fetch(`/api/v1/projects/${projectId}/cloud/${provider}/files?${query}`);
+    const body = (await res.json().catch(() => ({}))) as { entries?: Entry[]; next?: string | null; error?: string };
     if (!res.ok) {
       entries = [];
+      next = null;
       problem = body.error ?? 'failed';
       return;
     }
-    entries = body.entries ?? [];
+    entries = cursor ? [...entries, ...(body.entries ?? [])] : (body.entries ?? []);
+    next = body.next ?? null;
   }
 
   $effect(() => {
     void here;
-    void load();
+    void load(null);
   });
 
   async function choose(target: string) {
@@ -112,13 +121,20 @@
           {#if entry.folder}
             <button type="button" class="row" onclick={() => open(entry)}>{entry.name}/</button>
           {:else}
-            <button type="button" class="row" disabled={busy} data-testid="cloud-file" onclick={() => choose(entry.id)}>{entry.name}</button>
+            <button type="button" class="row" disabled={busy || !entry.importable} data-testid="cloud-file" onclick={() => choose(entry.id)}>
+              {entry.name}{#if !entry.importable} <span class="note">Not importable</span>{/if}
+            </button>
           {/if}
         </li>
       {:else}
         <li class="note">Nothing here</li>
       {/each}
     </ul>
+    {#if next}
+      <footer>
+        <button type="button" data-testid="cloud-more" onclick={() => load(next)}>Load more</button>
+      </footer>
+    {/if}
     {#if mode === CloudMode.Export}
       <footer>
         <button type="button" disabled={busy} data-testid="cloud-export-here" onclick={() => choose(here.id ?? '')}>Export here</button>
