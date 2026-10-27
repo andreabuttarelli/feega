@@ -46,6 +46,11 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
         'create_node',
         'update_node',
         'move_node',
+        'align_nodes',
+        'distribute_nodes',
+        'tidy_nodes',
+        'stack_nodes',
+        'undo_last',
         'connect_nodes',
         'delete_node',
         'list_assets',
@@ -75,7 +80,7 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
         'canvas_tool'
       ])
     );
-    expect(names).toHaveLength(32);
+    expect(names).toHaveLength(38);
   });
 
   it('col brand i tool di brand ci sono, accanto a quelli di progetto', () => {

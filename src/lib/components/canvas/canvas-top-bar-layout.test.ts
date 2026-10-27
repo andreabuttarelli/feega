@@ -8,7 +8,7 @@ const top = readFileSync(join(dir, 'CanvasTopBar.svelte'), 'utf8');
 
 describe('il riquadro destro porta credito, share e il toggle della chat', () => {
   it('il toggle della chat è nel riquadro destro, non più isolato in cima', () => {
-    const rightBoxMatch = top.match(/<div class="top-box right"[\s\S]*?<\/div>\s*<\/header>/);
+    const rightBoxMatch = top.match(/<div class="top-box top-group right"[\s\S]*?<\/div>\s*<\/header>/);
     expect(rightBoxMatch).not.toBeNull();
     expect(rightBoxMatch?.[0]).toMatch(/onclick={onToggleChat}/);
   });

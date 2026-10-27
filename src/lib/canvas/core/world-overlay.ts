@@ -3,7 +3,7 @@ import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import { EdgeLook, edgeItems, ghostItems, guideItems, hoverItems, marqueeItems, runningItems, peerItems, type CorePeer, type CoreTheme } from './overlay';
-import { stateChrome, tileChrome, type Glyphs, type StateTile } from './chrome';
+import { ports, stateChrome, tileChrome, type Glyphs, type StateTile } from './chrome';
 import { turned, type Turn } from './screen-uses';
 import { line, rect, solid } from './shapes';
 
@@ -19,12 +19,19 @@ export type WorldOverlay = { curves: readonly { edge: Wire; curve: Curve }[]; se
 
 export enum ChromeLayers {
   State = 'state',
-  Whole = 'whole'
+  Whole = 'whole',
+  Ports = 'ports'
 }
 
 export type ChromeOnCanvas = StateTile & { turn?: Turn; layers?: ChromeLayers };
 
-const chromeOf = (t: ChromeOnCanvas, glyphs: Glyphs): PathItem[] => (t.layers === ChromeLayers.Whole ? [...tileChrome(t, glyphs), ...stateChrome(t, glyphs)] : stateChrome(t, glyphs));
+const CHROME_OF: Record<ChromeLayers, (t: ChromeOnCanvas, glyphs: Glyphs) => PathItem[]> = {
+  [ChromeLayers.State]: (t, glyphs) => stateChrome(t, glyphs),
+  [ChromeLayers.Ports]: (t) => ports(t),
+  [ChromeLayers.Whole]: (t, glyphs) => [...tileChrome(t, glyphs), ...stateChrome(t, glyphs)]
+};
+
+const chromeOf = (t: ChromeOnCanvas, glyphs: Glyphs): PathItem[] => CHROME_OF[t.layers ?? ChromeLayers.State](t, glyphs);
 
 export function edgeLook(edge: Wire, selected: readonly string[], selectedEdge: string | null): EdgeLook {
   if (edge.mode === ITERATE) {

@@ -1,3 +1,5 @@
+import { exportCodeNode, isExportMode } from '$lib/server/canvas/code-export-node';
+import { ExportMode } from '$lib/canvas/code-frame';
 import { cardPreviews } from '$lib/server/canvas/card-previews';
 import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
@@ -63,8 +65,9 @@ import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
+import { BATCH_MAX_ROWS } from '$lib/canvas/technique-batch';
 import { saveFromSelection } from '$lib/server/canvas/techniques';
-import { detachInstance, openDefinition, placeInstance, runInstance } from '$lib/server/canvas/technique-instance';
+import { cancelRows, detachInstance, openDefinition, placeInstance, previewRows, rowsProgress, runInstance, runRows } from '$lib/server/canvas/technique-instance';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
@@ -97,12 +100,15 @@ import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
 import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-frame';
 import { imageToolAskSchema } from '$lib/image-tools';
+import { videoReframeAskSchema } from '$lib/reframe';
+import { VIDEO_REFRAME_DEPS, startVideoReframe } from '$lib/server/canvas/video-reframe';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
 import { COMBINE_STATUS, CombineOutcome, combineAskSchema, combineScenes } from '$lib/server/motion/combine-scenes';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
+import { importLottieAt } from '$lib/server/motion/lottie-at';
 import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
 import { DropOn, OutputKind } from '$lib/motion/move-element';
 
@@ -216,6 +222,17 @@ async function spendOnVoice<T>(
     return fail(denied.status, denied.data);
   }
   return work(deps, await import('$lib/server/voices/custom-voices'));
+}
+
+function rowsRequest(fd: FormData) {
+  const parsed = z
+    .object({
+      techniqueId: z.string().min(1),
+      rows: z.array(z.array(z.string().max(4000))).min(1).max(BATCH_MAX_ROWS),
+      mapping: z.array(z.number().int().nullable()).nullable()
+    })
+    .safeParse({ techniqueId: fd.get('technique_id'), rows: jsonField(fd, 'rows'), mapping: jsonField(fd, 'mapping') ?? null });
+  return parsed.success ? parsed.data : null;
 }
 
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
@@ -897,6 +914,14 @@ export const actions: Actions<CanvasParams> = {
     return SHOW_RUN_ANSWERS[shown.outcome](shown as never);
   },
 
+  exportCode: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const mode = fd.get('mode');
+    const out = await exportCodeNode(scope.db, { orgId: scope.orgId, nodeId: String(fd.get('node_id') ?? ''), mode: isExportMode(mode) ? mode : ExportMode.Inline });
+    return out.ok ? { folder: out.folder, files: out.files } : fail(400, { error: out.error });
+  },
+
   create: async ({ request, params, locals }) => {
     const sizeOf = (form: FormData) => {
       const width = coord(form.get('width'));
@@ -1230,7 +1255,7 @@ export const actions: Actions<CanvasParams> = {
   imageTool: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = imageToolAskSchema.safeParse({ nodeId: fd.get('node_id'), tool: fd.get('tool'), factor: fd.get('factor') ?? undefined, prompt: fd.get('prompt') ?? undefined, mask: jsonField(fd, 'mask'), extend: jsonField(fd, 'extend') });
+    const ask = imageToolAskSchema.safeParse({ nodeId: fd.get('node_id'), tool: fd.get('tool'), factor: fd.get('factor') ?? undefined, prompt: fd.get('prompt') ?? undefined, mask: jsonField(fd, 'mask'), extend: jsonField(fd, 'extend'), aspect: fd.get('aspect') ?? undefined });
     if (!ask.success) {
       return fail(400, { error: 'invalid request' });
     }
@@ -1240,7 +1265,19 @@ export const actions: Actions<CanvasParams> = {
       return fail(denied.status, denied.data);
     }
 
-    const started = await startImageTool(scope.db, IMAGE_TOOL_DEPS, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, sourceNodeId: ask.data.nodeId, tool: ask.data.tool, factor: ask.data.factor, prompt: ask.data.prompt, mask: ask.data.mask, extend: ask.data.extend });
+    const started = await startImageTool(scope.db, IMAGE_TOOL_DEPS, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, sourceNodeId: ask.data.nodeId, tool: ask.data.tool, factor: ask.data.factor, prompt: ask.data.prompt, mask: ask.data.mask, extend: ask.data.extend, aspect: ask.data.aspect });
+    return started.ok ? { outcome: 'done', nodeId: started.nodeId } : fail(400, { error: started.error });
+  },
+
+  videoReframe: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = videoReframeAskSchema.safeParse({ nodeId: fd.get('node_id'), aspect: fd.get('aspect'), focus: jsonField(fd, 'focus') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    const started = await startVideoReframe(scope.db, VIDEO_REFRAME_DEPS, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, sourceNodeId: ask.data.nodeId, aspect: ask.data.aspect, focus: ask.data.focus, actor: userActor(scope) });
     return started.ok ? { outcome: 'done', nodeId: started.nodeId } : fail(400, { error: started.error });
   },
 
@@ -1455,6 +1492,22 @@ export const actions: Actions<CanvasParams> = {
     }
     const nodes = await Promise.all(pasted.frameIds.map((nodeId) => findNode(scope.db, { orgId: scope.orgId, nodeId })));
     return { outcome: pasted.outcome, nodes: nodes.filter((n) => n !== null), undo: pasted.undo, skipped: pasted.skipped, fills: pasted.fills, fileKey: pasted.fileKey };
+  },
+
+  importLottie: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const at = figmaAtSchema.safeParse(jsonField(fd, 'at'));
+    const json = jsonField(fd, 'lottie');
+    if (!at.success || json === null) {
+      return fail(400, { error: 'invalid Lottie' });
+    }
+    const placed = await importLottieAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, json, at.data, () => crypto.randomUUID().slice(0, 8));
+    if ('error' in placed) {
+      return fail(400, { error: placed.error });
+    }
+    const node = await findNode(scope.db, { orgId: scope.orgId, nodeId: placed.frameId });
+    return { outcome: placed.outcome, nodes: node ? [node] : [], undo: placed.undo, skipped: placed.skipped };
   },
 
   placeOutput: async ({ request, params, locals, setHeaders }) => {
@@ -1826,6 +1879,45 @@ export const actions: Actions<CanvasParams> = {
 
     const out = await runInstance(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, nodeId: String(fd.get('node_id') ?? ''), actor: userActor(scope) });
     return out.outcome === 'queued' ? out : fail(400, { error: out.error });
+  },
+
+  preview_technique_rows: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const asked = rowsRequest(await request.formData());
+    if (!asked) {
+      return fail(400, { error: 'invalid rows' });
+    }
+
+    const out = await previewRows(scope.db, { orgId: scope.orgId, techniqueId: asked.techniqueId, rowCount: asked.rows.length });
+    return out.outcome === 'preview' ? out : fail(400, { error: out.error });
+  },
+
+  run_technique_rows: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const asked = rowsRequest(await request.formData());
+    if (!asked) {
+      return fail(400, { error: 'invalid rows' });
+    }
+
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    if (denied) {
+      return fail(denied.status, denied.data);
+    }
+
+    const out = await runRows(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, ...asked, actor: userActor(scope) });
+    return out.outcome === 'queued' ? out : fail(400, { error: out.error });
+  },
+
+  technique_rows_progress: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const runIds = z.array(z.string()).max(2000).safeParse(jsonField(await request.formData(), 'run_ids'));
+    return runIds.success ? rowsProgress(scope.db, { runIds: runIds.data }) : fail(400, { error: 'invalid runs' });
+  },
+
+  cancel_technique_rows: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const workflowIds = z.array(z.string()).max(BATCH_MAX_ROWS).safeParse(jsonField(await request.formData(), 'workflow_ids'));
+    return workflowIds.success ? cancelRows(scope.db, { orgId: scope.orgId, workflowIds: workflowIds.data }) : fail(400, { error: 'invalid workflows' });
   },
 
   detach_technique: async ({ request, params, locals }) => {

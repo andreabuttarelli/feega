@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CHAT_MAX, HEARTBEAT_MS, viewportCentredOn, SETTLE_MS, TICK_MS, centreOf, followed, landedAt, presenterOf, withPeerMotion, canvasHub, canvasPeersOf, keepCanvasMark, toCanvasMark, type CanvasMark } from './canvas-presence';
+import { CHAT_MAX, HEARTBEAT_MS, viewportCentredOn, SETTLE_MS, TICK_MS, centreOf, followed, landedAt, presenterOf, presentControlsShown, withPeerMotion, canvasHub, canvasPeersOf, keepCanvasMark, toCanvasMark, type CanvasMark } from './canvas-presence';
 import { MARK_STALE_MS } from './frame-presence';
 
 const self = { sessionId: 's-me', userId: 'me', name: 'me' };
@@ -205,5 +205,19 @@ describe('viewportCentredOn', () => {
     const size = { width: 800, height: 600 };
     const view = viewportCentredOn({ cx: 250, cy: 175, zoom: 2 }, size);
     expect(view).toEqual({ x: -100, y: -50, zoom: 2 });
+  });
+});
+
+describe('presentControlsShown', () => {
+  it('non compaiono da soli', () => {
+    expect(presentControlsShown({ others: 0, presenting: false })).toBe(false);
+  });
+
+  it('compaiono con altre persone sulla tela', () => {
+    expect(presentControlsShown({ others: 1, presenting: false })).toBe(true);
+  });
+
+  it('chi presenta non perde i controlli se gli altri se ne vanno', () => {
+    expect(presentControlsShown({ others: 0, presenting: true })).toBe(true);
   });
 });

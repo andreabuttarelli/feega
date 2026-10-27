@@ -146,7 +146,7 @@
   {#each topFirst as { fill, index } (index)}
     <div
       bind:this={rowEls[index]}
-      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_48px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-selected', !fill.visible && '[&>.dim]:opacity-40')}
+      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_56px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-selected', !fill.visible && '[&>.dim]:opacity-40')}
       role="button"
       tabindex="0"
       draggable="true"
