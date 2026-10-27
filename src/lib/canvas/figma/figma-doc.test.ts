@@ -132,6 +132,9 @@ describe('text in a frame much larger than the text', () => {
 });
 
 describe('component instances', () => {
+  const innerTextId = (doc: { comps: Record<string, { component?: unknown; tracks: { clips: unknown[] }[] }> }) =>
+    (Object.values(doc.comps).find((c) => c.component)!.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.component === 'Text')!).id;
+
   const instancesOf = (doc: Parameters<typeof clipsOf>[0]) => clipsOf(doc).filter((c) => c.component === 'Precomp' && c.name === 'Button');
   const mainsOf = (doc: { comps: Record<string, { component?: { name: string } }> }) => Object.values(doc.comps).filter((c) => c.component);
   const linkedOf = (doc: Parameters<typeof clipsOf>[0] & Parameters<typeof mainsOf>[0]) => instancesOf(doc).filter((c) => doc.comps[c.props.comp as string]?.component);
@@ -149,6 +152,16 @@ describe('component instances', () => {
     const [first, second] = linkedOf(item.doc);
     const scale = item.doc.width / item.size.width;
     expect(((second.transform.x ?? 0) - (first.transform.x ?? 0)) * item.doc.width).toBeCloseTo(300 * scale, 0);
+  });
+
+  it('draw both instances on the canvas', () => {
+    const [item] = planOf(buttonInstances({ mainCopied: true }), newId)!.items;
+    const list = drawFrame(prepare(item.doc, FEEGA_TOKENS, {}, { fonts: boxBook(), smoothing: Smoothing.Plain }), stillFrame(item.doc));
+    const labels = list.items.filter((i) => 'clip' in i && String(i.clip).endsWith(innerTextId(item.doc)));
+    expect(labels).toHaveLength(2);
+    const [first, second] = linkedOf(item.doc).map((host) => list.items.find((i) => 'clip' in i && i.clip === `${host.id}__0__${innerTextId(item.doc)}`) as unknown as { matrix: number[] });
+    const scale = item.doc.width / item.size.width;
+    expect(second.matrix[4] - first.matrix[4]).toBeCloseTo(300 * scale, 0);
   });
 
   it('become groups named after the component when the main is not in the paste', () => {
