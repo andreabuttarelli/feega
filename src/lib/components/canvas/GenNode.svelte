@@ -9,6 +9,8 @@
   import { filterSkills, insertSkill, slashQueryAt, type PromptSkill, type SlashQuery } from '$lib/canvas/prompt-skills';
   import { formatPrice } from '$lib/components/credit-amount-format';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
+  import Copy from '@lucide/svelte/icons/copy';
+  import Check from '@lucide/svelte/icons/check';
   import { untrack } from 'svelte';
   import OutputDragHandle from './OutputDragHandle.svelte';
   import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
@@ -42,7 +44,8 @@
     example = null,
     skills = [],
     onsaveskill,
-    selected = false
+    selected = false,
+    thumbUrl
   }: {
     node: GenNode;
     choices?: ModelChoice[];
@@ -72,7 +75,20 @@
     skills?: PromptSkill[];
     onsaveskill?: (name: string, body: string) => Promise<boolean>;
     selected?: boolean;
+    thumbUrl?: (mediaId: string) => string;
   } = $props();
+
+  const LONG_ERROR = 140;
+  const COPIED_MS = 1500;
+  let errorOpen = $state(false);
+  let copied = $state(false);
+  const withOutput = $derived(node.runs.filter((run) => run.mediaId));
+
+  async function copyError(text: string) {
+    await navigator.clipboard.writeText(text);
+    copied = true;
+    setTimeout(() => (copied = false), COPIED_MS);
+  }
 
   const COMPACT_MEDIA: ReadonlySet<GenNode['medium']> = new Set(['text', 'image', 'video']);
   const compact = $derived(COMPACT_MEDIA.has(node.medium));
@@ -233,7 +249,15 @@
         <div class="gen-fail" role="alert">
           <p class="gen-fail-title">{RUN_LABEL.failed}</p>
           {#if node.error}
-            <p class="gen-fail-why">{node.error}</p>
+            <p class="gen-fail-why nodrag" class:is-open={errorOpen} data-testid="gen-error">{node.error}</p>
+            <span class="gen-fail-tools nodrag">
+              {#if node.error.length > LONG_ERROR}
+                <button type="button" class="gen-link" onclick={() => (errorOpen = !errorOpen)}>{errorOpen ? 'Less' : 'More'}</button>
+              {/if}
+              <button type="button" class="gen-link" data-testid="copy-error" onclick={() => copyError(node.error ?? '')}>
+                {#if copied}<Check size={12} strokeWidth={2} />Copied{:else}<Copy size={12} strokeWidth={2} />Copy{/if}
+              </button>
+            </span>
           {/if}
           <button type="button" class="gen-unlock" onclick={() => onrun?.()} disabled={!canRun}>Try again</button>
         </div>
@@ -256,7 +280,16 @@
       {/if}
     </div>
   {/if}
-  {#if node.runs.length > 1}
+  {#if thumbUrl && compact && node.medium !== 'text' && withOutput.length > 1}
+    <div class="gen-strip nodrag" role="group" aria-label="Generations" data-testid="gen-history-strip">
+      <span class="gen-strip-count">{withOutput.length}</span>
+      {#each [...withOutput].reverse() as run (run.id)}
+        <button type="button" class="gen-strip-one" class:is-shown={run.mediaId === node.refId} title={run.prompt} aria-label="Show this generation" aria-pressed={run.mediaId === node.refId} onclick={() => onshow?.(run.id)}>
+          <img src={thumbUrl(run.mediaId ?? '')} alt="" loading="lazy" decoding="async" />
+        </button>
+      {/each}
+    </div>
+  {:else if node.runs.length > 1}
     <div class="gen-past" role="group" aria-label="Earlier generations">
       {#each node.runs as run, i (run.id)}
         <button
@@ -349,10 +382,9 @@
         {#if providerQuotes.length && !variableTextInput}
           <ul class="gen-providers" data-testid="provider-quotes">
             {#each providerQuotes as providerQuote (providerQuote.provider)}
-              <li class:is-selected={providerQuote.selected} class:is-cheapest={providerQuote.cheapest}>
-                <span>{providerQuote.label}</span>
+              <li class:is-selected={providerQuote.selected}>
+                <span class="gen-provider-name">{providerQuote.label}{#if providerQuote.cheapest}<em class="gen-pill">cheapest</em>{/if}</span>
                 {#if providerQuote.credits !== null}<span>{formatPrice(providerQuote.credits)}</span>{/if}
-                {#if providerQuote.cheapest}<em>cheapest</em>{/if}
               </li>
             {/each}
           </ul>
@@ -1018,5 +1050,98 @@
     left: 0;
     right: 0;
     bottom: calc(100% + 6px);
+  }
+  .gen-provider-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .gen-pill {
+    padding: 0 6px;
+    border-radius: var(--ui-radius-full, 9999px);
+    font-style: normal;
+    font-size: 10.5px;
+    line-height: 16px;
+    font-weight: 500;
+    color: var(--ui-ok, #1f9d55);
+    background: color-mix(in srgb, var(--ui-ok, #1f9d55) 14%, transparent);
+  }
+  .gen-fail-why {
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .gen-fail-why.is-open {
+    display: block;
+    max-height: 120px;
+    overflow: auto;
+  }
+  .gen-fail-tools {
+    display: inline-flex;
+    gap: 4px;
+  }
+  .gen-link {
+    gap: 4px;
+    height: 22px;
+    padding: 0 6px;
+    font-size: 11px;
+    color: var(--ink-soft, #6e6e73);
+    background: transparent;
+  }
+  .gen-link:hover {
+    color: var(--ink, #1d1d1f);
+    background: var(--paper-2, #f2f2f2);
+  }
+  .gen-strip {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    max-width: 100%;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    overflow-x: auto;
+    border-radius: var(--ui-radius-md, 6px);
+    background: var(--ui-raised, #fff);
+    box-shadow: var(--ui-shadow-float);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--ui-dur-fast, 120ms) ease;
+  }
+  .gen.is-selected .gen-strip,
+  .gen:hover .gen-strip {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .gen-strip-count {
+    flex: none;
+    padding: 0 4px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft, #6e6e73);
+  }
+  .gen-strip-one {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--ui-radius-sm, 4px);
+    background: var(--paper-2, #f2f2f2);
+    box-shadow: inset 0 0 0 1px var(--line, #e5e5e5);
+  }
+  .gen-strip-one img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .gen-strip-one.is-shown {
+    box-shadow: 0 0 0 2px var(--ui-accent, #0099ff);
   }
 </style>

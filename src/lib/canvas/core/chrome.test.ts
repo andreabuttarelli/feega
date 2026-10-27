@@ -214,3 +214,17 @@ describe('connector ports are round', () => {
     expect(ports.every((p) => p.contours.flat().length > 8)).toBe(true);
   });
 });
+
+describe('resize handles sit on the selection ring corners', () => {
+  it('centres each handle on the middle of the ring stroke, not inside it', () => {
+    const t = tile({ ring: NodeChrome.Selected, handles: true, radius: 10 });
+    const ring = box(stateChrome(t, glyphs).find((i) => i.clip === `n1:${ChromePart.Ring}`)!.contours);
+    const handles = stateChrome(t, glyphs).filter((i) => i.clip === `n1:${ChromePart.Handle}`).filter((_, i) => i % 2 === 0).map((h) => box(h.contours));
+    const centreline = [ring[0] + 1, ring[1] + 1, ring[2] - 1, ring[3] - 1];
+
+    expect((handles[0][0] + handles[0][2]) / 2).toBe(centreline[0]);
+    expect((handles[0][1] + handles[0][3]) / 2).toBe(centreline[1]);
+    expect((handles[3][0] + handles[3][2]) / 2).toBe(centreline[2]);
+    expect((handles[3][1] + handles[3][3]) / 2).toBe(centreline[3]);
+  });
+});

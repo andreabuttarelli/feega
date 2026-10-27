@@ -136,11 +136,12 @@ function handles(t: StateTile): PathItem[] {
     return [];
   }
   const half = HANDLE_SIZE / 2;
+  const out = RING_OFFSET + RING_WIDTH / 2;
   const corners = [
-    [t.x, t.y],
-    [t.x + t.width, t.y],
-    [t.x, t.y + t.height],
-    [t.x + t.width, t.y + t.height]
+    [t.x - out, t.y - out],
+    [t.x + t.width + out, t.y - out],
+    [t.x - out, t.y + t.height + out],
+    [t.x + t.width + out, t.y + t.height + out]
   ];
   return corners.flatMap(([cx, cy]) => [
     item(t, ChromePart.Handle, [rect(cx - half, cy - half, HANDLE_SIZE, HANDLE_SIZE)], t.ringColor),

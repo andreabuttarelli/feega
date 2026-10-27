@@ -212,15 +212,15 @@
     transform: translate(-50%, -50%);
   }
   .handle.left {
-    left: 0;
+    left: -2px;
   }
   .handle.right {
-    left: 100%;
+    left: calc(100% + 2px);
   }
   .handle.top {
-    top: 0;
+    top: -2px;
   }
   .handle.bottom {
-    top: 100%;
+    top: calc(100% + 2px);
   }
 </style>

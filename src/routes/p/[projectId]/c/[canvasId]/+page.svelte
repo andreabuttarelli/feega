@@ -4160,6 +4160,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             skills={skillShelf.list}
             onsaveskill={(name, body) => saveSkill(data.projectId, name, body)}
             {selected}
+            thumbUrl={(mediaId) => canvasAssetUrl(data.projectId, data.canvas.id, mediaId, AssetSize.Thumb)}
           >
             {#snippet result({ refId, text })}
               <!-- `/c/<tela>/assets/<id>` firma lo storage al volo: un URL firmato messo qui

@@ -414,7 +414,7 @@ function compactItems(x: Ctx, v: GenTileView): PathItem[] {
   const b = fullBody(c);
   const room = aboveBar(c, v);
   const body = v.hasBody ? [solid(x.clip(GenPart.Body), at(x, roundRect(b.x, b.y, b.w, b.h, CARD_RADIUS - BORDER)), theme.paper2), ...BODIES[v.state](x, v, room)] : [];
-  const history = v.runs > 1 ? past(x, v, BAR.inset - PAST.padY) : [];
+  const history = v.runs > 1 && v.medium === 'text' ? past(x, v, BAR.inset - PAST.padY) : [];
   const prompt = v.hasBody ? [] : fullPrompt(x, v);
   return [...panel(x, v.state === 'running'), ...body, ...prompt, ...history, ...(showsBar(v) ? bar(x, v) : [])];
 }
