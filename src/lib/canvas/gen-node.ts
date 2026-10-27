@@ -63,6 +63,7 @@ export type ModelChoice = {
     estimatedOutputTokens?: number;
   };
   creditOverrides?: Record<string, Record<string, number>>;
+  perSecondCredits?: PerSecondCredits;
   variableCredits?: boolean;
   /** I campi extra dichiarati da `ai_models.param_schema` per questo modello, oltre a quelli con
    *  un controllo già dedicato (`aspectRatio`, `resolution`…) — v. `model-params.ts`. Assente per
@@ -79,7 +80,14 @@ export type ModelChoice = {
   recommendedWhy?: string;
 };
 
-export type RoutePrice = Pick<ModelChoice, 'unitCredits' | 'pricedInputs' | 'creditOverrides' | 'variableCredits'>;
+export enum VideoAudio {
+  With = 'with',
+  Without = 'without'
+}
+
+export type PerSecondCredits = Partial<Record<VideoAudio, Record<string, number>>>;
+
+export type RoutePrice = Pick<ModelChoice, 'unitCredits' | 'pricedInputs' | 'creditOverrides' | 'variableCredits' | 'perSecondCredits'>;
 
 export type RouteStats = { successRate: number | null; p95Ms: number | null; healthy: boolean };
 
