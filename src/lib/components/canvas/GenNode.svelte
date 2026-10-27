@@ -1098,9 +1098,10 @@
   }
   .gen-strip {
     position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-    max-width: 100%;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100% - 96px);
     z-index: 4;
     display: flex;
     align-items: center;

@@ -127,7 +127,7 @@
   <DropdownMenu.Trigger
     aria-label="Model"
     data-control="model"
-    class="{CONTROL_HEIGHT} inline-flex max-w-80 min-w-0 items-center gap-1.5 rounded-sm border border-line-2 bg-background px-2 text-left text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-expanded:bg-muted"
+    class="{CONTROL_HEIGHT} inline-flex max-w-56 min-w-0 items-center gap-1.5 rounded-sm border border-line-2 bg-background px-2 text-left text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-expanded:bg-muted"
   >
     {#if mixed}
       <span class="truncate">{MIXED_TEXT}</span>
@@ -135,7 +135,6 @@
       <ProviderIcon provider={current.provider} />
       <span class="truncate font-medium">{current.label}</span>
       {#if currentRoute}<span class="shrink-0 text-muted-foreground" data-testid="route-trigger">· {currentRoute.provider === AUTO_ROUTE ? 'Auto' : currentRoute.label}</span>{/if}
-      {@render badges(current)}
     {:else}
       <span class="truncate text-muted-foreground">Choose model</span>
     {/if}
