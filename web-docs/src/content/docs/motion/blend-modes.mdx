@@ -1,0 +1,40 @@
+---
+title: Blend modes
+description: The 26 layer blend modes, set from the inspector or by the chat agent.
+sidebar:
+  order: 6
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="blend-modes" caption="An orange colour layer over a product photo, stepping through six blend modes." />
+
+## From the editor
+
+1. Select the layer you want to blend, for example a colour wash over a photo.
+2. In the inspector, open the **Layer** section: the **Blend mode** menu sits next to the opacity slider.
+3. Pick a mode. The canvas updates at once, and the layer keeps blending when exported.
+4. Pick **Normal** to turn blending off.
+
+## From an agent, MCP or CLI
+
+`set_blend_mode` takes a clip and a mode id (lowercase, dashed: `linear-dodge`, `vivid-light`, `hard-mix`, `darker-color`):
+
+```json
+{ "op": "set_blend_mode", "input": { "clip_id": "wash", "mode": "vivid-light" } }
+```
+
+On an adjustment layer (`add_adjustment_layer`) the mode applies to everything below it.
+
+## Modes
+
+| Group | Modes |
+|---|---|
+| Normal | Normal |
+| Darken | Darken, Multiply, Color Burn, Linear Burn, Darker Color |
+| Lighten | Lighten, Screen, Color Dodge, Linear Dodge (Add), Lighter Color |
+| Contrast | Overlay, Soft Light, Hard Light, Vivid Light, Linear Light, Pin Light, Hard Mix |
+| Difference | Difference, Exclusion, Subtract, Divide |
+| Colour | Hue, Saturation, Color, Luminosity |
+
+Blending is per layer: children do not inherit it.

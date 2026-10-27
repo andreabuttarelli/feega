@@ -240,6 +240,9 @@ float soft(float b, float s) {
   float d = b <= 0.25 ? ((16.0 * b - 12.0) * b + 4.0) * b : sqrt(b);
   return s <= 0.5 ? b - (1.0 - 2.0 * s) * b * (1.0 - b) : b + (2.0 * s - 1.0) * (d - b);
 }
+float quot(float b, float s) { return s <= 0.0 ? 1.0 : b / s; }
+float vivid(float b, float s) { return s <= 0.5 ? burn(b, 2.0 * s) : dodge(b, 2.0 * s - 1.0); }
+float pin(float b, float s) { return s <= 0.5 ? min(b, 2.0 * s) : max(b, 2.0 * s - 1.0); }
 vec3 mixed(vec3 b, vec3 s) {
   int mode = int(p(0));
   if (mode == 1) return b * s;
@@ -257,6 +260,16 @@ vec3 mixed(vec3 b, vec3 s) {
   if (mode == 13) return setLum(setSat(b, sat(s)), lum(b));
   if (mode == 14) return setLum(s, lum(b));
   if (mode == 15) return setLum(b, lum(s));
+  if (mode == 16) return b + s - 1.0;
+  if (mode == 17) return b + s;
+  if (mode == 18) return vec3(vivid(b.r, s.r), vivid(b.g, s.g), vivid(b.b, s.b));
+  if (mode == 19) return b + 2.0 * s - 1.0;
+  if (mode == 20) return vec3(pin(b.r, s.r), pin(b.g, s.g), pin(b.b, s.b));
+  if (mode == 21) return step(vec3(1.0), b + s);
+  if (mode == 22) return b - s;
+  if (mode == 23) return vec3(quot(b.r, s.r), quot(b.g, s.g), quot(b.b, s.b));
+  if (mode == 24) return lum(b) <= lum(s) ? b : s;
+  if (mode == 25) return lum(b) >= lum(s) ? b : s;
   return s;
 }
 vec4 run(ivec2 xy) {
