@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { cardOverElements, elementsOnly } from '../../../../tests/fixtures/figma/elements';
+import { cardOverElements, elementsOnly, nestedAutoLayout, landingWithUnsupported, onlyUnsupported, unsupportedBesideElement } from '../../../../tests/fixtures/figma/elements';
 import { figmaClipboardHtml } from '../../../../tests/fixtures/figma/clipboard';
 import { figmaMessage } from './archive';
 import { figmaPlan } from './figma-doc';
 import { Destination } from './scene';
+
+const newId = () => Math.random().toString(36).slice(2, 10);
 
 describe('a synthetic Figma clipboard', () => {
   it('round-trips through the fig-kiwi archive', () => {
@@ -19,5 +21,28 @@ describe('a synthetic Figma clipboard', () => {
   it('a frame among elements is the only frame in the paste', () => {
     const plan = figmaPlan(figmaClipboardHtml(cardOverElements()), () => Math.random().toString(36).slice(2, 10));
     expect(plan?.items.filter((i) => i.destination === Destination.Frame)).toHaveLength(1);
+  });
+
+  it('a landing frame with unsupported layers still lands, each kept as a placeholder', () => {
+    const plan = figmaPlan(figmaClipboardHtml(landingWithUnsupported()), newId);
+    const clips = plan!.items[0].doc.tracks.flatMap((t) => t.clips);
+    expect(plan?.items).toHaveLength(1);
+    expect(clips.length).toBeGreaterThanOrEqual(5);
+    expect(plan?.skipped.join(' ')).toMatch(/sticky/i);
+  });
+
+  it('an unsupported layer next to a supported one drops neither', () => {
+    expect(figmaPlan(figmaClipboardHtml(unsupportedBesideElement()), newId)?.items).toHaveLength(2);
+  });
+
+  it('a paste of only unsupported layers still lands', () => {
+    expect(figmaPlan(figmaClipboardHtml(onlyUnsupported()), newId)?.items).toHaveLength(1);
+  });
+
+  it('auto-layout frames nested inside a frame with a background land as one frame', () => {
+    const plan = figmaPlan(figmaClipboardHtml(nestedAutoLayout()), newId);
+    expect(plan?.items).toHaveLength(1);
+    expect(plan?.items[0].destination).toBe(Destination.Frame);
+    expect(plan?.items[0].doc.tracks.flatMap((t) => t.clips).length).toBeGreaterThan(3);
   });
 });

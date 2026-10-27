@@ -1,5 +1,6 @@
 import { BACKENDS, type FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
 import { drawFrame, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+import { sharedFrames } from '$lib/motion/gpu/webcodecs-decoder';
 import { createMedia } from '@feega/motion-core/motion/gpu-full/media';
 import { readClips, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
 import type { CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
@@ -22,7 +23,7 @@ export async function renderOnCore(prepared: Prepared, backend: FullBackend, tim
   if (!raster) {
     return false;
   }
-  const media = createMedia();
+  const media = createMedia({ frames: sharedFrames() });
   try {
     for (const [index, time] of times.entries()) {
       signal.throwIfAborted();

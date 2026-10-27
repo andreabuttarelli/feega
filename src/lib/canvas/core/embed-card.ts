@@ -1,9 +1,10 @@
 import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { BORDER, CardPart, LEADING, UiGlyph, at, box, glyph, measure, panel, write, type Ctx } from './card-kit';
 import { rect, solid } from './shapes';
+import { FRAME_TABS } from '../iframe-node';
 
 const HEAD = { padX: 9, padY: 7, gap: 6 };
-const MODES = { pad: 2, buttonX: 8, buttonY: 3, size: 11.5, labels: ['URL', 'Code'] as const };
+const MODES = { pad: 2, buttonX: 8, buttonY: 3, size: 11.5, labels: FRAME_TABS.map((t) => t.label) };
 const MODES_H = BORDER * 2 + MODES.pad * 2 + MODES.buttonY * 2 + MODES.size * LEADING;
 const FIELD = { padX: 7, padY: 3, size: 11.5 };
 const FIELD_H = FIELD.padY * 2 + FIELD.size * LEADING + BORDER * 2;
@@ -37,9 +38,9 @@ function modes(x: Ctx, on: number): { items: Item[]; right: number } {
 function head(x: Ctx): Item[] {
   const { c, theme, icons } = x;
   const e = c.face.embed!;
-  const bar = modes(x, e.mode === 'url' ? 0 : 1);
+  const bar = modes(x, e.tab);
   const line = solid(x.clip(CardPart.Head), at(c, [rect(0, HEAD_H - BORDER, c.w, BORDER)]), theme.line);
-  if (e.mode === 'html') {
+  if (e.mode !== 'url') {
     return [...bar.items, line];
   }
   const open = c.w - HEAD.padX - OPEN.box;

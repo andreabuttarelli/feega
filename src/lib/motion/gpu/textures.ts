@@ -6,6 +6,8 @@ import { PaintKind } from './paint-of';
 import type { Placement } from './renderer';
 import type { Drawn, Paint, SceneLayer } from './scene';
 import type { TextRaster } from './text-layout';
+import { sharedFrames } from './webcodecs-decoder';
+import type { Frame, VideoFrames } from '@feega/motion-core/motion/gpu-full/video-frames';
 
 type Of<K extends PaintKind> = Extract<Paint, { kind: K }>;
 
@@ -76,10 +78,12 @@ function pixels(img: HTMLImageElement): HTMLCanvasElement {
   return canvas;
 }
 
-export function createPainter(resolution = 1): Painter {
+type VideoEntry = { el: HTMLVideoElement | null; stage: HTMLCanvasElement | null; texture: Texture | null; natural: Size | null };
+
+export function createPainter(resolution = 1, frames: VideoFrames = sharedFrames()): Painter {
   const images = new Map<string, Promise<HTMLImageElement>>();
   const loaded = new Map<string, { texture: Texture; natural: Size }>();
-  const videos = new Map<string, { el: HTMLVideoElement; texture: Texture | null }>();
+  const videos = new Map<string, VideoEntry>();
   const fills = new Map<string, Texture>();
   const texts = new Map<SceneLayer, Texture>();
 
@@ -98,14 +102,32 @@ export function createPainter(resolution = 1): Painter {
 
   const shapeKey = (d: Drawn) => `${(d.paint as Of<PaintKind.Shape>).markup}@${rasterScale(d, resolution)}`;
 
-  const videoOf = (paint: Of<PaintKind.Video>) => {
-    let entry = videos.get(paint.src);
+  const videoOf = (src: string) => {
+    let entry = videos.get(src);
     if (!entry) {
-      const el = Object.assign(document.createElement('video'), { muted: true, playsInline: true, preload: 'auto', crossOrigin: 'anonymous', src: paint.src });
-      entry = { el, texture: null };
-      videos.set(paint.src, entry);
+      entry = { el: null, stage: null, texture: null, natural: null };
+      videos.set(src, entry);
     }
     return entry;
+  };
+
+  const showFrame = (entry: VideoEntry, frame: Frame) => {
+    if (!entry.stage || entry.stage.width !== frame.width || entry.stage.height !== frame.height) {
+      entry.texture?.destroy(true);
+      entry.stage = Object.assign(document.createElement('canvas'), { width: frame.width, height: frame.height });
+      entry.texture = sharp(entry.stage);
+    }
+    (entry.stage.getContext('2d') as CanvasRenderingContext2D).drawImage(frame.image, 0, 0);
+    entry.texture!.source.update();
+    entry.natural = { width: frame.width, height: frame.height };
+  };
+
+  const playFallback = async (entry: VideoEntry, paint: Of<PaintKind.Video>, time: number) => {
+    entry.el ??= Object.assign(document.createElement('video'), { muted: true, playsInline: true, preload: 'auto', crossOrigin: 'anonymous', src: paint.src });
+    await seeked(entry.el, time);
+    entry.texture ??= Texture.from(entry.el);
+    entry.texture.source.update();
+    entry.natural = { width: entry.el.videoWidth, height: entry.el.videoHeight };
   };
 
   const PREPARE: Record<PaintKind, (d: Drawn, t: number) => Promise<unknown>> = {
@@ -120,10 +142,14 @@ export function createPainter(resolution = 1): Painter {
     [PaintKind.Logo]: (d) => load((d.paint as Of<PaintKind.Logo>).src, (d.paint as Of<PaintKind.Logo>).src),
     [PaintKind.Video]: async (d, t) => {
       const paint = d.paint as Of<PaintKind.Video>;
-      const entry = videoOf(paint);
-      await seeked(entry.el, paint.mediaStart + (t - paint.start) * paint.rate);
-      entry.texture ??= Texture.from(entry.el);
-      entry.texture.source.update();
+      const entry = videoOf(paint.src);
+      const time = paint.mediaStart + (t - paint.start) * paint.rate;
+      const frame = await frames.at(paint.src, time, Math.ceil(d.content.width * resolution));
+      if (frame) {
+        showFrame(entry, frame);
+        return;
+      }
+      await playFallback(entry, paint, time);
     }
   };
 
@@ -164,7 +190,7 @@ export function createPainter(resolution = 1): Painter {
     [PaintKind.Video]: (d) => {
       const paint = d.paint as Of<PaintKind.Video>;
       const entry = videos.get(paint.src);
-      return entry?.texture ? { texture: entry.texture, rect: fitRect(paint.fit, d.content, { width: entry.el.videoWidth, height: entry.el.videoHeight }, [0.5, 0.5]) } : null;
+      return entry?.texture && entry.natural ? { texture: entry.texture, rect: fitRect(paint.fit, d.content, entry.natural, [0.5, 0.5]) } : null;
     }
   };
 

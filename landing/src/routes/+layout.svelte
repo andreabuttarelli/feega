@@ -9,7 +9,8 @@
 
   let { children } = $props();
 
-  const OG_IMAGE = `${SITE_URL}/og.png`;
+  const OG_IMAGE = `${SITE_URL}/og.gif`;
+  const OG_VIDEO = `${SITE_URL}/og.mp4`;
   const canonical = $derived(SITE_URL + page.url.pathname);
   const crumb = $derived(page.url.pathname === '/' ? undefined : pageTitle(page.url.pathname));
 </script>
@@ -26,6 +27,11 @@
   <meta property="og:image" content={OG_IMAGE} />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
+  <meta property="og:image:type" content="image/gif" />
+  <meta property="og:video" content={OG_VIDEO} />
+  <meta property="og:video:type" content="video/mp4" />
+  <meta property="og:video:width" content="1200" />
+  <meta property="og:video:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content={OG_IMAGE} />
   <meta name="robots" content="max-image-preview:large" />

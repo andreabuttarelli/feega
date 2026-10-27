@@ -7,6 +7,7 @@ export type Gradient = {
   from: [number, number];
   to: [number, number];
   stops: Stop[];
+  repeating: boolean;
 };
 
 const DEG = Math.PI / 180;
@@ -179,7 +180,10 @@ export function flattened(m: Matrix4, size: Size): Affine | null {
   if (projected.some((p) => p === null)) {
     return null;
   }
-  const points = projected as number[][];
+  return fitCorners(projected as Point[], box);
+}
+
+export function fitCorners(points: Point[], box: Size): Affine {
   const [hx, hy] = [box.w / 2, box.h / 2];
   const signs = [
     [-1, -1],
@@ -274,12 +278,20 @@ function placed(stops: RawStop[]): Stop[] {
   return stops.map((s, i) => ({ at: ats[i] as number, color: s.color }));
 }
 
+const padded = (stops: Stop[]): Stop[] => [
+  ...(stops[0].at > 0 ? [{ at: 0, color: stops[0].color }] : []),
+  ...stops,
+  ...(stops[stops.length - 1].at < 1
+    ? [{ at: 1, color: stops[stops.length - 1].color }]
+    : []),
+];
+
 export function linearGradient(css: string, size: Size): Gradient | null {
-  const m = /^linear-gradient\((.*)\)$/s.exec(css.trim());
+  const m = /^(repeating-)?linear-gradient\((.*)\)$/s.exec(css.trim());
   if (!m) {
     return null;
   }
-  const args = splitTop(m[1]);
+  const args = splitTop(m[2]);
   const directed = DIRECTION.test(args[0]);
   const angle = directed ? angleOf(args[0], size) : DEFAULT_ANGLE;
   if (angle === null) {
@@ -296,7 +308,8 @@ export function linearGradient(css: string, size: Size): Gradient | null {
   return {
     from: [size.w / 2 - half[0], size.h / 2 - half[1]],
     to: [size.w / 2 + half[0], size.h / 2 + half[1]],
-    stops: placed(raw),
+    stops: m[1] ? placed(raw) : padded(placed(raw)),
+    repeating: Boolean(m[1]),
   };
 }
 
@@ -386,5 +399,7 @@ export function radialGradient(css: string, size: Size): Radial | null {
     radii && radii[0] > 0 && radii[1] > 0
       ? stopsOf(headed ? args.slice(1) : args, radii[0])
       : null;
-  return radii && raw ? { center: [cx, cy], radii, stops: placed(raw) } : null;
+  return radii && raw
+    ? { center: [cx, cy], radii, stops: padded(placed(raw)) }
+    : null;
 }

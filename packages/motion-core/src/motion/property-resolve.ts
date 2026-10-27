@@ -8,7 +8,7 @@ export enum PropertyKind {
 }
 
 export type PropertyValue = string | boolean;
-export type PropertyDef = { kind: PropertyKind; target: string; default?: PropertyValue; nested?: string };
+export type PropertyDef = { kind: PropertyKind; target: string; default?: PropertyValue; nested?: string; preferred?: string[] };
 export type PropertyValues = Record<string, PropertyValue>;
 
 const asked = (def: PropertyDef, value: PropertyValue, clip: MotionClip): Record<string, unknown> => {

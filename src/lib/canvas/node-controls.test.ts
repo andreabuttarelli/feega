@@ -85,6 +85,12 @@ describe('il valore corrente, sempre visibile e mai inventato', () => {
     expect(control.mixed).toBe(false);
   });
 
+  it('an image node without a resolution shows the 1K it will render at, not the first option', () => {
+    const image: ModelChoice = { ...videoChoice, resolutions: ['512', '1K', '2K', '4K'], durationOptions: undefined };
+
+    expect(byId(controlsFor([{}], image), 'resolution').value).toBe('1K');
+  });
+
   it('durata e risoluzione non scritte mostrano il default del modello, come prima', () => {
     const controls = controlsFor([{}]);
 

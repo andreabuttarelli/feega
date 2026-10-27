@@ -558,7 +558,7 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
       return own as Content;
     };
     const grouped = content.length > 1 && (Object.keys(extras).length > 0 || alpha < 1 || blur > 0 || clip.blend !== BlendMode.Normal);
-    const projected = (items: Item[]) => (depth ? items.map((i) => warpItem(i, depth.warp)) : items);
+    const projected = (items: Item[]) => (depth ? items.flatMap((i) => warpItem(i, depth.warp)) : items);
     if (!grouped) {
       return projected(content.map((c) => ({ ...inner(c), opacity: alpha * c.opacity, blur: blur + ownBlur(c), blend: clip.blend, ...extras, ...ownLook(c, placed, extras), ...stenciled(c) }) as Item));
     }

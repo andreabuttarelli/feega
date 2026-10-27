@@ -31,6 +31,10 @@ function withSat(c: Rgb, s: number): Rgb {
   return c.map((v) => (max === min ? 0 : v === max ? s : v === min ? 0 : ((v - min) * s) / (max - min))) as Rgb;
 }
 
+const vividLight = (b: number, s: number) => (s <= HALF ? (s === 0 ? (b === 1 ? 1 : 0) : 1 - Math.min(1, (1 - b) / (2 * s))) : s === 1 ? (b === 0 ? 0 : 1) : Math.min(1, b / (2 * (1 - s))));
+const pinLight = (b: number, s: number) => (s <= HALF ? Math.min(b, 2 * s) : Math.max(b, 2 * s - 1));
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
 const BLENDS: Record<BlendMode, (b: Rgb, s: Rgb) => Rgb> = {
   [BlendMode.Normal]: (_b, s) => s,
   [BlendMode.Multiply]: separable((b, s) => b * s),
@@ -47,7 +51,17 @@ const BLENDS: Record<BlendMode, (b: Rgb, s: Rgb) => Rgb> = {
   [BlendMode.Hue]: (b, s) => withLum(withSat(s, sat(b)), lum(b)),
   [BlendMode.Saturation]: (b, s) => withLum(withSat(b, sat(s)), lum(b)),
   [BlendMode.Color]: (b, s) => withLum(s, lum(b)),
-  [BlendMode.Luminosity]: (b, s) => withLum(b, lum(s))
+  [BlendMode.Luminosity]: (b, s) => withLum(b, lum(s)),
+  [BlendMode.LinearBurn]: separable((b, s) => clamp01(b + s - 1)),
+  [BlendMode.LinearDodge]: separable((b, s) => clamp01(b + s)),
+  [BlendMode.VividLight]: separable(vividLight),
+  [BlendMode.LinearLight]: separable((b, s) => clamp01(b + 2 * s - 1)),
+  [BlendMode.PinLight]: separable(pinLight),
+  [BlendMode.HardMix]: separable((b, s) => (b + s >= 1 ? 1 : 0)),
+  [BlendMode.Subtract]: separable((b, s) => clamp01(b - s)),
+  [BlendMode.Divide]: separable((b, s) => (s === 0 ? 1 : clamp01(b / s))),
+  [BlendMode.DarkerColor]: (b, s) => (lum(b) <= lum(s) ? b : s),
+  [BlendMode.LighterColor]: (b, s) => (lum(b) >= lum(s) ? b : s)
 };
 
 export function blended(backdrop: Rgba, source: Rgba, mode: BlendMode): Rgba {

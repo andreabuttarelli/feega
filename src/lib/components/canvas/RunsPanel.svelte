@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { RunListing } from '$lib/canvas/run-graph';
+  import History from '@lucide/svelte/icons/history';
+  import { tip } from '$lib/motion/tooltip';
 
   let {
     runs,
@@ -13,6 +15,10 @@
 
   let open = $state(false);
 
+  const RUNS_LABEL = 'Runs';
+  const ACTIVE_STATUSES = ['running', 'queued'];
+  const activeCount = $derived(runs.filter((run) => ACTIVE_STATUSES.includes(run.status)).length);
+
   const cost = (usd: number | null) => (usd === null ? '—' : `$${usd.toFixed(3)}`);
 </script>
 
@@ -21,7 +27,10 @@
     {#if staleCount}
       <button type="button" data-testid="run-all-stale" onclick={onrunstale}>Run all out of date ({staleCount})</button>
     {/if}
-    <button type="button" aria-expanded={open} onclick={() => (open = !open)}>Runs</button>
+    <button type="button" class="runs-toggle" aria-label={RUNS_LABEL} aria-expanded={open} use:tip={{ name: RUNS_LABEL, keys: '' }} onclick={() => (open = !open)}>
+      <History size={16} />
+      {#if activeCount}<span class="count" data-testid="runs-active">{activeCount}</span>{/if}
+    </button>
   </div>
   {#if open}
     <ol>
@@ -65,22 +74,57 @@
 
   button {
     font: inherit;
-    padding: 4px 10px;
-    border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
-    background: var(--ui-panel);
+    height: 32px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
     color: inherit;
     cursor: pointer;
   }
 
+  .runs-toggle {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    color: var(--ui-icon-ink);
+  }
+  .runs-toggle:hover {
+    color: var(--ui-text);
+  }
+
+  .count {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
+    font-size: 10px;
+    line-height: 16px;
+    text-align: center;
+  }
+
   ol {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
     list-style: none;
     margin: 0;
     padding: 4px 0;
-    width: 280px;
-    max-height: 260px;
+    width: min(280px, calc(100vw - 24px));
+    max-height: min(260px, calc(100dvh - 140px));
     overflow-y: auto;
-    border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
-    background: var(--ui-panel);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   li {
