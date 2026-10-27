@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { RunListing } from '$lib/canvas/run-graph';
   import History from '@lucide/svelte/icons/history';
-  import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+  import { tip } from '$lib/motion/tooltip';
 
   let {
     runs,
@@ -15,6 +15,7 @@
 
   let open = $state(false);
 
+  const RUNS_LABEL = 'Runs';
   const ACTIVE_STATUSES = ['running', 'queued'];
   const activeCount = $derived(runs.filter((run) => ACTIVE_STATUSES.includes(run.status)).length);
 
@@ -26,19 +27,10 @@
     {#if staleCount}
       <button type="button" data-testid="run-all-stale" onclick={onrunstale}>Run all out of date ({staleCount})</button>
     {/if}
-    <Tooltip.Provider delayDuration={200}>
-      <Tooltip.Root>
-        <Tooltip.Trigger>
-          {#snippet child({ props })}
-            <button {...props} type="button" class="runs-toggle" aria-label="Runs" aria-expanded={open} onclick={() => (open = !open)}>
-              <History size={16} />
-              {#if activeCount}<span class="count" data-testid="runs-active">{activeCount}</span>{/if}
-            </button>
-          {/snippet}
-        </Tooltip.Trigger>
-        <Tooltip.Content side="top">Runs</Tooltip.Content>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+    <button type="button" class="runs-toggle" aria-label={RUNS_LABEL} aria-expanded={open} use:tip={{ name: RUNS_LABEL, keys: '' }} onclick={() => (open = !open)}>
+      <History size={16} />
+      {#if activeCount}<span class="count" data-testid="runs-active">{activeCount}</span>{/if}
+    </button>
   </div>
   {#if open}
     <ol>

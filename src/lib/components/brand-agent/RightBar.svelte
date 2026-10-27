@@ -155,7 +155,7 @@
   }
 
   .chat-tabs {
-    display: inline-flex;
+    display: flex;
     gap: 2px;
     padding: 2px;
     border-radius: var(--ui-radius-md);
@@ -164,8 +164,10 @@
 
   .chat-tab {
     position: relative;
+    flex: 1;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     height: 28px;
     padding: 0 12px;

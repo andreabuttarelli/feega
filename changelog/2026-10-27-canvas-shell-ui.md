@@ -48,3 +48,16 @@ were left out: they double the chrome height and the tooltips already name every
   sideways. Both fixed; `tests/e2e/inspector-overflow.spec.ts` asserts nothing passes the card
   edge (needs `E2E_REAL_STACK=1`, not run here).
 - The right bar tabs sit in a solid header.
+
+## Follow-up: inspector header
+
+- The grey action strip is gone for single elements. The header row is icon, editable name,
+  the type only when it differs from the name, Duplicate, then ⋯. One table
+  (`PLACEMENT` in `src/lib/motion/clip-bar.ts`) decides each action: inline, a menu group
+  (structure, shape, clip, danger with Delete last in red), or dropped because it lives
+  elsewhere (flip in Layout, parent in Parent & mask, select several and properties). The strip
+  stays only for multi-selection.
+- Field labels: `align` reads "Text align" and lives in Text. Select options read as words
+  ("Rectangle"); managed lists with nothing in them ("Path · 0 set") are hidden.
+- Runs popover long list covered by `runs-panel-render.test.ts` (40 runs, running count).
+- The image picker row wraps instead of pushing Replace/Remove off the card.

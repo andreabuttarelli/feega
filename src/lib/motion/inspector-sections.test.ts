@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClipFamily } from './track-style';
-import { Part, SECTION_ORDER, SECTION_TITLE, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection } from './inspector-sections';
+import { Part, SECTION_ORDER, SECTION_TITLE, emptyManaged, optionLabel, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection } from './inspector-sections';
 import { Control, Group } from '@feega/motion-core/motion/components';
 import { FieldFill } from './number-field';
 import { Source } from '@feega/motion-core/motion/keyframes';
@@ -94,7 +94,7 @@ describe('inspector sections', () => {
 
     expect(fieldSection(field('size', Control.Range, Group.Style), Typed.Yes)).toBe(Section.Text);
     expect(fieldSection(field('align', Control.Select, Group.Layout), Typed.Yes)).toBe(Section.Text);
-    expect(fieldSection(field('align', Control.Select, Group.Layout), Typed.No)).toBe(Section.Layout);
+    expect(fieldSection(field('align', Control.Select, Group.Layout), Typed.No)).toBe(Section.Text);
     expect(fieldSection(field('color', Control.Color, Group.Style), Typed.Yes)).toBe(Section.Fill);
     expect(fieldSection(field('paper', Control.Color, Group.Style), Typed.No)).toBe(Section.Fill);
     expect(fieldSection(field('strokeWidth', Control.Range, Group.Style), Typed.No)).toBe(Section.Stroke);
@@ -115,5 +115,13 @@ describe('inspector sections', () => {
   it('never shows a field that only wires the runtime, like the variable prefix', () => {
     expect(uiHidden('varPrefix')).toBe(true);
     expect(uiHidden('ink')).toBe(false);
+  });
+
+  it('shows human option names and hides empty managed rows', () => {
+    expect(optionLabel('rect')).toBe('Rectangle');
+    expect(optionLabel('drift-up')).toBe('Drift up');
+    expect(emptyManaged(Control.Managed, [])).toBe(true);
+    expect(emptyManaged(Control.Managed, [1])).toBe(false);
+    expect(emptyManaged(Control.Text, [])).toBe(false);
   });
 });

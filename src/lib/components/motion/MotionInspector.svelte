@@ -25,9 +25,9 @@
   import InspectorSection from './InspectorSection.svelte';
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
-  import { DIAL_KEYS, Part, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
+  import { DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
-  import { clipName as layerName, setClipFlags } from '@feega/motion-core/motion/organize';
+  import { clipName as layerName, renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
   import PositionSection from '$lib/components/motion/PositionSection.svelte';
   import { PositionPart } from '$lib/motion/position-part';
@@ -120,6 +120,7 @@
     partFill = null,
     gesture = null,
     lead,
+    actions,
     mode = EditMode.Motion,
     onalign
   }: {
@@ -142,6 +143,7 @@
     partFill?: Snippet | null;
     gesture?: LiveGesture | null;
     lead?: Snippet;
+    actions?: Snippet;
     mode?: EditMode;
     onalign?: (edge: AlignEdge) => void;
   } = $props();
@@ -197,6 +199,8 @@
       .filter((f) => !uiHidden(f.key))
       .filter((f) => !focus || focus.includes(f.key))
       .filter((f) => !shadowed(f.key, (clip.props as Record<string, unknown>)[f.key], f.fallback, transformKeys))
+      .filter((f) => !emptyManaged(f.control, (clip.props as Record<string, unknown>)[f.key]))
+      .map((f) => ({ ...f, label: fieldLabel(f.key, f.label) }))
   );
   const sharedFields = $derived(
     clipFieldGroups(doc, clip)
@@ -218,6 +222,8 @@
   const opacityProp = $derived(transformProps.find((p) => p.key === 'opacity') ?? null);
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
+  const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
+  const headKind = $derived(customName ? 'Component' : spec.label);
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
   const roundnessField = $derived(fieldsIn(Section.Layer).find((f) => f.key === 'roundness') ?? null);
   const cornersField = $derived(fieldsIn(Section.Layer).find((f) => f.key === 'corners') ?? null);
@@ -493,8 +499,9 @@
 <div class="inspector" data-testid="motion-inspector" data-side-edge style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header class="head" title={clip.id} data-testid="selection-head">
     <span class="icon"><FamilyIcon {family} /></span>
-    <span class="name">{customName ? componentLabel(customName) : layerName(clip)}</span>
-    <span class="kind">{customName ? 'Component' : spec.label}</span>
+    <input class="name" aria-label="Layer name" value={headTitle} data-testid="layer-name" onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} onchange={(e) => e.currentTarget.value.trim() && commit(renameClip(doc, clip.id, e.currentTarget.value.trim()), 'Renamed the layer')} />
+    {#if headKind !== headTitle}<span class="kind">{headKind}</span>{/if}
+    {@render actions?.()}
   </header>
 
   {#if customName}
@@ -624,7 +631,7 @@
           <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
         {:else if field.control === Control.Select}
           <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
-            {#each field.options ?? [] as option (option)}<option value={option}>{option}</option>{/each}
+            {#each field.options ?? [] as option (option)}<option value={option}>{optionLabel(option)}</option>{/each}
           </select>
         {:else if field.control === Control.Toggle}
           <SegmentedField name={field.label} options={YES_NO} value={answerOf(value(field))} onchange={(v) => setProp(field, v === Answer.Yes)} />
@@ -1083,6 +1090,15 @@
     border-bottom: 1px solid var(--ui-divider);
   }
 
+  .name:hover {
+    background: var(--ui-hover);
+  }
+
+  .name:focus {
+    outline: none;
+    background: var(--ui-input);
+  }
+
   .icon {
     display: inline-grid;
     place-items: center;
@@ -1096,6 +1112,14 @@
   .name {
     flex: 1;
     min-width: 0;
+    height: 28px;
+    padding: 0 6px;
+    margin-left: -6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-ink);
+    font-family: inherit;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
