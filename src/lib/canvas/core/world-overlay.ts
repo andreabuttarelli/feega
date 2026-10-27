@@ -48,26 +48,32 @@ const FIXED_KEYS = ['curves', 'chrome', 'selected', 'selectedEdge', 'theme', 'gl
 
 let fixedFor: Fixed | null = null;
 let fixedItems: PathItem[] = [];
-let built = new Map<string, PathItem[]>();
+let built = new Map<string, Built>();
+
+type Built = { from: Record<string, unknown>; items: PathItem[] };
+
+const alike = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+const sameFields = (a: Record<string, unknown>, b: Record<string, unknown>) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => alike(a[k], b[k]));
 
 function zoomFree(o: Fixed): PathItem[] {
   if (fixedFor && FIXED_KEYS.every((k) => fixedFor![k] === o[k])) {
     return fixedItems;
   }
-  const kept = fixedFor?.theme === o.theme && fixedFor.glyphs === o.glyphs ? built : new Map<string, PathItem[]>();
-  const next = new Map<string, PathItem[]>();
-  const once = (key: string, make: () => PathItem[]) => {
-    const items = kept.get(key) ?? next.get(key) ?? make();
-    next.set(key, items);
+  const kept = fixedFor?.theme === o.theme && fixedFor.glyphs === o.glyphs ? built : new Map<string, Built>();
+  const next = new Map<string, Built>();
+  const once = (key: string, from: Record<string, unknown>, make: () => PathItem[]) => {
+    const old = kept.get(key);
+    const items = old && sameFields(old.from, from) ? old.items : make();
+    next.set(key, { from, items });
     return items;
   };
   fixedFor = o;
   fixedItems = [
     ...o.curves.flatMap((c) => {
       const look = edgeLook(c.edge, o.selected, o.selectedEdge);
-      return once(JSON.stringify([c.edge.id, look, c.curve]), () => edgeItems(c.edge.id, c.curve, look, o.theme));
+      return once(`wire:${c.edge.id}`, { look, curve: c.curve }, () => edgeItems(c.edge.id, c.curve, look, o.theme));
     }),
-    ...o.chrome.flatMap((t) => once(JSON.stringify(t), () => turnedBy(chromeOf(t, o.glyphs), t.turn)))
+    ...o.chrome.flatMap((t) => once(`chrome:${t.id}`, t, () => turnedBy(chromeOf(t, o.glyphs), t.turn)))
   ];
   built = next;
   return fixedItems;

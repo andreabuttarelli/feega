@@ -2269,8 +2269,9 @@
   const corePeers = $derived(coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
   const stackOrder = $derived(placed.map((t) => t.id));
   const viewZoom = $derived(view.zoom);
+  const coreTheme = $derived(coreLook ? { ...coreLook, panel: coreLook.paper } : null);
   const coreOverlay = $derived(
-    coreLook && coreType
+    coreTheme && coreType
       ? overlayOf({
           curves,
           selected,
@@ -2278,7 +2279,7 @@
           marquee,
           guides: snapGuides,
           zoom: viewZoom,
-          theme: { ...coreLook, panel: coreLook.paper },
+          theme: coreTheme,
           glyphs: coreType.glyphs,
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
