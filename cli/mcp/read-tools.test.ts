@@ -84,6 +84,7 @@ const RESTANO = [
   'list_team',
   'team_op',
   'model_allowlist',
+  'org_fonts',
   'spend_caps',
   'studio_quote',
   'studio_start',

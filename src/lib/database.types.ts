@@ -2302,6 +2302,54 @@ export type Database = {
           },
         ]
       }
+      org_fonts: {
+        Row: {
+          created_at: string
+          family: string
+          id: string
+          org_id: string
+          path: string
+          style: string
+          uploaded_by: string | null
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          family: string
+          id: string
+          org_id: string
+          path: string
+          style?: string
+          uploaded_by?: string | null
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          family?: string
+          id?: string
+          org_id?: string
+          path?: string
+          style?: string
+          uploaded_by?: string | null
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_fonts_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_fonts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orgs: {
         Row: {
           created_at: string

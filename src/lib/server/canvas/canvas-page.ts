@@ -570,7 +570,7 @@ export const actions: Actions<CanvasParams> = {
   },
   uploadFont: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, path: String((await request.formData()).get('path') ?? '') });
+    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, userId: scope.userId, path: String((await request.formData()).get('path') ?? '') });
     return saved.ok ? { font: saved.font } : fail(400, { error: saved.error });
   },
   importLink: async ({ request, params, locals }) => {
