@@ -41,8 +41,10 @@
  * per una volta, non sono in conflitto.
  */
 
+import { Framework as FrameworkName, type CodeFiles, type Framework, type VarValues } from './code-frame';
+
 /** I due modi di riempire la tile. Quale sia lo dice quale campo è pieno: vedi `sourceOf`. */
-export const IFRAME_SOURCES = ['url', 'html'] as const;
+export const IFRAME_SOURCES = ['url', 'html', 'code', 'view'] as const;
 
 export type IframeSource = (typeof IFRAME_SOURCES)[number];
 
@@ -86,6 +88,11 @@ export type IframeNode = {
   source: IframeSource;
   url: string;
   html: string;
+  framework: Framework;
+  files: CodeFiles;
+  vars: VarValues;
+  sourceNodeId: string;
+  route: string;
 };
 
 export type UrlVerdict = { ok: true; url: string } | { ok: false; why: string };
@@ -143,7 +150,15 @@ export function normalizeEmbedUrl(raw: string): UrlVerdict {
  * SALVARLA così, ma un nodo appena nato sullo schermo lo è ancora, e deve aprirsi su un campo
  * invece di esplodere.
  */
-export function sourceOf(row: { url?: string | null; html?: string | null }): IframeSource {
+export function sourceOf(row: { url?: string | null; html?: string | null; files?: CodeFiles | null; sourceNodeId?: string | null }): IframeSource {
+  if (row.sourceNodeId) {
+    return 'view';
+  }
+
+  if (row.files && Object.keys(row.files).length > 0) {
+    return 'code';
+  }
+
   return row.html ? 'html' : 'url';
 }
 
@@ -209,3 +224,16 @@ export function newIframeNodeAt(at: { x: number; y: number }): NewIframeTile {
  */
 export const EMBED_REFUSAL_HINT =
   'Some sites block embedding: if this stays blank, open it in a tab.';
+
+export type FrameTab = { label: string; source: IframeSource; framework: Framework | null };
+
+export const FRAME_TABS: readonly FrameTab[] = [
+  { label: 'URL', source: 'url', framework: null },
+  { label: 'HTML', source: 'html', framework: null },
+  { label: 'React', source: 'code', framework: FrameworkName.React },
+  { label: 'Svelte', source: 'code', framework: FrameworkName.Svelte }
+];
+
+export function frameTabIndex(source: IframeSource, framework: Framework): number {
+  return FRAME_TABS.findIndex((t) => t.source === source && (t.framework === null || t.framework === framework));
+}

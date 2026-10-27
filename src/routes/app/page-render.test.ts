@@ -12,30 +12,26 @@ function page(canvases: (typeof canvas)[] = [canvas]) {
   return render(Page, { props: { data, form: null } as never }).body;
 }
 
-describe('the /app home: a hero, the recents, one prompt', () => {
-  it('reads create actions, hero, recents, then the prompt', () => {
+describe('the /app home: the recents, one prompt', () => {
+  it('reads create actions, recents, then the prompt', () => {
     const body = page();
     const at = (needle: string) => body.indexOf(needle);
 
     expect(at('data-testid="home-create"')).toBeGreaterThan(-1);
-    expect(at('data-testid="home-create"')).toBeLessThan(at('data-page-title'));
-    expect(at('data-page-title')).toBeLessThan(at('data-testid="home-recents"'));
+    expect(at('data-testid="home-create"')).toBeLessThan(at('data-testid="home-recents"'));
     expect(at('data-testid="home-recents"')).toBeLessThan(at('data-testid="video-brief"'));
   });
 
-  it('the hero says the slogan and the subline, over a still poster that never waits on video', () => {
+  it('has no hero box: create actions lead straight to the recents', () => {
     const body = page();
-    const hero = body.slice(body.indexOf('data-testid="home-hero"'), body.indexOf('data-testid="home-recents"'));
 
-    expect(hero).toContain('design that moves.');
-    expect(hero).toContain('an ai canvas for interaction design');
-    expect(hero).toContain('src="/home/hero-flow.jpg"');
-    expect(hero).not.toContain('<video');
+    expect(body).not.toContain('data-testid="home-hero"');
+    expect(body).not.toContain('design that moves.');
   });
 
   it('creates only a new canvas and imports: no catalogue rows on the home', () => {
     const body = page();
-    const create = body.slice(body.indexOf('data-testid="home-create"'), body.indexOf('data-page-title'));
+    const create = body.slice(body.indexOf('data-testid="home-create"'), body.indexOf('data-testid="home-scroll"'));
 
     expect(create).toContain('action="?/project"');
     expect(create).toContain('data-testid="new-canvas"');

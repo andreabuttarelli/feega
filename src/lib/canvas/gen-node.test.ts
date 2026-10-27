@@ -136,6 +136,10 @@ describe('la risoluzione video dopo un cambio di modello', () => {
     expect(snapResolution(m, undefined)).toBe('720p');
   });
 
+  it('without a saved resolution an image model starts at 1K, the resolution providers render by default', () => {
+    expect(snapResolution(choice({ resolutions: ['512', '1K', '2K', '4K'] }), undefined)).toBe('1K');
+  });
+
   it('un modello senza selettore non ha nessuna risoluzione da imporre', () => {
     expect(snapResolution(choice(), '480p')).toBeUndefined();
   });
@@ -171,9 +175,13 @@ describe('la misura di un nodo sulla tela', () => {
     expect(genNodeSize('text').h).toBeLessThan(genNodeSize('image').h);
   });
 
-  it('immagine e video sono alti abbastanza da mostrare quel che producono', () => {
-    expect(genNodeSize('image').h).toBeGreaterThan(300);
-    expect(genNodeSize('video').h).toBeGreaterThan(300);
+  it('image and video open at their default aspect ratio, with no empty band under the media', () => {
+    const image = genNodeSize('image');
+    const video = genNodeSize('video');
+
+    expect(image.w / image.h).toBe(1);
+    expect(video.w / video.h).toBeCloseTo(16 / 9, 2);
+    expect(image.h).toBeGreaterThan(300);
   });
 });
 

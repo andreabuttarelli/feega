@@ -5,6 +5,7 @@ import {
   removeProfileAvatar
 } from '$lib/server/settings-actions';
 import { deleteAccountAction } from '$lib/server/account/account-server';
+import { cloudConnections, disconnectCloudAction } from '$lib/server/settings/cloud-actions';
 import { hasFigmaToken, removeFigmaToken, saveFigmaToken, testFigmaToken } from '$lib/server/settings/figma-actions';
 
 function splitName(full: string | null | undefined): { firstName: string; lastName: string } {
@@ -17,7 +18,7 @@ function splitName(full: string | null | undefined): { firstName: string; lastNa
 export const load = async ({ locals }: SettingsEvent) => {
   const { supabase, safeGetSession } = locals;
   const { user } = await safeGetSession();
-  if (!user) return { firstName: '', lastName: '', email: null, avatarUrl: null, hasCustomAvatar: false, hasFigmaToken: false };
+  if (!user) return { firstName: '', lastName: '', email: null, avatarUrl: null, hasCustomAvatar: false, hasFigmaToken: false, cloud: [] };
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -40,7 +41,8 @@ export const load = async ({ locals }: SettingsEvent) => {
     email: profile?.email ?? user.email ?? null,
     avatarUrl: customAvatar || oauthAvatar,
     hasCustomAvatar: !!customAvatar,
-    hasFigmaToken: await hasFigmaToken(locals)
+    hasFigmaToken: await hasFigmaToken(locals),
+    cloud: await cloudConnections(locals)
   };
 };
 
@@ -51,5 +53,6 @@ export const actions: SettingsActions = {
   saveFigmaToken,
   testFigmaToken,
   removeFigmaToken,
+  disconnectCloud: disconnectCloudAction,
   deleteAccount: deleteAccountAction
 };

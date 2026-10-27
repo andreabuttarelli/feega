@@ -1,0 +1,42 @@
+---
+title: Follow a teammate and local fonts
+description: Follow a collaborator's view live, and use fonts installed on your computer.
+sidebar:
+  order: 12
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="follow-local-fonts" caption="Follow a teammate's view, then set a headline in an installed font." />
+
+## Follow a teammate
+
+- The avatars at the top of the canvas are the people on it. Click one to follow them: your view tracks theirs live, centre and zoom.
+- The followed avatar gets a ring. Click it again to stop.
+- Pan or zoom yourself and following stops on its own.
+- When someone starts presenting, a banner offers a Follow button.
+
+## Local fonts
+
+Fonts installed on your computer can be used in a video.
+
+- Select a text and open the font picker. Under Installed on this computer, press Show installed fonts.
+- The browser asks permission once. Allow it, search the list and pick a family.
+- Local fonts are tagged `local` in the picker and flagged `local` in the video's font list.
+- Chrome and Edge on desktop support this. Other browsers show a note instead of the list. Refusing the prompt keeps every other font working.
+
+A local font exists only on your computer. Other computers and server renders show a fallback font, so the export dialog lists the local fonts in use before you export. Export in the browser on the same machine, or upload the font file instead to share it with the workspace.
+
+## With the agent
+
+`list_fonts` returns `inVideo`, the fonts the video already has. Each entry has `source` and `local: true` when it is installed on one computer only.
+
+`register_font` with `origin: "local"` adds an installed font by its exact family name.
+
+```
+register_font { "family": "Avenir Next", "origin": "local" }
+set_font { "clip_id": "title", "family": "Avenir Next", "weight": 600 }
+list_fonts { "query": "" }
+```
+
+The same tools run through MCP and the CLI, for example `feega motion ask <nodeId> "Set the headline in Avenir Next"`. The agent cannot see which fonts your computer has: name the family.

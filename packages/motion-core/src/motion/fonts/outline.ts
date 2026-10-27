@@ -17,6 +17,9 @@ export function outlineUrl(family: string, asked: number, registry: readonly Fon
     const file = files.find((v) => v.weight === weight);
     return file ? assets[file.assetId] : null;
   }
+  if (face?.source === FontSource.Local) {
+    return null;
+  }
   const name = isBuiltin(family) ? BUILTIN_FAMILY[family] : family;
   return `${OUTLINE_CDN}${slug(name)}@latest/latin-${loadedWeight(family, asked, registry)}-normal.woff`;
 }

@@ -1,0 +1,67 @@
+---
+title: Prototype links
+description: Link layers to other frames with triggers, actions and transitions.
+sidebar:
+  order: 12
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="prototype-links" caption="Link a button to another frame and pick a transition." />
+
+A prototype link says what happens when someone acts on a layer: open another frame, show it as an overlay, go back, or scroll to something. Links are stored on the layer, so duplicating a layer copies them and deleting it removes them.
+
+## Link a layer to a frame
+
+1. Select a frame, then a layer inside it.
+2. In Properties, find **Prototype** and press **Link to frame**.
+3. Click the target frame on the canvas. A dashed arrow follows the pointer until you click.
+
+An arrow now runs from the source frame to the target, labelled with its trigger. Every link on the canvas is drawn the same way.
+
+## Edit a link
+
+Each link has three rows in Prototype.
+
+| Part | Options |
+|---|---|
+| Trigger | On click, While hovering, On drag, After delay (milliseconds) |
+| Action | Navigate to, Open overlay, Back, Scroll to |
+| Transition | Instant, Dissolve, Slide in, Push, [Smart animate](/canvas/smart-animate/); slide and push take a direction; every transition but Instant takes an easing and a duration in milliseconds |
+
+Navigate to, Open overlay and Scroll to need a target. **Pick** re-aims a link on the canvas; the Target frame list does the same by name. Back needs none. A layer holds up to 16 links. Remove deletes one.
+
+A new link is On click, Navigate to, Instant.
+
+## Agent and MCP
+
+The motion agent has three tools, also reachable through `motion_tool` in MCP and `feega motion tool`:
+
+- `add_interaction` with `clip_id`, `trigger`, `action` and an optional `transition`; pass `interaction_id` to replace a link.
+- `list_interactions` lists every link of a frame.
+- `remove_interaction` with `clip_id` and `interaction_id`.
+
+```json
+{
+  "tool": "add_interaction",
+  "input": {
+    "clip_id": "cta",
+    "trigger": { "kind": "click" },
+    "action": { "kind": "navigate", "target": "<frame node id>" },
+    "transition": { "kind": "slide", "direction": "left", "easing": "enter", "durationMs": 300 }
+  }
+}
+```
+
+Run it on a saved frame with the MCP `motion_tool` (`node_id`, `tool`, `input`), or from the CLI:
+
+```bash
+feega motion tool <nodeId> add_interaction --input '{"clip_id":"cta","trigger":{"kind":"click"},"action":{"kind":"navigate","target":"<frame node id>"}}'
+feega motion tool <nodeId> list_interactions
+```
+
+Clips also show their `interactions` in `get_motion_doc`.
+
+## Limits
+
+This release defines and edits links. Playing them in a present mode, flows and starting points, and overlay positioning come next. A link whose target frame was deleted is kept on the layer but no arrow is drawn.

@@ -99,6 +99,7 @@ test.describe('canvas cursors across two tabs @real', () => {
     await gotoHydrated(other, path);
 
     await page.getByTestId('spotlight').click();
+    await expect(page.getByTestId('presenting-banner')).toBeVisible();
     await other.getByTestId('presenter-prompt').getByRole('button', { name: 'Follow' }).click();
     const viewOf = (p: typeof page) => p.locator('.svelte-flow__viewport').first().getAttribute('style');
     const before = await viewOf(other);

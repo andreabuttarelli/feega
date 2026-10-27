@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cardRadiusOf } from '$lib/canvas/core/gen-card';
   import { LocalOff, isOff } from '$lib/local-user';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
@@ -12,6 +13,10 @@
   import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
+  import PrototypeArrows from '../PrototypeArrows.svelte';
+  import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
+  import { prototypeLinks } from '$lib/motion/prototype/links';
+  import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { alignSide } from '$lib/canvas/frame-tools';
   import { FRAME_ELEMENT_MENU, canRunInFrame, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
@@ -67,7 +72,7 @@
   import { Reach, frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { chainTarget, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
-  import { ImagesOutcome, figmaImageAssets } from '$lib/canvas/figma/fetch-images';
+  import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
   import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
   import { quadBox, quadStyle } from '$lib/canvas/quad-box';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
@@ -100,8 +105,8 @@
   import NodeBoundary from '../NodeBoundary.svelte';
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
-  import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
+  import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
@@ -118,11 +123,11 @@
   import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
-  import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { isSvgFile } from '$lib/canvas/system-clipboard';
+  import { isLottieFile } from '$lib/canvas/lottie-file';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
@@ -173,6 +178,7 @@
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
@@ -201,7 +207,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -232,7 +238,6 @@
   let surface = $state<HTMLDivElement | null>(null);
   let scene = $state<GpuScene | null>(null);
   let failed = $state<string | null>(null);
-  let lossNote = $state<string | null>(null);
   let view = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
 
   $effect(() => {
@@ -319,20 +324,42 @@
     }
   });
   const LIVE_POSTER_CAP = 3;
+  const LIVE_CODE_CAP = 4;
+  const IFRAME_TYPE = 'iframe';
   let settledView = $state<Viewport | null>(null);
+  const liveCode = $derived([...visibleIds(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)), view, area)].slice(0, LIVE_CODE_CAP));
   const domIds = $derived.by(() => {
     const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => holdsDoc(t.kind ?? '') && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
     const posters = placed.filter((t) => holdsDoc(t.kind ?? '') && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
     const sharp = !coreOn && BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
-    const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
+    const next = new Set([...editIds, ...sticky.keys(), ...liveCode, ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
+  let core = $state.raw<ReturnType<typeof CoreFrames> | null>(null);
+  let ramRuns = $state<FrameRange[]>([]);
+  let ramRun: AbortController | null = null;
+  let ramNode = $state('');
+
+  function cacheRam(nodeId: string, doc: MotionDoc) {
+    ramRun?.abort();
+    ramRun = new AbortController();
+    ramRuns = [];
+    ramNode = nodeId;
+    const range = doc.workArea ?? { from: 0, to: doc.durationInFrames };
+    void core?.cache(nodeId, range, ramRun.signal, (runs) => (ramRuns = runs));
+  }
   let coreDrawn = $state(new Set<string>());
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
   const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
+  const prototypeDocs = $derived(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
+  const arrowLinks = $derived(prototypeLinks(prototypeDocs));
+  $effect(() => {
+    prototypeLink.docs = prototypeDocs;
+    prototypeLink.targets = coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!) }));
+  });
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
     if (coreOn && !coreType) {
@@ -375,19 +402,20 @@
       return [];
     }
     return placed.flatMap((t) => {
-      if (!coreDrawn.has(t.id)) {
+      const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
+      if (!coreDrawn.has(t.id) && !handed) {
         return [];
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
-      const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : ChromeLayers.State;
+      const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
       }
       const marks = portMarks(t);
       const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id) } : { label: null, icon: null };
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), turn: turnOf(t), layers }];
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
     });
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
@@ -1260,7 +1288,7 @@
       startCrop(id, deeper.clip);
       return;
     }
-    if (id) {
+    if (id && !target.closest('textarea, input, [contenteditable="true"]')) {
       props.onNodeDoubled?.(id);
     }
     const stage = id ? wrap?.querySelector<HTMLElement>(`[data-motion-node="${id}"] [data-frame-stage]`)?.getBoundingClientRect() : null;
@@ -1726,7 +1754,13 @@
     }
     frameProperties.publish(panelNodeId, panelSession, panelTokens, panelExtras);
     frameProperties.part = pickedPart;
+    frameProperties.toggleDev = () => (frameViews = flipView(frameViews, FrameView.Dev));
+    frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
     return () => frameProperties.clear();
+  });
+
+  $effect(() => {
+    frameProperties.dev = shows(frameViews, FrameView.Dev);
   });
 
   const Step = { Back: 'back', Forward: 'forward' } as const;
@@ -2192,7 +2226,7 @@
   }
 
   function measuredIn(nodeId: string): Gap[] {
-    const live = altHeld && inside?.nodeId === nodeId && pickHover?.nodeId === nodeId && !frameGuides ? liveOf(nodeId) : null;
+    const live = (altHeld || shows(frameViews, FrameView.Dev)) && inside?.nodeId === nodeId && pickHover?.nodeId === nodeId && !frameGuides ? liveOf(nodeId) : null;
     if (!live || !pickHover) {
       return [];
     }
@@ -2226,6 +2260,19 @@
     props.onComment?.(commentPlacement(w, tile ? { id: tile.id, x: tile.x, y: tile.y } : null));
   }
 
+  function linkPrototype(targetId: string): boolean {
+    const draft = prototypeLink.draft;
+    const source = inside?.nodeId;
+    const live = source ? liveOf(source) : null;
+    const onCanvas = coreFrames.some((f) => f.id === targetId && kindOfNode(f.id) === FrameKind.Frame);
+    if (!draft || !source || !live || source === targetId || !onCanvas) {
+      return false;
+    }
+    commit(source, linkToFrame(live.doc, draft, targetId, () => crypto.randomUUID().slice(0, 8)), 'Linked to a frame');
+    prototypeLink.stop();
+    return true;
+  }
+
   function onDown(e: PointerEvent) {
     glide = null;
     dropHover();
@@ -2248,6 +2295,10 @@
     }
     const target = e.target as HTMLElement;
     const hit = boxHit(hitAt(w), target);
+    if (prototypeLink.draft && e.button === PRIMARY_BUTTON && hit.kind === HitKind.Node && linkPrototype(hit.nodeId)) {
+      e.preventDefault();
+      return;
+    }
     if (hit.kind === HitKind.Node && (extendPick(e, w) || pickElement(e, w))) {
       e.preventDefault();
       return;
@@ -2675,7 +2726,7 @@
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
           hovered: hovered && !selected.includes(hovered) && layersSource.hovered?.nodeId !== hovered ? (byId.get(hovered) ?? null) : null,
-          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})),
+          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })),
           chrome: coreChrome
         })
       : []
@@ -3023,7 +3074,7 @@
 
   async function fillFigmaImages(job: FigmaJob) {
     const got = await figmaImageAssets({ projectId: page.params.projectId ?? '', fileKey: job.fileKey, hashes: job.images.map((i) => i.hash) });
-    props.onFigmaImages?.(got.outcome);
+    props.onFigmaImages?.(got);
     if (got.outcome !== ImagesOutcome.Filled || !Object.keys(got.assets).length) {
       return;
     }
@@ -3119,6 +3170,7 @@
     'run-workflow': (ids) => props.onRunWorkflow?.(ids),
     'save-technique': (ids) => props.onSaveTechnique?.(ids),
     'run-technique': (ids) => props.onRunTechnique?.(ids),
+    'run-technique-rows': (ids) => props.onRunTechniqueRows?.(ids),
     'edit-technique': (ids) => props.onEditTechnique?.(ids),
     'detach-technique': (ids) => props.onDetachTechnique?.(ids),
     'run-downstream': (ids) => props.onRunGraph?.(GraphScope.Downstream, ids),
@@ -3137,6 +3189,7 @@
     'upscale-image': (ids) => props.onImageTool?.(ids[0], ImageTool.Upscale),
     inpaint: (ids) => props.onInpaint?.(ids[0]),
     outpaint: (ids) => props.onOutpaint?.(ids[0]),
+    reframe: (ids) => props.onReframe?.(ids[0]),
     'split-layers': (ids) => props.onImageTool?.(ids[0], ImageTool.SplitLayers),
     'layers-to-frame': (ids) => props.onLayersToFrame?.(ids[0]),
     export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
@@ -3206,7 +3259,7 @@
     const files = [...(e.dataTransfer?.files ?? [])];
     if (files.length && props.onUpload) {
       e.preventDefault();
-      files.forEach((file) => props.onUpload?.(file, isSvgFile(file) ? toFlow(at) : undefined));
+      files.forEach((file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? toFlow(at) : undefined));
       return;
     }
     const output = e.dataTransfer?.getData(CANVAS_DRAG_OUTPUT);
@@ -3284,7 +3337,6 @@
     const recover = (lost: GpuScene) => {
       const next = nextBackend(lost.backend);
       console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'none'}`);
-      lossNote = `${lost.backend} lost`;
       scene = null;
       built = null;
       try {
@@ -3353,6 +3405,8 @@
         onaction={(id) => void runFrameAction(id)}
         marks={props.commentMarks?.(nodeId, timeline.doc.fps) ?? []}
         onmark={(id) => props.onMark?.(id)}
+        ram={ramNode === nodeId ? ramRuns : []}
+        onram={() => cacheRam(nodeId, timeline!.doc)}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
       />
@@ -3380,7 +3434,7 @@
   >
     {#if coreOn}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>
@@ -3427,6 +3481,7 @@
         {/if}
       {/snippet}
     </FrameOverlays>
+    <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} />
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom});--zoom:${view.zoom}`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
         {#each curves as c (c.edge.id)}
@@ -3533,9 +3588,6 @@
     />
   {/if}
 
-  {#if dev}
-    <RendererBadge renderer={scene?.backend ?? (coreOn ? CORE : 'starting')} reason={lossNote} />
-  {/if}
 
   {#if refusal}
     <p class="edge-refusal" role="status">{refusal}</p>
@@ -3564,12 +3616,13 @@
   {#if spec.chrome && props.onCreate}
     <CanvasAddBar
       onpick={addAtCentre}
-      onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) ? viewCentre() : undefined) : undefined}
+      onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? viewCentre() : undefined) : undefined}
       oncloud={props.onCloud && !isOff(LocalOff.CloudImport) ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
       techniques={props.techniques}
       ontechnique={props.onTechnique ? (id) => props.onTechnique?.(id, viewCentre()) : undefined}
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
+      onfigma={props.onFigmaImport ? () => props.onFigmaImport?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
       onimage={insertImageInFrame}
       oncomment={props.onCommenting ? () => props.onCommenting?.(!props.commenting) : undefined}
@@ -3894,7 +3947,7 @@
 
   .remix-banner {
     position: absolute;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     translate: -50% 0;
     max-width: calc(100% - 32px);
@@ -3917,7 +3970,7 @@
   .edge-refusal {
     position: absolute;
     z-index: 12;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     transform: translateX(-50%);
     margin: 0;

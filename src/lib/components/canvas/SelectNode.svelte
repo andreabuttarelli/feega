@@ -96,7 +96,7 @@
       <ChevronRight size={14} strokeWidth={2} />
     </button>
 
-    <button type="button" class="select-help" onclick={() => requestGuide('loop')} aria-label="Guida">
+    <button type="button" class="select-help" onclick={() => requestGuide('ai/loops')} aria-label="Guida">
       <HelpCircle size={13} strokeWidth={2} />
     </button>
   </header>
@@ -337,6 +337,7 @@
     flex: none;
     width: 8px;
     height: 8px;
+    border-radius: var(--ui-radius-full, 9999px);
     background: var(--port);
   }
   .select-output-label {
