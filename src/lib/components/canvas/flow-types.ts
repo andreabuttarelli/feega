@@ -101,6 +101,7 @@ export type FlowProps = {
   onPaste?: (at: { x: number; y: number }) => void;
   onTemplate?: (id: string, at: { x: number; y: number }) => void;
   onFrameTemplates?: (at: { x: number; y: number }) => void;
+  onFigmaImport?: (at: { x: number; y: number }) => void;
   onNodeClicked?: (id: string) => void;
   onNodeDoubled?: (id: string) => void;
   barContext?: BarContext;

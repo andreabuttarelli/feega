@@ -1,3 +1,4 @@
+import { codeVarsError } from '$lib/server/canvas/code-source';
 /**
  * `insert_row` / `update_row` / `delete_row` PER IL NUOVO SCHEMA — org, non brand.
  *
@@ -293,6 +294,8 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
       if (!verdict.ok) return finish(invalidNodeData(verdict.error), 'org_db_write:refused:invalid_node_data', t0);
       const badModel = await nodeModelError(String(values.type ?? ''), values.data);
       if (badModel) return finish(invalidNodeData(badModel), 'org_db_write:refused:invalid_node_data', t0);
+      const badVars = codeVarsError(String(values.type ?? ''), (values.data ?? {}) as Record<string, unknown>);
+      if (badVars) return finish(invalidNodeData(badVars), 'org_db_write:refused:invalid_node_data', t0);
     } else {
       const refusedJsonb = firstInvalidJsonbColumn(table, values);
       if (refusedJsonb) return finish(refusedJsonb, 'org_db_write:refused:invalid_jsonb_column', t0);
@@ -475,6 +478,10 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
         const badModel = await nodeModelError(type, values.data);
         if (badModel) {
           return finish(invalidNodeData(`node ${row.id}: ${badModel}`), 'org_db_write:refused:invalid_node_data', t0);
+        }
+        const badVars = codeVarsError(type, mergeNodeData((row.data ?? {}) as NodeData, (values.data ?? {}) as NodeData));
+        if (badVars) {
+          return finish(invalidNodeData(`node ${row.id}: ${badVars}`), 'org_db_write:refused:invalid_node_data', t0);
         }
         merged.push({ id: row.id, version: row.version, data: mergeNodeData((row.data ?? {}) as NodeData, values.data as NodeData) });
       }

@@ -28,7 +28,7 @@
 	}
 </script>
 
-<div role="radiogroup" aria-label={label} data-slot="segmented" class="flex w-full min-w-0 flex-wrap gap-px border border-line-2 bg-line-2">
+<div role="radiogroup" aria-label={label} data-slot="segmented" class="flex w-full min-w-0 flex-wrap gap-px overflow-hidden rounded-sm border border-line-2 bg-line-2">
 	{#each options as option, i (option.value)}
 		<button
 			bind:this={buttons[i]}

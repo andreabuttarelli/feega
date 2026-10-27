@@ -1,3 +1,5 @@
+import { exportCodeNode, isExportMode } from '$lib/server/canvas/code-export-node';
+import { ExportMode } from '$lib/canvas/code-frame';
 import { cardPreviews } from '$lib/server/canvas/card-previews';
 import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
@@ -907,6 +909,14 @@ export const actions: Actions<CanvasParams> = {
 
     const shown = await showRun(scope.db, { orgId: scope.orgId, nodeId, runId, actor: userActor(scope) });
     return SHOW_RUN_ANSWERS[shown.outcome](shown as never);
+  },
+
+  exportCode: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const mode = fd.get('mode');
+    const out = await exportCodeNode(scope.db, { orgId: scope.orgId, nodeId: String(fd.get('node_id') ?? ''), mode: isExportMode(mode) ? mode : ExportMode.Inline });
+    return out.ok ? { folder: out.folder, files: out.files } : fail(400, { error: out.error });
   },
 
   create: async ({ request, params, locals }) => {

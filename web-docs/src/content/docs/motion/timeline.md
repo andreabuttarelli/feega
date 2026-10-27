@@ -12,6 +12,7 @@ sidebar:
 | `←` `→` | Previous / next frame (Motion mode); `Shift` jumps 10 frames |
 | `Home` `End` | Go to start / end |
 | `I` `O` or `B` `N` | Work area starts / ends here |
+| `⌥↵` | RAM preview: cache the work area so it plays at full speed (see [Video playback](/motion/video-playback/)) |
 | `M` | Add a marker |
 | `Shift+J` `Shift+K` | Previous / next keyframe |
 | `[` `]` | Move the clip to start / end here |

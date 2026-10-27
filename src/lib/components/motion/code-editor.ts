@@ -9,14 +9,18 @@ export enum CodeLanguage {
   Html = 'html',
   Css = 'css',
   Js = 'js',
-  Json = 'json'
+  Json = 'json',
+  Tsx = 'tsx',
+  Svelte = 'svelte'
 }
 
 const LANGUAGE: Record<CodeLanguage, () => Extension> = {
   [CodeLanguage.Html]: () => html(),
   [CodeLanguage.Css]: () => css(),
   [CodeLanguage.Js]: () => javascript(),
-  [CodeLanguage.Json]: () => javascript()
+  [CodeLanguage.Json]: () => javascript(),
+  [CodeLanguage.Tsx]: () => javascript({ jsx: true, typescript: true }),
+  [CodeLanguage.Svelte]: () => html()
 };
 
 const THEME = EditorView.theme({

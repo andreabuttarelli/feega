@@ -81,7 +81,7 @@ export enum ActionKind {
   Write = 'write'
 }
 
-const READ_ACTIONS: ReadonlySet<string> = new Set(['snapshot', 'revision', 'estimate_text_cost', 'audio_voices', 'voice_library', 'canvasComments', 'preview_technique_rows', 'technique_rows_progress']);
+const READ_ACTIONS: ReadonlySet<string> = new Set(['snapshot', 'revision', 'estimate_text_cost', 'audio_voices', 'voice_library', 'canvasComments', 'preview_technique_rows', 'technique_rows_progress', 'exportCode']);
 
 export function actionKind(action: string): ActionKind {
   return READ_ACTIONS.has(action) ? ActionKind.Read : ActionKind.Write;
@@ -249,6 +249,30 @@ export async function actAtVersion(action: VersionedAction): Promise<ActionAnswe
 
   await action.reread();
   return action.send(action.version());
+}
+
+export function inFlightWrites() {
+  const pending = new Map<string, Promise<void>>();
+
+  return {
+    track<T>(ids: string[], write: Promise<T>): Promise<T> {
+      const landed = write.then(() => {}, () => {});
+      for (const id of ids) {
+        pending.set(id, landed);
+      }
+      void landed.then(() => {
+        for (const id of ids) {
+          if (pending.get(id) === landed) {
+            pending.delete(id);
+          }
+        }
+      });
+      return write;
+    },
+    settled: async (id?: string): Promise<void> => {
+      await (id === undefined ? Promise.all(pending.values()) : pending.get(id));
+    }
+  };
 }
 
 export async function writeWithRetry(attempt: WriteAttempt): Promise<WriteOutcome> {
