@@ -80,7 +80,7 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
         'canvas_tool'
       ])
     );
-    expect(names).toHaveLength(37);
+    expect(names).toHaveLength(38);
   });
 
   it('col brand i tool di brand ci sono, accanto a quelli di progetto', () => {

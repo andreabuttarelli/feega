@@ -5,6 +5,8 @@ sidebar:
   order: 1
 ---
 
+import DemoVideo from '../../../components/DemoVideo.astro';
+
 feega's MCP server lets an agent read and write your canvases with the same sign-in as the CLI. There are no static API tokens.
 
 - Remote: `https://mcp.feega.app/mcp`, Streamable HTTP. The host must send `Authorization: Bearer <access token>`; discovery is at `/.well-known/oauth-protected-resource`. A missing Bearer is a `401`, not a broken server. Health: `https://mcp.feega.app/health`.
@@ -52,3 +54,19 @@ Some Cursor builds register a `cursor://` OAuth callback that feega's registrati
 A session lists 10 core tools (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`; about 900 tokens); the rest load on demand. Claude Code refreshes on `tools/list_changed`; Cursor does not, so call loaded tools by name.
 
 The whole surface: [MCP tools](/reference/generated/mcp-tools/) and [Edit ops](/reference/generated/edit-ops/). Never guess an org or project id: read it with `query` first.
+
+## Know what "this" means: get_selection
+
+<DemoVideo name="get-selection" caption="Select two nodes in the app, then ask the CLI what is selected." />
+
+An agent that is told "make this darker" needs to know which node "this" is. `get_selection` reads it from the canvas you have open.
+
+1. Open the canvas in feega and select one or more nodes (click, `Shift`-click or drag a box).
+2. Call the op with the canvas id: from the CLI, `feega canvas $PROJECT get_selection --input '{"canvasId":"<canvas>"}'`; over MCP, `canvas_tool({ project_id, op: "get_selection", input: { canvasId } })`.
+3. The answer lists one entry per open session of yours: `sessionId`, `selection` (the node ids), `view` (centre and zoom of the viewport) and `at`.
+
+```json
+{ "sessions": [{ "sessionId": "d6e8e2c8-...", "selection": ["4e17c983-...", "e75cf9d6-..."], "view": { "cx": 878, "cy": 229.9, "zoom": 0.61 }, "at": 1793042000000 }] }
+```
+
+With no tab open on that canvas the answer is `reason: "no_open_session"`. Only your own selection is returned, nothing is stored, and the call waits up to 3.5 seconds for the app to report it.

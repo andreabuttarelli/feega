@@ -221,7 +221,7 @@ lists them all and gives strict schemas. `view({ org, op, input })` reads: `canv
 | `canvas_file` | save or open a canvas as a `.feega` file on the local disk |
 
 `canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
-through the same code (op `describe` `{}` lists them all, `{ op }` gives one input schema; `draw_frame` `{ canvasId, x, y, w, format?, still? }` makes a frame or still): `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`, `list_models` (models this project can run, with provider, credits, uncensored flag and `routes[]` — one row per provider that serves the model; pass its `provider` to `run_node`),
+through the same code (op `describe` `{}` lists them all, `{ op }` gives one input schema; `draw_frame` `{ canvasId, x, y, w, format?, still? }` makes a frame or still): `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `get_selection` (what the user has selected on the open canvas + view, per open session; reason `no_open_session` when none), `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`, `list_models` (models this project can run, with provider, credits, uncensored flag and `routes[]` — one row per provider that serves the model; pass its `provider` to `run_node`),
 `list_templates`, `create_node`, `update_node`, `move_node`, `resize_node`, `rename_node`, `duplicate_nodes`,
 `write_nodes`, `paste_nodes`,
 `connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `undo_last`, `align_nodes`, `distribute_nodes`, `tidy_nodes`, `stack_nodes`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,
