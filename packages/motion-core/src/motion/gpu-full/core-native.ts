@@ -55,6 +55,9 @@ export function attachedOf(bridge: NativeCanvasBridge, toRgba: ToRgba): Attached
     },
     patch_uses: (patch) => bridge.patchUses(patch),
     set_overlay: (items) => bridge.setOverlay(items),
+    forget_picture: () => {},
+    picture_bytes: () => 0,
+    lost: () => false,
     frame: () => {
       const moved = wanted !== null && !sameCamera(sent, wanted);
       bridge.tick(moved ? wanted : null);

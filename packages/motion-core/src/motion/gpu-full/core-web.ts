@@ -8,12 +8,12 @@ import { inlineCore, unzipBase64 } from './inline-core';
 const CORE_URL = '/gpu-core/gpu_core.js';
 
 type Size = { width: number; height: number };
-export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; free: () => void };
+export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; free: () => void };
 
 export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine; cache?: boolean; hold?: boolean };
 export type UsePatch = { put: Use[]; drop: string[]; order?: string[] };
 export type Painted = { outcome: Outcome; pending: boolean; skipped: string[] };
-export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (items: Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; behindPage?: boolean };
+export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (items: Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; pictureBytes: () => number; lost: () => boolean; behindPage?: boolean };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
 
@@ -70,9 +70,37 @@ const asIs: Fit = (size) => size;
 
 export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
   const decoded = new WeakMap<object, ImageBitmap | null | undefined>();
-  const queues = new WeakMap<DisplayList, PictureItem[]>();
+  let queues = new WeakMap<DisplayList, PictureItem[]>();
   const uploaded = new Map<string, Picture['source']>();
   const stills = new Map<string, HTMLCanvasElement>();
+  const shown = new Map<string, Set<string>>();
+
+  function show(group: string, items: Item[], from = group) {
+    shown.set(group, new Set([...(shown.get(from) ?? []), ...wantedPictures(items).map(pictureKey)]));
+  }
+
+  function forget(key: string) {
+    const source = uploaded.get(key);
+    if (source) {
+      decoded.get(source as object)?.close();
+      decoded.delete(source as object);
+    }
+    uploaded.delete(key);
+    stills.delete(key);
+    attached.forget_picture(key);
+  }
+
+  function hide(group: string) {
+    const gone = shown.get(group);
+    shown.delete(group);
+    const still = new Set([...shown.values()].flatMap((keys) => [...keys]));
+    const freed = [...(gone ?? [])].filter((k) => !still.has(k));
+    if (!freed.length) {
+      return;
+    }
+    freed.forEach(forget);
+    queues = new WeakMap();
+  }
 
   function still(clip: string, picture: Picture): HTMLCanvasElement {
     const canvas = stills.get(clip) ?? stills.set(clip, document.createElement('canvas')).get(clip)!;
@@ -120,17 +148,23 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     },
     putGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
+      show(key, list.items, '');
       attached.put_group(key, wired(list));
     },
     appendGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
+      show(key, list.items);
       attached.append_group(key, wired(list));
     },
     patchGroup: (from: string, to: string, splice: Splice, pictures = NO_PICTURES) => {
       wantedPictures(splice.items).forEach((item) => upload(item, pictures));
+      show(to, splice.items, from);
       return attached.patch_group(from, to, JSON.stringify(splice));
     },
-    dropGroup: (key: string) => attached.drop_group(key),
+    dropGroup: (key: string) => {
+      attached.drop_group(key);
+      hide(key);
+    },
     upload: (list: DisplayList, pictures: Pictures, most: number) => {
       const queue = queues.get(list) ?? queues.set(list, wantedPictures(list.items)).get(list)!;
       let sent = 0;
@@ -163,27 +197,25 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
       return { outcome: outcome as Outcome, pending: attached.cache_pending(), skipped: skipped.filter(Boolean) };
     },
     cacheBytes: () => attached.cache_bytes(),
+    pictureBytes: () => attached.picture_bytes(),
+    lost: () => attached.lost(),
     dispose: () => attached.free()
   };
 }
 
-export async function createCore(canvas: HTMLCanvasElement, width: number, height: number): Promise<CoreRaster> {
-  if (!('gpu' in navigator)) {
-    throw new Error('webgpu unavailable');
-  }
-  const core = await warmCore();
-  return rasterOf(await core.WebCore.attach(canvas, width, height));
-}
+export const pictureSize =
+  (side: number): Fit =>
+  (size) => {
+    const scale = Math.min(1, side / Math.max(size.width, size.height));
+    return { width: Math.round(size.width * scale), height: Math.round(size.height * scale) };
+  };
 
 export const GL_PICTURE_SIDE = 2048;
 
-export function glPictureSize(size: Size): Size {
-  const scale = Math.min(1, GL_PICTURE_SIDE / Math.max(size.width, size.height));
-  return { width: Math.round(size.width * scale), height: Math.round(size.height * scale) };
-}
+export const glPictureSize = pictureSize(GL_PICTURE_SIDE);
 
-function fitted(source: unknown, size: Size): { source: unknown; size: Size } {
-  const fit = glPictureSize(size);
+function fitted(source: unknown, size: Size, fitOf: Fit): { source: unknown; size: Size } {
+  const fit = fitOf(size);
   if (fit.width === size.width && fit.height === size.height) {
     return { source, size };
   }
@@ -194,18 +226,29 @@ function fitted(source: unknown, size: Size): { source: unknown; size: Size } {
   return { source: canvas, size: fit };
 }
 
+function fitting(attached: Attached, fit: Fit): CoreRaster {
+  const picture = attached.picture.bind(attached);
+  attached.picture = (clip, source, w, h) => {
+    const shrunk = fitted(source, { width: w, height: h }, fit);
+    picture(clip, shrunk.source, shrunk.size.width, shrunk.size.height);
+  };
+  return rasterOf(attached, fit);
+}
+
+export async function createCore(canvas: HTMLCanvasElement, width: number, height: number, side = Infinity): Promise<CoreRaster> {
+  if (!('gpu' in navigator)) {
+    throw new Error('webgpu unavailable');
+  }
+  const core = await warmCore();
+  return fitting(await core.WebCore.attach(canvas, width, height), pictureSize(side));
+}
+
 const GL_CONTEXT = { antialias: false, depth: true };
 
-export async function createCoreGl(canvas: HTMLCanvasElement, width: number, height: number): Promise<CoreRaster> {
+export async function createCoreGl(canvas: HTMLCanvasElement, width: number, height: number, side = GL_PICTURE_SIDE): Promise<CoreRaster> {
   if (!canvas.getContext('webgl2', GL_CONTEXT)) {
     throw new Error('webgl2 unavailable');
   }
   const core = await warmCore();
-  const attached = core.WebGlCore.attach(canvas, width, height);
-  const picture = attached.picture.bind(attached);
-  attached.picture = (clip, source, w, h) => {
-    const fit = fitted(source, { width: w, height: h });
-    picture(clip, fit.source, fit.size.width, fit.size.height);
-  };
-  return rasterOf(attached, glPictureSize);
+  return fitting(core.WebGlCore.attach(canvas, width, height), pictureSize(Math.min(side, GL_PICTURE_SIDE)));
 }

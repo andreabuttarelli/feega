@@ -3,11 +3,16 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, frames: 0, puts: [] as string[], splices: [] as { from: string; to: string; items: number }[] }));
+const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, frames: 0, puts: [] as string[], attached: 0, lose: false, splices: [] as { from: string; to: string; items: number }[] }));
 
 vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
-  createCore: () =>
-    Promise.resolve({
+  createCore: () => {
+    calls.attached++;
+    const lost = calls.lose;
+    calls.lose = false;
+    return Promise.resolve({
+      lost: () => lost,
+      pictureBytes: () => 0,
       putGroup: (key: string) => calls.puts.push(key),
       patchGroup: (from: string, to: string, splice: { items: unknown[] }) => (calls.splices.push({ from, to, items: splice.items.length }), true),
       appendGroup: () => undefined,
@@ -22,7 +27,8 @@ vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
         calls.frames++;
         return { outcome: 'reused', pending: false };
       }
-    }),
+    });
+  },
   createCoreGl: () => new Promise(() => undefined)
 }));
 
@@ -91,5 +97,15 @@ describe('CoreFrames camera', () => {
 
     await vi.waitFor(() => expect(calls.splices).toEqual([{ from: 'e1:a', to: 'e1:b', items: 1 }]));
     expect(calls.puts.length).toBe(puts);
+  });
+
+  it('a lost GPU device is attached again instead of leaving the canvas dead', async () => {
+    calls.lose = true;
+    calls.attached = 0;
+    const props = $state({ frames: [], cards: [card], view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props });
+    flushSync();
+
+    await vi.waitFor(() => expect(calls.attached).toBe(2));
   });
 });
