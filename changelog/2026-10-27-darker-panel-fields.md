@@ -4,7 +4,7 @@
 floating right bar. Number fields, selects and the segmented track vanished into the bar; only
 the focused one (accent wash) showed.
 
-**Now.** One token moved: dark `--ui-input` is `--grey-1` and `--ui-input-hover` `--grey-2`, below
+**Now.** One token moved: dark `--ui-input` is `--grey-2` (one step under the timeline and panel `--grey-3`) and `--ui-input-hover` `--grey-3`, below
 both `--ui-panel` and `--ui-panel-raised`. Every control already read the token (`bg-ui-input`,
 `var(--ui-input)`), so nothing per component changed. Light is unchanged: `--grey-2` already sits
 under the white panel. Focus keeps the accent ring.
