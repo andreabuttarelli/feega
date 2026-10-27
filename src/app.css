@@ -1103,3 +1103,7 @@ html[data-hydrating] :is(button, [role='button'], input, select, textarea, label
 @keyframes awaiting-hydration {
   to { opacity: 0.55; }
 }
+
+.ui-section {
+  border-bottom: 1px solid var(--ui-divider);
+}
