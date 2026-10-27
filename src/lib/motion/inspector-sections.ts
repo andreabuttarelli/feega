@@ -131,6 +131,52 @@ const GROUP_SECTION: Record<Group, Section> = {
 
 const TEXT_KEYS: ReadonlySet<string> = new Set(['font', 'weight', 'fontWeight', 'italic', 'size', 'tracking', 'leading', 'textCase', 'stretch', 'slant', 'axes', 'align', 'sizing', 'verticalAlign', 'paragraphSpacing', 'paragraphIndent', 'lineHeight', 'letterSpacing', 'maxLines', 'textWrap', 'leadingTrim', 'decoration', 'decorationStyle', 'decorationThickness', 'decorationOffset', 'decorationColor', 'skipInk', 'features']);
 
+export enum TextTier {
+  Primary = 'primary',
+  Advanced = 'advanced',
+  Decorated = 'decorated',
+  Hidden = 'hidden'
+}
+
+const TEXT_TIER: Record<string, TextTier> = {
+  font: TextTier.Primary,
+  weight: TextTier.Primary,
+  fontWeight: TextTier.Primary,
+  size: TextTier.Primary,
+  leading: TextTier.Primary,
+  tracking: TextTier.Primary,
+  align: TextTier.Primary,
+  verticalAlign: TextTier.Primary,
+  italic: TextTier.Primary,
+  decoration: TextTier.Primary,
+  textCase: TextTier.Primary,
+  stretch: TextTier.Advanced,
+  slant: TextTier.Advanced,
+  axes: TextTier.Advanced,
+  maxLines: TextTier.Advanced,
+  paragraphSpacing: TextTier.Advanced,
+  paragraphIndent: TextTier.Advanced,
+  textWrap: TextTier.Advanced,
+  leadingTrim: TextTier.Advanced,
+  sizing: TextTier.Advanced,
+  features: TextTier.Advanced,
+  lineHeight: TextTier.Advanced,
+  letterSpacing: TextTier.Advanced,
+  decorationStyle: TextTier.Decorated,
+  decorationThickness: TextTier.Decorated,
+  decorationOffset: TextTier.Decorated,
+  decorationColor: TextTier.Decorated,
+  skipInk: TextTier.Decorated
+};
+
+export function textTier(key: string, decoration: unknown): TextTier {
+  const tier = TEXT_TIER[key] ?? TextTier.Advanced;
+  if (tier !== TextTier.Decorated) {
+    return tier;
+  }
+  return decoration === 'none' ? TextTier.Hidden : TextTier.Advanced;
+}
+
 const KEY_SECTION: Record<string, Section> = {
   align: Section.Text,
   opacity: Section.Layer,
@@ -201,6 +247,11 @@ const LOOKS: Record<string, Partial<FieldLook>> = {
   fontWeight: { short: 'Weight' },
   size: { short: 'Size' },
   tracking: { short: 'Spacing', unit: EM },
+  stretch: { short: 'Width' },
+  slant: { short: 'Slant' },
+  maxLines: { short: 'Max lines' },
+  decorationThickness: { short: 'Thickness' },
+  decorationOffset: { short: 'Offset' },
   leading: { short: 'Line', unit: TIMES },
   paragraphSpacing: { short: 'Paragraph', unit: EM },
   paragraphIndent: { short: 'Indent', unit: EM },
@@ -272,7 +323,7 @@ const SUMMARY: Record<Section, (clip: Summed, fps: number) => string> = {
 
 export const sectionSummary = (section: Section, clip: Summed, fps: number): string => SUMMARY[section](clip, fps);
 
-const FIELD_LABEL: Record<string, string> = { align: 'Text align' };
+const FIELD_LABEL: Record<string, string> = { align: 'Text align', lineHeight: 'Line override', letterSpacing: 'Spacing override' };
 
 export const fieldLabel = (key: string, label: string): string => FIELD_LABEL[key] ?? label;
 
