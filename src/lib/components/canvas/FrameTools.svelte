@@ -6,6 +6,7 @@
   import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
+  import Rulers from '$lib/components/canvas/Rulers.svelte';
   import LayoutGuidesOverlay from '$lib/components/motion/LayoutGuidesOverlay.svelte';
   import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
@@ -100,6 +101,7 @@
   {#if shown.has(FrameOverlay.Outlines)}<div class="beneath"><OutlineOverlay {doc} {frame} {boxes} /></div>{/if}
   <PixelGridOverlay width={doc.width} height={doc.height} toggle={shows(views, FrameView.PixelGrid) ? GridToggle.On : GridToggle.Off} />
   {#if shown.has(FrameOverlay.Guides)}<LayoutGuidesOverlay {doc} />{/if}
+  {#if shown.has(FrameOverlay.Rulers)}<Rulers {doc} size={{ width: fit.width, height: fit.height }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.Mask)}<MaskOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.Pen)}<PenOverlay {doc} clip={only} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
   {#if only && shown.has(FrameOverlay.Vector)}<VectorOverlay {doc} clip={only} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
