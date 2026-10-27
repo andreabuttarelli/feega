@@ -101,10 +101,12 @@
         {@render badges(choice)}
         {#if chosen}<Check class="ml-auto size-3.5" aria-hidden="true" />{/if}
       </DropdownMenu.SubTrigger>
-      <DropdownMenu.SubContent class={SUB_MENU} data-testid="route-menu">
-        <DropdownMenu.Label class="text-[0.6875rem] text-muted-foreground">Run {choice.label} on</DropdownMenu.Label>
-        {@render routes(choice)}
-      </DropdownMenu.SubContent>
+      <DropdownMenu.Portal>
+        <DropdownMenu.SubContent class={SUB_MENU} data-testid="route-menu">
+          <DropdownMenu.Label class="text-[0.6875rem] text-muted-foreground">Run {choice.label} on</DropdownMenu.Label>
+          {@render routes(choice)}
+        </DropdownMenu.SubContent>
+      </DropdownMenu.Portal>
     </DropdownMenu.Sub>
   {:else}
     <DropdownMenu.Item data-testid={`model-${choice.id}`} onSelect={() => pick(choice.id, null)}>
@@ -155,12 +157,14 @@
             {#if group.id !== RECOMMENDED_GROUP}<ProviderIcon provider={group.id} />{/if}
             <span class="truncate">{group.label}</span>
           </DropdownMenu.SubTrigger>
-          <DropdownMenu.SubContent class={SUB_MENU}>
-            {#each group.items as entry (entry.value)}
-              {@const choice = byId.get(entry.value)}
-              {#if choice}{@render model(choice)}{/if}
-            {/each}
-          </DropdownMenu.SubContent>
+          <DropdownMenu.Portal>
+            <DropdownMenu.SubContent class={SUB_MENU}>
+              {#each group.items as entry (entry.value)}
+                {@const choice = byId.get(entry.value)}
+                {#if choice}{@render model(choice)}{/if}
+              {/each}
+            </DropdownMenu.SubContent>
+          </DropdownMenu.Portal>
         </DropdownMenu.Sub>
       {/each}
     {/if}
