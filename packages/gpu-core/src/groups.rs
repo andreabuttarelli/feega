@@ -1,4 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
 use vello::kurbo::{Affine as Matrix, Point, Rect};
@@ -17,7 +19,7 @@ use crate::Skipped;
 
 #[derive(Default)]
 pub struct Groups {
-    lists: HashMap<String, DisplayList>,
+    lists: FxHashMap<String, DisplayList>,
 }
 
 impl Groups {
@@ -528,11 +530,11 @@ fn laid(u: &UseItem, group: &DisplayList, cast: &Cast, view: Rect) -> (Vec<Item>
 #[derive(Default)]
 pub struct Library {
     groups: Groups,
-    encodings: HashMap<String, Option<Arc<Cast>>>,
-    seeds: HashMap<String, Seed>,
+    encodings: FxHashMap<String, Option<Arc<Cast>>>,
+    seeds: FxHashMap<String, Seed>,
     composes: bool,
-    held: HashMap<String, Held>,
-    building: HashMap<String, Building>,
+    held: FxHashMap<String, Held>,
+    building: FxHashMap<String, Building>,
     stale: Vec<String>,
     retiring: Vec<String>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -685,7 +687,7 @@ impl Library {
     pub fn plan(&mut self, list: &DisplayList, limits: Limits) -> Plan {
         let mut missing = Vec::new();
         let mut rasters = Vec::new();
-        let mut seen = HashSet::new();
+        let mut seen = FxHashSet::default();
         let mut pending = false;
         let mut finished = Vec::new();
         let mut waiting = Vec::new();
