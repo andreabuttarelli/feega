@@ -25,15 +25,17 @@
   import InspectorSection from './InspectorSection.svelte';
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
-  import { DIAL_KEYS, Part, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
+  import { DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
-  import { clipName as layerName, setClipFlags } from '@feega/motion-core/motion/organize';
+  import { clipName as layerName, renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
   import PositionSection from '$lib/components/motion/PositionSection.svelte';
+  import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
+  import SquareDashed from '@lucide/svelte/icons/square-dashed';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import { IconButton as ShellIconButton, Menu, MenuContent, MenuItem, MenuTrigger } from '$lib/components/ui/shell';
@@ -118,6 +120,7 @@
     partFill = null,
     gesture = null,
     lead,
+    actions,
     mode = EditMode.Motion,
     onalign
   }: {
@@ -140,6 +143,7 @@
     partFill?: Snippet | null;
     gesture?: LiveGesture | null;
     lead?: Snippet;
+    actions?: Snippet;
     mode?: EditMode;
     onalign?: (edge: AlignEdge) => void;
   } = $props();
@@ -151,6 +155,7 @@
   }
 
   const CORNER_NAMES = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left'] as const;
+  const CORNER_SHORT = ['TL', 'TR', 'BR', 'BL'] as const;
   const PERCENT = 100;
   const CORNER_PERCENT_MAX = 50;
   const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
@@ -194,6 +199,8 @@
       .filter((f) => !uiHidden(f.key))
       .filter((f) => !focus || focus.includes(f.key))
       .filter((f) => !shadowed(f.key, (clip.props as Record<string, unknown>)[f.key], f.fallback, transformKeys))
+      .filter((f) => !emptyManaged(f.control, (clip.props as Record<string, unknown>)[f.key]))
+      .map((f) => ({ ...f, label: fieldLabel(f.key, f.label) }))
   );
   const sharedFields = $derived(
     clipFieldGroups(doc, clip)
@@ -204,13 +211,22 @@
   const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
   const spec = $derived(COMPONENTS[clip.component]);
   const transformProps = $derived(focus ? [] : ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && p.key !== 'anchorX' && p.key !== 'anchorY'));
-  const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Layout));
+  const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Transform));
+  const positioned = $derived(transformProps.length > 0);
+  const pinnable = $derived(positioned && typeof clip.props.x === 'number' && typeof clip.props.y === 'number' && !clip.parent);
+  const PLACED_KEYS: ReadonlySet<string> = new Set(['x', 'y']);
+  const NO_SKIP: ReadonlySet<string> = new Set();
+  const RADIUS_KEYS: ReadonlySet<string> = new Set(['roundness', 'corners']);
   const threeDProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.ThreeD));
   const layerProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Layer && p.key !== 'opacity'));
   const opacityProp = $derived(transformProps.find((p) => p.key === 'opacity') ?? null);
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
+  const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
+  const headKind = $derived(customName ? 'Component' : spec.label);
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
+  const roundnessField = $derived(fieldsIn(Section.Layer).find((f) => f.key === 'roundness') ?? null);
+  const cornersField = $derived(fieldsIn(Section.Layer).find((f) => f.key === 'corners') ?? null);
   const sceneProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Scene));
   const maskProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Mask));
   const NO_MASK = 'none';
@@ -443,7 +459,10 @@
   const view = $derived(focus ? PropertiesView.Part : PropertiesView.Clip);
   const has: Record<Section, boolean> = $derived({
     [Section.Content]: fieldsIn(Section.Content).length > 0,
-    [Section.Layout]: layoutProps.length > 0 || fieldsIn(Section.Layout).length > 0,
+    [Section.Layout]: positioned || fieldsIn(Section.Layout).length > 0,
+    [Section.Align]: positioned && visual,
+    [Section.Constraints]: pinnable,
+    [Section.Transform]: layoutProps.length > 0,
     [Section.Layer]: layerProps.length > 0 || fieldsIn(Section.Layer).length > 0 || (visual && !focus),
     [Section.Fill]: !!partFill || fieldsIn(Section.Fill).length > 0,
     [Section.Stroke]: fieldsIn(Section.Stroke).length > 0,
@@ -461,6 +480,9 @@
   const BODIES: Record<Section, Snippet> = $derived({
     [Section.Content]: contentBody,
     [Section.Layout]: layoutBody,
+    [Section.Align]: alignBody,
+    [Section.Constraints]: constraintsBody,
+    [Section.Transform]: transformBody,
     [Section.Layer]: layerBody,
     [Section.Fill]: fillBody,
     [Section.Stroke]: strokeBody,
@@ -477,8 +499,9 @@
 <div class="inspector" data-testid="motion-inspector" data-side-edge style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header class="head" title={clip.id} data-testid="selection-head">
     <span class="icon"><FamilyIcon {family} /></span>
-    <span class="name">{customName ? componentLabel(customName) : layerName(clip)}</span>
-    <span class="kind">{customName ? 'Component' : spec.label}</span>
+    <input class="name" aria-label="Layer name" value={headTitle} data-testid="layer-name" onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} onchange={(e) => e.currentTarget.value.trim() && commit(renameClip(doc, clip.id, e.currentTarget.value.trim()), 'Renamed the layer')} />
+    {#if headKind !== headTitle}<span class="kind">{headKind}</span>{/if}
+    {@render actions?.()}
   </header>
 
   {#if customName}
@@ -528,12 +551,12 @@
   {/if}
 {/snippet}
 
-{#snippet animField(prop: AnimProp)}
+{#snippet animField(prop: AnimProp, named = false)}
   {@const look = fieldLook(prop.key, prop.source)}
   {@const range = slider(prop)}
   <NumberField
-    label={look.short ?? prop.label}
-    kind={look.short ? FieldKind.Glyph : FieldKind.Named}
+    label={named ? prop.label : (look.short ?? prop.label)}
+    kind={named || !look.short ? FieldKind.Named : FieldKind.Glyph}
     name={prop.label}
     value={numberShown(prop)}
     {range}
@@ -608,7 +631,7 @@
           <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
         {:else if field.control === Control.Select}
           <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
-            {#each field.options ?? [] as option (option)}<option value={option}>{option}</option>{/each}
+            {#each field.options ?? [] as option (option)}<option value={option}>{optionLabel(option)}</option>{/each}
           </select>
         {:else if field.control === Control.Toggle}
           <SegmentedField name={field.label} options={YES_NO} value={answerOf(value(field))} onchange={(v) => setProp(field, v === Answer.Yes)} />
@@ -654,8 +677,27 @@
   {/if}
 {/snippet}
 
-{#snippet groupFields(section: Section)}
-  {@const list = fieldsIn(section)}
+{#snippet radiusControl(round: Field)}
+  {@const corners = (cornersField ? (value(cornersField) as number[] | undefined) : undefined) ?? []}
+  {@const radii = cornerRadii(Number(clip.props.roundness ?? 0), corners)}
+  {@const split = corners.length > 0}
+  <div class="radius" data-testid="radius">
+    <div class="radius-main">{@render rangeField(round)}</div>
+    {#if cornersField}
+      <button type="button" class="radius-split" class:on={split} data-testid="radius-per-corner" aria-pressed={split} aria-label="Per-corner radius" title="Per-corner radius" onclick={() => setProp(cornersField, split ? [] : radii)}><SquareDashed size={15} /></button>
+    {/if}
+  </div>
+  {#if cornersField && split}
+    <div class="corners" data-testid="corners">
+      {#each CORNER_NAMES as name, i (name)}
+        <label class="corner" title={name}><span>{CORNER_SHORT[i]}</span><input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={CORNER_PERCENT_MAX} step="1" value={Math.round(radii[i] * PERCENT)} onchange={(e) => setProp(cornersField, withCorner(Number(clip.props.roundness ?? 0), radii, i, Number(e.currentTarget.value) / PERCENT))} /></label>
+      {/each}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet groupFields(section: Section, skip: ReadonlySet<string> = NO_SKIP)}
+  {@const list = fieldsIn(section).filter((f) => !skip.has(f.key))}
   {@const gridded = list.filter(inGrid)}
   {#each list.filter((f) => !inGrid(f) && !segmented(f)) as field (field.key)}{@render fieldRow(field)}{/each}
   {#if gridded.length}
@@ -690,29 +732,36 @@
 {/snippet}
 
 {#snippet layoutBody()}
-  {@render groupFields(Section.Layout)}
-  {#if layoutProps.length}
-    <div class="stackable" data-testid="transform-section">
-      <PositionSection {doc} {clip} onchange={commit} onalign={(edge) => onalign?.(edge)} />
-      {@render animGrid(layoutProps)}
-    </div>
-  {/if}
+  {#if positioned}<PositionSection {doc} {clip} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
+  {@render groupFields(Section.Layout, positioned ? PLACED_KEYS : NO_SKIP)}
+  {#if positioned}<PositionSection {doc} {clip} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
+{/snippet}
+
+{#snippet alignBody()}
+  <PositionSection {doc} {clip} part={PositionPart.Align} onchange={commit} onalign={(edge) => onalign?.(edge)} />
+{/snippet}
+
+{#snippet constraintsBody()}
+  <PositionSection {doc} {clip} part={PositionPart.Constraints} onchange={commit} onalign={(edge) => onalign?.(edge)} />
+{/snippet}
+
+{#snippet transformBody()}
+  <div class="stackable" data-testid="transform-section">{@render animGrid(layoutProps)}</div>
 {/snippet}
 
 {#snippet layerBody()}
   {#if visual && !focus}
-    <div class="line layer-look" data-testid="layer-look">
-      <select id="blend-mode" aria-label="Blend mode" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
+    <div class="line" data-testid="layer-look">
+      <label for="blend-mode">Blend</label>
+      <select id="blend-mode" class="wide-select" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
         {#each BLEND_MODES as mode (mode)}<option value={mode}>{blendLabel(mode)}</option>{/each}
       </select>
-      {#if opacityProp}
-        <input class="opacity-slider" type="range" min="0" max="100" step="1" data-testid="opacity-slider" aria-label="Opacity slider" value={numberShown(opacityProp)} onchange={(e) => animate('opacity', stored('opacity', Number(e.currentTarget.value)))} />
-        <div class="opacity-number">{@render animField(opacityProp)}</div>
-      {/if}
     </div>
+    {#if opacityProp}<div class="stack" data-prop="opacity" data-testid="opacity-field">{@render animField(opacityProp, true)}</div>{/if}
   {/if}
-  {#if layerProps.length}<div class="stackable" data-testid="layer-transform">{@render animGrid(layerProps)}</div>{/if}
-  {@render groupFields(Section.Layer)}
+  {#if layerProps.length}<div class="stackable" data-testid="layer-transform">{#each layerProps as prop (prop.key)}<div class="stack" data-prop={prop.key}>{@render animField(prop, true)}</div>{/each}</div>{/if}
+  {#if roundnessField}{@render radiusControl(roundnessField)}{/if}
+  {@render groupFields(Section.Layer, roundnessField ? RADIUS_KEYS : NO_SKIP)}
   {#if visual && !focus}
     {#if hasChildren}
       <div class="line" data-prop="clipContent">
@@ -1041,6 +1090,15 @@
     border-bottom: 1px solid var(--ui-divider);
   }
 
+  .name:hover {
+    background: var(--ui-hover);
+  }
+
+  .name:focus {
+    outline: none;
+    background: var(--ui-input);
+  }
+
   .icon {
     display: inline-grid;
     place-items: center;
@@ -1054,6 +1112,14 @@
   .name {
     flex: 1;
     min-width: 0;
+    height: 28px;
+    padding: 0 6px;
+    margin-left: -6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-ink);
+    font-family: inherit;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1383,29 +1449,55 @@
     align-items: center;
     font-weight: 600;
   }
-  .layer-look {
-    gap: 6px;
-  }
-  .layer-look select {
+  .wide-select {
     flex: 1;
     min-width: 0;
   }
-  .opacity-slider {
-    width: 56px;
-    flex-shrink: 0;
-    accent-color: var(--ui-accent);
+  .radius {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
   }
-  .opacity-number {
-    width: 124px;
-    flex-shrink: 0;
+  .radius-main {
+    flex: 1;
+    min-width: 0;
   }
-  @media (pointer: coarse) {
-    .layer-look {
-      flex-wrap: wrap;
-    }
-    .opacity-number {
-      flex: 1 0 100%;
-    }
+  .radius-split {
+    display: grid;
+    place-items: center;
+    flex: 0 0 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-ink-2);
+    cursor: pointer;
+  }
+  .radius-split.on {
+    background: var(--ui-selected, var(--ui-accent-wash));
+    color: var(--ui-accent-text, var(--ui-accent));
+  }
+  .corner {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    height: 28px;
+    padding: 0 6px;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    font-size: var(--ui-text-xs);
+    color: var(--ui-ink-2);
+  }
+  .corner input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    color: var(--ui-ink);
+    font: inherit;
   }
   .split {
     border: 0;

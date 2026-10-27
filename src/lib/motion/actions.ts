@@ -37,7 +37,6 @@ import SlashIcon from '@lucide/svelte/icons/slash';
 import MoveUpRight from '@lucide/svelte/icons/move-up-right';
 import PenTool from '@lucide/svelte/icons/pen-tool';
 import Pencil from '@lucide/svelte/icons/pencil';
-import Merge from '@lucide/svelte/icons/merge';
 import PencilRuler from '@lucide/svelte/icons/pencil-ruler';
 import Pause from '@lucide/svelte/icons/pause';
 import Rewind from '@lucide/svelte/icons/rewind';
@@ -338,7 +337,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToolLine]: { name: 'Line tool', icon: SlashIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag from end to end' },
   [Command.ToolArrow]: { name: 'Arrow tool', icon: MoveUpRight, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag from tail to head' },
   [Command.ToolPencil]: { name: 'Pencil tool', icon: Pencil, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag to draw, hold Shift for straight segments' },
-  [Command.ToolShapeBuilder]: { name: 'Shape builder', icon: Merge, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Click regions to merge, Alt-click to subtract, Enter to apply' },
+  [Command.ToolShapeBuilder]: { name: 'Shape builder', icon: Combine, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Click regions to merge, Alt-click to subtract, Enter to apply' },
   [Command.ToolScale]: { name: 'Scale tool', icon: Scaling, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToolPen]: { name: 'Pen tool', icon: PenTool, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Tap points, tap the first to close' },
   [Tool.FitGraph]: { name: 'Fit curves to view', icon: Maximize, group: GuideGroup.Timeline, place: Place.Graph },

@@ -22,12 +22,14 @@ function inspect(component: ComponentId, props: Record<string, unknown> = {}, do
 const layer = (html: string) => html.slice(html.indexOf('data-section="layer"'), html.indexOf('</section>', html.indexOf('data-section="layer"')));
 
 describe('the Layer section', () => {
-  it('puts blend and opacity on one row, opacity as a number and a slider', () => {
-    const look = layer(inspect('Title')).split('data-testid="layer-look"')[1] ?? '';
-    const row = look.split('class="line')[0];
-    expect(row).toContain('data-testid="blend-select"');
-    expect(row).toMatch(/type="range"[^>]*data-testid="opacity-slider"|data-testid="opacity-slider"[^>]*type="range"/);
-    expect(row).toContain('aria-label="Opacity"');
+  it('gives blend its own labelled row and opacity one control, never a slider plus a duplicate field', () => {
+    const html = layer(inspect('Title'));
+    const look = html.split('data-testid="layer-look"')[1]?.split('</div>')[0] ?? '';
+    expect(look).toContain('>Blend</label>');
+    expect(look).toContain('data-testid="blend-select"');
+    expect(html).toContain('data-testid="opacity-field"');
+    expect(html).not.toContain('data-testid="opacity-slider"');
+    expect(html).not.toMatch(/type="range"/);
   });
 
   it('flips a layer horizontally and vertically', () => {
