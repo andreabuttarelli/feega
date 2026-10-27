@@ -40,6 +40,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   upload: canvas('register_upload'),
   uploadFont: editor('upload_font'),
   importLink: canvas('import_link'),
+  importFeedImage: canvas('import_feed_image'),
   snapshot: canvas('canvas_snapshot'),
   revision: canvas('canvas_revision'),
   run: canvas('run_node'),

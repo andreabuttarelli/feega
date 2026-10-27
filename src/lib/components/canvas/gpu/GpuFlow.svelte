@@ -149,6 +149,7 @@
   import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
+  import { CANVAS_DRAG_FEED_IMAGE, parseFeedImageDrag } from '$lib/canvas/feed-image';
   import { isAddable, type Addable } from '$lib/canvas/addable';
   import { edgeKindsFor } from '$lib/canvas/connect-rules';
   import { connectionRefusal, landingOf, type Connection } from '$lib/canvas/connection-verdict';
@@ -2783,11 +2784,20 @@
 
   function onDragOver(e: DragEvent) {
     const types = e.dataTransfer?.types ?? [];
-    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, CANVAS_DRAG_COMPONENT, OS_FILES].some((type) => types.includes(type))) {
+    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, CANVAS_DRAG_COMPONENT, CANVAS_DRAG_FEED_IMAGE, OS_FILES].some((type) => types.includes(type))) {
       return;
     }
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'copy';
+    if (types.includes(CANVAS_DRAG_FEED_IMAGE)) {
+      props.onFeedImageOver?.({ x: e.clientX, y: e.clientY });
+    }
+  }
+
+  function onDragLeave(e: DragEvent) {
+    if (!wrap?.contains(e.relatedTarget as Node | null)) {
+      props.onFeedImageOver?.(null);
+    }
   }
 
   function dropComponent(dragged: ComponentDrag, world: Point) {
@@ -2808,6 +2818,12 @@
     if (files.length && props.onUpload) {
       e.preventDefault();
       files.forEach((file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? toFlow(at) : undefined));
+      return;
+    }
+    const feedImage = parseFeedImageDrag(e.dataTransfer?.getData(CANVAS_DRAG_FEED_IMAGE) ?? '');
+    if (feedImage) {
+      e.preventDefault();
+      props.onDropFeedImage?.(feedImage, at);
       return;
     }
     const output = e.dataTransfer?.getData(CANVAS_DRAG_OUTPUT);
@@ -2876,7 +2892,7 @@
 }} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} onpointermove={(e) => (pointer = { x: e.clientX, y: e.clientY })} oncopy={(e) => onCopy(e, false)} oncut={(e) => onCopy(e, true)} onpaste={onPasteEvent} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondragleave={onDragLeave} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
   {#if timeline}
     {@const nodeId = timeline.nodeId}
     <div style="display: contents" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
