@@ -122,7 +122,9 @@ describe('una pagina incorporata, letta dalla riga', () => {
       id: 'n1',
       source: 'url',
       url: 'https://esempio.it',
-      html: ''
+      html: '',
+      framework: 'react',
+      files: {}
     });
   });
 
@@ -175,8 +177,8 @@ describe('con che `data` nasce una riga', () => {
     expect(newNodeRow('image')).toEqual({ prompt: '', model: null, params: {}, refId: null });
   });
 
-  it("una pagina incorporata nasce sull'indirizzo, che è il caso di nove volte su dieci", () => {
-    expect(newNodeRow('iframe')).toEqual({ url: '', html: '' });
+  it('un iframe nasce come code frame React', () => {
+    expect(newNodeRow('iframe')).toMatchObject({ url: '', html: '', framework: 'react' });
   });
 
   it('un documento nasce vuoto e privato', () => {

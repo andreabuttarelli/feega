@@ -30,9 +30,13 @@
     IFRAME_REFERRER_POLICY,
     IFRAME_SANDBOX,
     normalizeEmbedUrl,
-    type IframeNode,
-    type IframeSource
+    FRAME_TABS,
+    frameTabIndex,
+    type FrameTab,
+    type IframeNode
   } from '$lib/canvas/iframe-node';
+  import { starterFiles } from '$lib/canvas/code-frame';
+  import CodeFrame from './CodeFrame.svelte';
 
   let {
     node,
@@ -87,11 +91,25 @@
     onchange?.({ url: verdict.url, html: '' });
   }
 
-  function pickSource(source: IframeSource) {
-    // I due modi si escludono a vicenda nel database (`brand_canvas_items_iframe_source`), quindi
-    // passare all'uno svuota l'altro: tenerli entrambi pieni renderebbe la riga non salvabile, e
-    // il rifiuto arriverebbe molto dopo il gesto che lo ha causato.
-    onchange?.(source === 'url' ? { source, html: '' } : { source, url: '' });
+  const tabIndex = $derived(frameTabIndex(node.source, node.framework));
+  let editing = $state(true);
+
+  function pickTab(tab: FrameTab) {
+    if (tab.framework === null) {
+      onchange?.(tab.source === 'url' ? { source: 'url', html: '', files: {} } : { source: 'html', url: '', files: {} });
+      return;
+    }
+
+    if (node.source === 'code' && node.framework === tab.framework) {
+      return;
+    }
+
+    const hasCode = Object.keys(node.files).length > 0;
+    if (hasCode && !confirm(`Replace this frame's code with a new ${tab.label} starter?`)) {
+      return;
+    }
+
+    onchange?.({ source: 'code', url: '', html: '', framework: tab.framework, files: starterFiles(tab.framework) });
   }
 
   /**
@@ -159,21 +177,18 @@
 <div class="frame">
   <header class="frame-head">
     <div class="frame-modes" role="group" aria-label="Content source">
-      <button
-        type="button"
-        class:is-on={node.source === 'url'}
-        onclick={() => pickSource('url')}
-      >
-        URL
-      </button>
-      <button
-        type="button"
-        class:is-on={node.source === 'html'}
-        onclick={() => pickSource('html')}
-      >
-        Code
-      </button>
+      {#each FRAME_TABS as tab, i (tab.label)}
+        <button type="button" class:is-on={i === tabIndex} onclick={() => pickTab(tab)}>
+          {tab.label}
+        </button>
+      {/each}
     </div>
+
+    {#if node.source === 'code'}
+      <button type="button" class="frame-edit" class:is-on={editing} aria-pressed={editing} onclick={() => (editing = !editing)}>
+        Editor
+      </button>
+    {/if}
 
     {#if node.source === 'url'}
       <input
@@ -207,6 +222,9 @@
        dentro un viewport che trasforma e a cui riscrive `visibility` a ogni misura nuova, quindi
        il differimento si riarmava a ogni pan e a ogni zoom — la pagina ripartiva da capo per
        sempre. Un'anteprima su una tela non ha niente da differire: il nodo è lì per guardarlo. -->
+  {#if node.source === 'code'}
+    <CodeFrame framework={node.framework} files={node.files} {editing} onchange={(files) => onchange?.({ files, url: '', html: '' })} />
+  {:else}
   <div class="frame-body" bind:this={body}>
     {#if node.source === 'html'}
       <!--
@@ -233,6 +251,7 @@
       <p class="frame-hint">{refusal ?? 'Paste an address'}</p>
     {/if}
   </div>
+  {/if}
 
   {#if node.source === 'html'}
     <footer class="frame-foot">
@@ -313,6 +332,22 @@
   .frame-modes button.is-on {
     color: var(--ink, #1d1d1f);
     background: var(--paper, #fff);
+  }
+
+  .frame-edit {
+    margin-left: auto;
+    padding: 3px 8px;
+    font: inherit;
+    font-size: 11.5px;
+    color: var(--ink-soft, #6e6e73);
+    background: none;
+    border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--ui-radius-sm, 4px);
+    cursor: pointer;
+  }
+  .frame-edit.is-on {
+    color: var(--ink, #1d1d1f);
+    background: var(--paper-2, #f9f9f9);
   }
 
   .frame-field {
