@@ -12,3 +12,7 @@ group named after the component.
 
 Discarded: scaling a clamped text clip with a transform, since the pivot moves the text.
 Overrides on instances are still ignored.
+
+## Instances drew on top of each other
+
+A pasted instance past the first sat exactly under it: the host's own `x`/`y` never reached the clips inside a precomp. Inner top-level clips now take the host as parent, so moving an instance moves what it draws.
