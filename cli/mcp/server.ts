@@ -14,6 +14,7 @@ import { registerGalleryTools } from './tools/gallery.ts';
 import { registerLayoutTools } from './tools/layouts.ts';
 import { registerModelAllowlistTools } from './tools/model-allowlist.ts';
 import { registerSpendCapsTools } from './tools/spend-caps.ts';
+import { registerCloudTools } from './tools/cloud.ts';
 import { registerAppAccountTools } from './tools/app-account.ts';
 import { registerOrgTools } from './tools/orgs.ts';
 import { registerEditTools } from './tools/edit.ts';
@@ -146,6 +147,7 @@ function build(session: string): { server: McpServer; surface: ToolSurface } {
   registerGalleryTools(server);
   registerLayoutTools(server);
   registerAppAccountTools(server);
+  registerCloudTools(server);
   registerOrgTools(server);
   registerEditTools(server, surface);
   registerLoadingTools(server, surface);

@@ -84,6 +84,8 @@ export const TOOL_FAMILY: Readonly<Record<string, ToolFamily>> = {
   spend_caps: ToolFamily.Team,
   get_app_account: ToolFamily.Team,
   forget_app_account: ToolFamily.Team,
+  cloud: ToolFamily.Team,
+  figma_token_status: ToolFamily.Team,
   canvas_tool: ToolFamily.Legacy,
   canvas_file: ToolFamily.Canvas,
   motion_tool: ToolFamily.Legacy,

@@ -24,3 +24,19 @@ export function cloudFailure(mode: CloudMode, code: string | undefined): string 
   }
   return connectionMessage(code, FAILED_AT[mode]);
 }
+
+export enum CloudAction {
+  Connect = 'connect',
+  Status = 'status',
+  ListFiles = 'list_files',
+  Import = 'import',
+  Export = 'export',
+  Disconnect = 'disconnect'
+}
+
+export enum FigmaTokenAction {
+  Save = 'save',
+  Test = 'test',
+  Remove = 'remove',
+  Status = 'status'
+}

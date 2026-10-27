@@ -5,7 +5,8 @@ import { SELECTION_ACTIONS } from '$lib/canvas/selection-actions';
 import { isCanvasOp } from '$lib/server/canvas/canvas-ops';
 import { isEditorOp } from '$lib/server/frame-editor/editor-ops';
 import { motionToolList } from '$lib/server/motion/tool-run';
-import { CANVAS_PAGE_ACTIONS, EDITOR_ACTIONS, FRAME_PAGE_ACTIONS, PARITY_TABLES, SELECTION_TOOLBAR, type Parity, type Route } from './ui-actions';
+import { CloudAction, FigmaTokenAction } from '$lib/canvas/cloud-picker';
+import { CANVAS_PAGE_ACTIONS, CLOUD_ACTIONS, FIGMA_TOKEN, EDITOR_ACTIONS, FRAME_PAGE_ACTIONS, PARITY_TABLES, SELECTION_TOOLBAR, type Parity, type Route } from './ui-actions';
 
 const CANVAS_PAGE = 'src/lib/server/canvas/canvas-page.ts';
 const FRAME_PAGE = 'src/lib/server/frame-editor/editor-page.ts';
@@ -49,6 +50,11 @@ describe('every change a person makes in the app, an agent can make over MCP', (
 
   it('maps every button of the canvas selection toolbar', () => {
     expect(SELECTION_ACTIONS.map((a) => a.id).sort()).toEqual(Object.keys(SELECTION_TOOLBAR).sort());
+  });
+
+  it('maps every cloud and Figma token action', () => {
+    expect(Object.keys(CLOUD_ACTIONS).sort()).toEqual(Object.values(CloudAction).sort());
+    expect(Object.keys(FIGMA_TOKEN).sort()).toEqual(Object.values(FigmaTokenAction).sort());
   });
 
   it('points only at routes the MCP server really has', () => {

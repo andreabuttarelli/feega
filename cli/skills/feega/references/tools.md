@@ -180,6 +180,12 @@ Free.
 (login url, email, session expiry; never the password). `forget_app_account` (`{ project_id }`) deletes it
 and its session. Free.
 
+`cloud` (`{ project_id, action, provider?, ... }`) works the Google Drive and Dropbox files of the signed-in
+person: `status` (connected or not), `files` (`folder`, `cursor` for the next page), `import` (`file_id`,
+optional `canvas_id`, `x`, `y`), `export` (`asset_id`, `folder`, `name?`) and `disconnect`. Connecting is a
+browser sign-in in the app. `figma_token_status` (`{ project_id }`) says whether a Figma token is saved,
+never the token. Free.
+
 ## Edit and view
 
 | MCP | CLI |
