@@ -98,5 +98,12 @@ describe('faceBook', () => {
     const tick = withSymbols({ family: 'Inter', weight: 400, italic: false, size: 20, axes: {} }, 0x2713);
     expect(tick?.face.key?.font).toBe('https://fonts.gstatic.com/symbols.woff2');
   });
+
+  it('draws text whose uploaded font was deleted in the built-in sans, never nothing', () => {
+    const sans = faceRules(`@font-face { font-family: 'DM Sans'; font-weight: 100 1000; src: url(https://x.test/dm-sans.woff2); }`);
+    const withSans = faceBook([...rules, ...sans], new Map([...sources, ['https://x.test/dm-sans.woff2', source('dm-sans')]]), registry);
+    const gone = withSans({ family: 'Deleted Upload', weight: 400, italic: false, size: 20, axes: {} }, 0x41);
+    expect(gone?.face.key?.font).toBe('https://x.test/dm-sans.woff2');
+  });
 });
 
