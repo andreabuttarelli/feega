@@ -110,3 +110,4 @@ tests/e2e/.auth/
 
 # per-checkout vite deps cache (worktrees share node_modules)
 .vite-deps/
+/dist-app
