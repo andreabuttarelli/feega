@@ -29,6 +29,7 @@ import { FRAMES_CLOSED_HINT } from './server-frames';
 import { GUIDES, guidesFor, type GuideTopic } from './guides';
 import { lintAdvice } from '$lib/motion/custom/lint';
 import { tool, type Tool, type ToolExecutionOptions } from 'ai';
+import { cssText, devLayer, tailwindClasses } from '$lib/canvas/dev-css';
 import { addShader, removeShader, setShader } from '$lib/motion/shaders/ops';
 import type { EffectStore } from '$lib/server/effects/store';
 import type { LayoutStore } from '$lib/server/layouts/store';
@@ -969,6 +970,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const measured = measureText(look, box, exact ?? guessedAdvance(look.capitals));
         const { lines, ...rect } = measured;
         return { ok: true, approximate: !exact, box: rect, lines };
+      }
+    }),
+
+    read_layer_css: tool({
+      description: 'Dev mode for one layer: its CSS, the same as a Tailwind class list, the box in px of the frame, and the names it takes from the design (brand colours as variables, fonts, named styles, bound variables). Read-only: nothing changes. Brand colours stay variables (var(--brand-accent)) because the brand values come with the render, not the video.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => {
+        const layer = devLayer(session.doc, input.clip_id, null);
+        if (!layer) {
+          return { ok: false, error: `${input.clip_id} is not a layer of this video` };
+        }
+        return { ok: true, name: layer.name, component: layer.component, box: layer.box, css: cssText(layer), tailwind: tailwindClasses(layer), tokens: layer.tokens };
       }
     }),
 

@@ -54,7 +54,7 @@ export enum FrameToolAccess {
   Editor = 'editor'
 }
 
-const READ_TOOLS = ['get_motion_doc', 'measure_text', 'list_components', 'list_assets', 'beat_times', 'list_effects', 'list_layouts', 'list_fields', 'list_fonts', 'read_component', 'list_shots', 'list_templates', 'get_template', 'list_revisions', 'view_frames', 'describe_frames', 'list_ui_kinds'];
+const READ_TOOLS = ['get_motion_doc', 'read_layer_css', 'measure_text', 'list_components', 'list_assets', 'beat_times', 'list_effects', 'list_layouts', 'list_fields', 'list_fonts', 'read_component', 'list_shots', 'list_templates', 'get_template', 'list_revisions', 'view_frames', 'describe_frames', 'list_ui_kinds'];
 
 const EDITOR_ONLY_TOOLS = ['read_video_reference', 'render_batch', 'spawn_agent', 'render_video', 'analyze_site', 'write_storyboard', 'read_storyboard', 'update_storyboard_card', 'link_storyboard_beat', 'use_brand', 'import_asset', 'recreate_ui', 'add_music'];
 
