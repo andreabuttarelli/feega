@@ -24,6 +24,18 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. The src pin stores one fingerprint per tool/op, one entry each: PRs touching different tools do not conflict; a real conflict means the same tool changed twice. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
 
+### A Playwright spec cannot import motion-core: build the page with vite-node first
+
+**Signal:** `Module ".../part-usage.json" needs an import attribute of "type: json"` the moment a spec or demo imports `bundle.ts` or the doc ops. **Move:** Playwright loads TypeScript through Node, not Vite. Build the fixture in a separate `npx vite-node tests/e2e/fixtures/build-lumen.ts <dir> <origin>` step and let the spec read the files (`tests/e2e/fixtures/interactive-routes.ts`).
+
+### The legacy HTML player stays blank on localhost in new Chromium
+
+**Signal:** an old interactive embed drawn once, never reacts, console says `Permission was denied for this request to access the loopback address space` for `/motion-runtime/*.js`. **Move:** the player iframe has an opaque origin, so Local Network Access blocks its scripts from localhost. Launch the before-run with `--disable-features=LocalNetworkAccessChecks,PrivateNetworkAccessRespectPreflightResults,BlockInsecurePrivateNetworkRequests`. Production is not affected.
+
+### A scroll-scrubbed hero starts empty: Title and Text fade up from their own first frame
+
+**Signal:** playback `scrub` at progress 0 shows shapes and Kickers but no headline or body copy. **Move:** `Title` and `Text` fade up over their first frames, `Kicker` and `Caption` do not. Play the entrance (`autoplay`) and let `input.scroll` drive the rest, or start the story with the copy already faded in.
+
 ### An effect that publishes into a `$state` map loops once it runs per edit
 
 **Signal:** `effect_update_depth_exceeded` in the console, the UI stops updating after the first keystroke, the stack points at an `$effect` calling `liveDocs.set`. **Move:** the setter read `this.map` to copy it, so the effect depended on what it wrote; read it with `untrack` inside the setter. Vitest runs the server build of Svelte, where effects do not run: only a real browser shows it.
