@@ -142,6 +142,12 @@
     box-shadow: var(--ui-shadow-float);
   }
 
+  @media (max-width: 1180px) {
+    .chat-pane {
+      bottom: 76px;
+    }
+  }
+
   .chat-resize-handle {
     position: absolute;
     left: -3px;

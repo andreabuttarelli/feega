@@ -87,6 +87,12 @@
     box-shadow: var(--ui-shadow-float);
   }
 
+  @media (max-width: 1180px) {
+    .left-panel {
+      bottom: 76px;
+    }
+  }
+
   .left-panel-head {
     flex: 0 0 auto;
     display: flex;

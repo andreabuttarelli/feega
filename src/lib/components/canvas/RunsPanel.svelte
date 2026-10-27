@@ -65,9 +65,12 @@
 
   button {
     font: inherit;
-    padding: 4px 10px;
-    border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
-    background: var(--ui-panel);
+    height: 32px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
     color: inherit;
     cursor: pointer;
   }

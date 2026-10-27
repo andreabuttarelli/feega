@@ -11,7 +11,8 @@
     left: 8px;
     bottom: 8px;
     margin: 0;
-    padding: 2px 6px;
+    padding: 2px 8px;
+    border-radius: var(--ui-radius-full);
     font: 11px/1.4 var(--sans, sans-serif);
     color: var(--ui-text-secondary, #6e6e73);
     background: var(--ui-panel, #fff);
