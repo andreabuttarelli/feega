@@ -10,6 +10,7 @@ import Eraser from '@lucide/svelte/icons/eraser';
 import Scaling from '@lucide/svelte/icons/scaling';
 import Paintbrush from '@lucide/svelte/icons/paintbrush';
 import Expand from '@lucide/svelte/icons/expand';
+import Crop from '@lucide/svelte/icons/crop';
 import Layers from '@lucide/svelte/icons/layers';
 import Copy from '@lucide/svelte/icons/copy';
 import Download from '@lucide/svelte/icons/download';
@@ -75,6 +76,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'run-workflow': Play,
   'save-technique': BookmarkPlus,
   'run-technique': Play,
+  'run-technique-rows': ListEnd,
   'edit-technique': Pencil,
   'detach-technique': Unlink,
   'run-downstream': ListEnd,
@@ -83,6 +85,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'upscale-image': Scaling,
   inpaint: Paintbrush,
   outpaint: Expand,
+  reframe: Crop,
   'split-layers': Layers,
   'layers-to-frame': Frame,
   'copy-id': Hash,

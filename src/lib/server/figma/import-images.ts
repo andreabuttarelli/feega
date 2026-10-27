@@ -1,10 +1,10 @@
-const FIGMA_API = 'https://api.figma.com/v1';
-const TOKEN_HEADER = 'X-Figma-Token';
-const FILE_KEY = /^[A-Za-z0-9_-]{6,64}$/;
+export const FIGMA_API = 'https://api.figma.com/v1';
+export const TOKEN_HEADER = 'X-Figma-Token';
+export const FILE_KEY = /^[A-Za-z0-9_-]{6,64}$/;
 const IMAGE_HASH = /^[0-9a-f]{8,64}$/;
-const HTTP_OK = 200;
 const HTTP_FORBIDDEN = 403;
 const MISSING_SCOPE = /scope/i;
+export const HTTP_OK = 200;
 
 export const MAX_HASHES = 40;
 
@@ -12,10 +12,28 @@ export enum FigmaOutcome {
   Ok = 'ok',
   Invalid = 'invalid',
   Rejected = 'token_rejected',
-  Unavailable = 'unavailable'
+  NotFound = 'not_found',
+  Unavailable = 'unavailable',
+  NoToken = 'no_token',
+  BadLink = 'bad_link',
+  NoFrames = 'no_frames',
+  Unreadable = 'unreadable',
+  RateLimited = 'rate_limited'
 }
 
-type FetchFn = (url: string, init: { headers: Record<string, string> }) => Promise<Response>;
+export const FIGMA_STATUS: Record<Exclude<FigmaOutcome, FigmaOutcome.Ok>, number> = {
+  [FigmaOutcome.Invalid]: 400,
+  [FigmaOutcome.BadLink]: 400,
+  [FigmaOutcome.NoFrames]: 400,
+  [FigmaOutcome.Unreadable]: 422,
+  [FigmaOutcome.Rejected]: 422,
+  [FigmaOutcome.NotFound]: 404,
+  [FigmaOutcome.NoToken]: 409,
+  [FigmaOutcome.RateLimited]: 429,
+  [FigmaOutcome.Unavailable]: 502
+};
+
+export type FetchFn = (url: string, init: { headers: Record<string, string> }) => Promise<Response>;
 
 export type ImportDeps = { fetchFn: FetchFn; importUrl: (url: string) => Promise<string | null> };
 export type ImportAsk = { token: string; fileKey: string; hashes: string[] };

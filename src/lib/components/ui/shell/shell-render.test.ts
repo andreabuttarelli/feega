@@ -9,11 +9,26 @@ import Section from './Section.svelte';
 import Field from './Field.svelte';
 import PanelHeader from './PanelHeader.svelte';
 import Toolbar from './Toolbar.svelte';
+import Input from '../input/input.svelte';
+import Select from '../select/select.svelte';
+import { FIELD_INPUT, TONE } from './styles';
 import { Fold, Placement, Tone } from './styles';
 
 const svg = createRawSnippet(() => ({ render: () => '<svg></svg>' }));
 const body = createRawSnippet(() => ({ render: () => '<p>body</p>' }));
 const noop = () => {};
+
+describe('the field fill', () => {
+  it('inputs, selects, segmented tracks, filled buttons and the shared field class all carry the one field token', () => {
+    const segmented = render(SegmentedControl, { props: { label: 'Mode', value: 'a', onchange: noop, options: [{ value: 'a', label: 'A' }] } }).body;
+
+    expect(render(Input, { props: {} }).body).toContain('bg-ui-input');
+    expect(render(Select, { props: {} }).body).toContain('bg-ui-input');
+    expect(segmented).toContain('bg-ui-input');
+    expect(FIELD_INPUT).toContain('bg-ui-input');
+    expect(TONE.filled).toContain('bg-ui-input');
+  });
+});
 
 describe('the shell primitives', () => {
   it('an icon button always carries its name, so the tooltip and a screen reader say the same thing', () => {

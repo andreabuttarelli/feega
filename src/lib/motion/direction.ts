@@ -174,7 +174,7 @@ const LOGO_ENTRANCE: ReadonlySet<string> = new Set(['opacity', 'scale', 'x', 'y'
 const EXTRUDED: ReadonlySet<ComponentId> = new Set(['Logo3D'] as ComponentId[]);
 const FLAT_LOGO: ReadonlySet<ComponentId> = new Set(['Logo', 'Image'] as ComponentId[]);
 
-const BACKDROPS: ReadonlySet<ComponentId> = new Set(['BrandBackground', 'Adjustment', 'Particles', 'Null'] as ComponentId[]);
+const BACKDROPS: ReadonlySet<ComponentId> = new Set(['BrandBackground', 'Adjustment', 'Light', 'Particles', 'Null'] as ComponentId[]);
 const MEDIA: ReadonlySet<ComponentId> = new Set(['Image', 'Video', 'Device3D', 'Model3D'] as ComponentId[]);
 
 type Clip = MotionDoc['tracks'][number]['clips'][number];

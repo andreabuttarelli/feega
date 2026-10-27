@@ -137,6 +137,10 @@
       "chatTab": "Chat",
       "guideTab": "Guides",
       "guideBack": "Back to guides",
+      "guideSearch": "Search guides",
+      "guideNewTab": "Open in new tab",
+      "guideOffline": "Guides need a connection. Open them at",
+      "guideEmpty": "No guide matches.",
       "mobile": {
         "canvas": "Canvas",
         "chat": "Chat",

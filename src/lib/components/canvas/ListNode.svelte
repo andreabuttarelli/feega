@@ -134,7 +134,7 @@
     <span class="list-kind">{itemKind === 'text' ? 'Text' : 'Images'}</span>
     <span class="list-head-right">
       <span class="list-count">{count}</span>
-      <button type="button" class="list-help" onclick={() => requestGuide('loop')} aria-label="Guida">
+      <button type="button" class="list-help" onclick={() => requestGuide('ai/loops')} aria-label="Guida">
         <HelpCircle size={13} strokeWidth={2} />
       </button>
     </span>

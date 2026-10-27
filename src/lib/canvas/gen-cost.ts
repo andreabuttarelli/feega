@@ -1,4 +1,4 @@
-import type { GenMedium, GenParams, ModelChoice } from './gen-node';
+import { snapResolution, VideoAudio, type GenMedium, type GenParams, type ModelChoice } from './gen-node';
 import { pricedFor } from './model-routes';
 import { audioCreditsFor, audioDurationOf, audioModelFor, audioOperationOf } from './audio-operations';
 
@@ -66,6 +66,10 @@ function pricedCredits(input: RunCostInput): number | null {
 }
 
 export function listedCredits(choice: ModelChoice): number | undefined {
+  const rates = Object.values(choice.perSecondCredits ?? {}).flatMap((byResolution) => Object.values(byResolution ?? {}));
+  if (rates.length) {
+    return Math.round(Math.min(...rates) * (choice.minDuration ?? 1));
+  }
   if (typeof choice.unitCredits === 'number') {
     return choice.unitCredits;
   }
@@ -73,8 +77,32 @@ export function listedCredits(choice: ModelChoice): number | undefined {
   return priced.length ? Math.min(...priced) : undefined;
 }
 
+function enhanceCredits(input: RunCostInput): number {
+  return input.params.enhancePrompt && typeof input.enhanceUnitCredits === 'number' ? input.enhanceUnitCredits : 0;
+}
+
+function perSecondRunCredits(input: RunCostInput, model: ModelChoice): number | null {
+  const audio = (input.params.audio ?? model.generateAudio) ? VideoAudio.With : VideoAudio.Without;
+  const rates = model.perSecondCredits?.[audio] ?? model.perSecondCredits?.[VideoAudio.With] ?? model.perSecondCredits?.[VideoAudio.Without];
+  const resolution = snapResolution(model, input.params.resolution);
+  const perSecond = resolution ? rates?.[resolution] : undefined;
+  const seconds = input.params.duration ?? model.minDuration;
+  if (perSecond === undefined || typeof seconds !== 'number') {
+    return null;
+  }
+  return Math.round(perSecond * seconds) + enhanceCredits(input);
+}
+
+function withResolution(params: GenParams, model: ModelChoice | null): GenParams {
+  const resolution = model ? snapResolution(model, params.resolution) : params.resolution;
+  return resolution ? { ...params, resolution } : params;
+}
+
 export function creditsForRun(raw: RunCostInput): number | null {
-  const input = { ...raw, model: pricedFor(raw.model, raw.params) };
+  const input = { ...raw, params: withResolution(raw.params, raw.model), model: pricedFor(raw.model, raw.params) };
+  if (input.model?.perSecondCredits) {
+    return perSecondRunCredits(input, input.model);
+  }
   if (input.model?.pricedInputs) {
     return pricedCredits(input);
   }
