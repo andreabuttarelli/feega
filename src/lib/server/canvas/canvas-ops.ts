@@ -58,7 +58,8 @@ import { createFormats, formatTargetSchema } from '$lib/server/motion/create-for
 import { combineScenes, MAX_SCENES } from '$lib/server/motion/combine-scenes';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { runTechnique, saveFromSelection, TechniqueRun } from '$lib/server/canvas/techniques';
-import { detachInstance, openDefinition, placeInstance, runInstance } from '$lib/server/canvas/technique-instance';
+import { cancelRows, detachInstance, openDefinition, placeInstance, previewRows, rowsProgress, runInstance, runRows } from '$lib/server/canvas/technique-instance';
+import { BATCH_MAX_ROWS } from '$lib/canvas/technique-batch';
 import { deleteTechnique, listTechniques, TechniqueOutcome } from '$lib/server/repos/techniques';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
@@ -348,6 +349,15 @@ const runTechniqueInput = z
     run: z.boolean().optional().describe('default true: run the inner graph (spends credits); false only places it')
   })
   .strict();
+const techniqueRowsInput = z
+  .object({
+    techniqueId: z.string(),
+    rows: z.array(z.array(z.string().max(4000))).min(1).max(BATCH_MAX_ROWS).describe('one array of cells per row'),
+    mapping: z.array(z.number().int().nullable()).optional().describe('per input slot of the technique, the cell index it takes (null = none); default: slots take the cells in order. Image slots take a URL')
+  })
+  .strict();
+const cancelRowsInput = z.object({ workflowIds: z.array(z.string()).min(1).max(BATCH_MAX_ROWS) }).strict();
+const rowsProgressInput = z.object({ runIds: z.array(z.string()).min(1) }).strict();
 const techniqueIdInput = z.object({ techniqueId: z.string() }).strict();
 const placeTechniqueInput = z.object({ canvasId: z.string(), techniqueId: z.string(), x: z.number(), y: z.number() }).strict();
 const techniqueNodeInput = z.object({ nodeId: z.string() }).strict();
@@ -1351,6 +1361,31 @@ export const CANVAS_OPS = {
       const ask = { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, userId: ctx.userId, techniqueId: input.techniqueId, at: { x: input.x, y: input.y }, inputs: input.inputs ?? [], then, actor: ctx.actor };
       return then === TechniqueRun.Run ? ctx.billed(() => runTechnique(ctx.db, ask)) : runTechnique(ctx.db, ask);
     }
+  }),
+
+  preview_technique_rows: op({
+    access: Access.Read,
+    input: techniqueRowsInput,
+    run: async (ctx, input) => previewRows(ctx.db, { orgId: ctx.orgId, techniqueId: input.techniqueId, rowCount: input.rows.length })
+  }),
+
+  run_technique_rows: op({
+    access: Access.Spend,
+    input: techniqueRowsInput,
+    run: async (ctx, input) =>
+      ctx.billed(() => runRows(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, techniqueId: input.techniqueId, rows: input.rows, mapping: input.mapping ?? null, actor: ctx.actor }))
+  }),
+
+  technique_rows_progress: op({
+    access: Access.Read,
+    input: rowsProgressInput,
+    run: async (ctx, input) => rowsProgress(ctx.db, { runIds: input.runIds })
+  }),
+
+  cancel_technique_rows: op({
+    access: Access.Write,
+    input: cancelRowsInput,
+    run: async (ctx, input) => cancelRows(ctx.db, { orgId: ctx.orgId, workflowIds: input.workflowIds })
   }),
 
   place_technique: op({

@@ -8,7 +8,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool cancel_node_loop 1`] = `"f92dcb4ab3229951252b7ca1976793be73be4eb5c58d91f4d0cd6639efc9318f"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool canvas_tool 1`] = `"60b91bdac0c8a80714c4f6a43061e9e03c92c8c3ea0cc31a179804b6a95ec847"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool canvas_tool 1`] = `"6142132587d1b45539f375352f8645b3cd56eb5be631df104fee40f0e97a0e99"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool connect_nodes 1`] = `"c750f821558c17d14b967ffcb1709f66491241d2eec28037415d46fd856ccb96"`;
 
@@ -195,6 +195,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op cancel_render 1`] = `"91b21503a9e6dfc3498bd859b25d5a39043893c5c9bdc1fb7533c2dd3849554a"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op cancel_run 1`] = `"0f5cad87cf084a3738c2e60ac8862f51b9877489a7fddfe9e29b3aa02fec5329"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op cancel_technique_rows 1`] = `"bfaaef9c96759501511dcb8e417e6e07cb75e5b6e6185af4d521811c38bef65b"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op cancel_workflow 1`] = `"d13abc9247e1117fca25d8172bb2a2db20e18c8a2386498d5910f6b1b329b7f8"`;
 
@@ -446,6 +448,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op preview_run_graph 1`] = `"fc63460fc96680bccaf90847d8a296c52e319e76fb3d0540737fb860624170de"`;
 
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op preview_technique_rows 1`] = `"419fc0e6044a0ee3dc59c8c5744fd7400f0cfc7778d0e5fc690a11350ea38f7f"`;
+
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op preview_workflow 1`] = `"a8ca938c77c307673759f57ec7872ce785a036ca562641e653dda725601cd329"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op publish_embed 1`] = `"43a0e01ac22356cc3bfa6c170a8ef1a5548049b50ef8afd53892fd12a80b6ebf"`;
@@ -556,6 +560,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op run_technique_node 1`] = `"e1b82761179558a1945c3e4b6bee8dd6ffefc135a6772894fcdd349d73f878aa"`;
 
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op run_technique_rows 1`] = `"cd2233885c3922669f4fac20047d21a3b4a42db3a691c2b0e3e84387ed9dfd61"`;
+
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op run_workflow 1`] = `"e0c103a6243cd942493120237155c69e7eebe53818260c1ad00aa6848c7a757f"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op save_canvas_version 1`] = `"2e654bc9ec87b302075696c4a5946540d96bf0ec1540c858b78ab10ace98af87"`;
@@ -665,6 +671,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema cancel_render 1`] = `"bf797f4892cd119e801dafd168a349d3482ebb79afe1e65f2d093301f7f65bb3"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema cancel_run 1`] = `"f007919a1a7833975a4d873ea5ea3086caa9a8c047a5b060d0776edb70ed7285"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema cancel_technique_rows 1`] = `"bf7e41d07f299864a4955505e8ba8bdeb6f1ae9b98b6398c3d0174043508cc34"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema cancel_workflow 1`] = `"a14dd6d698b6e7459fe2b76d86bda38871193dd0c7849987882bbdab3a59db97"`;
 
@@ -916,6 +924,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema preview_run_graph 1`] = `"990df2af25e6dcf0752ceed473d0090e5c1063ae6cc38debfbeb6b4b7ecd161f"`;
 
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema preview_technique_rows 1`] = `"9eb6ec2cb23b7837ebcd0eb4e7fff099a78a884a3592b81c2f604c414649f7ef"`;
+
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema preview_workflow 1`] = `"492161334a4bc1d9951d609f95df8a5ec7c60cde3e4e5cc6f126f0d923fe1913"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema publish_embed 1`] = `"c0fee670ce75d4731921cde540ee779cf94e75395c16287d30b08fa7a9c97305"`;
@@ -1025,6 +1035,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema run_technique 1`] = `"ca428a42db8bf4908482d2124ea4e4b71bf1cf0c87fb2c18ec2b24508d89d92a"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema run_technique_node 1`] = `"2b3603d098d32e32dab104e9b93741aaf92570940e32e50fcf5039cac7174b1e"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema run_technique_rows 1`] = `"0a2007e29e6545ed0a7c2ba182b8d96012cab2ccc056f3bbc72ebccb579eb834"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema run_workflow 1`] = `"e1c071c2810d118098cd98147e2a08c203caf258a74e4849d513bcdae5f668b4"`;
 
@@ -1159,6 +1171,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema suggest_next_steps 1`] = `"927601d4bfdb1f3a073cd74d81a4f66b1e0802c170416c173be2f69a361d9c9c"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema sync_node 1`] = `"3dca847f19becc18a749b9a21b3e0de2fe475da75a5e320ad113323eb06d71d3"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema technique_rows_progress 1`] = `"d06a31097a81e7ba035a2bb886b8add563517083cd96ea54549e27509d05a64d"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema template_sounds 1`] = `"c6d4ec91039e34e6edc936615b62f056350a256fc86608980c61bc9d517e2c56"`;
 
@@ -1343,6 +1357,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op suggest_next_steps 1`] = `"03b33eb40391d38ee2fbe66175a8c0b0ba9fd1b3c058dd3585ee447a6ac14a2a"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op sync_node 1`] = `"b0b0ab9744cfcf0b6bbf2befdc1ea1d2f93f95920c664ffa1b285e98768d555d"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op technique_rows_progress 1`] = `"0ea00abc9d4b674a8f198789211eb5b215b963c85d9d8d1b0e40d069947b843d"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op template_sounds 1`] = `"5f1c74835360da0e83a2934e7646313807be4564d543ed212a0a5145130e86ec"`;
 

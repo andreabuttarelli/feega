@@ -122,6 +122,7 @@ export type FlowProps = {
   onRunWorkflow?: (ids: string[]) => void;
   onSaveTechnique?: (ids: string[]) => void;
   onRunTechnique?: (ids: string[]) => void;
+  onRunTechniqueRows?: (ids: string[]) => void;
   onEditTechnique?: (ids: string[]) => void;
   onDetachTechnique?: (ids: string[]) => void;
   techniques?: { id: string; name: string; nodes: number }[];

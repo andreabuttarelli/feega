@@ -3,9 +3,14 @@ import { fakeDb } from '$lib/server/db/fake-db';
 import type { Db } from '$lib/server/db/client';
 
 const enqueueWorkflow = vi.fn();
-vi.mock('$lib/server/canvas/workflow', () => ({ enqueueWorkflow: (...args: unknown[]) => enqueueWorkflow(...args) }));
+const cancelWorkflow = vi.fn();
+vi.mock('$lib/server/canvas/workflow', async () => ({
+  ...(await vi.importActual<object>('$lib/server/canvas/workflow')),
+  enqueueWorkflow: (...args: unknown[]) => enqueueWorkflow(...args),
+  cancelWorkflow: (...args: unknown[]) => cancelWorkflow(...args)
+}));
 
-import { detachInstance, openDefinition, placeInstance, runInstance, InstancePlaced } from './technique-instance';
+import { cancelRows, detachInstance, openDefinition, placeInstance, previewRows, rowsProgress, runRows, InstancePlaced, runInstance } from './technique-instance';
 
 const ORG = 'org-1';
 const PROJECT = 'proj-1';
@@ -160,5 +165,66 @@ describe('openDefinition', () => {
     expect(inserted(fake.calls, 'canvases')[0]).toMatchObject({ name: 'Technique: idea-to-picture' });
     expect(inserted(fake.calls, 'nodes').map((n) => n.type)).toEqual(['text', 'image']);
     expect(out).toMatchObject({ outcome: 'opened', canvasId: expect.any(String) });
+  });
+});
+
+describe('rows', () => {
+  const rows = [['red bike'], ['blue bike']];
+  const base = { orgId: ORG, projectId: PROJECT, userId: USER, techniqueId: TECH, actor: ACTOR };
+  const world = () => fakeDb({ nodes: [], nodes_connections: [], techniques: [technique(1, 'pic')], canvases: [canvasRow(CANVAS, 'Main')], canvas_events: [] }, { filter: true, store: true });
+
+  it('prices every row before anything is written', async () => {
+    const fake = world();
+
+    const out = await previewRows(fake.db, { ...base, rowCount: 3 });
+
+    expect(out).toMatchObject({ outcome: 'preview', rows: 3, credits: 3 * (out as { creditsPerRow: number }).creditsPerRow });
+    expect((out as { creditsPerRow: number }).creditsPerRow).toBeGreaterThan(0);
+    expect(inserted(fake.calls, 'nodes')).toHaveLength(0);
+  });
+
+  it('writes one output group per row, each on its own band, and queues each', async () => {
+    const fake = world();
+    enqueueWorkflow.mockResolvedValueOnce({ kind: 'enqueued', workflowId: 'wf-1', steps: [], runIdByNodeId: { a: 'r1' } });
+    enqueueWorkflow.mockResolvedValueOnce({ kind: 'enqueued', workflowId: 'wf-2', steps: [], runIdByNodeId: { b: 'r2' } });
+
+    const out = await runRows(fake.db, { ...base, rows, mapping: null });
+
+    const nodes = inserted(fake.calls, 'nodes');
+    expect(nodes.map((n) => (n.data as { prompt: string }).prompt)).toEqual(['red bike', 'pic', 'blue bike', 'pic']);
+    expect(new Set(nodes.map((n) => n.y)).size).toBe(2);
+    expect(out).toMatchObject({ outcome: 'queued', workflowIds: ['wf-1', 'wf-2'], runIds: ['r1', 'r2'] });
+  });
+
+  it('refuses more rows than the cap and an empty list', async () => {
+    const fake = world();
+
+    expect(await runRows(fake.db, { ...base, rows: Array.from({ length: 51 }, () => []), mapping: null })).toEqual({ outcome: 'refused', error: 'too_many_rows' });
+    expect(await runRows(fake.db, { ...base, rows: [], mapping: null })).toEqual({ outcome: 'refused', error: 'no_rows' });
+  });
+
+  it('maps columns to slots by the given mapping, leaving the others empty', async () => {
+    const fake = world();
+    enqueueWorkflow.mockResolvedValue({ kind: 'enqueued', workflowId: 'wf', steps: [], runIdByNodeId: {} });
+
+    await runRows(fake.db, { ...base, rows: [['ignored', 'blue bike']], mapping: [1] });
+
+    expect(inserted(fake.calls, 'nodes').map((n) => (n.data as { prompt: string }).prompt)).toEqual(['blue bike', 'pic']);
+  });
+
+  it('counts runs by state for the progress bar', async () => {
+    const run = (id: string, status: string) => ({ id, org_id: ORG, node_id: 'n', prompt: null, model: null, params: {}, status, error: null, output_asset_id: null, external_job_id: null, cost_usd: null, attempts: 0, actor_id: null, started_at: 'x', finished_at: null });
+    const fake = fakeDb({ node_runs: [run('r1', 'done'), run('r2', 'failed'), run('r3', 'running')] }, { filter: true });
+
+    expect(await rowsProgress(fake.db, { runIds: ['r1', 'r2', 'r3'] })).toEqual({ total: 3, done: 1, failed: 1, running: 1 });
+  });
+
+  it('cancels every workflow of the batch', async () => {
+    cancelWorkflow.mockResolvedValue({ cancelled: 2 });
+
+    const out = await cancelRows(world().db, { orgId: ORG, workflowIds: ['wf-1', 'wf-2'] });
+
+    expect(cancelWorkflow).toHaveBeenCalledTimes(2);
+    expect(out).toEqual({ cancelled: 4 });
   });
 });
