@@ -2,12 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findReachableProject = vi.fn();
 const cloudAccess = vi.fn();
+const disconnectCloud = vi.fn();
+const cloudStatuses = vi.fn();
 const importCanvasBytes = vi.fn();
+const findAsset = vi.fn();
 
 vi.mock('$env/dynamic/private', () => ({ env: { APP_SECRET: 'test-secret-for-cloud' } }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []) }));
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: unknown[]) => findReachableProject(...args) }));
-vi.mock('$lib/server/cloud/runtime', () => ({ cloudAccess: (...args: unknown[]) => cloudAccess(...args) }));
+vi.mock('$lib/server/cloud/runtime', () => ({ cloudAccess: (...args: unknown[]) => cloudAccess(...args), disconnectCloud: (...args: unknown[]) => disconnectCloud(...args), cloudStatuses: (...args: unknown[]) => cloudStatuses(...args) }));
+vi.mock('$lib/server/repos/assets', () => ({ findAsset: (...args: unknown[]) => findAsset(...args) }));
+vi.mock('$lib/server/repos/asset-storage', () => ({ BUCKET_BY_SOURCE: { upload: 'canvas-assets' }, SIGNED_URL_TTL_S: { providerInput: 60 }, signStoredFile: vi.fn(async () => 'https://signed.test/file') }));
 vi.mock('$lib/server/canvas/upload', () => ({
   importCanvasBytes: (...args: unknown[]) => importCanvasBytes(...args),
   UploadError: class UploadError extends Error {
@@ -19,6 +24,9 @@ vi.mock('$lib/server/canvas/upload', () => ({
 
 const files = await import('./files/+server');
 const imports = await import('./import/+server');
+const exports = await import('./export/+server');
+const provider = await import('./+server');
+const providers = await import('../+server');
 
 type Handler = (event: unknown) => Promise<Response>;
 
@@ -44,7 +52,7 @@ describe('GET cloud files', () => {
     const { res, body } = await call(files.GET, 'dropbox', { method: 'GET' });
 
     expect(res.status).toBe(200);
-    expect(body.entries).toEqual([{ id: '/a.png', name: 'a.png', folder: false, mime: null }]);
+    expect(body).toEqual({ entries: [{ id: '/a.png', name: 'a.png', folder: false, mime: null, importable: true }], next: null });
     expect(dropbox).toHaveBeenCalledWith('https://api.dropboxapi.com/2/files/list_folder', expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer at' }) }));
   });
 
@@ -81,5 +89,49 @@ describe('POST cloud import', () => {
     const { res } = await call(imports.POST, 'dropbox', { method: 'POST', body: {} });
 
     expect(res.status).toBe(400);
+  });
+});
+
+describe('POST cloud export', () => {
+  const UUID = '0b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d';
+
+  it('names the file as it was uploaded, not by its storage path', async () => {
+    findAsset.mockResolvedValue({ url: `o1/p1/${UUID}-summer-poster.png`, projectId: 'p1', source: 'upload', mimeType: 'image/png' });
+    const sent = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(new Uint8Array([1]))).mockResolvedValueOnce(new Response('{}'));
+
+    const { res } = await call(exports.POST, 'google_drive', { method: 'POST', body: { assetId: 'a1', folder: 'root' } });
+
+    expect(res.status).toBe(200);
+    expect(await (sent.mock.calls[1]![1]!.body as Blob).text()).toContain('"name":"summer-poster.png"');
+  });
+});
+
+describe('DELETE cloud provider', () => {
+  it('disconnects the signed-in person from the provider', async () => {
+    disconnectCloud.mockResolvedValue({ revoked: true });
+
+    const { res, body } = await call(provider.DELETE, 'google_drive', { method: 'DELETE' });
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ disconnected: true, revoked: true });
+    expect(disconnectCloud).toHaveBeenCalledWith(expect.anything(), 'u1', 'google_drive');
+  });
+
+  it('answers 404 for a provider we do not know', async () => {
+    const { res } = await call(provider.DELETE, 'box', { method: 'DELETE' });
+
+    expect(res.status).toBe(404);
+    expect(disconnectCloud).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET cloud providers', () => {
+  it('says which providers are connected and which the server can connect', async () => {
+    cloudStatuses.mockResolvedValue([{ provider: 'dropbox', label: 'Dropbox', connected: true, configured: true }]);
+
+    const { res, body } = await call(providers.GET, 'dropbox', { method: 'GET' });
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ providers: [{ provider: 'dropbox', label: 'Dropbox', connected: true, configured: true }] });
   });
 });

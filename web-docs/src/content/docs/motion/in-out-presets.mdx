@@ -1,0 +1,56 @@
+---
+title: In and Out presets
+description: One-click entrance and exit animations on a layer.
+sidebar:
+  order: 3
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="in-out-presets" caption="Animate a layer in and out with one click." />
+
+Animate a layer in or out without setting keyframes by hand. Each preset keys the layer from hidden to its resting look (In) or from its resting look to hidden (Out), with the house ease: a strong expo in-out with a tiny settle. No bounce, no linear.
+
+| Preset | Moves | Sides |
+|---|---|---|
+| Fade | opacity | In, Out |
+| Slide up / down / left / right | position and opacity | In, Out |
+| Scale | scale and opacity | In, Out |
+| Blur | blur and opacity | In, Out |
+| Pop | a deeper scale and opacity | In, Out |
+| Typewriter | text, letter by letter | In, text layers only |
+
+On Out, a slide leaves in the direction it names: Slide up leaves upward.
+
+## Apply a preset
+
+1. Select a layer and open **Animation** in the inspector.
+2. In the **In / Out** block, pick **In** or **Out**.
+3. Pick **Clip edge** (In plays at the layer start, Out ends on its last frame) or **Playhead** (the preset starts where the playhead is).
+4. Click a preset.
+
+Keys already inside the preset's span are replaced. The layer keeps its resting position, scale and opacity: only the ends of the animation are hidden. Durations are per preset, between 0.5 and 1.2 seconds. Adjust the keyframes afterwards in the timeline.
+
+## Agent and MCP
+
+The motion agent tool `apply_preset` does the same. Over MCP, call it through `edit`:
+
+```json
+{
+  "op": "apply_preset",
+  "input": { "clip_id": "title", "preset": "slide-up", "side": "in", "duration": 0.7 }
+}
+```
+
+CLI:
+
+```bash
+feega motion tool <nodeId> apply_preset --input '{"clip_id":"title","preset":"slide-up","side":"in"}'
+```
+
+- `preset`: `fade`, `slide-up`, `slide-down`, `slide-left`, `slide-right`, `scale`, `blur`, `pop`, `typewriter`.
+- `side`: `in` or `out`.
+- `duration`: seconds. Defaults to the preset's own.
+- `at`: seconds from the layer start, to play it there instead of at the layer edge.
+
+For per-letter text reveals with more control, see [Text animations](/motion/text-animations/). For custom curves, see [Keyframes and easing](/motion/keyframes-and-easing/).

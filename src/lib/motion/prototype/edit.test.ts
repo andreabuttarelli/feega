@@ -30,4 +30,11 @@ describe('inspector edits of an interaction', () => {
     expect(TRANSITION_FIELDS[TransitionKind.Dissolve]).toEqual({ direction: false, timing: true });
     expect(TRANSITION_FIELDS[TransitionKind.Push]).toEqual({ direction: true, timing: true });
   });
+
+  it('switching a slide to smart animate drops the direction and keeps the timing', () => {
+    const slid = retimed(base, { kind: TransitionKind.Slide, durationMs: 500 });
+
+    expect(retimed(slid, { kind: TransitionKind.SmartAnimate }).transition).toEqual({ kind: TransitionKind.SmartAnimate, easing: 'standard', durationMs: 500 });
+    expect(TRANSITION_FIELDS[TransitionKind.SmartAnimate]).toEqual({ direction: false, timing: true });
+  });
 });

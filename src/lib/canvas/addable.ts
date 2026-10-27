@@ -38,7 +38,7 @@ export const CANVAS_ADDABLE = [
 
 export type Addable = (typeof CANVAS_ADDABLE)[number];
 
-const NOT_READY: readonly Addable[] = ['iframe', 'calendar'];
+const NOT_READY: readonly Addable[] = ['calendar'];
 
 export const CANVAS_ADD_BAR = CANVAS_ADDABLE.filter((w) => !NOT_READY.includes(w));
 
@@ -72,7 +72,7 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   text: 'Generate text',
   image: 'Generate image',
   video: 'Generate video',
-  iframe: 'Web page',
+  iframe: 'Code frame',
   doc: 'Document',
   products: 'Products',
   social_account_feed: 'Social feed',

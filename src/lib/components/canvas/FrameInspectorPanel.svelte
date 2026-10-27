@@ -3,6 +3,9 @@
   import MultiInspector from '$lib/components/motion/MultiInspector.svelte';
   import LookInspector from '$lib/components/motion/LookInspector.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
+  import DevInspector from '$lib/components/canvas/DevInspector.svelte';
+  import { frameProperties } from './frame-properties.svelte';
+  import HeaderActions from '$lib/components/motion/HeaderActions.svelte';
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import InstanceInspector from '$lib/components/motion/InstanceInspector.svelte';
   import RangeTextInspector from '$lib/components/motion/RangeTextInspector.svelte';
@@ -74,10 +77,23 @@
   }
 </script>
 
+{#snippet devToggle(label: string)}<button type="button" class="dev-toggle" title="⇧D" onclick={() => frameProperties.toggleDev?.()} data-testid="dev-toggle">{label}</button>{/snippet}
+{#snippet headerBar()}{#if session && doc}<HeaderActions {doc} selection={session.selection} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} />{/if}{/snippet}
+
 {#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}
 
-{#if session && doc && tokens && !session.selection.length}
+{#if frameProperties.dev && session && doc}
+  <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Dev mode">
+    {@render devToggle('Exit dev mode')}
+    {#if shown?.clip}
+      <DevInspector doc={shownDoc!} clipId={shown.clip.id} brand={tokens} onexport={frameProperties.exportPicks} />
+    {:else}
+      <p class="empty" data-testid="dev-empty">Select one layer to read its CSS.</p>
+    {/if}
+  </aside>
+{:else if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
+    {@render devToggle('Dev mode')}
     <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
     <ScenesSection {doc} onchange={editGuides} />
     <FramePresetSection {doc} onchange={editGuides} />
@@ -89,16 +105,17 @@
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
-    <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
+    {@render devToggle('Dev mode')}
     {#if shown.view === PropertiesView.Multiple}
+      <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
       <MultiInspector {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />
     {:else if shown.view === PropertiesView.Template}
-      <TemplateInspector gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
+      <TemplateInspector actions={headerBar} gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
     {:else}
       {@const Presets = CLIP_PRESETS[shown.clip.component]}
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector gesture={session.live} lead={partLead} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} />
+      <MotionInspector gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} />
       <PrototypeSection doc={shownDoc!} clip={shown.clip} commit={commitShown} />
       {#if Presets}<Presets doc={shownDoc!} clip={shown.clip} onchange={editShown} />{/if}
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}
@@ -114,6 +131,23 @@
     flex-direction: column;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+
+  .dev-toggle {
+    align-self: flex-end;
+    margin: var(--ui-space-2) var(--ui-space-4) 0;
+    padding: var(--ui-space-1) var(--ui-space-3);
+    font: inherit;
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text);
+    background: var(--ui-input);
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    cursor: pointer;
+  }
+
+  .dev-toggle:hover {
+    background: var(--ui-input-hover);
   }
 
   .empty {

@@ -5,13 +5,16 @@
   import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
   import Cloud from '@lucide/svelte/icons/cloud';
+  import Frame from '@lucide/svelte/icons/frame';
     import MessageCircle from '@lucide/svelte/icons/message-circle';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import Film from '@lucide/svelte/icons/film';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
-  import Hash from '@lucide/svelte/icons/hash';
+  import FrameIcon from '@lucide/svelte/icons/frame';
+  import Shapes from '@lucide/svelte/icons/shapes';
+  import { DockPlace, toolsIn } from '$lib/canvas/draw-dock';
   import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
   import PenTool from '@lucide/svelte/icons/pen-tool';
   import Sparkles from '@lucide/svelte/icons/sparkles';
@@ -31,6 +34,7 @@
     onpick,
     onupload,
     oncloud,
+    onfigma,
     ontemplate,
     techniques = [],
     ontechnique,
@@ -46,6 +50,7 @@
     onpick?: (what: Addable) => void;
     onupload?: (file: File) => void;
     oncloud?: () => void;
+    onfigma?: () => void;
     ontemplate?: (id: string) => void;
     techniques?: { id: string; name: string; nodes: number }[];
     ontechnique?: (id: string) => void;
@@ -149,10 +154,22 @@
 
   const SHAPE_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
     const tip = tipText(command);
-    return { tool, name: tip.name, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[command].icon };
+    return { tool, name: tip.name, keys: tip.keys, hint: ACTIONS[command].gesture ?? '', label: `${tip.name} (${tip.keys})`, icon: ACTIONS[command].icon };
   });
-  const FRAME_TOOL = { tool: DrawTool.Frame, name: 'Frame', label: 'Frame', icon: Hash };
+  const FRAME_TOOL = { tool: DrawTool.Frame, name: 'Frame', keys: '', hint: 'Drag to draw a frame', label: 'Frame', icon: FrameIcon };
   const DRAW_TOOLS = [...SHAPE_TOOLS, FRAME_TOOL];
+  const toolOf = (tool: DrawTool) => DRAW_TOOLS.find((t) => t.tool === tool)!;
+  const BAR_TOOLS = toolsIn(DockPlace.Bar).map(toolOf);
+  const MORE_TOOLS = toolsIn(DockPlace.More).map(toolOf);
+  const MORE_LABEL = 'More tools';
+
+  let toolsMore = $state(false);
+  const moreActive = $derived(MORE_TOOLS.find((t) => t.tool === frameBar.tool) ?? null);
+
+  function pickMoreTool(tool: DrawTool) {
+    toolsMore = false;
+    frameBar.tool = tool;
+  }
 
   let drawOpen = $state(false);
 
@@ -205,6 +222,7 @@
   const drawTiles = $derived(DRAW_TOOLS.filter((t) => t.tool !== DrawTool.Select).map((t) => ({ id: `draw-${t.tool}`, label: t.name, icon: t.icon, run: () => (frameBar.tool = t.tool) })));
   const UPLOAD_TILE: Tile = { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile };
   const cloudTiles = (): Tile[] => (oncloud ? [{ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: oncloud }] : []);
+  const figmaTiles = (): Tile[] => (onfigma ? [{ id: 'figma', label: 'Import from Figma', icon: Frame, run: onfigma }] : []);
   const TRAILER_LABEL = 'Start from the feega trailer';
   const trailerTiles = $derived<Tile[]>(ontrailer ? [{ id: 'feega-trailer', label: TRAILER_LABEL, icon: Film, run: ontrailer }] : []);
 
@@ -214,7 +232,7 @@
   const canvasSections = (): Section[] => [
     { title: 'Design', tiles: drawTiles },
     { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].filter(offered).map(addTile) },
-    { title: 'Media', tiles: [UPLOAD_TILE, ...cloudTiles()] },
+    { title: 'Media', tiles: [UPLOAD_TILE, ...cloudTiles(), ...figmaTiles()] },
     {
       title: 'Templates',
       tiles: [
@@ -294,6 +312,14 @@
         <Cloud size={17} strokeWidth={1.7} />
       </button>
       <span class="add-tip" role="tooltip">Drive / Dropbox</span>
+    </span>
+  {/if}
+  {#if onfigma}
+    <span class="tool">
+      <button type="button" title="Import from Figma" aria-label="Import from Figma" data-testid="figma-import" onclick={onfigma}>
+        <Frame size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Figma</span>
     </span>
   {/if}
 {/snippet}
@@ -380,16 +406,37 @@
   {/if}
 {/snippet}
 
+{#snippet toolTip(t: (typeof DRAW_TOOLS)[number])}
+  <span class="add-tip tool-tip" role="tooltip"><span class="tip-head">{t.name}{#if t.keys}<kbd>{t.keys}</kbd>{/if}</span>{#if t.hint}<span class="tip-hint">{t.hint}</span>{/if}</span>
+{/snippet}
+
 {#snippet drawSlot()}
   <span class="draw" class:open={drawOpen} role="toolbar" aria-label="Draw" data-testid="draw-tools">
-    {#each DRAW_TOOLS as t (t.tool)}
+    {#each BAR_TOOLS as t (t.tool)}
       <span class="tool">
-        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} title={t.label} data-tool={t.tool} onclick={() => pickTool(t.tool)}>
+        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} data-tool={t.tool} onclick={() => pickTool(t.tool)}>
           <t.icon size={17} strokeWidth={1.7} />
         </button>
-        <span class="add-tip" role="tooltip">{t.label}</span>
+        {@render toolTip(t)}
       </span>
     {/each}
+    <span class="tool">
+      <button type="button" class="pick" class:on={!!moreActive} aria-label={moreActive ? `${MORE_LABEL}: ${moreActive.name}` : MORE_LABEL} aria-haspopup="menu" aria-expanded={toolsMore} data-testid="draw-more" data-tool={moreActive?.tool} onclick={() => (toolsMore = !toolsMore)}>
+        {#if moreActive}<moreActive.icon size={17} strokeWidth={1.7} />{:else}<Shapes size={17} strokeWidth={1.7} />{/if}
+      </button>
+      {#if !toolsMore}<span class="add-tip" role="tooltip">{MORE_LABEL}</span>{/if}
+      {#if toolsMore}
+        <span class="tools-menu" role="menu" aria-label={MORE_LABEL}>
+          {#each MORE_TOOLS as t (t.tool)}
+            <button type="button" role="menuitem" class="tools-row" class:on={frameBar.tool === t.tool} data-tool={t.tool} title={t.hint} onclick={() => pickMoreTool(t.tool)}>
+              <t.icon size={16} strokeWidth={1.7} />
+              <span class="tools-name">{t.name}</span>
+              <kbd>{t.keys}</kbd>
+            </button>
+          {/each}
+        </span>
+      {/if}
+    </span>
   </span>
 {/snippet}
 
@@ -427,7 +474,7 @@
     bind:this={fileInput}
     type="file"
     class="sr-only"
-    accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml,.svg,video/mp4,video/webm,video/quicktime,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,text/html,text/csv,text/plain,text/markdown,.xml,.rss,.atom,.ipynb,.ttf,.otf,.woff,.woff2"
+    accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml,.svg,.json,.lottie,video/mp4,video/webm,video/quicktime,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,text/html,text/csv,text/plain,text/markdown,.xml,.rss,.atom,.ipynb,.ttf,.otf,.woff,.woff2"
     onchange={fileChosen}
   />
 
@@ -512,7 +559,7 @@
   .add-bar {
     position: absolute;
     z-index: 61;
-    bottom: var(--lift, 0px);
+    bottom: calc(var(--lift, 0px) + 12px);
     left: 50%;
     transform: translateX(-50%);
     transition: bottom var(--chrome-move) var(--ease-expo), left var(--chrome-move) var(--ease-expo), opacity var(--chrome-move) var(--ease-expo), translate var(--chrome-move) var(--ease-expo);
@@ -667,6 +714,63 @@
   .keys-toggle {
     cursor: pointer;
     color: var(--ui-text-secondary);
+  }
+
+  .tool-tip {
+    display: grid;
+    gap: 2px;
+    text-align: left;
+  }
+  .tip-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tip-hint {
+    font-weight: var(--ui-weight-regular, 400);
+    opacity: 0.7;
+  }
+  kbd {
+    font-family: var(--ui-mono);
+    font-size: var(--ui-type-caption);
+    opacity: 0.7;
+  }
+
+  .tools-menu {
+    position: absolute;
+    z-index: 14;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: grid;
+    min-width: 220px;
+    padding: 4px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
+  }
+  .tools-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    height: var(--ui-row, 32px);
+    padding: 0 10px;
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text);
+    font-size: var(--ui-type-body);
+  }
+  .tools-row:hover {
+    background: var(--ui-wash);
+  }
+  .tools-row.on {
+    background: var(--ui-selected);
+    color: var(--ui-accent-text);
+  }
+  .tools-name {
+    flex: 1;
+    text-align: left;
   }
 
   .add-tip {

@@ -13,11 +13,35 @@ Create a component from the selection with `⌥⌘K`. The Assets panel lists the
 
 ## Variants
 
-A component can have variants. In Properties, switch an instance between them, or swap it for another component.
+A component can have several variant properties, like Size (S, M, L) and State (default, hover). Select an instance and the variant matrix appears in Properties: one cell per combination, the current one highlighted.
+
+<DemoVideo name="variant-matrix" caption="Switch an instance across a Size by State matrix, then add a property." />
+
+1. Select an instance of the component.
+2. Click a cell in the matrix to switch the instance to that combination. Overrides on the instance stay.
+3. To add a property, type its name (`Tone`) and values (`Light, Dark`) under the matrix and press Add property. Feega creates a variant for every missing combination, up to 64 per set.
+4. A dash marks a combination that does not exist; it cannot be picked.
+
+The dropdown per property and the Swap list still work for switching one axis, or swapping to any other component.
+
+**Agent and CLI.** The `component` tool covers the same steps:
+
+```json
+{ "action": "define-variant", "comp": "<main id>", "prop": "Size", "values": ["S", "M", "L"] }
+{ "action": "set-variant", "clip_id": "<instance id>", "variant": { "Size": "L", "State": "hover" } }
+```
+
+Through the CLI: `feega motion ask <nodeId> "Give the Buy button Size S, M, L and State default, hover, then set the cart button to L hover"`.
 
 ## Properties
 
 A component can expose properties: show or hide a layer, edit text, swap a nested component, or surface a nested component property. Set them per instance.
+
+### Preferred swaps
+
+An instance-swap property can list preferred components. Under the instance, tick the components to prefer in Preferred; the swap dropdown then shows them first, under Preferred, above All components. Preferred is a suggestion: any component can still be swapped in.
+
+Agent: `set-preferred` with `comp`, `prop` (the swap property) and `preferred` (main component ids).
 
 ## Overrides
 

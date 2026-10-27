@@ -129,6 +129,9 @@ export type BrandSummary = {
   id: string;
   name: string;
   slug: string;
+  scheduled: number;
+  accounts: number;
+  accountsDown: number;
 };
 
 export type MediaItem = {

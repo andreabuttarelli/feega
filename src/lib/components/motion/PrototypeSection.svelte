@@ -20,6 +20,7 @@
     needsTarget,
     type Interaction
   } from '@feega/motion-core/motion/prototype/model';
+  import SmartAnimatePreview from './SmartAnimatePreview.svelte';
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { putInteraction, removeInteraction } from '$lib/motion/prototype/ops';
   import { TRANSITION_FIELDS, retimed, retriggered, retargeted } from '$lib/motion/prototype/edit';
@@ -85,6 +86,9 @@
           <input type="text" inputmode="numeric" aria-label="Duration in milliseconds" value={String(interaction.transition.durationMs)} onchange={(e) => put(retimed(interaction, { durationMs: Math.max(1, ms(e.currentTarget.value, DEFAULT_DURATION_MS)) }), 'Changed the duration')} />
           <span class="unit">ms</span>
         </div>
+      {/if}
+      {#if interaction.transition.kind === TransitionKind.SmartAnimate && prototypeLink.docs.get(targetOf(interaction))}
+        <SmartAnimatePreview source={doc} target={prototypeLink.docs.get(targetOf(interaction))!} easing={interaction.transition.easing} durationMs={interaction.transition.durationMs} />
       {/if}
     </div>
   {/each}

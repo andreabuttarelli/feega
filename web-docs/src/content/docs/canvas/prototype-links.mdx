@@ -27,7 +27,7 @@ Each link has three rows in Prototype.
 |---|---|
 | Trigger | On click, While hovering, On drag, After delay (milliseconds) |
 | Action | Navigate to, Open overlay, Back, Scroll to |
-| Transition | Instant, Dissolve, Slide in, Push; slide and push take a direction; dissolve, slide and push take an easing and a duration in milliseconds |
+| Transition | Instant, Dissolve, Slide in, Push, [Smart animate](/canvas/smart-animate/); slide and push take a direction; every transition but Instant takes an easing and a duration in milliseconds |
 
 Navigate to, Open overlay and Scroll to need a target. **Pick** re-aims a link on the canvas; the Target frame list does the same by name. Back needs none. A layer holds up to 16 links. Remove deletes one.
 
@@ -64,4 +64,4 @@ Clips also show their `interactions` in `get_motion_doc`.
 
 ## Limits
 
-Links are played in the [Prototype player](/canvas/prototype-player/). Smart animate between frames comes next. A link whose target frame was deleted is kept on the layer but no arrow is drawn.
+Links are played in the [Prototype player](/canvas/prototype-player/). A link whose target frame was deleted is kept on the layer but no arrow is drawn.

@@ -43,6 +43,16 @@ describe('prototype interactions through the agent tools', () => {
 
     expect(await run('add_interaction', { clip_id: id, trigger: { kind: 'click' }, action: { kind: 'navigate' } })).toMatchObject({ ok: false });
   });
+
+  it('add_interaction accepts a smart animate transition and list_interactions reads it back', async () => {
+    const { run, id } = await withButton();
+
+    const added = await run('add_interaction', { clip_id: id, trigger: { kind: 'click' }, action: { kind: 'navigate', target: 'frame-b' }, transition: { kind: 'smart_animate', easing: 'enter', durationMs: 500 } });
+    const listed = await run('list_interactions', {});
+
+    expect(added).toMatchObject({ ok: true });
+    expect(listed).toMatchObject({ interactions: [{ transition: { kind: 'smart_animate', easing: 'enter', durationMs: 500 } }] });
+  });
 });
 
 describe('flows through the agent tools', () => {

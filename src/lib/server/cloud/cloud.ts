@@ -7,7 +7,8 @@ export enum CloudProvider {
 
 export type Credentials = { clientId: string; clientSecret: string };
 export type TokenSet = { accessToken: string; refreshToken: string | null; expiresAt: number };
-export type CloudEntry = { id: string; name: string; folder: boolean; mime: string | null };
+export type CloudEntry = { id: string; name: string; folder: boolean; mime: string | null; importable: boolean };
+export type CloudPage = { entries: CloudEntry[]; next: string | null };
 export type CloudFile = { name: string; mime: string; bytes: Uint8Array };
 export type Upload = { folder: string; name: string; mime: string; bytes: Uint8Array };
 
@@ -17,11 +18,14 @@ const STATE_CONTEXT = 'feega:cloud-state';
 const STATE_TTL_MS = 10 * 60_000;
 const REFRESH_MARGIN_MS = 60_000;
 const SECOND_MS = 1000;
+const DRIVE_ROOT = 'root';
 const DRIVE_FOLDER = 'application/vnd.google-apps.folder';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
 const DROPBOX_RPC = 'https://api.dropboxapi.com/2/files';
 const DROPBOX_CONTENT = 'https://content.dropboxapi.com/2/files';
+const DRIVE_NATIVE = 'application/vnd.google-apps.';
+const PAGE_SIZE = 200;
 const BOUNDARY = 'feega-cloud-boundary';
 
 type Spec = {
@@ -30,22 +34,43 @@ type Spec = {
   tokenUrl: string;
   scope: string;
   offline: Record<string, string>;
-  list: (token: string, folder: string | null, fetchFn: Fetch) => Promise<CloudEntry[]>;
+  list: (token: string, folder: string | null, cursor: string | null, fetchFn: Fetch) => Promise<CloudPage>;
   download: (token: string, id: string, fetchFn: Fetch) => Promise<CloudFile | null>;
   upload: (token: string, file: Upload, fetchFn: Fetch) => Promise<boolean>;
+  revoke: (token: string, fetchFn: Fetch) => Promise<boolean>;
+  revokes: 'refreshToken' | 'accessToken';
 };
 
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-async function driveList(token: string, folder: string | null, fetchFn: Fetch): Promise<CloudEntry[]> {
-  const query = `'${folder ?? 'root'}' in parents and trashed=false`;
-  const url = `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=${encodeURIComponent('files(id,name,mimeType)')}&pageSize=200`;
-  const res = await fetchFn(url, { headers: bearer(token) });
-  if (!res.ok) {
-    return [];
+type NativeExport = { mime: string; extension: string };
+
+const NATIVE_EXPORTS: Record<string, NativeExport> = {
+  [`${DRIVE_NATIVE}document`]: { mime: 'application/pdf', extension: 'pdf' },
+  [`${DRIVE_NATIVE}spreadsheet`]: { mime: 'application/pdf', extension: 'pdf' },
+  [`${DRIVE_NATIVE}presentation`]: { mime: 'application/pdf', extension: 'pdf' },
+  [`${DRIVE_NATIVE}drawing`]: { mime: 'image/png', extension: 'png' }
+};
+
+const isNative = (mime: string) => mime.startsWith(DRIVE_NATIVE);
+
+async function driveList(token: string, folder: string | null, cursor: string | null, fetchFn: Fetch): Promise<CloudPage> {
+  const query = `'${folder ?? DRIVE_ROOT}' in parents and trashed=false`;
+  const params = new URLSearchParams({ q: query, fields: 'nextPageToken,files(id,name,mimeType)', pageSize: String(PAGE_SIZE) });
+  if (cursor) {
+    params.set('pageToken', cursor);
   }
-  const body = (await res.json()) as { files?: { id: string; name: string; mimeType: string }[] };
-  return (body.files ?? []).map((f) => ({ id: f.id, name: f.name, folder: f.mimeType === DRIVE_FOLDER, mime: f.mimeType === DRIVE_FOLDER ? null : f.mimeType }));
+  const res = await fetchFn(`${DRIVE_API}?${params}`, { headers: bearer(token) });
+  if (!res.ok) {
+    return { entries: [], next: null };
+  }
+  const body = (await res.json()) as { files?: { id: string; name: string; mimeType: string }[]; nextPageToken?: string };
+  const entries = (body.files ?? []).map((f) => {
+    const folderEntry = f.mimeType === DRIVE_FOLDER;
+    const importable = !isNative(f.mimeType) || folderEntry || f.mimeType in NATIVE_EXPORTS;
+    return { id: f.id, name: f.name, folder: folderEntry, mime: folderEntry ? null : f.mimeType, importable };
+  });
+  return { entries, next: body.nextPageToken ?? null };
 }
 
 async function driveDownload(token: string, id: string, fetchFn: Fetch): Promise<CloudFile | null> {
@@ -54,24 +79,35 @@ async function driveDownload(token: string, id: string, fetchFn: Fetch): Promise
     return null;
   }
   const { name, mimeType } = (await meta.json()) as { name: string; mimeType: string };
-  const media = await fetchFn(`${DRIVE_API}/${encodeURIComponent(id)}?alt=media`, { headers: bearer(token) });
-  return media.ok ? { name, mime: mimeType, bytes: new Uint8Array(await media.arrayBuffer()) } : null;
+  const native = NATIVE_EXPORTS[mimeType];
+  if (isNative(mimeType) && !native) {
+    return null;
+  }
+  const url = native ? `${DRIVE_API}/${encodeURIComponent(id)}/export?mimeType=${encodeURIComponent(native.mime)}` : `${DRIVE_API}/${encodeURIComponent(id)}?alt=media`;
+  const media = await fetchFn(url, { headers: bearer(token) });
+  if (!media.ok) {
+    return null;
+  }
+  const bytes = new Uint8Array(await media.arrayBuffer());
+  return native ? { name: `${name}.${native.extension}`, mime: native.mime, bytes } : { name, mime: mimeType, bytes };
 }
 
 async function driveUpload(token: string, file: Upload, fetchFn: Fetch): Promise<boolean> {
-  const head = `--${BOUNDARY}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: file.name, parents: [file.folder] })}\r\n--${BOUNDARY}\r\nContent-Type: ${file.mime}\r\n\r\n`;
+  const head = `--${BOUNDARY}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: file.name, parents: [file.folder || DRIVE_ROOT] })}\r\n--${BOUNDARY}\r\nContent-Type: ${file.mime}\r\n\r\n`;
   const body = new Blob([head, file.bytes as BlobPart, `\r\n--${BOUNDARY}--`]);
   const res = await fetchFn(DRIVE_UPLOAD, { method: 'POST', headers: { ...bearer(token), 'Content-Type': `multipart/related; boundary=${BOUNDARY}` }, body });
   return res.ok;
 }
 
-async function dropboxList(token: string, folder: string | null, fetchFn: Fetch): Promise<CloudEntry[]> {
-  const res = await fetchFn(`${DROPBOX_RPC}/list_folder`, { method: 'POST', headers: { ...bearer(token), 'Content-Type': 'application/json' }, body: JSON.stringify({ path: folder ?? '' }) });
+async function dropboxList(token: string, folder: string | null, cursor: string | null, fetchFn: Fetch): Promise<CloudPage> {
+  const call = cursor ? { url: `${DROPBOX_RPC}/list_folder/continue`, body: { cursor } } : { url: `${DROPBOX_RPC}/list_folder`, body: { path: folder ?? '', limit: PAGE_SIZE } };
+  const res = await fetchFn(call.url, { method: 'POST', headers: { ...bearer(token), 'Content-Type': 'application/json' }, body: JSON.stringify(call.body) });
   if (!res.ok) {
-    return [];
+    return { entries: [], next: null };
   }
-  const body = (await res.json()) as { entries?: { '.tag': string; name: string; path_lower: string }[] };
-  return (body.entries ?? []).map((e) => ({ id: e.path_lower, name: e.name, folder: e['.tag'] === 'folder', mime: null }));
+  const body = (await res.json()) as { entries?: { '.tag': string; name: string; path_lower: string }[]; has_more?: boolean; cursor?: string };
+  const entries = (body.entries ?? []).map((e) => ({ id: e.path_lower, name: e.name, folder: e['.tag'] === 'folder', mime: null, importable: true }));
+  return { entries, next: body.has_more ? (body.cursor ?? null) : null };
 }
 
 async function dropboxDownload(token: string, id: string, fetchFn: Fetch): Promise<CloudFile | null> {
@@ -89,6 +125,19 @@ async function dropboxUpload(token: string, file: Upload, fetchFn: Fetch): Promi
   return res.ok;
 }
 
+const DRIVE_REVOKE = 'https://oauth2.googleapis.com/revoke';
+const DROPBOX_REVOKE = 'https://api.dropboxapi.com/2/auth/token/revoke';
+
+async function driveRevoke(token: string, fetchFn: Fetch): Promise<boolean> {
+  const res = await fetchFn(DRIVE_REVOKE, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }).toString() }).catch(() => null);
+  return Boolean(res?.ok);
+}
+
+async function dropboxRevoke(token: string, fetchFn: Fetch): Promise<boolean> {
+  const res = await fetchFn(DROPBOX_REVOKE, { method: 'POST', headers: bearer(token) }).catch(() => null);
+  return Boolean(res?.ok);
+}
+
 const PROVIDERS: Record<CloudProvider, Spec> = {
   [CloudProvider.Drive]: {
     label: 'Google Drive',
@@ -98,7 +147,9 @@ const PROVIDERS: Record<CloudProvider, Spec> = {
     offline: { access_type: 'offline', prompt: 'consent' },
     list: driveList,
     download: driveDownload,
-    upload: driveUpload
+    upload: driveUpload,
+    revoke: driveRevoke,
+    revokes: 'refreshToken'
   },
   [CloudProvider.Dropbox]: {
     label: 'Dropbox',
@@ -108,7 +159,9 @@ const PROVIDERS: Record<CloudProvider, Spec> = {
     offline: { token_access_type: 'offline' },
     list: dropboxList,
     download: dropboxDownload,
-    upload: dropboxUpload
+    upload: dropboxUpload,
+    revoke: dropboxRevoke,
+    revokes: 'accessToken'
   }
 };
 
@@ -164,8 +217,12 @@ export async function freshAccess(provider: CloudProvider, tokens: TokenSet, cre
   return next ? { ...next, refreshToken: next.refreshToken ?? tokens.refreshToken } : null;
 }
 
-export const listFiles = (provider: CloudProvider, token: string, folder: string | null, fetchFn: Fetch = fetch) => PROVIDERS[provider].list(token, folder, fetchFn);
+export const listFiles = (provider: CloudProvider, token: string, folder: string | null, cursor: string | null, fetchFn: Fetch = fetch) => PROVIDERS[provider].list(token, folder, cursor, fetchFn);
 
 export const downloadFile = (provider: CloudProvider, token: string, id: string, fetchFn: Fetch = fetch) => PROVIDERS[provider].download(token, id, fetchFn);
 
 export const uploadFile = (provider: CloudProvider, token: string, file: Upload, fetchFn: Fetch = fetch) => PROVIDERS[provider].upload(token, file, fetchFn);
+
+export const revokeAccess = (provider: CloudProvider, token: string, fetchFn: Fetch = fetch) => PROVIDERS[provider].revoke(token, fetchFn);
+
+export const revocableToken = (provider: CloudProvider, tokens: TokenSet): string | null => tokens[PROVIDERS[provider].revokes];

@@ -19,6 +19,13 @@ export enum EffectKind {
   ChromaticAberration = 'chromatic-aberration',
   Vignette = 'vignette',
   Wave = 'wave',
+  DisplacementMap = 'displacement-map',
+  RadialBlur = 'radial-blur',
+  LensBlur = 'lens-blur',
+  Bulge = 'bulge',
+  Twirl = 'twirl',
+  Sharpen = 'sharpen',
+  ChromaKey = 'chroma-key',
   Lut = 'lut',
   Levels = 'levels',
   LiftGammaGain = 'lift-gamma-gain'
@@ -149,6 +156,8 @@ function directionalTaps(length: number, angle: number): SvgNode[] {
 }
 
 const ALPHA_ROW = '0 0 0 1 0';
+const ZERO_ROW = '0 0 0 0 0';
+const LUMA_ROW = `${LUMA.join(' ')} 0 0`;
 
 const channel = (keep: number) =>
   [0, 1, 2]
@@ -181,6 +190,44 @@ const transfer = (tables: [string, string, string]) =>
     {},
     ['feFuncR', 'feFuncG', 'feFuncB'].map((tag, i) => node(tag, { type: 'table', tableValues: tables[i] }))
   );
+
+
+const warpNode = (mode: string, v: Values, extra: SvgNode['attrs']): SvgNode =>
+  node('feWarp', { mode, cx: r(n(v, 'centerX')), cy: r(n(v, 'centerY')), ...extra });
+
+const dot3 = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+const keyAxis = (key: string) => {
+  const k = rgb(key);
+  const mean = (k[0] + k[1] + k[2]) / 3;
+  const w = k.map((c) => c - mean);
+  const span = dot3(w, k) || 1;
+  return { w, span };
+};
+
+const rowOf = (coefficients: number[], offset = 0) => [...coefficients, 0, offset].map(r).join(' ');
+
+function chromaKeyNodes(v: Values): SvgNode[] {
+  const { w, span } = keyAxis(String(v.key));
+  const soft = Math.max(n(v, 'softness'), 0.01);
+  const pivot = 1 - n(v, 'tolerance');
+  const chroma = w.map((c) => c / span);
+  const alpha = rowOf(chroma.map((c) => -c / soft), pivot / soft + 0.5);
+  const keyed = node('feColorMatrix', { in: 'SourceGraphic', type: 'matrix', values: `${ZERO_ROW} ${ZERO_ROW} ${ZERO_ROW} ${alpha}`, result: 'keyed' });
+  const spill = n(v, 'spill');
+  if (!spill) {
+    return [keyed, node('feComposite', { in: 'SourceGraphic', in2: 'keyed', operator: 'in' })];
+  }
+  const widest = Math.max(...w);
+  const pulled = w.map((own) => chroma.map((c) => (own > 0 ? (-spill * c * own) / widest : 0)));
+  const rows = pulled.map((row, i) => rowOf(row.map((c, j) => c + (i === j ? 1 : 0)))).join(' ');
+  return [
+    keyed,
+    node('feColorMatrix', { in: 'SourceGraphic', type: 'matrix', values: `${rows} ${ALPHA_ROW}`, result: 'spillfree' }),
+    node('feBlend', { in: 'spillfree', in2: 'SourceGraphic', mode: 'darken', result: 'spill' }),
+    node('feComposite', { in: 'spill', in2: 'keyed', operator: 'in' })
+  ];
+}
 
 const PASS_THROUGH: Rendered = { filter: '', nodes: [] };
 
@@ -415,6 +462,61 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     about: `per-channel colour wheels: lift R/G/B ${LIFT.min}..${LIFT.max} (shadows), gamma ${GAMMA.min}..${GAMMA.max} (midtones), gain ${GAIN.min}..${GAIN.max} (highlights)`,
     params: [...gradeParams('lift', 'Lift', LIFT), ...gradeParams('gamma', 'Gamma', GAMMA), ...gradeParams('gain', 'Gain', GAIN)],
     render: (v, _f, id) => svg(id, [transfer(CHANNELS_RGB.map((c) => liftGammaGainTable(n(v, `lift${c}`), n(v, `gamma${c}`), n(v, `gain${c}`))) as [string, string, string])])
+  },
+  [EffectKind.DisplacementMap]: {
+    label: 'Displacement map',
+    about: 'pushes the layer by its own brightness: bright parts move down-right, dark parts up-left, up to amount px',
+    params: [num('amount', 'Amount', 0, 200, 1, 20)],
+    reach: (v) => n(v, 'amount') / 2,
+    render: (v, _f, id) =>
+      svg(id, [
+        node('feColorMatrix', { in: 'SourceGraphic', type: 'matrix', values: `${LUMA_ROW} ${LUMA_ROW} ${ZERO_ROW} ${ALPHA_ROW}`, result: 'map' }),
+        node('feDisplacementMap', { in: 'SourceGraphic', in2: 'map', scale: r(n(v, 'amount')), xChannelSelector: 'R', yChannelSelector: 'G' })
+      ])
+  },
+  [EffectKind.RadialBlur]: {
+    label: 'Radial blur',
+    about: 'zoom blur (zoom 0..1) and spin blur (spin degrees) around a centre, centre as 0..1 of the layer',
+    params: [num('centerX', 'Centre X', 0, 1, 0.01, 0.5), num('centerY', 'Centre Y', 0, 1, 0.01, 0.5), num('zoom', 'Zoom', 0, 1, 0.01, 0.15), num('spin', 'Spin', 0, 90, 0.5, 0)],
+    render: (v, _f, id) => svg(id, [warpNode('radial', v, { amount: r(n(v, 'zoom')), spin: r(n(v, 'spin')) })])
+  },
+  [EffectKind.LensBlur]: {
+    label: 'Lens blur',
+    about: 'disc-shaped bokeh blur of radius px; highlights 0..4 makes bright spots bloom into the disc',
+    params: [num('radius', 'Radius', 0, 100, 0.5, 12), num('highlights', 'Highlights', 0, 4, 0.05, 1)],
+    reach: (v) => n(v, 'radius'),
+    render: (v, _f, id) => svg(id, [node('feWarp', { mode: 'lens', cx: 0.5, cy: 0.5, amount: r(n(v, 'radius')), boost: r(n(v, 'highlights')) })])
+  },
+  [EffectKind.Bulge]: {
+    label: 'Bulge',
+    about: 'magnifies (amount > 0) or pinches (amount < 0) within radius px of a centre given as 0..1 of the layer',
+    params: [num('centerX', 'Centre X', 0, 1, 0.01, 0.5), num('centerY', 'Centre Y', 0, 1, 0.01, 0.5), num('radius', 'Radius', 1, 2000, 1, 200), num('amount', 'Amount', -1, 1, 0.01, 0.5)],
+    render: (v, _f, id) => svg(id, [warpNode('bulge', v, { radius: r(n(v, 'radius')), amount: r(n(v, 'amount')) })])
+  },
+  [EffectKind.Twirl]: {
+    label: 'Twirl',
+    about: 'rotates the layer by angle degrees at the centre, fading to nothing at radius px; centre as 0..1 of the layer',
+    params: [num('centerX', 'Centre X', 0, 1, 0.01, 0.5), num('centerY', 'Centre Y', 0, 1, 0.01, 0.5), num('radius', 'Radius', 1, 2000, 1, 240), num('angle', 'Angle', -720, 720, 1, 90)],
+    render: (v, _f, id) => svg(id, [warpNode('twirl', v, { radius: r(n(v, 'radius')), amount: r(n(v, 'angle')) })])
+  },
+  [EffectKind.Sharpen]: {
+    label: 'Sharpen',
+    about: 'unsharp mask: adds amount times the detail finer than radius px',
+    params: [num('amount', 'Amount', 0, 5, 0.05, 1), num('radius', 'Radius', 0.1, 20, 0.1, 1.5)],
+    reach: (v) => n(v, 'radius') * GAUSS_TAIL,
+    render: (v, _f, id) => {
+      const amount = n(v, 'amount');
+      return svg(id, [
+        node('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: r(n(v, 'radius')), result: 'soft' }),
+        node('feComposite', { in: 'SourceGraphic', in2: 'soft', operator: 'arithmetic', k1: 0, k2: r(1 + amount), k3: r(-amount), k4: 0 })
+      ]);
+    }
+  },
+  [EffectKind.ChromaKey]: {
+    label: 'Chroma key',
+    about: 'makes the key colour transparent: tolerance 0..1 (how far from the key still counts), softness 0..1 (edge feather), spill 0..1 (removes key-colour cast from what stays)',
+    params: [colour('key', 'Key colour', '#00ff00'), num('tolerance', 'Tolerance', 0, 1, 0.01, 0.6), num('softness', 'Softness', 0, 1, 0.01, 0.2), num('spill', 'Spill suppression', 0, 1, 0.01, 0.5)],
+    render: (v, _f, id) => svg(id, chromaKeyNodes(v))
   },
   [EffectKind.Wave]: {
     label: 'Wave distort',

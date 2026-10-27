@@ -15,6 +15,7 @@
   import { joltNote } from '$lib/motion/smoothness';
   import type { FrameSize } from './MotionPreview.svelte';
   import { liveNote, stillStandIns, unverified } from '$lib/motion/custom/determinism';
+  import { localFontNote } from '$lib/motion/fonts/local';
   import { CheckState } from '@feega/motion-core/motion/custom/component';
   import { postPageAction } from '$lib/api/page-action';
   import { HOLD_BUFFER, renderQuote } from '$lib/motion/render-quote';
@@ -163,6 +164,7 @@
   const busy = $derived(phase === Phase.Mixing || phase === Phase.Rendering || phase === Phase.Saving);
   const blockers = $derived(unverified(doc));
   const live = $derived(stillStandIns(doc));
+  const localNote = $derived(localFontNote(doc.fonts));
   const BLOCKER_LABEL: Record<CheckState, string> = { [CheckState.Unchecked]: 'is still being checked', [CheckState.Failed]: 'failed the seek check', [CheckState.Passed]: '' };
   const hasAudio = $derived(withAudio && sounds.length > 0);
   const place = $derived(caps && device ? renderPlace({ doc: target, settings, capabilities: caps, device, background, hasAudio }) : null);
@@ -448,6 +450,7 @@
       {#if live.length}
         <p class="warn" role="alert" data-testid="export-live">{liveNote(live)}. <button type="button" class="link" onclick={() => (mode = ExportMode.Interactive)}>Embed on a website</button></p>
       {/if}
+      {#if localNote}<p class="warn" role="alert" data-testid="export-local-fonts">{localNote}</p>{/if}
 
       {#if PROGRESS_LABEL[phase]}
         <div class="progress" data-testid="export-progress">
