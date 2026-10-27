@@ -15,7 +15,7 @@ export const fontkitEngine: Engine = async () => fontkitSource;
 
 export type Reader = { text: (url: string) => Promise<string>; bytes: (url: string) => Promise<Uint8Array> };
 
-const web: Reader = {
+export const webReader: Reader = {
   text: (url) => fetch(url).then((r) => (r.ok ? r.text() : '')),
   bytes: (url) => fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`${r.status} ${url}`)))).then((b) => new Uint8Array(b))
 };
@@ -50,7 +50,7 @@ const remembered = <T>(load: (url: string) => Promise<T>) => {
   };
 };
 
-export function fontLoader(read: Reader = web, engine: Engine = fontkitEngine): (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook> {
+export function fontLoader(read: Reader = webReader, engine: Engine = fontkitEngine): (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook> {
   const sheet = remembered((url) => read.text(url).catch(() => ''));
   let made: ReturnType<Engine> | null = null;
   const source = remembered((url) => Promise.all([read.bytes(url), (made ??= engine())]).then(([bytes, make]): [string, Source] => [url, make(bytes)]).catch(() => null));

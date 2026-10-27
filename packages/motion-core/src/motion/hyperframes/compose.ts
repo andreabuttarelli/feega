@@ -73,6 +73,7 @@ import { Chunk, chunkCode, chunkUrl } from './runtime-chunks';
 import { RuntimeDelivery } from './runtime-delivery';
 import { shaderBakes, shaderScript, type ShaderBake } from '../shaders/compose';
 import { liveSpec, type SpecInput } from '../interactive/spec';
+import type { LiveSpec } from '../interactive/live';
 import { LIVE_GLOBAL } from '../interactive/runtime';
 import { boundDoc, defaultsOf, withVars, type VarValues } from '../interactive/vars';
 import { Liveness, interactiveOf } from '../interactive/settings';
@@ -624,6 +625,12 @@ const liveDoc = (raw: ComposeInput, shown: MotionDoc): MotionDoc => bakePaths(wi
 const bakedDoc = (raw: ComposeInput, live: MotionDoc): MotionDoc => bakePhysics(bakeExpressions(live, raw.analyses));
 
 export const preparedDoc = (raw: ComposeInput): MotionDoc => bakedDoc(raw, liveDoc(raw, shownDoc(raw)));
+
+export function liveSpecOf(raw: ComposeInput): LiveSpec {
+  const live = liveDoc(raw, shownDoc(raw));
+  const baked = bakedDoc(raw, live);
+  return liveSpec({ live, baked, outside: interactiveOf(raw.doc).outside, parents: [...parentsWithChildren(baked)], color: (v) => resolveColor(v, raw.tokens) });
+}
 
 export const junctionMovesOf = (raw: ComposeInput): JunctionMove[] => {
   const shown = shownDoc(raw);

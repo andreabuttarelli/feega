@@ -106,7 +106,14 @@ export const FeegaMotion = forwardRef<FeegaMotionHandle, FeegaMotionProps>(funct
       }
     };
     const failed = (e: Event) => callbacks.current.onError?.(String((e as CustomEvent<{ error?: { message?: string } }>).detail?.error?.message ?? 'playback failed'));
-    const events: [string, (e: Event) => void][] = [['ready', ready], ['timeupdate', time], ['ended', ended], ['playbackerror', failed]];
+    const linked = (e: Event) => {
+      if (callbacks.current.onLinkClick) {
+        e.preventDefault();
+        callbacks.current.onLinkClick((e as CustomEvent<{ url: string }>).detail.url);
+      }
+    };
+    const varied = (e: Event) => callbacks.current.onVarsChange?.((e as CustomEvent<{ values: VarValues }>).detail.values);
+    const events: [string, (e: Event) => void][] = [['ready', ready], ['timeupdate', time], ['ended', ended], ['playbackerror', failed], ['link', linked], ['varschange', varied]];
     events.forEach(([name, fn]) => el.addEventListener(name, fn));
     import(/* webpackIgnore: true */ /* @vite-ignore */ playerModuleUrl(origin)).then(
       () => live && el.load(source),

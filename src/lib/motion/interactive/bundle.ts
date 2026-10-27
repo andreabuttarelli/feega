@@ -1,21 +1,22 @@
 import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
-import { Target, composeHtml, hostedScriptTag, inlinedScript, type Inlined } from '@feega/motion-core/motion/hyperframes/compose';
+import { Target, composeHtml, hostedScriptTag } from '@feega/motion-core/motion/hyperframes/compose';
 import { MOTION_RUNTIME_ROUTE, PARTICLE_RUNTIME_GLOBAL, RuntimeDelivery } from '@feega/motion-core/motion/hyperframes/runtime-delivery';
 import { Chunk, chunkUrl } from '@feega/motion-core/motion/hyperframes/runtime-chunks';
 import { MOTION_ENV_ROUTE } from '@feega/motion-core/motion/look';
-import { HOSTED, MODULES, Module, Script, cdnRewrites, defaultOrigin, folderOf, libsBase, moduleUrl, notice, scriptUrl } from '@feega/motion-core/motion/libs/catalog';
-import type { InlinedModules } from '@feega/motion-core/motion/hyperframes/three';
-import { MATTE_RUNTIME } from '@feega/motion-core/motion/hyperframes/mattes';
+import { HOSTED, Module, Script, cdnRewrites, defaultOrigin, libsBase, moduleUrl, notice } from '@feega/motion-core/motion/libs/catalog';
 import { esc } from '@feega/motion-core/motion/hyperframes/html';
 import { InputKey } from '@feega/motion-core/motion/expression/inputs';
-import { INPUT_MESSAGE, LIVE_GLOBAL } from '@feega/motion-core/motion/interactive/runtime';
+import { INPUT_MESSAGE } from '@feega/motion-core/motion/interactive/runtime';
 import { EVENT_MESSAGE } from '@feega/motion-core/motion/custom/runtime';
 import { playerMain, type PlayerConfig } from './player';
 import { EMBED_ROUTE, HOST_MESSAGE, gestureScrub, hostMain, readHost, selfScroll } from './host';
-import { Liveness, PlayMode, SCROLL_LENGTH, interactiveOf, isInteractive, type Interactive } from '@feega/motion-core/motion/interactive/settings';
+import { Liveness, PlayMode, SCROLL_LENGTH, interactiveOf, type Interactive } from '@feega/motion-core/motion/interactive/settings';
 import { GPU_PLAYER_TAG, GPU_SOURCE_ATTR } from '@feega/motion-core/motion/gpu-full/player-tag';
+import { INLINE_CORE_GLOBAL, zipBase64, type InlineCore, type InlineFonts } from '@feega/motion-core/motion/gpu-full/inline-core';
+import { fontLoader, fontkitEngine, type Reader } from '@feega/motion-core/motion/gpu-full/text/load';
+import { recording } from '@feega/motion-core/motion/gpu-full/text/inline-fonts';
 import { FIT_SCALE, fitBox } from './fit';
 import { LINK_MESSAGE, NATIVE_BRIDGE, PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEvent } from './protocol';
 import type { EmbedSettings } from './loader';
@@ -91,49 +92,16 @@ function playerConfig(source: PlayerSource): PlayerConfig {
   };
 }
 
-function licences(inlined: Inlined, origin: string): string {
-  const lines = (Object.keys(inlined) as Script[]).sort().map((script) => {
-    const lib = HOSTED[script];
-    return `${lib.name}@${lib.version} (${lib.licence}) ${lib.home} licence: ${libsBase(origin)}/${folderOf(lib)}/${lib.licenceFile}`;
-  });
-  return `<!--\nThird-party software included unmodified in this file:\n${lines.join('\n')}\n-->`;
-}
-
 const HTML_TYPE = /^text\/html/;
 
-async function libraryCode(url: string, name: string, fetchBlob: FetchBlob): Promise<string> {
+async function libraryCode(url: string, name: string, fetchBlob: FetchBlob): Promise<Blob> {
   const blob = await fetchBlob(url).catch((e: unknown) => {
     throw new Error(`${name} could not be loaded: ${e instanceof Error ? e.message : String(e)}`);
   });
   if (HTML_TYPE.test(blob.type)) {
     throw new Error(`${name} could not be loaded: ${url} answered with a page, not a script`);
   }
-  return blob.text();
-}
-
-const libName = (lib: { name: string; version: string }) => `${lib.name}@${lib.version}`;
-
-type Need = (html: string, origin: string, script: Script) => boolean;
-
-const tagged: Need = (html, origin, script) => html.includes(`<script src="${scriptUrl(origin, script)}"`);
-
-const SCRIPT_NEED: Partial<Record<Script, Need>> = {
-  [Script.Player]: () => true,
-  [Script.Screenshot]: (html) => html.includes(MATTE_RUNTIME)
-};
-
-const scriptNeeded: Need = (html, origin, script) => (SCRIPT_NEED[script] ?? tagged)(html, origin, script);
-
-async function inlinedScripts(html: string, origin: string, fetchBlob: FetchBlob): Promise<Inlined> {
-  const needed = Object.values(Script).filter((script) => scriptNeeded(html, origin, script));
-  const codes = await Promise.all(needed.map(async (script) => [script, await libraryCode(scriptUrl(origin, script), libName(HOSTED[script]), fetchBlob)] as const));
-  return Object.fromEntries(codes);
-}
-
-async function inlinedModules(html: string, origin: string, fetchBlob: FetchBlob): Promise<InlinedModules> {
-  const needed = Object.values(Module).filter((module) => html.includes(`"${module}":"${moduleUrl(origin, module)}"`));
-  const codes = await Promise.all(needed.map(async (module) => [module, await libraryCode(moduleUrl(origin, module), `${libName(MODULES[module].lib)} (${module})`, fetchBlob)] as const));
-  return Object.fromEntries(codes);
+  return blob;
 }
 
 const PAD_TOUCH: Record<PlayMode, string> = {
@@ -258,16 +226,12 @@ function storedSource(page: string): EmbedSource | null {
 
 export type GpuSource = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; playback: PlayMode; loop: boolean; scrollLength: number };
 
-export function gpuSource(page: string, origin: string): GpuSource | null {
+export function gpuSource(page: string): GpuSource | null {
   const source = storedSource(page);
   if (!source) {
     return null;
   }
-  const { doc, tokens, assets, analyses, settings } = source;
-  const composed = composeHtml({ doc, tokens, assets, analyses, liveness: Liveness.Live, target: Target.Screen, origin, runtime: RuntimeDelivery.Hosted });
-  if (stageOf(doc, composed) !== Stage.Gpu) {
-    return null;
-  }
+  const { doc, tokens, assets, settings } = source;
   return { doc, tokens, assets, playback: settings.playback, loop: settings.loop, scrollLength: settings.scrollLength };
 }
 
@@ -281,38 +245,23 @@ export function hostedPage(page: string, origin: string): string | null {
 }
 
 export const GPU_PLAYER_ROUTE = '/motion-player.js';
+export const GPU_CORE_ROUTE = '/gpu-core/gpu_core.js';
+export const GPU_WASM_ROUTE = '/gpu-core/gpu_core_bg.wasm';
 const GPU_SOURCE_ID = 'feega-source';
 const HYPERFRAMES_STAGE = '<hyperframes-player id="player" sandbox-origin="opaque" assets-loading-ui="none" disable-click-to-play></hyperframes-player>';
 
-export enum Stage {
-  Hyperframes = 'hyperframes',
-  Gpu = 'gpu'
-}
+const gpuStage = ({ doc, tokens, assets }: Pick<EmbedSource, 'doc' | 'tokens' | 'assets'>) => `<script type="application/json" id="${GPU_SOURCE_ID}">${scriptJson({ doc, tokens, assets })}</script><${GPU_PLAYER_TAG} id="player" ${GPU_SOURCE_ATTR}="${GPU_SOURCE_ID}"></${GPU_PLAYER_TAG}>`;
 
-const readsLiveInput = (composed: string) => composed.includes(`window.${LIVE_GLOBAL}(`);
+const hostedPlayer = (origin: string) => `<script type="module" src="${origin}${GPU_PLAYER_ROUTE}"></script>`;
 
-export const stageOf = (doc: MotionDoc, composed: string): Stage => (isInteractive(doc) || readsLiveInput(composed) ? Stage.Hyperframes : Stage.Gpu);
-
-type Staged = { player: string; stage: string };
-
-const STAGES: Record<Stage, (source: EmbedSource, origin: string) => Staged> = {
-  [Stage.Hyperframes]: (_, origin) => ({ player: hostedScriptTag(origin, Script.Player), stage: HYPERFRAMES_STAGE }),
-  [Stage.Gpu]: ({ doc, tokens, assets }, origin) => ({
-    player: `<script type="module" src="${origin}${GPU_PLAYER_ROUTE}"></script>`,
-    stage: `<script type="application/json" id="${GPU_SOURCE_ID}">${scriptJson({ doc, tokens, assets })}</script><${GPU_PLAYER_TAG} id="player" ${GPU_SOURCE_ATTR}="${GPU_SOURCE_ID}"></${GPU_PLAYER_TAG}>`
-  })
-};
-
-function servedPage(source: EmbedSource, origin: string, forced?: Stage): string {
-  const { doc, tokens, assets, analyses, settings, title } = source;
-  const composed = composeHtml({ doc, tokens, assets, analyses, liveness: Liveness.Live, target: Target.Screen, origin, runtime: RuntimeDelivery.Hosted });
-  const { player, stage } = STAGES[forced ?? stageOf(doc, composed)](source, origin);
-  return `<!doctype html>${pageOf(sourceOf(composed, doc, settings), esc(title), player, stage)}`;
+function servedPage(source: EmbedSource, origin: string): string {
+  const { doc, settings, title } = source;
+  return `<!doctype html>${pageOf(sourceOf('', doc, settings), esc(title), hostedPlayer(origin), gpuStage(source))}`;
 }
 
 export type LiveSource = Omit<EmbedSource, 'settings'>;
 
-export const livePage = (source: LiveSource, origin: string): string => servedPage({ ...source, settings: interactiveOf(source.doc) }, origin, Stage.Hyperframes).replace('</body>', `${bridgeScript()}</body>`);
+export const livePage = (source: LiveSource, origin: string): string => servedPage({ ...source, settings: interactiveOf(source.doc) }, origin).replace('</body>', `${bridgeScript()}</body>`);
 
 export const isSourceEmbed = (page: string) => STORED_SOURCE.test(page);
 
@@ -371,10 +320,6 @@ function playerSettings(page: string): EmbedSettings | null {
   return source ? { width: source.width, height: source.height, playback: source.playback, scrollLength: source.scrollLength ?? SCROLL_LENGTH.default, vars: source.vars ?? [] } : null;
 }
 
-export function playerPage(html: string, doc: MotionDoc, settings: Interactive, title: string, player: string): string {
-  return pageOf(sourceOf(html, doc, settings), esc(title), player);
-}
-
 function pageOf(source: PlayerSource, title: string, player: string, stage = HYPERFRAMES_STAGE): string {
   return [
     '<html lang="en"><head><meta charset="UTF-8" />',
@@ -409,13 +354,30 @@ export function fileSnippet(doc: SnippetDoc, file = BUNDLE_FILE): string {
   return SNIPPET_SHAPE[settings.playback](`${frame}\n${host}`, settings);
 }
 
+const SCRIPT_CLOSE = /<\/(script)/gi;
+
+const moduleSafe = (code: string) => code.replace(SCRIPT_CLOSE, '<\\/$1');
+
+async function fontsOf(source: EmbedSource, fetchBlob: FetchBlob): Promise<InlineFonts> {
+  const read: Reader = {
+    text: (url) => fetchBlob(url).then((b) => b.text(), () => ''),
+    bytes: (url) => fetchBlob(url).then(async (b) => new Uint8Array(await b.arrayBuffer()))
+  };
+  const { reader, fonts } = recording(read);
+  await fontLoader(reader, fontkitEngine)(source.doc, source.assets, source.tokens);
+  return fonts();
+}
+
+async function inlineCoreOf(input: InteractiveInput, source: EmbedSource, origin: string): Promise<InlineCore> {
+  const [js, wasm, fonts] = await Promise.all([libraryCode(`${origin}${GPU_CORE_ROUTE}`, 'gpu-core', input.fetchBlob), libraryCode(`${origin}${GPU_WASM_ROUTE}`, 'gpu-core', input.fetchBlob), fontsOf(source, input.fetchBlob)]);
+  return { js: await js.text(), wasm: await zipBase64(new Uint8Array(await wasm.arrayBuffer())), origin, fonts };
+}
+
 export async function interactiveBundle(input: InteractiveInput): Promise<InteractiveBundle> {
-  const { settings, assets, tokens } = await inlinedInput(input);
+  const source = await inlinedInput(input);
   const origin = input.origin ?? defaultOrigin();
-  const page = { doc: input.doc, tokens, assets, analyses: input.analyses, liveness: Liveness.Live, target: Target.Screen, origin };
-  const hosted = composeHtml(page);
-  const [{ [Script.Player]: player, ...inlined }, modules] = await Promise.all([inlinedScripts(hosted, origin, input.fetchBlob), inlinedModules(hosted, origin, input.fetchBlob)]);
-  const composed = composeHtml({ ...page, inlined, modules });
-  const html = `<!doctype html>${licences({ ...inlined, [Script.Player]: player }, origin)}${playerPage(composed, input.doc, settings, input.title, inlinedScript(Script.Player, player ?? ''))}`;
-  return { html, bytes: new TextEncoder().encode(html).length, snippet: fileSnippet({ ...input.doc, interactive: settings }) };
+  const [player, core] = await Promise.all([libraryCode(`${origin}${GPU_PLAYER_ROUTE}`, 'the player', input.fetchBlob).then((b) => b.text()), inlineCoreOf(input, source, origin)]);
+  const inlined = `<script>window.${INLINE_CORE_GLOBAL}=${scriptJson(core)};</script><script type="module">${moduleSafe(player)}</script>`;
+  const html = `<!doctype html>${pageOf(sourceOf('', source.doc, source.settings), esc(input.title), inlined, gpuStage(source))}`;
+  return { html, bytes: new TextEncoder().encode(html).length, snippet: fileSnippet({ ...input.doc, interactive: source.settings }) };
 }
