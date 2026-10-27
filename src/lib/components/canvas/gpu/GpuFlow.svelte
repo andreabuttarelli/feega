@@ -100,7 +100,6 @@
   import NodeBoundary from '../NodeBoundary.svelte';
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
-  import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
@@ -118,7 +117,6 @@
   import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
-  import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
@@ -232,7 +230,6 @@
   let surface = $state<HTMLDivElement | null>(null);
   let scene = $state<GpuScene | null>(null);
   let failed = $state<string | null>(null);
-  let lossNote = $state<string | null>(null);
   let view = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
 
   $effect(() => {
@@ -3284,7 +3281,6 @@
     const recover = (lost: GpuScene) => {
       const next = nextBackend(lost.backend);
       console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'none'}`);
-      lossNote = `${lost.backend} lost`;
       scene = null;
       built = null;
       try {
@@ -3533,9 +3529,6 @@
     />
   {/if}
 
-  {#if dev}
-    <RendererBadge renderer={scene?.backend ?? (coreOn ? CORE : 'starting')} reason={lossNote} />
-  {/if}
 
   {#if refusal}
     <p class="edge-refusal" role="status">{refusal}</p>

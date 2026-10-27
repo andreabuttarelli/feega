@@ -18,3 +18,15 @@ a component would be an abstraction with one shape. Labels under icons (the mini
 were left out: they double the chrome height and the tooltips already name every button.
 
 `canvas-shell-layout.test.ts` now asserts the floating layout instead of the docked one.
+
+## Follow-up: draw tools, Runs, renderer chip
+
+- Draw tools: `src/lib/canvas/draw-dock.ts` is the one table of what sits on the bar (select,
+  frame, rectangle, ellipse, text, pen) and what goes in More (line, arrow, polygon, star, pencil,
+  shape builder). More is a menu row per tool: icon, name, shortcut. When a More tool is active the
+  More button shows its icon. Tooltips on bar tools show name, shortcut and the one-line gesture
+  already declared in `ACTIONS`. Frame tool icon `frame`, shape builder `combine`.
+- Runs: icon-only round button (`history`), tooltip and aria-label "Runs", a count badge for
+  running/queued runs.
+- The `core` renderer chip is gone; it was dev-only and the engine is assumed right.
+- Under 1180px the floating side panels stop above the add bar.

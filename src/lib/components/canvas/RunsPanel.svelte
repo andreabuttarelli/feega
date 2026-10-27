@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { RunListing } from '$lib/canvas/run-graph';
+  import History from '@lucide/svelte/icons/history';
+  import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
   let {
     runs,
@@ -13,6 +15,9 @@
 
   let open = $state(false);
 
+  const ACTIVE_STATUSES = ['running', 'queued'];
+  const activeCount = $derived(runs.filter((run) => ACTIVE_STATUSES.includes(run.status)).length);
+
   const cost = (usd: number | null) => (usd === null ? '—' : `$${usd.toFixed(3)}`);
 </script>
 
@@ -21,7 +26,19 @@
     {#if staleCount}
       <button type="button" data-testid="run-all-stale" onclick={onrunstale}>Run all out of date ({staleCount})</button>
     {/if}
-    <button type="button" aria-expanded={open} onclick={() => (open = !open)}>Runs</button>
+    <Tooltip.Provider delayDuration={200}>
+      <Tooltip.Root>
+        <Tooltip.Trigger>
+          {#snippet child({ props })}
+            <button {...props} type="button" class="runs-toggle" aria-label="Runs" aria-expanded={open} onclick={() => (open = !open)}>
+              <History size={16} />
+              {#if activeCount}<span class="count" data-testid="runs-active">{activeCount}</span>{/if}
+            </button>
+          {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content side="top">Runs</Tooltip.Content>
+      </Tooltip.Root>
+    </Tooltip.Provider>
   </div>
   {#if open}
     <ol>
@@ -73,6 +90,34 @@
     box-shadow: var(--ui-shadow-float);
     color: inherit;
     cursor: pointer;
+  }
+
+  .runs-toggle {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    color: var(--ui-icon-ink);
+  }
+  .runs-toggle:hover {
+    color: var(--ui-text);
+  }
+
+  .count {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
+    font-size: 10px;
+    line-height: 16px;
+    text-align: center;
   }
 
   ol {

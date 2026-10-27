@@ -11,7 +11,9 @@
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import Film from '@lucide/svelte/icons/film';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
-  import Hash from '@lucide/svelte/icons/hash';
+  import FrameIcon from '@lucide/svelte/icons/frame';
+  import Shapes from '@lucide/svelte/icons/shapes';
+  import { DockPlace, toolsIn } from '$lib/canvas/draw-dock';
   import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
   import PenTool from '@lucide/svelte/icons/pen-tool';
   import Sparkles from '@lucide/svelte/icons/sparkles';
@@ -149,10 +151,22 @@
 
   const SHAPE_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
     const tip = tipText(command);
-    return { tool, name: tip.name, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[command].icon };
+    return { tool, name: tip.name, keys: tip.keys, hint: ACTIONS[command].gesture ?? '', label: `${tip.name} (${tip.keys})`, icon: ACTIONS[command].icon };
   });
-  const FRAME_TOOL = { tool: DrawTool.Frame, name: 'Frame', label: 'Frame', icon: Hash };
+  const FRAME_TOOL = { tool: DrawTool.Frame, name: 'Frame', keys: '', hint: 'Drag to draw a frame', label: 'Frame', icon: FrameIcon };
   const DRAW_TOOLS = [...SHAPE_TOOLS, FRAME_TOOL];
+  const toolOf = (tool: DrawTool) => DRAW_TOOLS.find((t) => t.tool === tool)!;
+  const BAR_TOOLS = toolsIn(DockPlace.Bar).map(toolOf);
+  const MORE_TOOLS = toolsIn(DockPlace.More).map(toolOf);
+  const MORE_LABEL = 'More tools';
+
+  let toolsMore = $state(false);
+  const moreActive = $derived(MORE_TOOLS.find((t) => t.tool === frameBar.tool) ?? null);
+
+  function pickMoreTool(tool: DrawTool) {
+    toolsMore = false;
+    frameBar.tool = tool;
+  }
 
   let drawOpen = $state(false);
 
@@ -380,16 +394,37 @@
   {/if}
 {/snippet}
 
+{#snippet toolTip(t: (typeof DRAW_TOOLS)[number])}
+  <span class="add-tip tool-tip" role="tooltip"><span class="tip-head">{t.name}{#if t.keys}<kbd>{t.keys}</kbd>{/if}</span>{#if t.hint}<span class="tip-hint">{t.hint}</span>{/if}</span>
+{/snippet}
+
 {#snippet drawSlot()}
   <span class="draw" class:open={drawOpen} role="toolbar" aria-label="Draw" data-testid="draw-tools">
-    {#each DRAW_TOOLS as t (t.tool)}
+    {#each BAR_TOOLS as t (t.tool)}
       <span class="tool">
-        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} title={t.label} data-tool={t.tool} onclick={() => pickTool(t.tool)}>
+        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} data-tool={t.tool} onclick={() => pickTool(t.tool)}>
           <t.icon size={17} strokeWidth={1.7} />
         </button>
-        <span class="add-tip" role="tooltip">{t.label}</span>
+        {@render toolTip(t)}
       </span>
     {/each}
+    <span class="tool">
+      <button type="button" class="pick" class:on={!!moreActive} aria-label={moreActive ? `${MORE_LABEL}: ${moreActive.name}` : MORE_LABEL} aria-haspopup="menu" aria-expanded={toolsMore} data-testid="draw-more" data-tool={moreActive?.tool} onclick={() => (toolsMore = !toolsMore)}>
+        {#if moreActive}<moreActive.icon size={17} strokeWidth={1.7} />{:else}<Shapes size={17} strokeWidth={1.7} />{/if}
+      </button>
+      {#if !toolsMore}<span class="add-tip" role="tooltip">{MORE_LABEL}</span>{/if}
+      {#if toolsMore}
+        <span class="tools-menu" role="menu" aria-label={MORE_LABEL}>
+          {#each MORE_TOOLS as t (t.tool)}
+            <button type="button" role="menuitem" class="tools-row" class:on={frameBar.tool === t.tool} data-tool={t.tool} title={t.hint} onclick={() => pickMoreTool(t.tool)}>
+              <t.icon size={16} strokeWidth={1.7} />
+              <span class="tools-name">{t.name}</span>
+              <kbd>{t.keys}</kbd>
+            </button>
+          {/each}
+        </span>
+      {/if}
+    </span>
   </span>
 {/snippet}
 
@@ -667,6 +702,63 @@
   .keys-toggle {
     cursor: pointer;
     color: var(--ui-text-secondary);
+  }
+
+  .tool-tip {
+    display: grid;
+    gap: 2px;
+    text-align: left;
+  }
+  .tip-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tip-hint {
+    font-weight: var(--ui-weight-regular, 400);
+    opacity: 0.7;
+  }
+  kbd {
+    font-family: var(--ui-mono);
+    font-size: var(--ui-type-caption);
+    opacity: 0.7;
+  }
+
+  .tools-menu {
+    position: absolute;
+    z-index: 14;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: grid;
+    min-width: 220px;
+    padding: 4px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
+  }
+  .tools-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    height: var(--ui-row, 32px);
+    padding: 0 10px;
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text);
+    font-size: var(--ui-type-body);
+  }
+  .tools-row:hover {
+    background: var(--ui-wash);
+  }
+  .tools-row.on {
+    background: var(--ui-selected);
+    color: var(--ui-accent-text);
+  }
+  .tools-name {
+    flex: 1;
+    text-align: left;
   }
 
   .add-tip {
