@@ -18,7 +18,7 @@ describe('genTileView', () => {
     expect(v.hint).toBe('Write what you want');
     expect(v.placeholder).toBe('Describe what you want to see…');
     expect(v.warn).toEqual({ text: 'Write what you want', soft: true });
-    expect(v.run).toEqual({ label: 'Generate', credits: '~0.04', variable: false, enabled: false });
+    expect(v.run).toEqual({ label: 'Generate', credits: '$0.04', variable: false, enabled: false });
   });
 
   it('drops the body of a text node that has nothing to show', () => {
@@ -39,7 +39,7 @@ describe('genTileView', () => {
   it('labels the run with its variants when there is more than one', () => {
     const v = genTileView(node(), quote({ credits: 16, variants: { count: 4, into: 'nodes' as never, counts: [1, 2, 4, 8] } }), extras);
 
-    expect(v.run).toMatchObject({ label: 'Generate ×4', credits: '~0.16' });
+    expect(v.run).toMatchObject({ label: 'Generate ×4', credits: '$0.16' });
   });
 
   it('offers Cancel all while a variant batch is in flight', () => {

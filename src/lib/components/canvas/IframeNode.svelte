@@ -30,17 +30,59 @@
     IFRAME_REFERRER_POLICY,
     IFRAME_SANDBOX,
     normalizeEmbedUrl,
-    type IframeNode,
-    type IframeSource
+    FRAME_TABS,
+    frameTabIndex,
+    type FrameTab,
+    type IframeNode
   } from '$lib/canvas/iframe-node';
+  import { ExportMode, starterFiles, type VarValues } from '$lib/canvas/code-frame';
+  import CodeFrame from './CodeFrame.svelte';
 
   let {
     node,
-    onchange
+    code = null,
+    selected = false,
+    onchange,
+    onvars,
+    onview,
+    onexport
   }: {
     node: IframeNode;
+    code?: IframeNode | null;
+    selected?: boolean;
     onchange?: (patch: Partial<IframeNode>) => void;
+    onvars?: (vars: VarValues) => void;
+    onview?: (route: string) => void;
+    onexport?: (mode: ExportMode) => void;
   } = $props();
+
+  let exporting = $state(false);
+
+  function pickExport(mode: ExportMode) {
+    exporting = false;
+    onexport?.(mode);
+  }
+
+  let newRoute = $state<string | null>(null);
+  let routeDraft = $state(node.route);
+
+  const routeOf = (raw: string) => '/' + raw.trim().replace(/^[#/]+/, '');
+
+  function openView() {
+    const raw = newRoute;
+    newRoute = null;
+    if (raw !== null && raw.trim()) {
+      onview?.(routeOf(raw));
+    }
+  }
+
+  function commitRoute() {
+    const route = routeOf(routeDraft);
+    routeDraft = route;
+    if (route !== node.route) {
+      onchange?.({ route });
+    }
+  }
 
   /**
    * Quel che si sta scrivendo resta locale finché non è valido: portare ogni battuta fino al
@@ -87,11 +129,25 @@
     onchange?.({ url: verdict.url, html: '' });
   }
 
-  function pickSource(source: IframeSource) {
-    // I due modi si escludono a vicenda nel database (`brand_canvas_items_iframe_source`), quindi
-    // passare all'uno svuota l'altro: tenerli entrambi pieni renderebbe la riga non salvabile, e
-    // il rifiuto arriverebbe molto dopo il gesto che lo ha causato.
-    onchange?.(source === 'url' ? { source, html: '' } : { source, url: '' });
+  const tabIndex = $derived(frameTabIndex(node.source, node.framework));
+  let editing = $state(true);
+
+  function pickTab(tab: FrameTab) {
+    if (tab.framework === null) {
+      onchange?.(tab.source === 'url' ? { source: 'url', html: '', files: {} } : { source: 'html', url: '', files: {} });
+      return;
+    }
+
+    if (node.source === 'code' && node.framework === tab.framework) {
+      return;
+    }
+
+    const hasCode = Object.keys(node.files).length > 0;
+    if (hasCode && !confirm(`Replace this frame's code with a new ${tab.label} starter?`)) {
+      return;
+    }
+
+    onchange?.({ source: 'code', url: '', html: '', framework: tab.framework, files: starterFiles(tab.framework) });
   }
 
   /**
@@ -158,22 +214,56 @@
 
 <div class="frame">
   <header class="frame-head">
-    <div class="frame-modes" role="group" aria-label="Content source">
-      <button
-        type="button"
-        class:is-on={node.source === 'url'}
-        onclick={() => pickSource('url')}
-      >
-        URL
-      </button>
-      <button
-        type="button"
-        class:is-on={node.source === 'html'}
-        onclick={() => pickSource('html')}
-      >
-        Code
-      </button>
-    </div>
+    {#if node.source === 'view'}
+      <span class="frame-view-label">View</span>
+      <input
+        class="frame-field"
+        aria-label="Route"
+        data-testid="view-route"
+        bind:value={routeDraft}
+        onblur={commitRoute}
+        onkeydown={(e) => e.key === 'Enter' && commitRoute()}
+      />
+    {:else}
+      <div class="frame-modes" role="group" aria-label="Content source">
+        {#each FRAME_TABS as tab, i (tab.label)}
+          <button type="button" class:is-on={i === tabIndex} onclick={() => pickTab(tab)}>
+            {tab.label}
+          </button>
+        {/each}
+      </div>
+    {/if}
+
+    {#if node.source === 'code'}
+      <span class="frame-actions">
+        {#if newRoute === null}
+          <button type="button" class="frame-edit" onclick={() => (newRoute = '/')}>Open page in new frame</button>
+        {:else}
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            class="frame-field frame-route"
+            aria-label="Route for the new frame"
+            placeholder="/pricing"
+            autofocus
+            bind:value={newRoute}
+            onblur={openView}
+            onkeydown={(e) => e.key === 'Enter' && openView()}
+          />
+        {/if}
+        <span class="frame-export">
+          <button type="button" class="frame-edit" aria-expanded={exporting} onclick={() => (exporting = !exporting)}>Export</button>
+          {#if exporting}
+            <span class="frame-export-menu" role="menu">
+              <button type="button" role="menuitem" onclick={() => pickExport(ExportMode.Inline)}>Vite project, values inline</button>
+              <button type="button" role="menuitem" onclick={() => pickExport(ExportMode.Config)}>Vite project, values in src/content.ts</button>
+            </span>
+          {/if}
+        </span>
+        <button type="button" class="frame-edit" class:is-on={editing} aria-pressed={editing} onclick={() => (editing = !editing)}>
+          Editor
+        </button>
+      </span>
+    {/if}
 
     {#if node.source === 'url'}
       <input
@@ -207,6 +297,15 @@
        dentro un viewport che trasforma e a cui riscrive `visibility` a ogni misura nuova, quindi
        il differimento si riarmava a ogni pan e a ogni zoom — la pagina ripartiva da capo per
        sempre. Un'anteprima su una tela non ha niente da differire: il nodo è lì per guardarlo. -->
+  {#if node.source === 'code'}
+    <CodeFrame owner={node.id} framework={node.framework} files={node.files} {editing} {selected} vars={node.vars} onchange={(files) => onchange?.({ files, url: '', html: '' })} onvars={(vars) => onvars?.(vars)} />
+  {:else if node.source === 'view'}
+    {#if code?.source === 'code'}
+      <CodeFrame owner={code.id} framework={code.framework} files={code.files} editing={false} route={node.route} {selected} label={`View ${node.route}`} vars={code.vars} onvars={(vars) => onvars?.(vars)} />
+    {:else}
+      <p class="frame-hint" data-testid="view-orphan">The code frame this view showed was deleted. Delete this view, or undo the deletion.</p>
+    {/if}
+  {:else}
   <div class="frame-body" bind:this={body}>
     {#if node.source === 'html'}
       <!--
@@ -233,6 +332,7 @@
       <p class="frame-hint">{refusal ?? 'Paste an address'}</p>
     {/if}
   </div>
+  {/if}
 
   {#if node.source === 'html'}
     <footer class="frame-foot">
@@ -313,6 +413,64 @@
   .frame-modes button.is-on {
     color: var(--ink, #1d1d1f);
     background: var(--paper, #fff);
+  }
+
+  .frame-actions {
+    display: inline-flex;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .frame-export {
+    position: relative;
+  }
+  .frame-export-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    min-width: 240px;
+    padding: 4px;
+    background: var(--paper, #fff);
+    border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--ui-radius-md, 6px);
+    box-shadow: 0 8px 24px -12px rgb(0 0 0 / 0.25);
+  }
+  .frame-export-menu button {
+    padding: 6px 8px;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    background: none;
+    border: none;
+    border-radius: var(--ui-radius-sm, 4px);
+    cursor: pointer;
+  }
+  .frame-export-menu button:hover {
+    background: var(--paper-2, #f2f2f2);
+  }
+  .frame-route {
+    width: 120px;
+    flex: none;
+  }
+  .frame-view-label {
+    font-size: 11.5px;
+    color: var(--ink-soft, #6e6e73);
+  }
+  .frame-edit {
+    padding: 3px 8px;
+    font: inherit;
+    font-size: 11.5px;
+    color: var(--ink-soft, #6e6e73);
+    background: none;
+    border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--ui-radius-sm, 4px);
+    cursor: pointer;
+  }
+  .frame-edit.is-on {
+    color: var(--ink, #1d1d1f);
+    background: var(--paper-2, #f9f9f9);
   }
 
   .frame-field {

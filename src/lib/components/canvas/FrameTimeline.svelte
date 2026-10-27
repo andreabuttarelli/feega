@@ -7,6 +7,7 @@
   import { advance } from '$lib/canvas/frame-playhead';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+  import { proxySetting } from '$lib/motion/gpu/proxy-setting.svelte';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { frameBarActions } from '$lib/canvas/frame-inspector';
   import { EditMode } from '$lib/motion/edit-mode';
@@ -112,6 +113,7 @@
     {#each grouping as id (id)}<IconButton action={id} size={14} data-testid={`frame-timeline-${id}`} onclick={() => onaction(id)} />{/each}
     {#if onpin}<button type="button" class="pin-here" data-testid="frame-timeline-pin" onclick={onpin}>Comment here</button>{/if}
     <span class="spacer"></span>
+    <button type="button" class="pin-here" data-testid="frame-timeline-proxies" aria-pressed={proxySetting.on} title="Play and scrub a light copy of large videos. Export always uses the original." onclick={() => proxySetting.toggle()}>Use proxies</button>
     <IconButton action={Action.ToggleEditMode} size={14} pressed={mode === EditMode.Motion} label={MODE_LABEL[mode]} data-testid="frame-timeline-mode" data-mode={mode} onclick={onmode} />
     <IconButton action={Action.GraphMode} size={14} pressed={graphOpen} onclick={() => (graphOpen = !graphOpen)} />
   </div>
@@ -150,6 +152,27 @@
     border-top: 1px solid var(--ui-line, #e5e5e5);
     color: var(--ui-ink);
     z-index: 5;
+  }
+
+  @media (min-width: 768px) {
+    .timeline {
+      left: var(--shell-left, 0px);
+      right: var(--shell-right, 0px);
+      bottom: 12px;
+      overflow: hidden;
+      border-top: 0;
+      border-radius: var(--ui-radius-lg);
+      background: var(--ui-panel-raised);
+      box-shadow: var(--ui-shadow-float);
+      transition: left var(--ui-dur-fast) var(--ui-ease), right var(--ui-dur-fast) var(--ui-ease);
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1180px) {
+    .timeline {
+      left: 68px;
+      right: 12px;
+    }
   }
 
   .bar {

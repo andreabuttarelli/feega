@@ -3,6 +3,7 @@ import { THREE_D_COMPONENTS, TrackKind, type ComponentId } from './components';
 import { keyframeSchema, type Keyframe } from './keyframes';
 import { BlendMode } from './blend';
 import { MAX_SOURCE } from './expression/language';
+import { STAGE_LIGHT, STAGE_LIGHT_COLOUR, STAGE_LIGHT_KEYS, StageLightKind } from './lights';
 
 export enum Space {
   World = 'world',
@@ -67,7 +68,21 @@ export enum Composite {
   Projected = 'projected'
 }
 
-export type StageLayer = { id: string; depth: number; kind: `${LayerKind}`; dof: boolean; composite: `${Composite}` };
+export const TURN_KEYS = ['rotateX', 'rotateY', 'rotateZ'] as const;
+
+export type StageTurn = { from: number; base: Record<(typeof TURN_KEYS)[number], number>; keyframes: Partial<Record<string, Keyframe[]>> };
+
+export type StageLayer = { id: string; depth: number; kind: `${LayerKind}`; dof: boolean; composite: `${Composite}`; lit?: StageTurn };
+
+export type StageLight = {
+  from: number;
+  to: number;
+  kind: `${StageLightKind}`;
+  color: string;
+  depth: number;
+  base: Record<string, number>;
+  keyframes: Partial<Record<string, Keyframe[]>>;
+};
 
 export type StageSpec = {
   width: number;
@@ -77,21 +92,62 @@ export type StageSpec = {
   base: CameraValues;
   keyframes: Partial<Record<CameraKey, Keyframe[]>>;
   layers: StageLayer[];
+  lights?: StageLight[];
 };
 
-type StageClip = { id: string; component: ComponentId; depth: number; space: Space; props: Record<string, unknown>; blend?: string };
+type StageClip = {
+  id: string;
+  component: ComponentId;
+  from: number;
+  durationInFrames: number;
+  depth: number;
+  space: Space;
+  props: Record<string, unknown>;
+  transform: Record<string, number | undefined>;
+  keyframes: Record<string, Keyframe[]>;
+  blend?: string;
+  hidden?: boolean;
+  acceptsLights?: boolean;
+};
 
 const LOOKS_THE_SAME_BLURRED: Partial<Record<ComponentId, (props: Record<string, unknown>) => boolean>> = {
   BrandBackground: (props) => props.pattern === 'solid'
 };
 
 const blurrable = (c: StageClip) => !THREE_D_COMPONENTS.includes(c.component) && !LOOKS_THE_SAME_BLURRED[c.component]?.(c.props);
-type StageDoc = { width: number; height: number; camera: Camera | null; tracks?: { kind: string; clips: unknown[] }[] };
+type StageDoc = { width: number; height: number; camera: Camera | null; tracks?: { kind: string; hidden?: boolean; clips: unknown[] }[] };
+
+const LIGHT_COMPONENT: ComponentId = 'Light';
+
+function shownClips(doc: StageDoc): StageClip[] {
+  const bottomFirst = [...(doc.tracks ?? [])].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);
+  return bottomFirst.flatMap((t) => t.clips as StageClip[]).filter((c) => !c.hidden);
+}
 
 function stageClips(doc: StageDoc): StageClip[] {
-  const bottomFirst = [...(doc.tracks ?? [])].reverse().filter((t) => t.kind === TrackKind.Visual);
-  return bottomFirst.flatMap((t) => t.clips as StageClip[]).filter((c) => c.space === Space.World);
+  return shownClips(doc).filter((c) => c.space === Space.World && c.component !== LIGHT_COMPONENT);
 }
+
+const numberOf = (value: unknown, fallback: number) => (typeof value === 'number' ? value : fallback);
+
+function stageLights(doc: StageDoc): StageLight[] {
+  return shownClips(doc)
+    .filter((c) => c.component === LIGHT_COMPONENT)
+    .map((c) => ({
+      from: c.from,
+      to: c.from + c.durationInFrames,
+      kind: (c.props.kind ?? StageLightKind.Point) as `${StageLightKind}`,
+      color: String(c.props[STAGE_LIGHT_COLOUR.key] ?? STAGE_LIGHT_COLOUR.fallback),
+      depth: c.depth,
+      base: {
+        ...Object.fromEntries(STAGE_LIGHT_KEYS.map((k) => [k, numberOf(c.props[k], STAGE_LIGHT[k].fallback)])),
+        ...Object.fromEntries(['x', 'y', 'z', 'rotateX', 'rotateY'].map((k) => [k, numberOf(c.transform[k], 0)]))
+      },
+      keyframes: c.keyframes
+    }));
+}
+
+const turnOf = (c: StageClip): StageTurn => ({ from: c.from, base: Object.fromEntries(TURN_KEYS.map((k) => [k, numberOf(c.transform[k], 0)])) as StageTurn['base'], keyframes: c.keyframes });
 
 export function stageSpec(doc: StageDoc): StageSpec {
   const camera = doc.camera ?? newCamera();
@@ -102,9 +158,11 @@ export function stageSpec(doc: StageDoc): StageSpec {
     const dof = blurrable(c) && dofSlots > 0;
     dofSlots -= dof ? 1 : 0;
     const composite = (c.blend ?? BlendMode.Normal) === BlendMode.Normal ? Composite.World : Composite.Projected;
-    return { id: c.id, depth: c.depth, kind: billboard ? LayerKind.Billboard : LayerKind.Flat, dof, composite };
+    const accepts = !billboard && c.acceptsLights !== false;
+    return { id: c.id, depth: c.depth, kind: billboard ? LayerKind.Billboard : LayerKind.Flat, dof, composite, ...(accepts ? { lit: turnOf(c) } : {}) };
   });
-  return { width: doc.width, height: doc.height, rest: cameraMath(() => 0).perspectiveOf(base.fov, doc.height), dof: camera.dof, base, keyframes: camera.keyframes, layers };
+  const lights = stageLights(doc);
+  return { width: doc.width, height: doc.height, rest: cameraMath(() => 0).perspectiveOf(base.fov, doc.height), dof: camera.dof, base, keyframes: camera.keyframes, layers, ...(lights.length ? { lights } : {}) };
 }
 
 type Sampler = (track: Keyframe[], frame: number) => number;
@@ -188,6 +246,98 @@ export function cameraMath(sample: Sampler) {
     return blur < MIN_BLUR ? 0 : Math.round(blur * 100) / 100;
   };
 
+  const LIT_MAX = 2;
+  const LIGHT_KINDS = { ambient: 'ambient', point: 'point', spot: 'spot', parallel: 'parallel' };
+
+  const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(String(hex).slice(i, i + 2), 16) / 255);
+
+  const numberAt = (base: number, track: Keyframe[] | undefined, frame: number) => (track && track.length ? sample(track, frame) : base);
+
+  const colourAt = (light: StageLight, frame: number) => {
+    const track = light.keyframes.color;
+    if (!track || !track.length) {
+      return channels(light.color);
+    }
+    const next = track.findIndex((k) => k.frame >= frame);
+    if (next === -1) {
+      return channels(String(track[track.length - 1].value));
+    }
+    if (next === 0 || track[next].frame === frame) {
+      return channels(String(track[next].value));
+    }
+    const from = channels(String(track[next - 1].value));
+    const to = channels(String(track[next].value));
+    const t = (frame - track[next - 1].frame) / (track[next].frame - track[next - 1].frame);
+    return from.map((v, i) => v + (to[i] - v) * t);
+  };
+
+  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+  const unit = (v: number[]) => {
+    const length = Math.hypot(v[0], v[1], v[2]) || 1;
+    return [v[0] / length, v[1] / length, v[2] / length];
+  };
+
+  const aimOf = (rx: number, ry: number) => [Math.cos(rx * DEG) * Math.sin(ry * DEG), Math.sin(rx * DEG), Math.cos(rx * DEG) * Math.cos(ry * DEG)];
+
+  const normalOf = (rx: number, ry: number, rz: number) => {
+    const sx = Math.sin(rx * DEG);
+    const cx = Math.cos(rx * DEG);
+    const sy = Math.sin(ry * DEG);
+    const cy = Math.cos(ry * DEG);
+    const sz = Math.sin(rz * DEG);
+    const cz = Math.cos(rz * DEG);
+    const x = sy * cx;
+    const y = -sx;
+    const z = cy * cx;
+    return [cz * x - sz * y, sz * x + cz * y, -z];
+  };
+
+  const smooth = (edge: number, inner: number, angle: number) => (angle >= edge ? 0 : angle <= inner ? 1 : (edge - angle) / (edge - inner));
+
+  const reach = (light: StageLight, spec: Spec, frame: number, depth: number, normal: number[]) => {
+    const at = frame - light.from;
+    const pick = (key: string) => numberAt(light.base[key], light.keyframes[key], at);
+    if (light.kind === LIGHT_KINDS.ambient) {
+      return 1;
+    }
+    const aim = aimOf(pick('rotateX'), pick('rotateY'));
+    const position = [pick('x') * spec.width, pick('y') * spec.height, light.depth + pick('z')];
+    const toLight = light.kind === LIGHT_KINDS.parallel ? aim.map((v) => -v) : [position[0], position[1], position[2] - depth];
+    const lambert = Math.max(0, dot(normal, unit(toLight)));
+    if (light.kind === LIGHT_KINDS.parallel) {
+      return lambert;
+    }
+    const distance = Math.hypot(toLight[0], toLight[1], toLight[2]);
+    const radius = pick('falloff');
+    const fade = radius > 0 ? 1 / (1 + (distance / radius) ** 2) : 1;
+    if (light.kind === LIGHT_KINDS.point) {
+      return lambert * fade;
+    }
+    const angle = Math.acos(Math.min(1, Math.max(-1, dot(aim, unit(toLight.map((v) => -v)))))) / DEG;
+    const half = pick('coneAngle') / 2;
+    return lambert * fade * smooth(half, half * (1 - pick('coneFeather')), angle);
+  };
+
+  const litBy = (spec: Spec, layer: StageLayer, frame: number): number[] | null => {
+    const lights = (spec.lights ?? []).filter((l) => frame >= l.from && frame < l.to);
+    if (!layer.lit || !lights.length) {
+      return null;
+    }
+    const turn = layer.lit;
+    const at = frame - turn.from;
+    const rotation = (key: string) => numberAt(turn.base[key as 'rotateX'], turn.keyframes[key], at);
+    const normal = normalOf(rotation('rotateX'), rotation('rotateY'), rotation('rotateZ'));
+    const sum = [0, 0, 0];
+    for (const light of lights) {
+      const strength = numberAt(light.base.intensity, light.keyframes.intensity, frame - light.from) * reach(light, spec, frame, layer.depth, normal);
+      colourAt(light, frame - light.from).forEach((c, i) => {
+        sum[i] += c * strength;
+      });
+    }
+    return sum.map((v) => round(Math.min(LIT_MAX, Math.max(0, v))));
+  };
+
   const flatTransform = (spec: Spec, depth: number) => `translate3d(0px,0px,${round(-depth)}px) scale(${round(compensation(spec, depth))})`;
 
   const matrixCss = (m: M) => `matrix3d(${m.join(',')})`;
@@ -203,7 +353,8 @@ export function cameraMath(sample: Sampler) {
       layers: spec.layers.map((l) => ({
         id: l.id,
         transform: l.composite === 'projected' ? `${matrixCss(world)} ${own(l)}` : own(l),
-        blur: spec.dof && l.dof ? dofBlur(v.aperture, l.depth, v.focusDistance) : 0
+        blur: spec.dof && l.dof ? dofBlur(v.aperture, l.depth, v.focusDistance) : 0,
+        light: litBy(spec, l, frame)
       }))
     };
   };
