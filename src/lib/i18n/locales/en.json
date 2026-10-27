@@ -205,6 +205,7 @@
         "figmaRemove": "Remove",
         "figmaSaved": "Figma token saved.",
         "figmaTested": "Connected to Figma.",
+        "figmaTestedScope": "Figma accepted the token. It has no Current user scope, so the account name is hidden; images still work.",
         "figmaRemoved": "Figma token removed.",
         "figmaInvalid": "Paste a valid Figma token.",
         "figmaRejected": "Figma did not accept this token.",

@@ -3,6 +3,8 @@ const TOKEN_HEADER = 'X-Figma-Token';
 const FILE_KEY = /^[A-Za-z0-9_-]{6,64}$/;
 const IMAGE_HASH = /^[0-9a-f]{8,64}$/;
 const HTTP_OK = 200;
+const HTTP_FORBIDDEN = 403;
+const MISSING_SCOPE = /scope/i;
 
 export const MAX_HASHES = 40;
 
@@ -21,13 +23,13 @@ export type ImportResult = { outcome: FigmaOutcome; assets: Record<string, strin
 
 const asked = (token: string) => ({ headers: { [TOKEN_HEADER]: token } });
 
-export async function figmaMe(fetchFn: FetchFn, token: string): Promise<{ ok: true; handle: string } | { ok: false }> {
+export async function figmaMe(fetchFn: FetchFn, token: string): Promise<{ ok: true; handle: string | null } | { ok: false }> {
   const res = await fetchFn(`${FIGMA_API}/me`, asked(token)).catch(() => null);
-  if (res?.status !== HTTP_OK) {
-    return { ok: false };
+  const body = (await res?.json().catch(() => ({}))) as { handle?: string; err?: string } | undefined;
+  if (res?.status === HTTP_OK) {
+    return { ok: true, handle: body?.handle ?? '' };
   }
-  const body = (await res.json().catch(() => ({}))) as { handle?: string };
-  return { ok: true, handle: body.handle ?? '' };
+  return res?.status === HTTP_FORBIDDEN && MISSING_SCOPE.test(body?.err ?? '') ? { ok: true, handle: null } : { ok: false };
 }
 
 const refused = (outcome: FigmaOutcome): ImportResult => ({ outcome, assets: {} });

@@ -58,7 +58,7 @@
 {:else if form?.figmaSaved}
   <Notice tone="success">{$_('app.settings.profile.figmaSaved')}</Notice>
 {:else if form?.figmaTested !== undefined}
-  <Notice tone="success">{$_('app.settings.profile.figmaTested')}</Notice>
+  <Notice tone="success">{$_(form.figmaNote === 'scope' ? 'app.settings.profile.figmaTestedScope' : 'app.settings.profile.figmaTested')}</Notice>
 {:else if form?.cloudDisconnected}
   <Notice tone="success">{$_('app.settings.profile.cloudDisconnected')}</Notice>
 {:else if form?.cloudError}
