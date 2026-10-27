@@ -53,6 +53,27 @@ describe('Properties for one clip', () => {
     expect(textSection).toContain('data-segmented="Text align"');
   });
 
+  it('a text keeps the width and slant axes behind a collapsed advanced row', () => {
+    const html = inspect('Text');
+    const text = html.split('data-section="text"')[1] ?? '';
+
+    expect(text).toContain('data-testid="text-advanced"');
+    expect(text).toContain('aria-expanded="false"');
+    expect(text).not.toContain('Width axis');
+    expect(text).not.toContain('Slant axis');
+    expect(text).not.toContain('Other axes');
+    expect(text).toContain('>Weight</span>');
+    expect(text).toContain('>Spacing</span>');
+  });
+
+  it('a text offers the case as five icons, each named', () => {
+    const text = (inspect('Text').split('data-section="text"')[1] ?? '');
+
+    for (const name of ['As typed', 'Uppercase', 'Lowercase', 'Title case', 'Small caps']) {
+      expect(text).toContain(`aria-label="${name}"`);
+    }
+  });
+
   it('a colour is a swatch, a hex field and a picker, not a row of brand swatches', () => {
     const html = inspect('Caption');
 

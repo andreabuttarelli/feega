@@ -8,7 +8,12 @@ export enum SegmentIcon {
   Bottom = 'bottom',
   AutoWidth = 'auto-width',
   AutoHeight = 'auto-height',
-  FixedSize = 'fixed-size'
+  FixedSize = 'fixed-size',
+  AsTyped = 'as-typed',
+  Upper = 'upper',
+  Lower = 'lower',
+  Title = 'title',
+  SmallCaps = 'small-caps'
 }
 
 export type Segment = { value: string; label: string; icon: SegmentIcon | null };
@@ -49,11 +54,11 @@ const SEGMENTS: Record<string, Record<string, Omit<Segment, 'value'>>> = {
     cap: { label: 'Cap to baseline', icon: null }
   },
   textCase: {
-    'as-typed': { label: 'As typed', icon: null },
-    upper: { label: 'AA', icon: null },
-    lower: { label: 'aa', icon: null },
-    title: { label: 'Aa', icon: null },
-    'small-caps': { label: 'Small caps', icon: null }
+    'as-typed': { label: 'As typed', icon: SegmentIcon.AsTyped },
+    upper: { label: 'Uppercase', icon: SegmentIcon.Upper },
+    lower: { label: 'Lowercase', icon: SegmentIcon.Lower },
+    title: { label: 'Title case', icon: SegmentIcon.Title },
+    'small-caps': { label: 'Small caps', icon: SegmentIcon.SmallCaps }
   }
 };
 

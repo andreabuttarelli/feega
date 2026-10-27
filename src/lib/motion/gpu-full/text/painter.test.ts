@@ -54,6 +54,15 @@ describe('paintText', () => {
     expect(ink.right - ink.left).toBeLessThanOrEqual(e.box.width);
   });
 
+  it('draws a fixed-box text at the size it was given, however small the box', () => {
+    const height = (box: Record<string, unknown>) => {
+      const ink = extent(drawn(paintText(env('Text', { text: 'aa', size: 0.2, ...box }))));
+      return ink.bottom - ink.top;
+    };
+
+    expect(height({ width: 0.05, height: 0.02 })).toBeCloseTo(height({ width: 1, height: 1 }), 0);
+  });
+
   it('keeps an auto-width text on one line', () => {
     const e = env('Text', { text: 'aa bb cc', sizing: 'auto', width: 0.05 });
     const ink = extent(drawn(paintText(e)));
