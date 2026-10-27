@@ -40,7 +40,7 @@
 </script>
 
 {#if shown}
-  <img class="tiered" style:object-fit={fit} src={shown} {alt} decoding="async" data-tier={tier} />
+  <img draggable="false" class="tiered" style:object-fit={fit} src={shown} {alt} decoding="async" data-tier={tier} />
 {/if}
 
 <style>

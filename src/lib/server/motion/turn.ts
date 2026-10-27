@@ -1,3 +1,4 @@
+import { ffmpegLumas } from './track-frames';
 import { orgFontFamilies } from './font-upload';
 import { styleOf } from '$lib/motion/style';
 import { nameVersion, namedRevisions } from './version-names';
@@ -198,6 +199,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
     fontAdvance: readFontAdvance,
+    trackReader: ffmpegLumas,
     fonts: () => orgFontFamilies(db, orgId),
     inspect: frameStats,
     probe: async (times: number[]) => frameStats((await drawTurnFrames(`${CUT_PROBE_ID}-${probeDraws++}`, times))?.filter((f) => f.bytes.length > 0) ?? []),

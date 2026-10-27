@@ -127,7 +127,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
   import { frameHolding, type FrameHold } from '$lib/canvas/frame-holding';
-  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
+  import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
@@ -274,6 +276,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
   import type { FigmaJob } from '$lib/canvas/figma/images';
   import { ImagesOutcome, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
+  import { figmaNotice } from '$lib/canvas/figma/notice';
+  import FigmaNotice from '$lib/components/canvas/FigmaNotice.svelte';
   import { connectionMessage } from '$lib/canvas/connection-messages';
 
   const LINK_COPIED_MS = 1500;
@@ -695,6 +699,37 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+  }
+
+  function feedImageOver(client: PointerPoint | null) {
+    markFrame(client, null);
+    feedImageHover.over = client && !frameUnderPointer(client, null) ? (toFlow?.(client) ?? null) : null;
+  }
+
+  async function dropFeedImage(drag: FeedImageDrag, client: PointerPoint) {
+    feedImageOver(null);
+    feedImageHover.size = null;
+    const drop = dropAt(client, null);
+    if (!drop) {
+      return;
+    }
+
+    const ask = { source: drag.nodeId, item_id: drag.itemId, image_index: drag.imageIndex, drop: JSON.stringify(drop) };
+    if (drop.on !== DropOn.Canvas) {
+      landed(await post('importFeedImage', ask));
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    catalogPosters.set(id, drag.thumb);
+    nodes = [...nodes, toTile(pendingPicture(id, drop, feedImageSize(drag)))];
+    const res = await post('importFeedImage', { ...ask, node_id: id });
+    const created = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    catalogPosters.delete(id);
+    nodes = settle(nodes, id, created ? toTile(created, { select: true }) : null);
+    if (created) {
+      pushGesture(createGesture(created));
+    }
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -3565,7 +3600,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   const FIGMA_PASTE = 'These Figma layers could not be read. In Figma use Copy as → Copy as SVG, then paste here.';
-  const FIGMA_SKIPPED = 'Pasted from Figma. Approximated or skipped:';
 
   async function pasteFigma(html: string, at: { x: number; y: number }) {
     const res = await post('pasteFigma', { html, at: JSON.stringify(at) });
@@ -3577,12 +3611,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
     pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
     focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
-    const skipped = (res?.skipped ?? []) as string[];
-    if (skipped.length) {
-      failed = `${FIGMA_SKIPPED} ${skipped.join('; ')}`;
-    }
     const fileKey = (res?.fileKey ?? null) as string | null;
     const fills = (res?.fills ?? []) as { nodeId: string; images: FigmaImage[] }[];
+    figmaPasted({ skipped: (res?.skipped ?? []) as string[], images: fills.reduce((n, f) => n + f.images.length, 0), loading: Boolean(fileKey && fills.length) });
     if (fileKey && fills.length) {
       figmaJobs = [...figmaJobs, ...fills.map((f) => ({ ...f, fileKey }))];
     }
@@ -3618,16 +3649,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
     pushGesture({ items: landed.undo as UndoItem[] });
     focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
-    if (landed.skipped.length) {
-      failed = `${FIGMA_SKIPPED} ${landed.skipped.join('; ')}`;
-    }
+    figmaPasted({ skipped: landed.skipped, images: 0, loading: false });
   }
 
   let figmaJobs = $state<FigmaJob[]>([]);
-  let figmaTokenMissing = $state(false);
+  let figmaPaste = $state<{ skipped: string[]; images: number } | null>(null);
+  let figmaOutcome = $state<ImagesOutcome | null>(null);
+  const figmaShown = $derived(figmaPaste ? figmaNotice({ ...figmaPaste, outcome: figmaOutcome }) : null);
+
+  function figmaPasted(paste: { skipped: string[]; images: number; loading: boolean }) {
+    figmaPaste = { skipped: paste.skipped, images: paste.images };
+    figmaOutcome = paste.loading || !paste.images ? null : ImagesOutcome.Failed;
+  }
 
   function figmaImagesAnswered(answer: ImagesAnswer) {
-    figmaTokenMissing = answer.outcome === ImagesOutcome.NoToken;
+    figmaOutcome = answer.outcome;
     if (answer.outcome === ImagesOutcome.Failed) {
       failed = connectionMessage(answer.error);
     }
@@ -4030,11 +4066,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {/if}
     </p>
   {/if}
-  {#if figmaTokenMissing}
-    <p class="warning" role="status" data-testid="figma-token-hint">
-      Add a Figma token in Settings to import images
-      <a href="/p/{data.projectId}/settings/profile">Open settings</a>
-    </p>
+  {#if figmaShown}
+    <FigmaNotice notice={figmaShown} settingsHref="/p/{data.projectId}/settings/profile" onclose={() => (figmaPaste = null)} />
   {/if}
   {#if techniqueNotice}
     <p class="warning" role="status" data-testid="technique-notice">{techniqueNotice}</p>
@@ -4144,6 +4177,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCreate={create}
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
+    onDropFeedImage={dropFeedImage}
+    onFeedImageOver={feedImageOver}
     onDraw={drawElement}
     onDrawFrame={drawFrame}
     onRotate={rotateGroupBy}
@@ -4169,6 +4204,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onPasteData={pasteData}
     {figmaJobs}
     onFigmaImages={figmaImagesAnswered}
+    onFigmaPaste={figmaPasted}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
     techniques={techniqueShelf.list}
@@ -4222,6 +4258,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     follow={followView}
   >
     {#snippet canvasOver()}
+      {#if feedImageHover.over && feedImageHover.size}
+        <div class="feed-drop" data-testid="feed-drop" style={`transform: translate(${feedImageHover.over.x - feedImageHover.size.w / 2}px, ${feedImageHover.over.y - feedImageHover.size.h / 2}px);width:${feedImageHover.size.w}px;height:${feedImageHover.size.h}px`}></div>
+      {/if}
       {#if commentsPanel.pending && !commentsPanel.pending.nodeId}
         <CommentPin ghost at={commentsPanel.pending} />
       {/if}
@@ -4406,7 +4445,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onfield={(patch) => write(id, patch)}
             onsync={() => sync(id)}
           >
-            <ProductsNode node={catalog} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
+            <ProductsNode node={catalog} nodeId={id} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
           </SourceSettingsFrame>
         {:else if feed}
           <SourceSettingsFrame
@@ -4416,7 +4455,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onfield={(patch) => write(id, patch)}
             onsync={() => sync(id)}
           >
-            <SocialFeedNode node={feed} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
+            <SocialFeedNode node={feed} nodeId={id} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
           </SourceSettingsFrame>
         {:else if influencer}
           <InfluencerNode
@@ -4575,6 +4614,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     height: 100%;
     background: var(--muted);
     animation: pending-pulse 1.2s ease-in-out infinite alternate;
+  }
+
+  .feed-drop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    border: 1.5px dashed var(--ink, #1d1d1f);
+    background: rgb(0 0 0 / 0.05);
   }
 
   .pending-frame.shown {

@@ -600,6 +600,33 @@ allowlist
     await cmdAllowlistSet(medium as 'image' | 'video' | 'model3d', ids, opts);
   });
 
+const fonts = program
+  .command('fonts')
+  .description('List the fonts uploaded to your org')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdFonts } = await import('./commands/fonts.ts');
+    await cmdFonts(opts);
+  });
+
+fonts
+  .command('upload <file>')
+  .description('Upload a TTF, OTF, WOFF or WOFF2 file to the org font library')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (file: string, opts) => {
+    const { cmdFontsUpload } = await import('./commands/fonts.ts');
+    await cmdFontsUpload(file, opts);
+  });
+
+fonts
+  .command('delete <family>')
+  .description('Delete an uploaded font family; frames using it fall back to a system font')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (family: string, opts) => {
+    const { cmdFontsDelete } = await import('./commands/fonts.ts');
+    await cmdFontsDelete(family, opts);
+  });
+
 const caps = program
   .command('caps')
   .description('Show the spend caps of your org')

@@ -5,6 +5,8 @@ import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { FONT_FILE, MAX_FONT_MB, fontFamilies, missingUploads, type FontFamily, type FontFile, type FontLibrary, type FontUploaded } from '$lib/motion/fonts/library';
 import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
+import { orgFontCss } from '$lib/fonts/org-fonts';
+import { orgFonts } from '$lib/fonts/org-font-store.svelte';
 import { canvasMediaUploader } from './media-uploader';
 import type { MediaUploader } from '$lib/components/motion/media-upload';
 
@@ -103,6 +105,11 @@ export class FrameExtras implements FontLibrary {
     }
   }
 
+  get faceCss(): string {
+    const urls = this.assetUrls;
+    return orgFontCss(this.families.flatMap((f) => f.variants.map((v) => ({ ...v, family: f.family, url: urls[v.assetId] ?? null }))));
+  }
+
   get missing(): string[] {
     return missingUploads(this.docOf().fonts, this.assetUrls);
   }
@@ -138,6 +145,7 @@ export class FrameExtras implements FontLibrary {
     const font = result.data.font as FontFile;
     this.addAsset(result.data.asset as FrameAsset);
     this.families = fontFamilies([...this.families.flatMap((f) => f.variants.map((v) => ({ ...v, family: f.family }))), font]);
+    void orgFonts.refresh();
     return { ok: true, family: font.family };
   }
 
@@ -163,6 +171,7 @@ export class FrameExtras implements FontLibrary {
     const ids = this.families.find((f) => f.family === family)?.variants.map((v) => v.assetId) ?? [];
     this.gone = [...this.gone, ...ids];
     this.families = this.families.filter((f) => f.family !== family);
+    void orgFonts.refresh();
     return null;
   }
 }

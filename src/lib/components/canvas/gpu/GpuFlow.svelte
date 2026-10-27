@@ -149,6 +149,7 @@
   import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
+  import { CANVAS_DRAG_FEED_IMAGE, parseFeedImageDrag } from '$lib/canvas/feed-image';
   import { isAddable, type Addable } from '$lib/canvas/addable';
   import { edgeKindsFor } from '$lib/canvas/connect-rules';
   import { connectionRefusal, landingOf, type Connection } from '$lib/canvas/connection-verdict';
@@ -198,7 +199,7 @@
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -2578,7 +2579,6 @@
     [Pasted.Figma]: ({ html }) => ({ figma: html })
   };
   const PASTED_SUMMARY = 'Pasted';
-  const FIGMA_SKIPPED = 'Pasted from Figma. Approximated or skipped:';
 
   function pasteInFrame(data: PasteData<File>, at: Point): boolean {
     const paste = (IN_FRAME[data.kind] as ((d: PasteData<File>) => FramePaste) | undefined)?.(data);
@@ -2597,7 +2597,8 @@
     select([hit.nodeId]);
     commit(hit.nodeId, { ok: true, doc: done.doc }, PASTED_SUMMARY);
     pickMany(hit.nodeId, done.selection);
-    refusal = done.skipped?.length ? `${FIGMA_SKIPPED} ${done.skipped.join('; ')}` : null;
+    refusal = null;
+    props.onFigmaPaste?.({ skipped: done.skipped ?? [], images: done.images?.length ?? 0, loading: Boolean(done.images?.length && done.fileKey) });
     if (done.images?.length && done.fileKey) {
       void fillFigmaImages({ nodeId: hit.nodeId, fileKey: done.fileKey, images: done.images });
     }
@@ -2783,11 +2784,20 @@
 
   function onDragOver(e: DragEvent) {
     const types = e.dataTransfer?.types ?? [];
-    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, CANVAS_DRAG_COMPONENT, OS_FILES].some((type) => types.includes(type))) {
+    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, CANVAS_DRAG_COMPONENT, CANVAS_DRAG_FEED_IMAGE, OS_FILES].some((type) => types.includes(type))) {
       return;
     }
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'copy';
+    if (types.includes(CANVAS_DRAG_FEED_IMAGE)) {
+      props.onFeedImageOver?.({ x: e.clientX, y: e.clientY });
+    }
+  }
+
+  function onDragLeave(e: DragEvent) {
+    if (!wrap?.contains(e.relatedTarget as Node | null)) {
+      props.onFeedImageOver?.(null);
+    }
   }
 
   function dropComponent(dragged: ComponentDrag, world: Point) {
@@ -2808,6 +2818,12 @@
     if (files.length && props.onUpload) {
       e.preventDefault();
       files.forEach((file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? toFlow(at) : undefined));
+      return;
+    }
+    const feedImage = parseFeedImageDrag(e.dataTransfer?.getData(CANVAS_DRAG_FEED_IMAGE) ?? '');
+    if (feedImage) {
+      e.preventDefault();
+      props.onDropFeedImage?.(feedImage, at);
       return;
     }
     const output = e.dataTransfer?.getData(CANVAS_DRAG_OUTPUT);
@@ -2876,7 +2892,7 @@
 }} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} onpointermove={(e) => (pointer = { x: e.clientX, y: e.clientY })} oncopy={(e) => onCopy(e, false)} oncut={(e) => onCopy(e, true)} onpaste={onPasteEvent} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondragleave={onDragLeave} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
   {#if timeline}
     {@const nodeId = timeline.nodeId}
     <div style="display: contents" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
@@ -2893,6 +2909,7 @@
         onmark={(id) => props.onMark?.(id)}
         ram={ramNode === nodeId ? ramRuns : []}
         onram={() => cacheRam(nodeId, timeline!.doc)}
+        {assetUrl}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
       />

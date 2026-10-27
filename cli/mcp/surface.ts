@@ -92,6 +92,7 @@ export const TOOL_FAMILY: Readonly<Record<string, ToolFamily>> = {
   list_team: ToolFamily.Team,
   team_op: ToolFamily.Team,
   model_allowlist: ToolFamily.Team,
+  org_fonts: ToolFamily.Team,
   spend_caps: ToolFamily.Team,
   get_app_account: ToolFamily.Team,
   forget_app_account: ToolFamily.Team,

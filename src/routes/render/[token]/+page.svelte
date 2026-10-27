@@ -32,6 +32,8 @@
 
   const render = data.render;
   const html = render ? composeHtml({ doc: render.doc, tokens: render.tokens, assets: render.assetUrls, analyses: render.analyses }) : '';
+  const fullDoc = render ? { doc: render.doc, tokens: render.tokens, assets: render.assetUrls, analyses: render.analyses } : null;
+  const readsOf = render ? (only?: ReadonlySet<string>) => composeHtml({ doc: render.doc, tokens: render.tokens, assets: render.assetUrls, analyses: render.analyses, only }) : null;
   const total = render?.doc.durationInFrames ?? 0;
   const seconds = render ? render.doc.durationInFrames / render.doc.fps : 0;
   const hasAudio = render ? audioPlan(render.doc, render.assetUrls).length > 0 : false;
@@ -178,7 +180,7 @@
     </header>
 
     <div class="stage" style={`aspect-ratio: ${render.doc.width} / ${render.doc.height}`}>
-      <MotionPreview bind:this={preview} {html} width={render.doc.width} height={render.doc.height} fps={render.doc.fps} />
+      <MotionPreview bind:this={preview} {html} {fullDoc} gpuCompose={readsOf} width={render.doc.width} height={render.doc.height} fps={render.doc.fps} />
     </div>
 
     {#if phase === Phase.Checking}

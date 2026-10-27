@@ -236,7 +236,7 @@ through the same code (op `describe` `{}` lists them all, `{ op }` gives one inp
 `compare_runs` (what differs between two runs), `show_run` (pins a past run as the node output), `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
 `retry_loop_combination`, `preview_workflow`, `run_workflow`, `cancel_workflow`,
 `preview_run_graph`, `run_graph`, `cancel_render`, `withdraw_from_gallery`, `request_upload`,
-`register_upload`, `import_link`, `list_voices`, `voice_library`, `use_library_voice`, `design_voice`,
+`register_upload`, `import_link`, `import_feed_image`, `list_voices`, `voice_library`, `use_library_voice`, `design_voice`,
 `save_voice`, `clone_voice`, `delete_voice`. Every write a person
 makes on the canvas has an op here (`src/lib/server/parity/ui-actions.ts` holds the map). Reads
 are free; writes need a write key; `run_node`, `run_node_loop`, `retry_loop_combination`,
@@ -248,6 +248,11 @@ PUT the bytes to `uploadUrl` with the Content-Type, then `register_upload { canv
 fileName, mimeType, bytes, x?, y? }` answers the new node and asset. `feega canvas upload` does
 all three. `clone_voice` needs the user's consent (`attested: true`) and a 60-180 s recording as
 `sampleBase64` (max 3MB).
+
+`import_feed_image { canvasId, nodeId, itemId, imageIndex?, x?, y?, toFrameId?, frameX?, frameY? }` pulls one
+picture out of a Social feed or Products node (`itemId` is a post or product id from
+`canvas_snapshot`): the server copies it into the project, answers an image node and its asset,
+and keeps the source in `data.source`. With `toFrameId` it becomes an image layer of that Frame.
 
 `preview_run_graph` / `run_graph` take `{ graph: "downstream", nodeId }` (the node, then every
 node it feeds, in dependency order) or `{ graph: "stale", canvasId, nodeIds? }` (every result
@@ -425,4 +430,5 @@ permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publisha
 | `team_op` `set_role` / `remove_member` | `feega team role <userId> <role>` / `remove <userId>` |
 | `team_op` `leave` / `transfer_ownership` | `feega team leave` / `transfer <userId>` |
 | `model_allowlist` | `feega allowlist [set <medium> [ids...]]` |
+| `org_fonts` | `feega fonts [upload <file>\|delete <family>]` |
 | `spend_caps` | `feega caps [set <scope> <usd\|off> [--project <id>] [--reset monthly]]` |

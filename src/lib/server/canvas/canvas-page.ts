@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
 import { importCanvasLink, registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
+import { feedImageAskSchema, importFeedImage } from '$lib/server/canvas/feed-image';
 import { saveFontUpload } from '$lib/server/motion/font-upload';
 import { isOutputHandle } from '$lib/canvas/select-outputs';
 import { error, fail, redirect } from '@sveltejs/kit';
@@ -570,7 +571,7 @@ export const actions: Actions<CanvasParams> = {
   },
   uploadFont: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, path: String((await request.formData()).get('path') ?? '') });
+    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, userId: scope.userId, path: String((await request.formData()).get('path') ?? '') });
     return saved.ok ? { font: saved.font } : fail(400, { error: saved.error });
   },
   importLink: async ({ request, params, locals }) => {
@@ -583,6 +584,25 @@ export const actions: Actions<CanvasParams> = {
     try {
       const { asset } = await importCanvasLink(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, url });
       return { asset };
+    } catch (cause) {
+      if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
+      throw cause;
+    }
+  },
+  importFeedImage: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = feedImageAskSchema.safeParse({ nodeId: fd.get('source'), itemId: fd.get('item_id'), imageIndex: Number(fd.get('image_index') ?? 0), drop: jsonField(fd, 'drop'), id: fd.get('node_id') ?? undefined });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    try {
+      const landed = await importFeedImage(
+        { db: scope.db, frames: canvasFrames(scope), actor: userActor(scope) },
+        { ...ask.data, orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId }
+      );
+      return landed.placed === 'frame' ? movedAnswer(landed.moved) : { outcome: MoveOutcome.Done, node: landed.node, asset: landed.asset };
     } catch (cause) {
       if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
       throw cause;

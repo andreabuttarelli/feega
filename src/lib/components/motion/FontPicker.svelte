@@ -27,6 +27,7 @@
 
   const RESULTS = 40;
   const PREVIEW_LINK = 'motion-font-previews';
+  const UPLOADED_STYLE = 'motion-font-uploads';
   const REGULAR = 400;
   const ACCEPT = '.ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2';
 
@@ -78,6 +79,16 @@
     const link = (document.getElementById(PREVIEW_LINK) as HTMLLinkElement | null) ?? Object.assign(document.createElement('link'), { id: PREVIEW_LINK, rel: 'stylesheet' });
     link.href = href;
     document.head.appendChild(link);
+  });
+
+  $effect(() => {
+    const css = library?.faceCss ?? '';
+    if (!open || !css || typeof document === 'undefined') {
+      return;
+    }
+    const style = document.getElementById(UPLOADED_STYLE) ?? Object.assign(document.createElement('style'), { id: UPLOADED_STYLE });
+    style.textContent = css;
+    document.head.appendChild(style);
   });
 
   async function pickInstalled(family: string) {

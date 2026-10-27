@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isOwnEcho } from './node-save';
-import { FRAME_GAP, besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from './optimistic-insert';
+import { FRAME_GAP, besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from './optimistic-insert';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { CANVAS_INK, CanvasTheme } from '$lib/motion/draw-create';
 
@@ -35,6 +35,17 @@ describe('a frame placed before the server answers', () => {
 describe('a generated output dropped on the canvas', () => {
   it('shows centred on the drop while it saves', () => {
     expect(pendingOutput('o1', { x: 500, y: 500 })).toMatchObject({ id: 'o1', type: 'pending_frame', position: { x: 340, y: 340 } });
+  });
+});
+
+describe('a picture dragged out of a feed and dropped on the canvas', () => {
+  it('shows at the size the image node will have, centred on the drop, while the copy runs', () => {
+    expect(pendingPicture('p1', { x: 500, y: 400 }, { w: 288, h: 360 })).toMatchObject({
+      id: 'p1',
+      type: 'pending_frame',
+      position: { x: 356, y: 220 },
+      size: { width: 288, height: 360 }
+    });
   });
 });
 

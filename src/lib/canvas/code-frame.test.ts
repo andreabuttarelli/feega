@@ -111,4 +111,10 @@ describe('quali frame restano vivi sulla tela', () => {
     expect(isLiveCode({ sourceNodeId: 'n1', route: '/about' })).toBe(true);
     expect(isLiveCode({ url: 'https://example.com' })).toBe(false);
   });
+
+  it('declares the org fonts inside the frame, before the user code runs', () => {
+    const html = codeFrameHtml(Framework.React, starterFiles(Framework.React), undefined, '@font-face{font-family:"Acme";src:url("https://s/a.woff2")}');
+
+    expect(html).toMatch(/<style>@font-face\{font-family:"Acme"[^<]*<\/style>[\s\S]*<div id="root">/);
+  });
 });

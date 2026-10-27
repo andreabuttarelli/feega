@@ -287,6 +287,18 @@
         "adminOnly": "Only owners and admins can change this.",
         "unavailable": "Could not save. Try again later."
       },
+      "fonts": {
+        "title": "Fonts",
+        "subtitle": "Fonts uploaded here can be used by everyone in the organization, in every frame, code frame and video export.",
+        "upload": "Upload font",
+        "uploading": "Uploading…",
+        "hint": "TTF, OTF, WOFF or WOFF2, up to 10MB. Upload only fonts your licence allows.",
+        "empty": "No uploaded fonts yet.",
+        "delete": "Delete",
+        "confirmDelete": "Delete this font for everyone in the organization? Frames using it fall back to a system font.",
+        "preview": "The quick brown fox jumps over the lazy dog",
+        "styles": "styles"
+      },
       "spend": {
         "title": "Billing limits",
         "subtitle": "Stop spending once a limit is reached. Spending is counted from your AI usage; a monthly limit starts again on the first of the month.",

@@ -96,6 +96,8 @@ import { cancelRender } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
 import { importCanvasLink, registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
+import { importFeedImage } from '$lib/server/canvas/feed-image';
+import { DropOn } from '$lib/motion/move-element';
 import { canvasUploadPrefix, verdictForUpload } from '$lib/canvas/upload-kind';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { findProjectById } from '$lib/server/repos/projects';
@@ -460,6 +462,20 @@ const MAX_CLONE_SAMPLE_BYTES = 3 * 1024 * 1024;
 
 const requestUploadInput = z.object({ fileName: z.string().min(1), mimeType: z.string().min(1), bytes: z.number().int().positive() }).strict();
 const importLinkInput = z.object({ url: z.string().url().describe('https link to a picture or video') }).strict();
+
+const importFeedImageInput = z
+  .object({
+    canvasId: z.string(),
+    nodeId: z.string().describe('the Social feed or Products node'),
+    itemId: z.string().describe('id of a post (socialPosts) or product (products) in canvas_snapshot'),
+    imageIndex: z.number().int().min(0).default(0).describe('which picture of a carousel post or product'),
+    x: z.number().default(0).describe('canvas position of the new image node, its centre'),
+    y: z.number().default(0),
+    toFrameId: z.string().optional().describe('put the picture inside this Frame instead of making a node'),
+    frameX: z.number().min(0).max(1).default(0.5),
+    frameY: z.number().min(0).max(1).default(0.5)
+  })
+  .strict();
 
 const registerUploadInput = z
   .object({
@@ -1625,6 +1641,21 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: importLinkInput,
     run: async (ctx, input) => uploadAnswer(async () => ({ asset: (await importCanvasLink(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, url: input.url })).asset }))
+  }),
+
+  import_feed_image: op({
+    access: Access.Write,
+    input: importFeedImageInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const drop = input.toFrameId ? { on: DropOn.Frame, nodeId: input.toFrameId, at: { x: input.frameX, y: input.frameY } } as const : { on: DropOn.Canvas, x: input.x, y: input.y } as const;
+      return uploadAnswer(async () => {
+        const landed = await importFeedImage({ db: ctx.db, frames: framesOf(ctx), actor: ctx.actor }, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, nodeId: input.nodeId, itemId: input.itemId, imageIndex: input.imageIndex, drop });
+        return landed.placed === 'frame' ? frameAnswer(landed.moved) : { node: landed.node, asset: landed.asset };
+      });
+    }
   }),
 
   list_voices: op({
