@@ -4,6 +4,10 @@
   import BrandLogo from '$lib/components/BrandLogo.svelte';
   import BrandSwitcher from './BrandSwitcher.svelte';
   import BrandKit from './BrandKit.svelte';
+  import BrandLibrary from './BrandLibrary.svelte';
+  import { SegmentedControl } from '$lib/components/ui/shell';
+  import { LibraryTab, LIBRARY_TABS, type LibraryItem } from '$lib/canvas/brand-library';
+  import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { togglePin, type SwitcherBrand } from '$lib/canvas/brand-switcher';
   import type { PanelBrandBase } from '$lib/canvas/brand-pieces';
 
@@ -21,6 +25,42 @@
   let query = $state('');
   let pinned = $state<string[]>(readPins());
   let openId = $state<string | null>(null);
+
+  let tab = $state<LibraryTab>(LibraryTab.Kit);
+  let library = $state<Record<string, LibraryItem[] | 'loading' | 'failed'>>({});
+
+  const TAB_LABEL: Record<LibraryTab, string> = {
+    [LibraryTab.Kit]: 'Kit',
+    [LibraryTab.Products]: 'Products',
+    [LibraryTab.Posts]: 'Posts',
+    [LibraryTab.Ads]: 'Ads'
+  };
+
+  const TAB_EMPTY: Record<LibraryTab, string> = {
+    [LibraryTab.Kit]: '',
+    [LibraryTab.Products]: 'No products. Sync the store from the brand settings.',
+    [LibraryTab.Posts]: 'No posts or social posts yet.',
+    [LibraryTab.Ads]: 'No competitor ads tracked for this brand.'
+  };
+
+  const libraryKey = $derived(`${openId}:${tab}`);
+  const canvasId = $derived(page.params.canvasId ?? null);
+
+  function thumb(assetId: string): string | null {
+    return canvasId ? canvasAssetUrl(projectId, canvasId, assetId, AssetSize.Thumb) : null;
+  }
+
+  async function loadLibrary(key: string, brandId: string, which: LibraryTab) {
+    library[key] = 'loading';
+    const res = await fetch(`/api/v1/projects/${projectId}/agent/brands/${brandId}/library?tab=${which}`).catch(() => null);
+    library[key] = res?.ok ? ((await res.json()) as { items: LibraryItem[] }).items : 'failed';
+  }
+
+  $effect(() => {
+    if (openId && tab !== LibraryTab.Kit && !library[libraryKey]) {
+      void loadLibrary(libraryKey, openId, tab);
+    }
+  });
 
   const open = $derived(brands.find((b) => b.id === openId) ?? null);
   const newBrandHref = $derived(`/p/${projectId}/brands/new?returnTo=${encodeURIComponent(page.url.pathname)}`);
@@ -91,9 +131,20 @@
       <span class="logo"><BrandLogo name={open.name} url={open.logoUrl} /></span>
       <span class="name">{open.name}</span>
     </div>
-    {#key open.id}
-      <BrandKit {projectId} brand={open} />
-    {/key}
+    <SegmentedControl label="Brand material" value={tab} onchange={(value) => (tab = value as LibraryTab)} options={LIBRARY_TABS.map((value) => ({ value, label: TAB_LABEL[value] }))} />
+    <div class="tab-body">
+      {#if tab === LibraryTab.Kit}
+        {#key open.id}
+          <BrandKit {projectId} brand={open} />
+        {/key}
+      {:else if library[libraryKey] === 'failed'}
+        <button type="button" class="retry" onclick={() => openId && loadLibrary(libraryKey, openId, tab)}>Retry</button>
+      {:else if Array.isArray(library[libraryKey])}
+        <BrandLibrary items={library[libraryKey] as LibraryItem[]} {thumb} empty={TAB_EMPTY[tab]} />
+      {:else}
+        <p class="hint">Loading…</p>
+      {/if}
+    </div>
   {:else}
     <BrandSwitcher {brands} {pinned} {projectBrandId} bind:query {newBrandHref} onpick={(id) => (openId = id)} onpin={pin} />
   {/if}
@@ -136,6 +187,10 @@
     font-size: 14px;
     font-weight: 600;
     color: var(--ui-text);
+  }
+
+  .tab-body {
+    padding-top: 8px;
   }
 
   .hint {
