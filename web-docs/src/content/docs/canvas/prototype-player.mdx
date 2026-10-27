@@ -1,0 +1,67 @@
+---
+title: Prototype player
+description: Play a clickable prototype full screen, start it from a flow and share it as a link.
+sidebar:
+  order: 13
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="prototype-player" caption="Mark a starting point, press Play and click through the frames." />
+
+The player runs the [prototype links](/canvas/prototype-links/) of a canvas. It shows one frame at a time, full screen, and follows the links when you click, hover, drag or wait.
+
+## Play a prototype
+
+1. Open a frame and, with nothing selected, find **Prototype flow** in Properties.
+2. Press **Play**. The player opens on that frame.
+3. Click the layers that have links. The next frame arrives with the transition you chose.
+
+Clicking an empty spot flashes the linked areas. **Restart** (or `R`) goes back to the start; `Esc` closes the player, or closes an overlay first.
+
+| Trigger | In the player |
+|---|---|
+| On click | click the layer |
+| While hovering | the pointer enters the layer |
+| On drag | press on the layer and move |
+| After delay | a timer starts when the frame is shown |
+
+| Action | In the player |
+|---|---|
+| Navigate to, Scroll to | the target frame replaces the current one |
+| Open overlay | the target frame opens centred over the current one; click outside it to close |
+| Back | closes the top overlay, otherwise returns to the previous frame, with the transition reversed |
+
+Dissolve, Slide in and Push use the easing and duration set on the link.
+
+## Flows
+
+A flow is a named starting point. In **Prototype flow** press **Set as starting point** on the frame where a journey begins and name it (for example Onboarding). A canvas can hold several flows; the player lists them next to the frame name and **Restart** returns to the one you picked. **Remove** takes the mark off.
+
+## Share a play link
+
+Press **Copy play link**. It publishes every frame that can be reached from this one through the links, turns the canvas share link on and copies an address like `https://feega.app/play/<token>?frame=<nodeId>`. Anyone with the link plays the prototype, read only, without signing in. A link without `?frame=` starts on the first flow of the canvas, otherwise on the top-left frame.
+
+Turning the canvas share off ends every play link.
+
+## Agent, MCP and CLI
+
+- `set_flow` (frame tool, through `motion_tool` in MCP or `feega motion tool`) with `name`; `name: null` removes the mark. `get_motion_doc` reads it as `flow`.
+- `get_play_link` (MCP, and the canvas agent) with `node_id`: answers `url`, the reachable `frames` and the canvas `flows` as `{ frame_id, name }`.
+
+```bash
+feega motion tool <nodeId> set_flow --input '{"name":"Onboarding"}'
+feega motion play <nodeId>
+```
+
+```json
+{ "node_id": "<frame node id>" }
+```
+
+## Limits
+
+- Hovering opens the target on pointer enter; moving off the layer does not undo it, use a Back link.
+- Scroll to behaves like Navigate to: it moves to the target frame, it does not scroll inside a frame.
+- Frames are played at their first frame with the animation looping; layers are located where they sit at the start.
+- A public link shows only frames that are published; uncensored projects cannot be shared.
+- Overlays are centred at 80% of the stage; position and background options are not set per link.

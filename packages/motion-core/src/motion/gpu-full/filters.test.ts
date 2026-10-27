@@ -36,4 +36,8 @@ describe('unsupportedPrimitive', () => {
     expect(unsupportedPrimitive([{ tag: 'filter', attrs: {}, children: [{ tag: 'feSpecularLighting', attrs: {} }] }])).toBe('feSpecularLighting');
     expect(unsupportedPrimitive([{ tag: 'filter', attrs: {}, children: [{ tag: 'feOffset', attrs: {} }] }])).toBeNull();
   });
+
+  it('lets the warp pass of bulge, twirl, radial and lens blur through', () => {
+    expect(unsupportedPrimitive([{ tag: 'filter', attrs: {}, children: [{ tag: 'feWarp', attrs: { mode: 'twirl' } }] }])).toBeNull();
+  });
 });

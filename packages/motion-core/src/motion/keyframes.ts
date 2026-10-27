@@ -5,6 +5,7 @@ import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mas
 import { RING_NUMBERS, RING_NUMBER_KEYS } from '../canvas/composition/ring';
 import { PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS } from './particles/model';
 import { GLASS_NUMBERS, GLASS_NUMBER_KEYS, GLASS_TINT } from './glass/model';
+import { STAGE_LIGHT, STAGE_LIGHT_COLOUR, STAGE_LIGHT_KEYS } from './lights';
 import { BLOB_NUMBERS, BLOB_NUMBER_KEYS, BLOB_TINT } from './blob/model';
 
 export type Bezier = [number, number, number, number];
@@ -212,6 +213,11 @@ const BLOB_PROPS: AnimProp[] = [
   { key: BLOB_TINT.key, label: BLOB_TINT.label, kind: ValueKind.Color, source: Source.Param, min: 0, max: 0, step: 0, fallback: 0 }
 ];
 
+const LIGHT_PROPS: AnimProp[] = [
+  { key: STAGE_LIGHT_COLOUR.key, label: STAGE_LIGHT_COLOUR.label, kind: ValueKind.Color, source: Source.Prop, min: 0, max: 0, step: 0, fallback: 0 },
+  ...STAGE_LIGHT_KEYS.map((key) => ({ key, ...STAGE_LIGHT[key], kind: ValueKind.Number, source: Source.Prop }))
+];
+
 const RING_PROPS: AnimProp[] = RING_NUMBER_KEYS.map((key) => {
   const { label, min, max, step, fallback } = RING_NUMBERS[key];
   return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Layout };
@@ -243,6 +249,7 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   LiquidBlob: BLOB_PROPS,
   ShaderEffect: visual(),
   Precomp: visual(),
+  Light: [...transformProps, ...LIGHT_PROPS],
   Adjustment: adjustmentProps,
   Custom: visual()
 };

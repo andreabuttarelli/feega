@@ -33,7 +33,7 @@
     data-control="settings"
     class={cn(
       CONTROL_HEIGHT,
-      'inline-flex min-w-0 max-w-64 items-center gap-1.5 border border-line-2 bg-background px-2 text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-expanded:bg-muted'
+      'inline-flex min-w-0 max-w-64 items-center gap-1.5 rounded-sm bg-transparent px-2 text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-expanded:bg-muted'
     )}
   >
     <SlidersHorizontal class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />

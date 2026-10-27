@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { isCloudProvider, uploadFile } from '$lib/server/cloud/cloud';
+import { exportName } from '$lib/server/cloud/export-name';
 import { cloudAccess } from '$lib/server/cloud/runtime';
 import { findAsset } from '$lib/server/repos/assets';
 import { BUCKET_BY_SOURCE, SIGNED_URL_TTL_S, signStoredFile } from '$lib/server/repos/asset-storage';
@@ -43,7 +44,7 @@ export const POST: RequestHandler = async (event) => {
     return json({ error: 'asset_unreadable' }, { status: HTTP_BAD_GATEWAY });
   }
   const mime = asset.mimeType ?? fetched.headers.get('content-type') ?? 'application/octet-stream';
-  const name = ask.data.name ?? asset.url.split('/').pop() ?? 'export';
+  const name = ask.data.name ?? exportName(asset.url);
 
   const done = await uploadFile(event.params.provider, access.token, { folder: ask.data.folder, name, mime, bytes: new Uint8Array(await fetched.arrayBuffer()) });
   return done ? json({ exported: true }) : json({ error: 'upload_failed' }, { status: HTTP_BAD_GATEWAY });

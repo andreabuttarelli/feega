@@ -3,7 +3,7 @@ import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/mot
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { VarType } from '@feega/motion-core/motion/variables-model';
 import { bindVariable, defineVariable, setActiveMode } from './variables';
-import { adoptCollection, syncedCollection, variableLibraryOf } from './variable-library';
+import { adoptCollection, bindFromLibrary, syncedCollection, variableLibraryOf } from './variable-library';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -48,5 +48,16 @@ describe('the variables library shared by the frames of a canvas', () => {
 
   it('a frame without the collection is left alone', () => {
     expect(syncedCollection(shape(), 'Theme', variableLibraryOf([themed(shape())]).Theme)).toBeNull();
+  });
+
+  it('binding from the library copies the collection in and binds in one step', () => {
+    const library = variableLibraryOf([themed(shape())]);
+    const bound = must(bindFromLibrary(shape(), library, 's', 'fill', 'Theme/surface'));
+    expect(findClip(bound, 's')!.clip.bind).toEqual({ fill: 'Theme/surface' });
+    expect(findClip(bound, 's')!.clip.props.fill).toBe('#ffffff');
+  });
+
+  it('binding a variable no collection offers is refused', () => {
+    expect(bindFromLibrary(shape(), {}, 's', 'fill', 'Theme/surface')).toMatchObject({ ok: false });
   });
 });

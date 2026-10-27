@@ -1,0 +1,91 @@
+---
+title: Effects
+description: Every layer effect, its parameters, and how to add and animate it.
+sidebar:
+  order: 7
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="ae-effects" caption="Twirl, radial blur, lens blur and sharpen added to a product photo and tuned from the inspector." />
+
+An effect is a filter on a layer. Layers hold a stack of up to 12, applied top to bottom inside the layer's transform.
+
+## Add an effect
+
+1. Select a layer on the canvas or in the timeline.
+2. In the inspector, find **Effects** and press **+**. Pick an effect from the list.
+3. Press the effect's row to open its parameters. Type a value, or drag the field.
+4. The eye on the row hides the effect without losing its settings. The cross removes it. **Order** moves it up or down the stack.
+
+Every parameter can be keyframed: in Animate mode, a change is keyed at the playhead, and the key is named `fx.<effect id>.<parameter>`. See [Keyframes and easing](/motion/keyframes-and-easing/).
+
+Bulge, twirl, radial blur and lens blur warp pixels, so they draw on the GPU canvas and in the exports made from it; an SVG filter in a browser ignores them.
+
+## Colour
+
+| Effect | Kind | What it does | Parameters |
+|---|---|---|---|
+| Brightness & contrast | `brightness-contrast` | Brightness and contrast multipliers (1 = unchanged). | Brightness (`brightness`, 0 to 3, default 1)<br />Contrast (`contrast`, 0 to 3, default 1) |
+| Hue & saturation | `hue-saturation` | Hue rotation in degrees and saturation multiplier. | Hue (`hue`, -180 to 180, default 0)<br />Saturation (`saturation`, 0 to 4, default 1) |
+| Tint | `tint` | Maps black and white to two colours (colorize), mixed by amount. | Map black to (`black`, a colour, default #000000)<br />Map white to (`white`, a colour, default #ffffff)<br />Amount (`amount`, 0 to 1, default 1) |
+| Curves | `curves` | Three-point RGB curve: output at shadows (0), midtones (0.5) and highlights (1). | Shadows (`shadows`, 0 to 1, default 0)<br />Midtones (`midtones`, 0 to 1, default 0.5)<br />Highlights (`highlights`, 0 to 1, default 1) |
+| Black & white | `black-white` | Desaturates; amount 0..1. | Amount (`amount`, 0 to 1, default 1) |
+| Levels | `levels` | Input black/white point, gamma, output black/white point (0..1). | Input black (`inBlack`, 0 to 1, default 0)<br />Input white (`inWhite`, 0 to 1, default 1)<br />Gamma (`gamma`, 0.1 to 10, default 1)<br />Output black (`outBlack`, 0 to 1, default 0)<br />Output white (`outWhite`, 0 to 1, default 1) |
+| Lift / gamma / gain | `lift-gamma-gain` | Per-channel colour wheels: lift R/G/B -0.5..0.5 (shadows), gamma 0.2..4 (midtones), gain 0..3 (highlights). | Lift R (`liftR`, -0.5 to 0.5, default 0)<br />Lift G (`liftG`, -0.5 to 0.5, default 0)<br />Lift B (`liftB`, -0.5 to 0.5, default 0)<br />Gamma R (`gammaR`, 0.2 to 4, default 1)<br />Gamma G (`gammaG`, 0.2 to 4, default 1)<br />Gamma B (`gammaB`, 0.2 to 4, default 1)<br />Gain R (`gainR`, 0 to 3, default 1)<br />Gain G (`gainG`, 0 to 3, default 1)<br />Gain B (`gainB`, 0 to 3, default 1) |
+| LUT | `lut` | Colour look from a .cube file or a preset (set_lut), mixed by amount 0..1. | Amount (`amount`, 0 to 1, default 1) |
+| Vignette | `vignette` | Darkens toward the frame edges; amount 0..1. | Amount (`amount`, 0 to 1, default 0.5) |
+
+## Blur and sharpen
+
+| Effect | Kind | What it does | Parameters |
+|---|---|---|---|
+| Gaussian blur | `gaussian-blur` | Blur radius in px. | Radius (`radius`, 0 to 200, default 8) |
+| Directional blur | `directional-blur` | Motion blur of length px along angle degrees. | Length (`length`, 0 to 400, default 40)<br />Angle (`angle`, -180 to 180, default 0) |
+| Progressive blur | `progressive-blur` | Blur that grows from startRadius px at (startX, startY) to endRadius px at (endX, endY), points as 0..1 of the layer. | Start radius (`startRadius`, 0 to 200, default 0)<br />End radius (`endRadius`, 0 to 200, default 24)<br />Start X (`startX`, 0 to 1, default 0.5)<br />Start Y (`startY`, 0 to 1, default 0)<br />End X (`endX`, 0 to 1, default 0.5)<br />End Y (`endY`, 0 to 1, default 1) |
+| Background blur | `background-blur` | Blurs what is behind the layer box by radius px; the layer itself stays sharp. | Radius (`radius`, 0 to 200, default 4) |
+| Radial blur | `radial-blur` | Zoom blur (zoom 0..1) and spin blur (spin degrees) around a centre, centre as 0..1 of the layer. | Centre X (`centerX`, 0 to 1, default 0.5)<br />Centre Y (`centerY`, 0 to 1, default 0.5)<br />Zoom (`zoom`, 0 to 1, default 0.15)<br />Spin (`spin`, 0 to 90, default 0) |
+| Lens blur | `lens-blur` | Disc-shaped bokeh blur of radius px; highlights 0..4 makes bright spots bloom into the disc. | Radius (`radius`, 0 to 100, default 12)<br />Highlights (`highlights`, 0 to 4, default 1) |
+| Sharpen | `sharpen` | Unsharp mask: adds amount times the detail finer than radius px. | Amount (`amount`, 0 to 5, default 1)<br />Radius (`radius`, 0.1 to 20, default 1.5) |
+
+## Light and edges
+
+| Effect | Kind | What it does | Parameters |
+|---|---|---|---|
+| Drop shadow | `drop-shadow` | Shadow at distance px and angle degrees, blur px, colour and opacity. | Distance (`distance`, 0 to 300, default 16)<br />Angle (`angle`, -180 to 180, default 135)<br />X (`x`, -300 to 300, default 0)<br />Y (`y`, -300 to 300, default 0)<br />Softness (`blur`, 0 to 200, default 24)<br />Spread (`spread`, -100 to 100, default 0)<br />Colour (`color`, a colour, default #000000)<br />Opacity (`opacity`, 0 to 1, default 0.5)<br />Show behind (`behind`, 0 to 1, default 1) |
+| Inner shadow | `inner-shadow` | Shadow inside the layer edge at distance px and angle degrees, blur px, colour and opacity. | Distance (`distance`, 0 to 300, default 4)<br />Angle (`angle`, -180 to 180, default 90)<br />Softness (`blur`, 0 to 200, default 8)<br />Colour (`color`, a colour, default #000000)<br />Opacity (`opacity`, 0 to 1, default 0.25) |
+| Glow | `glow` | Soft light around the layer: radius px, colour, intensity 0..1. | Radius (`radius`, 0 to 200, default 24)<br />Colour (`color`, a colour, default #ffffff)<br />Intensity (`intensity`, 0 to 1, default 0.8) |
+| Stroke | `stroke` | Outline around the layer alpha: width px and colour. | Width (`width`, 0 to 60, default 4)<br />Colour (`color`, a colour, default #ffffff) |
+| Noise & grain | `noise` | Film grain: amount 0..1, grain size px, evolve 0 = still, 1 = new grain every frame. | Amount (`amount`, 0 to 1, default 0.2)<br />Size (`size`, 0.5 to 8, default 1.5)<br />Evolve (`evolve`, 0 to 1, default 1) |
+| Chromatic aberration | `chromatic-aberration` | Splits red and blue by offset px along angle degrees. | Offset (`offset`, 0 to 60, default 6)<br />Angle (`angle`, -180 to 180, default 0) |
+
+## Distort
+
+| Effect | Kind | What it does | Parameters |
+|---|---|---|---|
+| Wave distort | `wave` | Displaces the layer with a flowing noise: amount px, scale px, speed px/s. | Amount (`amount`, 0 to 200, default 24)<br />Scale (`scale`, 10 to 1000, default 160)<br />Speed (`speed`, 0 to 1000, default 120) |
+| Displacement map | `displacement-map` | Pushes the layer by its own brightness: bright parts move down-right, dark parts up-left, up to amount px. | Amount (`amount`, 0 to 200, default 20) |
+| Bulge | `bulge` | Magnifies (amount > 0) or pinches (amount < 0) within radius px of a centre given as 0..1 of the layer. | Centre X (`centerX`, 0 to 1, default 0.5)<br />Centre Y (`centerY`, 0 to 1, default 0.5)<br />Radius (`radius`, 1 to 2000, default 200)<br />Amount (`amount`, -1 to 1, default 0.5) |
+| Twirl | `twirl` | Rotates the layer by angle degrees at the centre, fading to nothing at radius px; centre as 0..1 of the layer. | Centre X (`centerX`, 0 to 1, default 0.5)<br />Centre Y (`centerY`, 0 to 1, default 0.5)<br />Radius (`radius`, 1 to 2000, default 240)<br />Angle (`angle`, -720 to 720, default 90) |
+
+## Keying
+
+| Effect | Kind | What it does | Parameters |
+|---|---|---|---|
+| Chroma key | `chroma-key` | Makes the key colour transparent: tolerance 0..1 (how far from the key still counts), softness 0..1 (edge feather), spill 0..1 (removes key-colour cast from what stays). | Key colour (`key`, a colour, default #00ff00)<br />Tolerance (`tolerance`, 0 to 1, default 0.6)<br />Softness (`softness`, 0 to 1, default 0.2)<br />Spill suppression (`spill`, 0 to 1, default 0.5) |
+
+## From an agent, MCP or CLI
+
+`add_effect` adds an effect at the end of a clip's stack. Parameters you leave out take their defaults. The answer carries the `effect_id` and the keys to animate.
+
+```bash
+feega motion tool <nodeId> add_effect --input '{"clip_id":"photo","kind":"twirl","params":{"radius":420,"angle":200}}'
+```
+
+Then animate any parameter with `set_keyframes`:
+
+```json
+{ "clip_id": "photo", "prop": "fx.<effect id>.angle", "keyframes": [{ "time": 0, "value": 0 }, { "time": 1.5, "value": 200 }] }
+```
+
+`set_lut` loads a `.cube` file or a preset into a LUT effect. Over MCP the same tools run through `edit` with `{ op, input }`.

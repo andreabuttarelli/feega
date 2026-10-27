@@ -23,6 +23,8 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
     'List the canvases of THIS project. One project only — never other projects, never a brand.',
   list_nodes:
     'List live nodes on one canvas of THIS project (id, type, position, data, version). Read this before update_node or run_node: the version is required and the data is what you must resend.',
+  get_selection:
+    'The nodes the user has selected on a canvas of THIS project right now, and the visible view, per open session (sessions[].selection ids, view {cx,cy,zoom}). Waits up to 3.5 s; answers reason no_open_session when the canvas is not open. Use it for "this", "these", "the selected".',
   create_node:
     [
       'Create a node on a canvas of THIS project. data must match the type exactly (describe_node_types): unknown fields and missing required fields are refused.',

@@ -35,6 +35,8 @@
   import { SECTION_DEFAULT_FILL } from '$lib/canvas/node-data';
 
   const ICON_BUTTON = 'size-11 md:size-8';
+  const TOOLBAR_MIN_WRAP = 340;
+  const TOOLBAR_CHROME = 18;
 
   let {
     box,
@@ -73,7 +75,7 @@
     onrun?: () => void;
     oncancelvariants?: () => void;
     variantsInFlight?: number;
-    history?: { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void } | null;
+    history?: { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void; oncompare: (a: string, b: string) => void } | null;
     onaction?: (id: SelectionActionId) => void;
     onpropertychange?: (patch: SelectionPatch & { model?: string | null; variants?: number; variantsInto?: VariantInto }) => void;
     onsectionchange?: (id: string, patch: { title?: string; fill?: string }) => void;
@@ -103,6 +105,9 @@
   let toolbarHeight = $state(0);
   let innerWidth = $state(0);
   let innerHeight = $state(0);
+  let leadWidth = $state(0);
+  let actionsWidth = $state(0);
+  const stacked = $derived(!!box && leadWidth + actionsWidth + TOOLBAR_CHROME > Math.max(box.width / scale, TOOLBAR_MIN_WRAP));
 
   const anchor = $derived(
     box
@@ -160,11 +165,42 @@
   </Tooltip.Root>
 {/snippet}
 
+{#snippet runButton()}
+  {@const blocked = !running && !runQuote?.enabled}
+  {@const label = running ? 'Stop' : runQuote ? runLabelOf(runQuote) : 'Generate'}
+  <Tooltip.Root>
+    <Tooltip.Trigger>
+      {#snippet child({ props })}
+        <button
+          {...props}
+          type="button"
+          class="run"
+          data-control="run"
+          data-run={running ? 'running' : blocked ? 'blocked' : 'ready'}
+          data-testid={running ? 'stop-run' : undefined}
+          aria-label={label}
+          aria-disabled={blocked}
+          onclick={() => (running ? onstop?.() : blocked ? undefined : onrun?.())}
+        >
+          {#if running}
+            <svg class="run-ring" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" /></svg>
+            <Square class="size-3" fill="currentColor" strokeWidth={0} />
+          {:else}
+            <ArrowUp class="size-4" strokeWidth={2.25} />
+          {/if}
+        </button>
+      {/snippet}
+    </Tooltip.Trigger>
+    <Tooltip.Content side="top">{running ? 'Stop generating' : (runQuote?.reason ?? label)}</Tooltip.Content>
+  </Tooltip.Root>
+{/snippet}
+
 <svelte:window bind:innerWidth bind:innerHeight />
 
 {#if visible && anchor}
   <div
     class="toolbar"
+    class:stacked
     bind:offsetWidth={toolbarWidth}
     bind:offsetHeight={toolbarHeight}
     style={`left:${anchor.x}px; top:${anchor.y}px; --toolbar-scale:${scale}; --toolbar-gap:${TOOLBAR_GAP}px`}
@@ -172,85 +208,71 @@
     aria-label="Selection actions"
   >
     <Tooltip.Provider delayDuration={200}>
-      {#if properties.type}
-        <div class="group" role="group" aria-label="Node properties">
-          {#if !choices.length && !catalogueSynced}
-            <span class="warn">Catalog not synced</span>
-          {:else}
-            <ModelMenu
-              {choices}
-              value={modelValue}
-              provider={providerValue}
-              mixed={properties.model.kind === 'mixed'}
-              medium={runQuote?.cost.medium ?? null}
-              params={runQuote?.cost.params ?? {}}
-              onselect={(id, provider) => onpropertychange?.({ model: id || null, dynamicParams: { [PROVIDER_PARAM]: provider } })}
-            />
-          {/if}
-          {#if controls.length}
-            <NodeSettings {controls} onchange={(patch) => onpropertychange?.(patch)} />
-          {/if}
-        </div>
-      {/if}
-
-      {#if section}
-        <div class="group" role="group" aria-label="Section">
-          <input class="section-title" aria-label="Section title" value={sectionTitle} onchange={(e) => onsectionchange?.(section.id, { title: e.currentTarget.value.trim() || 'Section' })} onkeydown={(e) => e.stopPropagation()} />
-          <input class="section-fill" type="color" aria-label="Section fill" value={sectionFill} onchange={(e) => onsectionchange?.(section.id, { fill: e.currentTarget.value })} />
-        </div>
-      {/if}
-
-      {#if running}
-        <div class="group" role="group" aria-label="Stop">
-          <Button size="sm" variant="secondary" class="h-11 md:h-8" data-testid="stop-run" onclick={() => onstop?.()}>
-            <Square strokeWidth={1.8} />
-            Stop
-          </Button>
-        </div>
-      {/if}
-
-      {#if runQuote || primary.length}
-        <div class="group" role="group" aria-label="Run">
-          {#if history && properties.type && runQuote}
-            <HistoryMenu items={history.items} medium={properties.type} urlOf={history.urlOf} onshow={history.onshow} />
-          {/if}
-          {#if runQuote?.variants}
-            <VariantsMenu quote={runQuote.variants} onchange={(patch) => onpropertychange?.(patch)} />
-          {/if}
-          {#if runQuote}
-            {#if runQuote.credits !== null}
-              <span class="run-price" data-testid="run-price">{formatPrice(runQuote.credits)}</span>
-            {:else if runQuote.variable}
-              <span class="run-price">variable</span>
+      <div class="row" bind:offsetWidth={leadWidth}>
+        {#if properties.type}
+          <div class="group" role="group" aria-label="Node properties">
+            {#if !choices.length && !catalogueSynced}
+              <span class="warn">Catalog not synced</span>
+            {:else}
+              <ModelMenu
+                {choices}
+                value={modelValue}
+                provider={providerValue}
+                mixed={properties.model.kind === 'mixed'}
+                medium={runQuote?.cost.medium ?? null}
+                params={runQuote?.cost.params ?? {}}
+                onselect={(id, provider) => onpropertychange?.({ model: id || null, dynamicParams: { [PROVIDER_PARAM]: provider } })}
+              />
             {/if}
-            <Tooltip.Root>
-              <Tooltip.Trigger>
-                {#snippet child({ props })}
-                  <Button {...props} size="icon-sm" class="size-11 rounded-full md:size-8" data-control="run" aria-label={runLabelOf(runQuote)} disabled={!runQuote.enabled} onclick={() => onrun?.()}>
-                    <ArrowUp strokeWidth={2.25} />
-                  </Button>
-                {/snippet}
-              </Tooltip.Trigger>
-              <Tooltip.Content side="top">{runQuote.reason ?? runLabelOf(runQuote)}</Tooltip.Content>
-            </Tooltip.Root>
-            {#if variantsInFlight > 0}
-              <Button size="sm" variant="secondary" class="h-11 md:h-8" data-control="cancel-variants" onclick={() => oncancelvariants?.()}>
-                Cancel all ({variantsInFlight})
+            {#if controls.length}
+              <NodeSettings {controls} onchange={(patch) => onpropertychange?.(patch)} />
+            {/if}
+          </div>
+        {/if}
+
+        {#if section}
+          <div class="group" role="group" aria-label="Section">
+            <input class="section-title" aria-label="Section title" value={sectionTitle} onchange={(e) => onsectionchange?.(section.id, { title: e.currentTarget.value.trim() || 'Section' })} onkeydown={(e) => e.stopPropagation()} />
+            <input class="section-fill" type="color" aria-label="Section fill" value={sectionFill} onchange={(e) => onsectionchange?.(section.id, { fill: e.currentTarget.value })} />
+          </div>
+        {/if}
+
+        {#if runQuote || running || primary.length}
+          <div class="group" role="group" aria-label="Run">
+            {#if history && properties.type && runQuote}
+              <HistoryMenu items={history.items} medium={properties.type} urlOf={history.urlOf} onshow={history.onshow} oncompare={history.oncompare} />
+            {/if}
+            {#if runQuote?.variants}
+              <VariantsMenu quote={runQuote.variants} onchange={(patch) => onpropertychange?.(patch)} />
+            {/if}
+            {#if runQuote}
+              {#if runQuote.credits !== null}
+                <span class="run-price" data-testid="run-price">{formatPrice(runQuote.credits)}</span>
+              {:else if runQuote.variable}
+                <span class="run-price">variable</span>
+              {/if}
+              {#if variantsInFlight > 0}
+                <Button size="sm" variant="secondary" class="h-11 md:h-8" data-control="cancel-variants" onclick={() => oncancelvariants?.()}>
+                  Cancel all ({variantsInFlight})
+                </Button>
+              {/if}
+            {/if}
+            {#if runQuote || running}
+              {@render runButton()}
+            {/if}
+            {#each primary as action (action.id)}
+              {@const Icon = SELECTION_ACTION_ICON[action.id]}
+              {@const gate = gateOf(action)}
+              <Button size="sm" variant={runQuote ? 'secondary' : 'primary'} class="h-11 md:h-8" disabled={!gate.enabled} title={gate.reason} onclick={() => onaction?.(action.id)}>
+                <Icon strokeWidth={1.8} />
+                {action.label}
               </Button>
-            {/if}
-          {/if}
-          {#each primary as action (action.id)}
-            {@const Icon = SELECTION_ACTION_ICON[action.id]}
-            {@const gate = gateOf(action)}
-            <Button size="sm" variant={runQuote ? 'secondary' : 'primary'} class="h-11 md:h-8" disabled={!gate.enabled} title={gate.reason} onclick={() => onaction?.(action.id)}>
-              <Icon strokeWidth={1.8} />
-              {action.label}
-            </Button>
-          {/each}
-        </div>
-      {/if}
+            {/each}
+          </div>
+        {/if}
+      </div>
 
-      <div class="group" role="group" aria-label="Actions">
+      <div class="group" role="group" aria-label="Actions" bind:offsetWidth={actionsWidth}>
         {#if count > 1}
           <span class="count">{count} selected</span>
         {/if}
@@ -347,10 +369,24 @@
   }
 
   .toolbar {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    row-gap: 4px;
-    max-width: min(560px, calc(100vw - 16px));
+    gap: 8px;
+    max-width: calc(100vw - 16px);
+  }
+
+  .toolbar.stacked {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .row:empty {
+    display: none;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .group {
@@ -358,20 +394,79 @@
   }
 
   .group[aria-label='Actions'] {
-    flex-basis: 100%;
-    justify-content: flex-end;
-    padding: 4px 0 0;
-    border-left: 0;
-    border-top: 1px solid var(--ui-divider);
+    gap: 2px;
+  }
+
+  .toolbar :global(button[data-slot='tooltip-trigger']:not(.run)),
+  .toolbar :global(button[data-slot='dropdown-menu-trigger']:not([data-control])) {
+    border-radius: var(--ui-radius-sm);
   }
 
   .toolbar :global(button:disabled) {
     opacity: 0.35;
   }
 
-  .toolbar :global(button),
-  .toolbar :global([data-control]) {
-    border-radius: var(--ui-radius-md);
+  .run {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    color: var(--ui-on-accent);
+    background: var(--ui-accent-solid);
+    transition: background-color var(--ui-dur-fast, 120ms), color var(--ui-dur-fast, 120ms);
+  }
+
+  .run:hover {
+    filter: brightness(1.1);
+  }
+
+  .run:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
+  }
+
+  .run[data-run='blocked'] {
+    cursor: not-allowed;
+    color: var(--ui-text-3);
+    background: var(--ui-wash);
+    filter: none;
+  }
+
+  .run[data-run='running'] {
+    color: var(--ui-text);
+    background: var(--ui-wash);
+  }
+
+  .run-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    animation: run-spin 0.9s linear infinite;
+  }
+
+  .run-ring circle {
+    fill: none;
+    stroke: var(--ui-accent);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-dasharray: 22 66;
+  }
+
+  @keyframes run-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 767px) {
+    .run {
+      width: 44px;
+      height: 44px;
+    }
   }
 
   @media (max-width: 767px) {
@@ -391,16 +486,6 @@
     align-items: center;
     gap: 4px;
     min-width: 0;
-    padding: 0 6px;
-  }
-  .group + .group {
-    border-left: 1px solid var(--ui-divider);
-  }
-  .group:first-child {
-    padding-left: 0;
-  }
-  .group:last-child {
-    padding-right: 0;
   }
 
   @media (max-width: 767px) {
@@ -410,9 +495,6 @@
     }
     .group[aria-label='Node properties'] {
       flex-basis: 100%;
-    }
-    .group + .group {
-      border-left: 0;
     }
     .group[aria-label='Node properties'] > :global(*) {
       flex: 1 1 0;
@@ -463,9 +545,9 @@
   .warn {
     padding: 0 8px;
     font-size: 12px;
-    color: var(--destructive, #c0392b);
-    border: 1px dashed currentColor;
-    line-height: 30px;
+    line-height: 32px;
+    color: var(--ui-text-3);
+    white-space: nowrap;
   }
 
   .count {

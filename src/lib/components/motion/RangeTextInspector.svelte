@@ -96,7 +96,7 @@
 </script>
 
 {#if values}
-  <section class="range" data-testid="range-text-inspector" data-text-range-panel>
+  <section class="range ui-section" data-testid="range-text-inspector" data-text-range-panel>
     <header>Text · selection</header>
     <div class="row">
       <span>Font</span>
@@ -170,7 +170,6 @@
     flex-direction: column;
     gap: var(--ui-space-2);
     padding: var(--ui-space-3) var(--ui-space-4);
-    border-bottom: 1px solid var(--ui-line);
     font-size: var(--ui-type-caption);
   }
 
@@ -191,9 +190,9 @@
   select {
     min-width: 0;
     padding: 4px 6px;
-    border: 1px solid var(--ui-line);
+    border: 1px solid transparent;
     border-radius: var(--ui-radius-sm);
-    background: var(--ui-surface);
+    background: var(--ui-input);
     color: var(--ui-text);
     font: inherit;
   }
