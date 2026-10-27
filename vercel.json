@@ -96,5 +96,11 @@
       "path": "/api/v1/canvas/runs/tick",
       "schedule": "*/1 * * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true
+    }
+  }
 }
