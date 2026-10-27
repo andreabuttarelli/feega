@@ -258,6 +258,21 @@ impl WebGlCore {
         Ok(())
     }
 
+    pub fn forget_picture(&mut self, clip: &str) {
+        if let Some(old) = self.pictures.remove(clip) {
+            self.renderer.destroy_image(&mut self.resources, old.id);
+        }
+        self.compositor.touch_picture(clip, &self.library);
+    }
+
+    pub fn picture_bytes(&self) -> f64 {
+        self.pictures.values().map(|p| p.size.width * p.size.height * 4.0).sum()
+    }
+
+    pub fn lost(&self) -> bool {
+        self.renderer.gl_context().is_context_lost()
+    }
+
     pub fn put_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse(list_json).map_err(failed)?);
