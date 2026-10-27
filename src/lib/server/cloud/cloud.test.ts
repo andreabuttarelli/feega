@@ -157,4 +157,13 @@ describe('uploadFile', () => {
     expect(done).toBe(true);
     expect(seen[0].url).toContain('uploadType=multipart');
   });
+
+  it('puts bytes at the Drive root when no folder is open', async () => {
+    const { fn, seen } = fetcher([jsonOf({ id: 'g1' })]);
+
+    await uploadFile(CloudProvider.Drive, 'at', { folder: '', name: 'out.png', mime: 'image/png', bytes: new Uint8Array([1]) }, fn);
+
+    const sent = await (seen[0].init?.body as Blob).text();
+    expect(sent).toContain('"parents":["root"]');
+  });
 });

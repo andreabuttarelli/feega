@@ -17,6 +17,7 @@ const STATE_CONTEXT = 'feega:cloud-state';
 const STATE_TTL_MS = 10 * 60_000;
 const REFRESH_MARGIN_MS = 60_000;
 const SECOND_MS = 1000;
+const DRIVE_ROOT = 'root';
 const DRIVE_FOLDER = 'application/vnd.google-apps.folder';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
@@ -38,7 +39,7 @@ type Spec = {
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 async function driveList(token: string, folder: string | null, fetchFn: Fetch): Promise<CloudEntry[]> {
-  const query = `'${folder ?? 'root'}' in parents and trashed=false`;
+  const query = `'${folder ?? DRIVE_ROOT}' in parents and trashed=false`;
   const url = `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=${encodeURIComponent('files(id,name,mimeType)')}&pageSize=200`;
   const res = await fetchFn(url, { headers: bearer(token) });
   if (!res.ok) {
@@ -59,7 +60,7 @@ async function driveDownload(token: string, id: string, fetchFn: Fetch): Promise
 }
 
 async function driveUpload(token: string, file: Upload, fetchFn: Fetch): Promise<boolean> {
-  const head = `--${BOUNDARY}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: file.name, parents: [file.folder] })}\r\n--${BOUNDARY}\r\nContent-Type: ${file.mime}\r\n\r\n`;
+  const head = `--${BOUNDARY}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: file.name, parents: [file.folder || DRIVE_ROOT] })}\r\n--${BOUNDARY}\r\nContent-Type: ${file.mime}\r\n\r\n`;
   const body = new Blob([head, file.bytes as BlobPart, `\r\n--${BOUNDARY}--`]);
   const res = await fetchFn(DRIVE_UPLOAD, { method: 'POST', headers: { ...bearer(token), 'Content-Type': `multipart/related; boundary=${BOUNDARY}` }, body });
   return res.ok;
