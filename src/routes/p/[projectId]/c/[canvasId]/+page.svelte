@@ -262,7 +262,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { BILLING_PATH } from '$lib/billing-path';
   import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
   import type { FigmaJob } from '$lib/canvas/figma/images';
-  import { ImagesOutcome } from '$lib/canvas/figma/fetch-images';
+  import { ImagesOutcome, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
+  import { connectionMessage } from '$lib/canvas/connection-messages';
 
   const LINK_COPIED_MS = 1500;
 
@@ -3498,8 +3499,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let figmaJobs = $state<FigmaJob[]>([]);
   let figmaTokenMissing = $state(false);
 
-  function figmaImagesAnswered(outcome: ImagesOutcome) {
-    figmaTokenMissing = outcome === ImagesOutcome.NoToken;
+  function figmaImagesAnswered(answer: ImagesAnswer) {
+    figmaTokenMissing = answer.outcome === ImagesOutcome.NoToken;
+    if (answer.outcome === ImagesOutcome.Failed) {
+      failed = connectionMessage(answer.error);
+    }
   }
 
   async function pasteSvg(svg: string, at: { x: number; y: number }) {
