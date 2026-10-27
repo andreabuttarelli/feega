@@ -6,6 +6,8 @@ import { removeAssetFile } from '$lib/server/repos/asset-storage';
 import { verdictForUpload, canvasUploadPrefix, UPLOAD_MAX_BYTES, type UploadKind } from '$lib/canvas/upload-kind';
 import { SafeFetchError, safeFetchBytes } from '$lib/server/tool-guard';
 import { convertFileToMarkdown } from '$lib/server/file-to-markdown';
+import { runInBackground } from '$lib/server/background-work';
+import { createVideoProxy } from './video-proxy';
 
 /**
  * L'UPLOAD ARRIVA GIÀ NELLO STORAGE: questa funzione non riceve più un `File`.
@@ -112,6 +114,10 @@ export async function registerUploadedAsset(db: Db, input: {
     mimeType: input.mimeType,
     bytes: input.bytes
   });
+
+  if (kind === 'video') {
+    runInBackground(() => createVideoProxy(db, { orgId: input.orgId, assetId: asset.id, path: input.path }), 'video-proxy');
+  }
 
   return { asset, kind };
 }

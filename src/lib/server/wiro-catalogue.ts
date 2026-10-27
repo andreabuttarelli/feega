@@ -10,6 +10,8 @@ const LIST_LIMIT = '500';
 const CATALOGUE_QUERIES: ReadonlyArray<Record<string, unknown>> = [
   { categories: ['text-to-image'] },
   { categories: ['text-to-video'] },
+  { categories: ['image-to-video'] },
+  { categories: ['video-to-video'] },
   { categories: ['3d-generation'] },
   { search: 'uncensored' }
 ];

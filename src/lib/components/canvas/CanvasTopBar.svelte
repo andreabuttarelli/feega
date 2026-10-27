@@ -444,6 +444,10 @@
     flex-shrink: 0;
   }
 
+  .top-box.right > :global(.connection-dot) {
+    margin-inline-start: 6px;
+  }
+
   .top-box {
     display: flex;
     align-items: center;
