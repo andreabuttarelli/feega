@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
+  import { RenderEngine } from '$lib/motion/gpu/engine-flag';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
@@ -118,7 +119,9 @@
 
   const renderer: NonNullable<MotionPreview['render']> = (...args) => (capture ? capture.render(...args) : Promise.reject(new Error('the preview is still loading')));
 
-  const framesFor = (d: MotionDoc): FrameSource => (times, size, onFrame, signal) => renderer(times, size, onFrame, signal, composeDraft(d));
+  const sceneOf = (d: MotionDoc) => ({ doc: played(d), tokens, assets: assetUrls, analyses: extras.analyses, compose: (only?: ReadonlySet<string>) => composeOnly(d, only) });
+
+  const framesFor = (d: MotionDoc): FrameSource => (times, size, onFrame, signal) => renderer(times, size, onFrame, signal, composeDraft(d), undefined, RenderEngine.GpuCore, sceneOf(d));
 
   const assetHref = (id: string) => canvasAssetUrl(projectId, canvasId, id, AssetSize.Full);
 
@@ -139,7 +142,9 @@
     return made?.ok ? { doc: made.doc, clipId: made.clipId } : null;
   }
 
-  const composeDraft = (d: MotionDoc) => composeHtml({ doc: played(d), tokens, assets: assetUrls, analyses: extras.analyses, liveness: Liveness.Baked, target: Target.Screen });
+  const composeOnly = (d: MotionDoc, only?: ReadonlySet<string>) => composeHtml({ doc: played(d), tokens, assets: assetUrls, analyses: extras.analyses, liveness: Liveness.Baked, target: Target.Screen, only });
+
+  const composeDraft = (d: MotionDoc) => composeOnly(d);
 
   function placedWith(entry: TemplateEntry, draft: Instance | null): Inserted {
     const placed = insertTemplate(doc, entry, { from: frame, newId });
@@ -290,7 +295,7 @@
     scope={{ orgId: data.orgId, projectId, nodeId }}
     {editorUrl}
     fileName={data.node.name ?? 'motion'}
-    render={renderer}
+    render={framesFor(doc)}
     fallbackRender={renderer}
     {tokens}
     analyses={extras.analyses}
@@ -374,7 +379,7 @@
 {/if}
 {#if CAPTURING.has(dialog)}
   <div class="capture" aria-hidden="true">
-    <MotionPreview bind:this={capture} html={captureHtml} width={doc.width} height={doc.height} fps={doc.fps} background={doc.background} />
+    <MotionPreview bind:this={capture} html={captureHtml} width={doc.width} height={doc.height} fps={doc.fps} background={doc.background} engine={RenderEngine.Html} />
   </div>
 {/if}
 </div>

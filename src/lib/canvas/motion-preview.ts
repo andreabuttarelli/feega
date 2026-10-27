@@ -1,3 +1,5 @@
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { timecode } from '$lib/motion/timeline-view';
 
 export enum Sight {
@@ -21,7 +23,9 @@ export enum PreviewMode {
   Capture = 'capture'
 }
 
-export type MotionPreview = { version: number; html: string; width: number; height: number; fps: number; durationInFrames: number };
+export type MotionScene = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> };
+
+export type MotionPreview = { version: number; html: string; width: number; height: number; fps: number; durationInFrames: number; scene?: MotionScene };
 
 const OUT_OF_VIEW = { [Still.Ready]: PreviewMode.Poster, [Still.Missing]: PreviewMode.Poster };
 
