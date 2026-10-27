@@ -171,6 +171,15 @@ motion
   });
 
 motion
+  .command('play <nodeId>')
+  .description('Create the public play link of a prototype starting on one frame, and list the flows (free)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionPlay } = await import('./commands/motion.ts');
+    await cmdMotionPlay(nodeId, opts);
+  });
+
+motion
   .command('move <frameId> <elementId>')
   .description('Move an element out of a frame into another frame (--to), or into a new frame on the canvas')
   .option('--to <frameId>', 'The frame to move it into; omit for a new frame')

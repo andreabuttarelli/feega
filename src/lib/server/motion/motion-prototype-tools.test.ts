@@ -44,3 +44,29 @@ describe('prototype interactions through the agent tools', () => {
     expect(await run('add_interaction', { clip_id: id, trigger: { kind: 'click' }, action: { kind: 'navigate' } })).toMatchObject({ ok: false });
   });
 });
+
+describe('flows through the agent tools', () => {
+  it('set_flow marks the frame as a starting point and the state reads it back', async () => {
+    const { run } = setup();
+
+    const set = await run('set_flow', { name: 'Onboarding' });
+    const state = (await run('get_motion_doc', {})) as { flow: unknown };
+
+    expect(set).toMatchObject({ ok: true });
+    expect(state.flow).toEqual({ name: 'Onboarding' });
+  });
+
+  it('a null name takes the mark off', async () => {
+    const { run } = setup();
+    await run('set_flow', { name: 'Onboarding' });
+
+    expect(await run('set_flow', { name: null })).toMatchObject({ ok: true });
+    expect(((await run('get_motion_doc', {})) as { flow: unknown }).flow).toBeNull();
+  });
+
+  it('a blank name is refused with the reason', async () => {
+    const { run } = setup();
+
+    expect(await run('set_flow', { name: '  ' })).toMatchObject({ ok: false });
+  });
+});

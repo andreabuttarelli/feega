@@ -48,6 +48,7 @@ export const TOOL_FAMILY: Readonly<Record<string, ToolFamily>> = {
   restore_motion_revision: ToolFamily.Motion,
   view_motion_frames: ToolFamily.Motion,
   share_motion_frame: ToolFamily.Motion,
+  get_play_link: ToolFamily.Motion,
   publish_motion_embed: ToolFamily.Motion,
   get_motion_embed: ToolFamily.Motion,
   list_shader_effects: ToolFamily.Motion,

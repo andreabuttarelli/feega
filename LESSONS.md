@@ -3365,3 +3365,7 @@ Signal: a poster is a white card on gpu-core; the console shows `UNSUPPORTED ...
 ### A below-the-fold image collage costs Lighthouse mobile points even with `loading="lazy"`
 
 **Signal:** home mobile score drops from 90 to 87 and LCP from 3.2 s to 3.7 s after adding a section of images a viewport below the hero; the LCP element is still the hero poster. **Move:** native lazy loading fetches within about a viewport and a half, and those requests compete with the poster and the hero video. Mount the tiles from an `IntersectionObserver` (`Collage.svelte`) and reserve the height with `aspect-ratio` so CLS stays 0. Measure against a build of `origin/dev`, not against the target alone.
+
+## Unit tests fail in a worktree only after a demo or e2e run copied `.env` into it
+
+**Signal:** `robots.txt`, `sitemap.xml`, `credits` and `/api/v1/motion/[nodeId]/embed` server tests go red in a worktree that was green, with no code change near them. **Move:** a worktree has no `.env`; copying the main one in to run a demo or the dev server makes `$env` values real and those tests read them. Move `.env` aside (`mv .env .env.bak`) for the unit run, put it back for the demo, and delete it with the worktree.

@@ -34,6 +34,7 @@ import { stillSchema } from './still-model';
 import { partStylesSchema } from './part-style-model';
 import { autoLayoutSchema, layoutItemSchema } from './layout/model';
 import { constraintsSchema } from './constraints/model';
+import { flowSchema } from './prototype/flow';
 import { interactionsSchema } from './prototype/model';
 import { layoutGuidesSchema } from './layout-guides/model';
 
@@ -221,6 +222,7 @@ export const motionDocSchema = z
     freeSize: z.boolean().optional(),
     layoutGuides: layoutGuidesSchema,
     links: z.record(z.string().min(1), z.string().min(1)).optional(),
+    flow: flowSchema.optional(),
     styles: stylesSchema,
     variables: variablesSchema
   })
