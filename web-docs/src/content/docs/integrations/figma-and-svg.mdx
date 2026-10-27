@@ -15,8 +15,19 @@ Copy layers in Figma and paste on the canvas.
 
 - Shapes, text and groups land as free elements. Frames and sections land as frames. Pasting over a frame puts everything inside it.
 - Rotation, stacked fills and strokes, gradients (including angular and diamond), and auto layout (direction, spacing, padding, alignment, sizing) come across.
+- Small text keeps its real size, even in a very large frame.
+- Component instances stay instances of one main component when the main is in the paste. Otherwise they become a group named after the component. Overrides are not carried over.
 - Layers keep their Figma names in the Layers panel.
 - Anything that cannot be carried over is listed.
+
+### Small text and component instances
+
+<DemoVideo name="figma-text-instances" caption="Paste a Figma design with a main component and an instance, and a 12 px legal line in a 2880 px frame." />
+
+- **Small text stays.** Text that is small next to its frame, such as a 12 px legal line in a 2880 px design, is kept at its size instead of being dropped.
+- **Instances are linked.** When the main component is part of what you copied, its instances land as instances of one component. Select one: the inspector shows the component name, its text and fill fields, and **Swap**, **Reset overrides**, **Push to main** and **Detach**. Editing the main updates every instance.
+- If the main component was not copied, an instance lands as a plain group named after the component.
+- Overrides made on an instance in Figma are not carried over.
 
 ## Figma images
 
