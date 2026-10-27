@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry, actAtVersion, sendResultOf } from './node-save';
+import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry, actAtVersion, sendResultOf, inFlightWrites } from './node-save';
 import { SendResult } from './save-scheduler';
 
 describe('actAtVersion: an action on a node waits for my own writes and never conflicts with them', () => {
@@ -35,6 +35,29 @@ describe('actAtVersion: an action on a node waits for my own writes and never co
     expect(await actAtVersion({ settle: async () => {}, version: () => 1, send, reread })).toBe(refused);
     expect(send).toHaveBeenCalledTimes(1);
     expect(reread).not.toHaveBeenCalled();
+  });
+});
+
+describe('inFlightWrites: Generate waits for a model or route change still on the wire', () => {
+  it('an action on the node settles only after the write that changes it lands', async () => {
+    const writes = inFlightWrites();
+    let route = 'auto';
+    let land = () => {};
+    void writes.track(['n1'], new Promise<void>((resolve) => { land = () => { route = 'kie'; resolve(); }; }));
+
+    const sent = actAtVersion({ settle: () => writes.settled('n1'), version: () => 1, send: async () => ({ type: 'success', data: { route } }), reread: async () => {} });
+    land();
+
+    expect(await sent).toEqual({ type: 'success', data: { route: 'kie' } });
+  });
+
+  it('a failed write still releases the action, and other nodes never wait', async () => {
+    const writes = inFlightWrites();
+    void writes.track(['n1'], Promise.reject(new Error('offline'))).catch(() => {});
+    void writes.track(['n2'], new Promise(() => {}));
+
+    await expect(writes.settled('n1')).resolves.toBeUndefined();
+    await expect(writes.settled('n3')).resolves.toBeUndefined();
   });
 });
 

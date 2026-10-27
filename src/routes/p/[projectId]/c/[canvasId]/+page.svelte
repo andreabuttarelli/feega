@@ -58,7 +58,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { syncOf } from '$lib/canvas/sync-status';
   import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
@@ -209,7 +209,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
-  import { historyItemsOf, producedRuns } from '$lib/canvas/gen-history';
+  import { historyItemsOf, producedRuns, shownOutput } from '$lib/canvas/gen-history';
   import { genTileView, type GenTileView } from '$lib/canvas/gen-tile-view';
   import { runQuoteOf, type RunQuote } from '$lib/canvas/run-quote';
   import { DEFAULT_INTO, DEFAULT_VARIANTS, VariantInto, browserVariantsStorage, effectiveVariants, readRemembered, variantsIntoOf, writeRemembered, type RememberedVariants } from '$lib/canvas/variants';
@@ -1412,6 +1412,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const OFFLINE_RUN_NOTICE = 'Offline: generating needs a connection. Your edits are kept and will save when you are back.';
   const LINE_REFUSED_NOTICE = 'A line change was refused by the canvas and was undone.';
   let outbox: Outbox | null = null;
+  const batchWrites = inFlightWrites();
   const saves = createSaveScheduler({
     send: sendSave,
     debounceMs: SAVE_DEBOUNCE_MS,
@@ -1873,7 +1874,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   function postAtVersion(action: string, id: string, fields: Fields): Promise<Record<string, unknown> | null> {
     let release = () => {};
     const asked = actAtVersion({
-      settle: async () => { await saves.flush(id); release = saves.hold(id); },
+      settle: async () => { await batchWrites.settled(id); await saves.flush(id); release = saves.hold(id); },
       version: () => nodes.find((node) => node.id === id)?.version ?? 0,
       send: (version) => send(action, { ...fields, node_id: id, version }),
       reread: refresh
@@ -2350,7 +2351,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  async function run(id: string, gen: GenNodeState) {
+  async function run(id: string, clicked: GenNodeState) {
+    await batchWrites.settled(id);
+    const row = nodes.find((node) => node.id === id);
+    const gen = (row ? genOf(row) : null) ?? clicked;
     if (gen.running) {
       return;
     }
@@ -2564,11 +2568,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    */
   /** Rimettere in vetrina un giro di prima: lo decide il server, che sa quale asset è quel giro. */
   async function restore(id: string, gen: GenNodeState, runId: string) {
-    const hit = (runsByNode[id] ?? []).find((r) => r.id === runId);
-    if (hit?.mediaId) {
+    const mediaId = (runsByNode[id] ?? []).find((r) => r.id === runId)?.mediaId;
+    if (mediaId) {
       nodes = nodes.map((node) =>
         node.id === id
-          ? { ...node, data: { ...node.data, refId: hit.mediaId, running: false, error: null } }
+          ? { ...node, data: shownOutput(node.data, { id: runId, mediaId }) }
           : node
       );
     }
@@ -3293,11 +3297,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       };
     });
 
-    const result = await post('batchWrite', { items: JSON.stringify(items) });
+    const patches = new Map(items.map((item) => [item.node_id, item.patch as Record<string, unknown>]));
+    nodes = nodes.map((n) => (patches.has(n.id) ? { ...n, data: { ...n.data, ...patches.get(n.id) } } : n));
+
+    const result = await batchWrites.track(ids, post('batchWrite', { items: JSON.stringify(items) }));
     const results = (result?.results ?? []) as { nodeId: string; outcome: string; node?: CanvasNodeRecord }[];
     const conflicts = results.filter((r) => r.outcome === 'conflict');
     if (conflicts.length) {
       failed = `${conflicts.length} node(s) not saved: changed by someone else meanwhile`;
+    }
+    if (!result || conflicts.length) {
+      await refresh();
     }
 
     const written = results.filter((r) => r.outcome === 'written' && r.node).map((r) => r.node as CanvasNodeRecord);
