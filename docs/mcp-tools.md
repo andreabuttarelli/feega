@@ -3,12 +3,12 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**72 tool** — 28 in lettura, 36 in scrittura, 8 che distruggono.
-Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3690 caratteri**, circa **923 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 73.045 caratteri.
+**73 tool** — 28 in lettura, 36 in scrittura, 9 che distruggono.
+Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3690 caratteri**, circa **923 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 73.695 caratteri.
 
 | gruppo | tool |
 |---|---:|
-| Altro | 44 |
+| Altro | 45 |
 | Video motion | 16 |
 | Accesso diretto al database | 5 |
 | Nodi e generazione | 4 |
@@ -300,6 +300,18 @@ Which image, video and 3D models the org offers. Without `medium` it reads: ids 
 | `org`? | string |  |
 | `medium`? | `image` \| `video` \| `model3d` |  |
 | `model_ids`? | string[] |  |
+
+### `org_fonts` · D
+
+*List, upload or delete the fonts of an org*
+
+The fonts uploaded once per org and usable in every frame, code frame and export. Without `upload` or `delete` it lists them: family, weight, italic, signed url. `upload` is a local path to a TTF, OTF, WOFF or WOFF2 file (10MB max): the family is read from the file. `delete` removes a whole family; frames using it fall back to a system font. Only when the user asks. Free.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `upload`? | string |  |
+| `delete`? | string |  |
 
 ### `patch_effect` · W
 
