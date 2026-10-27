@@ -38,6 +38,7 @@ const DOC: Record<string, Access> = {
   userGuides: { write: ['add_guide', 'remove_guide'], read: 'userGuides' },
   styles: { write: ['named_style'], read: 'styles' },
   variables: { write: ['variable'], read: 'variables' },
+  flow: { write: ['set_flow'], read: 'flow' },
   links: { fixed: 'written by the canvas when a generative node is connected to the frame (connect_nodes)' }
 };
 

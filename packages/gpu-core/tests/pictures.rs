@@ -132,3 +132,19 @@ fn parses_a_crop_window_and_a_tile_turn() {
 fn an_image_item_from_before_has_no_crop_and_no_turn() {
     assert!(matches!(&parse(&list("cover", true)).unwrap().items[0], Item::Image(i) if i.crop.is_none() && i.tile_turn == 0.0));
 }
+
+#[cfg(feature = "gpu")]
+#[test]
+fn a_gpu_picture_is_copied_again_only_when_its_change_is_announced() {
+    use gpu_core::render::Change;
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
+    let list = parse(&list("fill", true)).unwrap();
+    let mut shown = |rgba: [u8; 4], change: Change| {
+        let image = renderer.picture("pic", 2, 2, &rgba.repeat(4), change);
+        at(&renderer.render(&list, &Pictures::from([("pic".to_string(), image)])).unwrap().pixels, 32, 32)
+    };
+
+    assert_eq!(shown(RED, Change::Announced), RED);
+    assert_eq!(shown(GREEN, Change::Unannounced), RED);
+    assert_eq!(shown(BLUE, Change::Announced), BLUE);
+}

@@ -45,7 +45,7 @@
     const wanted = { ...settings };
     bundle = null;
     error = '';
-    interactiveBundle({ doc, tokens, assetUrls, analyses, settings: wanted, title: fileName, fetchBlob }).then(
+    interactiveBundle({ doc, tokens, assetUrls, analyses, settings: wanted, title: fileName, fetchBlob, origin: location.origin }).then(
       (b) => (bundle = b),
       (e) => (error = e instanceof Error ? e.message : String(e))
     );

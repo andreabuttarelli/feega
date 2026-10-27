@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('$env/dynamic/public', () => ({ env: { PUBLIC_SUPABASE_URL: 'https://sb.test', PUBLIC_APP_URL: 'https://oh.feega.app' } }));
 
 const { EMBED_BUCKET, embedSlot, publishEmbed, readEmbed, readEmbedAsset, readEmbedSettings, removeEmbed, embedPublished } = await import('./embed');
-const { Chunk, chunkUrl } = await import('@feega/motion-core/motion/hyperframes/runtime-chunks');
 const { MotionFormat, newMotionDoc } = await import('@feega/motion-core/motion/doc');
 const { FEEGA_TOKENS } = await import('@feega/motion-core/motion/brand');
 const { ProjectMode } = await import('$lib/project-mode');
@@ -77,7 +76,7 @@ describe('hosted embed', () => {
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
-  it('publishing stores the clip, not the engine, so the page is built with the runtime of the day it is read', async () => {
+  it('publishing stores the clip, not the engine, so the page loads the player of the day it is read', async () => {
     const { db, bucket } = fakeDb();
     const doc = newMotionDoc(MotionFormat.Landscape);
     const fetchBlob = vi.fn(async () => new Blob(['window.lib=1;']));
@@ -89,7 +88,7 @@ describe('hosted embed', () => {
 
     expect(stored).not.toContain('motionEngine');
     expect(stored).toContain(`"durationInFrames":${doc.durationInFrames}`);
-    expect(page).toContain(chunkUrl('https://oh.feega.app', Chunk.Engine));
+    expect(page).toContain('<script type="module" src="https://oh.feega.app/motion-player.js">');
     expect(page).toContain('<title>Clip</title>');
     expect(await readEmbedSettings(fetchFn as never, NODE)).toMatchObject({ width: doc.width, height: doc.height });
   });

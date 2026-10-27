@@ -66,6 +66,10 @@ Since #970 the core path never creates or imports the Pixi scene. What is left, 
 | E | core is the default (heavy-canvas bench ≤ 1 % pixels off, no metric worse than Pixi) | — |
 | F | one release clean on the default | the Pixi canvas modules in `src/lib/canvas/gpu/`; `pixi8` stays for the motion engine, html-to-image for `text-layout` |
 
+Step F landed on 2026-10-27: the Pixi canvas modules are gone, `?renderer=` is no longer read and
+any value opens the core. The `card-previews` route and its table are still there, unused by the
+canvas.
+
 Benchmarks for any step run only with load average < 6: one run under load 26 showed core full
 paint 24.8 s vs Pixi 13.7 s and is not evidence of anything.
 

@@ -12,7 +12,7 @@ export const frameShareUrl = (origin: string, token: string, nodeId: string) => 
 
 const failed = (failure: EmbedFailure, body: Record<string, unknown> = {}): EmbedAnswer => ({ ok: false, failure, body: { error: failure, ...body } });
 
-async function shareable(db: Db, scope: ShareScope): Promise<Shareable | EmbedAnswer> {
+export async function shareable(db: Db, scope: ShareScope): Promise<Shareable | EmbedAnswer> {
   const saved = await savedMotion(db, scope);
   if (!saved) {
     return failed(EmbedFailure.NotFound);

@@ -119,6 +119,6 @@ export async function readEmbedSettings(fetchFn: typeof fetch, id: string): Prom
 
 export async function readGpuSource(fetchFn: typeof fetch, id: string, origin: string): Promise<GpuSource | null> {
   const page = await storedEmbed(fetchFn, id);
-  const source = page === null ? null : gpuSource(page, origin);
+  const source = page === null ? null : gpuSource(page);
   return source ? (JSON.parse(hostAssets(JSON.stringify(source), assetBase(origin, id))) as GpuSource) : null;
 }

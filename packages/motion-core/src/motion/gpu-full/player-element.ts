@@ -5,12 +5,21 @@ import { mountPlayer, type Player } from './play';
 import { GPU_PLAYER_TAG, GPU_SOURCE_ATTR } from './player-tag';
 import { Target, composeHtml } from '../hyperframes/compose';
 import { RuntimeDelivery } from '../hyperframes/runtime-delivery';
-import { Liveness } from '../interactive/settings';
+import { Liveness, interactiveOf } from '../interactive/settings';
+import { InputKey, type InputValues } from '../expression/inputs';
+import type { LiveInputs } from '../interactive/gpu-live';
+import { coerceVars, type VarValues } from '../interactive/var-model';
+import { contentBox, fitOf, unit } from './pointer';
+import { inlineCore } from './inline-core';
 
 
 export type GpuSource = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> };
 
 const BACKEND_ORDER = [FullBackend.Core, FullBackend.CoreGl];
+
+export type Drive = { values?: Partial<Record<InputKey, number | undefined>>; vars?: VarValues };
+
+const MS_PER_SECOND = 1000;
 
 export const durationOf = (doc: MotionDoc) => doc.durationInFrames / doc.fps;
 
@@ -25,6 +34,10 @@ export class GpuPlayerElement extends HTMLElement {
   private clock = 0;
   private tried = 0;
   private announced = false;
+  private born = performance.now();
+  private touched: InputValues = {};
+  private driven: InputValues = {};
+  private variables: VarValues = {};
 
   get duration(): number {
     return this.source ? durationOf(this.source.doc) : 0;
@@ -51,10 +64,84 @@ export class GpuPlayerElement extends HTMLElement {
     }
   }
 
+  connectedCallback() {
+    this.addEventListener('pointermove', this.touch);
+    this.addEventListener('pointerdown', this.press);
+    this.addEventListener('pointerup', this.release);
+    this.addEventListener('pointerleave', this.leave);
+  }
+
   disconnectedCallback() {
     cancelAnimationFrame(this.clock);
     this.player?.dispose();
+    this.removeEventListener('pointermove', this.touch);
+    this.removeEventListener('pointerdown', this.press);
+    this.removeEventListener('pointerup', this.release);
+    this.removeEventListener('pointerleave', this.leave);
   }
+
+  drive(next: Drive) {
+    if (next.values) {
+      this.driven = Object.fromEntries(Object.entries({ ...this.driven, ...next.values }).filter(([, v]) => v !== undefined));
+    }
+    if (!next.vars || !this.source) {
+      return;
+    }
+    const given = coerceVars(interactiveOf(this.source.doc).vars, next.vars);
+    if (!Object.keys(given).length) {
+      return;
+    }
+    this.variables = { ...this.variables, ...given };
+    this.dispatchEvent(new CustomEvent('varschange', { detail: { values: this.variables } }));
+  }
+
+  linkAt(x: number, y: number): string | null {
+    const doc = this.source?.doc;
+    return doc && this.player ? this.player.linkAt([x * doc.width, y * doc.height]) : null;
+  }
+
+  clipAt(x: number, y: number): string | null {
+    const doc = this.source?.doc;
+    return doc && this.player ? this.player.clipAt([x * doc.width, y * doc.height]) : null;
+  }
+
+  private live = (): LiveInputs => ({ values: { [InputKey.Time]: (performance.now() - this.born) / MS_PER_SECOND, ...this.touched, ...this.driven }, vars: this.variables });
+
+  private unitOf(e: PointerEvent): [number, number] {
+    const canvas = this.querySelector('canvas');
+    const doc = this.source?.doc;
+    if (!canvas || !doc) {
+      return [0, 0];
+    }
+    const r = canvas.getBoundingClientRect();
+    return unit(contentBox({ left: r.left, top: r.top, width: r.width, height: r.height }, doc.width / doc.height, fitOf(this.getAttribute('fit'))), e.clientX, e.clientY);
+  }
+
+  private touch = (e: PointerEvent) => {
+    const [x, y] = this.unitOf(e);
+    this.touched = { ...this.touched, [InputKey.PointerX]: x, [InputKey.PointerY]: y, [InputKey.Hover]: 1 };
+    this.style.cursor = this.linkAt(x, y) ? 'pointer' : '';
+  };
+
+  private press = (e: PointerEvent) => {
+    this.touch(e);
+    this.touched = { ...this.touched, [InputKey.PointerDown]: 1 };
+  };
+
+  private release = (e: PointerEvent) => {
+    this.touch(e);
+    this.touched = { ...this.touched, [InputKey.PointerDown]: 0 };
+    const url = this.linkAt(...this.unitOf(e));
+    if (url && this.dispatchEvent(new CustomEvent('link', { detail: { url }, cancelable: true }))) {
+      window.open(url, '_blank', 'noopener');
+    }
+  };
+
+  private leave = () => {
+    const { [InputKey.PointerX]: _x, [InputKey.PointerY]: _y, ...rest } = this.touched;
+    this.touched = { ...rest, [InputKey.Hover]: 0, [InputKey.PointerDown]: 0 };
+    this.style.cursor = '';
+  };
 
   play() {
     if (this.playing) {
@@ -112,9 +199,9 @@ export class GpuPlayerElement extends HTMLElement {
     Object.assign(canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%' });
     this.append(host, canvas);
     const backend = BACKEND_ORDER[this.tried];
-    this.player = mountPlayer({ canvas, host, backend, size: { width: source.doc.width, height: source.doc.height }, time: () => this.currentTime, onfallback: (reason) => this.fallback(reason) });
+    this.player = mountPlayer({ canvas, host, backend, size: { width: source.doc.width, height: source.doc.height }, time: () => this.currentTime, onfallback: (reason) => this.fallback(reason), inputs: this.live });
     this.fitCanvas();
-    const origin = new URL(import.meta.url).origin;
+    const origin = inlineCore()?.origin ?? new URL(import.meta.url).origin;
     this.player.show({ ...source, compose: (only) => composeHtml({ ...source, liveness: Liveness.Baked, target: Target.Screen, origin, runtime: RuntimeDelivery.Hosted, only }) });
     if (!this.announced) {
       this.announced = true;

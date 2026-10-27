@@ -178,6 +178,14 @@ export async function cmdMotionShare(nodeId: string, opts: { org?: string }) {
   console.log(shared.url);
 }
 
+export async function cmdMotionPlay(nodeId: string, opts: { org?: string }) {
+  const played = await motionApi.play(await token(), nodeId, opts.org);
+  console.log(played.url);
+  for (const flow of played.flows) {
+    console.log(`flow ${flow.name}  ${flow.frame_id}`);
+  }
+}
+
 export async function embedAndReport(bearer: string, nodeId: string, opts: EmbedOpts) {
   if (opts.download) {
     await writeFile(opts.download, await motionApi.bundle(bearer, nodeId, opts.org));

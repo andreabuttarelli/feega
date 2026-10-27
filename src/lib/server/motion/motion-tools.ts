@@ -128,6 +128,8 @@ import { COUNTER_FORMATS } from '@feega/motion-core/motion/text-counter';
 import { setTextCounter } from '$lib/motion/text-counter-ops';
 import { actionSchema, transitionSchema, triggerSchema, ACTION_KINDS, TRANSITION_KINDS as LINK_TRANSITIONS, TRIGGER_KINDS } from '@feega/motion-core/motion/prototype/model';
 import { putInteraction, removeInteraction } from '$lib/motion/prototype/ops';
+import { setFlow } from '$lib/motion/prototype/flows';
+import { MAX_FLOW_NAME } from '@feega/motion-core/motion/prototype/flow';
 import { animateTo } from '$lib/motion/animate-to';
 import { IN_OUT_PRESETS, InOutPreset, PresetSide, applyInOut } from '$lib/motion/in-out-presets';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '@feega/motion-core/motion/graph';
@@ -481,6 +483,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     styles: stylesOf(doc),
     variables: doc.variables ?? {},
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
+    flow: doc.flow ?? null,
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     interactive: interactiveOf(doc),
     style: styleOf(doc),
@@ -2419,6 +2422,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Remove one prototype link from a layer. interaction_id comes from list_interactions.',
       inputSchema: z.object({ clip_id: z.string(), interaction_id: z.string() }),
       execute: async ({ clip_id, interaction_id }) => apply(removeInteraction(session.doc, clip_id, interaction_id), `unlinked ${interaction_id} from ${clip_id}`)
+    }),
+
+    set_flow: tool({
+      description: 'Make this frame the starting point of a prototype flow, named name (for example Onboarding), or take the mark off with name null. The prototype player and the play link start on the first flow of the canvas; links between frames come from add_interaction. get_motion_doc reads it as flow.',
+      inputSchema: z.object({ name: z.string().max(MAX_FLOW_NAME).nullable() }),
+      execute: async ({ name }) => apply(setFlow(session.doc, name), name === null ? 'removed the flow' : `flow ${name}`)
     }),
 
     list_interactions: tool({

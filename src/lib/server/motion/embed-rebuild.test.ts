@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { embedSource, hostedPage, isSourceEmbed } from '$lib/motion/interactive/bundle';
+import { isSourceEmbed } from '$lib/motion/interactive/bundle';
+import { Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { RuntimeDelivery } from '@feega/motion-core/motion/hyperframes/runtime-delivery';
+import { Liveness, interactiveOf } from '@feega/motion-core/motion/interactive/settings';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
@@ -23,8 +26,11 @@ const CURRENT = titled('Unpublished draft');
 
 const inputOf = (doc: MotionDoc) => ({ doc, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Saturn', fetchBlob: vi.fn() });
 
-async function legacyPage(doc: MotionDoc): Promise<string> {
-  return hostedPage(await embedSource(inputOf(doc)), ORIGIN)!;
+function legacyPage(doc: MotionDoc): string {
+  const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, liveness: Liveness.Live, target: Target.Screen, origin: ORIGIN, runtime: RuntimeDelivery.Hosted });
+  const { playback, loop } = interactiveOf(doc);
+  const config = { html, width: doc.width, height: doc.height, duration: doc.durationInFrames / doc.fps, playback, loop };
+  return `<!doctype html><html><head><title>Saturn</title></head><body><script>(function playerMain(cfg){})(${JSON.stringify(config).replace(/</g, '\\u003c')});</script></body></html>`;
 }
 
 const PLACE: EmbedPlace = { orgId: 'org', projectId: 'p', canvasId: 'c', brandId: null, title: 'Saturn', mode: ProjectMode.Standard, deleted: false };
@@ -51,7 +57,7 @@ function bucket(page: string, overrides: Partial<RebuildPorts> = {}) {
 
 describe('rebuilding a legacy hosted embed', () => {
   it('a legacy page is rebuilt from the revision that was the head when it was published, not from the current doc', async () => {
-    const { ports, write, current } = bucket(await legacyPage(PUBLISHED));
+    const { ports, write, current } = bucket(legacyPage(PUBLISHED));
 
     expect(await rebuildEmbed(ports, NODE, ORIGIN)).toBe(RebuildOutcome.Rebuilt);
 
@@ -63,21 +69,21 @@ describe('rebuilding a legacy hosted embed', () => {
   });
 
   it('a revision that does not compose to the published page is never written over it', async () => {
-    const { ports, write } = bucket(await legacyPage(PUBLISHED), { revisionAt: vi.fn(async () => CURRENT) });
+    const { ports, write } = bucket(legacyPage(PUBLISHED), { revisionAt: vi.fn(async () => CURRENT) });
 
     expect(await rebuildEmbed(ports, NODE, ORIGIN)).toBe(RebuildOutcome.Mismatch);
     expect(write).not.toHaveBeenCalled();
   });
 
   it('without a revision at publish time the legacy page stays and nothing is written', async () => {
-    const { ports, write } = bucket(await legacyPage(PUBLISHED), { revisionAt: vi.fn(async () => null) });
+    const { ports, write } = bucket(legacyPage(PUBLISHED), { revisionAt: vi.fn(async () => null) });
 
     expect(await rebuildEmbed(ports, NODE, ORIGIN)).toBe(RebuildOutcome.NoRevision);
     expect(write).not.toHaveBeenCalled();
   });
 
   it('the second visit finds the source format and does nothing', async () => {
-    const { ports, write } = bucket(await legacyPage(PUBLISHED));
+    const { ports, write } = bucket(legacyPage(PUBLISHED));
 
     await rebuildEmbed(ports, NODE, ORIGIN);
 
@@ -86,7 +92,7 @@ describe('rebuilding a legacy hosted embed', () => {
   });
 
   it('concurrent visits rebuild once', async () => {
-    const { ports, write } = bucket(await legacyPage(PUBLISHED));
+    const { ports, write } = bucket(legacyPage(PUBLISHED));
 
     const outcomes = await Promise.all([rebuildEmbed(ports, NODE, ORIGIN), rebuildEmbed(ports, NODE, ORIGIN), rebuildEmbed(ports, NODE, ORIGIN)]);
 
@@ -95,7 +101,7 @@ describe('rebuilding a legacy hosted embed', () => {
   });
 
   it('a deleted node, an uncensored project or an unpublished embed is never rebuilt', async () => {
-    const page = await legacyPage(PUBLISHED);
+    const page = legacyPage(PUBLISHED);
     const deleted = bucket(page, { place: vi.fn(async () => ({ ...PLACE, deleted: true })) });
     const uncensored = bucket(page, { place: vi.fn(async () => ({ ...PLACE, mode: ProjectMode.Uncensored })) });
     const unpublished = bucket(page, { stored: vi.fn(async () => null) });
@@ -107,7 +113,7 @@ describe('rebuilding a legacy hosted embed', () => {
   });
 
   it('a page republished while rebuilding is left alone, and the lock is released', async () => {
-    const page = await legacyPage(PUBLISHED);
+    const page = legacyPage(PUBLISHED);
     const reads = [{ page, updatedAt: PUBLISHED_AT }, { page, updatedAt: '2026-10-09T10:00:00.000Z' }];
     const { ports, write } = bucket(page, { stored: vi.fn(async () => reads.shift() ?? null) });
 

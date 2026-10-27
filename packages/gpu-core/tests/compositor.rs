@@ -222,3 +222,47 @@ fn a_big_refine_is_rendered_in_tiles_of_at_most_1024_pixels() {
     assert_eq!(fake.painted.len(), 9);
     assert!(fake.painted.iter().all(|(r, _, _)| r.width() <= 1024.0 && r.height() <= 1024.0));
 }
+
+const RING: &str = r#"[{ "kind": "path", "clip": "sel", "contours": [[-40, -30, -30, -30, -30, -20, -40, -20]], "rule": "nonzero", "paint": { "kind": "solid", "color": [0, 0, 1, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0] }]"#;
+
+fn overlaid(composes: bool) -> (Compositor, Library) {
+    let (mut c, mut lib) = scene();
+    if composes {
+        lib.compose_encodings();
+    }
+    c.set_overlay(gpu_core::world::parse_overlay(RING).unwrap(), &mut lib);
+    (c, lib)
+}
+
+#[test]
+fn a_composed_overlay_reaches_the_painter_as_one_use() {
+    let (mut c, mut lib) = overlaid(true);
+    let mut fake = Fake::default();
+
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+
+    let items = &fake.painted[0].2;
+    assert_eq!(items.iter().map(|i| i.kind()).collect::<Vec<_>>(), vec!["use", "use"]);
+}
+
+#[test]
+fn an_expanded_overlay_lands_where_the_camera_puts_it() {
+    let (mut c, mut lib) = overlaid(false);
+    let mut fake = Fake::default();
+
+    c.frame(&mut fake, &mut lib, at(5.0, 7.0, 2.0), 0.0, &mut || 0.0).unwrap();
+
+    let Item::Path(ring) = fake.painted[0].2.last().unwrap() else { panic!("the overlay") };
+    assert_eq!(ring.look.matrix, [2.0, 0.0, 0.0, 2.0, 80.0, 82.0]);
+}
+
+#[test]
+fn replacing_the_overlay_replaces_what_the_painter_gets() {
+    let (mut c, mut lib) = overlaid(true);
+    c.set_overlay(vec![], &mut lib);
+    let mut fake = Fake::default();
+
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+
+    assert_eq!(fake.painted[0].2.iter().map(|i| i.kind()).collect::<Vec<_>>(), vec!["use"]);
+}
