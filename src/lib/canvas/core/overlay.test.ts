@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import { wireCurve } from '$lib/canvas/gpu/geometry';
-import { EdgeLook, OverlayPart, edgeItems, guideItems, marqueeItems, peerItems, type CoreTheme } from './overlay';
+import { EdgeLook, OverlayPart, edgeItems, guideItems, marqueeItems, peerItems, runningItems, type CoreTheme } from './overlay';
 import type { Glyphs } from './chrome';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', paper2: '#f9f9f9', line: '#e5e5e5', line2: '#d2d2d7', chip: '#f2f2f2', chipInk: '#141414', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
@@ -62,5 +62,14 @@ describe('peerItems', () => {
 
     expect(box(items[0].contours)).toEqual([100, 100, 106, 108]);
     expect(box(pill.contours)).toEqual([105, 108, 127, 117]);
+  });
+});
+
+describe('the running ring of a rounded card', () => {
+  it('follows its corners', () => {
+    const square = runningItems({ id: 'n', x: 0, y: 0, w: 200, h: 100 }, 1, theme)[0];
+    const round = runningItems({ id: 'n', x: 0, y: 0, w: 200, h: 100, radius: 10 }, 1, theme)[0];
+
+    expect(round.contours.flat().length).toBeGreaterThan(square.contours.flat().length);
   });
 });

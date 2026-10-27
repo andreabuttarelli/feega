@@ -910,10 +910,13 @@
     border-radius: var(--ui-radius-sm, 4px);
     background: transparent;
     overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     transition: height var(--ui-dur, 200ms) var(--ui-ease, ease);
   }
   .is-compact .gen-actions .gen-prompt:focus {
     height: 96px;
+    white-space: pre-wrap;
     overflow: auto;
     background: transparent;
     box-shadow: none;
