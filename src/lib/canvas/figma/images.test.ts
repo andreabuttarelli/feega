@@ -21,7 +21,7 @@ describe('Figma image fills keep their place until the image arrives', () => {
 
     expect(plan.fileKey).toBe(FIGMA_FILE_KEY);
     expect(item.images.map((i) => i.hash)).toEqual([HASH]);
-    expect(plan.skipped.join(' ')).toContain('placed as a placeholder');
+    expect(plan.skipped).toEqual([]);
   });
 
   it('swaps the placeholder for an image fill, even inside a group', () => {

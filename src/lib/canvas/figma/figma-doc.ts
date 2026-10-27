@@ -4,6 +4,7 @@ import { blankElement, canvasReady, drawClip, drawnFrame, penClip } from '$lib/m
 import { DrawTool } from '$lib/motion/draw-tool';
 import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import type { Effect } from '@feega/motion-core/motion/effects/model';
+import { TYPE_SIZE } from '@feega/motion-core/motion/components';
 import { FillType } from '@feega/motion-core/motion/fill/model';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { registerFont } from '$lib/motion/fonts/ops';
@@ -153,7 +154,7 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
   const [width, height] = [Math.max(x1 - x0, MIN_TEXT_BOX.x), Math.max(y1 - y0, MIN_TEXT_BOX.y)];
   const id = p.newId();
   const drawn = drawClip(next, DrawTool.Text, { x: x0 + width / 2, y: y0 + height / 2, width, height }, p.frame, id, TextSizing.AutoWidth, { text: layer.text });
-  const size = (n: number) => round((n * p.scale) / minSide(next));
+  const size = (n: number) => clamp(round((n * p.scale) / minSide(next)), TYPE_SIZE.min, TYPE_SIZE.max);
   const font = known.get(layer.font);
   const runs = layer.runs.map(({ font: f, size: s, ...rest }) => ({ ...rest, ...(f && known.get(f) ? { font: f } : {}), ...(s ? { size: size(s) } : {}) }));
   const stacked = layer.fills.length > 1 || layer.fills.some((f) => f.kind !== FillKind.Solid);

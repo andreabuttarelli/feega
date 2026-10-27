@@ -274,6 +274,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
   import type { FigmaJob } from '$lib/canvas/figma/images';
   import { ImagesOutcome, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
+  import { figmaNotice } from '$lib/canvas/figma/notice';
+  import FigmaNotice from '$lib/components/canvas/FigmaNotice.svelte';
   import { connectionMessage } from '$lib/canvas/connection-messages';
 
   const LINK_COPIED_MS = 1500;
@@ -3565,7 +3567,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   const FIGMA_PASTE = 'These Figma layers could not be read. In Figma use Copy as → Copy as SVG, then paste here.';
-  const FIGMA_SKIPPED = 'Pasted from Figma. Approximated or skipped:';
 
   async function pasteFigma(html: string, at: { x: number; y: number }) {
     const res = await post('pasteFigma', { html, at: JSON.stringify(at) });
@@ -3577,12 +3578,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
     pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
     focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
-    const skipped = (res?.skipped ?? []) as string[];
-    if (skipped.length) {
-      failed = `${FIGMA_SKIPPED} ${skipped.join('; ')}`;
-    }
     const fileKey = (res?.fileKey ?? null) as string | null;
     const fills = (res?.fills ?? []) as { nodeId: string; images: FigmaImage[] }[];
+    figmaPasted({ skipped: (res?.skipped ?? []) as string[], images: fills.reduce((n, f) => n + f.images.length, 0), loading: Boolean(fileKey && fills.length) });
     if (fileKey && fills.length) {
       figmaJobs = [...figmaJobs, ...fills.map((f) => ({ ...f, fileKey }))];
     }
@@ -3618,16 +3616,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
     pushGesture({ items: landed.undo as UndoItem[] });
     focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
-    if (landed.skipped.length) {
-      failed = `${FIGMA_SKIPPED} ${landed.skipped.join('; ')}`;
-    }
+    figmaPasted({ skipped: landed.skipped, images: 0, loading: false });
   }
 
   let figmaJobs = $state<FigmaJob[]>([]);
-  let figmaTokenMissing = $state(false);
+  let figmaPaste = $state<{ skipped: string[]; images: number } | null>(null);
+  let figmaOutcome = $state<ImagesOutcome | null>(null);
+  const figmaShown = $derived(figmaPaste ? figmaNotice({ ...figmaPaste, outcome: figmaOutcome }) : null);
+
+  function figmaPasted(paste: { skipped: string[]; images: number; loading: boolean }) {
+    figmaPaste = { skipped: paste.skipped, images: paste.images };
+    figmaOutcome = paste.loading || !paste.images ? null : ImagesOutcome.Failed;
+  }
 
   function figmaImagesAnswered(answer: ImagesAnswer) {
-    figmaTokenMissing = answer.outcome === ImagesOutcome.NoToken;
+    figmaOutcome = answer.outcome;
     if (answer.outcome === ImagesOutcome.Failed) {
       failed = connectionMessage(answer.error);
     }
@@ -4030,11 +4033,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {/if}
     </p>
   {/if}
-  {#if figmaTokenMissing}
-    <p class="warning" role="status" data-testid="figma-token-hint">
-      Add a Figma token in Settings to import images
-      <a href="/p/{data.projectId}/settings/profile">Open settings</a>
-    </p>
+  {#if figmaShown}
+    <FigmaNotice notice={figmaShown} settingsHref="/p/{data.projectId}/settings/profile" onclose={() => (figmaPaste = null)} />
   {/if}
   {#if techniqueNotice}
     <p class="warning" role="status" data-testid="technique-notice">{techniqueNotice}</p>
@@ -4169,6 +4169,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onPasteData={pasteData}
     {figmaJobs}
     onFigmaImages={figmaImagesAnswered}
+    onFigmaPaste={figmaPasted}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
     techniques={techniqueShelf.list}
