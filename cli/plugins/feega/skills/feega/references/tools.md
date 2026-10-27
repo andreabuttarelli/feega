@@ -425,4 +425,5 @@ permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publisha
 | `team_op` `set_role` / `remove_member` | `feega team role <userId> <role>` / `remove <userId>` |
 | `team_op` `leave` / `transfer_ownership` | `feega team leave` / `transfer <userId>` |
 | `model_allowlist` | `feega allowlist [set <medium> [ids...]]` |
+| `org_fonts` | `feega fonts [upload <file>\|delete <family>]` |
 | `spend_caps` | `feega caps [set <scope> <usd\|off> [--project <id>] [--reset monthly]]` |

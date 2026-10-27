@@ -24,7 +24,7 @@ export const QUERY_TABLES =
   'market_account_fetch_attempts market_harvest_errors market_harvest_runs market_post_observations market_posts ' +
   'market_teardowns market_video_analyses media_generator_items media_generator_prompts moderation_checks ' +
   'motion_craft_scores motion_reference_specs motion_video_prompts motion_video_references motion_videos ' +
-  'onboarding_drafts onboarding_errors onboarding_jobs onboarding_step_jobs org_members org_model_allowlist ' +
+  'onboarding_drafts onboarding_errors onboarding_jobs onboarding_step_jobs org_fonts org_members org_model_allowlist ' +
   'org_spend_caps org_uncensored_optins org_usage organizations people post_links post_revisions post_verdicts ' +
   'post_visual_meta posts product_batch_items product_batches products profiles prompt_skills publish_logs ' +
   'push_subscriptions reference_images rubrics scheduler_runs scrapecreators_cache shared_views social_accounts ' +

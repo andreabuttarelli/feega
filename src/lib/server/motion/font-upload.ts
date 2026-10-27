@@ -1,8 +1,9 @@
 import type { Db } from '$lib/server/db/client';
-import { deleteAsset, insertAsset, listFontAssets, setAssetContent } from '$lib/server/repos/assets';
+import { deleteAsset, insertAsset, setAssetContent } from '$lib/server/repos/assets';
+import { FontStyle, deleteOrgFont, insertOrgFont, listOrgFonts, renameOrgFont, type OrgFont } from '$lib/server/repos/org-fonts';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { FONT_NAME } from '@feega/motion-core/motion/fonts/model';
-import { familyFromFileName, fontFamilies, fontFileOf, type FontFamily, type FontFile } from '$lib/motion/fonts/library';
+import { familyFromFileName, fontFamilies, type FontFamily, type FontFile } from '$lib/motion/fonts/library';
 import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
 import { readFontMeta } from './font-meta';
 
@@ -17,7 +18,6 @@ export enum FontFormat {
 
 const MB = 1024 * 1024;
 export const MAX_FONT_BYTES = 10 * MB;
-const LIBRARY_LIMIT = 200;
 const REGULAR = 400;
 
 const SIGNATURES: [FontFormat, number[]][] = [
@@ -36,7 +36,7 @@ export type FontSaved = { ok: true; assetId: string; format: FontFormat; font: F
 
 export type FontChange = { ok: true } | { ok: false; error: string };
 
-export async function saveFontUpload(db: Db, input: { orgId: string; path: string }): Promise<FontSaved> {
+export async function saveFontUpload(db: Db, input: { orgId: string; userId: string | null; path: string }): Promise<FontSaved> {
   if (!input.path.startsWith(orgFontPrefix(input.orgId)) || input.path.includes('..')) {
     return { ok: false, error: 'invalid_path' };
   }
@@ -45,23 +45,33 @@ export async function saveFontUpload(db: Db, input: { orgId: string; path: strin
     return { ok: false, error: 'file_not_found' };
   }
   const bytes = new Uint8Array(await download.data.arrayBuffer());
+  const refusal = fontRefusal(bytes);
+  if (refusal) {
+    await db.storage.from(CANVAS_ASSET_BUCKET).remove([input.path]);
+    return { ok: false, error: refusal };
+  }
+  return registerFont(db, { ...input, bytes });
+}
+
+function fontRefusal(bytes: Uint8Array): string | null {
   if (bytes.length > MAX_FONT_BYTES) {
-    await db.storage.from(CANVAS_ASSET_BUCKET).remove([input.path]);
-    return { ok: false, error: `a font file is at most ${MAX_FONT_BYTES / MB}MB` };
+    return `a font file is at most ${MAX_FONT_BYTES / MB}MB`;
   }
-  const format = fontFormatOf(bytes);
-  if (!format) {
-    await db.storage.from(CANVAS_ASSET_BUCKET).remove([input.path]);
-    return { ok: false, error: 'not a font: upload a TTF, OTF, WOFF or WOFF2 file' };
-  }
-  const meta = readFontMeta(bytes) ?? { family: familyFromFileName(input.path), weight: REGULAR, italic: false };
-  const asset = await insertAsset(db, { orgId: input.orgId, projectId: null, type: 'document', source: 'upload', url: input.path, content: JSON.stringify(meta), mimeType: `font/${format}`, bytes: bytes.length });
+  return fontFormatOf(bytes) ? null : 'not a font: upload a TTF, OTF, WOFF or WOFF2 file';
+}
+
+async function registerFont(db: Db, input: { orgId: string; userId: string | null; path: string; bytes: Uint8Array }): Promise<FontSaved> {
+  const format = fontFormatOf(input.bytes)!;
+  const meta = readFontMeta(input.bytes) ?? { family: familyFromFileName(input.path), weight: REGULAR, italic: false };
+  const asset = await insertAsset(db, { orgId: input.orgId, projectId: null, type: 'document', source: 'upload', url: input.path, content: JSON.stringify(meta), mimeType: `font/${format}`, bytes: input.bytes.length });
+  await insertOrgFont(db, { id: asset.id, orgId: input.orgId, family: meta.family, weight: meta.weight, style: meta.italic ? FontStyle.Italic : FontStyle.Normal, path: input.path, uploadedBy: input.userId });
   return { ok: true, assetId: asset.id, format, font: { assetId: asset.id, ...meta } };
 }
 
+const fileOf = (font: OrgFont): FontFile => ({ assetId: font.id, family: font.family, weight: font.weight, italic: font.style === FontStyle.Italic });
+
 async function orgFontFiles(db: Db, orgId: string) {
-  const assets = await listFontAssets(db, { orgId, limit: LIBRARY_LIMIT });
-  return assets.map((asset) => ({ asset, file: fontFileOf(asset) }));
+  return (await listOrgFonts(db, orgId)).map((font) => ({ font, file: fileOf(font) }));
 }
 
 export async function orgFontFamilies(db: Db, orgId: string): Promise<FontFamily[]> {
@@ -82,6 +92,7 @@ export async function renameFontFamily(db: Db, input: { orgId: string; family: s
     return { ok: false, error: `an uploaded font is already named ${to}` };
   }
   for (const { file } of own) {
+    await renameOrgFont(db, { orgId: input.orgId, id: file.assetId, family: to });
     await setAssetContent(db, { orgId: input.orgId, assetId: file.assetId, content: JSON.stringify({ family: to, weight: file.weight, italic: file.italic }) });
   }
   return { ok: true };
@@ -92,9 +103,33 @@ export async function deleteFontFamily(db: Db, input: { orgId: string; family: s
   if (!own.length) {
     return { ok: false, error: `no uploaded font ${input.family}` };
   }
-  for (const { asset } of own) {
-    await deleteAsset(db, { orgId: input.orgId, assetId: asset.id });
+  for (const { font } of own) {
+    await deleteOrgFont(db, { orgId: input.orgId, id: font.id });
+    await deleteAsset(db, { orgId: input.orgId, assetId: font.id });
   }
-  await db.storage.from(CANVAS_ASSET_BUCKET).remove(own.map((f) => f.asset.url ?? '').filter(Boolean));
+  await db.storage.from(CANVAS_ASSET_BUCKET).remove(own.map((f) => f.font.path));
   return { ok: true };
+}
+
+const UNSAFE_FILE_NAME = /[^\w.-]+/g;
+
+export async function storeFontFile(db: Db, input: { orgId: string; userId: string | null; name: string; bytes: Uint8Array }): Promise<FontSaved> {
+  const refusal = fontRefusal(input.bytes);
+  if (refusal) {
+    return { ok: false, error: refusal };
+  }
+  const path = `${orgFontPrefix(input.orgId)}${crypto.randomUUID()}-${input.name.replace(UNSAFE_FILE_NAME, '_')}`;
+  const stored = await db.storage.from(CANVAS_ASSET_BUCKET).upload(path, input.bytes, { contentType: `font/${fontFormatOf(input.bytes)}` });
+  if (stored.error) {
+    return { ok: false, error: 'store_failed' };
+  }
+  return registerFont(db, { orgId: input.orgId, userId: input.userId, path, bytes: input.bytes });
+}
+
+export type OrgFontFace = FontFile & { url: string | null };
+
+export async function orgFontFaces(db: Db, orgId: string, sign: (paths: string[]) => Promise<Map<string, string>>): Promise<OrgFontFace[]> {
+  const fonts = await listOrgFonts(db, orgId);
+  const urls = await sign(fonts.map((f) => f.path));
+  return fonts.map((font) => ({ ...fileOf(font), url: urls.get(font.path) ?? null }));
 }

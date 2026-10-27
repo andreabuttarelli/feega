@@ -160,7 +160,7 @@ export const EDITOR_OPS = {
     access: EditorAccess.Write,
     input: z.object({ path: z.string() }),
     run: async (ctx, input) => {
-      const saved = await saveFontUpload(ctx.db, { orgId: ctx.orgId, path: input.path });
+      const saved = await saveFontUpload(ctx.db, { orgId: ctx.orgId, userId: ctx.userId, path: input.path });
       if (!saved.ok) {
         return refused(HTTP_BAD_REQUEST, { error: saved.error });
       }
