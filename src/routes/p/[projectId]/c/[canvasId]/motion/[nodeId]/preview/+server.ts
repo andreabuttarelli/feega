@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { motionScope } from '$lib/server/motion/editor-scope';
 import { assetUrls, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
-import { composeHtml } from '$lib/motion/hyperframes/compose';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import type { MotionPreview } from '$lib/canvas/motion-preview';
 import type { RequestHandler } from './$types';
 

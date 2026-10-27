@@ -1,8 +1,9 @@
-import { BACKENDS, type FullBackend } from './backends';
-import { drawFrame, type Prepared } from './display-list';
-import { createMedia } from './media';
-import { readClips, type CustomReads } from './dom/custom';
-import type { CoreRaster } from './core-web';
+import { BACKENDS, type FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
+import { drawFrame, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+import { sharedFrames } from '$lib/motion/gpu/webcodecs-decoder';
+import { createMedia } from '@feega/motion-core/motion/gpu-full/media';
+import { readClips, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
+import type { CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
 
 export type FrameSink = (bitmap: ImageBitmap, index: number) => Promise<void>;
 
@@ -13,7 +14,7 @@ const NO_READS: ReadonlySet<string> = new Set();
 export const coreExportable = (prepared: Prepared, times: number[], read = NO_READS): boolean => times.every((t) => drawFrame(prepared, frameAt(prepared, t)).unsupported.every((gap) => read.has(gap.clip)));
 
 export async function renderOnCore(prepared: Prepared, backend: FullBackend, times: number[], onFrame: FrameSink, signal: AbortSignal, custom: CustomReads): Promise<boolean> {
-  if (!coreExportable(prepared, times, new Set(readClips(prepared.doc).read))) {
+  if (!coreExportable(prepared, times, new Set(readClips(prepared.doc, prepared.tokens.logoUrl).read))) {
     return false;
   }
   const { width, height } = prepared.doc;
@@ -22,7 +23,7 @@ export async function renderOnCore(prepared: Prepared, backend: FullBackend, tim
   if (!raster) {
     return false;
   }
-  const media = createMedia();
+  const media = createMedia({ frames: sharedFrames() });
   try {
     for (const [index, time] of times.entries()) {
       signal.throwIfAborted();

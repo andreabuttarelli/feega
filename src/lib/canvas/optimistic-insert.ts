@@ -1,6 +1,6 @@
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { MOTION_NODE_BAR_H, atFirstRevision, drawnFrameNodeOf, elementNodeOf, frameNodeOf } from './motion-node';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { drawnElement, drawnOf, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
 import { PENDING_FRAME_TYPE } from './pending-frame';

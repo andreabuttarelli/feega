@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import MotionNode from './MotionNode.svelte';
-import { MotionFormat } from '$lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { FrameKind } from '$lib/canvas/motion-node';
 
 const node = { id: 'n1', format: MotionFormat.Landscape, docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null, kind: FrameKind.Frame };

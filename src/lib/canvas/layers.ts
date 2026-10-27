@@ -1,11 +1,11 @@
-import { findClip, type MotionDoc } from '$lib/motion/doc';
-import { COMPONENTS, type ComponentId } from '$lib/motion/components';
-import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/timeline';
-import { renameClip, setClipFlags, setTrackFlags } from '$lib/motion/organize';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/components';
+import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '@feega/motion-core/motion/timeline';
+import { renameClip, setClipFlags, setTrackFlags } from '@feega/motion-core/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
-import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '$lib/motion/poster-parts';
+import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '@feega/motion-core/motion/poster-parts';
 import { EditMode } from '$lib/motion/edit-mode';
-import { TrackKind } from '$lib/motion/components';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { joinMask, leaveMask, maskMembers, maskOf, releaseMasks, useAsMask } from '$lib/motion/mask-group';
 import { Command } from '$lib/motion/shortcuts';
 import { NODE_KIND_LABEL } from './node-label';

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { setNetwork, toVector } from './ops';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { COMPONENTS } from '../components';
-import { shapeMarkup, type ShapeLook } from '../shape/render';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { shapeMarkup, type ShapeLook } from '@feega/motion-core/motion/shape/render';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {

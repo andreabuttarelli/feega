@@ -1,5 +1,5 @@
-import { FillType, newFill, retypeFill, setFill, type FillPatch } from './fill/model';
-import { MIXED, type GradientFill, type RunStyle } from './text-runs';
+import { FillType, newFill, retypeFill, setFill, type FillPatch } from '@feega/motion-core/motion/fill/model';
+import { MIXED, type GradientFill, type RunStyle } from '@feega/motion-core/motion/text-runs';
 
 export enum RunPaint {
   Solid = 'solid',

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, type OpResult } from '$lib/motion/timeline';
-import { BrandKind } from '$lib/motion/script';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { BrandKind } from '@feega/motion-core/motion/script';
 import { ProjectMode } from '$lib/project-mode';
 import { builtinTemplate, BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 import { bandOf, byline, DurationBand, factsOf, filterHref, GalleryKind, glyphSize, publishMetaSchema, rangeHref, resultCount, SLIDER_MAX, swapAssetIds } from './model';

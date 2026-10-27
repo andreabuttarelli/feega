@@ -1,6 +1,6 @@
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { EditMode } from '$lib/motion/edit-mode';
-import type { OpResult } from '$lib/motion/timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 import type { CanvasLayer, LayerHover } from './layers';
 
 export type CanvasSide = {

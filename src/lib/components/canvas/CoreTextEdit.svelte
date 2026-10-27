@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { anchorShift, editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { rangeOf, select, selectionIn, textOf, type Span } from '$lib/canvas/editable-text';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import GradientHandles from './GradientHandles.svelte';
-  import { ListKind, type ListItem } from '$lib/motion/text-lists';
-  import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '$lib/motion/text-runs';
+  import { ListKind, type ListItem } from '@feega/motion-core/motion/text-lists';
+  import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '@feega/motion-core/motion/text-runs';
 
   let { layout, look, text, body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
 
@@ -33,7 +33,6 @@
 
   const style = $derived(editCss(look, layout));
   let barAt = $state({ left: 0, top: 0 });
-  let laid: number | null = null;
 
   const CARET_PX = 2;
   const BAR_GAP_PX = 32;
@@ -48,8 +47,7 @@
       field.style.width = `${field.scrollWidth + CARET_PX}px`;
     }
     const content = field.scrollHeight;
-    laid ??= content;
-    field.style.marginTop = `${(laid - content) * layout.vertical}px`;
+    field.style.marginTop = `${anchorShift(layout, content)}px`;
     field.style.height = `${content}px`;
     const own = field.getBoundingClientRect();
     const host = field.offsetParent?.getBoundingClientRect() ?? own;

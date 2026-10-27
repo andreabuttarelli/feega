@@ -6,8 +6,8 @@ import FrameGuides from './FrameGuides.svelte';
 import LayersPanel from './LayersPanel.svelte';
 import { layersSource } from '$lib/canvas/layers-source.svelte';
 import { videoSide } from '$lib/canvas/frame-select';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 
 const RECT = { left: 10, top: 20, width: 100, height: 50 };
 const QUAD: [number, number][] = [

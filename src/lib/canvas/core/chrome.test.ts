@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
-import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
-import { stateChrome, tileChrome, ChromePart, PortState, type StateTile, type Glyphs } from './chrome';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
+import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
+import { stateChrome, tileChrome, ChromePart, ADD_BESIDE, PortState, type StateTile, type Glyphs } from './chrome';
 import type { ConnectorType } from '$lib/canvas/connectors';
 
 const marks = (...types: ConnectorType[]) => types.map((type) => ({ type, state: PortState.Quiet }));
@@ -126,11 +126,26 @@ describe('tileChrome', () => {
     expect(ofPart(tile({ inputs: marks('text') }), ChromePart.PortName)).toHaveLength(0);
   });
 
+  it('keeps the output name clear of the add-beside button', () => {
+    const t = tile({ outputs: [{ type: 'videos', state: PortState.Lit }], addBeside: true });
+    const [left] = box(ofPart(t, ChromePart.PortName)[0].contours);
+
+    expect(left).toBeGreaterThanOrEqual(400 + ADD_BESIDE.offset + ADD_BESIDE.size);
+  });
+
   it('puts the kind icon before the label and shifts the label past it', () => {
     const t = tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]] });
 
     expect(box(ofPart(t, ChromePart.Icon)[0].contours)).toEqual([100, 180, 112, 192]);
     expect(box(ofPart(t, ChromePart.Label)[0].contours)).toEqual([117, 178, 177, 190]);
+  });
+
+  it('draws the colour tag as a dot at the right end of the label row, even with no label', () => {
+    const [dot] = ofPart(tile({ tag: '#e5484d' }), ChromePart.Tag);
+
+    expect(dot.paint).toEqual({ kind: PaintKind.Solid, color: rgbaOf('#e5484d') });
+    expect(box(dot.contours)).toEqual([392, 182, 400, 190]);
+    expect(ofPart(tile(), ChromePart.Tag)).toHaveLength(0);
   });
 
   it('fills the icon strokes as a union, so overlapping round joins never cancel', () => {
@@ -175,5 +190,41 @@ describe('tileChrome', () => {
     const [, , right] = box(ofPart(t, ChromePart.Label)[0].contours);
 
     expect(right).toBeLessThanOrEqual(400);
+  });
+});
+
+describe('a rounded node gets a rounded selection ring', () => {
+  const ringOf = (over: Partial<StateTile>) => stateChrome(tile({ ring: NodeChrome.Selected, ...over }), glyphs).find((i) => i.clip === `n1:${ChromePart.Ring}`)!;
+
+  it('follows the corner radius instead of drawing a square around it', () => {
+    const square = ringOf({});
+    const round = ringOf({ radius: 10 });
+
+    expect(box(round.contours)).toEqual(box(square.contours));
+    expect(round.contours.flat().length).toBeGreaterThan(square.contours.flat().length);
+  });
+});
+
+describe('connector ports are round', () => {
+  it('draws a disc, not a square, for every input and output', () => {
+    const items = tileChrome(tile({ inputs: marks('text'), outputs: marks('images') }), glyphs).concat(stateChrome(tile({ inputs: marks('text'), outputs: marks('images') }), glyphs));
+    const ports = items.filter((i) => i.clip === `n1:${ChromePart.PortIn}` || i.clip === `n1:${ChromePart.PortOut}`);
+
+    expect(ports.length).toBeGreaterThan(0);
+    expect(ports.every((p) => p.contours.flat().length > 8)).toBe(true);
+  });
+});
+
+describe('resize handles sit on the selection ring corners', () => {
+  it('centres each handle on the middle of the ring stroke, not inside it', () => {
+    const t = tile({ ring: NodeChrome.Selected, handles: true, radius: 10 });
+    const ring = box(stateChrome(t, glyphs).find((i) => i.clip === `n1:${ChromePart.Ring}`)!.contours);
+    const handles = stateChrome(t, glyphs).filter((i) => i.clip === `n1:${ChromePart.Handle}`).filter((_, i) => i % 2 === 0).map((h) => box(h.contours));
+    const centreline = [ring[0] + 1, ring[1] + 1, ring[2] - 1, ring[3] - 1];
+
+    expect((handles[0][0] + handles[0][2]) / 2).toBe(centreline[0]);
+    expect((handles[0][1] + handles[0][3]) / 2).toBe(centreline[1]);
+    expect((handles[3][0] + handles[3][2]) / 2).toBe(centreline[2]);
+    expect((handles[3][1] + handles[3][3]) / 2).toBe(centreline[3]);
   });
 });

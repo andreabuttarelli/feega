@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { parsePath, pathData, type Outline } from '$lib/motion/shape/geometry';
+import { parsePath, pathData, type Outline } from '@feega/motion-core/motion/shape/geometry';
 import { CANVAS_INK, CanvasTheme } from '$lib/motion/draw-create';
 import { drawnOnCanvas } from './canvas-draw';
 

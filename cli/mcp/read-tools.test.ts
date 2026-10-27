@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { handleMcpFetch } from './http-app.ts';
-import { MCP_INSTRUCTIONS } from './server.ts';
+import { MCP_INSTRUCTIONS, listAllTools } from './server.ts';
+import { CORE_TOOLS } from './surface.ts';
 
 /**
  * IL LEDGER DEL RITIRO. La superficie MCP passa da decine di tool brand-scoped (piano editoriale,
@@ -17,25 +17,8 @@ import { MCP_INSTRUCTIONS } from './server.ts';
  */
 type Tool = { name: string; description?: string; inputSchema?: { properties?: Record<string, unknown> } };
 
-async function rpc(method: string, params: unknown, id = 1) {
-  const res = await handleMcpFetch(
-    new Request('http://localhost/mcp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
-      body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-    }),
-  );
-  return (await res.json()) as { result?: Record<string, unknown> };
-}
-
 async function tools(): Promise<Tool[]> {
-  await rpc('initialize', {
-    protocolVersion: '2024-11-05',
-    capabilities: {},
-    clientInfo: { name: 'test', version: '0.0.1' },
-  });
-  const listed = await rpc('tools/list', {}, 2);
-  return (listed.result?.tools ?? []) as Tool[];
+  return (await listAllTools()) as Tool[];
 }
 
 /**
@@ -67,6 +50,7 @@ const RESTANO = [
   'preview_node_loop',
   'cancel_node_loop',
   'canvas_tool',
+  'canvas_file',
   'get_media',
   'ask_motion_agent',
   'get_motion_run',
@@ -96,8 +80,24 @@ const RESTANO = [
   'list_orgs',
   'list_team',
   'team_op',
+  'model_allowlist',
+  'spend_caps',
+  'studio_quote',
+  'studio_start',
+  'studio_status',
+  'studio_run',
+  'studio_more',
+  'studio_cancel',
+  'studio_retry',
+  'studio_regenerate',
+  'studio_approve',
+  'studio_reject',
   'edit',
-  'view'
+  'view',
+  'describe',
+  'find_tools',
+  'load_tools',
+  'unload_tools'
 ];
 
 describe('la superficie MCP è quella dichiarata', () => {
@@ -123,14 +123,15 @@ describe('la superficie MCP è quella dichiarata', () => {
     }
   });
 
-  test('le istruzioni del handshake mandano a `query`, e dicono la regola che la rende usabile', () => {
-    expect(MCP_INSTRUCTIONS).toContain('query');
-    expect(MCP_INSTRUCTIONS).toContain('columns');
-    expect(MCP_INSTRUCTIONS).toMatch(/offset/i);
+  test('the handshake instructions name the read, change and discovery tools', () => {
+    for (const name of ['query', 'view', 'edit', 'describe', 'find_tools', 'load_tools']) {
+      expect(MCP_INSTRUCTIONS, name).toContain(name);
+    }
   });
 
-  test('nominano describe_node_types, insert_row/update_row/delete_row e le due famiglie autonome', () => {
-    for (const name of RESTANO) expect(MCP_INSTRUCTIONS, name).toContain(name);
+  test('the instructions no longer send agents to the motion agent', () => {
+    expect(MCP_INSTRUCTIONS).not.toContain('ask_motion_agent');
+    expect(Object.keys(CORE_TOOLS)).not.toContain('ask_motion_agent');
   });
 });
 
@@ -144,5 +145,13 @@ describe('i tool dei post non esistono più', () => {
       expect(names, name).not.toContain(name);
       expect(MCP_INSTRUCTIONS, name).not.toContain(name);
     }
+  });
+});
+
+describe('run_node_generation fa più risultati in un colpo', () => {
+  test('accetta `variants` e `into`', async () => {
+    const tool = (await tools()).find((t) => t.name === 'run_node_generation');
+
+    expect(Object.keys(tool?.inputSchema?.properties ?? {})).toEqual(expect.arrayContaining(['variants', 'into']));
   });
 });

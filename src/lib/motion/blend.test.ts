@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { FEEGA_TOKENS } from './brand';
-import { composeHtml } from './hyperframes/compose';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { setParent } from './parent-ops';
-import { setCamera } from './camera-ops';
-import { cameraMath, stageSpec } from './camera';
-import { sampleTrack } from './keyframes';
-import { BLEND_MODES, BlendMode } from './blend';
+import { setCamera } from '@feega/motion-core/motion/camera-ops';
+import { cameraMath, stageSpec } from '@feega/motion-core/motion/camera';
+import { sampleTrack } from '@feega/motion-core/motion/keyframes';
+import { BLEND_MODES, BlendMode } from '@feega/motion-core/motion/blend';
 import { setBlendMode } from './blend-ops';
 
 function ok(r: OpResult): MotionDoc {
@@ -27,8 +27,8 @@ const compose = (doc: MotionDoc) => composeHtml({ doc, tokens: FEEGA_TOKENS, ass
 const layerOf = (html: string, id: string) => new RegExp(`<div id="c-${id}" class="clip layer"[^>]*>`).exec(html)?.[0] ?? '';
 
 describe('blend modes', () => {
-  it('has the sixteen CSS blend modes, normal by default, kept by a parse round trip', () => {
-    expect(BLEND_MODES).toHaveLength(16);
+  it('has the After Effects blend set, normal by default, kept by a parse round trip', () => {
+    expect(BLEND_MODES).toHaveLength(26);
     const doc = ok(setBlendMode(twoLayers(), 'top', BlendMode.Multiply));
     const parsed = parseMotionDoc(JSON.parse(JSON.stringify(doc)));
 
@@ -48,6 +48,12 @@ describe('blend modes', () => {
     expect(layerOf(html, 'top')).toContain('mix-blend-mode:color-dodge');
     expect(layerOf(html, 'bg')).not.toContain('mix-blend-mode');
     expect(html).toContain('#root{position:relative;width:100%;height:100%;overflow:hidden;isolation:isolate}');
+  });
+
+  it('a shader-only mode adds no invalid CSS to the markup', () => {
+    const html = compose(ok(setBlendMode(twoLayers(), 'top', BlendMode.LinearDodge)));
+
+    expect(layerOf(html, 'top')).not.toContain('mix-blend-mode');
   });
 
   it('normal adds nothing to the markup', () => {

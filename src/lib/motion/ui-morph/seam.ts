@@ -1,4 +1,4 @@
-import { springMath, springSource } from '../spring';
+import { springMath, springSource } from '@feega/motion-core/motion/spring';
 import { reelMath, type ReelPlan } from './reel';
 
 const reel = reelMath(springMath());

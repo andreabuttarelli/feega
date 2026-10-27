@@ -24,11 +24,11 @@ vi.mock('./farm-render', async (original) => ({ ...(await original<typeof import
 
 import { BATCH_CONCURRENCY, batchView, cancelRender, farmJob, reconcileRenders, RenderRefusal, renderRequest, renderView, startBatch, startRender, type RenderRequest } from './render-run';
 import { TaskState, WORKER_GONE } from './farm-render';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { RenderStage } from '$lib/motion/server-render';
 import { HOLD_BUFFER, Resolution, renderClass, renderQuote, sandboxCostUsd } from '$lib/motion/render-quote';
-import { addClip } from '$lib/motion/timeline';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
 import type { NodeRun } from '$lib/server/repos/node-runs';
 import { ExportFormat, GIF_LIMITS, Preset, settingsOf } from '$lib/motion/export-formats';

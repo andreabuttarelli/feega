@@ -11,11 +11,11 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL } from '$lib/canvas/node-label';
   import { iconBitmap } from '$lib/components/canvas/gpu/icon-bitmap';
   import { iconNodes } from '$lib/components/canvas/gpu/icon-nodes';
-  import { BACKENDS, FullBackend } from '$lib/motion/gpu-full/backends';
-  import { faceBook, faceRules } from '$lib/motion/gpu-full/text/fonts';
-  import { fontkitSource } from '$lib/motion/gpu-full/text/fontkit-face';
-  import type { ImageItem, Item } from '$lib/motion/gpu-full/display-list';
-  import type { Affine } from '$lib/motion/parent';
+  import { BACKENDS, FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
+  import { faceBook, faceRules } from '@feega/motion-core/motion/gpu-full/text/fonts';
+  import { fontkitSource } from '@feega/motion-core/motion/gpu-full/text/fontkit-face';
+  import type { ImageItem, Item } from '@feega/motion-core/motion/gpu-full/display-list';
+  import type { Affine } from '@feega/motion-core/motion/parent';
   import { cardItems, type CoreCard } from '$lib/canvas/core/cards';
   import { PortState, tileChrome } from '$lib/canvas/core/chrome';
   import { iconContours } from '$lib/canvas/core/icon-outline';

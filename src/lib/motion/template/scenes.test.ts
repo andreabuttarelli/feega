@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Forbidden, STYLES, styleProblems } from '$lib/motion/style';
-import { MotionStyle } from '$lib/motion/style-model';
-import { EASE_BEZIER } from '$lib/motion/keyframes';
-import { Ease } from '$lib/motion/design';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
+import { EASE_BEZIER } from '@feega/motion-core/motion/keyframes';
+import { Ease } from '@feega/motion-core/motion/design';
 import { BUILTIN_TEMPLATES } from './builtins';
 import { insertTemplate } from './library';
 import { Quality, docProblems } from '$lib/motion/direction';
 import { SCENES } from './scenes';
-import { TEMPLATES } from '$lib/motion/hyperframes/templates';
+import { TEMPLATES } from '@feega/motion-core/motion/hyperframes/templates';
 
 const LINE_OVER_SCENE: ReadonlySet<string> = new Set(['builtin:scene-device-split', 'builtin:scene-media-caption']);
 

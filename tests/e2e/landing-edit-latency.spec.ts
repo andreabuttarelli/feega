@@ -1,7 +1,7 @@
 import { test, expect, devices, webkit } from '@playwright/test';
 import { login, openFrame } from './fixtures/heavy-canvas';
 import heavy from './fixtures/heavy-canvas-landings.json' with { type: 'json' };
-import { REDRAWN, REDRAW_QUIET_MS } from '../../src/lib/motion/hyperframes/measure';
+import { REDRAWN, REDRAW_QUIET_MS } from '@feega/motion-core/motion/hyperframes/measure';
 
 const LANDING = heavy.landings[0].desktop.nodeId;
 const MAX_EDIT_P50_MS = 500;

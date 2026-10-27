@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import type { Json } from '$lib/database.types';
-import { parseMotionDoc, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+import { parseMotionDoc, type MotionDoc, type MotionFormat } from '@feega/motion-core/motion/doc';
 import { DURATION_BANDS, GalleryStatus, type GalleryAsset, type GalleryCard, type GalleryItem, type GalleryKind, type GallerySearch } from '$lib/gallery/model';
 import { actorCols, type Actor } from './actor';
 

@@ -2,9 +2,9 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { wrapInAutoLayout } from '$lib/motion/layout/ops';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import AutoLayoutOverlay from './AutoLayoutOverlay.svelte';
 
 const dir = dirname(fileURLToPath(import.meta.url));

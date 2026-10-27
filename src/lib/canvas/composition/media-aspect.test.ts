@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { aspectValue, cardBox, CARD_ASPECTS } from './card-look';
-import { LAYOUTS } from './index';
-import { instancesOf, poseAt, type PoseInput } from './pose';
-import type { LayoutId, Transform } from './types';
+import { aspectValue, cardBox, CARD_ASPECTS } from '@feega/motion-core/canvas/composition/card-look';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
+import { instancesOf, poseAt, type PoseInput } from '@feega/motion-core/canvas/composition/pose';
+import type { LayoutId, Transform } from '@feega/motion-core/canvas/composition/types';
 
 const MIXED = CARD_ASPECTS.filter((a) => a !== 'original').map((a) => aspectValue(a, 1.4));
 const TIMES = [0, 1.3, 2.9, 4.4, 6.1];

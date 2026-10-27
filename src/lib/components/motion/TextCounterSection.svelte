@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { EASE_IDS, EASE_LABEL } from '$lib/motion/design';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+  import { EASE_IDS, EASE_LABEL } from '@feega/motion-core/motion/design';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import { parseDecimal } from '$lib/motion/inspector';
-  import { COUNTER_COMPONENT, COUNTER_FORMATS, COUNTER_FORMAT_LABEL, CounterFormat, counterSchema, type Counter } from '$lib/motion/text-counter';
+  import { COUNTER_COMPONENT, COUNTER_FORMATS, COUNTER_FORMAT_LABEL, CounterFormat, counterSchema, type Counter } from '@feega/motion-core/motion/text-counter';
   import { setTextCounter, type CounterInput } from '$lib/motion/text-counter-ops';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
 

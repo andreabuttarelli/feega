@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
-import { parseLayoutSpec, type LayoutSpec } from '$lib/canvas/composition/spec';
+import { parseLayoutSpec, type LayoutSpec } from '@feega/motion-core/canvas/composition/spec';
 import { Outcome, type Actor } from '$lib/server/repos/effects';
 
 const TABLE = 'layouts';

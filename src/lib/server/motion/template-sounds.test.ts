@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { TrackKind } from '$lib/motion/components';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { Sfx } from '$lib/motion/sfx';
 import { insertTemplate, setTemplateValues } from '$lib/motion/template/library';
 import { PROMPT_INPUT_TEMPLATE } from '$lib/motion/template/prompt-input/template';

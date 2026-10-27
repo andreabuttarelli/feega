@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { setStill } from './still';
-import { COMPONENTS } from './components';
+import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setStill } from '@feega/motion-core/motion/still';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { DrawTool } from './draw-tool';
-import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, lineOutline, penClip } from './draw-create';
-import { parsePath, type Outline } from './shape/geometry';
-import type { OpResult } from './timeline';
-import { TextSizing } from './text-sizing';
-import { FillType } from './fill/model';
+import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
+import { parsePath, type Outline } from '@feega/motion-core/motion/shape/geometry';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
+import { FillType } from '@feega/motion-core/motion/fill/model';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -119,6 +119,29 @@ describe('drawing an element on the canvas, outside any frame', () => {
     expect(findClip(drawn.doc, 'p1')!.clip.props).toMatchObject({ shape: 'path', x: 0.5, y: 0.5, width: 1, height: 1 });
   });
 
+  it('an arrow drawn from two points is a stroked open path with its head at the end', () => {
+    const wire = drawnOf({ tool: DrawTool.Arrow, from: { x: 0, y: 100 }, to: { x: 300, y: 100 } });
+    if (typeof wire === 'string') {
+      throw new Error(wire);
+    }
+    const drawn = made(drawnElement(wire, 'a1'));
+    const props = findClip(drawn.doc, 'a1')!.clip.props;
+
+    expect(drawn.box.left).toBe(0);
+    expect(drawn.box.left + drawn.box.width).toBe(300);
+    expect(props).toMatchObject({ shape: 'path', fillKind: 'none', strokeKind: 'solid', stroke: CANVAS_INK[CanvasTheme.Light] });
+    expect(String(props.path).match(/L/g)?.length).toBeGreaterThan(1);
+  });
+
+  it('a line takes the stroke colour it is given', () => {
+    const wire = drawnOf({ tool: DrawTool.Line, from: { x: 0, y: 0 }, to: { x: 100, y: 100 }, stroke: '#ff0000' });
+    if (typeof wire === 'string') {
+      throw new Error(wire);
+    }
+
+    expect(findClip(made(drawnElement(wire, 'l1')).doc, 'l1')!.clip.props).toMatchObject({ stroke: '#ff0000', fillKind: 'none' });
+  });
+
   it('a pasted path keeps its fill, and a stroke-only path draws its stroke without fill', () => {
     const outline = parsePath('M 0 0 L 10 0 L 10 10 Z') as Outline;
     const filled = made(drawnElement({ tool: DrawTool.Pen, outline, fill: '#ff0000' }, 'f1'));
@@ -206,12 +229,17 @@ describe('the resizing a drawn text starts with', () => {
   const box = { x: 0.5, y: 0.5, width: 0.3, height: 0.1 };
   const sizingOf = (r: OpResult) => (r.ok ? findClip(r.doc, 'tx')?.clip.props.sizing : null);
 
-  it('a dragged text keeps its width and grows in height', () => {
-    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx'))).toBe('auto-height');
+  it('a text drawn without a sizing grows with its line', () => {
+    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx'))).toBe('auto');
   });
 
-  it('a clicked text grows with its line', () => {
-    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx', TextSizing.AutoWidth))).toBe('auto');
+  it('a text the chat or an agent draws without a sizing grows with its line', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 40 } }, 'tx');
+    expect(drawn.ok ? findClip(drawn.doc, 'tx')?.clip.props.sizing : null).toBe('auto');
+  });
+
+  it('a dragged text keeps its width and grows in height', () => {
+    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx', TextSizing.AutoHeight))).toBe('auto-height');
   });
 
   it('a free text drawn on the canvas keeps the resizing it was drawn with', () => {

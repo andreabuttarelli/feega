@@ -14,6 +14,7 @@ import Users from '@lucide/svelte/icons/users';
 import CircleHelp from '@lucide/svelte/icons/circle-help';
 import { REPORT_PATH } from '$lib/reports/report-link';
 import { BILLING_PATH } from '$lib/billing-path';
+import { marketingUrl } from '$lib/marketing';
 
 export enum NavSection {
   Main = 'main',
@@ -85,7 +86,7 @@ export const APP_NAV: readonly NavItem[] = [
   row({ id: 'settings', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.settings' }, icon: Settings, needs: NavNeeds.Project, href: inProject('/settings/project') }),
   row({ id: 'team', section: NavSection.Account, kind: NavKind.Link, label: { text: 'Team' }, icon: Users, href: () => TEAM_PATH }),
   row({ id: 'billing', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.billing' }, icon: CreditCard, meta: NavMeta.Credits, href: () => BILLING_PATH }),
-  row({ id: 'changelog', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.changelog' }, icon: Sparkles, load: NavLoad.Document, href: () => '/changelog' }),
+  row({ id: 'changelog', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.changelog' }, icon: Sparkles, load: NavLoad.Document, href: () => marketingUrl('/changelog') }),
   row({ id: 'report', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.report' }, icon: Flag, href: () => REPORT_PATH }),
   row({ id: 'tour', section: NavSection.Account, kind: NavKind.Tour, label: { text: 'How feega works' }, icon: CircleHelp }),
   row({ id: 'legal', section: NavSection.Account, kind: NavKind.Legal, label: { key: 'legal.menuLabel' }, icon: Scale }),

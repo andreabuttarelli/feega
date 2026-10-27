@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { drawFrame, ItemKind, prepare, Unsupported, type ImageItem } from './display-list';
-import { imageRect } from './image-rect';
-import { createMedia, Readiness, VideoPreload } from './media';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { drawFrame, ItemKind, prepare, Unsupported, type ImageItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { imageRect } from '@feega/motion-core/motion/gpu-full/image-rect';
+import { createMedia, Readiness, VideoPreload } from '@feega/motion-core/motion/gpu-full/media';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -38,10 +38,10 @@ describe('image items', () => {
     expect(imageOf(doc, 0, { ...FEEGA_TOKENS, logoUrl: 'https://cdn.test/logo.svg' })).toMatchObject({ src: 'https://cdn.test/logo.svg', fit: 'width', clipped: false });
   });
 
-  it('names a logo with no picture at all, which the HTML engine sets as text', () => {
+  it('waits for the read of a logo with no picture at all, which the HTML engine sets as text', () => {
     const doc = must(addClip(blank, { component: 'Logo', from: 0, durationInFrames: 30 }, 'logo'));
 
-    expect(drawFrame(prepared(doc), 0).unsupported).toContainEqual({ clip: 'logo', component: 'Logo', reason: Unsupported.Text });
+    expect(drawFrame(prepared(doc), 0).unsupported).toContainEqual({ clip: 'logo', component: 'Logo', reason: Unsupported.Unread });
   });
 });
 
@@ -91,6 +91,29 @@ describe('createMedia', () => {
     const made = fakeVideos();
     await createMedia({ videoPreload: VideoPreload.Metadata }).ready(withVideo);
     expect(made[0].preload).toBe('metadata');
+  });
+
+  const decoded = { image: { tag: 'bitmap' } as never, width: 8, height: 6 };
+  const framesOf = (frame: typeof decoded | null) => ({ has: () => false, at: vi.fn().mockResolvedValue(frame), cached: () => [], forget: () => {}, bytes: () => 0, dispose: vi.fn() });
+
+  it('shows the frame the decoder returns for the source time, without making a video element', async () => {
+    const made = fakeVideos();
+    const frames = framesOf(decoded);
+    const media = createMedia({ frames });
+    await media.ready({ ...withVideo, items: [{ ...video, mediaTime: 1.5, size: { width: 640, height: 360 } } as ImageItem] });
+
+    expect(frames.at).toHaveBeenCalledWith('/v.mp4', 1.5, 640);
+    expect(media.pictures(video)).toEqual({ source: decoded.image, size: { width: 8, height: 6 } });
+    expect(made).toHaveLength(0);
+  });
+
+  it('falls back to the video element when the decoder has no frame', async () => {
+    const made = fakeVideos();
+    const media = createMedia({ frames: framesOf(null) });
+    await media.ready({ ...withVideo, items: [{ ...video, size: { width: 640, height: 360 } } as ImageItem] });
+
+    expect(made).toHaveLength(1);
+    expect(media.pictures(video)?.size).toEqual({ width: 4, height: 4 });
   });
 });
 

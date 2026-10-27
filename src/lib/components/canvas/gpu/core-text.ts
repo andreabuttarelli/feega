@@ -1,5 +1,5 @@
-import { faceBook, faceRules } from '$lib/motion/gpu-full/text/fonts';
-import { fontkitSource } from '$lib/motion/gpu-full/text/fontkit-face';
+import { faceBook, faceRules } from '@feega/motion-core/motion/gpu-full/text/fonts';
+import { fontkitSource } from '@feega/motion-core/motion/gpu-full/text/fontkit-face';
 import { CORE_FACES, CORE_FAMILY } from './core-font';
 import { glyphsOf } from '$lib/canvas/core/glyphs';
 import { iconContours } from '$lib/canvas/core/icon-outline';

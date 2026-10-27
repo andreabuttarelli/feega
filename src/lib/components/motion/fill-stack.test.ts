@@ -2,8 +2,8 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { fillsSchema, type Fill } from '$lib/motion/fill/model';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { fillsSchema, type Fill } from '@feega/motion-core/motion/fill/model';
 import { MediaKind } from '$lib/motion/media/pick';
 import type { MediaUploader } from './media-upload';
 import FillStack from './FillStack.svelte';
@@ -253,5 +253,20 @@ describe('the fill stack in Properties', () => {
     click(byId('media-link-use'));
     await vi.waitFor(() => expect(sent(onchange)[0]).toMatchObject({ type: 'image', assetId: 'copied' }));
     expect(upload).toHaveBeenCalledWith(new URL('https://cdn.test/b.jpg'), expect.any(Function));
+  });
+
+  it('a typed shorthand of the same colour still shows the full hex', () => {
+    show(stack([{ type: 'solid', color: '#ffffff' }]));
+    click(inRow(0, 'fill-swatch'));
+    const hex = byId('fill-editor').querySelector<HTMLInputElement>('input.hex')!;
+    change(hex, 'ff');
+    expect(hex.value).toBe('FFFFFF');
+  });
+
+  it('a typed rgba sets colour and opacity in one change', () => {
+    const onchange = show(stack([{ type: 'solid', color: '#111111' }]));
+    click(inRow(0, 'fill-swatch'));
+    change(byId('fill-editor').querySelector<HTMLInputElement>('input.hex')!, 'rgba(255, 0, 0, 0.5)');
+    expect(sent(onchange)[0]).toMatchObject({ type: 'solid', color: '#ff000080' });
   });
 });

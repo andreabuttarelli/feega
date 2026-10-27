@@ -1,10 +1,10 @@
 import { composite, type Device, type Rect } from './compositor';
-import { EffectKind, MaskComposite, PaintKind, type Affine, type Effect, type GlassEffect, type LayerTree, type Paint, type Rgba } from '../hyperframes/layer-tree';
-import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '../effects/turbulence';
-import { GRAIN_TILE } from '../effects/registry';
-import { Layering } from '../hyperframes/capture';
-import { MAX_GLOW_PX, MIN_GLOW_PX, PARTICLE_STRIDE } from '../particles/simulate';
-import { ParticleShape } from '../particles/model';
+import { EffectKind, MaskComposite, PaintKind, type Affine, type Effect, type GlassEffect, type LayerTree, type Paint, type Rgba } from '@feega/motion-core/motion/hyperframes/layer-tree';
+import { GRAIN_SAMPLE_OFFSET, turbulenceTile } from '@feega/motion-core/motion/effects/turbulence';
+import { GRAIN_TILE } from '@feega/motion-core/motion/effects/registry';
+import { Layering } from '@feega/motion-core/motion/hyperframes/capture';
+import { MAX_GLOW_PX, MIN_GLOW_PX, PARTICLE_STRIDE } from '@feega/motion-core/motion/particles/simulate';
+import { ParticleShape } from '@feega/motion-core/motion/particles/model';
 
 const MAX_GRAINS = 4;
 const SCRATCH_UNIT = MAX_GRAINS + 2;
@@ -239,6 +239,9 @@ float soft(float b, float s) {
   float d = b <= 0.25 ? ((16.0 * b - 12.0) * b + 4.0) * b : sqrt(b);
   return s <= 0.5 ? b - (1.0 - 2.0 * s) * b * (1.0 - b) : b + (2.0 * s - 1.0) * (d - b);
 }
+float quot(float b, float s) { return s <= 0.0 ? 1.0 : b / s; }
+float vivid(float b, float s) { return s <= 0.5 ? burn(b, 2.0 * s) : dodge(b, 2.0 * s - 1.0); }
+float pin(float b, float s) { return s <= 0.5 ? min(b, 2.0 * s) : max(b, 2.0 * s - 1.0); }
 vec3 mixed(vec3 b, vec3 s) {
   if (mode == 1) { return b * s; }
   if (mode == 2) { return b + s - b * s; }
@@ -255,6 +258,16 @@ vec3 mixed(vec3 b, vec3 s) {
   if (mode == 13) { return setLum(setSat(b, sat(s)), lum(b)); }
   if (mode == 14) { return setLum(s, lum(b)); }
   if (mode == 15) { return setLum(b, lum(s)); }
+  if (mode == 16) { return b + s - 1.0; }
+  if (mode == 17) { return b + s; }
+  if (mode == 18) { return vec3(vivid(b.r, s.r), vivid(b.g, s.g), vivid(b.b, s.b)); }
+  if (mode == 19) { return b + 2.0 * s - 1.0; }
+  if (mode == 20) { return vec3(pin(b.r, s.r), pin(b.g, s.g), pin(b.b, s.b)); }
+  if (mode == 21) { return step(vec3(1.0), b + s); }
+  if (mode == 22) { return b - s; }
+  if (mode == 23) { return vec3(quot(b.r, s.r), quot(b.g, s.g), quot(b.b, s.b)); }
+  if (mode == 24) { return lum(b) <= lum(s) ? b : s; }
+  if (mode == 25) { return lum(b) >= lum(s) ? b : s; }
   return s;
 }
 void main() {
@@ -331,7 +344,7 @@ const PARTICLE_SHAPES: Record<Exclude<ParticleShape, ParticleShape.Sprite>, { in
 
 const COMBINE_OPS: Record<MaskComposite, number> = { [MaskComposite.Add]: 0, [MaskComposite.Subtract]: 1, [MaskComposite.Intersect]: 2, [MaskComposite.Exclude]: 3 };
 
-const BLEND_MODES = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'];
+const BLEND_MODES = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity', 'linear-burn', 'linear-dodge', 'vivid-light', 'linear-light', 'pin-light', 'hard-mix', 'subtract', 'divide', 'darker-color', 'lighter-color'];
 
 type Surface = { texture: WebGLTexture; buffer: WebGLFramebuffer };
 type Program = { program: WebGLProgram; uniform: (name: string) => WebGLUniformLocation | null };

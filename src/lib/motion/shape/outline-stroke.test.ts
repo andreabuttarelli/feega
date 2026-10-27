@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { outlineStroke, outlineStrokes } from './outline-stroke';
-import { polygonArea } from './boolean';
-import { MotionFormat, clipsOf, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { flatten, parsePath } from './geometry';
+import { polygonArea } from '@feega/motion-core/motion/shape/boolean';
+import { MotionFormat, clipsOf, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { flatten, parsePath } from '@feega/motion-core/motion/shape/geometry';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {

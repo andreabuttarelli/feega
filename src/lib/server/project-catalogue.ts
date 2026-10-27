@@ -2,6 +2,8 @@ import type { Db } from '$lib/server/db/client';
 import type { ModelChoice } from '$lib/canvas/gen-node';
 import type { ModelParam } from '$lib/canvas/model-params';
 import { listedCredits } from '$lib/canvas/gen-cost';
+import { pricedFor } from '$lib/canvas/model-routes';
+import { allowedCatalogue } from './model-allowlist/allowlist';
 import { catalogueIn, type ProjectMode } from '$lib/project-mode';
 import { canvasModelCatalogue } from './canvas-catalogue';
 import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from './uncensored-access';
@@ -22,7 +24,8 @@ function listedCatalogue() {
 
 export async function projectCatalogue(db: Db, scope: { orgId: string; mode: ProjectMode }) {
   const [full, access] = await Promise.all([listedCatalogue(), uncensoredAccess(db, scope.orgId).catch(() => NO_UNCENSORED_ACCESS)]);
-  return catalogueIn(scope.mode, visibleCatalogue(full, access));
+  const visible = visibleCatalogue(full, access);
+  return catalogueIn(scope.mode, (await allowedCatalogue(db, scope.orgId, visible)) as typeof visible);
 }
 
 export type ListedModel = {
@@ -65,7 +68,7 @@ export function listedModel(choice: ModelChoice): ListedModel {
     routes: (choice.routes ?? []).map((route) => ({
       provider: route.provider,
       label: route.label,
-      credits: listedCredits({ ...choice, ...route.price }) ?? null,
+      credits: listedCredits(pricedFor(choice, { provider: route.provider }) ?? choice) ?? null,
       healthy: route.stats?.healthy ?? null
     }))
   };

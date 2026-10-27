@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { projectAgentPrompt, selectedNodes } from './system-prompt';
-import { DocMode } from '$lib/motion/still';
+import { DocMode } from '@feega/motion-core/motion/still';
 
 describe('il prompt dichiara lo scope, non un brand obbligatorio', () => {
   const project = { id: 'p1', name: 'Lancio autunno' };
@@ -130,3 +130,13 @@ describe('the selection a client sends', () => {
   });
 });
 
+
+describe('il prompt insegna i code frame', () => {
+  it('chiede variabili tipate per testi e colori, e le viste per più pagine', () => {
+    const prompt = projectAgentPrompt({ project: { id: 'p1', name: 'P' }, canvases: [], brand: null });
+
+    expect(prompt).toContain("feega.var('");
+    expect(prompt).toContain('type');
+    expect(prompt).toContain('sourceNodeId');
+  });
+});

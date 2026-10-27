@@ -12,6 +12,12 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** a fresh database applies every file and the app still answers `PGRST205` for `orgs`. **Move:** the new schema was never a migration; `supabase/baseline` is generated from production catalogs and `db:migrate` applies it, then only files dated after its cutoff. Never delete or rename the legacy files.
 
+## Providers
+
+### Kie publishes its price list and its request schemas, you just have to find them
+
+**Signal:** a Kie price in `ai_models` differs from the billed one, or a Kie model exists that the picker lacks. **Move:** do not edit a table. Prices: `POST api.kie.ai/client/v1/model-pricing/page` (no key, 100 rows max per page; a bigger page answers 422). Wires: the OpenAPI block in `docs.kie.ai/market/*.md`, listed by `docs.kie.ai/llms.txt`. A price line joins a model through `?model=` in its `anchor`, else the page slug; lines on a shared page (Seedream 5) cannot be joined.
+
 ## Motion editor
 
 ### A PR that adds or changes a tool fails the tool surface pins
@@ -585,6 +591,19 @@ Segnale: il listener in cattura su `document` vede il dblclick sul tuo elemento,
 no. Svelte 5 delega `dblclick`/`click` alla radice; un antenato (la tela, un nodo) ferma la
 propagazione prima. Mossa: `addEventListener('dblclick', …)` diretto sull'elemento in un
 `$effect`, e un test e2e che fa il gesto vero.
+
+### Con un `.env` copiato nel worktree la suite unitaria diventa rossa
+Segnale: dopo aver copiato `.env` per un e2e `@real`, `ai-models-sync`, `canvas-catalogue`,
+`generate.test`, `settings-actions-upgrade` e altri falliscono con `.eq(...).eq is not a function`
+o liste con un modello in più, e in CI sono verdi. Causa: i test leggono la configurazione vera
+(chiavi Kie, Stripe) invece dei default vuoti. Mossa: sposta `.env` fuori dal worktree prima di
+`vitest`, rimettilo solo per l'e2e.
+
+### Un'op nuova che il chat elenca sfora il budget di caratteri
+Segnale: `tool-budget.test.ts` rosso di poche decine di caratteri su una PR che aggiunge un'op
+`canvas_tool`. Causa: il chat elenca nome e campi di ogni op, quindi ogni op costa il suo nome.
+Mossa: prima accorcia i riepiloghi; se non basta, alza `CANVAS_CHAT_MAX_CHARS` di poco (come
+#1172) nello stesso commit. Un'op con un enum di strumenti (`image_tool`) costa meno di un'op per strumento.
 
 ## Test: distinguere il tuo difetto dal rumore
 
@@ -3193,6 +3212,13 @@ backdrop), so a rebuilt atlas recopies it; once per frame is not enough. Guarded
 `a_picture_mask_survives_frames_that_grow_the_image_atlas` and
 `a_picture_under_a_backdrop_stays_drawn_frame_after_frame`.
 
+## A core frame that draws nothing after a text edit: look for a missing glyph
+
+**Signal:** a frame or instance draws on the canvas until a text gets a symbol (→, ✓), then
+shows nothing or a black box; the HTML engine draws it fine. **Move:** one glyph no loaded face
+covers makes the text a `Glyph` gap and the whole list undrawable (`drawsWhole`). Check the
+code point against the loaded faces before suspecting the feature that changed the text.
+
 ## A GPU parity gap that both backends share is usually the reference
 
 **Signal:** two independent renderers score the same SSIM against the HTML capture (video 0.96,
@@ -3288,3 +3314,64 @@ Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports cover
 ## An e2e that finds no row after a node-shape change
 
 Signal: a `@real` spec polls `nodes` and never finds the row it just made, right after a PR changed how that node is stored (type, `data` keys). Move: check the spec's filter against the current row shape before suspecting data loss — #1212 moved free elements from `data.kind` to `type` and seven specs kept reading `data.kind`. Grep `tests/e2e` for the old shape in the same PR that changes it.
+
+## A skill doc edited in one place and red in CI
+
+**Signal:** `plugin skill mirror` fails in CI after a new tool or CLI command, or a long-running dev server does not show your new page action or tab. **Cause:** `cli/skills/feega` is mirrored byte for byte in `cli/plugins/feega/skills/feega`, and a vite dev server keeps serving the modules it loaded before a branch switch. **Move:** copy the edited skill files to the plugin dir in the same commit; restart your own dev server after switching branches.
+
+## Generating docs from app code
+
+**Signal:** a script that imports `$lib/server/...` dies on `$app/...`, `virtual:...` or a missing `.svelte-kit/tsconfig.json`; `vite-node` with the SvelteKit plugin throws "An impossible situation occurred". **Move:** run the script as a vitest file with the app's own `vite.config.ts` (`web-docs/scripts/vitest.gen.config.ts`), overriding only `test.include` and `setupFiles`. A worktree needs a `node_modules` symlink first.
+
+## An OpenRouter call that 402s with plenty of credit left
+
+Signal: `This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens` from a judge or any call that sets no `max_tokens`. Cause: OpenRouter reserves the model's maximum output against the balance before the call. Move: always pass `max_tokens` sized to the answer (a 5-axis JSON verdict needs ~1500).
+
+## A mocked canvas generation refused `moderation_unavailable`
+
+Signal: an `@real` spec with `E2E_FAKE_IMAGES=1` runs a canvas node and every run comes back `moderation_unavailable: the safety review could not run`, though the image mock is up. Cause: the prompt is screened first by an LLM judge that calls `LLM_BASE_URL/responses` (and `/chat/completions`), which the mock did not serve. Move: `fixtures/mock-images.ts` answers both with a safe verdict; start your own dev server with `LLM_BASE_URL` on the mock and `KIE_API_KEY=` blank so no discount route can reach a real provider.
+
+## A migration-only PR leaves derived files stale and `dev` red
+
+Signal: CI `test` fails on `query-tool.test.ts` (query-tables.ts), `write-tool.test.ts` (write-rules.ts) and `cli/lib/contracts.test.ts` right after a PR that only adds a migration. Cause: those files are generated from the migrations and the PR never regenerated them. Move: `node scripts/query-tables-from-migrations.mjs --write && bash cli/scripts/sync-contracts.sh`, commit the four files with the migration.
+
+## A core frame that flashes stretched after an edit
+
+Signal: on the GPU canvas a frame or free text shows its new content squeezed or stretched for a moment, then snaps right. Cause: the doc (picture) and the node box reached `CoreFrames` at different times; `screen-uses` maps the picture's `size` onto the `box` per axis, so any gap draws one over the other. A network await between showing the doc and placing the size is enough. Move: hand the doc and the box over in the same synchronous step (`applyTextFit`); to measure, screenshot the region every ~40 ms after the commit and compare ink width/height with the settled frame.
+
+## Un frame nero sulla tela: chiedi alla display list perché, prima di guardare la rete
+
+Il contenuto dei template inseriti si vedeva nero, in locale e in cloud. Rete, font, CSP e
+origini erano puliti: il difetto stava in `readClips`, che non guardava dentro i `Precomp`.
+
+**Segnale**: un frame resta nero o vuoto, `canvas.core-frames` ha `data-partial` > 0, nessun errore
+in console.
+
+**Mossa**: nella pagina, `prepare` + `drawFrame` sul `/motion/<id>/source` del frame e leggi
+`list.unsupported`. `reason: "unread"` = la lettura DOM non è partita (guardia sul doc sbagliato);
+`reason: "dom"` = CSS che gpu-core non disegna; zero item e nessun motivo = il frame scelto è vuoto
+(controlla `stillFrame`).
+
+## A page script works in dev and throws `X is not defined` in a build
+
+**Signal:** a `fn.toString()` injected into a composed page (gpu, probe, runtime) runs under `vite dev` and `bench:gpu-parity`, but the built app's iframe throws `ReferenceError: J1 is not defined`; three.js templates draw nothing on the canvas. **Move:** the minifier renames module-level names the serialized function closes over, so a `const NAME=` re-declared in the template string no longer matches. Pass every constant and helper as a parameter of the serialized function; `gpu.test.ts` minifies the module with esbuild and runs the script to prove it.
+
+### A template frame renders white only when it holds an image
+Signal: a poster is a white card on gpu-core; the console shows `UNSUPPORTED ... "unread"` and `core DOM read failed ... DataCloneError: Non-origin-clean ImageBitmap`. Cause: an element the DOM read cannot draw (SVG `<image>`) makes the whole frame undrawable, and a remote image drawn to a canvas without CORS taints the bitmap so it cannot leave the reader iframe. Move: log `list.unsupported` in `drawsWhole` to see which gap; load probe images with `crossOrigin = "anonymous"`; a data URL hides the taint, so test with a real storage URL.
+
+
+## A Playwright click inside a canvas iframe hits the wrong element
+Signal: `frameLocator(...).click()` on a link in a code frame passes, but nothing happens; a capture listener in the frame logs the click on a parent (`NAV`). Cause: the tile is CSS-scaled with the canvas zoom and Playwright places in-iframe points without that scale. Move: compute the point yourself: `frame.boundingBox().x + rect.x * (frame.width / innerWidth)`, then `page.mouse.click`. Real clicks are fine.
+
+## A link `#/page` in a srcdoc iframe blanks the frame
+Signal: clicking `<a href="#/pricing">` in a code frame leaves an empty page at `about:blank#/pricing`. Cause: srcdoc documents resolve relative URLs against the parent's base, so the hash link is a cross-document navigation. Move: `<base href="about:srcdoc">` in the srcdoc head. `new URL('/x', location.href)` still throws there, so react-router's HashRouter/BrowserRouter cannot work: use MemoryRouter.
+
+## Landing
+
+### A below-the-fold image collage costs Lighthouse mobile points even with `loading="lazy"`
+
+**Signal:** home mobile score drops from 90 to 87 and LCP from 3.2 s to 3.7 s after adding a section of images a viewport below the hero; the LCP element is still the hero poster. **Move:** native lazy loading fetches within about a viewport and a half, and those requests compete with the poster and the hero video. Mount the tiles from an `IntersectionObserver` (`Collage.svelte`) and reserve the height with `aspect-ratio` so CLS stays 0. Measure against a build of `origin/dev`, not against the target alone.
+
+## Worktree tests resolve @feega/* from the main checkout
+
+Signal: a test of code under `packages/` hangs or ignores your edit in a worktree whose `node_modules` is a symlink; `svelte-check` says the new module does not exist. Cause: `node_modules/@feega/*` are relative symlinks, resolved from the real path, so they point at the main checkout. Move: a scratch vitest config that merges `vite.config.ts` and aliases `@feega/motion-core/(.*)` to `packages/motion-core/src/$1` (and a scratch tsconfig with the same `paths` plus `$lib`); do not commit them.

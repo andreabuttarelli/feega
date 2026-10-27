@@ -1,6 +1,7 @@
 import { SPAWN_AGENT } from '$lib/server/agents/spawn';
+import { PLATFORM_TIMING, landingWatch } from '$lib/server/agents/turn-core';
 import { spawnAgentTool, spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
-import { createUIMessageStream, createUIMessageStreamResponse, streamText, type ModelMessage } from 'ai';
+import { createUIMessageStream, createUIMessageStreamResponse, streamText, type ModelMessage, type Tool } from 'ai';
 import type { Db } from '$lib/server/db/client';
 import { llmLanguageModel } from '$lib/server/llm';
 import { PromptCache } from '$lib/server/prompt-cache';
@@ -12,7 +13,9 @@ import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
 import { createProjectTools } from './project-tools';
 import { createMotionDelegation } from './motion-delegation';
-import { createFrameTools, editorFrames, type OpenFrame } from './frame-tools';
+import { editorFrames, frameRunner, type OpenFrame } from './frame-tools';
+import { frameSurface, toolLoadingOf } from './tool-loading';
+import { env } from '$env/dynamic/private';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { FRAMES_REQUEST, type FramesRequest } from '$lib/motion/frames-request';
 import type { FrameBucket } from '$lib/server/motion/frame-store';
@@ -78,19 +81,19 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
   if (choosesForUser(text)) {
     delete webTools[ASK_REFERENCE_PICK];
   }
-  const projectTools = {
+  const core: Record<string, Tool> = {
     ...createProjectTools({ db, orgId, projectId: project.id, userId: userId, brandId: brand?.id ?? null }),
     ...createMotionDelegation({ db, orgId, projectId: project.id, userId: userId, origin, model, canvasId }),
-    ...createFrameTools({ db, orgId, projectId: project.id, userId: userId, open: frame, editor: frame ? editorFrames(db, db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket, { orgId, projectId: project.id, nodeId: frame.nodeId, userId: userId }, (request) => askEditor(request)) : null }),
     ...webTools
   };
-  Object.assign(projectTools, {
+  const frameDeps = { db, orgId, projectId: project.id, userId: userId, open: frame, editor: frame ? editorFrames(db, db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket, { orgId, projectId: project.id, nodeId: frame.nodeId, userId: userId }, (request) => askEditor(request)) : null };
+  Object.assign(core, {
     [SPAWN_AGENT]: spawnAgentTool(
       spawnOffers(),
       spawnAgents(
         {
           orgId,
-          tools: () => projectTools,
+          tools: () => core,
           codeTools: new Set<string>(),
           visionTools: new Set(['view_images']),
           remainingUsd: () => AGENT_TURN_CAP_USD - spent,
@@ -105,6 +108,8 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
       )
     )
   });
+  const frames = await frameSurface(toolLoadingOf(env.TOOL_LOADING), frameDeps, frameRunner(frameDeps), core, turns, { ...webTools, [SPAWN_AGENT]: core[SPAWN_AGENT] });
+  const projectTools = { ...core, ...frames.tools };
   const agent = await openAgentTools({
     projectTools,
     brand,
@@ -113,6 +118,16 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
 
   await ensureGatewayModels();
   const t0 = Date.now();
+  const cut = new AbortController();
+  const watch = landingWatch({
+    startedAt: t0,
+    timing: PLATFORM_TIMING,
+    stopped: () => reply.stopped(),
+    landEarly: () => {
+      watch.stop();
+      void reply.finish(finishedTurn(steps), ReplyStatus.Done).then(() => cut.abort());
+    }
+  });
   const billedScope = <T>(fn: () => T): T => (brand ? withBrandContext(brand.id, fn) : withOrgContext(orgId, fn));
 
   const result = billedScope(() => streamText({
@@ -123,12 +138,18 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
       brand: brand ? { name: brand.name, slug: brand.slug } : null,
       openCanvasId: canvasId,
       frame,
-      selectedNodeIds: selectedNodes(selection)
+      selectedNodeIds: selectedNodes(selection),
+      frameGuidance: frames.guidance
     }),
     allowSystemInMessages: true,
     messages: [...history, { role: 'user', content: opening }] as ModelMessage[],
     tools: agent.tools,
+    prepareStep: () => {
+      const active = frames.active();
+      return active ? { activeTools: [...active, ...Object.keys(agent.tools).filter((name) => !(name in projectTools))] } : {};
+    },
     providerOptions: reasoningProviderOptions(reasoning),
+    abortSignal: cut.signal,
     stopWhen: [agentStopWhen(t0), overTurnCap(() => spent), ({ steps }) => pickAwaits(steps)],
     onStepFinish: (step) => {
       spent += spentUsd([extractSdkUsage(step.usage)], [model], gatewayRate);
@@ -136,6 +157,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
       void reply.progress(finishedTurn(steps));
     },
     onFinish: async ({ steps: finished, totalUsage }) => {
+      watch.stop();
       await agent.close().catch((e) => console.error('[project-agent] tools not closed:', e));
 
       await reply.finish(finishedTurn(finished), ReplyStatus.Done);
@@ -162,6 +184,7 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
   runInBackground(
     async () => {
       await result.consumeStream({ onError: (e) => console.error('[project-agent] turn failed after client left', e) });
+      watch.stop();
       await reply.finish(finishedTurn(steps), ReplyStatus.Failed);
     },
     'project-agent-turn'

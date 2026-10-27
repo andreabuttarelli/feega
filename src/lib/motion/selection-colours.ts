@@ -1,6 +1,6 @@
-import { findClip, type MotionDoc } from './doc';
-import { BRAND_COLORS } from './components';
-import { setProps, type OpResult } from './timeline';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { BRAND_COLORS } from '@feega/motion-core/motion/components';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const HEX = /^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i;
 

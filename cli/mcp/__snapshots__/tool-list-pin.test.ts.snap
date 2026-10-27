@@ -2,7 +2,14 @@
 
 exports[`the MCP tool list does not move while the server code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > tool names and descriptions are byte-identical 1`] = `
 {
-  "count": 52,
-  "fingerprint": "2c17f7890cacaab62472b0e3829a999bc432ff1035b26455fce088fe26e42364",
+  "count": 10,
+  "fingerprint": "0d355c6d58873cf4422fca9e2a8423b3bad01a34c612b7a2c7e86015c03647d7",
+}
+`;
+
+exports[`the MCP tool list does not move while the server code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) tool names and descriptions are byte-identical 1`] = `
+{
+  "count": 10,
+  "fingerprint": "0d355c6d58873cf4422fca9e2a8423b3bad01a34c612b7a2c7e86015c03647d7",
 }
 `;

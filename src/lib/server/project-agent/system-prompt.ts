@@ -1,6 +1,7 @@
 import { WEB_GUIDANCE } from '$lib/server/web/web-tools';
-import { DocMode } from '$lib/motion/still';
+import { DocMode } from '@feega/motion-core/motion/still';
 import type { OpenFrame } from './frame-tools';
+import { PROXY_GUIDANCE } from './tool-loading';
 
 /**
  * CHI È IN SCOPE IN QUESTO TURNO: il progetto, le sue tele, e il brand solo se ce n'è uno.
@@ -16,6 +17,7 @@ export type PromptScope = {
   openCanvasId?: string | null;
   frame?: OpenFrame | null;
   selectedNodeIds?: readonly string[];
+  frameGuidance?: string;
 };
 
 const NODE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -28,14 +30,22 @@ export function selectedNodes(raw: unknown): string[] {
   return raw.filter((id): id is string => typeof id === 'string' && NODE_ID.test(id)).slice(0, MAX_SELECTED);
 }
 
+const CODE_FRAME_GUIDANCE = [
+  'A code frame is an iframe node with data { framework: "react" | "svelte", files: { "App.tsx" | "App.svelte": "...", ...more files } }: real component code rendered live, npm imports from esm.sh, Tailwind available.',
+  "Every piece of copy, colour, size or toggle a person may want to change is a typed variable declared in the code, never a hard-coded literal: feega.var('heroTitle', { type: 'text', default: 'Build faster', label: 'Hero title' }). Always give type, default and label; add min/max/step for range and number, options for select. Types: text, longtext, color, range, number, boolean, select, image, font. Shorthands like feega.color('accent', '#ff5100') are fine when no metadata is needed.",
+  'Set values with update_node data { vars: { heroTitle: "…" } }: a value that does not fit its declared type is refused.',
+  'For several pages of one site side by side, create views: iframe nodes with data { sourceNodeId: "<code frame id>", route: "/pricing" }. In React wrap routes in <MemoryRouter initialEntries={[feega.route]}>; in Svelte read location.hash.',
+  'export_code_frame returns the site as a plain Vite project without feega.'
+].join(' ');
+
 const MODE_WORD: Record<DocMode, string> = { [DocMode.Still]: 'a still', [DocMode.Video]: 'a video' };
 
 function frameLine(frame: OpenFrame | null | undefined): string {
   if (!frame) {
-    return 'No frame is open in the editor: frame_tool needs a node_id.';
+    return 'No frame is open in the editor: frame tools need a node_id.';
   }
   const selected = frame.selection.length ? `selected clips: ${frame.selection.join(', ')}` : 'nothing selected';
-  return `The user has frame ${frame.nodeId} open in the editor (${MODE_WORD[frame.mode]}, playhead at ${frame.playhead}s, ${selected}). "this", "here" and "it" mean that frame; frame_tool acts on it unless you pass another node_id.`;
+  return `The user has frame ${frame.nodeId} open in the editor (${MODE_WORD[frame.mode]}, playhead at ${frame.playhead}s, ${selected}). "this", "here" and "it" mean that frame; frame tools act on it unless you pass another node_id.`;
 }
 
 export function projectAgentPrompt(scope: PromptScope): string {
@@ -64,10 +74,11 @@ export function projectAgentPrompt(scope: PromptScope): string {
     'update_node changes only the fields you send; the rest is kept.',
     'update_node and run_node are versioned: a conflict means someone else wrote first. Re-read and retry with the new version.',
     frameLine(scope.frame),
-    'Edit frames (motion videos and stills) yourself with frame_tool: its description names the editor tools, describe_frame_tool gives one schema. Small, precise changes (a text, a colour, a timing, a still export) go through frame_tool.',
+    scope.frameGuidance ?? PROXY_GUIDANCE,
     'Building or rebuilding a whole video is the motion agent\'s job, which runs the quality checks: create_motion_video or ask_motion_agent hand it the request (pass canvas node ids in media for pictures, clips or sound it should use), then get_motion_run waits for it and view_motion_frames shows the result. Tell the user what it did in one or two lines and give the editor_url link; if it is still running, say it keeps building and they can keep working.',
     'A social post, story or poster is an editable still frame, not a picture from an image node: its text has to stay editable. Make each with create_motion_video (format 4:5 for a post, 9:16 for a story), one call per post, with a brief that says it is a still graphic (one frame, set_canvas still) and its copy. An image node is for a photo or an illustration the user asked for, which a frame can then use through media.',
     WEB_GUIDANCE,
+    CODE_FRAME_GUIDANCE,
     'To put a picture you found on the canvas, import_image it, then create a Generate image node (type image) with data { assetId: "<asset_id>" }.',
     'Anything that spends credits needs the user to ask for it first.',
     'Answer in the language the user writes in. Be brief: say what you did and what came back, not how you did it.'

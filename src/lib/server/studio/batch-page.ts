@@ -1,16 +1,13 @@
 import { fail } from '@sveltejs/kit';
-import type { Actions, ServerLoadEvent } from '@sveltejs/kit';
+import type { Actions, RequestEvent, ServerLoadEvent } from '@sveltejs/kit';
 
 type BatchParams = { batchId: string };
 import { batchScope } from '$lib/server/dashboard/tool-scope';
 import { studioOptions } from '$lib/server/studio/studio-options';
-import { approveItem, cancelBatch, moreVariations, requeueItems, runBatch } from '$lib/server/studio/studio-batch';
-import { drainStudio } from '$lib/server/studio/studio-drain';
+import { applyAction, BatchAction, type ActionInput, type BatchScope } from '$lib/server/studio/studio-actions';
 import { listItems } from '$lib/server/repos/product-batches';
 import { signedAssets } from '$lib/server/studio/studio-media';
-import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { orgCreditBalance } from '$lib/server/credits';
-import { Approval, ItemStatus } from '$lib/studio/batch-state';
 import { ENVIRONMENTS, isEnvironment } from '$lib/studio/environments';
 import { SHOTS, isShot } from '$lib/studio/shots';
 import { MAX_VARIATIONS } from '$lib/studio/plan';
@@ -18,12 +15,13 @@ import { MARKETPLACES } from '$lib/studio/marketplace';
 
 export const config = { maxDuration: 300 };
 
-const HTTP_UNPROCESSABLE = 422;
-
 export const load = async (event: ServerLoadEvent<BatchParams>) => {
-  const { db, orgId, projectId, batch } = await batchScope(event);
-  event.depends(`studio:batch:${batch.id}`);
+  const scope = await batchScope(event);
+  event.depends(`studio:batch:${scope.batch.id}`);
+  return batchView(scope);
+};
 
+export async function batchView({ db, orgId, projectId, batch }: BatchScope) {
   const [items, balance, options] = await Promise.all([
     listItems(db, { orgId, batchId: batch.id }),
     orgCreditBalance(db, orgId),
@@ -56,82 +54,27 @@ export const load = async (event: ServerLoadEvent<BatchParams>) => {
     balance,
     maxVariations: MAX_VARIATIONS
   };
-};
-
-function idsOf(fd: FormData): string[] {
-  return fd.getAll('itemId').map(String).filter(Boolean);
 }
 
-async function gated(orgId: string) {
-  const denied = await gateOrgAiActionForForm(orgId);
-  return denied ? fail(denied.status, { error: denied.data.message }) : null;
+function inputOf(fd: FormData): ActionInput {
+  return { itemIds: fd.getAll('itemId').map(String).filter(Boolean), variations: Number(fd.get('variations') ?? 1) };
+}
+
+async function act(event: RequestEvent<BatchParams>, action: BatchAction) {
+  const scope = await batchScope(event);
+  const result = await applyAction(scope, action, inputOf(await event.request.formData().catch(() => new FormData())));
+  return 'error' in result ? fail(result.status, { error: result.error }) : result.data;
 }
 
 export const actions: Actions<BatchParams> = {
-  run: async (event) => {
-    const scope = await batchScope(event);
-    const denied = await gated(scope.orgId);
-    if (denied) {
-      return denied;
-    }
-    const outcome = await runBatch(scope.db, scope, event.params.batchId, await studioOptions(scope.db, scope));
-    return 'error' in outcome ? fail(HTTP_UNPROCESSABLE, { error: outcome.error }) : { ok: true };
-  },
-
-  more: async (event) => {
-    const scope = await batchScope(event);
-    const denied = await gated(scope.orgId);
-    if (denied) {
-      return denied;
-    }
-    const variations = Number((await event.request.formData()).get('variations') ?? 1);
-    const outcome = await moreVariations(scope.db, scope, event.params.batchId, await studioOptions(scope.db, scope), Math.min(Math.max(variations, 1), MAX_VARIATIONS));
-    return 'error' in outcome ? fail(HTTP_UNPROCESSABLE, { error: outcome.error }) : { ok: true };
-  },
-
-  cancel: async (event) => {
-    const scope = await batchScope(event);
-    return { cancelled: await cancelBatch(scope.db, scope, event.params.batchId) };
-  },
-
-  retry: async (event) => {
-    const scope = await batchScope(event);
-    const denied = await gated(scope.orgId);
-    if (denied) {
-      return denied;
-    }
-    const itemIds = idsOf(await event.request.formData());
-    return { requeued: await requeueItems(scope.db, scope, { batchId: event.params.batchId, itemIds, from: [ItemStatus.Failed, ItemStatus.Cancelled] }) };
-  },
-
-  regenerate: async (event) => {
-    const scope = await batchScope(event);
-    const denied = await gated(scope.orgId);
-    if (denied) {
-      return denied;
-    }
-    const itemIds = idsOf(await event.request.formData());
-    return { requeued: await requeueItems(scope.db, scope, { batchId: event.params.batchId, itemIds, from: [ItemStatus.Done] }) };
-  },
-
-  approve: async (event) => {
-    const scope = await batchScope(event);
-    const [itemId] = idsOf(await event.request.formData());
-    await approveItem(scope.db, scope, { itemId, approval: Approval.Approved });
-    return { ok: true };
-  },
-
-  reject: async (event) => {
-    const scope = await batchScope(event);
-    const [itemId] = idsOf(await event.request.formData());
-    await approveItem(scope.db, scope, { itemId, approval: Approval.Rejected });
-    return { ok: true };
-  },
-
-  drain: async (event) => {
-    const scope = await batchScope(event);
-    return { drained: await drainStudio(scope.db, { batchId: scope.batch.id }) };
-  }
+  run: (event) => act(event, BatchAction.Run),
+  more: (event) => act(event, BatchAction.More),
+  cancel: (event) => act(event, BatchAction.Cancel),
+  retry: (event) => act(event, BatchAction.Retry),
+  regenerate: (event) => act(event, BatchAction.Regenerate),
+  approve: (event) => act(event, BatchAction.Approve),
+  reject: (event) => act(event, BatchAction.Reject),
+  drain: (event) => act(event, BatchAction.Drain)
 };
 
 export type BatchData = Awaited<ReturnType<typeof load>>;

@@ -1,10 +1,10 @@
-import type { MotionClip, MotionDoc } from './doc';
-import { withAutoLayout } from './layout/resolve';
-import { withoutHidden } from './organize';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { withoutHidden } from '@feega/motion-core/motion/organize';
 import { quadOf, type Boxes, type Pt } from './scene-select';
-import { flatten } from './shape/geometry';
-import { baseOutline, type ShapeLook } from './shape/render';
-import { pathSpace } from './shape/space';
+import { flatten } from '@feega/motion-core/motion/shape/geometry';
+import { baseOutline, type ShapeLook } from '@feega/motion-core/motion/shape/render';
+import { pathSpace } from '@feega/motion-core/motion/shape/space';
 
 export enum OutlineView {
   On = 'on',

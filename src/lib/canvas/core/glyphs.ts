@@ -1,6 +1,6 @@
-import type { FaceBook } from '$lib/motion/gpu-full/text/face';
-import { Shaping, Spaces, layOut } from '$lib/motion/gpu-full/text/layout';
-import { glyphContours, moved } from '$lib/motion/gpu-full/text/painter';
+import type { FaceBook } from '@feega/motion-core/motion/gpu-full/text/face';
+import { Shaping, Spaces, layOut } from '@feega/motion-core/motion/gpu-full/text/layout';
+import { glyphContours, moved } from '@feega/motion-core/motion/gpu-full/text/painter';
 import type { Glyphs } from './chrome';
 
 const LEADING = 1.4;

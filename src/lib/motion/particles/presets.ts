@@ -1,6 +1,6 @@
-import { findClip, type MotionDoc } from '../doc';
-import { setProps, type OpResult } from '../timeline';
-import { Emitter, ParticleShape } from './model';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Emitter, ParticleShape } from '@feega/motion-core/motion/particles/model';
 
 export enum ParticlePreset {
   Sparks = 'sparks',

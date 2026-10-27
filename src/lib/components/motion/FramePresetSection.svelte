@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { FRAME_PRESETS, PRESET_LABEL, PRESET_SIZE, applyPreset, presetOf, type FramePreset } from '$lib/motion/frame-presets';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
 
   const CUSTOM = 'custom';
 

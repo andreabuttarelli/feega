@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENTS } from '../../components';
-import { boxOf } from '../../layout';
-import { FillType } from '../../fill/model';
-import { apply2d } from '../../affine';
-import { paintText, Smoothing, TextGap, TextOutput, type Ink, type TextComponent, type TextEnv } from './painter';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { boxOf } from '@feega/motion-core/motion/layout';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { apply2d } from '@feega/motion-core/motion/affine';
+import { paintText, Smoothing, TextGap, TextOutput, type Ink, type TextComponent, type TextEnv } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { boxBook, boxFace } from './test-face';
-import type { Face } from './face';
-import { FillRule, PaintKind, type Paint } from '../paint';
-import { animatorSchema, AnimatorUnit, SelectorShape } from '../../text-animators/model';
+import type { Face } from '@feega/motion-core/motion/gpu-full/text/face';
+import { FillRule, PaintKind, type Paint } from '@feega/motion-core/motion/gpu-full/paint';
+import { animatorSchema, AnimatorUnit, SelectorShape } from '@feega/motion-core/motion/text-animators/model';
 
 const stage = { width: 1920, height: 1080 };
 const FPS = 30;

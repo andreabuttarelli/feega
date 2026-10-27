@@ -1,0 +1,46 @@
+:root[data-window] {
+  --window-bar-h: 48px;
+  --window-lights-w: 80px;
+  --window-controls-w: 140px;
+}
+
+:root[data-window] :is(.canvas-topbar, .app-bar, .visual-pane) {
+  app-region: drag;
+}
+
+:root[data-window] .app-bar {
+  height: var(--window-bar-h);
+}
+
+:root[data-window] .app-sidebar {
+  padding-top: 0;
+}
+
+:root[data-window] .app-sidebar .wordmark {
+  display: flex;
+  align-items: center;
+  flex: 0 0 var(--window-bar-h);
+  height: var(--window-bar-h);
+  padding-top: 0;
+  app-region: drag;
+}
+
+:root[data-window='mac'] .app-sidebar .wordmark {
+  padding-left: var(--window-lights-w);
+}
+
+:root[data-window] :is(a, button, input, select, textarea, label, [role='button'], [contenteditable]) {
+  app-region: no-drag;
+}
+
+:root[data-window='mac'] :is(.canvas-topbar, .app-bar) {
+  padding-left: var(--window-lights-w);
+}
+
+:root[data-window='overlay'] :is(.canvas-topbar, .app-bar) {
+  padding-right: var(--window-controls-w);
+}
+
+:root[data-window] :is(a[href^='/changelog'], a[href^='/docs']) {
+  display: none;
+}

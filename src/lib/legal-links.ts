@@ -1,4 +1,4 @@
-export const LEGAL_BASE_URL = 'https://feega.app';
+import { marketingUrl } from '$lib/marketing';
 
 export const CURRENT_TERMS_VERSION = '2026-09-30';
 
@@ -39,5 +39,5 @@ export const FOOTER_LEGAL_LINKS: LegalLinkKey[] = [
 ];
 
 export function legalHref(key: LegalLinkKey): string {
-  return `${LEGAL_BASE_URL}${LEGAL_LINKS[key].path}`;
+  return marketingUrl(LEGAL_LINKS[key].path);
 }

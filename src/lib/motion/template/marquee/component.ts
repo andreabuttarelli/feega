@@ -1,4 +1,4 @@
-import { ComponentMode, PropFormat, VAR_PREFIX, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
+import { ComponentMode, PropFormat, VAR_PREFIX, type CustomComponent, type PropSpec } from '@feega/motion-core/motion/custom/component';
 import { MARQUEE_MODEL } from './model';
 import { MARQUEE_VIEW } from './view';
 import { MARQUEE_CSS } from './style';

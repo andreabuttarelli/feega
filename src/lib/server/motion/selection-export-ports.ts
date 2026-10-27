@@ -4,18 +4,28 @@ import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { findNode } from '$lib/server/repos/canvas';
 import { insertAsset } from '$lib/server/repos/assets';
 import { SIGNED_URL_TTL_S, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
-import { frameStore } from './move-element';
+import { withScenes } from '$lib/canvas/scene-sources';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { frameStore, type FrameStore } from './move-element';
 import { chromiumExport } from './chromium-frames';
 import { drawTargets } from './selection-draw';
 import { vectorOf, type Span } from './vector-list';
 import { libsOrigin } from './libs-origin';
-import { composeHtml } from '$lib/motion/hyperframes/compose';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { assetUrls, motionAssets, motionTokens } from './editor';
 import type { DrawTarget, SelectionPorts } from './selection-export';
 
 export type SelectionScope = { db: Db; orgId: string; projectId: string; brandId: string | null; actor: Actor };
 
 const FRAME_NAME = 'Frame';
+
+export async function playedDoc(store: Pick<FrameStore, 'read'>, doc: MotionDoc): Promise<MotionDoc> {
+  const sceneHead = async (nodeId: string) => {
+    const head = await store.read(nodeId);
+    return head ? { doc: head.doc, assets: {} } : null;
+  };
+  return (await withScenes({ doc, assets: {} }, sceneHead)).doc;
+}
 
 export function selectionPorts(scope: SelectionScope): SelectionPorts {
   const { db, orgId, projectId } = scope;
@@ -36,7 +46,7 @@ export function selectionPorts(scope: SelectionScope): SelectionPorts {
         return null;
       }
       canvasOf.set(nodeId, frame.canvasId);
-      return { name: node?.displayName || FRAME_NAME, doc: frame.doc };
+      return { name: node?.displayName || FRAME_NAME, doc: await playedDoc(frames, frame.doc) };
     },
     draw: (targets, row) => drawTargets({ port: chromiumExport, compose, vector }, targets, row),
     store: async (packed) => {

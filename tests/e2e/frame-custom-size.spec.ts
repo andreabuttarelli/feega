@@ -3,8 +3,8 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
 import { drawnElement } from '../../src/lib/motion/draw-create';
 import { DrawTool } from '../../src/lib/motion/draw-tool';
-import { setCanvas } from '../../src/lib/motion/timeline';
-import { Background, MotionFormat, type MotionDoc } from '../../src/lib/motion/doc';
+import { setCanvas } from '@feega/motion-core/motion/timeline';
+import { Background, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const SHOTS = process.env.FRAME_CUSTOM_SHOTS;

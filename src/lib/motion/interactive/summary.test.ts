@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { setExpression } from '../expression/ops';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
 import { setInteractive } from './presets';
-import { PlayMode } from './settings';
+import { PlayMode } from '@feega/motion-core/motion/interactive/settings';
 import { Reaction, reactionsOf } from './summary';
 
 function ok(result: OpResult): MotionDoc {

@@ -1,0 +1,15 @@
+{
+  "name": "feega-web-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen": "node scripts/gen.mjs",
+    "dev": "npm run gen && astro dev",
+    "build": "npm run gen && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.34.4",
+    "astro": "5.9.3"
+  }
+}

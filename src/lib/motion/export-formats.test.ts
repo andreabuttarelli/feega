@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { APNG_MAX_SECONDS, ExportFormat, EXPORT_FORMATS, FORMAT, GIF_LIMITS, GifLoop, Preset, PRESETS, estimateBytes, exportProblem, gifOf, parseSettings, settingsOf } from './export-formats';
-import { MotionFormat, newMotionDoc } from './doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { Resolution } from './render-quote';
 
 const doc = (seconds: number, fps = 30) => ({ ...newMotionDoc(MotionFormat.Landscape), fps: fps as 30, durationInFrames: seconds * fps });

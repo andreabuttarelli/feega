@@ -1,5 +1,5 @@
 import type { Library } from '$lib/motion/style-library';
-import { STYLE_NAME, type Style } from '$lib/motion/styles-model';
+import { STYLE_NAME, type Style } from '@feega/motion-core/motion/styles-model';
 
 export type StyleSink = {
   push: (name: string, style: Style) => void;

@@ -1,9 +1,9 @@
-import { findClip, type MotionClip, type MotionDoc } from '../doc';
-import { duplicateClip, editClip, removeClips, type OpResult } from '../timeline';
-import { polyline, type Pt } from './geometry';
-import { bottomFirst, polygonArea, polygonsInFrame, reshapedTo, shapesOf } from './boolean';
-import { ClipOp, clipPolygons } from './polygon-clip';
-import { pathSpace } from './space';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { duplicateClip, editClip, removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
+import { polyline, type Pt } from '@feega/motion-core/motion/shape/geometry';
+import { bottomFirst, polygonArea, polygonsInFrame, reshapedTo, shapesOf } from '@feega/motion-core/motion/shape/boolean';
+import { ClipOp, clipPolygons } from '@feega/motion-core/motion/shape/polygon-clip';
+import { pathSpace } from '@feega/motion-core/motion/shape/space';
 
 export type Region = { id: string; members: string[]; polygons: Pt[][] };
 export type Picks = { merge: string[]; cut: string[] };

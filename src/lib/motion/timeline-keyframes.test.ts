@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { Interp } from './keyframes';
-import { EasePreset } from './graph';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import { Interp } from '@feega/motion-core/motion/keyframes';
+import { EasePreset } from '@feega/motion-core/motion/graph';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import {
   Direction,
   addClip,
@@ -23,7 +23,7 @@ import {
   setTransform,
   snapTargets,
   type OpResult
-} from './timeline';
+} from '@feega/motion-core/motion/timeline';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENT_IDS, Control, type ComponentId } from './components';
+import { COMPONENT_IDS, Control, type ComponentId } from '@feega/motion-core/motion/components';
 import { customFields, fieldsOf } from './inspector';
-import { PropFormat } from './custom/component';
+import { PropFormat } from '@feega/motion-core/motion/custom/component';
 import { BUILTIN_TEMPLATES } from './template/builtins';
 
 const PICKERS: ReadonlySet<Control> = new Set([Control.Asset, Control.MediaItem, Control.MediaList, Control.Fills]);

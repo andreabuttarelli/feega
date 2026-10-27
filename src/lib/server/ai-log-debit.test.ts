@@ -40,7 +40,7 @@ vi.mock('./supabase-admin', () => ({
 }));
 
 import { logAiCall, withBrandContext } from './ai-log';
-import { CHAT_MULTIPLIER, CREDITS_PER_USD_GRANT, MULTIPLIER_FLOOR } from '$lib/credit-ladder';
+import { CHAT_MULTIPLIER, CREDITS_PER_USD_GRANT } from '$lib/credit-ladder';
 import { RENDER_CALL_LABEL, RENDER_MULTIPLIER } from '$lib/motion/render-quote';
 import { GEMINI_FLASH } from './google-models';
 
@@ -110,13 +110,20 @@ describe('logAiCall debita credit_ledger per una chiamata prezzata', () => {
 });
 
 describe('what a credit costs the user against what the call cost us', () => {
-	it('a chat turn of an agent bills its cost at least four times over', async () => {
+	it('a chat turn of an agent bills 1.2 times its cost', async () => {
 		logAiCall({ label: 'project-agent', provider: 'llm', ms: 900, ok: true, flatCostUsd: 0.05, orgId: 'org-1', actorKind: 'agent', threadId: 't1', agentKey: 'sidebar' });
 
 		await settled();
 
-		expect(CHAT_MULTIPLIER).toBeGreaterThanOrEqual(MULTIPLIER_FLOOR);
 		expect(ledgerRows[0].amount).toBe(Math.round(0.05 * CHAT_MULTIPLIER * CREDITS_PER_USD_GRANT));
+	});
+
+	it('a chat turn costing one dollar bills 120 credits', async () => {
+		logAiCall({ label: 'project-agent', provider: 'llm', ms: 900, ok: true, flatCostUsd: 1, orgId: 'org-1', actorKind: 'agent', threadId: 't1', agentKey: 'sidebar' });
+
+		await settled();
+
+		expect(ledgerRows[0].amount).toBe(120);
 	});
 
 	it('a render bills its measured sandbox cost times the render multiplier', async () => {

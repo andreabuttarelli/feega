@@ -14,7 +14,7 @@
  * un motivo per rifiutare un'operazione che altrimenti riuscirebbe. `write-tool.ts` chiama questa
  * funzione con `.catch(() => {})`.
  */
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '$lib/server/db/connect';
 import { env as publicEnv } from '$env/dynamic/public';
 import type { Actor } from '$lib/server/repos/actor';
 

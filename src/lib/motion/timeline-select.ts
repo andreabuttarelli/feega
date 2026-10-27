@@ -1,5 +1,5 @@
-import { findClip, type MotionDoc } from './doc';
-import type { KeyRef } from './timeline';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { KeyRef } from '@feega/motion-core/motion/timeline';
 
 export type Related = { layers: string[]; keys: KeyRef[] };
 

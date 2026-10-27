@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { setProps } from './timeline';
+import { setProps } from '@feega/motion-core/motion/timeline';
 import { applyValues } from './template/fields';
-import { interactiveOf } from './interactive/settings';
-import { mergeView, viewOf } from './precomp';
+import { interactiveOf } from '@feega/motion-core/motion/interactive/settings';
+import { mergeView, viewOf } from '@feega/motion-core/motion/precomp';
 import { SPLIT_CLIP, SPLIT_HEADLINE_TEMPLATE } from './template/split-headline/template';
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 const ASSET = '0b0c7e5e-1f3a-4c55-9d0e-1a2b3c4d5e6f';
 const doc = SPLIT_HEADLINE_TEMPLATE.template.doc;

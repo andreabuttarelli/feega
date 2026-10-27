@@ -1,4 +1,5 @@
 import type { GenerativeMedium } from './default-models';
+import { IMAGE_TOOL_MODEL } from '$lib/image-tools';
 
 export type RecommendationTier = 'best' | 'balanced' | 'cheapest-good';
 
@@ -31,7 +32,8 @@ export const RECOMMENDATION_EXCLUSIONS: readonly ExclusionRow[] = [
   { medium: 'video', pattern: /flux-video-upscale$/, reason: 'upscales an existing clip, cannot generate one' },
   { medium: 'video', pattern: /flux-video-edit$/, reason: 'edits an existing clip, cannot generate one' },
   { medium: 'video', pattern: /^runway\/aleph/, reason: 'video-to-video editor, needs a source clip' },
-  { medium: 'video', pattern: /^heygen\//, reason: 'talking-avatar renderer, not a general video model' }
+  { medium: 'video', pattern: /^heygen\//, reason: 'talking-avatar renderer, not a general video model' },
+  ...Object.values(IMAGE_TOOL_MODEL).map((id): ExclusionRow => ({ medium: 'image', pattern: new RegExp(`^${id}$`), reason: 'transforms a picture it is given, cannot generate one' }))
 ];
 
 type Weights = { recency: number; benchmark: number; capability: number; priceTier: number };

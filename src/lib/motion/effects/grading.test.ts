@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { Ease } from '../design';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { composeHtml } from '../hyperframes/compose';
-import { EffectKind } from './registry';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { addEffect } from './ops';
-import { effectKey, effectsProblem } from './model';
+import { effectKey, effectsProblem } from '@feega/motion-core/motion/effects/model';
 import { LUT_PRESETS, LutPreset, applyLut, compileLut, evalLut, lutFromCube, parseCube, type Rgb } from './lut';
 
 function must(r: OpResult): MotionDoc {

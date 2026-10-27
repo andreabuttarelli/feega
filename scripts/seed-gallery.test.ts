@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { builtinTemplate } from '$lib/motion/template/builtins';
-import { everyClip } from '$lib/motion/doc';
+import { everyClip } from '@feega/motion-core/motion/doc';
 import { publishRefusal } from '$lib/gallery/refusals';
 import { ProjectMode } from '$lib/project-mode';
 import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { applyValues } from '$lib/motion/template/fields';
 import { builtinTitle, catalogue, DEMOS, EXCLUDED_DEMOS, filledTemplate, seedId, seedProblems, SHOWCASE, SOURCE_DIR } from './seed-gallery';
 

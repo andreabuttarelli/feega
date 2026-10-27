@@ -1,6 +1,6 @@
-import { findClip, type MotionDoc } from '../doc';
-import { setProps, type OpResult } from '../timeline';
-import { FontCategory, FontSource, isBuiltin, searchFonts, usedFaces, variantsOf, type CatalogueFont, type FontFace, type FontVariant } from './model';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FontCategory, FontSource, isBuiltin, searchFonts, usedFaces, variantsOf, type CatalogueFont, type FontFace, type FontVariant } from '@feega/motion-core/motion/fonts/model';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 

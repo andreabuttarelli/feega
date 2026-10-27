@@ -12,12 +12,12 @@ import type { Actor } from '$lib/server/repos/actor';
 import { assetUrls, motionAssets, motionTokens, type AssetSigner } from './editor';
 import { analyzeSounds, storageAnalysis } from './audio-analysis';
 import { saveExport } from './export';
-import { clipsOf, type MotionDoc } from '$lib/motion/doc';
+import { clipsOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { exportPath } from '$lib/motion/export-plan';
 import { LinkRefusal, RENDER_LINK_OPEN_MS } from '$lib/motion/render-link';
 import { Quality } from '$lib/motion/export-formats';
-import type { BrandTokens } from '$lib/motion/brand';
-import type { AudioAnalysis } from '$lib/motion/audio-analysis';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
 
 const LINK_KIND = 'browser-render';
 const SECRET_BYTES = 32;

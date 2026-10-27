@@ -1,11 +1,11 @@
-import { findClip, type MotionClip, type MotionDoc } from './doc';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { EditMode } from './edit-mode';
 import { scaleAround } from './group-transform';
-import { Horizontal, Vertical } from './constraints/model';
+import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
 import { MIXED, shared, type Shared } from './mixed';
 import type { Bounds } from './scene-select';
 import { moveBy } from './space';
-import { setProps, type OpResult } from './timeline';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum PropKind {
   Colour = 'colour',

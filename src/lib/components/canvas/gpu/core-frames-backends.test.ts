@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const tried = vi.hoisted(() => ({ webgpu: [] as HTMLCanvasElement[], webgl: [] as HTMLCanvasElement[] }));
 
-vi.mock('$lib/motion/gpu-full/core-web', () => ({
+vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
   createCore: (canvas: HTMLCanvasElement) => {
     tried.webgpu.push(canvas);
     return Promise.reject(new Error('no adapter'));
@@ -16,7 +16,7 @@ vi.mock('$lib/motion/gpu-full/core-web', () => ({
   }
 }));
 
-vi.mock('$lib/canvas/core/frame-source', () => ({ drawsWhole: () => true, onStage: (l: unknown) => l, stillFrame: () => 0 }));
+vi.mock('$lib/canvas/core/frame-source', () => ({ drawsAny: () => true, onStage: (l: unknown) => l, stillFrame: () => 0 }));
 
 const { default: CoreFrames } = await import('./CoreFrames.svelte');
 const dir = dirname(fileURLToPath(import.meta.url));

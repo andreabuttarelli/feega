@@ -4,7 +4,7 @@
   import Download from '@lucide/svelte/icons/download';
   import Share2 from '@lucide/svelte/icons/share-2';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
-  import { composeHtml } from '$lib/motion/hyperframes/compose';
+  import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
   import { audioPlan } from '$lib/motion/audio-plan';
   import { BROWSER_RESOLUTIONS, eta, exportSize, type Capabilities } from '$lib/motion/export-plan';
   import { capabilities } from '$lib/motion/export/encode';
@@ -12,7 +12,7 @@
   import { cancelLink, saveToLink } from '$lib/motion/export/link-upload';
   import { RenderPlace, renderPlace, thisDevice, type Device, type PlaceVerdict } from '$lib/motion/render-place';
   import { Preset, settingsOf } from '$lib/motion/export-formats';
-  import { REFUSAL_TEXT } from '$lib/motion/render-link';
+  import { REFUSAL_TEXT, autostarts } from '$lib/motion/render-link';
   import { profileOf } from '$lib/motion/export/capture-profile';
   import type { Resolution } from '$lib/motion/render-quote';
 
@@ -84,6 +84,16 @@
         URL.revokeObjectURL(downloadUrl);
       }
     };
+  });
+
+  let autostarted = false;
+
+  $effect(() => {
+    if (autostarted || phase !== Phase.Ready || !preview || !autostarts(page.url.searchParams)) {
+      return;
+    }
+    autostarted = true;
+    void start();
   });
 
   function etaLabel(s: number | null): string {

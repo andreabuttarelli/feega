@@ -1,7 +1,7 @@
-import { PropFormat, VAR_PREFIX, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
-import { parsePart } from '$lib/motion/poster-parts';
+import { PropFormat, VAR_PREFIX, type CustomComponent, type PropSpec } from '@feega/motion-core/motion/custom/component';
+import { parsePart } from '@feega/motion-core/motion/poster-parts';
 import { PAGE, type PartUsage } from '$lib/motion/part-usage';
-import { ShapePaint, markupPaint } from '$lib/motion/part-shapes';
+import { ShapePaint, markupPaint } from '@feega/motion-core/motion/part-shapes';
 import { PART_ATTR, defaultsOf, renderRoot, type Schema, type Size } from './static-parts';
 
 type Rule = { selector: string; pseudo: boolean; decls: { prop: string; value: string }[] };

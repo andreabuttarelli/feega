@@ -1,4 +1,4 @@
-import type { VectorRegion, VectorSegment } from './model';
+import type { VectorRegion, VectorSegment } from '@feega/motion-core/motion/vector/model';
 
 const MIN_LOOP = 2;
 

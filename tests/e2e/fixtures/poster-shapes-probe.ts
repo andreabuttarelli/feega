@@ -1,11 +1,11 @@
 import { BUILTIN_TEMPLATES } from '../../../src/lib/motion/template/builtins';
-import { FEEGA_TOKENS } from '../../../src/lib/motion/brand';
-import { composeHtml } from '../../../src/lib/motion/hyperframes/compose';
-import { PartKind, partKind } from '../../../src/lib/motion/poster-parts';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { PartKind, partKind } from '@feega/motion-core/motion/poster-parts';
 import { setPartFills } from '../../../src/lib/motion/part-style';
 import { partUsage } from '../../../src/lib/motion/part-usage';
-import { FillType, fillsSchema } from '../../../src/lib/motion/fill/model';
-import type { MotionClip, MotionDoc } from '../../../src/lib/motion/doc';
+import { FillType, fillsSchema } from '@feega/motion-core/motion/fill/model';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { Paint, type ShapeBox } from './poster-shapes-paint';
 
 const RECOLOUR = fillsSchema.parse([{ type: FillType.Solid, color: '#ff00aa' }]);

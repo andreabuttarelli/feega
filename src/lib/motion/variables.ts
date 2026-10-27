@@ -1,8 +1,8 @@
-import { Control } from './components';
+import { Control } from '@feega/motion-core/motion/components';
 import { fieldsOf } from './inspector';
-import { findClip, type MotionClip, type MotionDoc } from './doc';
-import type { OpResult } from './timeline';
-import { DEFAULT_MODE, VarType, keyOf, splitKey, variableSchema, variablesSchema, type Collection, type VarAlias, type VarInput, type VarLiteral, type Variables } from './variables-model';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { DEFAULT_MODE, VarType, keyOf, splitKey, variableSchema, variablesSchema, type Collection, type VarAlias, type VarInput, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
 
 export { VarType };
 

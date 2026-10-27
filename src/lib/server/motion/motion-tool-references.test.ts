@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 const SOURCES = ['src/lib/motion', 'src/lib/server/motion'].map((dir) => join(process.cwd(), dir));

@@ -3,8 +3,8 @@
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import { postPageAction } from '$lib/api/page-action';
   import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
-  import type { BrandTokens } from '$lib/motion/brand';
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { DESCRIPTION_MAX, itemPath, TAGS_MAX, TITLE_MAX } from '$lib/gallery/model';
 
   export type Listed = { id: string; title: string };

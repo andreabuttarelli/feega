@@ -1,12 +1,12 @@
-import { MAX_TRACKS, findClip, type MotionClip, type MotionDoc, type MotionTrack } from '../doc';
-import { fillsOf } from '../fill/model';
-import { StrokeAlign, strokesOf, type Stroke } from '../stroke/model';
-import { setProps, type OpResult } from '../timeline';
-import { flatten, pathData, polyline, type Pt } from './geometry';
-import { ClipOp, Ends, Join, clipPolygons, offsetPolygons } from './polygon-clip';
-import { baseOutline, type ShapeLook } from './render';
-import { ShapeKind } from './schema';
-import { pathSpace } from './space';
+import { MAX_TRACKS, findClip, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { fillsOf } from '@feega/motion-core/motion/fill/model';
+import { StrokeAlign, strokesOf, type Stroke } from '@feega/motion-core/motion/stroke/model';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { flatten, pathData, polyline, type Pt } from '@feega/motion-core/motion/shape/geometry';
+import { ClipOp, Ends, Join, clipPolygons, offsetPolygons } from '@feega/motion-core/motion/shape/polygon-clip';
+import { baseOutline, type ShapeLook } from '@feega/motion-core/motion/shape/render';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
+import { pathSpace } from '@feega/motion-core/motion/shape/space';
 
 const UNIT = { w: 1, h: 1 };
 const STROKE_TRACK = 'Stroke';

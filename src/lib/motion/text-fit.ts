@@ -1,5 +1,5 @@
-import type { MotionClip, MotionDoc } from './doc';
-import { fittedShare, fittedTextBox, sizingAfterResize, TextSizing } from './text-sizing';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { fittedShare, fittedTextBox, sizingAfterResize, TextSizing } from '@feega/motion-core/motion/text-sizing';
 
 type PxBox = { left: number; top: number; width: number; height: number };
 

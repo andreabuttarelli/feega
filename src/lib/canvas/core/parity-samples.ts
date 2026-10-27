@@ -27,7 +27,8 @@ const BY_KIND: Record<NodeType, Record<string, unknown>> = {
   composition: {},
   calendar: { anchor: '2026-10', view: 'month' },
   studio_batch: {},
-  section: { title: 'Launch', fill: '#f3f3f3' }
+  section: { title: 'Launch', fill: '#f3f3f3' },
+  technique: { techniqueId: '00000000-0000-4000-8000-000000000001', name: 'logo-flow' }
 };
 
 const MEDIA: ParitySample[] = [

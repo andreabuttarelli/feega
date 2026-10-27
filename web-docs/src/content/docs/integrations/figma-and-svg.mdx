@@ -1,0 +1,64 @@
+---
+title: Figma and SVG
+description: Bring designs in from Figma and SVG files.
+sidebar:
+  order: 3
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="figma-paste" caption="Paste from Figma onto the canvas." />
+
+## Paste from Figma
+
+Copy layers in Figma and paste on the canvas.
+
+- Shapes, text and groups land as free elements. Frames and sections land as frames. Pasting over a frame puts everything inside it.
+- Rotation, stacked fills and strokes, gradients (including angular and diamond), and auto layout (direction, spacing, padding, alignment, sizing) come across.
+- Small text keeps its real size, even in a very large frame.
+- Component instances stay instances of one main component when the main is in the paste. Otherwise they become a group named after the component. Overrides are not carried over.
+- Layers keep their Figma names in the Layers panel.
+- Anything that cannot be carried over is listed.
+
+### Small text and component instances
+
+<DemoVideo name="figma-text-instances" caption="Paste a Figma design with a main component and an instance, and a 12 px legal line in a 2880 px frame." />
+
+- **Small text stays.** Text that is small next to its frame, such as a 12 px legal line in a 2880 px design, is kept at its size instead of being dropped.
+- **Instances are linked.** When the main component is part of what you copied, its instances land as instances of one component. Select one: the inspector shows the component name, its text and fill fields, and **Swap**, **Reset overrides**, **Push to main** and **Detach**. Editing the main updates every instance.
+- If the main component was not copied, an instance lands as a plain group named after the component.
+- Overrides made on an instance in Figma are not carried over.
+
+## Figma images
+
+Add a Figma personal access token in Settings and the grey placeholders fill with the real pictures. Steps and troubleshooting are in [Connect Figma](/integrations/connect-figma/).
+
+## Import from a Figma link
+
+<DemoVideo name="figma-import-link" caption="Open Import from Figma, paste a design link and find its frames. Without a token saved, the dialog asks for one." />
+
+Bring whole frames in without copying anything.
+
+1. In Figma, create a personal access token (Settings, Security, Personal access tokens) with read access to files. In feega, paste it in Settings, Profile.
+2. On the canvas, switch the add bar to the design tools (the left toggle) and choose **Import from Figma**.
+3. Paste a figma.com design link and choose **Find frames**. If the link has a `node-id`, that frame is already ticked.
+4. Tick the frames you want (up to 20) and choose **Import**.
+
+Each frame lands as a frame on the canvas, in the same arrangement it has in Figma, at the middle of your view. Layers, text, vectors, gradients, shadows, auto layout and images come across, the same as a paste. Anything that cannot be carried over is listed. If the images cannot be fetched, the frame still lands with grey placeholders.
+
+The token is stored encrypted, per person, and is never sent back to the browser. It needs access to the file: a file you cannot open in Figma cannot be imported.
+
+From the CLI:
+
+```bash
+feega canvas $PROJECT list_figma_frames --input '{"url":"https://www.figma.com/design/<file key>/<name>?node-id=12-48"}'
+feega canvas $PROJECT import_figma --input '{"canvasId":"<canvas>","url":"https://www.figma.com/design/<file key>/<name>","frameIds":["12:48"],"x":0,"y":0}'
+```
+
+Agents do the same with two canvas ops over MCP or the API: `list_figma_frames` with `{url}` returns the frames of the file, and `import_figma` with `{canvasId, url, frameIds, x, y}` draws them. The REST endpoints behind the dialog are `POST /api/v1/projects/{projectId}/figma/frames` and `POST /api/v1/projects/{projectId}/figma/import`.
+
+Not yet: signing in with a Figma account (OAuth). It needs a Figma app registered for feega, so for now the token is the only way to connect.
+
+## SVG import
+
+Drop or upload an SVG file to get editable vector layers, not a flat image. Gradients, rounded corners, clipping, text and cut-outs (holes) are kept. A pasted SVG keeps its holes too.

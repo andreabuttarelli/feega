@@ -1,6 +1,6 @@
-import { compOf, findClip, type MotionClip, type MotionComp, type MotionDoc } from './doc';
-import { precompose, withOverride } from './precomp';
-import { setProps, type OpResult } from './timeline';
+import { compOf, findClip, type MotionClip, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { precompose, withOverride } from '@feega/motion-core/motion/precomp';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export type NewId = () => string;
 
@@ -17,7 +17,10 @@ export enum ComponentAction {
   DefineProp = 'define-prop',
   RemoveProp = 'remove-prop',
   SetProp = 'set-prop',
-  ResetPropValue = 'reset-prop-value'
+  ResetPropValue = 'reset-prop-value',
+  DefineVariant = 'define-variant',
+  SetVariant = 'set-variant',
+  SetPreferred = 'set-preferred'
 }
 
 export const COMPONENT_ACTIONS = Object.values(ComponentAction) as [ComponentAction, ...ComponentAction[]];

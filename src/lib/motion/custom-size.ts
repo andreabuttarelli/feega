@@ -1,5 +1,5 @@
-import { MAX_SHORT_SIDE, MAX_SIDE, MIN_SIDE, sideRange, type MotionClip, type MotionDoc } from './doc';
-import type { CanvasSize, OpResult } from './timeline';
+import { MAX_SHORT_SIDE, MAX_SIDE, MIN_SIDE, sideRange, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { CanvasSize, OpResult } from '@feega/motion-core/motion/timeline';
 import { Horizontal, Vertical, resizeFrame } from './constraints/constraints';
 import { keepTextSize } from './text-fit';
 

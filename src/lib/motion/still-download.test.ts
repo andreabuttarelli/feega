@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attachmentUrl } from './still-model';
+import { attachmentUrl } from '@feega/motion-core/motion/still-model';
 
 const SIGNED = 'https://x.supabase.co/storage/v1/object/sign/canvas-assets/o/p/stills/a.png?token=abc';
 

@@ -1,5 +1,5 @@
 import { NOISE_DATA_URI } from '../poster-kit';
-import { fillLayersHtml } from '../../fill/render';
+import { fillLayersHtml } from '@feega/motion-core/motion/fill/render';
 
 export const TYPE_GRID_VIEW = String.raw`
 const NOISE = ${JSON.stringify(`url("${NOISE_DATA_URI}")`)};

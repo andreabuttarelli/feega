@@ -3,13 +3,15 @@ import { error, json, redirect, text } from '@sveltejs/kit';
 import * as Sentry from '@sentry/sveltekit';
 import { busyAnswer } from '$lib/db-busy';
 import { seedMetaClickCookies } from '$lib/server/meta-click-cookies';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import type { CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '$lib/server/db/connect';
 import { outlivesTurn } from '$lib/server/session-life';
 import { markRlsScoped } from '$lib/server/rls-client';
 import { createUserDb, type Db } from '$lib/server/db/client';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env as privateEnv } from '$env/dynamic/private';
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, ServerInit } from '@sveltejs/kit';
+import { localModeRefusal, localSession, localStore, serveLocal } from '$lib/server/local/local-mode';
 import { withBrandContext, withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
 import { createAdminClient } from '$lib/server/supabase-admin';
@@ -18,7 +20,7 @@ import { redirectFor } from '$lib/server/host-redirects';
 import { corsPreflight, extraOrigins, withCors } from '$lib/server/api-cors';
 import { SessionSource, bearerSession, bearerTokenOf, sessionSourceOf } from '$lib/server/bearer-session';
 import { grantBearerOf } from '$lib/server/canvas/asset-grant';
-import { SiteVisibility, rootShowsSite, siteVisibility } from '$lib/site/visibility';
+import { landingUrlFor } from '$lib/marketing';
 import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
@@ -112,21 +114,12 @@ const hostRedirect: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
-const SITE_ROUTES = '/(site)';
-const SEE_OTHER = 303;
-const APP_HOME = '/app';
+const MOVED_PERMANENTLY = 301;
 
-function siteEnv() {
-  return { vercelEnv: privateEnv.VERCEL_ENV, flag: publicEnv.PUBLIC_SITE_ENABLED };
-}
-
-export function siteShown(): boolean {
-  return siteVisibility(siteEnv()) === SiteVisibility.Shown;
-}
-
-export const siteGate: Handle = async ({ event, resolve }) => {
-  if (event.route.id?.startsWith(SITE_ROUTES) && !siteShown()) {
-    throw redirect(SEE_OTHER, APP_HOME);
+export const marketingRedirect: Handle = async ({ event, resolve }) => {
+  const target = landingUrlFor(event.url);
+  if (target) {
+    throw redirect(MOVED_PERMANENTLY, target);
   }
   return resolve(event);
 };
@@ -172,7 +165,20 @@ async function refuseUncensoredSection(event: RequestEvent): Promise<void> {
   }
 }
 
-export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
+export const init: ServerInit = () => {
+  const refusal = localModeRefusal(process.env);
+  if (refusal) {
+    throw new Error(refusal);
+  }
+  localStore();
+};
+
+const localMode: Handle = ({ event, resolve }) => {
+  const local = localStore();
+  return local ? serveLocal(event, resolve, local) : resolve(event);
+};
+
+export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, csrf, localMode, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
@@ -218,7 +224,7 @@ export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentr
 
     return { session, user };
   };
-  event.locals.safeGetSession = () => (cachedSession ??= getSession());
+  event.locals.safeGetSession = () => (cachedSession ??= localStore() ? Promise.resolve(localSession()) : getSession());
 
   // Il database NUOVO, accanto al vecchio e non al posto suo: 103 file leggono ancora
   // `locals.supabase`, e spegnerlo qui vorrebbe dire non compilare più. Questo è tipizzato su
@@ -234,7 +240,7 @@ export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentr
 
   seedMetaClickCookies(event.cookies, event.url, event.route.id);
 
-  if (isRootPath(event.url.pathname) && !rootShowsSite(event.url, siteEnv())) {
+  if (isRootPath(event.url.pathname)) {
     rememberCampaign(event.cookies, event.url);
     if (event.url.searchParams.has('code') || event.url.searchParams.has('error_description')) {
       throw redirect(303, `/auth/callback${event.url.search}`);

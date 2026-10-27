@@ -33,6 +33,7 @@
       });
     </script>
     <script>document.documentElement.setAttribute('data-hydrating', '');</script>
+    <script>(function(u){if(u.includes('FeegaNative/')&&u.includes('Electron/'))document.documentElement.setAttribute('data-window',u.includes('Macintosh')?'mac':'overlay')})(navigator.userAgent);</script>
     <script>(function(r){if(r.getAttribute('data-theme'))return;var s=null;try{s=localStorage.getItem('theme')}catch(e){}r.setAttribute('data-theme',s==='light'||s==='dark'?s:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})(document.documentElement);</script>
     %sveltekit.head%
   </head>

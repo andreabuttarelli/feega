@@ -1,9 +1,9 @@
-import type { MotionDoc } from '../doc';
-import { findClip } from '../doc';
-import type { OpResult } from '../timeline';
-import { LUT_NODES, type CompiledLut } from './lut-model';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { findClip } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { LUT_NODES, type CompiledLut } from '@feega/motion-core/motion/effects/lut-model';
 import { setEffect } from './ops';
-import { EffectKind } from './registry';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 
 export type Rgb = [number, number, number];
 export type Cube = { size: number; table: number[]; min: Rgb; max: Rgb };

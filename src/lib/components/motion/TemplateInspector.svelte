@@ -1,16 +1,17 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import Unlink from '@lucide/svelte/icons/unlink';
-  import type { AssetKind } from '$lib/motion/components';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+  import type { AssetKind } from '@feega/motion-core/motion/components';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import { detachTemplate, instanceComp, keyFieldsOf, setTemplateValues, templateFields, type TemplateFieldValue } from '$lib/motion/template/library';
-  import { FieldLayout, splitFields } from '$lib/motion/template/key-fields';
+  import { FieldLayout, splitFields } from '@feega/motion-core/motion/template/key-fields';
   import FieldForm from './FieldForm.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import type { MediaUploader } from './media-upload';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
-  let { doc, clip, assets, upload = null, gesture = null, onchange }: { gesture?: LiveGesture | null; doc: MotionDoc; clip: MotionClip; assets: Asset[]; upload?: MediaUploader | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, clip, assets, upload = null, gesture = null, actions, onchange }: { gesture?: LiveGesture | null; actions?: Snippet; doc: MotionDoc; clip: MotionClip; assets: Asset[]; upload?: MediaUploader | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   let error = $state('');
 
@@ -34,6 +35,7 @@
     <header>
       <span class="name">{mark.name}</span>
       <button type="button" class="detach" data-testid="detach-template" title="Detach to edit its structure" onclick={detach}><Unlink size={12} /> Detach</button>
+      {@render actions?.()}
     </header>
 
     {#if split.key.length}

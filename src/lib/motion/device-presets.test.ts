@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { Device } from './devices';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Device } from '@feega/motion-core/motion/devices';
 import { DevicePreset, addDeviceRow, applyDevicePreset } from './device-presets';
-import { addClip, type OpResult } from './timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {

@@ -1,7 +1,7 @@
-import { CAPTURE_REPLY, type CaptureReply } from './capture';
+import { CAPTURE_REPLY, type CaptureReply } from '@feega/motion-core/motion/hyperframes/capture';
 import { previewDriver, type ShotRequest } from './preview-driver';
 import { laneVisibility } from '../export/lanes';
-import { engineOf } from '../engine';
+import { engineOf } from '@feega/motion-core/motion/engine';
 
 type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; iframeElement: HTMLIFrameElement };
 

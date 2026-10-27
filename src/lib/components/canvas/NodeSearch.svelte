@@ -3,6 +3,7 @@
   import { searchNodes, type SearchableNode } from '$lib/canvas/node-search';
   import { NODE_KIND_LABEL } from '$lib/canvas/node-label';
   import type { NodeType } from '$lib/canvas/node-data';
+  import { COLOUR_TAGS, COLOUR_TAG_HEX, colourOf, type ColourTag } from '$lib/canvas/node-colour';
 
   const FIND_KEY = 'f';
   const SHOWN_MAX = 30;
@@ -13,8 +14,9 @@
   let open = $state(false);
   let query = $state('');
   let active = $state(0);
+  let colour = $state<ColourTag | null>(null);
   let input = $state<HTMLInputElement | null>(null);
-  const found = $derived(searchNodes(nodes, query).slice(0, SHOWN_MAX));
+  const found = $derived(searchNodes(nodes, query, colour).slice(0, SHOWN_MAX));
 
   function titleOf(node: SearchableNode): string {
     const own = node.displayName ?? (typeof node.data.title === 'string' ? node.data.title : null);
@@ -29,8 +31,15 @@
   async function show() {
     open = true;
     query = '';
+    colour = null;
     active = 0;
     await tick();
+    input?.focus();
+  }
+
+  function pickColour(tag: ColourTag) {
+    colour = colour === tag ? null : tag;
+    active = 0;
     input?.focus();
   }
 
@@ -75,14 +84,20 @@
   <div class="scrim" onclick={() => (open = false)}></div>
   <div class="find" role="dialog" aria-label="Find on canvas" data-testid="node-search">
     <input bind:this={input} bind:value={query} oninput={() => (active = 0)} onkeydown={onInputKey} placeholder="Find nodes by name, text or prompt…" aria-label="Find on canvas" data-testid="node-search-input" />
+    <div class="chips" role="group" aria-label="Colour tag">
+      {#each COLOUR_TAGS as tag (tag)}
+        <button type="button" class="chip" class:on={colour === tag} aria-pressed={colour === tag} aria-label={`Filter ${tag}`} data-testid={`search-colour-${tag}`} style={`--tag:${COLOUR_TAG_HEX[tag]}`} onclick={() => pickColour(tag)}></button>
+      {/each}
+    </div>
     <div class="list" role="listbox">
       {#each found as node, i (node.id)}
         <button type="button" role="option" aria-selected={i === active} class:active={i === active} onpointerenter={() => (active = i)} onclick={() => jump(node)}>
+          {#if colourOf(node.data)}<span class="dot" style={`--tag:${COLOUR_TAG_HEX[colourOf(node.data)!]}`}></span>{/if}
           <span class="name">{titleOf(node)}</span>
           <span class="snippet">{snippetOf(node)}</span>
         </button>
       {:else}
-        {#if query.trim()}<p class="empty">Nothing matches</p>{/if}
+        {#if query.trim() || colour}<p class="empty">Nothing matches</p>{/if}
       {/each}
     </div>
   </div>
@@ -166,6 +181,33 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--ui-ink-3);
+  }
+
+  .chips {
+    display: flex;
+    gap: 6px;
+    padding: 0 14px 8px;
+  }
+
+  .chip {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background: var(--tag);
+  }
+
+  .chip.on {
+    border-color: var(--ui-ink);
+  }
+
+  .dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--tag);
   }
 
   .empty {

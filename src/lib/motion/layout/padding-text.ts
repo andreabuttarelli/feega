@@ -1,4 +1,4 @@
-import type { Padding } from './auto-layout';
+import type { Padding } from '@feega/motion-core/motion/layout/auto-layout';
 
 const MAX_VALUES = 4;
 

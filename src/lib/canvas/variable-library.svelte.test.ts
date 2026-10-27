@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { VarType, type Collection } from '$lib/motion/variables-model';
+import { VarType, type Collection } from '@feega/motion-core/motion/variables-model';
 import { VariableLibrary } from './variable-library.svelte';
 
 const THEME: Collection = { modes: ['Light'], vars: { surface: { type: VarType.Colour, values: { Light: '#ffffff' } } } };

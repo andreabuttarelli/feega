@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { findClip, MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { ListKind } from '$lib/motion/text-lists';
-import { commitText, editBody, editCss, editLayout, editsText, hideText, listsOfClip, runsOfClip, textEditStyle } from './frame-text-edit';
-import type { TextCaret } from '$lib/motion/gpu-full/display-list';
+import { findClip, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { ListKind } from '@feega/motion-core/motion/text-lists';
+import { anchorShift, commitText, editBody, editCss, editLayout, editsText, hideText, listsOfClip, runsOfClip, textEditStyle } from './frame-text-edit';
+import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
 
 function withText() {
   const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Hello', size: 0.1 } }, 'title');
@@ -134,6 +134,17 @@ describe('the editing box follows the drawn text', () => {
 
     expect(css).toContain('text-decoration-line:underline');
     expect(css).toContain("font-feature-settings:'tnum' 1");
+  });
+
+  it('a centred text grows both ways around the laid box, whatever the editor measured first', () => {
+    const laid = editLayout(caret({ height: 196, vertical: 0.5 }), [1, 0, 0, 1, 0, 0]);
+
+    expect(anchorShift(laid, 196)).toBeCloseTo(0);
+    expect(anchorShift(laid, 296)).toBe(-50);
+  });
+
+  it('a top-anchored text only grows down', () => {
+    expect(anchorShift(editLayout(caret({ vertical: 0 }), [1, 0, 0, 1, 0, 0]), 400)).toBeCloseTo(0);
   });
 
   it('title-cases and justifies the way the canvas draws', () => {

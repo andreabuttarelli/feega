@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Answer, answerAgent, framesUrl, type FramesAnswer } from './agent-requests';
 import { CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST } from '$lib/motion/frames-request';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { CheckState } from '$lib/motion/custom/component';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { CheckState } from '@feega/motion-core/motion/custom/component';
 
 const doc: MotionDoc = { ...newMotionDoc(MotionFormat.Landscape), fps: 30, durationInFrames: 60 };
 

@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from '../design';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setKeyframes, setProps, type OpResult } from '../timeline';
-import { FEEGA_TOKENS } from '../brand';
-import { composeHtml } from '../hyperframes/compose';
-import { setExpression } from '../expression/ops';
-import { AnimatorUnit } from '../text-animators/model';
-import { addAnimator } from '../text-animators/ops';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
+import { AnimatorUnit } from '@feega/motion-core/motion/text-animators/model';
+import { addAnimator } from '@feega/motion-core/motion/text-animators/ops';
 import { editAt } from '../inspector';
-import { placeGlyphs, type Curve, type Placement } from './layout';
-import { presetCurve } from './curves';
-import { PathAlign, PathPreset, PathSourceKind, TEXT_PATH, TEXT_PATH_KEYS, textPathKey } from './model';
-import { removeTextPath, setTextPath } from './ops';
-import { textPathBake, textPathOutline } from '../hyperframes/text-path';
+import { placeGlyphs, type Curve, type Placement } from '@feega/motion-core/motion/text-path/layout';
+import { presetCurve } from '@feega/motion-core/motion/text-path/curves';
+import { PathAlign, PathPreset, PathSourceKind, TEXT_PATH, TEXT_PATH_KEYS, textPathKey } from '@feega/motion-core/motion/text-path/model';
+import { removeTextPath, setTextPath } from '@feega/motion-core/motion/text-path/ops';
+import { textPathBake, textPathOutline } from '@feega/motion-core/motion/hyperframes/text-path';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {

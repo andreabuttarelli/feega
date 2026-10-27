@@ -1,4 +1,4 @@
-import { Cap, Join, strokePolygons } from '$lib/motion/gpu-full/stroke';
+import { Cap, Join, strokePolygons } from '@feega/motion-core/motion/gpu-full/stroke';
 
 export type Polyline = { points: number[]; closed: boolean };
 

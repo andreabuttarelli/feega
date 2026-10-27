@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { AssetKind } from '$lib/motion/components';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import { createMotionTools, type MotionSession } from './motion-tools';
 import type { MotionAsset } from './editor';
 

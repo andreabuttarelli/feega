@@ -260,7 +260,8 @@ export const SHARED_VIEW_OF: Record<NodeType, (input: ViewInput) => SharedView |
   motion: () => EMPTY,
   element: () => EMPTY,
   studio_batch: () => EMPTY,
-  section: () => EMPTY
+  section: () => EMPTY,
+  technique: () => EMPTY
 };
 
 async function viewOf(input: ViewInput): Promise<SharedView> {

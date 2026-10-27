@@ -42,7 +42,11 @@ export function strokesFromPx(strokes: unknown, frame: Frame): unknown {
   return Array.isArray(strokes) ? strokes.map((s) => strokeFromPx(s, frame)) : strokes;
 }
 
-export function propsFromPx(props: Props, shownBefore: Props, frame: Frame): Props {
+const NONE_OWNED: ReadonlySet<string> = new Set();
+
+export function propsFromPx(given: Props, shownBefore: Props, frame: Frame, owned = NONE_OWNED): Props {
+  const kept = Object.fromEntries(Object.entries(given).filter(([key]) => owned.has(key)));
+  const props = Object.fromEntries(Object.entries(given).filter(([key]) => !owned.has(key)));
   const { left, top, radius, ...rest } = props;
   const width = num(rest.width) ?? num(shownBefore.width) ?? 0;
   const height = num(rest.height) ?? num(shownBefore.height) ?? 0;
@@ -61,7 +65,7 @@ export function propsFromPx(props: Props, shownBefore: Props, frame: Frame): Pro
   if (rest.strokes !== undefined) {
     out.strokes = strokesFromPx(rest.strokes, frame);
   }
-  return out;
+  return { ...out, ...kept };
 }
 
 function boxOf(stored: Props, frame: Frame): PxBox | null {

@@ -1,0 +1,56 @@
+---
+title: Components, variants and properties
+description: Reuse a design and override it per instance.
+sidebar:
+  order: 4
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="component-variants" caption="Add variants to a component." />
+
+Create a component from the selection with `⌥⌘K`. The Assets panel lists the components and variants on your canvas; drag one onto any frame to add an instance.
+
+## Variants
+
+A component can have several variant properties, like Size (S, M, L) and State (default, hover). Select an instance and the variant matrix appears in Properties: one cell per combination, the current one highlighted.
+
+<DemoVideo name="variant-matrix" caption="Switch an instance across a Size by State matrix, then add a property." />
+
+1. Select an instance of the component.
+2. Click a cell in the matrix to switch the instance to that combination. Overrides on the instance stay.
+3. To add a property, type its name (`Tone`) and values (`Light, Dark`) under the matrix and press Add property. Feega creates a variant for every missing combination, up to 64 per set.
+4. A dash marks a combination that does not exist; it cannot be picked.
+
+The dropdown per property and the Swap list still work for switching one axis, or swapping to any other component.
+
+**Agent and CLI.** The `component` tool covers the same steps:
+
+```json
+{ "action": "define-variant", "comp": "<main id>", "prop": "Size", "values": ["S", "M", "L"] }
+{ "action": "set-variant", "clip_id": "<instance id>", "variant": { "Size": "L", "State": "hover" } }
+```
+
+Through the CLI: `feega motion ask <nodeId> "Give the Buy button Size S, M, L and State default, hover, then set the cart button to L hover"`.
+
+## Properties
+
+A component can expose properties: show or hide a layer, edit text, swap a nested component, or surface a nested component property. Set them per instance.
+
+### Preferred swaps
+
+An instance-swap property can list preferred components. Under the instance, tick the components to prefer in Preferred; the swap dropdown then shows them first, under Preferred, above All components. Preferred is a suggestion: any component can still be swapped in.
+
+Agent: `set-preferred` with `comp`, `prop` (the swap property) and `preferred` (main component ids).
+
+## Overrides
+
+Instances can override fill, stroke, image, visibility and effects, each with its own reset. Double-click into an instance to move or restyle its elements; only that instance changes and the main stays as it is.
+
+| Action | Where |
+|---|---|
+| Detach instance | Command palette (`⌘K`) |
+| Reset instance | Command palette |
+| Push instance changes to the main | Command palette, so every copy follows |
+
+**Unverified:** the exact menu location of detach, reset and push. The commands exist in the shortcut registry (`DetachInstance`, `ResetInstance`, `PushInstance`).

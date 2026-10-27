@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { fillSchema, FillType, type Fill } from '$lib/motion/fill/model';
-import { addClip } from '$lib/motion/timeline';
-import { findClip, MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { fillSchema, FillType, type Fill } from '@feega/motion-core/motion/fill/model';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { findClip, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { GradientGrip, draggedFill, gradientHandles, gradientTarget, withFill } from './gradient-handles';
 
 const box = { width: 200, height: 100 };

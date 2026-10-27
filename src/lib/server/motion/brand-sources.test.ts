@@ -11,7 +11,7 @@ import type { AddressInfo } from 'node:net';
 import type { Tool } from 'ai';
 import sharp from 'sharp';
 import type { Db } from '$lib/server/db/client';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { createMotionTools, type MotionSession } from './motion-tools';
 import { brandSources } from './brand-sources';
 import type { MotionAsset } from './editor';

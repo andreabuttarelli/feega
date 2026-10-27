@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadPageData, postPageAction } from '$lib/api/page-action';
 import type { EditorPageData } from '$lib/server/frame-editor/editor-page';
-import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { FONT_FILE, MAX_FONT_MB, fontFamilies, missingUploads, type FontFamily, type FontFile, type FontLibrary, type FontUploaded } from '$lib/motion/fonts/library';
 import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
 import { canvasMediaUploader } from './media-uploader';

@@ -1,7 +1,7 @@
-import { compOf, findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-import { MAX_COMP_DEPTH, SEPARATOR, viewOf, type CompPath } from '$lib/motion/precomp';
+import { compOf, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { MAX_COMP_DEPTH, SEPARATOR, viewOf, type CompPath } from '@feega/motion-core/motion/precomp';
 import { mergeScope, scopeView } from '$lib/motion/instance-view';
-import { apply2d, invert2d, worldAt } from '$lib/motion/parent';
+import { apply2d, invert2d, worldAt } from '@feega/motion-core/motion/parent';
 import type { Pt } from '$lib/motion/scene-select';
 import { Reach, clickTarget } from './frame-select';
 

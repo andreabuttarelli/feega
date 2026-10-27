@@ -1,6 +1,6 @@
 <script lang="ts">
   import { apiEnhance } from '$lib/dashboard/api-enhance';
-  import { FORMATS } from '$lib/motion/doc';
+  import { FORMATS } from '@feega/motion-core/motion/doc';
   import { POSTER_FORMATS, type CatalogueItem, type PosterFormat } from '$lib/motion/template/catalogue';
 
   let { items, projectId = null }: { items: CatalogueItem[]; projectId?: string | null } = $props();

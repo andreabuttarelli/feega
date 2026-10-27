@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { ellipseOutline, starOutline } from './geometry';
-import { MORPH_POINTS, morphBetween } from './morph';
+import { ellipseOutline, starOutline } from '@feega/motion-core/motion/shape/geometry';
+import { MORPH_POINTS, morphBetween } from '@feega/motion-core/motion/shape/morph';
 
 const MAX_RING_COPIES = 4;
 

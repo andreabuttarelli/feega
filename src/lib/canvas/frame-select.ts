@@ -1,8 +1,8 @@
-import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Depth, drill, type Gesture, type Level, type Probe } from '$lib/motion/drill';
 import { EditMode } from '$lib/motion/edit-mode';
-import type { OpResult } from '$lib/motion/timeline';
-import { PART_SEP } from '$lib/motion/poster-parts';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { PART_SEP } from '@feega/motion-core/motion/poster-parts';
 import type { VideoSide } from './layers-source.svelte';
 
 export type Inside = { nodeId: string; level: Level };

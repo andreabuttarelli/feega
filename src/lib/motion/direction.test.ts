@@ -1,19 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { Side, addClip, removeClips, setTransition } from './timeline';
-import { precompose } from './precomp';
-import { Quality, SEVERITY, Severity, blocking, docProblems, frameProblems } from './direction';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Side, addClip, removeClips, setTransition } from '@feega/motion-core/motion/timeline';
+import { precompose } from '@feega/motion-core/motion/precomp';
+import { writeComponent } from './custom/ops';
+import { Quality, SEVERITY, Severity, blocking, blockingFor, docProblems, frameProblems, vanishes, type QualityProblem } from './direction';
 import { Forbidden, STYLES, Script } from './style';
 import supasitoV1 from './fixtures/supasito-v1.json';
-import { Ease, TransitionKind } from './design';
+import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
 import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
-import { MOTION_STYLES, MotionStyle } from './style-model';
+import { MOTION_STYLES, MotionStyle } from '@feega/motion-core/motion/style-model';
 import { UI_KIT, UiKind } from './ui-kit/kit';
 import { writeComponent } from './custom/ops';
-import { ComponentMode } from './custom/component';
+import { ComponentMode } from '@feega/motion-core/motion/custom/component';
 import { Isolate, focusUi } from './ui-focus';
-import { JunctionKind } from './junctions';
+import { JunctionKind } from '@feega/motion-core/motion/junctions';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -73,6 +74,17 @@ describe('the quality gate reads the direction of the video', () => {
     const twice = place(place(newMotionDoc(MotionFormat.Landscape), 'scene-hero-title', 0), 'scene-hero-title', 90);
 
     expect(kinds(fitted(varied))).toEqual([]);
+    expect(kinds(twice)).toContain(Quality.RepeatedLayout);
+  });
+
+  it('two different code components in a row are two layouts, the same one twice repeats', () => {
+    const custom = (doc: MotionDoc, id: string, name: string, at: number) => must(addClip(doc, { component: 'Custom', from: at, durationInFrames: 90, props: { name } }, id));
+    const piece = (doc: MotionDoc, name: string) => must(writeComponent(doc, name, { source: { html: '<div></div>', css: '', js: '' }, propsSchema: { type: 'object', properties: {} } }));
+    const empty = piece(piece(newMotionDoc(MotionFormat.Landscape), 'HeroTitle'), 'CanvasMoment');
+    const varied = custom(custom(empty, 'a', 'HeroTitle', 0), 'b', 'CanvasMoment', 90);
+    const twice = custom(custom(empty, 'a', 'HeroTitle', 0), 'b', 'HeroTitle', 90);
+
+    expect(kinds(varied)).not.toContain(Quality.RepeatedLayout);
     expect(kinds(twice)).toContain(Quality.RepeatedLayout);
   });
 
@@ -529,5 +541,40 @@ describe('transitions that cannot play', () => {
 
   it('a transition at a real cut plays', () => {
     expect(dead(pair(90))).toEqual([]);
+  });
+});
+
+describe('what blocks scales with the length of the video', () => {
+  const story: QualityProblem[] = [
+    { kind: Quality.NoScript, detail: 'no script' },
+    { kind: Quality.Silent, detail: 'no music' },
+    { kind: Quality.BlankFrame, detail: 'blank' }
+  ];
+
+  it('under 15 s, script and music are advice; a blank frame still blocks', () => {
+    expect(blockingFor(story, 9).map((p) => p.detail)).toEqual(['blank']);
+  });
+
+  it('a film of 15 s or more is held to the whole list', () => {
+    expect(blockingFor(story, 20)).toHaveLength(3);
+  });
+});
+
+describe('content that vanishes at a cut and comes back', () => {
+  const at = (time: number, lumaStd: number) => ({ time, luma: 20, lumaStd, whiteShare: 0 });
+
+  it('the canvas that goes empty right after a cut and returns within a second is blocking', () => {
+    const problems = vanishes([at(7.967, 17), at(8, 4.5), at(8.25, 4.5), at(8.5, 4.6), at(9.1, 21.6)]);
+
+    expect(problems.map((p) => [p.kind, p.at])).toEqual([[Quality.VanishingCut, 8]]);
+    expect(blocking(problems)).toHaveLength(1);
+  });
+
+  it('a cut to a title card that stays is not a flash', () => {
+    expect(vanishes([at(17.967, 30), at(18, 8), at(18.5, 8), at(19.2, 8.2)])).toEqual([]);
+  });
+
+  it('frames far apart are never read as a cut', () => {
+    expect(vanishes([at(1, 30), at(3, 4), at(3.5, 30)])).toEqual([]);
   });
 });

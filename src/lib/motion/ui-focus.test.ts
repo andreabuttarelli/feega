@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc } from './doc';
+import { MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { anchorBox } from './clicks';
-import { Ease } from './design';
+import { Ease } from '@feega/motion-core/motion/design';
 import { Isolate, focusUi } from './ui-focus';
 import { pieceAnchors } from './ui-kit/anchors';
 import { UiBlock, recreatedUi } from './ui-kit/kit';

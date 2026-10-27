@@ -2,7 +2,7 @@ import { orgFontFamilies } from './font-upload';
 import { asSchema, type Tool } from 'ai';
 import { nameVersion, namedRevisions } from './version-names';
 import type { Db } from '$lib/server/db/client';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { agentActor } from '$lib/server/repos/actor';
 import { Checkpoint, readRevision } from '$lib/server/repos/motion-revisions';
 import { screenModelInput } from '$lib/server/moderation/model-input';
@@ -22,7 +22,7 @@ import { drawFrames, firstFrames } from './server-frames';
 import { fontAdvance } from './font-advance';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
 import type { Frame } from './frames';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 export enum ToolRun {
   Done = 'done',
@@ -46,6 +46,25 @@ export type ToolRunResult = { outcome: ToolRun.Done; output: unknown; version: n
 
 export const TOOL_RUN_AGENT_KEY = 'mcp';
 export const SPENDING_TOOLS: ReadonlySet<string> = new Set(['generate_voiceover']);
+
+export enum FrameToolAccess {
+  Read = 'read',
+  Write = 'write',
+  Spend = 'spend',
+  Editor = 'editor'
+}
+
+const READ_TOOLS = ['get_motion_doc', 'measure_text', 'list_components', 'list_assets', 'beat_times', 'list_effects', 'list_layouts', 'list_fields', 'list_fonts', 'read_component', 'list_shots', 'list_templates', 'get_template', 'list_revisions', 'view_frames', 'describe_frames', 'list_ui_kinds'];
+
+const EDITOR_ONLY_TOOLS = ['read_video_reference', 'render_batch', 'spawn_agent', 'render_video', 'analyze_site', 'write_storyboard', 'read_storyboard', 'update_storyboard_card', 'link_storyboard_beat', 'use_brand', 'import_asset', 'recreate_ui', 'add_music'];
+
+const FRAME_ACCESS: ReadonlyMap<string, FrameToolAccess> = new Map([
+  ...READ_TOOLS.map((name) => [name, FrameToolAccess.Read] as const),
+  ...EDITOR_ONLY_TOOLS.map((name) => [name, FrameToolAccess.Editor] as const),
+  ...[...SPENDING_TOOLS].map((name) => [name, FrameToolAccess.Spend] as const)
+]);
+
+export const frameToolAccess = (name: string): FrameToolAccess => FRAME_ACCESS.get(name) ?? FrameToolAccess.Write;
 const ID_LENGTH = 8;
 const HEADLESS = 'needs a chat turn in the editor: ask the motion agent instead';
 

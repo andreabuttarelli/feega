@@ -1,4 +1,4 @@
-import type { Collection, Variables } from '$lib/motion/variables-model';
+import type { Collection, Variables } from '@feega/motion-core/motion/variables-model';
 
 export type VariableSink = {
   push: (name: string, collection: Collection) => void;

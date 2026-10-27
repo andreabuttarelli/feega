@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { INTERACTIVE_PRESETS } from '$lib/motion/interactive/presets';
-import { Outside, PlayMode } from '$lib/motion/interactive/settings';
+import { Outside, PlayMode } from '@feega/motion-core/motion/interactive/settings';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession } from './motion-tools';

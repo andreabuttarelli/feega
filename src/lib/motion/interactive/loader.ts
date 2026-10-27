@@ -1,7 +1,7 @@
 import { EMBED_ROUTE, HOST_MESSAGE, type hostMain } from './host';
-import { PlayMode, SCROLL_LENGTH } from './settings';
+import { PlayMode, SCROLL_LENGTH } from '@feega/motion-core/motion/interactive/settings';
 import { PLAYER_MESSAGE, PlayerEvent } from './protocol';
-import type { VarDecl } from './var-model';
+import type { VarDecl } from '@feega/motion-core/motion/interactive/var-model';
 
 export const EMBED_TAG = 'feega-motion';
 export const EMBED_ATTR = 'data-feega';

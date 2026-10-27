@@ -25,8 +25,18 @@ export type SelectionActionId =
   | 'connect-new'
   | 'connect-existing'
   | 'run-workflow'
+  | 'save-technique'
+  | 'run-technique'
+  | 'edit-technique'
+  | 'detach-technique'
   | 'run-downstream'
   | 'run-stale'
+  | 'remove-background'
+  | 'upscale-image'
+  | 'inpaint'
+  | 'outpaint'
+  | 'split-layers'
+  | 'layers-to-frame'
   | 'copy-id'
   | 'report'
   | 'group'
@@ -85,6 +95,10 @@ export type SelectionAction = {
 
 export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'run-workflow', label: 'Run flow', group: 'primary', minNodes: 2 },
+  { id: 'save-technique', label: 'Save as technique…', group: 'menu', minNodes: 2 },
+  { id: 'run-technique', label: 'Run technique', group: 'secondary', minNodes: 1 },
+  { id: 'edit-technique', label: 'Edit technique', group: 'menu', minNodes: 1 },
+  { id: 'detach-technique', label: 'Detach technique', group: 'menu', minNodes: 1 },
   { id: 'run-downstream', label: 'Run from here', group: 'secondary', minNodes: 1 },
   { id: 'run-stale', label: 'Re-run out of date', group: 'secondary', minNodes: 1 },
   { id: 'connect-new', label: 'Connect to new…', group: 'secondary', minNodes: 1 },
@@ -92,6 +106,12 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, shortcut: 'Mod+D' },
   { id: 'group', label: 'Group', group: 'secondary', minNodes: 2, shortcut: 'Mod+G' },
   { id: 'ungroup', label: 'Ungroup', group: 'secondary', minNodes: 1, shortcut: 'Mod+Shift+G' },
+  { id: 'remove-background', label: 'Remove background', group: 'secondary', minNodes: 1 },
+  { id: 'upscale-image', label: 'Upscale 2×', group: 'secondary', minNodes: 1 },
+  { id: 'inpaint', label: 'Inpaint…', group: 'secondary', minNodes: 1 },
+  { id: 'outpaint', label: 'Outpaint…', group: 'secondary', minNodes: 1 },
+  { id: 'split-layers', label: 'Split into layers', group: 'secondary', minNodes: 1 },
+  { id: 'layers-to-frame', label: 'Layers to frame', group: 'secondary', minNodes: 1 },
   { id: 'copy', label: 'Copy', group: 'menu', minNodes: 1, shortcut: 'Mod+C' },
   { id: 'paste', label: 'Paste', group: 'menu', minNodes: 1, shortcut: 'Mod+V' },
   { id: 'bring-front', label: 'Bring to front', group: 'menu', minNodes: 1, shortcut: 'Mod+]' },
@@ -159,7 +179,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -177,8 +197,21 @@ const isOneFrame = (summaries: readonly Summary[]) => summaries.length === 1 && 
 
 const FRAME_DIALOG_SHOWN = Object.fromEntries((Object.keys(FRAME_DIALOG_ACTIONS) as FrameDialogActionId[]).map((id) => [id, isOneFrame]));
 
+const isOneFinishedImage = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'image' && Boolean(summaries[0].data.refId);
+
+const isOneTechnique = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'technique';
+
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
   ...FRAME_DIALOG_SHOWN,
+  'run-technique': isOneTechnique,
+  'edit-technique': isOneTechnique,
+  'detach-technique': isOneTechnique,
+  'remove-background': isOneFinishedImage,
+  'upscale-image': isOneFinishedImage,
+  inpaint: isOneFinishedImage,
+  outpaint: isOneFinishedImage,
+  'split-layers': isOneFinishedImage,
+  'layers-to-frame': (summaries) => isOneFinishedImage(summaries) && Array.isArray(summaries[0].data.layerRefIds) && summaries[0].data.layerRefIds.length > 0,
   ungroup: (summaries) => summaries.some(isGroup),
   'create-formats': (summaries) => summaries.length === 1 && isFrame(summaries[0]),
   'combine-video': (summaries) => summaries.length > 1 && summaries.every(isFrame),
@@ -228,6 +261,11 @@ const GATES: Partial<Record<SelectionActionId, (input: GateInput) => Gate>> = {
     );
     return { enabled: plan.ok, reason: plan.ok ? undefined : plan.reason };
   },
+  'save-technique': ({ nodeSummaries, edges }) => {
+    const asGenerative = new Map(nodeSummaries.map((n) => [n.id, [...GENERATIVE_TYPES][0]]));
+    const plan = planWorkflow(nodeSummaries.map((n) => n.id), edges, asGenerative);
+    return { enabled: plan.ok, reason: plan.ok ? undefined : plan.reason };
+  },
   'run-downstream': ({ nodeSummaries, edges }) => {
     const [only] = nodeSummaries;
     const runs = nodeSummaries.length === 1 && (GENERATIVE_TYPES.has(only.type) || edges.some((e) => e.sourceNodeId === only.id));
@@ -244,4 +282,39 @@ export function enabledFor(
   stale: string[] = []
 ): Gate {
   return GATES[id]?.({ nodeSummaries, edges, stale }) ?? ALWAYS;
+}
+
+const PINNED_LIMIT = 3;
+
+const TOOLBAR_PRIORITY: readonly SelectionActionId[] = [
+  'duplicate',
+  'run-downstream',
+  'upscale-image',
+  'remove-background',
+  'run-technique',
+  'run-stale',
+  'inpaint',
+  'outpaint',
+  'connect-new',
+  'connect-existing',
+  'split-layers',
+  'layers-to-frame',
+  'group',
+  'ungroup'
+];
+
+const rankOf = (id: SelectionActionId) => {
+  const at = TOOLBAR_PRIORITY.indexOf(id);
+  return at === -1 ? TOOLBAR_PRIORITY.length : at;
+};
+
+export type ToolbarSlots = { pinned: SelectionAction[]; overflow: SelectionAction[]; danger: SelectionAction[] };
+
+export function toolbarSlots(actions: readonly SelectionAction[]): ToolbarSlots {
+  const ranked = actions.filter((a) => a.group === 'secondary').sort((a, b) => rankOf(a.id) - rankOf(b.id));
+  return {
+    pinned: ranked.slice(0, PINNED_LIMIT),
+    overflow: [...ranked.slice(PINNED_LIMIT), ...actions.filter((a) => a.group === 'overflow')],
+    danger: actions.filter((a) => a.group === 'danger')
+  };
 }

@@ -1,4 +1,4 @@
-import { findClip, type MotionClip, type MotionDoc } from './doc';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 
 const kindOf = (clip: MotionClip) => (clip.component === 'Shape' ? `Shape:${String(clip.props.shape)}` : clip.component);
 

@@ -1,5 +1,5 @@
-import { indented, listedAt, listedParagraphs, shiftLists, touched, unlisted, type ListItem, type ListKind } from '$lib/motion/text-lists';
-import { codePoints, rangeValues, shiftRuns, styledRange, type Range, type RangeValues, type RunEdit, type RunStyle, type TextRun } from '$lib/motion/text-runs';
+import { indented, listedAt, listedParagraphs, shiftLists, touched, unlisted, type ListItem, type ListKind } from '@feega/motion-core/motion/text-lists';
+import { codePoints, rangeValues, shiftRuns, styledRange, type Range, type RangeValues, type RunEdit, type RunStyle, type TextRun } from '@feega/motion-core/motion/text-runs';
 
 export type RangeOpen = { clipId: string; text: string; runs: TextRun[]; lists?: ListItem[]; base: RunStyle };
 

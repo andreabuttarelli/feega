@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc } from '$lib/motion/doc';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { composeHtml, Target } from '$lib/motion/hyperframes/compose';
-import { ComponentMode, customValues, Strictness } from '$lib/motion/custom/component';
+import { MotionFormat, newMotionDoc, parseMotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml, Target } from '@feega/motion-core/motion/hyperframes/compose';
+import { ComponentMode, customValues, Strictness } from '@feega/motion-core/motion/custom/component';
 import { lintSource } from '$lib/motion/custom/lint';
 import { stillStandIns } from '$lib/motion/custom/determinism';
-import { interactiveOf } from '$lib/motion/interactive/settings';
+import { interactiveOf } from '@feega/motion-core/motion/interactive/settings';
 import { builtinTemplate } from '../builtins';
 import { insertTemplate, setTemplateValues, templateFields } from '../library';
-import { FieldType } from '../field-model';
+import { FieldType } from '@feega/motion-core/motion/template/field-model';
 import { CAROUSEL_COMPONENT } from './component';
 import { CAROUSEL_KEY_FIELDS, CAROUSEL_TEMPLATE_ID, CIRCULAR_CAROUSEL_TEMPLATE } from './template';
 

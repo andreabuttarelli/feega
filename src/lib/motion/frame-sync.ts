@@ -1,4 +1,4 @@
-import type { MotionDoc } from './doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { diffDoc, rebase, type DocOp } from './doc-ops';
 
 export type Revision = { version: number; doc: MotionDoc };

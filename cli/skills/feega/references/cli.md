@@ -34,6 +34,6 @@ flags: [`cli/README.md`](../../../README.md).
 
 ## MCP instead
 
-MCP reaches the whole org directly (`query`, `insert_row`, `ask_motion_agent`, `run_node_generation`,
+MCP reaches the whole org directly (`query`, `insert_row`, `run_node_generation`,
 …) and is preferred when connected — see [mcp.md](mcp.md). Tool ↔ command mapping:
 [tools.md](tools.md).

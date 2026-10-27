@@ -7,6 +7,12 @@ use crate::world::{Patch, World};
 use crate::Skipped;
 
 const ROUGH_SCALE: f64 = 0.5;
+const RENDER_TILE_PX: u32 = 1024;
+
+pub fn render_tile(max_texture: u32) -> (u32, u32) {
+    let side = max_texture.min(RENDER_TILE_PX);
+    (side, side)
+}
 
 pub trait Painter {
     type Error;

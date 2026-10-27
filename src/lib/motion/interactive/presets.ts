@@ -1,7 +1,7 @@
-import type { MotionDoc } from '../doc';
-import type { OpResult } from '../timeline';
-import { setExpression } from '../expression/ops';
-import { PlayMode, interactiveOf, type Interactive } from './settings';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
+import { PlayMode, interactiveOf, type Interactive } from '@feega/motion-core/motion/interactive/settings';
 
 export enum InteractivePreset {
   CursorParallax = 'cursor-parallax',

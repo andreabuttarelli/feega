@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import ClipBar from './ClipBar.svelte';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, type OpResult } from '$lib/motion/timeline';
-import { precompose } from '$lib/motion/precomp';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { PickMode } from '$lib/motion/clip-bar';
 
 const must = (r: OpResult): MotionDoc => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
 import { FrameEditSession, type SessionPort, type SendResult } from './frame-edit-session.svelte';
@@ -35,16 +35,16 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('the edit mode and the playhead', () => {
-  it('starts in Motion, flips to Design and back, and tells the host each time', () => {
+  it('starts in Design, flips to Motion and back, and tells the host each time', () => {
     const { session, port } = open();
 
-    expect(session.mode).toBe(EditMode.Motion);
+    expect(session.mode).toBe(EditMode.Design);
     session.toggleMode();
     session.toggleMode();
 
-    expect(port.moded).toHaveBeenNthCalledWith(1, EditMode.Design);
-    expect(port.moded).toHaveBeenNthCalledWith(2, EditMode.Motion);
-    expect(session.mode).toBe(EditMode.Motion);
+    expect(port.moded).toHaveBeenNthCalledWith(1, EditMode.Motion);
+    expect(port.moded).toHaveBeenNthCalledWith(2, EditMode.Design);
+    expect(session.mode).toBe(EditMode.Design);
   });
 
   it('opens in the mode the host remembered', () => {
@@ -109,6 +109,15 @@ describe('applying an op result', () => {
     expect(session.history.present.durationInFrames).toBe(60);
     expect(session.notice).toBe('');
     expect(port.recorded).toHaveBeenCalled();
+  });
+
+  it('an edit outside a gesture is shown on the canvas before it is saved', () => {
+    const { session, port } = open();
+
+    session.apply({ ok: true, doc: longer(60) }, 'Image adjustment');
+
+    expect(port.show).toHaveBeenLastCalledWith(session.history.present);
+    expect(port.send).not.toHaveBeenCalled();
   });
 
   it('the same summary within the coalesce window is one undo step', () => {

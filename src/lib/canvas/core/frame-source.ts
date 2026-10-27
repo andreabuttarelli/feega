@@ -1,9 +1,9 @@
 import { FrameKind, MOTION_NODE_BAR_H, docKindOf, frameChrome, holdsDoc } from '$lib/canvas/motion-node';
-import { REST_SECOND } from '$lib/motion/poster-time';
-import { stillFrame as docStill } from '$lib/motion/still';
-import type { MotionDoc } from '$lib/motion/doc';
-import type { DisplayList } from '$lib/motion/gpu-full/display-list';
-import type { Rgba } from '$lib/motion/gpu-full/rgba';
+import { restFrameOf } from '$lib/motion/poster-time';
+import { stillFrame as docStill } from '@feega/motion-core/motion/still';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
+import type { Rgba } from '@feega/motion-core/motion/gpu-full/rgba';
 import type { Box } from './canvas-scene';
 
 export type FrameTile = { id: string; kind?: string | null; x: number; y: number; w: number; h: number; rotation?: number };
@@ -29,13 +29,18 @@ export function framesOnCanvas(tiles: readonly FrameTile[], dataOf: (id: string)
   });
 }
 
-type StillDoc = Pick<MotionDoc, 'fps' | 'durationInFrames' | 'still' | 'tracks' | 'comps'>;
-
-export const stillFrame = (doc: StillDoc): number => docStill(doc) ?? Math.round(REST_SECOND * doc.fps);
+export const stillFrame = (doc: MotionDoc): number => docStill(doc) ?? restFrameOf(doc);
 
 export const frameOfLive = (live: { doc: Parameters<typeof stillFrame>[0]; playhead?: number }): number => live.playhead ?? stillFrame(live.doc);
 
-export const drawsWhole = (list: DisplayList): boolean => list.unsupported.length === 0 && list.items.length > 0;
+export const drawsAny = (list: DisplayList): boolean => list.items.length > 0;
+
+export function logGaps(id: string, list: DisplayList) {
+  if (!list.unsupported.length) {
+    return;
+  }
+  console.warn('[canvas] core left out of frame', id, list.unsupported.map((g) => `${g.clip} (${g.component}): ${g.detail ?? g.reason}`).join('; '));
+}
 
 const STAGE: Record<FrameKind, Rgba | null> = {
   [FrameKind.Frame]: [0, 0, 0, 1],

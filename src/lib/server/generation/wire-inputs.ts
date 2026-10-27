@@ -3,7 +3,7 @@ import type { WireFields } from '$lib/server/canvas/task-provider';
 
 const CONTROLLED_SCHEMA_KEYS = new Set(['aspect_ratio', 'resolution', 'duration']);
 
-export type WireInput = { prompt: string; params: GenParams; imageUrls: string[]; lastFrameUrl: string | null; videoUrls?: string[]; audioUrls?: string[] };
+export type WireInput = { prompt: string; params: GenParams; imageUrls: string[]; lastFrameUrl: string | null; maskUrl?: string | null; videoUrls?: string[]; audioUrls?: string[] };
 
 export type ListCaps = Readonly<Partial<Record<'image' | 'video' | 'audio', number>>>;
 
@@ -92,6 +92,9 @@ export function wireInputs(shape: WireShape, input: WireInput, schema: Record<st
   }
   if (fields.lastFrame && input.lastFrameUrl) {
     inputs[fields.lastFrame] = input.lastFrameUrl;
+  }
+  if (fields.mask && input.maskUrl) {
+    inputs[fields.mask] = input.maskUrl;
   }
   return inputs;
 }

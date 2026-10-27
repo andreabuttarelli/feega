@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { createMotionTools, type MotionSession, type RevisionLibrary } from './motion-tools';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;

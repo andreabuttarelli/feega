@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GenNode, ModelChoice } from './gen-node';
-import { runQuoteOf } from './run-quote';
+import { providerQuotesOf, runQuoteOf } from './run-quote';
+import { VariantInto } from './variants';
 
 const image: ModelChoice = { id: 'img', label: 'Img', provider: 'x', providerLabel: 'X', aspectRatios: ['1:1'], unitCredits: 12, maxPromptChars: 10 };
 
@@ -46,6 +47,37 @@ describe('il preventivo di un giro, lo stesso per il nodo e per la barra', () =>
   });
 });
 
+describe('the quote of variants', () => {
+  it('multiplies the price of one run by the variants the node asks for', () => {
+    const quote = runQuoteOf({ node: node({ params: { variants: 4 } }), choices: [image] });
+
+    expect(quote.credits).toBe(48);
+    expect(quote.variants).toEqual({ count: 4, into: 'nodes', counts: [1, 2, 4, 8] });
+  });
+
+  it('falls back to the choice this user made last', () => {
+    const quote = runQuoteOf({ node: node(), choices: [image], remembered: { count: 2, into: VariantInto.History } });
+
+    expect(quote.credits).toBe(24);
+    expect(quote.variants).toMatchObject({ count: 2, into: 'history' });
+  });
+
+  it('stays unknown when the price of one run is', () => {
+    const quote = runQuoteOf({ node: node({ medium: 'text', params: { variants: 4 } }), choices: [], variableTextInput: true });
+
+    expect(quote.credits).toBeNull();
+  });
+
+  it('is one run on a medium that has no variants', () => {
+    const choices = [{ ...image, id: 'txt' }];
+    const plain = runQuoteOf({ node: node({ medium: 'text', model: 'txt' }), choices });
+    const asked = runQuoteOf({ node: node({ medium: 'text', model: 'txt', params: { variants: 4 } }), choices, remembered: { count: 4, into: VariantInto.Nodes } });
+
+    expect(asked.variants).toBeNull();
+    expect(asked.credits).toBe(plain.credits);
+  });
+});
+
 describe('the quote of a 3D run', () => {
   const TRELLIS = 'wiro/microsoft/trellis-2';
   const trellis: ModelChoice = {
@@ -80,5 +112,43 @@ describe('the quote of a 3D run', () => {
     const quote = runQuoteOf({ node: model3d({ prompt: 'a teapot' }), choices: [trellis], imageChoices: [cheapImage], hasUpstreamImage: true });
 
     expect(quote.credits).toBe(30);
+  });
+});
+
+describe('the provider comparison of a run', () => {
+  const served: ModelChoice = {
+    ...image,
+    maxPromptChars: undefined,
+    unitCredits: undefined,
+    routes: [
+      { provider: 'auto', label: 'Auto (cheapest healthy)', price: { unitCredits: 8 }, stats: null },
+      { provider: 'openrouter', label: 'OpenRouter', price: { unitCredits: 10 }, stats: null },
+      { provider: 'kie', label: 'Kie.ai', price: { unitCredits: 8 }, stats: null }
+    ]
+  };
+
+  it('prices every provider for the same node, cheapest flagged', () => {
+    expect(providerQuotesOf({ node: node(), choices: [served] })).toEqual([
+      { provider: 'auto', label: 'Auto (cheapest healthy)', credits: 8, cheapest: false, selected: true },
+      { provider: 'openrouter', label: 'OpenRouter', credits: 10, cheapest: false, selected: false },
+      { provider: 'kie', label: 'Kie.ai', credits: 8, cheapest: true, selected: false }
+    ]);
+  });
+
+  it('follows the variants and marks the provider the user picked', () => {
+    const quotes = providerQuotesOf({ node: node({ params: { variants: 4, provider: 'openrouter' } }), choices: [served] });
+
+    expect(quotes.map((q) => q.credits)).toEqual([32, 40, 32]);
+    expect(quotes.find((q) => q.selected)?.provider).toBe('openrouter');
+  });
+
+  it('says nothing for a model one provider serves', () => {
+    expect(providerQuotesOf({ node: node(), choices: [image] })).toEqual([]);
+  });
+
+  it('shows the same credits as the button for the selected provider', () => {
+    const input = { node: node({ params: { variants: 2, provider: 'kie' } }), choices: [served] };
+
+    expect(providerQuotesOf(input).find((q) => q.selected)?.credits).toBe(runQuoteOf(input).credits);
   });
 });

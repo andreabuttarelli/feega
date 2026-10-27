@@ -1,4 +1,4 @@
-import { FrameKind } from '../motion-node';
+import { DocNodeType, FrameKind, docKindOf } from '../motion-node';
 import { NODE_KIND_LABEL, NameTag } from '../node-label';
 import { NODE_EMPTY_HINT } from '../node-empty';
 import { isNodeType, type NodeType } from '../node-data';
@@ -6,8 +6,10 @@ import { isUploadedNodeRow } from '../uploaded-node';
 import type { Poster } from '../poster-lod';
 import type { GenTileView } from '../gen-tile-view';
 import type { SourceTile } from '../source-thumbs';
+import { techniqueFace } from '../technique-face';
 import { selectView, type BatchView, type NodeView, type SelectView } from '../node-view';
-import { EMBED_REFUSAL_HINT, normalizeEmbedUrl, sourceOf } from '../iframe-node';
+import { EMBED_REFUSAL_HINT, frameTabIndex, normalizeEmbedUrl, sourceOf, type IframeSource } from '../iframe-node';
+import { CODE_ENTRY, Framework, isCodeFiles, isFramework } from '../code-frame';
 
 export enum Surface {
   Generate = 'generate',
@@ -35,7 +37,7 @@ export type Media = { url: string; video: boolean };
 
 export type CardRow = { lead: string; text: string; thumb: string | null; status: string | null };
 
-export type EmbedFace = { mode: 'url' | 'html'; url: string; code: string; hint: string | null; note: string | null };
+export type EmbedFace = { mode: IframeSource; tab: number; url: string; code: string; hint: string | null; note: string | null };
 
 export type CardFace = {
   surface: Surface;
@@ -104,12 +106,14 @@ const PASTE = 'Paste an address';
 
 function embedFace(d: Data): Partial<CardFace> {
   const url = str(d.url);
-  const code = str(d.html);
-  const mode = sourceOf({ url, html: code });
+  const files = isCodeFiles(d.files) ? d.files : {};
+  const framework = isFramework(d.framework) ? d.framework : Framework.React;
+  const mode = sourceOf({ url, html: str(d.html), files });
+  const code = mode === 'code' ? (files[CODE_ENTRY[framework]] ?? '') : str(d.html);
   const verdict = normalizeEmbedUrl(url);
   const refusal = url.trim() && !verdict.ok ? verdict.why : null;
   const shown = mode === 'url' && !verdict.ok;
-  return { surface: Surface.Embed, embed: { mode, url, code, hint: shown ? (refusal ?? PASTE) : null, note: mode === 'url' && verdict.ok ? EMBED_REFUSAL_HINT : null } };
+  return { surface: Surface.Embed, embed: { mode, tab: frameTabIndex(mode, framework), url, code, hint: shown ? (refusal ?? PASTE) : null, note: mode === 'url' && verdict.ok ? EMBED_REFUSAL_HINT : null } };
 }
 
 const feedTitle = (d: Data): string => (str(d.handle).trim() ? `@${str(d.handle)} · ${str(d.platform) || 'instagram'}` : 'Feed social');
@@ -145,8 +149,8 @@ const listFace: Draw = (d, asset) => {
   };
 };
 
-const motion: Draw = (d, asset, t) => {
-  const kind = str(d.kind) || FrameKind.Frame;
+const docFace = (type: DocNodeType): Draw => (d, asset, t) => {
+  const kind = docKindOf(type, d.kind);
   const live = str(d.lastRenderAssetId);
   const rev = typeof d.docHeadRevision === 'number' && d.docHeadRevision ? `Rev ${d.docHeadRevision}` : 'Empty';
   return {
@@ -163,8 +167,8 @@ const FACES: Record<NodeType, Draw> = {
   video: generate(true),
   audio: textGenerate,
   model3d: (d, asset, t) => ({ ...generate(false)(d, asset, t), media: str(d.posterRefId) ? { url: asset(str(d.posterRefId)), video: false } : null }),
-  motion,
-  element: motion,
+  motion: docFace(DocNodeType.Motion),
+  element: docFace(DocNodeType.Element),
   doc: (d) => ({ surface: Surface.Doc, text: str(d.content), pills: ['Read', 'Write'], count: d.public === true ? 'Revoke' : 'Public link' }),
   iframe: embedFace,
   social_account_feed: preview(feedTitle, 'Select the node to choose the account.', 'No posts yet. Select the node to sync.', (d) => str(d.handle).trim() !== ''),
@@ -178,7 +182,8 @@ const FACES: Record<NodeType, Draw> = {
   composition: (d, asset) => ({ surface: Surface.Effects, media: ref(d) ? { url: asset(ref(d)!), video: true } : null, empty: COMPOSITION_EMPTY, actions: [COMPONENT, OPEN_EDITOR] }),
   calendar: hollow('calendar'),
   studio_batch: (_d, _a, _t, view) => ({ surface: Surface.Pick, title: 'Open Photo studio', batch: view?.batch ?? null }),
-  section: (d) => ({ surface: Surface.Section, title: str(d.title) || 'Section', tint: str(d.fill) || null })
+  section: (d) => ({ surface: Surface.Section, title: str(d.title) || 'Section', tint: str(d.fill) || null }),
+  technique: (d, _a, _t, view) => techniqueFace(str(d.name), view?.technique ?? null)
 };
 
 const BLANK: CardFace = {

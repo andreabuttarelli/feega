@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FillType, fillsSchema, type Fill } from './model';
-import { Source, ValueKind } from '../keyframes';
-import { MotionFormat, newMotionDoc } from '../doc';
-import { Ease } from '../design';
-import { addClip, setKeyframes } from '../timeline';
+import { FillType, fillsSchema, type Fill } from '@feega/motion-core/motion/fill/model';
+import { Source, ValueKind } from '@feega/motion-core/motion/keyframes';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { Ease } from '@feega/motion-core/motion/design';
+import { addClip, setKeyframes } from '@feega/motion-core/motion/timeline';
 import { keyLanes } from '../timeline-view';
-import { withParams } from '../custom/params';
-import { applyFillKeys, fillKey, fillOfKey, fillProps, FillField, splitFillEdit } from './keys';
+import { withParams } from '@feega/motion-core/motion/custom/params';
+import { applyFillKeys, fillKey, fillOfKey, fillProps, FillField, splitFillEdit } from '@feega/motion-core/motion/fill/keys';
 
 const stack = (raw: unknown[]): Fill[] => fillsSchema.parse(raw);
 const linear = stack([{ type: FillType.Linear, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }], angle: 90 }]);

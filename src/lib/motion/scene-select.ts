@@ -1,10 +1,10 @@
-import { findClip, type MotionClip, type MotionDoc } from './doc';
-import type { Box } from './layout';
-import type { Transform, TransformKey } from './keyframes';
-import { IDENTITY, apply2d, decomposeLocal, invert2d, localAt, pivotBox, pivotOf, transformAt, worldAt, type Affine, type Size } from './parent';
-import { setKeyframe, setTransform, type OpResult } from './timeline';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { Box } from '@feega/motion-core/motion/layout';
+import type { Transform, TransformKey } from '@feega/motion-core/motion/keyframes';
+import { IDENTITY, apply2d, decomposeLocal, invert2d, localAt, pivotBox, pivotOf, transformAt, worldAt, type Affine, type Size } from '@feega/motion-core/motion/parent';
+import { setKeyframe, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { propsOwner, toShown, unitOf } from './units';
-import type { ComponentId } from './components';
+import type { ComponentId } from '@feega/motion-core/motion/components';
 
 export type Pt = [number, number];
 export type Quad = [Pt, Pt, Pt, Pt];

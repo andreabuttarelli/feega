@@ -1,4 +1,4 @@
-import { corner, distance, type Outline, type Pt, type Vertex } from './geometry';
+import { corner, distance, type Outline, type Pt, type Vertex } from '@feega/motion-core/motion/shape/geometry';
 
 const SIMPLIFY_TOLERANCE = 2;
 const HANDLE_SHARE = 1 / 6;

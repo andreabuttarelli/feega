@@ -7,7 +7,7 @@ import { saveMotionDoc } from '$lib/server/motion/editor';
 import { MOTION_START_DEPS, startMotion, type MotionStart } from '$lib/server/motion/start';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { composeEditorPath, draftFromDoc } from '$lib/motion/composition-draft';
-import type { AssetRef, MotionDoc } from '$lib/motion/doc';
+import type { AssetRef, MotionDoc } from '@feega/motion-core/motion/doc';
 import { swapAssetIds, type GalleryAsset } from '$lib/gallery/model';
 import { exposeMainFields } from '$lib/gallery/remix-fields';
 import { downloadFile, isGalleryFile, storeRemixFile, type FileBytes } from './files';

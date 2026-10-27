@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import type { Boxes } from '$lib/motion/scene-select';
   import { outlinePaths } from '$lib/motion/outline-view';
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PRODUCT_SCREENS_RULE, TEMPLATE_SECTIONS_RULE, motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { HOUSE_DEFAULTS, STYLES, TITLE_CARD_RULE, TITLE_TYPE_RULE, UI_FOCUS_RULE } from '$lib/motion/style';
-import { MotionStyle } from '$lib/motion/style-model';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
 import { LOOP_RULE } from '$lib/motion/loop';
 
 const prompt = (style: MotionStyle) =>

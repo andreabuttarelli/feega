@@ -1,9 +1,9 @@
-import { TrackKind } from './components';
-import { Ease, TransitionKind } from './design';
-import { MotionFormat, parseMotionDoc, type MotionComp, type MotionDoc } from './doc';
-import { RING_LAYOUT, Spin, type RingCard } from './ring/model';
-import { FillKind, ShapeKind, StrokeKind, modifierKey } from './shape/schema';
-import { ModifierKind } from './shape/modifiers';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
+import { MotionFormat, parseMotionDoc, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { RING_LAYOUT, Spin, type RingCard } from '@feega/motion-core/motion/ring/model';
+import { FillKind, ShapeKind, StrokeKind, modifierKey } from '@feega/motion-core/motion/shape/schema';
+import { ModifierKind } from '@feega/motion-core/motion/shape/modifiers';
 import { assemble, edge, s, type Beat, type TrackSpec } from './template-kit';
 
 export const UI_RING_SECONDS = 16;

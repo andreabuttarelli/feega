@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { TEXT_SIZINGS } from '$lib/motion/text-sizing';
-import { Background, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+import { TEXT_SIZINGS } from '@feega/motion-core/motion/text-sizing';
+import { Background, formatOf, type MotionDoc, type MotionFormat } from '@feega/motion-core/motion/doc';
 import type { Db } from '$lib/server/db/client';
 import { createNode, deleteConnection, deleteNode, findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
@@ -9,15 +9,15 @@ import { DocNodeType, FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeO
 import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { gradientFillSchema } from '$lib/motion/fill/model';
-import { FILL_RULES } from '$lib/motion/shape/schema';
+import { gradientFillSchema } from '@feega/motion-core/motion/fill/model';
+import { FILL_RULES } from '@feega/motion-core/motion/shape/schema';
 import { frameShape } from './start';
-import { figmaPlan, type FigmaImage, type PlanItem } from '$lib/canvas/figma/figma-doc';
+import { figmaPlan, type FigmaImage, type FigmaPlan, type PlanItem } from '$lib/canvas/figma/figma-doc';
 import { Destination } from '$lib/canvas/figma/scene';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
-import { saveMotionDoc } from './editor';
-import { DocMode, docMode } from '$lib/motion/still';
+import { commitOnto } from './frame-ops';
+import { DocMode, docMode } from '@feega/motion-core/motion/still';
 import { DropOn, OutputKind, clipCentre, elementBox, frameOf, liftElement, linkOutput, mediaElement, placeElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
 import { RevisionOutcome, appendRevision, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { UndoItem } from '$lib/canvas/undo-plan';
@@ -468,7 +468,7 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
       const saved = await savedMotion(db, { orgId, nodeId });
       return inScope(saved ? { nodeId, projectId: saved.project.id, canvasId: saved.record.canvasId, version: saved.version, doc: saved.doc, kind: saved.node.kind, stage: stageOf(saved.record, saved.doc), row: rowOf(saved.record), at: { x: saved.record.position.x, y: saved.record.position.y } } : null);
     },
-    write: (nodeId, expectedVersion, doc, summary) => saveMotionDoc(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
+    write: (nodeId, expectedVersion, doc, summary) => commitOnto(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
     create: async (at, doc, shape) => {
       const { type, data, ...size } = shape ?? frameShape(doc);
       const node = await createNode(db, { id: at.id, orgId, projectId: at.projectId, canvasId: at.canvasId, type, x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...size, data: { ...atFirstRevision(data), format: formatOf(doc) }, actor });
@@ -533,7 +533,10 @@ const hexColour = z.string().regex(/^#[0-9a-f]{6}$/i);
 const drawnBox = z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse, DrawTool.Polygon, DrawTool.Star]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional(), sizing: z.enum(TEXT_SIZINGS).optional() }).strict();
 const drawnPen = z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(1).max(20_000) }).strict();
 
-export const drawnSchema = z.discriminatedUnion('tool', [drawnBox, drawnPen]);
+const canvasPoint = z.object({ x: z.number().finite(), y: z.number().finite() }).strict();
+const drawnLine = z.object({ tool: z.enum([DrawTool.Line, DrawTool.Arrow]), from: canvasPoint, to: canvasPoint, stroke: hexColour.optional(), theme: z.enum(CanvasTheme).optional() }).strict();
+
+export const drawnSchema = z.discriminatedUnion('tool', [drawnBox, drawnPen, drawnLine]);
 
 export const pastedSchema = z.discriminatedUnion('tool', [
   drawnBox.extend({ text: z.string().min(1).max(PASTED_TEXT_MAX).optional(), color: hexColour.optional(), weight: z.number().int().min(PASTED_WEIGHT.min).max(PASTED_WEIGHT.max).optional() }),
@@ -576,9 +579,10 @@ const ITEM_SHAPE: Record<Destination, (item: PlanItem) => DocNodeShape> = {
 
 export async function pasteFigmaAt(store: FrameStore, place: Place, html: string, centre: Point, newId: NewId): Promise<FigmaPasteOutcome> {
   const plan = figmaPlan(html, newId);
-  if (!plan) {
-    return null;
-  }
+  return plan ? placeFigmaPlan(store, place, plan, centre) : null;
+}
+
+export async function placeFigmaPlan(store: FrameStore, place: Place, plan: FigmaPlan, centre: Point): Promise<NonNullable<FigmaPasteOutcome>> {
   const frameIds: string[] = [];
   const undo: UndoItem[] = [];
   const fills: FigmaFill[] = [];

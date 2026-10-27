@@ -1,8 +1,8 @@
-import type { BrandTokens } from '$lib/motion/brand';
-import type { MotionDoc } from '$lib/motion/doc';
-import { prepare, textBoxesAt, type TextBox } from '$lib/motion/gpu-full/display-list';
-import { loadFonts } from '$lib/motion/gpu-full/text/load';
-import { Smoothing } from '$lib/motion/gpu-full/text/painter';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { prepare, textBoxesAt, type TextBox } from '@feega/motion-core/motion/gpu-full/display-list';
+import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
+import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { fitTexts, freeTextFit, hostFit } from '$lib/motion/text-fit';
 import { FrameKind } from './motion-node';
 import { ResizeMode, fitToNode } from '$lib/motion/custom-size';
@@ -32,4 +32,16 @@ export async function measuredTexts(doc: MotionDoc, tokens: BrandTokens, assets:
   const fonts = await loadFonts(doc, assets, tokens);
   const boxes = textBoxesAt(prepare(doc, tokens, assets, { fonts, smoothing: Smoothing.Plain }), stillFrame(doc));
   return textAutosize(doc, boxes, kind, node);
+}
+
+export type FitTargets = { amend: (doc: MotionDoc) => void; show: (doc: MotionDoc) => void; place: (node: NodeSize) => void };
+
+export function applyTextFit(fit: TextFit, to: FitTargets): void {
+  if (fit.doc) {
+    to.amend(fit.doc);
+    to.show(fit.doc);
+  }
+  if (fit.node) {
+    to.place(fit.node);
+  }
 }

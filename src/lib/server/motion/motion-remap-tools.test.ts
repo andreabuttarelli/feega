@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { REMAP_KEY, isRemapped } from '$lib/motion/time-remap';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { REMAP_KEY, isRemapped } from '@feega/motion-core/motion/time-remap';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 function setup() {

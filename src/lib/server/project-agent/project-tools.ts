@@ -7,6 +7,7 @@ import { chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames
 import { templateLibrary } from '$lib/server/motion/templates';
 import { toolsOf } from '$lib/server/edit/tool-row';
 import { projectRows } from '$lib/server/edit/project-rows';
+import { Surface, compactWrite, touchedOf } from '$lib/server/edit/compact-result';
 
 /**
  * I TOOL DI PROGETTO E TELA. Sempre presenti, anche senza brand.
@@ -32,6 +33,16 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
     'Change some fields of a node\'s data on THIS project. Send only the fields to change: the rest is kept, and a field set to null is removed. `params` and `filters` merge one level down; arrays replace whole. Returns { outcome: "invalid" } when the merged data breaks the node schema.',
   move_node:
     'Move a node on its canvas. Position only: last-write-wins, does not touch node data or version.',
+  align_nodes:
+    'Align the picked nodes of a canvas of THIS project to an edge or centre line of their shared bounds (left, center, right, top, middle, bottom). Same as the align buttons in the app.',
+  distribute_nodes:
+    'Spread 3 or more nodes of a canvas of THIS project with equal gaps along x or y. The outer two stay in place.',
+  tidy_nodes:
+    'Untangle overlapping nodes of a canvas of THIS project with the smallest moves, as Tidy up in the app.',
+  stack_nodes:
+    'Line the picked nodes up in a row or column (the longer spread decides) with a gap, as Stack in the app.',
+  undo_last:
+    'Revert your last write on a canvas of THIS project: create, update, delete or a line, together with the writes made in the same instant. Refused when someone changed the node since. Moves are not recorded: put a node back with move_node. Calling it twice undoes the undo.',
   connect_nodes:
     'Connect two nodes on one canvas of THIS project. The edge is directed: source feeds target. Refused when the target node uses an uncensored model — those take no inputs of any kind, ever: switch the model first. Also refused when the source medium does not feed the target — an audio node only takes what its current operation needs (describe_node_types type "audio" lists them).',
   move_frame_element:
@@ -80,10 +91,13 @@ const GENERIC_DESCRIPTION = [
   `Ops: ${GENERIC_OPS.map((name) => `${name} {${fieldsOf(CANVAS_OPS[name].input)}}`).join(';')}.`
 ].join(' ');
 
+const shown = (name: CanvasOpName, input: unknown, result: unknown) =>
+  CANVAS_OPS[name].access === Access.Write ? compactWrite(result, { surface: Surface.ChatCanvas, touched: touchedOf(input) }) : result;
+
 function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
   const own = Object.entries(CHAT_TOOL_OPS).map(([name, description]) => {
     const op = CANVAS_OPS[name as CanvasOpName];
-    return [name, tool({ description, inputSchema: op.input, execute: (input: unknown) => op.run(ctx, input as never) })];
+    return [name, tool({ description, inputSchema: op.input, execute: async (input: unknown) => shown(name as CanvasOpName, input, await op.run(ctx, input as never)) })];
   });
 
   const generic = tool({
@@ -94,7 +108,7 @@ function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
       if (!parsed.success) {
         return { error: 'invalid_input', issues: parsed.error.issues };
       }
-      return CANVAS_OPS[op].run(ctx, parsed.data as never);
+      return shown(op, input, await CANVAS_OPS[op].run(ctx, parsed.data as never));
     }
   });
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import FrameInspectorPanel from './FrameInspectorPanel.svelte';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -58,11 +58,12 @@ describe('frame inspector panel', () => {
     expect(render(FrameInspectorPanel, { props: { session: null, tokens: FEEGA_TOKENS } }).body).toContain('data-testid="properties-empty"');
   });
 
-  it('shows the motion inspector and the clip bar for one element', () => {
+  it('shows the motion inspector with its actions in the header, not a clip bar strip, for one element', () => {
     const body = html(['a']);
 
     expect(body).toContain('data-testid="frame-inspector"');
-    expect(body).toContain('data-testid="clip-bar"');
+    expect(body).toContain('data-testid="header-actions"');
+    expect(body).not.toContain('data-testid="clip-bar"');
   });
 
   it('shows the inspector for several elements', () => {

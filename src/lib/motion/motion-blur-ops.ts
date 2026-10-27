@@ -1,6 +1,6 @@
-import { findClip, type MotionDoc } from './doc';
-import { motionBlurSchema, type MotionBlur } from './motion-blur';
-import type { OpResult } from './timeline';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { motionBlurSchema, type MotionBlur } from '@feega/motion-core/motion/motion-blur';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 export function setMotionBlur(doc: MotionDoc, patch: Partial<MotionBlur>): OpResult {
   const parsed = motionBlurSchema.safeParse({ ...doc.motionBlur, ...patch });

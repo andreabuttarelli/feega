@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { FRAME_RATES, type FrameRate } from './design';
-import type { MotionDoc } from './doc';
+import { FRAME_RATES, type FrameRate } from '@feega/motion-core/motion/design';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { Resolution } from './render-quote';
 import { MAX_RENDER_SIDE, outputSize } from './export-plan';
 

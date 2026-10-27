@@ -1,12 +1,12 @@
-import { clipsOf, type MotionClip, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
+import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { writeComponent } from '../custom/ops';
 import { registerFont } from '../fonts/ops';
-import type { CatalogueFont } from '../fonts/model';
-import { springMath } from '../spring';
+import type { CatalogueFont } from '@feega/motion-core/motion/fonts/model';
+import { springMath } from '@feega/motion-core/motion/spring';
 import { reelMath, type MorphKind, type ReelPlan } from './reel';
 import { seamProblems } from './seam';
-import { MotionStyle } from '../style-model';
+import { MotionStyle } from '@feega/motion-core/motion/style-model';
 import { REEL_COMPONENT, REEL_FONT, REEL_PIECE } from './piece';
 
 export type ReelRequest = { states: readonly MorphKind[]; bpm: number; offset: number; pace: number; props: Record<string, string | number> };

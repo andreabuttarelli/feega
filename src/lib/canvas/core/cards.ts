@@ -1,4 +1,4 @@
-import type { Item } from '$lib/motion/gpu-full/display-list';
+import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
 import { Surface, type CardFace } from '$lib/canvas/gpu/card-face';
 import type { Glyphs } from './chrome';
@@ -9,7 +9,7 @@ import { embedItems } from './embed-card';
 import { batchItems, effectsItems } from './media-card';
 import { selectItems } from './select-card';
 import { personItems, previewItems } from './source-card';
-import { genBody, genItems, genMark } from './gen-card';
+import { genBody, genItems, genMatte } from './gen-card';
 import { BODY_SIZE, BORDER, CardPart, DONE, ERROR, FOOTER_LINES, Fit, HEAD_H, HEAD_SIZE, PAD, ROW_GAP, ROW_H, ROW_THUMB, DOT_RADIUS, PILL_H, PILL_PAD, PROMPT_HINT, RUNNING, AUTO_MODEL, STAGE, STATUS_RADIUS, STATUS_TEXT_GAP, THUMB_GAP, at, body, image, panel, text, whole, type CardIcons, type CoreCard, type Ctx } from './card-kit';
 
 export { CardPart, type CoreCard };
@@ -22,9 +22,9 @@ function live(x: Ctx): Item[] | null {
   if (!gen || !icons) {
     return null;
   }
-  const media = c.face.media && gen.state === 'done' ? [image(x, CardPart.Media, c.face.media, genBody(c, gen), Fit.Contain)] : [];
+  const media = c.face.media && gen.state === 'done' ? [{ ...image(x, CardPart.Media, c.face.media, genBody(c, gen), Fit.Contain), matte: { items: [genMatte(c, gen)], luma: false, invert: false } }] : [];
   const kit = { theme: x.theme, glyphs: x.glyphs, bold: x.bold, icons };
-  return [...genItems(c, gen, kit), ...media, ...genMark(c, gen, kit)];
+  return [...genItems(c, gen, kit), ...media];
 }
 
 function generate(x: Ctx): Item[] {
@@ -58,7 +58,10 @@ function frame(x: Ctx): Item[] {
   const { c } = x;
   const stage = { x: 0, y: 0, w: c.w, h: Math.max(1, c.h - MOTION_NODE_BAR_H) };
   const media = c.face.live ? { url: c.face.live, video: true } : c.face.media;
-  return [...panel(x, false), solid(x.clip(CardPart.Stage), at(c, [rect(stage.x, stage.y, stage.w, stage.h)]), STAGE), ...(media ? [image(x, CardPart.Media, media, stage, Fit.Contain)] : [])];
+  if (!media) {
+    return panel(x, false);
+  }
+  return [...panel(x, false), solid(x.clip(CardPart.Stage), at(c, [rect(stage.x, stage.y, stage.w, stage.h)]), STAGE), image(x, CardPart.Media, media, stage, Fit.Contain)];
 }
 
 const markdownText = (md: string) => md.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/^#{1,6}\s+/gm, '').replace(/^\s*[-*]\s+/gm, '• ').replace(/[*_`>]/g, '');

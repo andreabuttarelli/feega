@@ -1,5 +1,5 @@
-import { BlendMode } from './blend';
-import type { Item } from './gpu-full/display-list';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 
 export function commonGap(item: Item): string | null {
   if (item.blend !== BlendMode.Normal) {

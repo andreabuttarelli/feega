@@ -10,6 +10,11 @@ import { motionBundles } from './scripts/motion-bundles';
 import { motionLibs } from './scripts/motion-libs';
 import { changelogEntries } from './scripts/changelog-entries';
 
+const libsSource = async (id: string): Promise<string | null> => {
+  const load = motionLibs().load as (id: string) => Promise<string | null>;
+  return load(`\0${id}`);
+};
+
 /** Worktree `node_modules` is often a symlink into another checkout; Vite resolves it and
  *  rejects the real path unless it is on the allow list. */
 const nodeModulesReal = (() => {
@@ -60,8 +65,8 @@ export default defineConfig({
     org: "021-6z",
     project: "021-1m",
     autoInstrument: { load: false, serverLoad: true }
-  }), sveltekit(), tailwindcss(), devCrons(), motionBundles(), motionLibs(), changelogEntries()],
-  worker: { format: 'es', plugins: () => [motionBundles(), motionLibs()] },
+  }), sveltekit(), tailwindcss(), devCrons(), motionBundles(libsSource), motionLibs(), changelogEntries()],
+  worker: { format: 'es', plugins: () => [motionBundles(libsSource), motionLibs()] },
   // Modern baselines: skip legacy transforms (e.g. Array.from) that PSI flags as unused
   // on current Chrome/Safari/Firefox. Aligns with "Baseline widely available" guidance.
   build: {
@@ -102,6 +107,7 @@ export default defineConfig({
       'src/**/*.{test,spec}.{js,ts}',
       'packages/*/src/**/*.{test,spec}.{js,ts}',
       'packages/*.{test,spec}.{js,ts}',
+      'npx/**/*.test.mjs',
       'scripts/**/*.{test,spec}.{js,ts}',
       'docker/**/*.{test,spec}.{js,mjs,ts}',
       // I test della CLI sono scritti per `bun:test` e giravano solo se qualcuno lanciava

@@ -4,6 +4,8 @@
   import { page } from '$app/stores';
   import { navigating } from '$app/state';
   import CookieBanner from '$lib/components/CookieBanner.svelte';
+  import { LocalOff, localOff } from '$lib/local-user';
+  import { env as publicEnv } from '$env/dynamic/public';
   import TermsUpdateNotice from '$lib/components/TermsUpdateNotice.svelte';
   import HowFeegaWorks from '$lib/components/onboarding/HowFeegaWorks.svelte';
   import { TourState, tourShowsOn } from '$lib/onboarding/tour';
@@ -174,8 +176,8 @@
 
 {@render children()}
 {#if perfHud}{@const PerfHud = perfHud}<PerfHud />{/if}
-{#if !isBlog}<CookieBanner />{/if}
-{#if !isBlog && data?.session}<TermsUpdateNotice version={data.termsNoticeVersion ?? null} />{/if}
+{#if !isBlog && !localOff(LocalOff.CookieBanner, publicEnv)}<CookieBanner />{/if}
+{#if !isBlog && data?.session && !localOff(LocalOff.TermsNotice, publicEnv)}<TermsUpdateNotice version={data.termsNoticeVersion ?? null} />{/if}
 {#if data?.session && tourShowsOn($page.url.pathname)}<HowFeegaWorks tour={data.tour ?? TourState.Seen} />{/if}
 
 <style>

@@ -1,8 +1,8 @@
-import type { MotionDoc } from '../doc';
-import type { Box } from '../layout';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { Box } from '@feega/motion-core/motion/layout';
 import type { Bounds } from '../scene-select';
-import type { OpResult } from '../timeline';
-import { AUTO_COUNT, GuideAlign, GuideKind, MAX_LAYOUT_GUIDES, layoutGuideSchema, type LayoutGuide } from './model';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { AUTO_COUNT, GuideAlign, GuideKind, MAX_LAYOUT_GUIDES, layoutGuideSchema, type LayoutGuide } from '@feega/motion-core/motion/layout-guides/model';
 
 export { GuideAlign, GuideKind, type LayoutGuide };
 
@@ -27,12 +27,16 @@ const STARTS_AT: Record<GuideAlign, (guide: LayoutGuide, span: number, total: nu
   [GuideAlign.Center]: (_guide, span, total) => (span - total) / 2
 };
 
-function countOf(guide: LayoutGuide, span: number): number {
-  if (guide.count !== AUTO_COUNT) {
-    return guide.count;
-  }
+function sectionsThatFit(guide: LayoutGuide, span: number): number {
   const fits = Math.floor((AVAILABLE[guide.align](guide, span) + guide.gutter) / (guide.size + guide.gutter));
   return Math.max(1, Math.min(MAX_AUTO_BANDS, fits));
+}
+
+function countOf(guide: LayoutGuide, span: number): number {
+  if (guide.count === AUTO_COUNT) {
+    return sectionsThatFit(guide, span);
+  }
+  return guide.align === GuideAlign.Stretch ? guide.count : Math.min(guide.count, sectionsThatFit(guide, span));
 }
 
 function bandsAlong(guide: LayoutGuide, span: number): [number, number][] {
@@ -62,10 +66,15 @@ export function guideLines(guide: LayoutGuide, frame: Size): GuideLine[] {
   return [...every(guide.size, frame.width).map((at) => ({ axis: 'x' as const, at })), ...every(guide.size, frame.height).map((at) => ({ axis: 'y' as const, at }))];
 }
 
-export function guideSnapBounds(doc: Pick<MotionDoc, 'layoutGuides' | 'width' | 'height'>): Bounds[] {
-  return (doc.layoutGuides ?? [])
-    .flatMap((g) => guideBands(g, doc))
-    .map((b) => ({ left: b.left, top: b.top, right: b.left + b.width, bottom: b.top + b.height }));
+const lineBounds = (line: GuideLine, frame: Size): Bounds =>
+  line.axis === 'x' ? { left: line.at, top: 0, right: line.at, bottom: frame.height } : { left: 0, top: line.at, right: frame.width, bottom: line.at };
+
+export function guideSnapBounds(doc: Pick<MotionDoc, 'layoutGuides' | 'userGuides' | 'width' | 'height'>): Bounds[] {
+  const guides = doc.layoutGuides ?? [];
+  const bands = guides.flatMap((g) => guideBands(g, doc)).map((b) => ({ left: b.left, top: b.top, right: b.left + b.width, bottom: b.top + b.height }));
+  const lines = guides.flatMap((g) => guideLines(g, doc)).map((l) => lineBounds(l, doc));
+  const pulled = (doc.userGuides ?? []).map((g) => lineBounds(g, doc));
+  return [...bands, ...lines, ...pulled];
 }
 
 export function setLayoutGuides(doc: MotionDoc, guides: readonly LayoutGuide[]): OpResult {

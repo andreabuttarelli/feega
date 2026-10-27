@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, addTrack, setKeyframe, setTransform, type OpResult } from './timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, addTrack, setKeyframe, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { setParent } from './parent-ops';
-import { TrackKind } from './components';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { Grip, Modifier, PickMode, aabb, pickModeAt, dragPatch, handlesOf, pick, quadOf, readout, remeasured, snapMove, spacing, stackAt, writePatch, type Boxes } from './scene-select';
 
 function must(r: OpResult): MotionDoc {

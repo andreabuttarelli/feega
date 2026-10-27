@@ -1,6 +1,6 @@
 import { resizeFrame } from './constraints/constraints';
-import type { MotionDoc } from './doc';
-import type { CanvasSize, OpResult } from './timeline';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { CanvasSize, OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum FramePreset {
   Phone = 'phone',

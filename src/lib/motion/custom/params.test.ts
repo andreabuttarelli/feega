@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { installEngine, testTimeline } from '../engine/testing';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setKeyframes, setProps, type OpResult } from '../timeline';
-import { Ease } from '../design';
-import { FEEGA_TOKENS } from '../brand';
-import { composeHtml } from '../hyperframes/compose';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Ease } from '@feega/motion-core/motion/design';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { clipFieldGroups, valueAt } from '../inspector';
-import { Control } from '../components';
+import { Control } from '@feega/motion-core/motion/components';
 import { writeComponent } from './ops';
-import { extractParams, withParams } from './params';
-import { ERRORS, REGISTRY, bootScript, definitionScript, seedOf } from './runtime';
+import { extractParams, withParams } from '@feega/motion-core/motion/custom/params';
+import { ERRORS, REGISTRY, bootScript, definitionScript, seedOf } from '@feega/motion-core/motion/custom/runtime';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

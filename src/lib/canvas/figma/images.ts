@@ -1,6 +1,6 @@
-import { clipProps, type MotionClip, type MotionDoc, type MotionTrack } from '$lib/motion/doc';
-import { Strictness } from '$lib/motion/custom/component';
-import { FillType, ImageFit } from '$lib/motion/fill/model';
+import { clipProps, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { Strictness } from '@feega/motion-core/motion/custom/component';
+import { FillType, ImageFit } from '@feega/motion-core/motion/fill/model';
 import type { FigmaImage } from './figma-doc';
 
 export type ImageAssets = Record<string, string>;

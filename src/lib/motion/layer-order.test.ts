@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { arrangeLayers, Arrange } from './layer-order';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, addTrack, type OpResult } from './timeline';
-import { TrackKind } from './components';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, addTrack, type OpResult } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { layerOrder } from './siblings';
 
 const ok = (r: OpResult): MotionDoc => {

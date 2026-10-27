@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENTS } from '../../components';
-import { boxOf } from '../../layout';
-import { apply2d } from '../../affine';
-import { LIST_STEP_EM, MARKER_GAP_EM } from '../../text-lists';
-import { paintText, Smoothing, type Ink, type TextEnv } from './painter';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { boxOf } from '@feega/motion-core/motion/layout';
+import { apply2d } from '@feega/motion-core/motion/affine';
+import { LIST_STEP_EM, MARKER_GAP_EM } from '@feega/motion-core/motion/text-lists';
+import { paintText, Smoothing, type Ink, type TextEnv } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { UPM, WIDE, boxBook } from './test-face';
 
 const stage = { width: 1920, height: 1080 };

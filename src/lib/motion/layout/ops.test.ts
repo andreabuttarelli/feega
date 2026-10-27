@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { Align, Direction, Sizing, TrackType } from './auto-layout';
-import { autoLayoutPatchSchema, layoutItemPatchSchema } from './model';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Align, Direction, Sizing, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
+import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
 import { addAutoLayout, leaveAutoLayout, reorderChild, removeAutoLayout, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from './ops';
-import { withAutoLayout } from './resolve';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { layerOrder } from '../siblings';
 
 function must(r: OpResult): MotionDoc {
@@ -23,6 +23,19 @@ const row = (() => {
 })();
 
 const clip = (doc: MotionDoc, id: string) => findClip(doc, id)!.clip;
+
+describe('a new auto layout container', () => {
+  it('counts inside strokes explicitly', () => {
+    expect(clip(must(setAutoLayout(row, 'a', {})), 'a').autoLayout?.strokesIncluded).toBe(true);
+    expect(clip(must(wrapInAutoLayout(row, ['a', 'b'], 'box', 'lane')), 'box').autoLayout?.strokesIncluded).toBe(true);
+  });
+
+  it('keeps the choice of an existing container', () => {
+    const off = must(setAutoLayout(row, 'a', { strokesIncluded: false }));
+
+    expect(clip(must(setAutoLayout(off, 'a', { gap: 4 })), 'a').autoLayout?.strokesIncluded).toBe(false);
+  });
+});
 
 describe('wrapInAutoLayout', () => {
   const wrapped = must(wrapInAutoLayout(row, ['b', 'k', 'a'], 'box', 'lane'));

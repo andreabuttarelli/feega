@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { offsetOf, pointAt, select, selectionIn, textOf } from './editable-text';
-import { textBody, TextBodyFor } from '$lib/motion/hyperframes/text-body';
-import { ListKind } from '$lib/motion/text-lists';
+import { textBody, TextBodyFor } from '@feega/motion-core/motion/hyperframes/text-body';
+import { ListKind } from '@feega/motion-core/motion/text-lists';
 
 function editor(text: string, lists = [null, { kind: ListKind.Bullet, level: 0 }, null]) {
   const root = document.createElement('div');

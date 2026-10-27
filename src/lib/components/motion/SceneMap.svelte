@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { sceneMap } from '$lib/motion/scene-map';
 
   let { doc, frame, selected = null, onpick }: { doc: MotionDoc; frame: number; selected?: string | null; onpick?: (clipId: string) => void } = $props();

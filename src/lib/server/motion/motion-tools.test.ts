@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { AssetKind } from '$lib/motion/components';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { AssetKind } from '@feega/motion-core/motion/components';
 import { createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { MAX_VIEWS_PER_TURN } from './frames';
 
@@ -251,6 +251,17 @@ describe('motion agent tools', () => {
     expect(out.blocking.some((q) => q.includes('jumps to the first'))).toBe(false);
   });
 
+  it('view_frames blocks a canvas that vanishes right after a cut', async () => {
+    const probe = async (times: number[]) => times.map((time, i) => ({ time, luma: 20, lumaStd: i % 6 === 0 || i % 6 === 5 ? 20 : 4.5, whiteShare: 0 }));
+    const { run } = setup({ probe, inspect: async (frames) => frames.map((f) => ({ time: f.time, luma: 120, lumaStd: 40, whiteShare: 0 })) });
+    await run('add_clip', { component: 'Title', start: 0, duration: 2, props: { text: 'One' } });
+    await run('add_clip', { component: 'Title', start: 2, duration: 2, props: { text: 'Two' } });
+
+    const out = (await run('view_frames', { times: [1] })) as { blocking: string[] };
+
+    expect(out.blocking.some((q) => q.includes('vanishes'))).toBe(true);
+  });
+
   it('view_frames takes at most six times', () => {
     const { schema } = setup();
 
@@ -401,5 +412,33 @@ describe('render_video', () => {
     await run('render_video', { quality: 'max' });
 
     expect(renderLink.mock.calls).toEqual([['high'], ['max']]);
+  });
+});
+
+describe('component variants through the agent', () => {
+  async function withButton() {
+    const ctx = setup();
+    await ctx.run('add_clip', { component: 'Text', start: 0, duration: 2, props: { text: 'Buy now' } });
+    const made = await ctx.run('component', { action: 'create', clip_ids: ['id1'], name: 'Button' });
+    return { ...ctx, comp: String(made.comp), instance: String(made.clip_id) };
+  }
+
+  it('define-variant builds the matrix and set-variant switches an instance on two axes', async () => {
+    const { run, session, comp, instance } = await withButton();
+
+    expect((await run('component', { action: 'define-variant', comp, prop: 'Size', values: ['S', 'L'] })).ok).toBe(true);
+    expect((await run('component', { action: 'define-variant', comp, prop: 'State', values: ['default', 'hover'] })).ok).toBe(true);
+    expect((await run('component', { action: 'set-variant', clip_id: instance, variant: { Size: 'L', State: 'hover' } })).ok).toBe(true);
+
+    const picked = String(findClip(session.doc, instance)?.clip.props.comp);
+    expect(session.doc.comps[picked].component?.variant).toEqual({ Size: 'L', State: 'hover' });
+  });
+
+  it('set-preferred stores the suggested swaps of an instance-swap property', async () => {
+    const { run, session, comp } = await withButton();
+    const out = await run('component', { action: 'set-preferred', comp, prop: 'Nope', preferred: [comp] });
+
+    expect(out.ok).toBe(false);
+    expect(session.doc.comps[comp].component?.properties).toBeUndefined();
   });
 });

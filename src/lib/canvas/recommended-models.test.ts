@@ -6,6 +6,7 @@ import {
   RECOMMENDATION_EXCLUSIONS,
   type CandidateModel
 } from './recommended-models';
+import { IMAGE_TOOL_MODEL, ImageTool } from '$lib/image-tools';
 
 const NOW = new Date('2026-09-29T00:00:00Z');
 
@@ -86,6 +87,16 @@ describe('recommend', () => {
     ], NOW);
 
     expect(tier(list, 'balanced')).not.toBe('unknown');
+  });
+
+  it('an image tool is never recommended as an image generator', () => {
+    const list = recommend('image', [
+      model({ id: IMAGE_TOOL_MODEL[ImageTool.RemoveBackground], releasedAt: '2026-09-20T00:00:00Z', unitCostUsd: 0.005 }),
+      model({ id: IMAGE_TOOL_MODEL[ImageTool.Upscale], releasedAt: '2026-09-20T00:00:00Z', unitCostUsd: 0.05 }),
+      model({ id: 'maker/painter' })
+    ], NOW);
+
+    expect(new Set(list.map((r) => r.id))).toEqual(new Set(['maker/painter']));
   });
 
   it('a model matching an exclusion row is never recommended', () => {

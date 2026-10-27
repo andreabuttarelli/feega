@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { boxBook } from '$lib/motion/gpu-full/text/test-face';
-import { Smoothing } from '$lib/motion/gpu-full/text/painter';
+import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
+import { sequenceScenes } from '$lib/motion/scenes';
+import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
 import { buildFrame, frameBuilder, type BuildAsk, type BuildWorker } from './frame-build';
 
 function must(r: OpResult): MotionDoc {
@@ -31,6 +34,16 @@ describe('building a frame away from the main thread', () => {
 
   it('leaves a doc that needs the DOM reader to the main thread', async () => {
     expect(await buildFrame(source(customDoc), Smoothing.Plain, fonts)).toBeNull();
+  });
+
+  it('leaves a template wrapped in a precomp to the main thread too', async () => {
+    const template = must(precompose(customDoc, ['card'], { comp: 'tpl', clip: 'pc' }, 'Template'));
+    expect(await buildFrame(source(template), Smoothing.Plain, fonts)).toBeNull();
+  });
+
+  it('leaves a combined video to the main thread, which resolves its scenes', async () => {
+    const combined = sequenceScenes(blank, [{ nodeId: '00000000-0000-4000-8000-000000000001', durationInFrames: 60 }]);
+    expect(await buildFrame(source(combined), Smoothing.Plain, fonts)).toBeNull();
   });
 
   it('the list survives the trip between threads unchanged', async () => {
@@ -60,6 +73,15 @@ describe('the builder', () => {
     expect(worker.asked.map((a) => a.url)).toEqual(['/a', '/b']);
     expect(a?.width).toBe(1);
     expect(b?.width).toBe(1);
+  });
+
+  it('hands the worker the local font files it cannot see from its own thread', async () => {
+    keepLocalFiles('Avenir Next', [{ url: 'blob:x', weight: 400, italic: false }]);
+    const worker = echo();
+    await frameBuilder(() => worker)('/a', Smoothing.Plain);
+    forgetLocalFiles();
+
+    expect(worker.asked[0].locals).toEqual([['Avenir Next', [{ url: 'blob:x', weight: 400, italic: false }]]]);
   });
 
   it('a worker that dies fails what it was building and is not asked again', async () => {

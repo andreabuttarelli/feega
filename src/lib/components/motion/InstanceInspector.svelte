@@ -1,11 +1,12 @@
 <script lang="ts">
   import Diamond from '@lucide/svelte/icons/diamond';
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { Paint, instanceElements, instanceOf, instanceTexts, overrideInstance, recolorInstance, resetOverride } from '$lib/motion/main-component';
   import { Action, type ActionId } from '$lib/motion/actions';
-  import { defineProperty, exposable, instanceProperties, removeProperty, resetProperty, setProperty, type Exposure } from '$lib/motion/component-properties';
-  import { PropertyKind, type PropertyDef } from '$lib/motion/property-resolve';
+  import { defineProperty, exposable, instanceProperties, removeProperty, resetProperty, setPreferred, setProperty, type Exposure } from '$lib/motion/component-properties';
+  import { PropertyKind, type PropertyDef } from '@feega/motion-core/motion/property-resolve';
   import { addVariant, pickVariant, swapInstance, variantProps } from '$lib/motion/variants';
+  import VariantMatrix from './VariantMatrix.svelte';
 
   let { doc, clipId, onchange, onrun }: { doc: MotionDoc; clipId: string; onchange: (doc: MotionDoc, summary: string) => void; onrun: (id: ActionId) => void } = $props();
 
@@ -53,6 +54,12 @@
   const resetProp = (key: string) => change(resetProperty(doc, clipId, key), 'Reset a property');
   const dropProp = (key: string) => instance && change(removeProperty(doc, instance.compId, key), 'Removed a property');
 
+  function togglePreferred(key: string, current: string[], id: string, on: boolean) {
+    if (instance) {
+      change(setPreferred(doc, instance.compId, key, on ? [...current, id] : current.filter((x) => x !== id)), 'Changed preferred swaps');
+    }
+  }
+
   function retext(innerId: string, text: string) {
     const result = overrideInstance(doc, clipId, innerId, { text });
     if (result.ok) {
@@ -74,13 +81,31 @@
           <input type="checkbox" checked={p.value === true} data-testid="instance-property-boolean" onchange={(e) => setProp(p.key, e.currentTarget.checked)} />
         {:else if p.control === PropertyKind.Swap}
           <select value={String(p.value)} data-testid="instance-property-swap" onchange={(e) => setProp(p.key, e.currentTarget.value)}>
-            {#each mains as [id, comp] (id)}<option value={id}>{comp.component?.name}</option>{/each}
+            {#if p.preferred.length}
+              <optgroup label="Preferred">
+                {#each p.preferred as id (id)}<option value={id}>{doc.comps[id]?.component?.name}</option>{/each}
+              </optgroup>
+            {/if}
+            <optgroup label="All components">
+              {#each mains as [id, comp] (id)}<option value={id}>{comp.component?.name}</option>{/each}
+            </optgroup>
           </select>
         {:else}
           <input type="text" value={String(p.value)} data-testid="instance-property-text" onchange={(e) => setProp(p.key, e.currentTarget.value)} />
         {/if}
         {#if p.overridden}<button type="button" class="reset" data-testid="instance-property-reset" onclick={() => resetProp(p.key)}>Reset</button>{:else}<button type="button" class="reset" data-testid="instance-property-remove" onclick={() => dropProp(p.key)}>Remove</button>{/if}
       </label>
+    {/each}
+    {#each properties.filter((p) => p.control === PropertyKind.Swap) as p (p.key)}
+      <div class="preferred" data-testid="preferred-swaps" data-key={p.key}>
+        <span>Preferred · {p.key}</span>
+        {#each mains as [id, comp] (id)}
+          <label>
+            <input type="checkbox" checked={p.preferred.includes(id)} data-testid="preferred-toggle" onchange={(e) => togglePreferred(p.key, p.preferred, id, e.currentTarget.checked)} />
+            {comp.component?.name}
+          </label>
+        {/each}
+      </div>
     {/each}
     {#each texts as t (t.innerId)}
       <label class="field">
@@ -142,6 +167,7 @@
         </select>
       </label>
     {/each}
+    <VariantMatrix {doc} {clipId} compId={instance.compId} {onchange} />
     <label class="field">
       <span>Swap</span>
       <select data-testid="instance-swap" value={instance.compId} onchange={(e) => applied(swapInstance(doc, clipId, e.currentTarget.value), 'Swapped instance')}>
@@ -189,6 +215,14 @@
     font-size: var(--ui-type-caption);
     font-weight: 600;
     color: var(--ui-text);
+  }
+
+  .preferred {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-1);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-secondary);
   }
 
   .expose {

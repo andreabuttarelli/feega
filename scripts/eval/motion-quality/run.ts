@@ -6,7 +6,7 @@ import { chromium, type Page } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 import { env } from '../../_shims/env-private';
 import { createE2eSession, signInE2e, teardownE2eSession, type E2eSession } from '../../../tests/e2e/fixtures/session';
-import { analyzeAudio } from '$lib/motion/audio-analysis';
+import { analyzeAudio } from '@feega/motion-core/motion/audio-analysis';
 import { UI_KIT } from '$lib/motion/ui-kit/kit';
 import { billedUsdInScope, withOrgContext } from '$lib/server/ai-log';
 import { judge } from './judge';

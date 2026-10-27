@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CAPTURE_REPLY, CAPTURE_REQUEST, FrameFormat, captureScript, type CaptureReply, type CaptureRequest } from './capture';
-import { EXACT_SEEK } from './exact-seek';
+import { CAPTURE_REPLY, CAPTURE_REQUEST, FrameFormat, captureScript, type CaptureReply, type CaptureRequest } from '@feega/motion-core/motion/hyperframes/capture';
+import { EXACT_SEEK } from '@feega/motion-core/motion/hyperframes/exact-seek';
 import { Playback, RELOAD_DEBOUNCE_MS, previewDriver, type PlayerPort } from './preview-driver';
 
 const REQUEST = { format: FrameFormat.Jpeg, width: 64, height: 36 };

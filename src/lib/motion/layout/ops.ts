@@ -1,13 +1,13 @@
-import { TrackKind } from '../components';
-import { findClip, type MotionClip, type MotionDoc } from '../doc';
-import { pivotBox } from '../parent';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { pivotBox } from '@feega/motion-core/motion/parent';
 import { setParent } from '../parent-ops';
 import { layerOrder } from '../siblings';
-import { addClip, moveClip, type OpResult } from '../timeline';
-import { Align, Direction, Sizing } from './auto-layout';
-import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from './model';
-import { childrenInOrder, withAutoLayout } from './resolve';
-import { isText } from './text-extent';
+import { addClip, moveClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Align, Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
+import { childrenInOrder, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { isText } from '@feega/motion-core/motion/layout/text-extent';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -37,7 +37,7 @@ export function setAutoLayout(doc: MotionDoc, clipId: string, patch: Partial<Aut
   if (patch === null) {
     return { ok: true, doc: withClip(doc, clipId, (c) => ({ ...c, autoLayout: null })) };
   }
-  const parsed = autoLayoutSchema.safeParse({ ...(found.clip.autoLayout ?? DEFAULT_AUTO_LAYOUT), ...patch });
+  const parsed = autoLayoutSchema.safeParse({ ...(found.clip.autoLayout ?? NEW_AUTO_LAYOUT), ...patch });
   if (!parsed.success) {
     return fail(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
   }

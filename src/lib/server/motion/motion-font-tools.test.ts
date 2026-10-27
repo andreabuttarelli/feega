@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession } from './motion-tools';
@@ -75,5 +75,25 @@ describe('motion agent font tools', () => {
     for (const needle of ['set_font', 'list_fonts', 'register_font']) {
       expect(prompt).toContain(needle);
     }
+  });
+});
+
+describe('motion agent local fonts', () => {
+  it('register_font with local adds a local-flagged family and list_fonts flags it', async () => {
+    const { session, run } = setup();
+
+    expect((await run('register_font', { family: 'Avenir Next', origin: 'local' })).ok).toBe(true);
+    expect(session.doc.fonts[0]).toMatchObject({ family: 'Avenir Next', source: 'local' });
+    const listed = (await run('list_fonts', { query: '' })) as { inVideo: { family: string; local: boolean }[] };
+
+    expect(listed.inVideo).toContainEqual({ family: 'Avenir Next', source: 'local', local: true });
+  });
+
+  it('list_fonts marks Google fonts in the video as not local', async () => {
+    const { run } = setup();
+    await run('register_font', { family: 'Space Grotesk' });
+    const listed = (await run('list_fonts', { query: '' })) as { inVideo: { family: string; local: boolean }[] };
+
+    expect(listed.inVideo).toContainEqual({ family: 'Space Grotesk', source: 'google', local: false });
   });
 });

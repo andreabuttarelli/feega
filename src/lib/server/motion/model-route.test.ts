@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, toolsWritingCode } from './model-route';
 import { ToolForcing, toolForcing } from '$lib/server/chat-model/catalogue';
 

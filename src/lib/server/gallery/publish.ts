@@ -9,7 +9,7 @@ import { assetsById, type AssetSigner } from '$lib/server/motion/editor';
 import { ReferenceMedium, type Reference } from '$lib/server/moderation/people';
 import type { ScreenOutcome } from '$lib/server/moderation/screen';
 import { motionOf } from '$lib/canvas/motion-node';
-import { everyClip, type MotionDoc } from '$lib/motion/doc';
+import { everyClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { factsOf, swapAssetIds, type GalleryAsset, type PublishMeta } from '$lib/gallery/model';
 import { publishRefusal } from '$lib/gallery/refusals';
 import { downloadFile, publishFile, REMIX_FOLDER, removeGalleryFiles, type FileBytes } from './files';

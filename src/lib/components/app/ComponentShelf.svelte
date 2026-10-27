@@ -1,7 +1,7 @@
 <script lang="ts">
   import { apiEnhance } from '$lib/dashboard/api-enhance';
   import ComponentPreview from '$lib/components/motion/ComponentPreview.svelte';
-  import { FORMATS } from '$lib/motion/doc';
+  import { FORMATS } from '@feega/motion-core/motion/doc';
   import { ComponentKind, KIND_LABEL, STARTER_FORMATS, matching, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
 
   let { items, projectId = null }: { items: CatalogueItem[]; projectId?: string | null } = $props();

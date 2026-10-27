@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { guideBands, guideLines } from '$lib/motion/layout-guides/guides';
 
   let { doc }: { doc: MotionDoc } = $props();

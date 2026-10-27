@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
 import type { Db } from '$lib/server/db/client';
-import { expireStuckRuns, reconcileVideoNodeRuns, runGenNode, RUN_STALE_MS } from './generate';
+import { cancelNodeRun, expireStuckRuns, reconcileVideoNodeRuns, runGenNode, RUN_STALE_MS } from './generate';
 import { getOrgContext } from '$lib/server/ai-log';
 import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
 
@@ -790,6 +790,28 @@ describe('un modello sparito da ai_models blocca il nodo senza toccare il suo st
   });
 });
 
+describe('cancelNodeRun stops one running generation', () => {
+  it('closes the run cancelled and turns the node idle without an error', async () => {
+    const { db, calls } = fakeDb({ node_runs: [runRow], nodes: [nodeRow] }, { updateRows: { node_runs: [runRow], nodes: [nodeRow] } });
+
+    const result = await cancelNodeRun(db, { orgId: ORG, nodeId: NODE });
+
+    expect(result).toEqual({ cancelled: 1 });
+    const runUpdate = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { error?: string })?.error === 'cancelled');
+    expect(runUpdate?.payload).toMatchObject({ status: 'failed', error: 'cancelled' });
+    const nodeUpdate = calls.find((c) => c.table === 'nodes' && c.op === 'update');
+    expect(nodeUpdate?.payload).toMatchObject({ data: expect.objectContaining({ running: false }) });
+    expect((nodeUpdate?.payload as { data: Record<string, unknown> }).data.error ?? null).toBeNull();
+  });
+
+  it('leaves a loop ticket to cancel_node_loop', async () => {
+    const ticket = { ...runRow, params: { loop: { phase: 'queued', outputListNodeId: 'l', label: 'v1', values: {} } } };
+    const { db } = fakeDb({ node_runs: [ticket], nodes: [nodeRow] });
+
+    expect(await cancelNodeRun(db, { orgId: ORG, nodeId: NODE })).toEqual({ cancelled: 0 });
+  });
+});
+
 /**
  * IL BOTTONE RIMASTO SPENTO. Una `node_runs` che non ha mai smesso di essere `running` — una
  * richiesta morta a metà, senza chi la finisca — deve poter uscire da sola: nessun cron esiste
@@ -1103,6 +1125,10 @@ function statefulNodesDb(initial: { id: string; orgId: string; data: Record<stri
       // vuoto è un caso legittimo (`offerableModels` torna `synced: false`, non un errore).
       if (table === 'ai_models') {
         return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
+      }
+
+      if (table === 'org_model_allowlist') {
+        return { select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) }) };
       }
 
       if (table === 'projects') {

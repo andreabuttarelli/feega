@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, addTrack } from '$lib/motion/timeline';
-import { TrackKind } from '$lib/motion/components';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { EditMode } from '$lib/motion/edit-mode';
 import { maskMembers, useAsMask } from '$lib/motion/mask-group';
 import { Command } from '$lib/motion/shortcuts';
-import { CUSTOM_CLIP } from '$lib/motion/poster-parts';
+import { CUSTOM_CLIP } from '@feega/motion-core/motion/poster-parts';
 import { createComponent } from '$lib/motion/main-component';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
 

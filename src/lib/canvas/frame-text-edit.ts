@@ -1,20 +1,20 @@
-import type { BrandTokens } from '$lib/motion/brand';
-import { resolveColor } from '$lib/motion/brand';
-import { Strictness } from '$lib/motion/custom/component';
-import { clipProps, findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-import { fontStack, loadedWeight } from '$lib/motion/fonts/model';
-import { CLIP_TEXT, editablePart, PartEdit } from '$lib/motion/poster-parts';
-import { setProps, type OpResult } from '$lib/motion/timeline';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import { resolveColor } from '@feega/motion-core/motion/brand';
+import { Strictness } from '@feega/motion-core/motion/custom/component';
+import { clipProps, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { fontStack, loadedWeight } from '@feega/motion-core/motion/fonts/model';
+import { CLIP_TEXT, editablePart, PartEdit } from '@feega/motion-core/motion/poster-parts';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { styledComponent } from '$lib/motion/text-run-ops';
-import { normalLists, type ListItem } from '$lib/motion/text-lists';
-import { type RunCase, type RunStyle, type TextRun } from '$lib/motion/text-runs';
-import { textBody, TextBodyFor } from '$lib/motion/hyperframes/text-body';
-import { css, esc } from '$lib/motion/hyperframes/html';
-import { mul2d, type Affine } from '$lib/motion/affine';
-import type { TextCaret } from '$lib/motion/gpu-full/display-list';
-import type { TextCase } from '$lib/motion/components';
-import { decorationCss } from '$lib/motion/decoration';
-import { AUTO, CAP_TRIM_CSS, CSS_AUTO, CSS_NORMAL, leadingOf, trackingOf } from '$lib/motion/type-units';
+import { normalLists, type ListItem } from '@feega/motion-core/motion/text-lists';
+import { type RunCase, type RunStyle, type TextRun } from '@feega/motion-core/motion/text-runs';
+import { textBody, TextBodyFor } from '@feega/motion-core/motion/hyperframes/text-body';
+import { css, esc } from '@feega/motion-core/motion/hyperframes/html';
+import { mul2d, type Affine } from '@feega/motion-core/motion/affine';
+import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
+import type { TextCase } from '@feega/motion-core/motion/components';
+import { decorationCss } from '@feega/motion-core/motion/decoration';
+import { AUTO, CAP_TRIM_CSS, CSS_AUTO, CSS_NORMAL, leadingOf, trackingOf } from '@feega/motion-core/motion/type-units';
 
 type Size = { width: number; height: number };
 
@@ -88,6 +88,8 @@ export function editLayout(caret: TextCaret, screen: Affine): EditLayout {
   const m = mul2d(screen, caret.matrix);
   return { transform: `matrix(${m.join(',')})`, width: caret.width, height: caret.height, fontPx: caret.size, wraps: caret.flow.wraps, vertical: caret.vertical };
 }
+
+export const anchorShift = (layout: EditLayout, content: number): number => (layout.height - content) * layout.vertical;
 
 const FLOW_CSS: Record<'wraps' | 'line', (layout: EditLayout) => string> = {
   wraps: (layout) => `white-space:pre-wrap;width:${layout.width}px;`,

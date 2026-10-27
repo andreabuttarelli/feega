@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EFFECTS, EffectKind, defaultValues, type SvgNode } from './registry';
+import { EFFECTS, EffectKind, defaultValues, type SvgNode } from '@feega/motion-core/motion/effects/registry';
 
 const FRAME = { width: 100, height: 100, frame: 0, fps: 30 };
 const drop = (extra: Record<string, number | string>) => EFFECTS[EffectKind.DropShadow].render({ ...defaultValues(EffectKind.DropShadow), ...extra }, FRAME, 'f', null);

@@ -41,6 +41,16 @@ program
   });
 
 program
+  .command('local [file]')
+  .description('Run feega locally on one canvas saved in a .feega file: no account, no database')
+  .option('--port <port>', 'port to listen on (default 5173)')
+  .option('--build', 'rebuild the app first')
+  .action(async (file, options) => {
+    const { cmdLocal } = await import('./commands/local.ts');
+    await cmdLocal(file ?? 'canvas.feega', options);
+  });
+
+program
   .command('brands')
   .description('Elenca tutti i brand')
   .action(async () => {
@@ -476,6 +486,36 @@ canvas
   });
 
 canvas
+  .command('export-code <projectId> <nodeId>')
+  .description('Export a code frame (or a view of it) as a runnable Vite project with no feega runtime (free)')
+  .option('--config', 'Keep variable values in src/content.ts instead of inlining them')
+  .option('--out <dir>', 'Where to write the project (default: the frame name)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, nodeId: string, opts) => {
+    const { cmdCanvasExportCode } = await import('./commands/canvas.ts');
+    await cmdCanvasExportCode(projectId, nodeId, opts);
+  });
+
+canvas
+  .command('save <projectId> <canvasId>')
+  .description('Save a whole canvas as a .feega file: nodes, lines, frames and their media (free)')
+  .option('--out <file>', 'Where to save it (default: <canvas name>.feega)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, canvasId: string, opts) => {
+    const { cmdCanvasSave } = await import('./commands/canvas.ts');
+    await cmdCanvasSave(projectId, canvasId, opts);
+  });
+
+canvas
+  .command('import <projectId> <file>')
+  .description('Open a .feega file as a new canvas in a project, e.g. one saved from a local instance')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, file: string, opts) => {
+    const { cmdCanvasImport } = await import('./commands/canvas.ts');
+    await cmdCanvasImport(projectId, file, opts);
+  });
+
+canvas
   .command('frame <projectId>')
   .description('Draw an empty frame on a canvas, like the frame tool: a box in canvas units, or a width and a preset format')
   .requiredOption('--canvas <id>', 'The canvas')
@@ -533,6 +573,44 @@ effects
     await cmdEffectsPatch(effectId, opts);
   });
 
+const allowlist = program
+  .command('allowlist')
+  .description('Show which image, video and 3D models your org offers')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdAllowlist } = await import('./commands/model-allowlist.ts');
+    await cmdAllowlist(opts);
+  });
+
+allowlist
+  .command('set <medium> [ids...]')
+  .description('Replace the models a medium (image, video, model3d) offers; no ids allows every model. Admins only')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (medium: string, ids: string[], opts) => {
+    const { cmdAllowlistSet } = await import('./commands/model-allowlist.ts');
+    await cmdAllowlistSet(medium as 'image' | 'video' | 'model3d', ids, opts);
+  });
+
+const caps = program
+  .command('caps')
+  .description('Show the spend caps of your org')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdCaps } = await import('./commands/spend-caps.ts');
+    await cmdCaps(opts);
+  });
+
+caps
+  .command('set <scope> <usd>')
+  .description('Set a cap (scope: org_member, project_member, project_total; usd, or "off" to remove). Admins only')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .option('--project <id>', 'The project, for the project scopes')
+  .option('--reset <reset>', 'none or monthly')
+  .action(async (scope: string, usd: string, opts) => {
+    const { cmdCapsSet } = await import('./commands/spend-caps.ts');
+    await cmdCapsSet(scope as 'org_member', usd, opts);
+  });
+
 const layouts = program
   .command('layouts')
   .description('List the custom composition layouts of your workspace')
@@ -561,6 +639,98 @@ layouts
   .action(async (layoutId: string, opts) => {
     const { cmdLayoutsPatch } = await import('./commands/layouts.ts');
     await cmdLayoutsPatch(layoutId, opts);
+  });
+
+const studio = program.command('studio').description('Photo studio batches: quote, start and follow them');
+
+studio
+  .command('quote')
+  .description('Price a batch selection: image count, credits and a quote id, free')
+  .requiredOption('--file <path>', 'JSON selection: { name, productIds, environments, shots, variations, model, ... }')
+  .option('--project <id>', 'Which project')
+  .action(async (opts) => {
+    const { cmdStudioQuote } = await import('./commands/studio.ts');
+    await cmdStudioQuote(opts);
+  });
+
+studio
+  .command('start')
+  .description('Start a batch from a quoted selection, spends credits')
+  .requiredOption('--file <path>', 'The same JSON selection you quoted')
+  .requiredOption('--quote <id>', 'The quote id `studio quote` printed')
+  .option('--project <id>', 'Which project')
+  .action(async (opts) => {
+    const { cmdStudioStart } = await import('./commands/studio.ts');
+    await cmdStudioStart(opts);
+  });
+
+studio
+  .command('run <batchId>')
+  .description('Render the rest of a batch after its previews, spends credits')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('run', batchId, opts);
+  });
+
+studio
+  .command('more <batchId>')
+  .description('Add variations per cell and render them, spends credits')
+  .option('--variations <n>', 'Variations per cell')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('more', batchId, opts);
+  });
+
+studio
+  .command('cancel <batchId>')
+  .description('Stop the items still queued, free')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('cancel', batchId, opts);
+  });
+
+studio
+  .command('retry <batchId>')
+  .description('Requeue failed or cancelled items, spends credits')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('retry', batchId, opts);
+  });
+
+studio
+  .command('regenerate <batchId>')
+  .description('Requeue finished items for a new render, spends credits')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('regenerate', batchId, opts);
+  });
+
+studio
+  .command('approve <batchId>')
+  .description('Approve an item, free')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('approve', batchId, opts);
+  });
+
+studio
+  .command('reject <batchId>')
+  .description('Reject an item, free')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('reject', batchId, opts);
+  });
+
+studio
+  .command('status <batchId>')
+  .description('Show a batch: its items and their state, free')
+  .action(async (batchId: string) => {
+    const { cmdStudioStatus } = await import('./commands/studio.ts');
+    await cmdStudioStatus(batchId);
   });
 
 program

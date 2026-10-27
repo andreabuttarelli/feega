@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { FORMATS, MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
 import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, tileFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath, holdsDoc } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';

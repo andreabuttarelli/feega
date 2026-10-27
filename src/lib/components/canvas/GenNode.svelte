@@ -1,26 +1,19 @@
 <script lang="ts">
-  /**
-   * IL NODO CHE PRODUCE, disegnato.
-   *
-   * Due fasce, e l'ordine non è estetico: sopra quel che è VENUTO FUORI, sotto COSA si chiede. Il
-   * prompt sta in fondo perché è la riga che si riscrive dieci volte guardando il risultato che le
-   * sta sopra — al contrario, ogni modifica spingerebbe il risultato fuori dallo sguardo.
-   *
-   * MODELLO, FORMATO, DURATA E RIPETIZIONE NON STANNO PIÙ QUI: stanno nella barra della selezione
-   * (`SelectionToolbar.svelte`), che compare quando il nodo è scelto — la stessa barra che porta
-   * duplica/collega/elimina, non una seconda accanto. Questo file resta il PRODOTTO — prompt,
-   * risultato, storia — e legge ancora il catalogo (`choices`) perché `tooLong` e il motivo per
-   * cui "Genera" è spento dipendono dal modello scelto, che il nodo continua a sapere.
-   */
   import { runStateOf, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
   import { shownIndex } from '$lib/canvas/gen-history';
   import { PROMPT_PLACEHOLDER, RUN_LABEL, hasGenBody } from '$lib/canvas/gen-tile-view';
-  import { loopCreditsOf, runQuoteOf } from '$lib/canvas/run-quote';
+  import { loopCreditsOf, providerQuotesOf, runLabelOf, runQuoteOf } from '$lib/canvas/run-quote';
   import { effectiveModel } from '$lib/canvas/default-models';
+  import type { RememberedVariants } from '$lib/canvas/variants';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
-  import CreditAmount from '$lib/components/CreditAmount.svelte';
+  import { filterSkills, insertSkill, slashQueryAt, type PromptSkill, type SlashQuery } from '$lib/canvas/prompt-skills';
+  import { formatPrice } from '$lib/components/credit-amount-format';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
+  import Copy from '@lucide/svelte/icons/copy';
+  import Check from '@lucide/svelte/icons/check';
   import { untrack } from 'svelte';
   import OutputDragHandle from './OutputDragHandle.svelte';
+  import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
   import { EXAMPLE_LABEL, type DemoResult } from '$lib/onboarding/demo';
 
   let {
@@ -36,6 +29,8 @@
     loopQueued = 0,
     loopVisible = false,
     loopCombinationCount = 0,
+    variantsInFlight = 0,
+    remembered = null,
     onchange,
     onrun,
     onrunloop,
@@ -46,76 +41,118 @@
     onestimate,
     result,
     references,
-    example = null
+    example = null,
+    skills = [],
+    onsaveskill,
+    selected = false,
+    thumbUrl
   }: {
     node: GenNode;
-    /** I modelli che questo medium può usare, dal catalogo del brand. */
     choices?: ModelChoice[];
-    /**
-     * Il catalogo che alimenta `choices` ha almeno una riga per questo medium. `false` con
-     * `choices` vuoto vuol dire "il sync non è ancora passato", non "questo medium non ha
-     * modelli": un menù vuoto senza dirlo sembra un difetto, non la conseguenza accettata della
-     * regola "non sincronizzato, non offerto" (`offerable-models.ts`).
-     */
     catalogueSynced?: boolean;
-    /** Il prezzo di UNA riscrittura "Migliora prompt" per questo medium (`canvas-catalogue.ts`),
-     *  dallo stesso listino di `TEXT_NODE_CREDITS` — assente = costo ignoto, il preventivo non
-     *  aggiunge un extra. */
     enhanceUnitCredits?: number;
     estimatedTextInputTokens?: number;
     estimatedTextOutputTokens?: number;
     estimateRevision?: string;
     variableTextInput?: boolean;
-    /** Un testo a monte collegato conta come prompt quando il nodo non ne ha uno suo
-     *  (`hasPrompt`, `gen-node.ts`) — chi usa il nodo lo calcola da `edges`/`nodes`, che il nodo
-     *  stesso non conosce. */
     hasUpstreamText?: boolean;
-    /** Quanti biglietti di loop sono ancora in coda per QUESTO nodo — 0 = nessun loop in corso.
-     *  Chi lo usa lo calcola da `node_runs` (`params.loop.phase === 'queued'`): il nodo non ha un
-     *  `db`, mostra solo quel che gli si passa, come ogni altro suo stato. */
     loopQueued?: number;
-    /** Se un loop è possibile per questo nodo — un filo `iterate` la cui sorgente porta
-     *  >=2 valori (un asse). Chi lo usa lo calcola da `edges`/`nodes` (`loop-axes.ts::loopAffordance`):
-     *  senza un asse, il bottone non ha niente da combinare e resta nascosto. */
     loopVisible?: boolean;
-    /** Quante combinazioni il loop girerebbe — mostrato sul bottone ("Loop ×N"). */
     loopCombinationCount?: number;
     onchange?: (patch: Partial<GenNode>) => void;
     onrun?: () => void;
-    /** Genera in loop — N combinazioni degli archi `iterate`, o N varianti (`repeat`) senza
-     *  assi. Il nodo non pianifica né chiede conferma da sé: chi lo usa lo fa (`loop_plan`
-     *  prima, poi `run_loop`, che METTE IN CODA — il cron gira le combinazioni nei minuti
-     *  successivi, non questa chiamata). */
     onrunloop?: () => void;
-    /** Ferma i biglietti non ancora reclamati — quelli già in corso finiscono comunque. */
+    variantsInFlight?: number;
+    remembered?: RememberedVariants | null;
     oncancelloop?: () => void;
-    /** Rimettere in vetrina un giro di prima. Il nodo non sa scrivere: chiede a chi lo usa. */
     onshow?: (runId: string) => void;
-    /** Sblocca una corsa che non torna più. Senza, il bottone resta spento per sempre. */
     onunlock?: () => void;
-    /** Solo per `medium === 'text'`: l'altezza reale del contenuto (prompt + risultato), a ogni
-     *  cambio — mai scritta, chi la usa la clampa (`text-node-grow.ts`) e la mostra soltanto. */
     onmeasure?: (contentHeight: number) => void;
     onestimate?: (prompt: string, model: string | null, revision: string) => void;
-    /** Come si disegna quel che è uscito. Il nodo non sa da dove venga l'URL firmato. */
     result?: import('svelte').Snippet<[{ refId: string; text: string | null }]>;
     references?: import('svelte').Snippet;
     example?: DemoResult | null;
+    skills?: PromptSkill[];
+    onsaveskill?: (name: string, body: string) => Promise<boolean>;
+    selected?: boolean;
+    thumbUrl?: (mediaId: string) => string;
   } = $props();
 
-  /**
-   * IL MODELLO CHE CONTA È QUELLO RISOLTO, non `node.model`: un nodo nato prima del default per
-   * il suo medium (`default-models.ts`) non ha mai scritto un `model` in `nodes.data`, e senza
-   * questo il bottone resterebbe spento su ogni nodo vecchio finché qualcuno non riapre un menù
-   * che non c'è più.
-   */
+  const LONG_ERROR = 140;
+  const COPIED_MS = 1500;
+  let errorOpen = $state(false);
+  let copied = $state(false);
+  const withOutput = $derived(node.runs.filter((run) => run.mediaId));
+
+  async function copyError(text: string) {
+    await navigator.clipboard.writeText(text);
+    copied = true;
+    setTimeout(() => (copied = false), COPIED_MS);
+  }
+
+  const COMPACT_MEDIA: ReadonlySet<GenNode['medium']> = new Set(['text', 'image', 'video']);
+  const compact = $derived(COMPACT_MEDIA.has(node.medium));
+
+  let slash = $state<SlashQuery | null>(null);
+  let picked = $state(0);
+  let promptEl = $state<HTMLTextAreaElement | null>(null);
+  let naming = $state<string | null>(null);
+  const SKILL_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+  const matches = $derived(slash ? filterSkills(skills, slash.query) : []);
+
+  function trackSlash(el: HTMLTextAreaElement) {
+    slash = slashQueryAt(el.value, el.selectionStart);
+    picked = 0;
+  }
+
+  function useSkill(skill: PromptSkill) {
+    if (!slash || !promptEl) {
+      return;
+    }
+    const out = insertSkill(promptEl.value, slash, skill);
+    slash = null;
+    onchange?.({ prompt: out.text });
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(out.caret, out.caret);
+    });
+  }
+
+  function pickKey(e: KeyboardEvent) {
+    if (!slash || matches.length === 0) {
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      picked = (picked + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length;
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      useSkill(matches[picked]);
+    } else if (e.key === 'Escape') {
+      slash = null;
+    }
+  }
+
+  async function saveNamed() {
+    const name = naming?.trim() ?? '';
+    if (!SKILL_NAME.test(name) || !onsaveskill) {
+      return;
+    }
+    if (await onsaveskill(name, node.prompt)) {
+      naming = null;
+    }
+  }
+
   const resolvedModel = $derived(effectiveModel(node.medium, node.model, choices));
   const quote = $derived(
-    runQuoteOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens })
+    runQuoteOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens, remembered })
+  );
+  const providerQuotes = $derived(
+    providerQuotesOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens, remembered })
   );
   const choice = $derived(quote.choice);
   const upstream = $derived({ hasUpstreamText });
-  const state = $derived(runStateOf(node, upstream));
+  const runState = $derived(runStateOf(node, upstream));
   const tooLong = $derived(quote.tooLong);
   const TEXT_ESTIMATE_DELAY_MS = 400;
 
@@ -136,36 +173,13 @@
   const canRun = $derived(quote.enabled);
   const shown = $derived(shownIndex(node));
 
-  /** Quanto costerebbe UN giro, con lo stesso modello/parametri che "Genera" spedirebbe adesso —
-   *  `null` quando il catalogo non porta un prezzo per questo modello, mai un numero inventato. */
   const runCredits = $derived(quote.credits);
   const loopCredits = $derived(loopCreditsOf(quote, loopCombinationCount, variableTextInput));
 
-  /**
-   * SE QUESTO NODO HA UNA FASCIA `.gen-body` DA MOSTRARE — la stessa regola che decide se
-   * disegnarla (sotto), tenuta in UN POSTO SOLO perché anche il layout del prompt la legge: senza
-   * un corpo, il prompt riempie tutto il nodo invece di restare una striscia di due righe sopra
-   * uno spazio vuoto.
-   */
   const shownExample = $derived(node.refId ? null : example);
-  const hasBody = $derived(hasGenBody(node.medium, state, node.refId, !!shownExample));
+  const hasBody = $derived(hasGenBody(node.medium, runState, node.refId, !!shownExample));
 
 
-  /**
-   * QUANTO È ALTO IL CONTENUTO VERO, per il nodo testo — `scrollHeight`, non i caratteri del
-   * prompt: conta a capo, la lunghezza reale della riga resa e il font dell'utente, che una
-   * stima a caratteri indovinerebbe male.
-   *
-   * `.gen-body` e `.gen-prompt` sono entrambi vincolati alla propria fascia (`overflow` interno):
-   * lo `scrollHeight` che conta è quello del testo VERO dentro — `.gen-text`, che ha `overflow:
-   * auto` e quindi uno `scrollHeight` che riflette il contenuto, non la fascia che lo contiene.
-   * Il primo figlio di `.gen-body` (`.gen-text-wrap`) è `height: 100%`: il suo `scrollHeight`
-   * torna sempre uguale allo spazio che GIÀ ha, mai a quanto il testo chiederebbe — misurarlo
-   * lì avrebbe chiuso il nodo su se stesso, crescita che non cresce mai. `.gen-prompt`, la
-   * `textarea`, sommata — non il suo contenitore, che resterebbe fisso all'altezza assegnata.
-   * `ResizeObserver` su entrambi, non una lettura sola: il corpo cresce mentre si digita o mentre
-   * il risultato arriva a pezzi, non solo al montaggio.
-   */
   function measureHeight(el: HTMLElement) {
     if (node.medium !== 'text' || !onmeasure) return {};
 
@@ -195,27 +209,55 @@
   }
 </script>
 
-<div class="gen" class:is-running={state === 'running' || loopQueued > 0} use:measureHeight>
-  <!-- Il risultato, quando c'è. Il testo lo mostra qui perché è esso stesso il prodotto; immagine
-       e video li disegna chi usa il nodo, che sa da dove viene l'URL firmato.
+{#snippet prompt()}
+  <textarea
+    class="gen-prompt nodrag"
+    class:is-full={!hasBody}
+    rows={compact && hasBody ? 1 : 2}
+    placeholder={PROMPT_PLACEHOLDER[node.medium]}
+    value={node.prompt}
+    bind:this={promptEl}
+    oninput={(e) => {
+      onchange?.({ prompt: e.currentTarget.value });
+      trackSlash(e.currentTarget);
+    }}
+    onkeydown={pickKey}
+    onblur={() => setTimeout(() => (slash = null), 150)}
+    use:scrollGuard
+  ></textarea>
+{/snippet}
 
-       UN NODO TESTO SENZA ANCORA NIENTE DA MOSTRARE non ha un corpo: la fascia con «Scrivi cosa
-       vuoi»/«Pronto» al centro era un riquadro vuoto sopra una casella di scrittura che dice la
-       stessa cosa — running/failed restano visibili, sono uno stato del giro, non un placeholder
-       del risultato. Immagine e video tengono il proprio placeholder: la fascia è la loro unica
-       anteprima prima di girare, non una ripetizione di quel che il prompt già dice. -->
+{#snippet refs()}
+  {#if references && node.medium !== 'text'}
+    {#if choice?.uncensored}
+      <p class="gen-uncensored-note nodrag">Uncensored models don't accept references</p>
+    {:else}
+      {@render references()}
+    {/if}
+  {/if}
+{/snippet}
+
+<div class="gen" class:is-compact={compact} class:is-done={runState === 'done'} class:is-selected={selected} class:is-running={runState === 'running' || loopQueued > 0} use:measureHeight>
   {#if hasBody}
     <div class="gen-body">
-      {#if state === 'running'}
+      {#if runState === 'running'}
         <div class="gen-busy">
           <span class="gen-dots" aria-label={RUN_LABEL.running}><i></i><i></i><i></i></span>
           <button type="button" class="gen-unlock" onclick={() => onunlock?.()}>Sblocca</button>
         </div>
-      {:else if state === 'failed'}
+      {:else if runState === 'failed'}
         <div class="gen-fail" role="alert">
           <p class="gen-fail-title">{RUN_LABEL.failed}</p>
           {#if node.error}
-            <p class="gen-fail-why">{node.error}</p>
+            <p class="gen-fail-why nodrag" class:is-open={errorOpen} data-testid="gen-error">{node.error}</p>
+            <span class="gen-fail-tools nodrag">
+              {#if node.error.length > LONG_ERROR}
+                <button type="button" class="gen-link" onclick={() => (errorOpen = !errorOpen)}>{errorOpen ? 'Less' : 'More'}</button>
+              {/if}
+              <button type="button" class="gen-link" data-testid="copy-error" onclick={() => copyError(node.error ?? '')}>
+                {#if copied}<Check size={12} strokeWidth={2} />Copied{:else}<Copy size={12} strokeWidth={2} />Copy{/if}
+              </button>
+            </span>
           {/if}
           <button type="button" class="gen-unlock" onclick={() => onrun?.()} disabled={!canRun}>Try again</button>
         </div>
@@ -234,18 +276,20 @@
           {/if}
         </div>
       {:else}
-        <p class="gen-hint">{RUN_LABEL[state]}</p>
+        <p class="gen-hint">{RUN_LABEL[runState]}</p>
       {/if}
     </div>
   {/if}
-
-  <!-- LA STORIA, sotto il risultato e sopra il prompt: si guarda quel che è uscito, si sceglie
-       fra i giri fatti, si riscrive la frase. Una striscia e non frecce, perché con le frecce per
-       sapere quante generazioni ci sono bisogna premerle fino in fondo.
-
-       Compare da DUE giri in su: con uno solo sarebbe una fila di un elemento che dice quel che il
-       corpo del nodo già mostra, e ruberebbe altezza al risultato. -->
-  {#if node.runs.length > 1}
+  {#if thumbUrl && compact && node.medium !== 'text' && withOutput.length > 1}
+    <div class="gen-strip nodrag" role="group" aria-label="Generations" data-testid="gen-history-strip">
+      <span class="gen-strip-count">{withOutput.length}</span>
+      {#each [...withOutput].reverse() as run (run.id)}
+        <button type="button" class="gen-strip-one" class:is-shown={run.mediaId === node.refId} title={run.prompt} aria-label="Show this generation" aria-pressed={run.mediaId === node.refId} onclick={() => onshow?.(run.id)}>
+          <img src={thumbUrl(run.mediaId ?? '')} alt="" loading="lazy" decoding="async" />
+        </button>
+      {/each}
+    </div>
+  {:else if node.runs.length > 1}
     <div class="gen-past" role="group" aria-label="Earlier generations">
       {#each node.runs as run, i (run.id)}
         <button
@@ -267,76 +311,108 @@
     <p class="gen-route-note nodrag" data-testid="route-note">{node.routeNote}</p>
   {/if}
 
-  {#if references && node.medium !== 'text'}
-    {#if choice?.uncensored}
-      <p class="gen-uncensored-note nodrag">Uncensored models don't accept references</p>
-    {:else}
-      {@render references()}
-    {/if}
+  {#if !compact}
+    {@render refs()}
   {/if}
 
   <footer class="gen-foot" class:is-full={!hasBody}>
-    <textarea
-      class="gen-prompt nodrag"
-      class:is-full={!hasBody}
-      rows="2"
-      placeholder={PROMPT_PLACEHOLDER[node.medium]}
-      value={node.prompt}
-      oninput={(e) => onchange?.({ prompt: e.currentTarget.value })}
-      use:scrollGuard
-    ></textarea>
+    {#if tooLong && blocked}
+      <span class="gen-warn">{blocked}{#if choice?.maxPromptChars} ({node.prompt.length}/{choice.maxPromptChars}){/if}</span>
+    {/if}
+    {#if !compact || !hasBody}
+      {@render prompt()}
+    {/if}
+
+    {#if slash && matches.length > 0}
+      <ul class="gen-skills nodrag" role="listbox" data-testid="skill-picker">
+        {#each matches as skill, i (skill.id)}
+          <li role="option" aria-selected={i === picked}>
+            <button type="button" class:is-picked={i === picked} onmousedown={(e) => e.preventDefault()} onclick={() => useSkill(skill)}>
+              <b>/{skill.name}</b>
+              <span>{skill.body}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
+    {#if naming !== null}
+      <form class="gen-skill-name nodrag" onsubmit={(e) => { e.preventDefault(); void saveNamed(); }}>
+        <input placeholder="skill-name" bind:value={naming} data-testid="skill-name" />
+        <button type="submit" disabled={!SKILL_NAME.test(naming.trim())}>Save</button>
+        <button type="button" onclick={() => (naming = null)}>Cancel</button>
+      </form>
+    {/if}
 
     <div class="gen-actions">
-      <!-- Il perché sta ACCANTO al bottone spento, non altrove: un motivo che non si vede da dove
-           si preme è un motivo che nessuno legge. -->
-      {#if blocked}
-        <span class="gen-warn" class:is-soft={!tooLong}>
-          {blocked}{#if tooLong && choice?.maxPromptChars}
-            ({node.prompt.length}/{choice.maxPromptChars}){/if}
-        </span>
+      {#if compact}
+        {@render refs()}
+        {#if hasBody}
+          {@render prompt()}
+        {/if}
       {/if}
-      {#if loopQueued > 0 && oncancelloop}
+      {#if onsaveskill && node.prompt.trim() && naming === null}
+        <button type="button" class="gen-skill-save nodrag" data-testid="skill-save" title="Save this prompt as a skill" aria-label="Save this prompt as a skill" onclick={() => (naming = '')}><BookmarkPlus size={14} strokeWidth={1.75} /></button>
+      {/if}
+      {#if !compact && blocked && !tooLong}
+        <span class="gen-warn is-soft">{blocked}</span>
+      {/if}
+      {#if variantsInFlight > 0 && oncancelloop}
+        <button type="button" class="gen-loop" onclick={() => oncancelloop?.()}>
+          Cancel all ({variantsInFlight})
+        </button>
+      {:else if loopQueued > 0 && oncancelloop}
         <button type="button" class="gen-loop" onclick={() => oncancelloop?.()}>
           Annulla loop ({loopQueued})
         </button>
       {:else if onrunloop && loopVisible}
         <button type="button" class="gen-loop" onclick={() => onrunloop?.()} disabled={!canRun}>
-          Loop ×{loopCombinationCount}{#if loopCredits !== null} · <CreditAmount amount={loopCredits} approx />{:else if quote.variable} · variable cost{/if}
+          Loop ×{loopCombinationCount}{#if loopCredits !== null} · {formatPrice(loopCredits)}{:else if quote.variable} · variable{/if}
         </button>
       {/if}
-      <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
-        {state === 'done' ? 'Redo' : 'Generate'}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
-      </button>
+      <span class="gen-run">
+        {#if runCredits !== null}
+          <span class="gen-price" data-testid="gen-price">{formatPrice(runCredits)}</span>
+        {:else if quote.variable}
+          <span class="gen-price">variable</span>
+        {/if}
+        <button type="button" class="gen-cta" data-testid="gen-run" aria-label={runLabelOf(quote)} title={blocked ?? runLabelOf(quote)} onclick={() => onrun?.()} disabled={!canRun}>
+          <ArrowUp size={16} strokeWidth={2.25} />
+        </button>
+        {#if providerQuotes.length && !variableTextInput}
+          <ul class="gen-providers" data-testid="provider-quotes">
+            {#each providerQuotes as providerQuote (providerQuote.provider)}
+              <li class:is-selected={providerQuote.selected}>
+                <span class="gen-provider-name">{providerQuote.label}{#if providerQuote.cheapest}<em class="gen-pill">cheapest</em>{/if}</span>
+                {#if providerQuote.credits !== null}<span>{formatPrice(providerQuote.credits)}</span>{/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </span>
     </div>
   </footer>
 </div>
 
 <style>
-  /*
-   * UN NODO GALLEGGIA, non è appoggiato.
-   *
-   * Su una tela è tutto su un piano solo: un bordo da un pixel è l'unica cosa che separa il nodo
-   * dallo sfondo, e a zoom ridotto sparisce — restano rettangoli che si confondono col pattern.
-   * L'ombra dà la profondità che il bordo da solo non ha, e cresce con la selezione perché il
-   * nodo su cui si sta lavorando deve stare AVANTI agli altri, non solo essere contornato.
-   *
-   * `--paper` e non `--paper-2`: il nodo è il foglio, e la tela è ciò che gli sta sotto. Invertiti
-   * — come erano — il nodo era più scuro dello sfondo, che è il contrario di quel che galleggia.
-   */
   .gen {
+    --gen-inset: 6px;
+    --gen-well: var(--ui-radius-md, 6px);
     position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;
     min-height: 0;
+    padding: 0 var(--gen-inset) var(--gen-inset);
     background: var(--paper, #fff);
     border: 1px solid var(--line, #e5e5e5);
+    border-radius: var(--ui-radius-lg, 10px);
     box-shadow:
       0 1px 2px rgb(0 0 0 / 0.05),
       0 8px 24px -12px rgb(0 0 0 / 0.2);
     transition:
-      box-shadow 140ms ease,
-      border-color 140ms ease;
+      box-shadow var(--ui-dur-fast, 120ms) ease,
+      border-color var(--ui-dur-fast, 120ms) ease;
   }
   .gen:hover {
     box-shadow:
@@ -350,12 +426,13 @@
     content: '';
     position: absolute;
     inset: -1px;
-    padding: 2px;
+    padding: 1.5px;
+    border-radius: inherit;
     pointer-events: none;
     background: conic-gradient(
       from var(--gen-running-angle),
       transparent 0deg,
-      var(--accent, #c485fe) 70deg,
+      var(--ui-accent, #0099ff) 70deg,
       transparent 140deg,
       transparent 360deg
     );
@@ -379,39 +456,37 @@
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .gen.is-running::after {
-      animation: none;
-      background: var(--accent, #c485fe);
-    }
-    .gen {
-      transition: none;
-    }
-  }
-
-  /*
-   * IL RISULTATO ARRIVA AI BORDI. Il nodo esiste per guardare quel che è uscito: dentro un
-   * `padding` diventa una miniatura con una cornice attorno, e su una clip verticale la cornice
-   * è più larga del contenuto. Il taglio col raggio del guscio è quel che dà il bordo pulito
-   * senza che l'immagine debba saperlo.
-   *
-   * Il taglio vale per il CONTENUTO, non per il nodo: `overflow: hidden` sul nodo intero
-   * mangerebbe la fascia delle proprietà, che sporge apposta.
-   */
   .gen-body {
     position: relative;
     flex: 1;
     min-height: 0;
+    margin-top: var(--gen-inset);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    border-radius: var(--gen-well);
     background: var(--paper-2, #f9f9f9);
   }
 
-  /* Il contenuto che il chiamante disegna riempie la fascia invece di galleggiarci dentro:
-     `contain` e non `cover` perché un'immagine tagliata a metà non si può giudicare, ed è il
-     giudizio la ragione per cui sta lì. */
+  .gen.is-running .gen-body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--ui-accent, #0099ff) 9%, transparent) 50%, transparent 80%);
+    background-size: 220% 100%;
+    animation: gen-shimmer 1.8s ease-in-out infinite;
+  }
+
+  @keyframes gen-shimmer {
+    from {
+      background-position: 120% 0;
+    }
+    to {
+      background-position: -120% 0;
+    }
+  }
+
   .gen-body :global(img),
   .gen-body :global(video) {
     width: 100%;
@@ -449,6 +524,7 @@
     left: 6px;
     z-index: 2;
     padding: 0 6px;
+    border-radius: var(--ui-radius-sm, 4px);
     font-size: 0.6875rem;
     font-weight: 600;
     line-height: 1.25rem;
@@ -465,10 +541,11 @@
   }
 
   .gen-busy {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     padding: 12px;
   }
 
@@ -499,7 +576,9 @@
     padding: 4px 12px;
     font: inherit;
     font-size: 11.5px;
+    line-height: 1.5;
     border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--gen-well);
     background: var(--paper, #fff);
     color: var(--ink, #1d1d1f);
     cursor: pointer;
@@ -512,35 +591,24 @@
     cursor: default;
   }
 
-  /* `margin-top: auto` spinge il piede in fondo quando `.gen-body` manca (un nodo testo mai
-     girato, CLAUDE.md): senza, l'altezza fissa del nodo lascerebbe uno spazio vuoto sotto la
-     casella invece del bordo del nodo. Con `.gen-body` presente non cambia niente: `flex: 1` ha
-     già preso lo spazio restante. */
   .gen-route-note {
     margin: 0;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.125rem 0;
     font-size: 0.6875rem;
     color: var(--muted-foreground);
   }
 
   .gen-uncensored-note {
     margin: 0;
-    padding: 6px 9px;
+    padding: 8px 2px 0;
     font-size: 11px;
     color: var(--ink-soft, #6e6e73);
-    border-top: 1px solid var(--line, #e5e5e5);
   }
 
   .gen-foot {
     margin-top: auto;
-    padding: 8px 9px 9px;
-    border-top: 1px solid var(--line, #e5e5e5);
-    background: var(--paper, #fff);
+    padding-top: var(--gen-inset);
   }
-  /* SENZA `.gen-body` — un nodo testo che non ha ancora prodotto niente — il prompt è l'unica
-     cosa sul nodo: riempie tutto lo spazio invece di restare una striscia di due righe sopra un
-     vuoto. `flex: 1` sulla fascia e sulla textarea, non un'altezza fissa: la crescita resta
-     quella di `text-node-grow.ts`, non una seconda regola scritta qui. */
   .gen-foot.is-full {
     display: flex;
     flex-direction: column;
@@ -548,23 +616,74 @@
     min-height: 0;
   }
   .gen-prompt {
+    display: block;
     width: 100%;
     resize: none;
-    border: 1px solid var(--line-2, #d2d2d7);
-    padding: 6px 8px;
+    border: 1px solid var(--line, #e5e5e5);
+    border-radius: var(--gen-well);
+    padding: 8px 10px;
     font: inherit;
     font-size: 12.5px;
     line-height: 1.45;
     color: var(--ink, #1d1d1f);
     background: var(--paper-2, #f9f9f9);
+    transition:
+      border-color var(--ui-dur-fast, 120ms) ease,
+      box-shadow var(--ui-dur-fast, 120ms) ease,
+      background var(--ui-dur-fast, 120ms) ease;
+  }
+  .gen-prompt::placeholder {
+    color: var(--ink-soft, #6e6e73);
+    opacity: 0.55;
   }
   .gen-prompt.is-full {
     flex: 1;
     min-height: 0;
   }
+  .gen-prompt:hover {
+    border-color: var(--line-2, #d2d2d7);
+  }
   .gen-prompt:focus {
     outline: none;
-    border-color: var(--accent, #c485fe);
+    background: var(--paper, #fff);
+    border-color: var(--ui-accent, #0099ff);
+    box-shadow: 0 0 0 3px var(--ui-accent-wash, rgb(0 153 255 / 0.1));
+  }
+
+  .gen-skills {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 2px;
+    max-height: 132px;
+    overflow-y: auto;
+    border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--ui-radius-md, 6px);
+    background: var(--paper, #fff);
+    box-shadow: var(--ui-shadow-float);
+  }
+  .gen-skills button {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    height: auto;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm, 4px);
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    color: var(--ink, #1d1d1f);
+    cursor: pointer;
+  }
+  .gen-skills button.is-picked {
+    background: var(--paper-2, #f2f2f2);
+  }
+  .gen-skills span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-3, #6e6e73);
   }
 
   .gen-actions {
@@ -572,65 +691,179 @@
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 6px;
+    height: 30px;
+    margin-top: var(--gen-inset);
+  }
+  .gen-skill-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: auto;
+    height: 26px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--gen-well);
+    background: none;
+    font: inherit;
+    font-size: 11.5px;
+    color: var(--ink-soft, #6e6e73);
+    cursor: pointer;
+  }
+  .gen-skill-save:hover {
+    background: var(--paper-2, #f2f2f2);
+    color: var(--ink, #1d1d1f);
+  }
+  .gen-skill-name {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: auto;
+    min-width: 0;
+    font-size: 12px;
+  }
+  .gen-skill-name input {
+    flex: 1;
+    min-width: 0;
+    height: 26px;
+    padding: 0 8px;
+    font: inherit;
+    border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--gen-well);
+    background: var(--paper, #fff);
+    color: var(--ink, #1d1d1f);
+  }
+  .gen-skill-name button {
+    height: 26px;
+    padding: 0 8px;
+    font-size: 11.5px;
   }
   .gen-warn {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 11px;
-    color: #c0392b;
+    color: var(--ui-danger, #e5484d);
   }
-  /* «Manca ancora qualcosa» non è un errore: in rosso, aprire un nodo nuovo sembrerebbe aver già
-     sbagliato qualcosa. Il rosso resta a quel che il modello rifiuterebbe davvero. */
   .gen-warn.is-soft {
     color: var(--ink-soft, #6e6e73);
   }
 
-  /*
-   * LA STRISCIA DEI GIRI FATTI. Numeri e non miniature: una miniatura dentro una fascia alta
-   * venti pixel è illeggibile — si distinguerebbero due immagini simili solo aprendole — e
-   * caricarne dieci costringerebbe il nodo a scaricare dieci file per una fila che spesso nessuno
-   * guarda. Il prompt di quel giro sta nel `title`, che è dove si cerca quando i numeri non
-   * bastano.
-   */
   .gen-past {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
-    padding: 5px 9px;
-    border-top: 1px solid var(--line, #e5e5e5);
-    background: var(--paper, #fff);
+    padding-top: 5px;
   }
   .gen-past-one {
-    min-width: 20px;
-    padding: 1px 5px;
+    min-width: 22px;
+    height: auto;
+    padding: 1px 7px;
     font-size: 10.5px;
     line-height: 1.5;
     color: var(--ink-soft, #6e6e73);
     background: var(--paper-2, #f9f9f9);
-    border: 1px solid var(--line-2, #d2d2d7);
+    border: 1px solid transparent;
+    border-radius: var(--ui-radius-full, 9999px);
     cursor: pointer;
+  }
+  .gen-past-one:hover {
+    color: var(--ink, #1d1d1f);
   }
   .gen-past-one.is-shown {
     color: var(--paper, #fff);
     background: var(--ink, #1d1d1f);
-    border-color: var(--ink, #1d1d1f);
   }
+
   button {
-    padding: 4px 12px;
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 12px;
     font: inherit;
     font-size: 12px;
     border: none;
-    background: var(--ink, #1d1d1f);
-    color: var(--paper, #fff);
+    border-radius: var(--gen-well);
+    background: var(--paper-2, #f2f2f2);
+    color: var(--ink, #1d1d1f);
     cursor: pointer;
+    white-space: nowrap;
   }
   button:disabled {
     opacity: 0.35;
     cursor: default;
   }
-  /* Secondario a "Genera": stesso posto, meno peso — il loop è l'azione meno frequente delle due. */
+  .gen-price {
+    align-self: center;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft, #6e6e73);
+    white-space: nowrap;
+  }
+  .gen-cta {
+    justify-content: center;
+    width: 30px;
+    padding: 0;
+    border-radius: var(--ui-radius-full, 9999px);
+    background: var(--ui-accent, #0099ff);
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 1px 2px rgb(0 0 0 / 0.12);
+    transition: filter var(--ui-dur-fast, 120ms) ease;
+  }
+  .gen-cta:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .gen-cta:active:not(:disabled) {
+    filter: brightness(0.95);
+  }
+  .gen-cta:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus);
+  }
+
+  .gen-run {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .gen-providers {
+    display: none;
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    margin: 0 0 6px;
+    padding: 4px;
+    list-style: none;
+    min-width: 220px;
+    background: var(--ui-raised, #fff);
+    border-radius: var(--ui-radius-md, 6px);
+    box-shadow: var(--ui-shadow-float);
+    font-size: 12px;
+    z-index: 5;
+  }
+  .gen-run:hover .gen-providers,
+  .gen-run:focus-within .gen-providers {
+    display: block;
+  }
+  .gen-providers li {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 6px;
+    border-radius: var(--ui-radius-sm, 4px);
+  }
+  .gen-providers li.is-selected {
+    font-weight: 600;
+    background: var(--paper-2, #f2f2f2);
+  }
+  .gen-providers li.is-cheapest em {
+    font-style: normal;
+    color: var(--ui-ok, #1f9d55);
+  }
   .gen-loop {
     background: var(--paper, #fff);
-    color: var(--ink, #1d1d1f);
     border: 1px solid var(--line-2, #d2d2d7);
   }
   .gen-loop:hover:not(:disabled) {
@@ -644,7 +877,8 @@
   .gen-dots i {
     width: 6px;
     height: 6px;
-    background: var(--accent, #c485fe);
+    border-radius: 50%;
+    background: var(--ui-accent, #0099ff);
     animation: gen-blink 1.2s infinite;
   }
   .gen-dots i:nth-child(2) {
@@ -657,7 +891,258 @@
     0%, 60%, 100% { opacity: 0.25; }
     30% { opacity: 1; }
   }
+
   @media (prefers-reduced-motion: reduce) {
-    .gen-dots i { animation: none; opacity: 0.5; }
+    .gen.is-running::after {
+      animation: none;
+      background: var(--ui-accent, #0099ff);
+    }
+    .gen.is-running .gen-body::before,
+    .gen-dots i {
+      animation: none;
+    }
+    .gen {
+      transition: none;
+    }
+  }
+  .gen.is-compact {
+    padding: 0;
+  }
+  .is-compact .gen-body {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    border-radius: calc(var(--ui-radius-lg, 10px) - 1px);
+  }
+  .is-compact:not(.is-done) .gen-body {
+    padding-bottom: 48px;
+  }
+  .is-compact .gen-foot {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 3;
+    padding: 0;
+    transition: opacity var(--ui-dur-fast, 120ms) ease;
+  }
+  .is-compact .gen-foot.is-full {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 8px 8px;
+  }
+  .is-compact.is-done:not(.is-selected):not(:hover):not(:focus-within) .gen-foot {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .is-compact .gen-actions {
+    height: auto;
+    min-height: 40px;
+    margin: 0;
+    align-items: flex-end;
+    gap: 6px;
+    padding: 5px;
+    border: 1px solid var(--line, #e5e5e5);
+    border-radius: var(--gen-well);
+    background: color-mix(in srgb, var(--paper, #fff) 94%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 6px 20px -10px rgb(0 0 0 / 0.35);
+  }
+  .is-compact .gen-actions .gen-prompt {
+    flex: 1;
+    min-width: 0;
+    height: 28px;
+    padding: 5px 4px;
+    border: 0;
+    border-radius: var(--ui-radius-sm, 4px);
+    background: transparent;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    transition: height var(--ui-dur, 200ms) var(--ui-ease, ease);
+  }
+  .is-compact .gen-actions:has(.gen-prompt:focus) {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .is-compact .gen-actions:has(.gen-prompt:focus) .gen-run {
+    margin-left: auto;
+  }
+  .is-compact .gen-actions .gen-prompt:focus {
+    order: -1;
+    flex: 1 1 100%;
+    height: 96px;
+    white-space: pre-wrap;
+    overflow: auto;
+    background: transparent;
+    box-shadow: none;
+  }
+  .is-compact .gen-foot.is-full .gen-prompt {
+    flex: 1;
+    margin: 8px 0;
+    padding: 0 10px;
+    border: 0;
+    background: transparent;
+  }
+  .is-compact .gen-foot.is-full .gen-prompt:focus {
+    box-shadow: none;
+  }
+  .is-compact .gen-actions :global(.refs) {
+    padding: 0;
+    gap: 4px;
+    flex-wrap: nowrap;
+  }
+  .is-compact .gen-actions :global(.refs-add) {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+    border: 0;
+  }
+  .is-compact .gen-actions :global(.refs-label) {
+    display: none;
+  }
+  .is-compact .gen-actions :global(.ref) {
+    width: 28px;
+    height: 28px;
+  }
+  .is-compact .gen-actions button,
+  .is-compact .gen-actions :global(button) {
+    height: 28px;
+  }
+  .is-compact .gen-cta {
+    width: 28px;
+  }
+  .is-compact .gen-skill-save {
+    width: 28px;
+    margin: 0;
+    padding: 0;
+    justify-content: center;
+  }
+  .is-compact .gen-past {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 3;
+    padding: 0;
+  }
+  .is-compact .gen-route-note {
+    position: absolute;
+    left: 12px;
+    bottom: 54px;
+    z-index: 3;
+  }
+  .gen-warn {
+    display: block;
+    margin-bottom: 4px;
+  }
+  .gen-skill-name {
+    margin: 0 0 6px;
+  }
+  .is-compact .gen-uncensored-note {
+    padding: 0 4px;
+    align-self: center;
+  }
+  .is-compact .gen-skills {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 6px);
+  }
+  .gen-provider-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .gen-pill {
+    padding: 0 6px;
+    border-radius: var(--ui-radius-full, 9999px);
+    font-style: normal;
+    font-size: 10.5px;
+    line-height: 16px;
+    font-weight: 500;
+    color: var(--ui-ok, #1f9d55);
+    background: color-mix(in srgb, var(--ui-ok, #1f9d55) 14%, transparent);
+  }
+  .gen-fail-why {
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .gen-fail-why.is-open {
+    display: block;
+    max-height: 120px;
+    overflow: auto;
+  }
+  .gen-fail-tools {
+    display: inline-flex;
+    gap: 4px;
+  }
+  .gen-link {
+    gap: 4px;
+    height: 22px;
+    padding: 0 6px;
+    font-size: 11px;
+    color: var(--ink-soft, #6e6e73);
+    background: transparent;
+  }
+  .gen-link:hover {
+    color: var(--ink, #1d1d1f);
+    background: var(--paper-2, #f2f2f2);
+  }
+  .gen-strip {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100% - 96px);
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    overflow-x: auto;
+    border-radius: var(--ui-radius-md, 6px);
+    background: var(--ui-raised, #fff);
+    box-shadow: var(--ui-shadow-float);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--ui-dur-fast, 120ms) ease;
+  }
+  .gen.is-selected .gen-strip,
+  .gen:hover .gen-strip {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .gen-strip-count {
+    flex: none;
+    padding: 0 4px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft, #6e6e73);
+  }
+  .gen-strip-one {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--ui-radius-sm, 4px);
+    background: var(--paper-2, #f2f2f2);
+    box-shadow: inset 0 0 0 1px var(--line, #e5e5e5);
+  }
+  .gen-strip-one img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .gen-strip-one.is-shown {
+    box-shadow: 0 0 0 2px var(--ui-accent, #0099ff);
   }
 </style>

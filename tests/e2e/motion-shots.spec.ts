@@ -1,11 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
-import { MotionFormat } from '../../src/lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { ShotId } from '../../src/lib/motion/shots/library';
 import { VectorKind, VectorRole, type VectorUi } from '../../src/lib/motion/vector-ui/model';
 import type { ShotCase } from './fixtures/shot-probe';
 import STRIPE_STAT_COUNT from './fixtures/stripe-stat-count.json' with { type: 'json' };
 
-const HOST_PAGE = '/changelog';
+const HOST_PAGE = '/login';
 const PROBE = '/tests/e2e/fixtures/shot-probe.ts';
 const RENDER_TIMEOUT_MS = 600_000;
 const TOO_SLOW_FOR_CI: ReadonlySet<ShotId> = new Set([ShotId.WhipZoom]);

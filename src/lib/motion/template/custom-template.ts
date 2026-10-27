@@ -1,11 +1,11 @@
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { PropFormat, VAR_PREFIX, paramVar, snakeKey, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { PropFormat, VAR_PREFIX, paramVar, snakeKey, type CustomComponent, type PropSpec } from '@feega/motion-core/motion/custom/component';
 import { writeComponent } from '$lib/motion/custom/ops';
 import { registerFont } from '$lib/motion/fonts/ops';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
-import { declareVar, VarKind, type VarDecl } from '$lib/motion/interactive/vars';
-import { interactiveOf, type Interactive } from '$lib/motion/interactive/settings';
-import { addClip, setCanvas, type OpResult } from '$lib/motion/timeline';
+import { declareVar, VarKind, type VarDecl } from '@feega/motion-core/motion/interactive/vars';
+import { interactiveOf, type Interactive } from '@feega/motion-core/motion/interactive/settings';
+import { addClip, setCanvas, type OpResult } from '@feega/motion-core/motion/timeline';
 import { exposeField, FieldType, type FieldInput } from './fields';
 
 export type CustomTemplateSpec = {

@@ -1,20 +1,20 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, addTrack, setCanvas, setProps, setTrackMatte, setTransform, type OpResult } from '../timeline';
-import { setCamera, setClipDepth } from '../camera-ops';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, addTrack, setCanvas, setProps, setTrackMatte, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+import { setCamera, setClipDepth } from '@feega/motion-core/motion/camera-ops';
 import { writeComponent } from '../custom/ops';
-import { stageSpec } from '../camera';
+import { stageSpec } from '@feega/motion-core/motion/camera';
 import { installEngine, testTimeline } from '../engine/testing';
-import { particleScript } from './particles';
-import { stageScript } from './stage';
-import { shapeScript } from './shapes';
-import { TrackKind, type ComponentId } from '../components';
-import { Matte } from '../mask';
-import { MATTE_RUNTIME } from './mattes';
-import { composeHtml } from './compose';
-import { GL_GLOBAL, HOT_PATCH, hotPatch, keptGl, type HotPatch } from './hot';
+import { particleScript } from '@feega/motion-core/motion/hyperframes/particles';
+import { stageScript } from '@feega/motion-core/motion/hyperframes/stage';
+import { shapeScript } from '@feega/motion-core/motion/hyperframes/shapes';
+import { TrackKind, type ComponentId } from '@feega/motion-core/motion/components';
+import { Matte } from '@feega/motion-core/motion/mask';
+import { MATTE_RUNTIME } from '@feega/motion-core/motion/hyperframes/mattes';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { GL_GLOBAL, HOT_PATCH, hotPatch, keptGl, type HotPatch } from '@feega/motion-core/motion/hyperframes/hot';
 
 function must(r: OpResult | { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {

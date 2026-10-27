@@ -1,5 +1,5 @@
 import { Sandbox } from '@vercel/sandbox';
-import { HYPERFRAMES_VERSION } from '$lib/motion/hyperframes/compose';
+import { HYPERFRAMES_VERSION } from '@feega/motion-core/motion/hyperframes/compose';
 import { FARM_RUNTIME_DIR, type FarmWorker, type LiveWorker, type RenderFarm, type WorkerUsage, type WorkerSpec } from './render-farm';
 
 export type FarmAccess = { token?: string; teamId?: string; projectId?: string };

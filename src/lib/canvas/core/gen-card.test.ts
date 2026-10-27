@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { PathItem } from '$lib/motion/gpu-full/display-list';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
+import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import { mix } from '$lib/canvas/gpu/theme';
 import type { GenTileView } from '$lib/canvas/gen-tile-view';
 import type { Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
-import { GenPart, genItems, genMark, type GenIcons } from './gen-card';
+import { GenPart, genItems, type GenIcons } from './gen-card';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', paper2: '#f9f9f9', line: '#ededef', line2: '#d2d2d7', ink: '#1d1d1f', inkSoft: '#6e6e73', chip: '#f2f2f2', chipInk: '#141414', accent: '#0099ff', wire: '#b3b3b6', iterate: '#d97706' };
 const glyphs: Glyphs = (text, size) => ({ contours: text ? [[0, 0, text.length * size * 0.5, 0, text.length * size * 0.5, size, 0, size]] : [], width: text.length * size * 0.5, height: size });
@@ -39,21 +39,28 @@ const bounds = (i: PathItem) => {
 };
 
 describe('genItems', () => {
-  it('lays out an image node like the DOM tile: body, references band, footer', () => {
+  it('lets the media fill an image node, with the prompt bar floating over its bottom edge', () => {
     const items = draw(view());
 
-    expect(bounds(parts(items, GenPart.Body)[0])).toEqual([1, 1, 359, 304.5]);
-    expect(bounds(parts(items, GenPart.References)[0])).toEqual([1, 304.5, 359, 305.5]);
-    expect(bounds(parts(items, GenPart.Prompt)[0])).toEqual([10, 358.5, 350, 408.7]);
+    expect(bounds(parts(items, GenPart.Body)[0])).toEqual([1, 1, 359, 459]);
+    expect(bounds(parts(items, GenPart.Footer)[0])).toEqual([8, 412, 352, 452]);
+    expect(bounds(parts(items, GenPart.References)[0])).toEqual([14, 418, 42, 446]);
     expect(parts(items, GenPart.Hint)).toHaveLength(1);
   });
 
-  it('fades a disabled run button and keeps it right aligned', () => {
+  it('shows only the media once an image is done', () => {
+    const items = draw(view({ state: 'done' }));
+
+    expect(parts(items, GenPart.Footer)).toHaveLength(0);
+    expect(parts(items, GenPart.Run)).toHaveLength(0);
+  });
+
+  it('fades a disabled run button and keeps it right aligned inside the bar', () => {
     const [button] = parts(draw(view()), GenPart.Run);
 
     expect(button.opacity).toBe(1);
-    expect(bounds(button)[2]).toBe(350);
-    expect(button.paint).toEqual({ kind: 'solid', color: rgbaOf(mix(theme.ink, theme.paper, 0.35)) });
+    expect(bounds(button)[2]).toBe(346);
+    expect(button.paint).toEqual({ kind: 'solid', color: rgbaOf(mix(theme.accent, theme.paper, 0.35)) });
   });
 
   it('writes the prompt instead of the placeholder once there is one', () => {
@@ -69,7 +76,7 @@ describe('genItems', () => {
 
     expect(parts(items, GenPart.Body)).toHaveLength(0);
     expect(parts(items, GenPart.References)).toHaveLength(0);
-    expect(bounds(parts(items, GenPart.Prompt)[0])[1]).toBe(10);
+    expect(bounds(parts(items, GenPart.PromptText)[0])[1]).toBe(16);
   });
 
   it('shows dots and an unlock button while running, a reason and retry when failed', () => {
@@ -78,16 +85,10 @@ describe('genItems', () => {
     expect(parts(draw(view({ state: 'failed', error: 'boom' })), GenPart.FailWhy)).toHaveLength(1);
   });
 
-  it('draws the loop button and the warning when the tile has them', () => {
+  it('draws the loop button in the bar when the tile has one', () => {
     const items = draw(view({ loop: { label: 'Loop ×2', credits: '~0.08', variable: false, enabled: false, cancel: false } }));
 
     expect(parts(items, GenPart.Loop).length).toBeGreaterThan(0);
-    expect(parts(items, GenPart.Warn)).toHaveLength(1);
-  });
-
-  it('marks a finished output as AI-generated, and nothing before', () => {
-    expect(genMark(card, view({ state: 'done' }), { theme, glyphs, bold: glyphs, icons })).toHaveLength(2);
-    expect(genMark(card, view(), { theme, glyphs, bold: glyphs, icons })).toHaveLength(0);
   });
 
   it('draws the markdown toggle over a finished text output', () => {

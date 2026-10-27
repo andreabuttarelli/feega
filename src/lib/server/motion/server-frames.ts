@@ -1,4 +1,4 @@
-import { composeHtml, type ComposeInput } from '$lib/motion/hyperframes/compose';
+import { composeHtml, type ComposeInput } from '@feega/motion-core/motion/hyperframes/compose';
 import type { Frame } from './frames';
 import { libsOrigin } from './libs-origin';
 

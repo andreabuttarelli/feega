@@ -1,5 +1,5 @@
-import { evalCubic, isLine, segmentCubic, splitCubicAt } from './curve-math';
-import { Mirroring, ZERO, type Vector, type VectorNetwork, type VectorSegment, type VectorVertex } from './model';
+import { evalCubic, isLine, segmentCubic, splitCubicAt } from '@feega/motion-core/motion/vector/curve-math';
+import { Mirroring, ZERO, type Vector, type VectorNetwork, type VectorSegment, type VectorVertex } from '@feega/motion-core/motion/vector/model';
 import { reindexRegionLoops, remapRegions } from './regions';
 
 export enum Tangent {

@@ -4,10 +4,10 @@
   import { onMount } from 'svelte';
   import Download from '@lucide/svelte/icons/download';
   import { postPageAction } from '$lib/api/page-action';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { applyValues, exposeField, FieldType, fieldValues, removeField } from '$lib/motion/template/fields';
-  import { FIELD_TYPE_LABEL, FIELD_TYPES } from '$lib/motion/template/field-model';
+  import { FIELD_TYPE_LABEL, FIELD_TYPES } from '@feega/motion-core/motion/template/field-model';
   import { batchRows, DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName, parseCsv, sheetCsvUrl, type ColumnMap, type CsvTable } from '$lib/motion/template/batch';
   import { renderQuote } from '$lib/motion/render-quote';
   import { EXPORT_FORMATS, FORMAT, Preset, settingsOf, type RenderSettings } from '$lib/motion/export-formats';

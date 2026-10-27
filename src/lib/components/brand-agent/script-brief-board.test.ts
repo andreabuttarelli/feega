@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import '$lib/i18n';
-import { Act } from '$lib/motion/script';
+import { Act } from '@feega/motion-core/motion/script';
 import ScriptBrief from './ScriptBrief.svelte';
 
 const outline = [

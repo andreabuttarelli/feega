@@ -1,6 +1,6 @@
 import { Depth, Gesture, drill, type Probe } from '$lib/motion/drill';
-import { PART_SEP, partAt, partBoxes } from '$lib/motion/poster-parts';
-import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+import { PART_SEP, partAt, partBoxes } from '@feega/motion-core/motion/poster-parts';
+import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
 import type { FramePoint } from './frame-drill';
 
 type Size = { width: number; height: number };

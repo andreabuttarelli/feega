@@ -1,10 +1,10 @@
-import { IDENTITY, apply2d, type Affine } from './affine';
+import { IDENTITY, apply2d, type Affine } from '@feega/motion-core/motion/affine';
 import { commonGap } from './export-gaps';
-import { MaskMode } from './mask';
-import { CoverKind } from './gpu-full/mask-layers';
-import { ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type MaskLayer, type Paint, type PathItem } from './gpu-full/display-list';
-import { FillRule } from './gpu-full/paint';
-import type { Rgba } from './gpu-full/rgba';
+import { MaskMode } from '@feega/motion-core/motion/mask';
+import { CoverKind } from '@feega/motion-core/motion/gpu-full/mask-layers';
+import { ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type MaskLayer, type Paint, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
+import type { Rgba } from '@feega/motion-core/motion/gpu-full/rgba';
 import type { Crop } from './export-vector';
 
 export type SvgOptions = { scale: number; crop?: Crop; images: ReadonlyMap<string, string> };

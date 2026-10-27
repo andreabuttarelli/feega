@@ -1,4 +1,7 @@
-# feega — Social Media AI Autopilot
+# feega — infinite canvas of typed nodes
+
+This file mirrors `CLAUDE.md` for non-Claude agents (Codex, Cursor…). `CLAUDE.md` is the source
+of truth: when they disagree, it wins.
 
 ## CLI
 
@@ -14,30 +17,88 @@ feega login
 
 # Quick commands
 feega brands                                    # List brands
-feega dashboard <slug>                          # Brand overview
-feega content <slug> --status pending_user      # Pending posts
-feega approve <slug> --all                      # Approve all pending
-feega post <slug> <id> edit --caption "..."     # Edit post
-feega post <slug> <id> slide --index 1 ...      # Edit one carousel slide
-feega plan <slug>                               # View editorial plan
-feega weekly-plan <slug> produce --week 0       # Produce posts
-feega seo <slug>                                # SEO grade + initiatives
-feega geo <slug>                                # AI visibility / citations
-feega keywords <slug>                           # Keyword strategy
-feega web <slug>                                # Blog articles (drafts too)
-# Backlinks network lives at GET/POST /api/v1/brands/:slug/backlinks (CLI command TBD — see cli/)
-# Idea bank: GET/POST /api/v1/brands/:slug/ideas (disruptive ideas agents save — docs/42)
-# Field watch: GET/POST /api/v1/brands/:slug/market/field (what moves in the brand's field, taken apart)
-# Radar self-test: GET /api/v1/brands/:slug/radar/diagnose (fetches every source live, says why one finds nothing)
-# Brand doctor: GET /api/v1/brands/:slug/doctor (per cycle, the first gate the brand fails and how to unlock it)
-# Agent Library: GET /api/v1/agent-templates (public catalogue behind /agents + Automations › Custom Agents)
-# Chat goals: GET /api/v1/brands/:slug/goals (history + summary of goal mode — met_first_pass, laps, stopped_by)
-# Web evidence: GET /api/v1/brands/:slug/web/{audits,audits/findings,audits/citations,fixes}
-#   (audit history, what one audit observed, the citation probes behind share of voice, and the
-#   generated fixes with their body — reads only, spend nothing)
-feega studio <slug> add-note --text "..."       # Add knowledge
-feega ai <slug> --message "..."                 # AI chat (full access)
+feega projects                                  # List projects
+feega canvases <projectId>                      # List a project's canvases
+feega motion list                               # List motion frames
+feega motion ask <nodeId> "<prompt>"            # Ask the motion agent to change a frame
+feega products <slug> sync                      # Re-import catalog from the connected store
+feega upgrade <slug>                            # Open billing checkout
 ```
+
+## Lo schema del database (26 tabelle, progetto `klnswzhhgrqvbfjzioul`)
+
+Il prodotto è una **tela infinita**: nodi tipizzati che una persona, la chat in sidebar o un agente
+esterno via MCP lavorano insieme. Il disegno completo, con le ragioni di ogni scelta, sta in
+[`NEW_DATABASE_STRUCTURE.md`](NEW_DATABASE_STRUCTURE.md); qui stanno i nomi e i vincoli che
+servono per non sbagliare una query.
+
+**La gerarchia, e dove sta il brand:**
+
+```
+org ──┬── brands            voce, palette, account: serve a PUBBLICARE
+      └── projects ──┬── canvases ── nodes ── nodes_connections
+                     │                 └── node_runs (una generazione)
+                     └── assets       testo/immagini/video/documenti
+```
+
+`projects.brand_id` è **nullable, ed è il caso normale**: si apre una tela per esplorare e si
+sceglie il brand solo quando il materiale diventa qualcosa da pubblicare. Tutto il canvas
+funziona senza brand; chiederlo prima trasformerebbe un foglio bianco in un modulo da compilare.
+
+**Il post non appartiene al progetto.** `posts.brand_id` è NOT NULL, `posts` non ha `project_id`:
+il calendario è per brand, e un post assembla materiale da tele diverse. Il legame con l'origine
+è `post_sources` (molti-a-molti verso `nodes`), l'unica tabella senza `org_id` — il tenant lo
+porta il padre.
+
+| Gruppo | Tabelle |
+|---|---|
+| Tenant | `orgs` `orgs_members` `orgs_invites` `profiles` `api_keys` |
+| Tela | `projects` `canvases` `nodes` `nodes_connections` `node_runs` `assets` `canvas_events` |
+| Brand | `brands` `products` `social_accounts` |
+| Contenuto | `posts` `post_sources` `scheduled_posts` |
+| Ads (solo Meta) | `ad_accounts` `ad_campaigns` `ad_creatives` `competitor_ads` |
+| Sorgenti | `social_posts` (feed scaricati) |
+| Agenti | `chat_threads` `chat_messages` `ai_calls` |
+| Influencer | `influencers` `influencer_views` |
+
+**I vincoli che non si scoprono leggendo i nomi:**
+
+- **`org_id` su ogni tabella** (tranne `post_sources`), e la RLS è attiva su tutte con
+  `auth_org_ids()`. **La service-role key la scavalca**: ogni uso va dichiarato in
+  `src/lib/server/db/service-role-uses.ts`, che è un argomento obbligatorio di
+  `createServiceRoleDb`. **`influencers`/`influencer_views` sono la deviazione dichiarata**:
+  `org_id` è **nullable**, e `null` è il catalogo globale (seminato da
+  `scripts/import-anomalia-talents.ts` con la service-role key) — ogni org lo legge, nessuna lo
+  scrive; un'org che crea un proprio influencer ottiene `org_id` valorizzato, visibile solo a lei.
+- **`nodes.data jsonb`** porta il payload per tipo (`text` `image` `video` `doc` `iframe`
+  `social_account_feed` `social_post_mockup` `products` `ads` `influencer`). Una tabella sola: i
+  campi per tipo sarebbero ~40, quasi tutti NULL, e il mockup è un albero.
+- **`nodes.version`**: la posizione è last-write-wins, `data` va in concorrenza ottimistica
+  (`where version = $atteso`; zero righe = conflitto, mai un successo silenzioso).
+- **`nodes.deleted_at`**: cancellazione morbida, e ogni lettura filtra `deleted_at is null`.
+- **`actor_kind` / `actor_id` / `agent_key`** ovunque si registri un'azione. Per un agente
+  `actor_id` è **l'utente per conto del quale agisce** — `api_keys.user_id` è NOT NULL proprio
+  perché dietro un agente c'è sempre chi paga.
+- **`nodes_connections.target_handle`**: un video con frame iniziale e finale ha due ingressi.
+  Senza saperlo l'arco non si può eseguire.
+- **Realtime** pubblica `nodes`, `nodes_connections`, `canvases`, `node_runs` con
+  `replica identity full` — senza, un DELETE arriva con la sola chiave primaria.
+- **Storage**: bucket `brand-knowledge` (`${userId}/media/...`) e `canvas-assets`
+  (`${orgId}/${projectId}/...`), entrambi privati. Nascono da una migration: erano mancanti sul
+  progetto nuovo e ogni generazione immagine falliva con `store_failed`. Bucket `influencers`
+  (privato anche lui): `catalogue/<influencerId>/...` (letto da chiunque abbia una sessione) e
+  `<orgId>/<influencerId>/...` (letto solo dalla propria org) — la sola policy di lettura del
+  primo confronta il segmento con la STRINGA `'catalogue'`, non con un `org_id` in `auth_org_ids()`
+  come ogni altra policy di questo bucket e di `canvas-assets`. Bucket `media`, PUBBLICO
+  (`20260923_media_bucket.sql`, non ancora applicata) — non per la produzione AI riusabile, che va
+  in `brand-knowledge`/`signKnowledgePaths` come ogni altro asset `generated`, ma per ciò che deve
+  restare un URL nudo, durevole oltre la sessione: avatar (`${userId}/profile/...`), logo del brand
+  (`${userId}/studio/...`, `${brandId}/logo-...`) e swatch di un colore trascinato sulla tela
+  (`colours/${orgId}/${hex}.png`).
+
+I tipi vengono **generati** (`npm run db:types` → `src/lib/database.types.ts`), mai scritti a
+mano: sono ciò che trasforma una colonna sbagliata in un errore di compilazione invece che in un
+`console.warn` che nessuno legge.
 
 ## Architecture (this repo — the server side of the CLI)
 
@@ -48,32 +109,6 @@ feega ai <slug> --message "..."                 # AI chat (full access)
   `loadBrandForUser`, and `gateAiAction` (paid plan + credits) for endpoints that spend AI
 - **Login callback** (`src/routes/cli/callback/`) — the page the browser login flow posts back to
 
-## Connectors (Composio)
-
-External apps are brokered by **Composio** (`COMPOSIO_API_KEY`), not by us: it holds the OAuth
-tokens and we store only the connected account id. Provider APIs are called through the Composio
-proxy (`composioProxy`), so no access token is ever read or logged in this repo.
-
-- **Client** `src/lib/server/composio.ts` — REST v3.1: toolkits, auth configs, Connect Links,
-  connected accounts, tools, proxy.
-- **Catalog + brand rows** `src/lib/server/composio-catalog.ts` (+ client-safe
-  `src/lib/composio-catalog.ts`) — `app_integration_registry` decides what brands see,
-  `brand_app_connections` mirrors Composio and is reconciled on read.
-- **Agent tools** `src/lib/server/composio-agent.ts` — backs the chat tools
-  `list_integrations_tools` / `call_integrations_tools`.
-- **Knowledge ingest** `src/lib/server/knowledge-sources.ts` + `knowledge-connectors/` — Drive,
-  Notion, GitHub, Gmail into `brand_documents`.
-- **Surfaces**: Settings → Connectors (browser), and `/api/v1/brands/:slug/connections*` for the
-  CLI and MCP (`feega connections`). Docs: [`docs/api/09-connections.md`](docs/api/09-connections.md).
-- **Outbound webhooks** `brand-webhooks.ts` + `brand-triggers.ts` — Composio posts every trigger
-  event to one project URL (`/api/v1/composio/webhook`, `COMPOSIO_WEBHOOK_SECRET`); we fan out to
-  each brand's own endpoint with our signature, retries (`/api/v1/webhooks/work`, cron) and a
-  delivery log. Trigger instances are created and deleted from the brand's own state: an endpoint
-  plus a connected toolkit plus something selected to watch.
-
-Composio-managed auth means most toolkits need no OAuth app of ours; create a custom auth config
-in the Composio dashboard when a toolkit needs our branding, scopes or quota — the code prefers a
-custom config over the managed one automatically.
 
 ## How code is written here: clean architecture and Kent Beck's method (a rule, not a habit)
 
@@ -140,20 +175,56 @@ code:
   next case is added with a row and all of them are visible together. A rule written in five
   places diverges at the first change — and diverges silently.
 
+## I raggi seguono una scala, non il gusto del momento (una regola, non un'abitudine)
+
+Il 14/10/2026 la regola "cerchi o rettangoli" è stata tolta: il guscio ora usa **una scala di
+raggi con un ruolo per gradino** (`--ui-radius-*` in `src/app.css`, esposta da Tailwind come
+`rounded-xs/sm/md/lg`; `--radius` in `src/lib/styles/tailwind.css` vale `md`): `none` 0 per
+tele, contenuto dei nodi, pannelli e barre a tutta altezza; `xs` 2px per kbd, checkbox, swatch;
+`sm` 4px per bottoni, input, righe, segmenti; `md` 6px per menu, popover, card; `lg` 10px per
+dialog, sheet e barre flottanti; `full` per avatar, pallini, pill. Si sceglie il gradino per
+ruolo, mai un valore libero (`border-radius: 7px` no). Il dettaglio sta in `DESIGN.md`. Il
+contenuto dei video e dei template segue le sue regole, non questa.
+
+## L'app comanda, CLI e MCP si adattano (una regola, non un'abitudine)
+
+La direzione è una sola: **app → CLI → MCP.** Se una funzionalità esce dal prodotto, escono con
+lei gli endpoint che la servivano, i comandi CLI che li chiamavano e i tool MCP che li
+esponevano — nello stesso cambiamento.
+
+Che la CLI usi una cosa **non è un argomento per tenerla**: è l'argomento per aggiornare la CLI.
+
+## Una funzione non esiste finché non è collegata (una regola, non un'abitudine)
+
+Costruire il pezzo non basta. Una funzione è finita solo quando è **collegata da capo a capo**
+(punto d'ingresso nella UI → handler/action → funzione server → database o provider → quello che
+l'utente vede) e chi l'ha scritta ha **seguito quel percorso nel codice**, file per file. Il
+report lo dice: *clic su X in `A.svelte` → `action` in `B/+page.server.ts` → `fn` in `C.ts` →
+tabella D*.
+
+Il test giusto è quello che esercita il collegamento vero: un test della route/action che chiama
+la funzione server reale, non un mock della cosa che si sta collegando. **Playwright non serve
+per ogni funzione**: costa tempo e budget. Si tiene per pochi percorsi critici (il canvas si apre,
+genera, crea un post, il calendario), sull'harness condiviso in `tests/e2e/fixtures/`.
+
+Il 22/09/2026 i connettori tipizzati esistevano nella logica e nessun componente li disegnava, e
+il calendario puntava a colonne mai esistite: la suite era verde in entrambi i casi.
+
 ## Two changelogs, always both (a rule, not a habit)
 
 Every change a user can notice updates **two**, in the same commit. Both are **one file per
 entry** — two PRs in parallel touch different files and the changelogs never conflict:
 
 1. **`changelog/YYYY-MM-DD-<slug>.md`** — for whoever works on the code. Why the thing exists,
-   what was there before, which decisions were made and what was discarded. Convention in
-   `changelog/README.md`. **`CHANGELOG.md` is frozen** (historical archive): nothing is added
+   what was there before, which decisions were made and what was discarded. Shape: `# Title`,
+   then `**Before:**`, `**Now:**`, `**Discarded:**` paragraphs. **`CHANGELOG.md` is frozen** (historical archive): nothing is added
    there anymore.
 2. **`src/lib/content/changelog/YYYY-MM-DD-<slug>.ts`** — the **public** changelog, the one the
    customer reads. It is **English only**, one `ChangelogEntry` as export default; the loader
    (`src/lib/content/changelog/index.ts`) sorts them newest first. One line per feature, few
    words, release-note style ("Motion videos now have voice-over and music by default"), not a
-   paragraph. The page `src/routes/[[lang=locale]]/changelog/+page.svelte` is not touched: it
+   paragraph. The page `landing/src/routes/changelog/+page.svelte` (the
+   standalone marketing site, `landing/`) reads this folder at build: it is not touched, it
    already shows everything.
 
 They are two different texts, not the same text translated. The public one doesn't name files,
@@ -172,7 +243,12 @@ worktree. Con più worktree aperti — che qui è la norma, uno per task — uno
 essere riesumato in un altro e sostituire in silenzio i tuoi edit con quelli di un lavoro
 estraneo. È già successo, ed è costato lavoro perso: la storia sta in [`LESSONS.md`](LESSONS.md).
 
-Non c'è un caso in cui valga la pena: **un hook `PreToolUse` lo blocca prima che parta.** Per
+Non c'è un caso in cui valga la pena: **un hook `PreToolUse` lo blocca prima che parta** (solo in Claude Code: altri agenti non ce l'hanno, la regola vale lo stesso)
+(`.claude/hooks/block-destructive-git.sh`, registrato in `.claude/settings.json`, casi in
+`.claude/hooks/cases.tsv`, verifica con `.claude/hooks/check.sh`). Blocca anche `reset --hard` e
+`clean -fd`; lascia passare `stash list` e `stash show`. Fino al 22/09/2026 questa sezione
+descriveva un hook che nel repo non esisteva: uno `stash -u` ha poi spazzato il lavoro non
+committato di otto agenti. Per
 sospendere delle modifiche ci sono tre strade, tutte più sicure e nessuna più lenta:
 
 - **committa sul branch del task** — è per questo che il branch esiste, e un commit di lavoro si
@@ -195,7 +271,8 @@ no stories.
 
 ## Agent evaluation, before anything that matters (a rule, not a habit)
 
-Unit tests (5200, all green) verify that the **code is well built**. They have never prevented a
+Unit tests (~7.000, green in CI — check the CI log before believing a local red: see
+LESSONS.md) verify that the **code is well built**. They have never prevented a
 single quality defect, because they run on a fake model and a fake database: brand context
 arrived empty, attachments were rejected by a constraint, the model resolved to the wrong one,
 and a read crossed every brand of the user — **green suite for everyone**.
@@ -204,26 +281,55 @@ The evaluation (`scripts/eval/`) is the only thing that verifies **the product w
 the real agents to work on a disposable trial brand, with real requests, and judges FACTS before
 tastes — does the artifact exist? is the number right? how many text blocks? what did it cost?
 
-**What exists today. Only this command is real:**
+**What exists today — four commands against the real canvas, and they measure different things:**
 
 ```bash
-npm run eval:durability   # the work does not vanish: 3 scenarios against the real database and the real plpgsql
-npm run eval:durability -- --only=<scenario>
+npm run eval:bootstrap    # a real signup lands in a working org/project — the entry path itself
+npm run eval:canvas       # realtime on nodes/canvases/presence: does a peer see what another peer wrote?
+npm run eval:gen-node     # the three paths run_node_generation can take, against the real engine
+npm run eval:image-node   # an image node lands a real file in storage, not just a row that claims one
+npm run eval:provider-smoke -- --spend   # one cheapest render per media provider, $1 hard cap; dry run without --spend
 ```
 
-`eval:durability` measures whether the product *keeps what it produced* — a turn killed
-mid-work, the salvage when it gives up, and a taken-over run that must not deposit a second
-message. It runs against real SQL, which is the whole point: the two defects that slipped
-through in one session were a changed function signature and a reaper whose contract had moved
-under its own tests, and a fake client cannot see either.
+`eval:bootstrap` proves the entry path a real signup takes — a fresh user through `enterApp` —
+lands in a usable org and project, not a row that exists but nothing can open.
+
+`eval:canvas` proves realtime works on what the canvas is built from: it connects two clients to
+the same canvas and checks that a write from one arrives at the other — presence, node changes,
+connections. A UI that reads from a channel nobody proved delivers is a UI that looks done and
+silently isn't.
+
+`eval:gen-node` walks `run_node_generation`'s three real outcomes — success, a stale `version`
+refused as `conflict`, a medium that doesn't match the node's `type` refused before anything is
+spent — against the actual engine, not a mock of it.
+
+`eval:image-node` is the narrower, cheaper proof that an image node lands a real file: one render
+on the cheapest model in the catalog, then the object is actually downloaded and its bytes
+counted. A bucket that exists and a policy that compiles are not the same claim as a file landing
+in it — `store_failed` can still come back for reasons neither of those catches.
+
+`npm run eval:motion -- --port=5199 [--only=<case>] [--compare=<run dir>] [--cap=20]` is the
+motion agent's quality eval: five fixed briefs (feega, linear, stripe, a Shopify demo store, a
+mobile app), each on a throwaway account, driven through the editor chat by Playwright, exported
+in the browser. Facts first (duration, holds, empty frames, text size, recreated vs kit UI, beat
+alignment, gate left, errors, cost from `ai_calls`), then a vision judge calibrated on anchor
+stills in `scripts/eval/motion-quality/anchors/`. Output in `~/Documents/feega-videos/evals/<ts>/`.
+Never on port 5173; ~$2.5 per case.
 
 **What does NOT exist, so nobody writes it in a report as if it had run:** `npm run eval`,
-`npm run eval:ux` — the onboarding walk was removed: it cost real money on every run and graded
-the in-app chat, which is not where the product is going — the
-`--all` / `--budget` / `--jobs` / `--compare` flags, cost read from `ai_calls`, `docs/EVAL_PLAN.md`,
-and the browser engine with a throttled network. The richer scenario catalogue described in the
-frozen `CHANGELOG.md` (`brand-nudo`, `conteggio-secco`, …) was designed and never merged. Reading
-about a command here is not evidence that it runs — check `package.json`.
+`npm run eval:ux`, `npm run eval:durability`, `npm run eval:creative`, `npm run eval:clip` — the
+rubric/plan/post pipeline and the UGC clip renderer they walked are gone with the rest of the old
+product, and their scripts were deleted alongside them, not left broken in `scripts/eval/`. Also
+absent: the `--all` / `--budget` / `--jobs` / `--compare` flags, cost read from `ai_calls`,
+`docs/EVAL_PLAN.md`, and a browser engine with a throttled network. Reading about a command here
+is not evidence that it runs — check `package.json`.
+
+**And being in `package.json` is not evidence that it WORKS.** A script with a dead import — a
+function whose signature moved, a module that no longer exists — fails on its first line and
+nobody notices, because no unit test covers a script and nobody runs it between deploys; it costs
+money. A probe nobody runs rots exactly like the product it was meant to watch: run it before you
+trust its last report, and delete it outright the day its imports stop resolving rather than
+leaving it to lie in a report later.
 
 **When to run it** — not on every commit (it costs real money), but always:
 
@@ -252,11 +358,49 @@ The criterion of a good scenario is one only: **if you re-ran the real failures 
 would this one catch them?** If a real defect would not have been caught by any scenario, the
 scenario is missing.
 
-**Two families, not one.** The *quality* scenarios (does the agent answer well? deliver? use the
-brand's context?) run server-side and stand alone. The *durability* scenarios — bad network, tab
-closed and reopened mid-work, a turn that outlasts 30 minutes and must continue alone — need a
-real browser with a throttled network, so they live alongside but on another engine. A product
-that answers well and loses work when the line drops is not ready: measure both.
+**Two families, not one — only one built today.** *Quality* scenarios (does the write land? does
+realtime deliver it? does the file actually exist?) run server-side and are what `scripts/eval/`
+holds now. A second family — bad network, tab closed and reopened mid-work, a turn that outlasts
+30 minutes — would need a real browser with a throttled network and does not exist yet: nothing
+in this repo measures it. A product that answers well and loses work when the line drops is not
+ready, so that gap is real, not a nitpick — it just isn't closed by a command you can run today.
+
+## Docs and a feature video ship with the change (a rule, not a habit)
+
+Every PR that changes a feature, an API under `/api/v1`, a CLI command, an MCP tool or
+self-hosting does two more things in the **same PR**:
+
+1. **Updates `web-docs/`** (published on https://docs.feega.app). Pages under
+   `reference/generated/`, `self-hosting/` and `architecture/adr/` are generated at build from the
+   code and `docs/`: fix the source, not the page. Every command, endpoint and tool a page names
+   must exist in the code; what leaves the product leaves the docs.
+2. **Records a feature video**, attached to the PR under *Evidence* and ready to post on X and
+   Threads: 16:9, about 10 s, two parts joined —
+   - an **intro/title made in feega's motion editor**, exported as MP4;
+   - a **real screen recording of the app** made with the demo recorder (`scripts/demo-record/`,
+     one `demos/<slug>.demo.ts` per feature, run with
+     `npx playwright test -c scripts/demo-record/playwright.config.ts <slug>`), whose camera zooms
+     on **every click and every typing moment**.
+
+   The video is always **complete** (the whole flow, start to finish, never a fragment) and uses
+   **real, realistic, well-made example content** (a landing page UI, an app UI, a graphic design
+   piece), never placeholder shapes or lorem ipsum.
+
+   Files land in `~/Documents/feega-videos/demos/`: the recorder writes
+   `<YYYY-MM-DD>-<slug>-16x9.mp4` (raw takes in `demos/raw/<slug>-<ts>/`); the intro is saved
+   next to it as `<YYYY-MM-DD>-<slug>-intro.mp4` and the joined cut as
+   `<YYYY-MM-DD>-<slug>-final.mp4`. `<slug>` is the PR branch slug. The final cut is the one
+   attached to the PR.
+
+A change that is invisible from outside (refactor, test, index) needs neither.
+
+## Agent PRs go to `dev`, never to `main` (a rule, not a habit)
+
+`main` is the repo's default branch and what production deploys. Every merge into it is a
+production deploy, and one per PR was too many. So every PR an agent opens branches from an
+up-to-date `origin/dev` and targets `dev` (`gh pr create --base dev`); it is merged there when CI
+`test` passes. `main` only receives batched releases `dev → main`, and only when the user says so.
+A production hotfix straight to `main` happens only when the user asks for that specific fix.
 
 ## The commit author, or Vercel won't build
 
@@ -307,7 +451,6 @@ touches the database; it exits 1 if it finds something.
 
 - Let the reader of the code breathe. Add empty lines between logical blocks of code.
 
-- Add a small, to the point, comment to explain *what* the block does and *why*. Use examples when possible. Propose ASCII drawings to explain complete systems.
 
 - Treat member visibility changes as a breaking design shift. Keep all fields and functions private unless external access is strictly required by the design. Prompt the user for explicit approval before changing any access modifier from private to internal or public.
 
@@ -333,20 +476,9 @@ Rule 7: Use the body to explain what and why vs. how. Assume the code explains t
 
 - If the prompt indicates that a bug is being fixed, don't write the fix right away. First write the test. Observe it failing. Then write the fix. And observe the test passing.
 
-## Mattpocock skills (use them often)
+## Domain docs
 
-Prefer these skills over improvising; load them with the `skill` tool.
-
-- Any non-trivial change or new feature → `grill-with-docs` (outside code: `grill-me`)
-- Implementing from a spec or tickets → `implement`, driving `tdd` (red-green-refactor)
-- Bug or perf regression → `diagnosing-bugs`
-- Design question needing an answer fast → `prototype`
-- Decision hard to explain → `domain-modeling` (CONTEXT.md / ADR)
-- Feature ready to close → `code-review`
-- Planning large work → `to-spec` → `to-tickets`; bigger than one session → `wayfinder`
-
-The user-invoked skills (`grill-with-docs`, `to-spec`, `implement`, `wayfinder`) fire on explicit
-request; the others you load yourself when the task matches.
+Single-context: root `CONTEXT.md` + `docs/adr/`. Issues live in GitHub Issues (andreabuttarelli/feega), via the `gh` CLI.
 
 ## Tasks = Notion "feega > Tasks"
 

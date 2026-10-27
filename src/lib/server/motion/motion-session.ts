@@ -8,7 +8,7 @@ import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { VIDEO_BUDGET, type BudgetCard } from '$lib/server/motion/video-budget';
 import { type CutReview } from '$lib/motion/cut-review';
 import type { SavedTool } from '$lib/server/repos/chat';
-import type { LaunchScript } from '$lib/motion/script';
+import type { LaunchScript } from '@feega/motion-core/motion/script';
 import { StudioRole } from '$lib/server/motion/studio-roster';
 import { type MotionToolDeps } from '$lib/server/motion/motion-tools';
 import type { MotionAsset } from '$lib/server/motion/editor';
@@ -51,6 +51,7 @@ export const STILL_OPEN_ID = 'still-open';
 export const LAST_LOOK_ID = 'last-look';
 export const CRITIC_ID = 'critic-sheet';
 export const LOOP_SEAM_ID = 'loop-seam';
+export const CUT_PROBE_ID = 'cut-probe';
 export const CUT_REVIEW_ID = 'cut-review';
 export const SHEET_FILE = 'sheet.jpg';
 

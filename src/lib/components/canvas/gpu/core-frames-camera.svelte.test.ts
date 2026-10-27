@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, frames: 0, puts: [] as string[], splices: [] as { from: string; to: string; items: number }[] }));
 
-vi.mock('$lib/motion/gpu-full/core-web', () => ({
+vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
   createCore: () =>
     Promise.resolve({
       putGroup: (key: string) => calls.puts.push(key),
@@ -26,7 +26,7 @@ vi.mock('$lib/motion/gpu-full/core-web', () => ({
   createCoreGl: () => new Promise(() => undefined)
 }));
 
-vi.mock('$lib/canvas/core/frame-source', () => ({ drawsWhole: () => true, onStage: (l: unknown) => l, stillFrame: () => 0 }));
+vi.mock('$lib/canvas/core/frame-source', () => ({ drawsAny: () => true, onStage: (l: unknown) => l, stillFrame: () => 0 }));
 
 const { default: CoreFrames } = await import('./CoreFrames.svelte');
 const dir = dirname(fileURLToPath(import.meta.url));

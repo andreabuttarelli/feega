@@ -1,23 +1,27 @@
-import type { BrandTokens } from '$lib/motion/brand';
-import type { MotionDoc } from '$lib/motion/doc';
-import { drawFrame, prepare, type DisplayList } from '$lib/motion/gpu-full/display-list';
-import { readClips } from '$lib/motion/gpu-full/dom/custom';
-import type { FaceBook } from '$lib/motion/gpu-full/text/face';
-import type { Smoothing } from '$lib/motion/gpu-full/text/painter';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
+import { readClips } from '@feega/motion-core/motion/gpu-full/dom/custom';
+import { localFilesSnapshot, type LocalFilesSnapshot } from '@feega/motion-core/motion/fonts/local-files';
+import type { FaceBook } from '@feega/motion-core/motion/gpu-full/text/face';
+import type { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
+import { sceneNodeIds } from '$lib/motion/scenes';
 import { frameOfLive } from './frame-source';
 
 export type FrameDoc = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens; playhead?: number };
 
 export type Fonts = (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook>;
 
-export type BuildAsk = { id: number; url: string; smoothing: Smoothing };
+export type BuildAsk = { id: number; url: string; smoothing: Smoothing; locals: LocalFilesSnapshot };
 
 export type BuildAnswer = { id: number; list: DisplayList | null } | { id: number; error: string };
 
 export type BuildWorker = { postMessage: (ask: BuildAsk) => void; onmessage: ((e: MessageEvent<BuildAnswer>) => void) | null; onerror: ((e: ErrorEvent) => void) | null };
 
+const MAIN_THREAD_ONLY: ((source: FrameDoc) => boolean)[] = [(source) => readClips(source.doc, source.tokens.logoUrl).read.length > 0, (source) => sceneNodeIds(source.doc).length > 0];
+
 export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: Fonts): Promise<DisplayList | null> {
-  if (readClips(source.doc).read.length) {
+  if (MAIN_THREAD_ONLY.some((needs) => needs(source))) {
     return null;
   }
   const faces = await fonts(source.doc, source.assets, source.tokens);
@@ -57,7 +61,7 @@ export function frameBuilder(spawn: () => BuildWorker | null): (url: string, smo
     worker.onmessage = answer;
     worker.onerror = die;
     const id = next++;
-    worker.postMessage({ id, url, smoothing });
+    worker.postMessage({ id, url, smoothing, locals: localFilesSnapshot() });
     return new Promise((resolve, reject) => waiting.set(id, { resolve, reject }));
   };
 }

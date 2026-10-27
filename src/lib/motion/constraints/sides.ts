@@ -1,4 +1,4 @@
-import { Horizontal, Vertical } from './model';
+import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
 
 export enum Side {
   Start = 'start',

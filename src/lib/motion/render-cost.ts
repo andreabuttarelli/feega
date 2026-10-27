@@ -1,8 +1,8 @@
-import type { ComponentId } from './components';
-import { clipsOf, type MotionClip, type MotionDoc } from './doc';
-import { Matte } from './mask';
-import type { LayoutId } from '../canvas/composition/types';
-import { ringCards, ringRadiusPx, slicesFor, RING_LAYOUT, type RingCard } from './ring/model';
+import type { ComponentId } from '@feega/motion-core/motion/components';
+import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Matte } from '@feega/motion-core/motion/mask';
+import type { LayoutId } from '@feega/motion-core/canvas/composition/types';
+import { ringCards, ringRadiusPx, slicesFor, RING_LAYOUT, type RingCard } from '@feega/motion-core/motion/ring/model';
 
 export type CostSpan = { from: number; to: number; ms: number };
 

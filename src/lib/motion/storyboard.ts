@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { ACTS, Act } from './script';
-import { findClip, type MotionDoc } from './doc';
+import { ACTS, Act } from '@feega/motion-core/motion/script';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { nodeSize } from '$lib/canvas/node-size';
 import { PLACEMENT_GAP } from '$lib/canvas/placement';
 import type { DuplicatePlan, DuplicatedEdge, DuplicatedNode } from '$lib/canvas/duplicate-plan';

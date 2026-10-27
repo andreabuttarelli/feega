@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { flattenComps } from './precomp';
-import { appendScene, insertableScenes, reorderScenes, sceneEdit, resolveScenes, sceneNodeIds, scenesLeftToRight, scenesOf, sceneTransition, sequenceScenes, trimScene } from './scenes';
-import { JunctionKind } from './junction-model';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
+import { appendScene, insertSceneAt, insertableScenes, reorderScenes, sceneEdit, resolveScenes, sceneNodeIds, scenesLeftToRight, scenesOf, sceneTransition, sequenceScenes, trimScene } from './scenes';
+import { JunctionKind } from '@feega/motion-core/motion/junction-model';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -122,6 +122,33 @@ describe('scenes sequenced in a parent frame', () => {
       [B, 60]
     ]);
     expect(new Set(scenesOf(grown).map((s) => s.clipId)).size).toBe(2);
+  });
+
+  it('inserting at a time lands on the nearest scene boundary', () => {
+    const parent = sequenceScenes(newMotionDoc(MotionFormat.Landscape), [
+      { nodeId: A, durationInFrames: 60 },
+      { nodeId: A, durationInFrames: 60 }
+    ]);
+    const order = (frame: number) => scenesOf(insertSceneAt(parent, { nodeId: B, durationInFrames: 30 }, frame)).map((s) => s.nodeId);
+
+    expect(order(0)).toEqual([B, A, A]);
+    expect(order(25)).toEqual([B, A, A]);
+    expect(order(35)).toEqual([A, B, A]);
+    expect(order(70)).toEqual([A, B, A]);
+    expect(order(100)).toEqual([A, A, B]);
+    expect(order(500)).toEqual([A, A, B]);
+  });
+
+  it('the edit entry point inserts at a time in seconds', () => {
+    const seconds = (s: number) => Math.round(s * 30);
+    const start = sequenceScenes(newMotionDoc(MotionFormat.Landscape), [
+      { nodeId: A, durationInFrames: 60 },
+      { nodeId: A, durationInFrames: 60 }
+    ]);
+
+    const inserted = must(sceneEdit(start, { op: 'insert', node_id: B, duration: 1, at: 2 }, seconds));
+
+    expect(scenesOf(inserted).map((s) => s.nodeId)).toEqual([A, B, A]);
   });
 
   it('one edit entry point serves the agent tools', () => {

@@ -1,9 +1,9 @@
-import { findClip, type MotionDoc } from '../doc';
-import type { OpResult } from '../timeline';
-import { parsePath, pathData, type Outline, type Pt } from './geometry';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { parsePath, pathData, type Outline, type Pt } from '@feega/motion-core/motion/shape/geometry';
 import { Handle, Mirror, deletePoint, dragHandle, insertPoint, isCorner, movePoint, toggleClosed, toggleSmooth, type PointRef } from './pen';
 import { setPath, shapePath, type ShapeParams } from './ops';
-import { ShapeKind } from './schema';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 
 export enum PointOp {
   Move = 'move',

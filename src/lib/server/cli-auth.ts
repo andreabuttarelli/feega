@@ -1,10 +1,11 @@
-import { createServerClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, createServerClient } from '$lib/server/db/connect';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env } from '$env/dynamic/private';
 import { json } from '@sveltejs/kit';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { markRlsScoped } from '$lib/server/rls-client';
+import { LOCAL_AI_MESSAGE, localStore } from '$lib/server/local/local-mode';
+import { hasAiKey } from '$lib/local-ai-keys';
 
 /**
  * The new `api_keys` (org_id NOT NULL, scopes: string[]) has no per-brand scoping column — a key
@@ -230,6 +231,9 @@ export type CreditGateDenial = { status: number; data: { error: string; message:
 const CREDITS_EXHAUSTED_MESSAGE = 'AI credits are exhausted for this billing period. Buy more to continue.';
 
 async function creditGateOutcome(spend: () => Promise<void>): Promise<CreditGateDenial | undefined> {
+  if (localStore()) {
+    return hasAiKey(process.env) ? undefined : { status: 403, data: { error: 'local_mode', message: LOCAL_AI_MESSAGE } };
+  }
   const { CreditsExhaustedError } = await import('./credits');
   try {
     await spend();

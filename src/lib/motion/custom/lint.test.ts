@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { lintAdvice, lintSource } from './lint';
-import { ComponentMode } from './component';
+import { ComponentMode } from '@feega/motion-core/motion/custom/component';
 
 const ok = { html: '<div class="node"><span class="port"></span></div>', css: '.node{width:200px;background:#111}', js: 'tl.from(root.querySelector(".node"),{scale:0,duration:0.4,ease:"back.out"});' };
 

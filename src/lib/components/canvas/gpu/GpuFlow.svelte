@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { cardRadiusOf } from '$lib/canvas/core/gen-card';
+  import { LocalOff, isOff } from '$lib/local-user';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
   import { FrameFit, framePicker, type WorldRect } from '$lib/canvas/frame-pick';
   import { onDestroy, onMount, untrack } from 'svelte';
-  import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
+  import { TILE_PAINTED } from '@feega/motion-core/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
   import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
@@ -23,9 +25,9 @@
   import FrameTools from '../FrameTools.svelte';
   import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from '$lib/canvas/frame-view';
   import type { Boxes } from '$lib/motion/scene-select';
-  import type { MotionDoc } from '$lib/motion/doc';
-  import { findClip, type MotionClip } from '$lib/motion/doc';
-  import { TRANSFORM } from '$lib/motion/keyframes';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { findClip, type MotionClip } from '@feega/motion-core/motion/doc';
+  import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
   import CoreTextEdit from '../CoreTextEdit.svelte';
   import GradientHandles from '../GradientHandles.svelte';
   import CropHandles from '../CropHandles.svelte';
@@ -35,19 +37,20 @@
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
   import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
   import { removeVariable } from '$lib/motion/variables';
-  import type { Collection } from '$lib/motion/variables-model';
-  import type { Style } from '$lib/motion/styles-model';
+  import type { Collection } from '@feega/motion-core/motion/variables-model';
+  import type { Style } from '@feega/motion-core/motion/styles-model';
   import { gradientTarget, withFill } from '$lib/canvas/gradient-handles';
   import { imageTarget } from '$lib/canvas/crop-handles';
   import { cropRequest } from '$lib/canvas/crop-request.svelte';
-  import type { FillOf, FillType } from '$lib/motion/fill/model';
-  import type { Fill } from '$lib/motion/fill/model';
+  import { ImageTool } from '$lib/image-tools';
+  import type { FillOf, FillType } from '@feega/motion-core/motion/fill/model';
+  import type { Fill } from '@feega/motion-core/motion/fill/model';
   import { baseStyle, commitText, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
-  import { measuredTexts } from '$lib/canvas/text-autosize';
-  import type { TextCaret } from '$lib/motion/gpu-full/display-list';
-  import type { RunStyle, TextRun } from '$lib/motion/text-runs';
-  import type { ListItem } from '$lib/motion/text-lists';
+  import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
+  import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
+  import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
+  import type { ListItem } from '@feega/motion-core/motion/text-lists';
   import { frameProperties } from '../frame-properties.svelte';
   import { trailerFrom } from '$lib/motion/trailer';
   import FrameDialogs from '../FrameDialogs.svelte';
@@ -69,7 +72,7 @@
   import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
   import { quadBox, quadStyle } from '$lib/canvas/quad-box';
   import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
@@ -77,7 +80,7 @@
   import { Grip, handlesOf, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
-  import { withAutoLayout } from '$lib/motion/layout/resolve';
+  import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { EditMode, recalledMode, rememberMode, startMode } from '$lib/motion/edit-mode';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
@@ -87,6 +90,8 @@
   import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
+  import { COLOUR_TAG_HEX, colourOf } from '$lib/canvas/node-colour';
+  import { CloudMode } from '$lib/canvas/cloud-picker';
   import SelectionToolbar from '../SelectionToolbar.svelte';
   import NextStepChips from '../NextStepChips.svelte';
   import CanvasContextMenu from '../CanvasContextMenu.svelte';
@@ -96,9 +101,9 @@
   import NodeBoundary from '../NodeBoundary.svelte';
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
-  import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
-  import { sceneStamp } from '$lib/canvas/scene-sources';
+  import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
+  import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
@@ -114,7 +119,6 @@
   import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
-  import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
@@ -137,7 +141,8 @@
   import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { isTypingTarget } from '$lib/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
-  import { DragPhase, DropVerdict, isOutside, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, isOutside, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
   import { isAddable, type Addable } from '$lib/canvas/addable';
@@ -168,6 +173,7 @@
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
@@ -191,7 +197,7 @@
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { revealIn as revealDelay } from '$lib/canvas/gpu/reveal-gate';
   import { CANVAS_LOAD_EVENT, LoadKind, claimLoad, loadTiming } from '$lib/canvas/gpu/load-timing';
-  import { engineOf } from '$lib/motion/engine';
+  import { engineOf } from '@feega/motion-core/motion/engine';
   import { track } from '$lib/analytics';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { dragAngle, followGroup } from '$lib/canvas/node-layout';
@@ -227,7 +233,6 @@
   let surface = $state<HTMLDivElement | null>(null);
   let scene = $state<GpuScene | null>(null);
   let failed = $state<string | null>(null);
-  let lossNote = $state<string | null>(null);
   let view = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
 
   $effect(() => {
@@ -314,16 +319,32 @@
     }
   });
   const LIVE_POSTER_CAP = 3;
+  const LIVE_CODE_CAP = 4;
+  const IFRAME_TYPE = 'iframe';
   let settledView = $state<Viewport | null>(null);
+  const liveCode = $derived([...visibleIds(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)), view, area)].slice(0, LIVE_CODE_CAP));
   const domIds = $derived.by(() => {
     const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => holdsDoc(t.kind ?? '') && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
     const posters = placed.filter((t) => holdsDoc(t.kind ?? '') && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
     const sharp = !coreOn && BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
-    const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
+    const next = new Set([...editIds, ...sticky.keys(), ...liveCode, ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
+  let core = $state.raw<ReturnType<typeof CoreFrames> | null>(null);
+  let ramRuns = $state<FrameRange[]>([]);
+  let ramRun: AbortController | null = null;
+  let ramNode = $state('');
+
+  function cacheRam(nodeId: string, doc: MotionDoc) {
+    ramRun?.abort();
+    ramRun = new AbortController();
+    ramRuns = [];
+    ramNode = nodeId;
+    const range = doc.workArea ?? { from: 0, to: doc.durationInFrames };
+    void core?.cache(nodeId, range, ramRun.signal, (runs) => (ramRuns = runs));
+  }
   let coreDrawn = $state(new Set<string>());
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
   const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
@@ -335,6 +356,10 @@
     }
   });
   const coreLook = $derived(wrap ? themeOf(wrap) : null);
+  const tagHexOf = (id: string) => {
+    const tag = colourOf(summaries.get(id)?.data ?? {});
+    return tag ? COLOUR_TAG_HEX[tag] : null;
+  };
   const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
   const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
   const coreCards = $derived.by(() => {
@@ -350,12 +375,14 @@
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.viewOf?.(t.id) ?? null, props.genViewFor?.(t.id) ?? null),
         ...portMarks(t),
         label: labelOf(t),
-        icon: text.icons.get(t.kind as NodeType) ?? null
+        icon: text.icons.get(t.kind as NodeType) ?? null,
+        tag: tagHexOf(t.id)
       };
       const poster = holdsDoc(t.kind ?? '');
       return [{ key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
     });
   });
+  const addsBeside = (t: Tile) => holdsDoc(t.kind ?? '') && kindOfNode(t.id) === FrameKind.Frame;
   const turnOf = (t: Tile) => (t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined);
   const coreChrome = $derived.by(() => {
     const look = coreLook;
@@ -364,19 +391,20 @@
       return [];
     }
     return placed.flatMap((t) => {
-      if (!coreDrawn.has(t.id)) {
+      const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
+      if (!coreDrawn.has(t.id) && !handed) {
         return [];
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
-      const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : ChromeLayers.State;
+      const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
       }
       const marks = portMarks(t);
-      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null } : { label: null, icon: null };
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, turn: turnOf(t), layers }];
+      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id) } : { label: null, icon: null };
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
     });
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
@@ -1249,7 +1277,7 @@
       startCrop(id, deeper.clip);
       return;
     }
-    if (id) {
+    if (id && !target.closest('textarea, input, [contenteditable="true"]')) {
       props.onNodeDoubled?.(id);
     }
     const stage = id ? wrap?.querySelector<HTMLElement>(`[data-motion-node="${id}"] [data-frame-stage]`)?.getBoundingClientRect() : null;
@@ -1378,7 +1406,7 @@
   const revisionOfFrame = (id: string) => coreFrames.find((f) => f.id === id)?.revision ?? 0;
   const drawnFrames = $derived(coreFrames.map((f) => {
     const doc = liveOf(f.id)?.doc;
-    const scenes = doc ? sceneStamp(doc, revisionOfFrame) : '';
+    const scenes = doc ? sceneStamp(doc, (id) => sceneRevision(revisionOfFrame(id), liveDocs.edits.get(id))) : '';
     return scenes ? { ...f, scenes } : f;
   }));
   $effect(() => {
@@ -2045,14 +2073,7 @@
     if (!fit || saver.history.present !== doc) {
       return;
     }
-    if (fit.doc) {
-      saver.amendRoot(fit.doc, 'Fitted text');
-      liveDocs.set(nodeId, { ...live, doc: fit.doc });
-    }
-    if (fit.node) {
-      await saver.flushPending();
-      props.onPlace?.(nodeId, fit.node.w, fit.node.h);
-    }
+    applyTextFit(fit, { amend: (fitted) => saver.amendRoot(fitted, 'Fitted text'), show: (fitted) => liveDocs.set(nodeId, { ...live, doc: fitted }), place: (node) => props.onPlace?.(nodeId, node.w, node.h) });
   }
 
   let frameGuides = $state<{ nodeId: string; guides: Guide[]; gaps: Gap[] } | null>(null);
@@ -2591,6 +2612,12 @@
     snapGuides = [];
     snapSpacing = [];
     props.onLive?.([]);
+    const asScene = sceneDrop(ids, (id) => liveOf(id)?.doc ?? null, frameUnderPointer(pointOf(e), ids[0] ?? null));
+    if (asScene && props.onInsertScene) {
+      settleOverrides();
+      props.onInsertScene(asScene);
+      return;
+    }
     if (props.onTileDrop?.(ids, pointOf(e)) === DropVerdict.Taken) {
       settleOverrides();
       return;
@@ -2665,7 +2692,7 @@
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
           hovered: hovered && !selected.includes(hovered) && layersSource.hovered?.nodeId !== hovered ? (byId.get(hovered) ?? null) : null,
-          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})),
+          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })),
           chrome: coreChrome
         })
       : []
@@ -2784,7 +2811,7 @@
       return false;
     }
     const at = scoped(tools.doc, picks, tools.frame);
-    const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy], savers.get(nodeId)?.mode ?? EditMode.Motion) : null;
+    const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy], savers.get(nodeId)?.mode ?? EditMode.Design) : null;
     if (at && result?.ok) {
       commit(nodeId, { ok: true, doc: at.merge(result.doc) }, GRIP_SUMMARY[Grip.Move]);
     }
@@ -2969,7 +2996,7 @@
     [Pasted.Figma]: ({ html }) => ({ figma: html })
   };
   const PASTED_SUMMARY = 'Pasted';
-  const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
+  const FIGMA_SKIPPED = 'Pasted from Figma. Approximated or skipped:';
 
   function pasteInFrame(data: PasteData<File>, at: Point): boolean {
     const paste = (IN_FRAME[data.kind] as ((d: PasteData<File>) => FramePaste) | undefined)?.(data);
@@ -3107,6 +3134,10 @@
       targeting = ids;
     },
     'run-workflow': (ids) => props.onRunWorkflow?.(ids),
+    'save-technique': (ids) => props.onSaveTechnique?.(ids),
+    'run-technique': (ids) => props.onRunTechnique?.(ids),
+    'edit-technique': (ids) => props.onEditTechnique?.(ids),
+    'detach-technique': (ids) => props.onDetachTechnique?.(ids),
     'run-downstream': (ids) => props.onRunGraph?.(GraphScope.Downstream, ids),
     'run-stale': (ids) => props.onRunGraph?.(GraphScope.Stale, ids),
     'copy-id': (ids) => void navigator.clipboard?.writeText(ids.join('\n')),
@@ -3119,6 +3150,12 @@
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
     'combine-video': (ids) => props.onCombineScenes?.(ids),
+    'remove-background': (ids) => props.onImageTool?.(ids[0], ImageTool.RemoveBackground),
+    'upscale-image': (ids) => props.onImageTool?.(ids[0], ImageTool.Upscale),
+    inpaint: (ids) => props.onInpaint?.(ids[0]),
+    outpaint: (ids) => props.onOutpaint?.(ids[0]),
+    'split-layers': (ids) => props.onImageTool?.(ids[0], ImageTool.SplitLayers),
+    'layers-to-frame': (ids) => props.onLayersToFrame?.(ids[0]),
     export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
     delete: (ids) => props.onDelete?.(ids)
   };
@@ -3264,7 +3301,6 @@
     const recover = (lost: GpuScene) => {
       const next = nextBackend(lost.backend);
       console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'none'}`);
-      lossNote = `${lost.backend} lost`;
       scene = null;
       built = null;
       try {
@@ -3333,6 +3369,8 @@
         onaction={(id) => void runFrameAction(id)}
         marks={props.commentMarks?.(nodeId, timeline.doc.fps) ?? []}
         onmark={(id) => props.onMark?.(id)}
+        ram={ramNode === nodeId ? ramRuns : []}
+        onram={() => cacheRam(nodeId, timeline!.doc)}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
       />
@@ -3360,7 +3398,7 @@
   >
     {#if coreOn}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>
@@ -3441,7 +3479,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px;--bar-h:${holdsDoc(t.kind ?? '') && frameChrome(kindOfNode(t.id)).bar ? MOTION_NODE_BAR_H : 0}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onaddbeside={holdsDoc(t.kind ?? '') && kindOfNode(t.id) === FrameKind.Frame ? props.onAddBeside : undefined} showAdd={on || hovered === t.id || addLinger === t.id} />
+          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onaddbeside={addsBeside(t) ? props.onAddBeside : undefined} showAdd={on || hovered === t.id || addLinger === t.id} />
           {#if !domIds.has(t.id) && holdsDoc(t.kind ?? '')}
             {@const kind = kindOfNode(t.id)}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
@@ -3513,9 +3551,6 @@
     />
   {/if}
 
-  {#if dev}
-    <RendererBadge renderer={scene?.backend ?? (coreOn ? CORE : 'starting')} reason={lossNote} />
-  {/if}
 
   {#if refusal}
     <p class="edge-refusal" role="status">{refusal}</p>
@@ -3545,8 +3580,12 @@
     <CanvasAddBar
       onpick={addAtCentre}
       onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) ? viewCentre() : undefined) : undefined}
+      oncloud={props.onCloud && !isOff(LocalOff.CloudImport) ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
+      techniques={props.techniques}
+      ontechnique={props.onTechnique ? (id) => props.onTechnique?.(id, viewCentre()) : undefined}
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
+      onfigma={props.onFigmaImport ? () => props.onFigmaImport?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
       onimage={insertImageInFrame}
       oncomment={props.onCommenting ? () => props.onCommenting?.(!props.commenting) : undefined}
@@ -3570,11 +3609,19 @@
       runQuote={props.runQuoteFor?.(selected) ?? null}
       frameTools
       onrun={() => props.onRunNode?.(selected[0])}
+      variantsInFlight={selected.length === 1 ? (props.variantsInFlightFor?.(selected[0]) ?? 0) : 0}
+      oncancelvariants={() => props.onCancelVariants?.(selected[0])}
+      history={selected.length === 1 ? (props.historyFor?.(selected[0]) ?? null) : null}
+      onstop={() => props.onCancelRun?.(selected[0])}
       onaction={runSelectionAction}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
       onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}
+      oncolourchange={(tag) => props.onColourChange?.(selected, tag)}
+      onview={() => props.onViewOutput?.(selected[0])}
+      oncompare={() => props.onCompareOutputs?.(selected)}
+      onexportcloud={(provider) => props.onCloud?.(provider, CloudMode.Export, selected[0], viewCentre())}
     />
-    {#if props.postAction}
+    {#if props.postAction && !isOff(LocalOff.NextSteps)}
       <NextStepChips postAction={props.postAction} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
     {/if}
   {/if}
@@ -3863,7 +3910,7 @@
 
   .remix-banner {
     position: absolute;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     translate: -50% 0;
     max-width: calc(100% - 32px);
@@ -3886,7 +3933,7 @@
   .edge-refusal {
     position: absolute;
     z-index: 12;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     transform: translateX(-50%);
     margin: 0;

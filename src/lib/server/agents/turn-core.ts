@@ -26,3 +26,22 @@ export function writeText(writer: { write: (chunk: UIMessageChunk) => void }, id
   writer.write({ type: 'text-delta', id, delta: text });
   writer.write({ type: 'text-end', id });
 }
+
+export type LandingWatch = { stop: () => void };
+
+export function landingWatch(input: { startedAt: number; timing: TurnTiming; stopped: () => Promise<boolean>; landEarly: () => void }): LandingWatch {
+  const wall = setTimeout(input.landEarly, Math.max(0, input.timing.landingMs - (Date.now() - input.startedAt)));
+  const watch = setInterval(() => {
+    void input.stopped().then((stopped) => {
+      if (stopped) {
+        input.landEarly();
+      }
+    });
+  }, input.timing.stopPollMs);
+  return {
+    stop: () => {
+      clearTimeout(wall);
+      clearInterval(watch);
+    }
+  };
+}

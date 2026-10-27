@@ -1,10 +1,10 @@
-import { Background, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+import { Background, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { CANVAS_INK, CanvasTheme, drawClip, penClip, penPaint } from '$lib/motion/draw-create';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { groupClips } from '$lib/motion/group';
-import { mapOutline, parsePath, type Pt } from '$lib/motion/shape/geometry';
+import { mapOutline, parsePath, type Pt } from '@feega/motion-core/motion/shape/geometry';
 import { svgShapes, type SvgText } from '$lib/motion/shape/svg-import';
-import { TextSizing } from '$lib/motion/text-sizing';
+import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
 import { figmaIntoFrame, type FigmaImage } from './figma/figma-doc';
 
 export type FramePaste = { svg: string } | { text: string } | { figma: string };
@@ -52,7 +52,7 @@ function pastedSvg(doc: MotionDoc, svg: string, at: Unit, scale: number, frame: 
     const box = svgTextBox(text);
     const [x, y] = toUnit([box.left + box.width / 2, box.top + box.height / 2]);
     const id = newId();
-    const made = drawClip(next, DrawTool.Text, { x, y, width: Math.max(MIN_TEXT_SIDE, (box.width * scale) / doc.width), height: Math.max(MIN_TEXT_SIDE, (box.height * scale) / doc.height) }, frame, id, TextSizing.AutoWidth, { text: text.text, color: text.fill, weight: text.weight });
+    const made = drawClip(next, DrawTool.Text, { x, y, width: Math.max(MIN_TEXT_SIDE, (box.width * scale) / doc.width), height: Math.max(MIN_TEXT_SIDE, (box.height * scale) / doc.height) }, frame, id, NEW_TEXT_SIZING, { text: text.text, color: text.fill, weight: text.weight });
     if (made.ok) {
       next = made.doc;
       ids.push(id);
@@ -71,7 +71,7 @@ function pastedText(doc: MotionDoc, text: string, at: Unit, scale: number, frame
   const width = (longest * TEXT_BOX.lineHeight * TEXT_BOX.charWidth * scale) / doc.width;
   const height = (TEXT_BOX.lineHeight * scale) / doc.height;
   const id = newId();
-  const made = drawClip(doc, DrawTool.Text, { x: at.x, y: at.y, width, height }, frame, id, TextSizing.AutoWidth, { text, color: INK[doc.background] });
+  const made = drawClip(doc, DrawTool.Text, { x: at.x, y: at.y, width, height }, frame, id, NEW_TEXT_SIZING, { text, color: INK[doc.background] });
   return made.ok ? { doc: made.doc, selection: [id] } : null;
 }
 

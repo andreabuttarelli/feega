@@ -1,7 +1,7 @@
 <script lang="ts">
   import { cardShapePatch, type CompositionNode, type UpstreamCard } from '$lib/canvas/composition-node';
-  import { CARD_ASPECTS, RATIO_RANGE, type CardAspect } from '$lib/canvas/composition/card-look';
-  import { CELL_FITS, type CellFit } from '$lib/motion/bento/model';
+  import { CARD_ASPECTS, RATIO_RANGE, type CardAspect } from '@feega/motion-core/canvas/composition/card-look';
+  import { CELL_FITS, type CellFit } from '@feega/motion-core/motion/bento/model';
 
   let { node, cards, onpatch }: { node: CompositionNode; cards: UpstreamCard[]; onpatch: (patch: Partial<CompositionNode>) => void } = $props();
 

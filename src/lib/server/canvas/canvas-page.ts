@@ -1,3 +1,5 @@
+import { exportCodeNode, isExportMode } from '$lib/server/canvas/code-export-node';
+import { ExportMode } from '$lib/canvas/code-frame';
 import { cardPreviews } from '$lib/server/canvas/card-previews';
 import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
@@ -44,21 +46,31 @@ const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number
   voice_not_yours: 403,
   cloning_not_in_this_project: 403
 };
-import { runGenNode, runsOf } from '$lib/server/canvas/generate';
-import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/canvas/loop';
+import { cancelNodeRun, runsOf } from '$lib/server/canvas/generate';
+import { planLoop, enqueueLoop, retryLoopCombo } from '$lib/server/canvas/loop';
+import { cancelBatch } from '$lib/server/canvas/cancel-batch';
+import { runGeneration } from '$lib/server/canvas/variants';
+import { parseVariantsAsk } from '$lib/canvas/variants';
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { RestoreOutcome, listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
+import { FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
+import { answerMention } from '$lib/server/canvas/comment-agent';
+import { httpAgent } from '$lib/server/canvas/comment-agent-http';
+import { runInBackground } from '$lib/server/background-work';
 import { CommentOutcome, addComment, deleteComment, editComment, listComments, resolveThread, teammates } from '$lib/server/canvas/canvas-comments';
 import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, renameOnCanvas, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
+import { saveFromSelection } from '$lib/server/canvas/techniques';
+import { detachInstance, openDefinition, placeInstance, runInstance } from '$lib/server/canvas/technique-instance';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
-import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';
@@ -82,7 +94,11 @@ import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
 import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
+import { INSERT_STATUS, InsertOutcome, insertAskSchema, insertScene } from '$lib/server/motion/insert-scene';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
+import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
+import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-frame';
+import { imageToolAskSchema } from '$lib/image-tools';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
 import { COMBINE_STATUS, CombineOutcome, combineAskSchema, combineScenes } from '$lib/server/motion/combine-scenes';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
@@ -597,7 +613,12 @@ export const actions: Actions<CanvasParams> = {
       return fail(denied.status, denied.data);
     }
 
-    const out = await runGenNode(scope.db, {
+    const asked = parseVariantsAsk({ variants: paramsIn.variants, into: paramsIn.variantsInto });
+    if (!asked.ok) {
+      return fail(400, { error: asked.error });
+    }
+
+    const out = await runGeneration(scope.db, {
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
@@ -607,7 +628,9 @@ export const actions: Actions<CanvasParams> = {
       prompt,
       model,
       params: paramsIn as never,
-      expectedVersion: version
+      expectedVersion: version,
+      count: asked.count,
+      into: asked.into
     });
 
     if (out.kind === 'refused') { return fail(400, { error: out.error }); }
@@ -682,7 +705,19 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid request' });
     }
 
-    return await cancelLoop(scope.db, { orgId: scope.orgId, nodeId });
+    return await cancelBatch(scope.db, { orgId: scope.orgId, nodeId });
+  },
+
+  cancel_run: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+
+    const nodeId = String(fd.get('node_id') ?? '');
+    if (!nodeId) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    return await cancelNodeRun(scope.db, { orgId: scope.orgId, nodeId });
   },
 
   /**
@@ -862,6 +897,14 @@ export const actions: Actions<CanvasParams> = {
 
     const shown = await showRun(scope.db, { orgId: scope.orgId, nodeId, runId, actor: userActor(scope) });
     return SHOW_RUN_ANSWERS[shown.outcome](shown as never);
+  },
+
+  exportCode: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const mode = fd.get('mode');
+    const out = await exportCodeNode(scope.db, { orgId: scope.orgId, nodeId: String(fd.get('node_id') ?? ''), mode: isExportMode(mode) ? mode : ExportMode.Inline });
+    return out.ok ? { folder: out.folder, files: out.files } : fail(400, { error: out.error });
   },
 
   create: async ({ request, params, locals }) => {
@@ -1194,6 +1237,34 @@ export const actions: Actions<CanvasParams> = {
     return out.outcome === ExportOutcome.Done ? out : fail(404, { error: out.outcome });
   },
 
+  imageTool: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = imageToolAskSchema.safeParse({ nodeId: fd.get('node_id'), tool: fd.get('tool'), factor: fd.get('factor') ?? undefined, prompt: fd.get('prompt') ?? undefined, mask: jsonField(fd, 'mask'), extend: jsonField(fd, 'extend') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    if (denied) {
+      return fail(denied.status, denied.data);
+    }
+
+    const started = await startImageTool(scope.db, IMAGE_TOOL_DEPS, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, sourceNodeId: ask.data.nodeId, tool: ask.data.tool, factor: ask.data.factor, prompt: ask.data.prompt, mask: ask.data.mask, extend: ask.data.extend });
+    return started.ok ? { outcome: 'done', nodeId: started.nodeId } : fail(400, { error: started.error });
+  },
+
+  layersToFrame: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const nodeId = String((await request.formData()).get('node_id') ?? '');
+    if (!nodeId) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    const made = await layersToFrame(scope.db, layersToFrameDeps(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, actor: userActor(scope) }), { orgId: scope.orgId, nodeId });
+    return made.ok ? { outcome: 'done', frameId: made.frameId } : fail(400, { error: made.error });
+  },
+
   createFormats: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
@@ -1214,6 +1285,17 @@ export const actions: Actions<CanvasParams> = {
     }
     const made = await combineScenes(canvasFrames(scope), ask.data);
     return made.outcome === CombineOutcome.Done ? made : fail(COMBINE_STATUS[made.outcome], { error: made.outcome });
+  },
+
+  insertScene: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = insertAskSchema.safeParse({ targetId: fd.get('target'), sourceId: fd.get('source'), at: fd.get('at') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid scene drop' });
+    }
+    const made = await insertScene(canvasFrames(scope), ask.data);
+    return made.outcome === InsertOutcome.Done ? made : fail(INSERT_STATUS[made.outcome], { error: made.outcome, detail: made.detail });
   },
 
   frameSize: async ({ request, params, locals }) => {
@@ -1499,6 +1581,29 @@ export const actions: Actions<CanvasParams> = {
     return { version: await saveCanvasVersion(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, name: String(fd.get('name') ?? ''), actor: userActor(scope) }) };
   },
 
+  export_canvas_file: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const at = { orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId };
+    const file = await exportCanvasFile(scope.db, at);
+    return file ? { name: file.name, url: await storeCanvasFile(scope.db, at, file) } : fail(404, { error: 'This canvas does not exist' });
+  },
+
+  request_canvas_import: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    return signCanvasFileUpload(scope.db, scope.orgId);
+  },
+
+  import_canvas_file: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const projectId = scope.canvas.projectId;
+    const path = String((await request.formData()).get('path') ?? '');
+    const out = await importStoredCanvasFile(scope.db, { orgId: scope.orgId, projectFor: async () => projectId, path, actor: userActor(scope) });
+    if (out.outcome === FeegaImport.Refused) {
+      return fail(400, { error: FEEGA_REFUSAL_MESSAGE[out.refusal] });
+    }
+    throw redirect(303, canvasPath(projectId, out.canvas.id));
+  },
+
   canvasVersions: async ({ params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     return { versions: await listCanvasVersions(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
@@ -1516,22 +1621,35 @@ export const actions: Actions<CanvasParams> = {
     return { threads: await listComments(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }), teammates: await teammates(scope.db, scope.orgId) };
   },
 
-  addComment: async ({ request, params, locals }) => {
+  addComment: async ({ request, params, locals, url }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
+    const body = String(fd.get('body') ?? '');
+    const nodeId = fd.get('node_id') ? String(fd.get('node_id')) : null;
+    const parentId = fd.get('parent_id') ? String(fd.get('parent_id')) : null;
     const out = await addComment(scope.db, {
       orgId: scope.orgId,
       canvasId: scope.canvasId,
       actor: userActor(scope),
-      body: String(fd.get('body') ?? ''),
-      nodeId: fd.get('node_id') ? String(fd.get('node_id')) : null,
-      parentId: fd.get('parent_id') ? String(fd.get('parent_id')) : null,
+      body,
+      nodeId,
+      parentId,
       x: Number(fd.get('x') ?? 0),
       y: Number(fd.get('y') ?? 0),
       timeMs: fd.get('time_ms') ? Number(fd.get('time_ms')) : null,
       mentions: fd.getAll('mention').map(String)
     });
-    return out.outcome === CommentOutcome.Added ? out : fail(out.outcome === CommentOutcome.Missing ? 404 : 400, { error: out.outcome });
+    if (out.outcome !== CommentOutcome.Added) {
+      return fail(out.outcome === CommentOutcome.Missing ? 404 : 400, { error: out.outcome });
+    }
+
+    const { session } = await locals.safeGetSession();
+    const agent = httpAgent({ origin: url.origin, token: session?.access_token ?? '' });
+    runInBackground(
+      () => answerMention({ db: scope.db, agent }, { orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId, userId: scope.userId, commentId: out.id!, parentId, nodeId, body }),
+      'comment-agent'
+    );
+    return out;
   },
 
   editComment: async ({ request, params, locals }) => {
@@ -1667,6 +1785,78 @@ export const actions: Actions<CanvasParams> = {
     }
 
     return out;
+  },
+
+  save_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ids = z.array(z.string().min(1)).min(2).max(50).safeParse(jsonField(fd, 'ids'));
+    if (!ids.success) {
+      return fail(400, { error: 'invalid selection' });
+    }
+
+    const saved = await saveFromSelection(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds: ids.data, name: String(fd.get('name') ?? ''), actor: userActor(scope) });
+    return saved.outcome === 'saved' ? { technique: { id: saved.technique.id, name: saved.technique.name } } : fail(400, { error: saved.error });
+  },
+
+  insert_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
+    if (!Number.isFinite(at.x) || !Number.isFinite(at.y)) {
+      return fail(400, { error: 'invalid position' });
+    }
+
+    const placed = await placeInstance(scope.db, {
+      orgId: scope.orgId,
+      projectId: scope.canvas.projectId,
+      canvasId: scope.canvasId,
+      userId: scope.userId,
+      techniqueId: String(fd.get('technique_id') ?? ''),
+      at,
+      actor: userActor(scope)
+    });
+    if (placed.outcome === 'refused') {
+      return fail(400, { error: placed.error });
+    }
+
+    const scopeIds = { orgId: scope.orgId, canvasId: scope.canvasId };
+    const ids = new Set(placed.nodeIds);
+    const [nodes, connections] = await Promise.all([listNodes(scope.db, scopeIds), listConnections(scope.db, scopeIds)]);
+    return { nodes: nodes.filter((n) => ids.has(n.id)), connections: connections.filter((c) => ids.has(c.sourceNodeId) && ids.has(c.targetNodeId)), message: placed.message };
+  },
+
+  run_technique_node: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    if (denied) {
+      return fail(denied.status, denied.data);
+    }
+
+    const out = await runInstance(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, userId: scope.userId, nodeId: String(fd.get('node_id') ?? ''), actor: userActor(scope) });
+    return out.outcome === 'queued' ? out : fail(400, { error: out.error });
+  },
+
+  detach_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const out = await detachInstance(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId, nodeId: String(fd.get('node_id') ?? ''), actor: userActor(scope) });
+    if (out.outcome === 'refused') {
+      return fail(400, { error: out.error });
+    }
+
+    const scopeIds = { orgId: scope.orgId, canvasId: scope.canvasId };
+    const ids = new Set(out.nodeIds);
+    const [nodes, connections] = await Promise.all([listNodes(scope.db, scopeIds), listConnections(scope.db, scopeIds)]);
+    return { removedId: out.removedId, nodes: nodes.filter((n) => ids.has(n.id)), connections: connections.filter((c) => ids.has(c.sourceNodeId) && ids.has(c.targetNodeId)) };
+  },
+
+  open_technique: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const out = await openDefinition(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, techniqueId: String(fd.get('technique_id') ?? ''), actor: userActor(scope) });
+    return out.outcome === 'opened' ? out : fail(400, { error: out.error });
   },
 
   /**

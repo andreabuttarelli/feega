@@ -3,7 +3,6 @@ import { Tool, type ActionId } from '$lib/motion/actions';
 import { LayerAction } from '$lib/canvas/layers';
 import { CanvasAction } from '$lib/canvas/canvas-list';
 import { ClipOp } from '$lib/motion/clip-ops';
-import { EmptyAction } from '$lib/canvas/empty-canvas';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
 import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
 import type { EditorOpName } from '$lib/server/frame-editor/editor-ops';
@@ -46,6 +45,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   loop_plan: canvas('preview_node_loop'),
   run_loop: canvas('run_node_loop'),
   cancel_loop: canvas('cancel_node_loop'),
+  cancel_run: canvas('cancel_run'),
   retry_loop_combo: canvas('retry_loop_combination'),
   workflow_plan: canvas('preview_workflow'),
   run_workflow: canvas('run_workflow'),
@@ -70,15 +70,22 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   frameSize: motion('set_canvas'),
   exportSelection: canvas('export_selection'),
   saveCanvasVersion: canvas('save_canvas_version'),
+  export_canvas_file: canvas('export_canvas_file'),
+  request_canvas_import: canvas('request_canvas_import'),
+  import_canvas_file: canvas('import_canvas_file'),
   canvasVersions: canvas('list_canvas_versions'),
   restoreCanvasVersion: canvas('restore_canvas_version'),
   canvasComments: canvas('list_canvas_comments'),
+  exportCode: canvas('export_code_frame'),
   addComment: canvas('add_canvas_comment'),
   resolveComment: canvas('resolve_canvas_comment'),
   editComment: canvas('edit_canvas_comment'),
   deleteComment: canvas('delete_canvas_comment'),
   createFormats: canvas('create_formats'),
   combineScenes: canvas('combine_scenes'),
+  insertScene: motion('edit_scenes'),
+  imageTool: canvas('image_tool'),
+  layersToFrame: canvas('layers_to_frame'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
   drawFrame: canvas('draw_frame'),
@@ -101,6 +108,11 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   onboarding_end: canvas('end_onboarding'),
   frame_template: canvas('add_frame_from_template'),
   template: canvas('insert_template'),
+  save_technique: canvas('save_technique'),
+  insert_technique: canvas('place_technique'),
+  run_technique_node: canvas('run_technique_node'),
+  detach_technique: canvas('detach_technique'),
+  open_technique: canvas('open_technique'),
   undo: canvas('undo_gesture'),
   suggestNextStep: canvas('suggest_next_steps')
 };
@@ -144,6 +156,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   ...OPACITY_PARITY,
   [Command.TogglePlay]: VIEW,
   [Command.Play]: VIEW,
+  [Command.RamPreview]: VIEW,
   [Command.Pause]: VIEW,
   [Command.Rewind]: VIEW,
   [Command.GoStart]: VIEW,
@@ -200,6 +213,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleTimeline]: VIEW,
   [Command.TogglePixelGrid]: VIEW,
   [Command.ToggleLayoutGuides]: VIEW,
+  [Command.ToggleRulers]: VIEW,
   [Command.TogglePivot]: VIEW,
   [Command.ToggleOutlines]: VIEW,
   [Command.Help]: VIEW,
@@ -311,8 +325,18 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'connect-new': canvas('connect_nodes'),
   'connect-existing': canvas('connect_nodes'),
   'run-workflow': canvas('run_workflow'),
+  'save-technique': canvas('save_technique'),
+  'run-technique': canvas('run_technique_node'),
+  'edit-technique': canvas('open_technique'),
+  'detach-technique': canvas('detach_technique'),
   'run-downstream': canvas('run_graph'),
   'run-stale': canvas('run_graph'),
+  'remove-background': canvas('image_tool'),
+  'upscale-image': canvas('image_tool'),
+  inpaint: canvas('image_tool'),
+  outpaint: canvas('image_tool'),
+  'split-layers': canvas('image_tool'),
+  'layers-to-frame': canvas('layers_to_frame'),
   'copy-id': CLIPBOARD,
   report: uiOnly('a person reports abuse to us; not an edit'),
   group: canvas('group_elements'),
@@ -321,14 +345,14 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   paste: CLIPBOARD,
   'bring-front': canvas('move_node'),
   'send-back': canvas('move_node'),
-  'align-left': canvas('move_node'),
-  'align-center': canvas('move_node'),
-  'align-right': canvas('move_node'),
-  'align-top': canvas('move_node'),
-  'align-middle': canvas('move_node'),
-  'align-bottom': canvas('move_node'),
-  'tidy-up': canvas('move_node'),
-  stack: canvas('move_node'),
+  'align-left': canvas('align_nodes'),
+  'align-center': canvas('align_nodes'),
+  'align-right': canvas('align_nodes'),
+  'align-top': canvas('align_nodes'),
+  'align-middle': canvas('align_nodes'),
+  'align-bottom': canvas('align_nodes'),
+  'tidy-up': canvas('tidy_nodes'),
+  stack: canvas('stack_nodes'),
   'section-selection': canvas('group_elements'),
   'flip-horizontal': motion('set_transform'),
   'flip-vertical': motion('set_transform'),
@@ -390,13 +414,6 @@ export const CLIP_BUTTONS: Record<ClipOp, Parity> = {
   [ClipOp.Parent]: motion('set_parent')
 };
 
-export const EMPTY_CANVAS: Record<EmptyAction, Parity> = {
-  [EmptyAction.Chat]: uiOnly('opens the project chat'),
-  [EmptyAction.Frame]: canvas('create_node'),
-  [EmptyAction.Image]: canvas('create_node'),
-  [EmptyAction.Video]: canvas('create_node')
-};
-
 export const FRAME_CONTENT: Record<string, Parity> = {
   'add text': motion('add_clip'),
   'add shape': motion('add_shape'),
@@ -430,14 +447,32 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'set template fields': motion('set_template_fields')
 };
 
+export const STUDIO_PAGE_ACTIONS: Record<string, Parity> = {
+  upload: uiOnly('browser file picker straight to storage; an agent brings images with its own import tools'),
+  quote: tool('studio_quote'),
+  generate: tool('studio_start')
+};
+
+export const BATCH_PAGE_ACTIONS: Record<string, Parity> = {
+  run: tool('studio_run'),
+  more: tool('studio_more'),
+  cancel: tool('studio_cancel'),
+  retry: tool('studio_retry'),
+  regenerate: tool('studio_regenerate'),
+  approve: tool('studio_approve'),
+  reject: tool('studio_reject'),
+  drain: uiOnly('background tick the page triggers while it is open; the server drains on its own')
+};
+
 export const PARITY_TABLES = {
   CANVAS_PAGE_ACTIONS,
+  STUDIO_PAGE_ACTIONS,
+  BATCH_PAGE_ACTIONS,
   FRAME_PAGE_ACTIONS,
   EDITOR_ACTIONS,
   SELECTION_TOOLBAR,
   LAYER_PANEL,
   CANVAS_LIST,
   CLIP_BUTTONS,
-  EMPTY_CANVAS,
   FRAME_CONTENT
 } as const;

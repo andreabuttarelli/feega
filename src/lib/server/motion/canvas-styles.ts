@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { renameStyle } from '$lib/motion/styles';
 import { adoptStyle, libraryOf, syncedDoc, type Library } from '$lib/motion/style-library';
-import { styleSchema, type Style } from '$lib/motion/styles-model';
+import { styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 
 const ELEMENT_SEP = ':';

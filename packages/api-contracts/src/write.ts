@@ -66,7 +66,8 @@ export const INSERT_ROW = {
   input: z
     .object({
       table: z.string().describe('Table name, bare. The same names `query` reads.'),
-      values: Values
+      values: Values,
+      verbose: z.boolean().optional().describe('The whole written row instead of its id and changed fields.')
     })
     .strict(),
   output: z.object({
@@ -104,7 +105,8 @@ export const UPDATE_ROW = {
         .array(Filter)
         .min(1, 'where may not be empty: an update with no filter rewrites every row of the table')
         .describe('Filters, ANDed. Required: without one this would rewrite the whole table.'),
-      values: Values
+      values: Values,
+      verbose: z.boolean().optional().describe('The whole written row instead of its id and changed fields.')
     })
     .strict(),
   output: z.object({

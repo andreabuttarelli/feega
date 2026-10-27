@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Action } from '$lib/motion/actions';
 import { Command } from '$lib/motion/shortcuts';
 import { aabb, quadOf } from '$lib/motion/scene-select';
 import { propBoxes } from '$lib/motion/space';
 import { PropertiesView } from '$lib/motion/properties-view';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { FieldType, exposeField } from '$lib/motion/template/fields';
 import { insertTemplate, templateFromComp } from '$lib/motion/template/library';
-import { precompose } from '$lib/motion/precomp';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor } from './frame-inspector';
-import { findClip } from '$lib/motion/doc';
+import { findClip } from '@feega/motion-core/motion/doc';
 import { copyElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
-import { addTrack } from '$lib/motion/timeline';
-import { TrackKind } from '$lib/motion/components';
+import { addTrack } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -217,6 +217,13 @@ describe('frameBarActions', () => {
 describe('frameKeyAction', () => {
   const press = (key: string, mods: { meta?: boolean; shift?: boolean; alt?: boolean } = {}) =>
     ({ key, code: `Key${key.toUpperCase()}`, metaKey: !!mods.meta, ctrlKey: false, shiftKey: !!mods.shift, altKey: !!mods.alt }) as KeyboardEvent;
+
+  it('a digit typed in a field stays in the field instead of setting opacity', () => {
+    const digit = { key: '2', code: 'Digit2', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false };
+    const field = { closest: (selector: string) => (selector.includes('input') ? {} : null) };
+    expect(frameKeyAction(digit as KeyboardEvent)).not.toBeNull();
+    expect(frameKeyAction({ ...digit, target: field } as unknown as KeyboardEvent)).toBeNull();
+  });
 
   it('⇧⌘R replaces the selection with the copied element, selecting the result', () => {
     const doc = fixture();

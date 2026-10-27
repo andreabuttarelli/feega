@@ -1,9 +1,9 @@
 import type { Db } from '$lib/server/db/client';
-import type { MotionDoc } from '$lib/motion/doc';
-import type { BrandTokens } from '$lib/motion/brand';
-import { stillSeconds } from '$lib/motion/still';
-import type { StillExport } from '$lib/motion/still-model';
-import { composeHtml, type ComposeInput } from '$lib/motion/hyperframes/compose';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import { stillSeconds } from '@feega/motion-core/motion/still';
+import type { StillExport } from '@feega/motion-core/motion/still-model';
+import { composeHtml, type ComposeInput } from '@feega/motion-core/motion/hyperframes/compose';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { insertAsset } from '$lib/server/repos/assets';
 import { signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';

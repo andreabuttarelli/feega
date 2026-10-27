@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fakeDb, type Call } from '$lib/server/db/fake-db';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, type OpResult } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { PublishRefusal } from '$lib/gallery/refusals';
 import { publishToGallery, PublishError, withdrawFromGallery, type GalleryModeration } from './publish';
 import { remixGalleryItem, RemixError } from './remix';

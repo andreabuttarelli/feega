@@ -3,7 +3,7 @@ import { staticParts } from './static-parts';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 import { CHECKER_STEPS_POSTER_TEMPLATE } from '$lib/motion/template/checker-steps-poster/template';
 import { TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 const clipOf = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Custom')!;
 

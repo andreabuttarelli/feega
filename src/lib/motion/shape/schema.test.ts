@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { clipFieldGroups } from '../inspector';
-import { addClip, type OpResult } from '../timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

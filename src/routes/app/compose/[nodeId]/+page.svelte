@@ -22,14 +22,14 @@
   import { ColorField, ControlRow, ControlLayout, NumberField, OptionMenu, RatioChips, Switch } from '$lib/components/ui/control/index.js';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
-  import { CUSTOM_LAYOUT, LAYOUTS, layoutOf } from '$lib/canvas/composition/index';
-  import { CAMERA_PRESETS, type CameraPresetId } from '$lib/canvas/composition/camera';
-  import type { LayoutId } from '$lib/canvas/composition/types';
+  import { CUSTOM_LAYOUT, LAYOUTS, layoutOf } from '@feega/motion-core/canvas/composition';
+  import { CAMERA_PRESETS, type CameraPresetId } from '@feega/motion-core/canvas/composition/camera';
+  import type { LayoutId } from '@feega/motion-core/canvas/composition/types';
   import { controlFor, setLayoutParam } from '$lib/canvas/composition-editor';
-  import { BRAND_COLORS, COMPOSITION_LAYOUTS, MAX_COMPOSITION_MEDIA, AssetKind } from '$lib/motion/components';
-  import { FORMATS, MOTION_FORMATS, type MotionDoc, MotionFormat } from '$lib/motion/doc';
-  import { resolveColor } from '$lib/motion/brand';
-  import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
+  import { BRAND_COLORS, COMPOSITION_LAYOUTS, MAX_COMPOSITION_MEDIA, AssetKind } from '@feega/motion-core/motion/components';
+  import { FORMATS, MOTION_FORMATS, type MotionDoc, MotionFormat } from '@feega/motion-core/motion/doc';
+  import { resolveColor } from '@feega/motion-core/motion/brand';
+  import { Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
   import { MAX_COMPOSE_SECONDS, MIN_SECONDS, applyDraft, clampSeconds, draftFromDoc, newDraft, withCamera, withCustomLayout, withLayout, type ComposeDraft, type CustomLayout, type ComposeMedia } from '$lib/motion/composition-draft';
 
   const SAVE_DEBOUNCE_MS = 700;

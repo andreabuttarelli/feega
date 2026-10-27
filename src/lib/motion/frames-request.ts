@@ -1,5 +1,5 @@
-import type { MotionDoc } from './doc';
-import type { AssetKind } from './components';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import type { AssetKind } from '@feega/motion-core/motion/components';
 
 export const FRAMES_REQUEST = 'data-motion-frames';
 

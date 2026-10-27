@@ -1,4 +1,4 @@
-import { screenCompOf } from './device-screen';
+import { screenCompOf } from '@feega/motion-core/motion/device-screen';
 
 type NestingClip = { component: string; props: Record<string, unknown> };
 

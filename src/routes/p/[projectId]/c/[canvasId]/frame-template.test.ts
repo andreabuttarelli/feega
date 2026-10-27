@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { MotionFormat } from '$lib/motion/doc';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
 
 const listMemberships = vi.fn();

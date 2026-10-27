@@ -1,9 +1,9 @@
-import type { BrandTokens } from '$lib/motion/brand';
-import type { MotionDoc } from '$lib/motion/doc';
-import { drawFrame, prepare, type DisplayList } from '$lib/motion/gpu-full/display-list';
-import { Smoothing } from '$lib/motion/gpu-full/text/painter';
-import { fontLoader } from '$lib/motion/gpu-full/text/load';
-import { stillSeconds } from '$lib/motion/still';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
+import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
+import { fontLoader } from '@feega/motion-core/motion/gpu-full/text/load';
+import { stillSeconds } from '@feega/motion-core/motion/still';
 import { imageSources } from '$lib/motion/export-svg';
 
 export type VectorInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> };

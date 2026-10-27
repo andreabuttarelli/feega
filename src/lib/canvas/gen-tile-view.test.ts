@@ -5,9 +5,9 @@ import { genTileView, type GenTileExtras } from './gen-tile-view';
 
 const node = (over: Partial<GenNode> = {}): GenNode => ({ id: 'n', medium: 'image', prompt: '', model: null, params: {}, refId: null, running: false, error: null, runs: [], ...over }) as GenNode;
 
-const quote = (over: Partial<RunQuote> = {}): RunQuote => ({ label: 'Generate', credits: 4, variable: false, enabled: true, reason: null, tooLong: false, choice: undefined, cost: { medium: 'image', model: null, params: {} }, ...over });
+const quote = (over: Partial<RunQuote> = {}): RunQuote => ({ label: 'Generate', credits: 4, variants: null, variable: false, enabled: true, reason: null, tooLong: false, choice: undefined, cost: { medium: 'image', model: null, params: {} }, ...over });
 
-const extras: GenTileExtras = { hasUpstreamText: false, variableTextInput: false, loopQueued: 0, loopVisible: false, loopCombinationCount: 0 };
+const extras: GenTileExtras = { hasUpstreamText: false, variableTextInput: false, loopQueued: 0, loopVisible: false, loopCombinationCount: 0, variantsInFlight: 0 };
 
 describe('genTileView', () => {
   it('shows the hint and the placeholder of an empty image node', () => {
@@ -18,7 +18,7 @@ describe('genTileView', () => {
     expect(v.hint).toBe('Write what you want');
     expect(v.placeholder).toBe('Describe what you want to see…');
     expect(v.warn).toEqual({ text: 'Write what you want', soft: true });
-    expect(v.run).toEqual({ label: 'Generate', credits: '~0.04', variable: false, enabled: false });
+    expect(v.run).toEqual({ label: 'Generate', credits: '$0.04', variable: false, enabled: false });
   });
 
   it('drops the body of a text node that has nothing to show', () => {
@@ -34,6 +34,16 @@ describe('genTileView', () => {
     const v = genTileView(node({ prompt: 'x' }), quote({ credits: 4 }), { ...extras, loopVisible: true, loopCombinationCount: 2 });
 
     expect(v.loop).toMatchObject({ label: 'Loop ×2', enabled: true, cancel: false });
+  });
+
+  it('labels the run with its variants when there is more than one', () => {
+    const v = genTileView(node(), quote({ credits: 16, variants: { count: 4, into: 'nodes' as never, counts: [1, 2, 4, 8] } }), extras);
+
+    expect(v.run).toMatchObject({ label: 'Generate ×4', credits: '$0.16' });
+  });
+
+  it('offers Cancel all while a variant batch is in flight', () => {
+    expect(genTileView(node(), quote(), { ...extras, variantsInFlight: 4 }).loop).toEqual({ label: 'Cancel all (4)', credits: null, variable: false, enabled: true, cancel: true });
   });
 
   it('turns the loop into a cancel while runs are queued', () => {

@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
-import { Ease, TransitionKind } from '../design';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { FillType } from '../fill/model';
-import { BlendMode } from '../blend';
-import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, textBoxesAt, textCaretAt, Unsupported, type ImageItem, type PathItem } from './display-list';
-import { apply2d } from '../affine';
-import { caretRect } from './text/caret';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, textBoxesAt, textCaretAt, Unsupported, type ImageItem, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { apply2d } from '@feega/motion-core/motion/affine';
+import { caretRect } from '@feega/motion-core/motion/gpu-full/text/caret';
 import { boxBook, boxFace } from './text/test-face';
-import { Smoothing, TextOutput } from './text/painter';
-import { addAnimator } from '../text-animators/ops';
-import { setTextPath } from '../text-path/ops';
-import { PathPreset, PathSourceKind } from '../text-path/model';
-import { SelectorShape } from '../text-animators/model';
+import { Smoothing, TextOutput } from '@feega/motion-core/motion/gpu-full/text/painter';
+import { addAnimator } from '@feega/motion-core/motion/text-animators/ops';
+import { setTextPath } from '@feega/motion-core/motion/text-path/ops';
+import { PathPreset, PathSourceKind } from '@feega/motion-core/motion/text-path/model';
+import { SelectorShape } from '@feega/motion-core/motion/text-animators/model';
 
 const boxType = { fonts: boxBook(), smoothing: Smoothing.Plain };
 

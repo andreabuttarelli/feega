@@ -1,11 +1,11 @@
-import type { MotionClip, MotionDoc } from './doc';
-import { apply2d, type Affine } from './affine';
-import { pivotBox, worldAt, type Size } from './parent';
-import { Space, cameraMath, newCamera, baseValues } from './camera';
-import { sampleTrack } from './sample-track';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { apply2d, type Affine } from '@feega/motion-core/motion/affine';
+import { pivotBox, worldAt, type Size } from '@feega/motion-core/motion/parent';
+import { Space, cameraMath, newCamera, baseValues } from '@feega/motion-core/motion/camera';
+import { sampleTrack } from '@feega/motion-core/motion/sample-track';
 import { pieceAnchors, stageScale, type Rect } from './ui-kit/anchors';
 import { cursorPlan } from './ui-kit/cursor-plan';
-import { springMath } from './spring';
+import { springMath } from '@feega/motion-core/motion/spring';
 import { reelMath } from './ui-morph/reel';
 import { isReel, reelPlanOf } from './ui-morph/ops';
 

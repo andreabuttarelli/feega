@@ -1,21 +1,21 @@
-import { compOf, findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+import { compOf, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Action, type ActionId } from '$lib/motion/actions';
 import { ClipOp, runClipOp, type ClipDone } from '$lib/motion/clip-ops';
 import { ungroupClip } from '$lib/motion/group';
 import { groupLight, ungroupLight } from '$lib/motion/light-group';
 import { addAutoLayout, removeAutoLayout, resizeToFit, wrapInFrame } from '$lib/motion/layout/ops';
-import { isText } from '$lib/motion/layout/text-extent';
+import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { Flip, flipClips } from '$lib/motion/layer-props';
 import { copyStyle, pasteStyle } from '$lib/motion/style-copy';
 import { pasteOverElements, replaceElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
-import { setClipFlags } from '$lib/motion/organize';
-import { BooleanOp, flattenShapes } from '$lib/motion/shape/boolean';
+import { setClipFlags } from '@feega/motion-core/motion/organize';
+import { BooleanOp, flattenShapes } from '@feega/motion-core/motion/shape/boolean';
 import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
-import { setProps, setTransform, type OpResult } from '$lib/motion/timeline';
-import { Command, OPACITY_KEYS, commandFor } from '$lib/motion/shortcuts';
+import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Command, OPACITY_KEYS, commandFor, isTyping } from '$lib/motion/shortcuts';
 import { Same, matchingLayers, sameLayers } from '$lib/motion/select-matching';
 import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
 import type { SelectionActionId } from './selection-actions';
@@ -23,7 +23,7 @@ import { siblingsOf } from './frame-select';
 import { EditMode } from '$lib/motion/edit-mode';
 import { propBoxes, tidySpace } from '$lib/motion/space';
 import { PropertiesView } from '$lib/motion/properties-view';
-import type { CompPath } from '$lib/motion/precomp';
+import type { CompPath } from '@feega/motion-core/motion/precomp';
 import { scopeView } from '$lib/motion/instance-view';
 import { scopeOf } from './frame-scope';
 import { isLockedComp } from '$lib/motion/template/library';
@@ -272,6 +272,9 @@ export const FRAME_ELEMENT_MENU: ReadonlySet<SelectionActionId> = new Set(
 const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.PasteOver, Command.TidyUp, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
 
 export function frameKeyAction(e: KeyboardEvent): ActionId | null {
+  if (isTyping(e.target as Parameters<typeof isTyping>[0])) {
+    return null;
+  }
   const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, EditMode.Design);
   return command && FRAME_KEYS.has(command) ? command : null;
 }

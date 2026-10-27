@@ -6,10 +6,16 @@
 import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
 import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
 import Globe from '@lucide/svelte/icons/globe';
+import Eraser from '@lucide/svelte/icons/eraser';
+import Scaling from '@lucide/svelte/icons/scaling';
+import Paintbrush from '@lucide/svelte/icons/paintbrush';
+import Expand from '@lucide/svelte/icons/expand';
+import Layers from '@lucide/svelte/icons/layers';
 import Copy from '@lucide/svelte/icons/copy';
 import Download from '@lucide/svelte/icons/download';
 import Workflow from '@lucide/svelte/icons/workflow';
 import Link2 from '@lucide/svelte/icons/link-2';
+import Pencil from '@lucide/svelte/icons/pencil';
 import Play from '@lucide/svelte/icons/play';
 import Clapperboard from '@lucide/svelte/icons/clapperboard';
 import ListEnd from '@lucide/svelte/icons/list-end';
@@ -67,8 +73,18 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'connect-new': Workflow,
   'connect-existing': Link2,
   'run-workflow': Play,
+  'save-technique': BookmarkPlus,
+  'run-technique': Play,
+  'edit-technique': Pencil,
+  'detach-technique': Unlink,
   'run-downstream': ListEnd,
   'run-stale': RefreshCw,
+  'remove-background': Eraser,
+  'upscale-image': Scaling,
+  inpaint: Paintbrush,
+  outpaint: Expand,
+  'split-layers': Layers,
+  'layers-to-frame': Frame,
   'copy-id': Hash,
   report: Flag,
   group: Group,

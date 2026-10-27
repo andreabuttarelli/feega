@@ -1,7 +1,7 @@
-import { FillType, ImageFit, WHOLE_PICTURE, type FillOf } from '$lib/motion/fill/model';
-import { imageRect } from '$lib/motion/gpu-full/image-rect';
-import { elementFills } from '$lib/motion/fill/elements';
-import { findClip, type MotionDoc } from '$lib/motion/doc';
+import { FillType, ImageFit, WHOLE_PICTURE, type FillOf } from '@feega/motion-core/motion/fill/model';
+import { imageRect } from '@feega/motion-core/motion/gpu-full/image-rect';
+import { elementFills } from '@feega/motion-core/motion/fill/elements';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { editsText } from './frame-text-edit';
 
 export type Pt = [number, number];
@@ -46,7 +46,8 @@ export const imagePlacement = (win: Window, box: Size): Placement => ({ x: (-win
 
 export const panned = (win: Window, box: Size, dx: number, dy: number): Window => inside({ ...win, x: win.x - (dx * win.w) / box.width, y: win.y - (dy * win.h) / box.height });
 
-export function zoomedAt(win: Window, box: Size, anchor: Pt, scale: number): Window {
+export function zoomedAt(win: Window, box: Size, anchor: Pt, wanted: number): Window {
+  const scale = clamp(wanted, Math.max(win.w, win.h), Math.min(win.w, win.h) / MIN_WINDOW);
   const w = clamp(win.w / scale, MIN_WINDOW, 1);
   const h = clamp(win.h / scale, MIN_WINDOW, 1);
   const pointX = win.x + (anchor[0] / box.width) * win.w;

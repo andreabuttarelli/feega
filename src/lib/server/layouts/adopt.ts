@@ -1,8 +1,8 @@
 import type { Db } from '$lib/server/db/client';
-import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-import { freeName } from '$lib/motion/shaders/model';
-import { CUSTOM_LAYOUT } from '$lib/canvas/composition/index';
-import type { LayoutSpec } from '$lib/canvas/composition/spec';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { freeName } from '@feega/motion-core/motion/shaders/model';
+import { CUSTOM_LAYOUT } from '@feega/motion-core/canvas/composition';
+import type { LayoutSpec } from '@feega/motion-core/canvas/composition/spec';
 import { Outcome } from '$lib/server/repos/effects';
 import { listLayouts, writeLayout } from '$lib/server/repos/layouts';
 import type { WorkspaceAuthor } from '$lib/server/effects/adopt';

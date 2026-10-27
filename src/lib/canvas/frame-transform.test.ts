@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { EditMode } from '$lib/motion/edit-mode';
-import { Ease } from '$lib/motion/design';
-import { setKeyframes } from '$lib/motion/timeline';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, setTransform, type OpResult } from '$lib/motion/timeline';
-import { setClipFlags } from '$lib/motion/organize';
+import { Ease } from '@feega/motion-core/motion/design';
+import { setKeyframes } from '@feega/motion-core/motion/timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+import { setClipFlags } from '@feega/motion-core/motion/organize';
 import { Grip, aabb, handlesOf, quadOf, type Bounds } from '$lib/motion/scene-select';
 import { guessedBoxes } from '$lib/motion/move-element';
-import { transformAt } from '$lib/motion/parent';
+import { transformAt } from '@feega/motion-core/motion/parent';
 import { GuideAlign, GuideKind, newGuide, setLayoutGuides } from '$lib/motion/layout-guides/guides';
 import { SnapMode, dragClips, measuredGaps, nudgeClips, type Drag } from './frame-transform';
 

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc, findClip, type MotionDoc } from './doc';
-import { addClip } from './timeline';
+import { MotionFormat, newMotionDoc, parseMotionDoc, findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { StyleKind, StyleSlot, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, saveAsStyle, stylesFor, stylesOf } from './styles';
 import { addEffect } from './effects/ops';
-import { EffectKind } from './effects/registry';
-import { FillType, type Fill } from './fill/model';
-import { BlendMode } from './blend';
-import type { Style } from './styles-model';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
+import { FillType, type Fill } from '@feega/motion-core/motion/fill/model';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import type { Style } from '@feega/motion-core/motion/styles-model';
 
 function docWith(): MotionDoc {
   const base = newMotionDoc(MotionFormat.Square);

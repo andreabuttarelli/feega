@@ -1,6 +1,6 @@
-import { cameraMath, stageSpec } from './camera';
-import { findClip, type MotionDoc } from './doc';
-import { sampleTrack } from './keyframes';
+import { cameraMath, stageSpec } from '@feega/motion-core/motion/camera';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { sampleTrack } from '@feega/motion-core/motion/keyframes';
 
 const MARGIN = 0.12;
 const DEG = Math.PI / 180;

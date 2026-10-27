@@ -1,8 +1,8 @@
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import type { MotionDoc } from '$lib/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrames } from '$lib/server/motion/server-frames';
 import { chromiumFrames } from '$lib/server/motion/chromium-frames';
 

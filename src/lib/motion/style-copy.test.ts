@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { copyStyle, pasteStyle } from './style-copy';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {

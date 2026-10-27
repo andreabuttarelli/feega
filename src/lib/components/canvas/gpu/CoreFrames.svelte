@@ -1,33 +1,35 @@
 <script lang="ts">
-  import { drawFrame, prepare, type DisplayList, type Prepared } from '$lib/motion/gpu-full/display-list';
-  import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
-  import { loadFonts } from '$lib/motion/gpu-full/text/load';
-  import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
-  import { createMedia, Readiness, VideoPreload } from '$lib/motion/gpu-full/media';
+  import { sharedFrames } from '$lib/motion/gpu/webcodecs-decoder';
+  import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+  import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
+  import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
+  import { createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+  import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
+  import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
-  import { Outcome } from '$lib/motion/gpu-full/core-outcome';
+  import { Outcome } from '@feega/motion-core/motion/gpu-full/core-outcome';
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
-  import { ItemKind } from '$lib/motion/gpu-full/display-list';
+  import { ItemKind } from '@feega/motion-core/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
-  import { spliceOf } from '$lib/canvas/core/group-diff';
+  import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { cached, uncached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentOverlay, SentUses } from '$lib/canvas/core/use-diff';
-  import type { PathItem } from '$lib/motion/gpu-full/display-list';
-  import { drawsWhole, frameOfLive, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
+  import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+  import { drawsAny, frameOfLive, logGaps, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
-  import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
-  import type { Pictures } from '$lib/motion/gpu-full/raster';
+  import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
+  import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
-  import { withScenes } from '$lib/canvas/scene-sources';
+  import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
@@ -47,7 +49,7 @@
   const put = new Set<string>();
   const pictured = new Set<string>();
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
-  const media = createMedia({ videoPreload: VideoPreload.Metadata });
+  const media = createMedia({ videoPreload: VideoPreload.Metadata, frames: sharedFrames() });
   const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
   const keyOf = (f: FrameAt) => `${f.id}:${f.revision}${f.scenes ? `:${f.scenes}` : ''}`;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
@@ -65,7 +67,7 @@
     if (!host || !readClips(source.doc).read.length) {
       return null;
     }
-    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('$lib/motion/gpu-full/dom/custom'), import('$lib/motion/hyperframes/compose'), import('$lib/motion/interactive/settings')]);
+    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('@feega/motion-core/motion/gpu-full/dom/custom'), import('@feega/motion-core/motion/hyperframes/compose'), import('@feega/motion-core/motion/interactive/settings')]);
     await whenQuiet(() => gesture.active() || edited.size > 0);
     return domRead(fromView(f), async (signal) => {
       const mounting = mountCustomReads(host, (only) => composeHtml({ doc: source.doc, tokens: source.tokens, assets: source.assets, liveness: Liveness.Baked, target: Target.Screen, only }), prepared);
@@ -85,22 +87,43 @@
     return buildSource(f, (await res.json()) as FrameDoc);
   }
 
-  async function sceneSource(id: string): Promise<FrameDoc | null> {
-    const held = live.get(id);
-    if (held) {
-      return { revision: 0, ...held };
-    }
+  async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);
     return res.ok ? ((await res.json()) as FrameDoc) : null;
   }
 
+  const fetchedScenes = new Map<string, LoadScene>();
+  const fetchedAt = (stamp: string) => fetchedScenes.get(stamp) ?? fetchedScenes.set(stamp, loadOnce(fetchScene)).get(stamp)!;
+
+  const sceneSource =
+    (stamp: string): LoadScene =>
+    async (id) => {
+      const held = live.get(id);
+      return held ? { revision: 0, ...held } : fetchedAt(stamp)(id);
+    };
+
   async function buildSource(f: FrameAt, given: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
-    const source = await withScenes(given, sceneSource);
+    const source = await withScenes(given, sceneSource(f.scenes ?? ''));
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
     const still = frameOfLive(source);
     const custom = await readDom(f, source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
     return { list: drawFrame(prepared, still, custom?.reads), custom };
+  }
+
+  const RUNS_EVERY = 5;
+
+  export async function cache(id: string, range: FrameRange, signal: AbortSignal, onRuns: (runs: FrameRange[]) => void) {
+    const f = frames.find((x) => x.id === id);
+    const held = live.get(id);
+    if (!f || !held) {
+      return;
+    }
+    const source = await withScenes({ revision: f.revision, ...held }, sceneSource(f.scenes ?? ''));
+    const prepared = prepare(source.doc, source.tokens, source.assets);
+    const ram = createRamPreview({ frames: sharedFrames(), uses: (frame) => videoUses(drawFrame(prepared, frame).items) });
+    await ram.fill(range, signal, (done) => done % RUNS_EVERY === 0 && onRuns(ram.runs(range)));
+    onRuns(ram.runs(range));
   }
 
   async function load(f: FrameAt) {
@@ -113,6 +136,7 @@
     if (built.custom) {
       customPictures.set(keyOf(f), built.custom.picture);
     }
+    logGaps(f.id, built.list);
     lists = new Map(lists).set(keyOf(f), onStage(built.list, f.kind));
   }
 
@@ -131,6 +155,7 @@
       return;
     }
     const key = `${f.id}:live${generation}`;
+    logGaps(f.id, built.list);
     lists = new Map(lists).set(key, onStage(built.list, f.kind));
     liveGroup = new Map(liveGroup).set(f.id, key);
     liveAtRevision.set(f.id, f.revision);
@@ -184,7 +209,7 @@
   const framePuts = $derived(
     frames.flatMap((f): HeldFrame[] => {
       const list = lists.get(groupOf(f));
-      return list && drawsWhole(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
+      return list && drawsAny(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
     })
   );
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));
@@ -562,7 +587,7 @@
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
 <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {#key backend}
-  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
 {/key}
 
 <style>

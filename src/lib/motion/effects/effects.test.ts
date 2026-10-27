@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { installEngine, testTimeline } from '../engine/testing';
-import { Ease } from '../design';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { FEEGA_TOKENS } from '../brand';
-import { composeHtml } from '../hyperframes/compose';
-import { setExpression } from '../expression/ops';
-import { EFFECTS, EFFECT_KINDS, EffectKind } from './registry';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
+import { EFFECTS, EFFECT_KINDS, EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from './ops';
-import { effectKey } from './model';
-import { effectLayer, effectTimeline } from './render';
+import { effectKey } from '@feega/motion-core/motion/effects/model';
+import { effectLayer, effectTimeline } from '@feega/motion-core/motion/effects/render';
 import { addModifier } from '../shape/ops';
-import { ModifierKind } from '../shape/modifiers';
+import { ModifierKind } from '@feega/motion-core/motion/shape/modifiers';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {

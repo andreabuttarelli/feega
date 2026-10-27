@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, setKeyframes, trimClip, ClipEdge, type OpResult } from './timeline';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, trimClip, ClipEdge, type OpResult } from '@feega/motion-core/motion/timeline';
 import { audioPlan, gainAt } from './audio-plan';
-import { Ease } from './design';
+import { Ease } from '@feega/motion-core/motion/design';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

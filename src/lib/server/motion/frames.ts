@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { ModelMessage, Tool } from 'ai';
-import { COMPONENTS, Control, TrackKind } from '$lib/motion/components';
+import { COMPONENTS, Control, TrackKind } from '@feega/motion-core/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { blocking, type QualityProblem } from '$lib/motion/direction';
 import { REFERENCE_TOOLS } from '$lib/server/web/web-tools';
 
@@ -51,6 +51,24 @@ export function keyFrameTimes(doc: MotionDoc, max = SELF_CHECK_FRAMES): number[]
   const step = (unique.length - 1) / (max - 1);
   const picked = unique.length <= max ? unique : Array.from({ length: max }, (_, i) => unique[Math.round(i * step)]);
   return picked.map((f) => Math.round((f / doc.fps) * SECONDS_PRECISION) / SECONDS_PRECISION);
+}
+
+const CUT_PROBE_OFFSETS_S = [0, 0.25, 0.5, 0.8, 1.2];
+const MAX_PROBED_CUTS = 8;
+
+export function cutProbeTimes(doc: MotionDoc): number[] {
+  const starts = doc.tracks
+    .filter((t) => t.kind === TrackKind.Visual)
+    .flatMap((t) => t.clips.filter((c) => isScene(c, doc)).map((c) => c.from))
+    .filter((f) => f > 0);
+  const cuts = [...new Set(starts)].sort((a, b) => a - b).slice(0, MAX_PROBED_CUTS);
+  const end = doc.durationInFrames / doc.fps;
+  const round = (t: number) => Math.round(t * SECONDS_PRECISION) / SECONDS_PRECISION;
+
+  return cuts.flatMap((cut) => {
+    const at = cut / doc.fps;
+    return [at - 1 / doc.fps, ...CUT_PROBE_OFFSETS_S.map((o) => at + o)].filter((t) => t < end).map(round);
+  });
 }
 
 const FRAMES_ASK = 'Look for clipped or overflowing text, overlaps, poor contrast and anything outside the safe area.';

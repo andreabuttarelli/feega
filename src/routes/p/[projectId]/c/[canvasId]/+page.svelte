@@ -2,6 +2,12 @@
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
+  import { withColour } from '$lib/canvas/node-colour';
+  import CompareOverlay from '$lib/components/canvas/CompareOverlay.svelte';
+  import OutputViewer from '$lib/components/canvas/OutputViewer.svelte';
+  import { OUTPUT_KIND_OF, viewableRuns, type OutputKind, type ViewerRun } from '$lib/canvas/run-info';
+  import CloudPicker from '$lib/components/canvas/CloudPicker.svelte';
+  import { CloudMode, type CloudProviderId } from '$lib/canvas/cloud-picker';
   import NodeSearch from '$lib/components/canvas/NodeSearch.svelte';
   import { NODES_PARAM, idsFromLink, selectionLink } from '$lib/canvas/selection-link';
   import type { CommentThread } from '$lib/canvas/comment-threads';
@@ -23,9 +29,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { stackedLocally, Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
   import { TEXT_BOX } from '$lib/canvas/frame-paste';
-  import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
-  import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
   /**
    * LA TELA.
@@ -54,7 +58,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { syncOf } from '$lib/canvas/sync-status';
   import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
@@ -65,7 +69,8 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
   import { adoptCommitted, commitHub, rowsOf } from '$lib/canvas/commit-note';
   import { peerTracks } from '$lib/realtime/peer-tracks';
-  import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
+  import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, presentControlsShown, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
+  import { LocalOff, isOff } from '$lib/local-user';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
   import CanvasShortcutHelp from '$lib/components/canvas/CanvasShortcutHelp.svelte';
@@ -78,7 +83,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { CoachStep, ONBOARDING_EVENT, OnboardingStatus, chainOf, stepOf, type CoachChain } from '$lib/onboarding/coach';
   import { DEMO_PRESET, exampleFor, isDemoMedium } from '$lib/onboarding/demo';
   import OnboardingCoach from '$lib/components/canvas/OnboardingCoach.svelte';
-  import { offCentre, placeBeside, placeNear, type Rect } from '$lib/canvas/placement';
+  import { offCentre, placeBeside, placeInRow, placeNear, type Rect } from '$lib/canvas/placement';
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
@@ -89,6 +94,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
+  import type { ExportMode } from '$lib/canvas/code-frame';
   import DocNode from '$lib/components/canvas/DocNode.svelte';
   import ProductsNode from '$lib/components/canvas/ProductsNode.svelte';
   import SocialFeedNode from '$lib/components/canvas/SocialFeedNode.svelte';
@@ -124,9 +130,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
-  import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
-  import { FEEGA_TOKENS } from '$lib/motion/brand';
-  import { AssetKind } from '$lib/motion/components';
+  import { Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+  import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+  import { AssetKind } from '@feega/motion-core/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import FrameHover from '$lib/components/canvas/FrameHover.svelte';
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
@@ -135,11 +141,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { DrawTool } from '$lib/motion/draw-tool';
-  import { TextSizing } from '$lib/motion/text-sizing';
+  import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
   import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
-  import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
+  import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
   import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
   import { decoded, painted } from '$lib/canvas/paint-wait';
@@ -149,6 +155,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
+  import type { SceneDrop } from '$lib/canvas/scene-drop';
   import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
@@ -177,6 +184,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     type WiredListSource
   } from '$lib/canvas/list-node';
   import { verdictForUpload, canvasUploadPrefix } from '$lib/canvas/upload-kind';
+  import { isFeegaFile } from '$lib/canvas/feega-file';
+  import { importFeega } from '$lib/canvas/feega-transfer';
   import { FONT_FILE } from '$lib/motion/fonts/library';
   import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
   import { isUploadedNodeRow, uploadedNodeOf } from '$lib/canvas/uploaded-node';
@@ -186,6 +195,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
   import { snapAspectRatio, snapResolution } from '$lib/canvas/gen-node';
+  import { outputTabUrl } from '$lib/canvas/open-output';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import { snapDynamicParams } from '$lib/canvas/model-params';
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
@@ -193,24 +204,34 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { cleanNodeName } from '$lib/canvas/node-name';
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
+  import { reloadTechniques, techniquesOf } from '$lib/canvas/techniques.svelte';
+  import { promptSkillsOf, saveSkill } from '$lib/canvas/prompt-skills.svelte';
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
-  import { producedRuns } from '$lib/canvas/gen-history';
+  import { historyItemsOf, producedRuns, shownOutput } from '$lib/canvas/gen-history';
   import { genTileView, type GenTileView } from '$lib/canvas/gen-tile-view';
   import { runQuoteOf, type RunQuote } from '$lib/canvas/run-quote';
+  import { DEFAULT_INTO, DEFAULT_VARIANTS, VariantInto, browserVariantsStorage, effectiveVariants, readRemembered, variantsIntoOf, writeRemembered, type RememberedVariants } from '$lib/canvas/variants';
   import { type Addable } from '$lib/canvas/addable';
   import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
   import { tileNode } from '$lib/canvas/connect-rules';
   import { planDelete } from '$lib/canvas/delete-plan';
   import { connectorsFor, orphanedByModelChange, type ConnectorType, type GenerativeNodeKind, connectorsForNode } from '$lib/canvas/connectors';
   import { portsOf } from '$lib/canvas/node-ports';
+  import { TECHNIQUE_NODE, TECHNIQUE_EDIT_PREFIX, instancePorts } from '$lib/canvas/technique-instance';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
+  import FigmaImportDialog from '$lib/components/canvas/FigmaImportDialog.svelte';
+  import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
+  import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
+  import type { Extend } from '$lib/outpaint';
+  import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
   import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
+  import { ImageTool } from '$lib/image-tools';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
   import {
     docData,
@@ -250,6 +271,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const LINK_COPIED_MS = 1500;
 
   let { data } = $props();
+  const techniqueShelf = techniquesOf(untrack(() => data.projectId));
+  const skillShelf = promptSkillsOf(untrack(() => data.projectId));
 
   function announceWelcome() {
     const campaign = campaignOf(page.url.searchParams.get(WELCOME_PARAM));
@@ -278,6 +301,71 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let linkCopied = $state(false);
+
+  let viewing = $state<{ runs: ViewerRun[]; start: number; kind: OutputKind } | null>(null);
+
+  let pairing = $state<{ left: string; right: string; leftLabel: string; rightLabel: string } | null>(null);
+
+  function compareOutputs(ids: string[]) {
+    const [a, b] = ids.map((id) => nodes.find((n) => n.id === id));
+    if (!a || !b || typeof a.data.refId !== 'string' || typeof b.data.refId !== 'string') {
+      return;
+    }
+    const urlOf = (assetId: string) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full);
+    const nameOf = (n: typeof a) => n.displayName ?? (typeof n.data.prompt === 'string' ? n.data.prompt.slice(0, 24) : 'Image');
+    pairing = { left: urlOf(a.data.refId), right: urlOf(b.data.refId), leftLabel: nameOf(a), rightLabel: nameOf(b) };
+  }
+
+  function viewOutput(id: string) {
+    const node = nodes.find((n) => n.id === id);
+    const kind = node ? OUTPUT_KIND_OF[node.type] : undefined;
+    if (!node || !kind) {
+      return;
+    }
+    const outputs = viewableRuns((runs[id] ?? []) as ViewerRun[]);
+    const shown = outputs.findIndex((run) => run.outputAssetId === node.data.refId);
+    if (!outputs.length) {
+      return;
+    }
+    viewing = { runs: outputs, start: Math.max(shown, 0), kind };
+  }
+
+  let cloud = $state<{ provider: CloudProviderId; mode: CloudMode; nodeId: string | null; at: { x: number; y: number } } | null>(null);
+
+  function openCloud(provider: CloudProviderId, mode: CloudMode, nodeId: string | null, at: { x: number; y: number }) {
+    cloud = { provider, mode, nodeId, at };
+  }
+
+  async function pickCloud(target: string, provider: CloudProviderId) {
+    if (!cloud) {
+      return;
+    }
+    const { mode, nodeId, at } = cloud;
+    const base = `/api/v1/projects/${data.projectId}/cloud/${provider}`;
+    if (mode === CloudMode.Import) {
+      const res = await fetch(`${base}/import`, { method: 'POST', body: JSON.stringify({ fileId: target, place: { canvasId: data.canvas.id, x: at.x, y: at.y } }) });
+      const body = (await res.json().catch(() => ({}))) as { node?: CanvasNodeRecord | null; error?: string };
+      if (!res.ok || !body.node) {
+        failed = body.error ?? 'Import failed';
+        return;
+      }
+      const created = body.node;
+      nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })];
+      cloud = null;
+      return;
+    }
+    const node = nodes.find((n) => n.id === nodeId);
+    const assetId = [node?.data.assetId, node?.data.refId].find((v): v is string => typeof v === 'string');
+    if (!assetId) {
+      return;
+    }
+    const res = await fetch(`${base}/export`, { method: 'POST', body: JSON.stringify({ assetId, folder: target }) });
+    if (!res.ok) {
+      failed = 'Export failed';
+      return;
+    }
+    cloud = null;
+  }
 
   async function copySelectionLink() {
     await navigator.clipboard.writeText(selectionLink(page.url, selectedIds));
@@ -1104,8 +1192,27 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       itemPort: () => itemPortOf(n.type === 'list' ? listValuesByNode[n.id]?.itemKind : upstreamListOf(n.id)?.itemKind),
       mediaKind: () => upstreamEffectsMediaOf(n.id)?.kind ?? (n.data.mediaKind === 'video' ? 'video' : 'image'),
       audioOperation: () => audioOperationOfTile(n),
-      audioInput: () => audioInputOfTile(n)
+      audioInput: () => audioInputOfTile(n),
+      techniquePorts: () => {
+        const technique = techniqueOfTile(n);
+        return technique ? instancePorts(technique) : { inputs: [], output: null };
+      }
     });
+  }
+
+  function techniqueOfTile(n: Tile) {
+    return techniqueShelf.list.find((t) => t.id === n.data.techniqueId) ?? null;
+  }
+
+  function techniqueView(n: Tile): NodeView | null {
+    if (n.type !== TECHNIQUE_NODE) {
+      return null;
+    }
+    const technique = techniqueOfTile(n);
+    if (!technique) {
+      return null;
+    }
+    return { technique: { name: technique.name, version: technique.version, inputs: technique.inputs.length, outputs: technique.outputs.length, ranVersion: typeof n.data.ranVersion === 'number' ? n.data.ranVersion : null } };
   }
 
   /**
@@ -1223,7 +1330,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!row) {
       return null;
     }
-    return mediaView(row) ?? selectedView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
+    return mediaView(row) ?? selectedView(row) ?? techniqueView(row) ?? (studioBatches[id] ? { batch: studioBatches[id] } : null);
   }
 
   let Flow = $state<typeof GpuFlow | null>(null);
@@ -1244,6 +1351,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let failed = $state<string | null>(null);
   let fontAdded = $state<string | null>(null);
+  let techniqueNotice = $state<string | null>(null);
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
   let topPeers = $state<HTMLElement | null>(null);
@@ -1305,6 +1413,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const OFFLINE_RUN_NOTICE = 'Offline: generating needs a connection. Your edits are kept and will save when you are back.';
   const LINE_REFUSED_NOTICE = 'A line change was refused by the canvas and was undone.';
   let outbox: Outbox | null = null;
+  const batchWrites = inFlightWrites();
   const saves = createSaveScheduler({
     send: sendSave,
     debounceMs: SAVE_DEBOUNCE_MS,
@@ -1766,7 +1875,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   function postAtVersion(action: string, id: string, fields: Fields): Promise<Record<string, unknown> | null> {
     let release = () => {};
     const asked = actAtVersion({
-      settle: async () => { await saves.flush(id); release = saves.hold(id); },
+      settle: async () => { await Promise.all([batchWrites.settled(), saves.flush(), lines.drain()]); release = saves.hold(id); },
       version: () => nodes.find((node) => node.id === id)?.version ?? 0,
       send: (version) => send(action, { ...fields, node_id: id, version }),
       reread: refresh
@@ -1822,6 +1931,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function upload(file: File, at = { x: 0, y: 0 }, hold: FrameHold | null = null) {
+    if (isFeegaFile(file)) {
+      failed = (await importFeega(`/p/${data.projectId}/c/${data.canvas.id}`, file)) ?? failed;
+      return;
+    }
     if (FONT_FILE.test(file.name)) {
       await uploadFontFile(file);
       return;
@@ -2043,6 +2156,48 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return { items: [{ kind: 'node.create', nodeId: node.id, after: { type: node.type, position: node.position, data: node.data } }] };
   }
 
+  async function openCodeView(sourceId: string, route: string) {
+    const source = nodes.find((n) => n.id === sourceId);
+    if (!source) {
+      return;
+    }
+
+    const spot = placeInRow({ x: source.x, y: source.y, w: source.w, h: source.h }, occupiedRects());
+    const res = await post('create', {
+      type: 'iframe',
+      x: spot.x,
+      y: spot.y,
+      width: source.w,
+      height: source.h,
+      data: JSON.stringify({ sourceNodeId: sourceId, route })
+    });
+    const created = (res?.node ?? null) as CanvasNodeRecord | null;
+    if (!created) {
+      return;
+    }
+
+    nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })];
+    pushGesture(createGesture(created));
+    focusOn([created.id]);
+  }
+
+  async function exportCode(id: string, mode: ExportMode) {
+    const res = await post('exportCode', { node_id: id, mode });
+    const files = res?.files as Record<string, string> | undefined;
+    if (!files) {
+      return;
+    }
+
+    const folder = String(res?.folder ?? 'code-frame');
+    const { zipFolder } = await import('$lib/canvas/code-zip');
+    const zip = zipFolder(folder, files);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([zip as BlobPart], { type: 'application/zip' }));
+    link.download = `${folder}.zip`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
   async function create(what: Addable, at: { x: number; y: number }) {
     const size = sizeForAddable(what);
     const spot = placeNear(at, size, occupiedRects());
@@ -2133,8 +2288,42 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       estimatedTextInputTokens: estimate?.inputTokens,
       estimatedTextOutputTokens: estimate?.outputTokens,
       hasUpstreamImage: edges.some((e) => e.target === row.id && e.targetHandle === 'images'),
-      imageChoices: catalogue.image
+      imageChoices: catalogue.image,
+      remembered: rememberedVariants
     });
+  }
+
+  const variantsUserId = data.session?.user?.id ?? '';
+  let rememberedVariants = $state<RememberedVariants | null>(null);
+  let variantsRunning = $state<Record<string, number>>({});
+
+  onMount(() => {
+    rememberedVariants = readRemembered(browserVariantsStorage(), variantsUserId);
+  });
+
+  function rememberVariants(patch: { variants?: number; variantsInto?: VariantInto }) {
+    const base = rememberedVariants ?? { count: DEFAULT_VARIANTS, into: DEFAULT_INTO };
+    rememberedVariants = { count: patch.variants ?? base.count, into: patch.variantsInto ?? base.into };
+    writeRemembered(browserVariantsStorage(), variantsUserId, rememberedVariants);
+  }
+
+  function variantsPlanFor(gen: GenNodeState): { count: number; into: VariantInto } {
+    const choice = catalogue[gen.medium]?.find((c) => c.id === effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []));
+    return { count: effectiveVariants(gen.medium, gen.params, rememberedVariants, choice), into: variantsIntoOf(gen.params, rememberedVariants) };
+  }
+
+  function historyFor(id: string) {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const items = gen ? historyItemsOf({ ...gen, runs: runsByNode[id] ?? [] }) : [];
+    return gen && items.length ? { items, urlOf: assetUrl, onshow: (runId: string) => void restore(id, gen, runId) } : null;
+  }
+
+  function variantsInFlightFor(id: string): number {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const historyBatch = gen?.running ? variantsPlanFor(gen) : null;
+    return variantsRunning[id] ?? (historyBatch && historyBatch.count > 1 && historyBatch.into === VariantInto.History ? historyBatch.count : 0);
   }
 
   function genViewFor(id: string): GenTileView | null {
@@ -2150,9 +2339,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const variableTextInput = estimate?.variableInput ?? (gen.medium === 'text' && revision !== '[]');
     const entry = mediumCatalogue[gen.medium];
     const hasUpstreamText = hasUpstreamTextByNode[id] ?? false;
-    const quote = runQuoteOf({ node, choices: entry.choices, hasUpstreamText, variableTextInput, enhanceUnitCredits: entry.enhanceUnitCredits, estimatedTextInputTokens: estimate?.inputTokens, estimatedTextOutputTokens: estimate?.outputTokens });
+    const quote = runQuoteOf({ node, choices: entry.choices, hasUpstreamText, variableTextInput, enhanceUnitCredits: entry.enhanceUnitCredits, estimatedTextInputTokens: estimate?.inputTokens, estimatedTextOutputTokens: estimate?.outputTokens, remembered: rememberedVariants });
 
-    return genTileView(node, quote, { hasUpstreamText, variableTextInput, loopQueued: loopQueuedByNode[id] ?? 0, loopVisible: loopAffordanceByNode[id]?.visible ?? false, loopCombinationCount: loopAffordanceByNode[id]?.combinationCount ?? 0 });
+    return genTileView(node, quote, { hasUpstreamText, variableTextInput, loopQueued: loopQueuedByNode[id] ?? 0, loopVisible: loopAffordanceByNode[id]?.visible ?? false, loopCombinationCount: loopAffordanceByNode[id]?.combinationCount ?? 0, variantsInFlight: variantsInFlightFor(id) });
   }
 
   function runNode(id: string) {
@@ -2163,7 +2352,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  async function run(id: string, gen: GenNodeState) {
+  async function run(id: string, clicked: GenNodeState) {
+    await batchWrites.settled();
+    const row = nodes.find((node) => node.id === id);
+    const gen = (row ? genOf(row) : null) ?? clicked;
     if (gen.running) {
       return;
     }
@@ -2172,16 +2364,29 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
-    nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
+    const variants = variantsPlanFor(gen);
+    const batched = variants.count > 1;
+    const params = batched || gen.params.variants !== undefined ? { ...gen.params, variants: variants.count, variantsInto: variants.into } : gen.params;
+    const spawnsNodes = batched && variants.into === VariantInto.Nodes;
+
+    if (!spawnsNodes) {
+      nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
+    }
+    if (batched) {
+      variantsRunning = { ...variantsRunning, [id]: variants.count };
+    }
 
     pending += 1;
     const result = await postAtVersion('run', id, {
       medium: gen.medium,
       prompt: gen.prompt,
       model: effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []) ?? '',
-      params: JSON.stringify(gen.params)
+      params: JSON.stringify(params)
     });
     pending -= 1;
+
+    const { [id]: _settled, ...stillRunning } = variantsRunning;
+    variantsRunning = stillRunning;
 
     if (!result) {
       // Il motivo VERO sta già scritto su `nodes.data` — `giveUp()` lo mette lì prima di
@@ -2233,6 +2438,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     await post('run_loop', { node_id: id, confirm: safety.verdict === 'confirm' ? '1' : '0' });
     await refresh();
     void invalidate('app:credits');
+  }
+
+  async function cancelRunFor(id: string) {
+    await post('cancel_run', { node_id: id });
+    await refresh();
   }
 
   /** Ferma i biglietti non ancora reclamati da un tick — quelli già in corso finiscono, i
@@ -2359,11 +2569,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    */
   /** Rimettere in vetrina un giro di prima: lo decide il server, che sa quale asset è quel giro. */
   async function restore(id: string, gen: GenNodeState, runId: string) {
-    const hit = (runsByNode[id] ?? []).find((r) => r.id === runId);
-    if (hit?.mediaId) {
+    const mediaId = (runsByNode[id] ?? []).find((r) => r.id === runId)?.mediaId;
+    if (mediaId) {
       nodes = nodes.map((node) =>
         node.id === id
-          ? { ...node, data: { ...node.data, refId: hit.mediaId, running: false, error: null } }
+          ? { ...node, data: shownOutput(node.data, { id: runId, mediaId }) }
           : node
       );
     }
@@ -2954,6 +3164,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       audio?: boolean;
       enhancePrompt?: boolean;
       repeat?: number;
+      variants?: number;
+      variantsInto?: VariantInto;
       /** I campi dichiarati da `ai_models.param_schema` che il toolbar generico scrive — un solo
        *  bucket dinamico, invece di un campo esplicito per ogni nome di parametro possibile. */
       dynamicParams?: Record<string, unknown>;
@@ -2961,6 +3173,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   ) {
     const chosen = nodes.filter((n) => ids.includes(n.id));
     if (!chosen.length) { return; }
+
+    if (patch.variants !== undefined || patch.variantsInto !== undefined) { rememberVariants(patch); }
 
     const droppedEdges: UndoItem[] = [];
     const clearedReferenceIds: string[] = [];
@@ -3084,11 +3298,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       };
     });
 
-    const result = await post('batchWrite', { items: JSON.stringify(items) });
+    const patches = new Map(items.map((item) => [item.node_id, item.patch as Record<string, unknown>]));
+    nodes = nodes.map((n) => (patches.has(n.id) ? { ...n, data: { ...n.data, ...patches.get(n.id) } } : n));
+
+    const result = await batchWrites.track(ids, post('batchWrite', { items: JSON.stringify(items) }));
     const results = (result?.results ?? []) as { nodeId: string; outcome: string; node?: CanvasNodeRecord }[];
     const conflicts = results.filter((r) => r.outcome === 'conflict');
     if (conflicts.length) {
       failed = `${conflicts.length} node(s) not saved: changed by someone else meanwhile`;
+    }
+    if (!result || conflicts.length) {
+      await refresh();
     }
 
     const written = results.filter((r) => r.outcome === 'written' && r.node).map((r) => r.node as CanvasNodeRecord);
@@ -3207,6 +3427,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let formatsFor = $state<string | null>(null);
+  let inpaintFor = $state<string | null>(null);
+  let outpaintFor = $state<string | null>(null);
   let exportFor = $state<string[] | null>(null);
   let exportElements = $state<{ frameId: string; elementIds: string[] } | null>(null);
 
@@ -3223,8 +3445,32 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return out?.url ? (out as { url: string; name: string; files: string[]; skipped?: string[] }) : 'Export failed';
   }
 
+  async function insertSceneDrop(drop: SceneDrop) {
+    await Promise.all([saves.flush(drop.targetId), saves.flush(drop.sourceId)]);
+    landed(await post('insertScene', { target: drop.targetId, source: drop.sourceId, at: drop.at }));
+  }
+
   async function combineScenes(frameIds: string[]) {
     landed(await post('combineScenes', { frame_ids: JSON.stringify(frameIds) }));
+  }
+
+  async function imageTool(nodeId: string, tool: ImageTool) {
+    landed(await post('imageTool', { node_id: nodeId, tool }));
+    void invalidate('app:credits');
+  }
+
+  async function inpaint(nodeId: string, prompt: string, mask: Mask) {
+    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Inpaint, prompt, mask: JSON.stringify(mask) }));
+    void invalidate('app:credits');
+  }
+
+  async function outpaint(nodeId: string, prompt: string, extend: Extend) {
+    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
+    void invalidate('app:credits');
+  }
+
+  async function layersToFrame(nodeId: string) {
+    landed(await post('layersToFrame', { node_id: nodeId }));
   }
 
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
@@ -3282,7 +3528,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   const FIGMA_PASTE = 'These Figma layers could not be read. In Figma use Copy as → Copy as SVG, then paste here.';
-  const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
+  const FIGMA_SKIPPED = 'Pasted from Figma. Approximated or skipped:';
 
   async function pasteFigma(html: string, at: { x: number; y: number }) {
     const res = await post('pasteFigma', { html, at: JSON.stringify(at) });
@@ -3302,6 +3548,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const fills = (res?.fills ?? []) as { nodeId: string; images: FigmaImage[] }[];
     if (fileKey && fills.length) {
       figmaJobs = [...figmaJobs, ...fills.map((f) => ({ ...f, fileKey }))];
+    }
+  }
+
+  let figmaImportAt = $state<{ x: number; y: number } | null>(null);
+
+  function figmaImported(landed: { nodes: unknown[]; undo: unknown[]; skipped: string[] }) {
+    const landedNodes = landed.nodes as CanvasNodeRecord[];
+    nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
+    pushGesture({ items: landed.undo as UndoItem[] });
+    focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
+    if (landed.skipped.length) {
+      failed = `${FIGMA_SKIPPED} ${landed.skipped.join('; ')}`;
     }
   }
 
@@ -3345,7 +3603,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const longest = Math.min(TEXT_BOX.maxChars, Math.max(...text.split('\n').map((line) => line.length)));
     const width = longest * TEXT_BOX.lineHeight * TEXT_BOX.charWidth;
     const height = TEXT_BOX.lineHeight;
-    void drawElement({ tool: DrawTool.Text, box: { left: at.x - width / 2, top: at.y - height / 2, width, height }, text, sizing: TextSizing.AutoWidth });
+    void drawElement({ tool: DrawTool.Text, box: { left: at.x - width / 2, top: at.y - height / 2, width, height }, text, sizing: NEW_TEXT_SIZING });
   }
 
   const PASTE_DATA: { [K in Pasted]: (data: Extract<PasteData<File>, { kind: K }>, at: { x: number; y: number }) => void } = {
@@ -3425,6 +3683,63 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (created.length) { nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))]; }
     if (connected.length) { edges = [...edges, ...connected.map(toEdge)]; }
     if (created.length) { pushGesture(createManyGesture(created, connected)); }
+  }
+
+  async function saveTechnique(ids: string[]) {
+    const editing = data.canvas.name.startsWith(TECHNIQUE_EDIT_PREFIX) ? data.canvas.name.slice(TECHNIQUE_EDIT_PREFIX.length) : '';
+    const name = prompt('Technique name (lowercase words with dashes)', editing)?.trim();
+    if (!name) {
+      return;
+    }
+
+    const saved = await post('save_technique', { ids: JSON.stringify(ids), name });
+    if (saved) {
+      void reloadTechniques(data.projectId, techniqueShelf);
+    }
+  }
+
+  const techniqueNodeIn = (ids: string[]) => nodes.find((n) => ids.includes(n.id) && n.type === TECHNIQUE_NODE);
+
+  async function runTechniqueNode(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const queued = node ? await post('run_technique_node', { node_id: node.id }) : null;
+    if (queued) {
+      techniqueNotice = 'Running. Results land on the Technique runs canvas.';
+      void refresh();
+    }
+  }
+
+  async function editTechnique(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const opened = node ? await post('open_technique', { technique_id: String(node.data.techniqueId) }) : null;
+    if (opened) {
+      leave(`/p/${data.projectId}/c/${String(opened.canvasId)}`, null);
+    }
+  }
+
+  async function detachTechnique(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const detached = node ? await post('detach_technique', { node_id: node.id }) : null;
+    if (!node || !detached) {
+      return;
+    }
+    const created = (detached.nodes ?? []) as CanvasNodeRecord[];
+    const connected = (detached.connections ?? []) as Connection[];
+    nodes = [...nodes.filter((n) => n.id !== node.id), ...created.map((n) => toTile(n, { select: true }))];
+    edges = [...edges, ...connected.map(toEdge)];
+  }
+
+  async function insertTechnique(id: string, at: { x: number; y: number }) {
+    const result = await post('insert_technique', { technique_id: id, x: at.x, y: at.y });
+    const created = (result?.nodes ?? []) as CanvasNodeRecord[];
+    const connected = (result?.connections ?? []) as Connection[];
+    if (!created.length) {
+      return;
+    }
+    techniqueNotice = typeof result?.message === 'string' ? result.message : null;
+    nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))];
+    edges = [...edges, ...connected.map(toEdge)];
+    pushGesture(createManyGesture(created, connected));
   }
 
   async function insertTemplate(id: string, at: { x: number; y: number }) {
@@ -3573,33 +3888,36 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * «Genera» resta spento finché non c'è chi esegue il giro (fase 3).
    */
 
-  const EMPTY_ORIGIN = { x: 0, y: 0 };
-  const CHAT_INPUT = 'chat-composer-input';
-
-  const EMPTY_STARTS: Record<EmptyAction, () => void> = {
-    [EmptyAction.Chat]: () => {
-      requestChat();
-      requestAnimationFrame(() => document.getElementById(CHAT_INPUT)?.focus());
-    },
-    [EmptyAction.Frame]: () => (frameLibraryAt = EMPTY_ORIGIN),
-    [EmptyAction.Image]: () => void create('image', EMPTY_ORIGIN),
-    [EmptyAction.Video]: () => void create('video', EMPTY_ORIGIN)
-  };
-
   const canvasMode = $derived(canvasModeFor(data.org.role));
   const viewOnly = $derived(canvasMode === CanvasMode.View);
+
+  function openOutput(id: string) {
+    const row = nodes.find((n) => n.id === id);
+    const gen = row ? genOf(row) : null;
+    const url = gen ? outputTabUrl({ projectId: data.projectId, canvasId: data.canvas.id }, gen) : null;
+    if (url) {
+      window.open(url, '_blank', 'noopener');
+    }
+  }
 </script>
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
 <svelte:window onpointermovecapture={readResizeMode} onpointerupcapture={readResizeMode} />
 
 <div class="canvas" class:view-only={viewOnly}>
-  {#if peers.length || canvasPeers.length}
+  {#if peers.length || canvasPeers.length || presenting}
+    {@const onspotlight = isOff(LocalOff.Present) || !presentControlsShown({ others: peers.length, presenting }) ? undefined : spotlight}
     {#if topPeers}
-      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></Portal>
+      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /></Portal>
     {:else}
-      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></div>
+      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /></div>
     {/if}
+  {/if}
+  {#if presenting}
+    <div class="presenting" role="status" data-testid="presenting-banner">
+      You're presenting · {peers.length} here
+      <button type="button" data-testid="presenting-stop" onclick={() => spotlight(false)}>Stop</button>
+    </div>
   {/if}
   <CursorChat onchat={(chat) => cursors.port.update({ chat })} />
   <CanvasShortcutHelp />
@@ -3625,6 +3943,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       Add a Figma token in Settings to import images
       <a href="/p/{data.projectId}/settings/profile">Open settings</a>
     </p>
+  {/if}
+  {#if techniqueNotice}
+    <p class="warning" role="status" data-testid="technique-notice">{techniqueNotice}</p>
   {/if}
   {#if fontAdded}
     <p class="warning" role="status" data-testid="font-added">{fontAdded}</p>
@@ -3656,6 +3977,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
   {#if versionsPanel.open}
     <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
+  {/if}
+  {#if outpaintFor}
+    <OutpaintDialog onapply={(prompt, extend) => outpaint(outpaintFor!, prompt, extend)} onclose={() => (outpaintFor = null)} />
+  {/if}
+  {#if inpaintFor}
+    <InpaintDialog src={assetUrl(String(nodes.find((n) => n.id === inpaintFor)?.data?.refId ?? '')) ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
+  {/if}
+  {#if figmaImportAt}
+    <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/p/{data.projectId}/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />
   {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
@@ -3691,10 +4021,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onResize={resize}
     onPlace={storeSize}
     onRename={renameNode}
+    onNodeDoubled={openOutput}
     onConnect={connect}
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}
     onCombineScenes={combineScenes}
+    onInsertScene={insertSceneDrop}
+    onImageTool={imageTool}
+    onLayersToFrame={layersToFrame}
+    onInpaint={(id) => (inpaintFor = id)}
+    onOutpaint={(id) => (outpaintFor = id)}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}
     onEdgeDelete={disconnect}
@@ -3708,6 +4044,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onAddBeside={addFrameBeside}
     onSection={wrapInSection}
     onSectionChange={(id, patch) => void write(id, patch, SaveTiming.Now)}
+    onViewOutput={viewOutput}
+    onCompareOutputs={compareOutputs}
+    onCloud={openCloud}
+    onColourChange={(ids, tag) => ids.forEach((id) => void write(id, withColour(tag), SaveTiming.Now))}
     onGroup={groupElements}
     onUngroup={ungroupElements}
     onRestack={restack}
@@ -3725,7 +4065,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onFigmaImages={figmaImagesAnswered}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
+    techniques={techniqueShelf.list}
+    onTechnique={insertTechnique}
+    onSaveTechnique={saveTechnique}
+    onRunTechnique={runTechniqueNode}
+    onEditTechnique={editTechnique}
+    onDetachTechnique={detachTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
+    onFigmaImport={(at) => (figmaImportAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
     onRedo={() => inTurn(redo)}
@@ -3738,6 +4085,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     {runQuoteFor}
     {genViewFor}
     onRunNode={runNode}
+    {variantsInFlightFor}
+    {historyFor}
+    onCancelVariants={cancelLoopFor}
+    onCancelRun={cancelRunFor}
     {nodeSummaries}
     {modelChoicesFor}
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
@@ -3758,7 +4109,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }}
     onUserPan={() => (following = null)}
     commenting={commentsPanel.placing}
-    onCommenting={(on) => commentsPanel.place(on)}
+    onCommenting={isOff(LocalOff.Comments) ? undefined : (on) => commentsPanel.place(on)}
     onComment={(at) => commentsPanel.drop(at)}
     commentMarks={(nodeId, fps) => marksFor(commentThreads ?? [], nodeId, fps)}
     onMark={(id) => commentsPanel.focus(id)}
@@ -3829,6 +4180,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             loopQueued={loopQueuedByNode[row.id] ?? 0}
             loopVisible={loopAffordanceByNode[row.id]?.visible ?? false}
             loopCombinationCount={loopAffordanceByNode[row.id]?.combinationCount ?? 0}
+            variantsInFlight={variantsInFlightFor(row.id)}
+            remembered={rememberedVariants}
             onchange={(patch) => changeGen(id, gen, patch)}
             onestimate={(prompt, model, revision) => void estimateTextCost(id, prompt, model ?? '', revision)}
             onrun={() => run(id, gen)}
@@ -3838,6 +4191,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onshow={(runId) => restore(id, gen, runId)}
             onmeasure={(contentHeight) => (grownHeights[id] = contentHeight)}
             example={exampleFor(row)}
+            skills={skillShelf.list}
+            onsaveskill={(name, body) => saveSkill(data.projectId, name, body)}
+            {selected}
+            thumbUrl={(mediaId) => canvasAssetUrl(data.projectId, data.canvas.id, mediaId, AssetSize.Thumb)}
           >
             {#snippet result({ refId, text })}
               <!-- `/c/<tela>/assets/<id>` firma lo storage al volo: un URL firmato messo qui
@@ -3846,7 +4203,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
               {#if row.data.outputUncensored === true}
                 <span class="uncensored-output" data-testid="uncensored-output">Uncensored</span>
               {/if}
-              <span class="ai-generated-mark" data-testid="ai-generated-mark">AI-generated</span>
               {#if gen.medium === 'text'}
                 <div class="gen-text-wrap">
                   <div class="gen-text-toggle" role="group" aria-label="Vista del testo">
@@ -3883,11 +4239,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
               {:else if gen.medium === 'video'}
                 <LiveVideo src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} {selected} controls />
                 <div class="gen-download">
+                  <a class="gen-open nodrag" href={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} target="_blank" rel="noopener" aria-label="Open full size in a new tab" title="Open full size in a new tab" data-testid="open-output"><ExternalLink size={14} strokeWidth={1.75} /></a>
                   <NodeDownload kind="video" sourceUrl={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {:else}
                 <TieredImage src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} alt={gen.prompt} />
                 <div class="gen-download">
+                  <a class="gen-open nodrag" href={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} target="_blank" rel="noopener" aria-label="Open full size in a new tab" title="Open full size in a new tab" data-testid="open-output"><ExternalLink size={14} strokeWidth={1.75} /></a>
                   <NodeDownload kind="image" sourceUrl={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {/if}
@@ -3920,7 +4278,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             {/snippet}
           </GenNode>
         {:else if frame}
-          <IframeNode node={frame} onchange={(patch) => write(id, frameData({ ...frame, ...patch }))} />
+          {@const codeRow = frame.source === 'view' ? nodes.find((n) => n.id === frame.sourceNodeId) : null}
+          {@const code = codeRow ? frameOf(codeRow) : null}
+          {@const owner = frame.source === 'view' ? code : frame}
+          <IframeNode
+            node={frame}
+            {code}
+            {selected}
+            onchange={(patch) => write(id, frameData({ ...frame, ...patch }))}
+            onvars={(vars) => owner && write(owner.id, frameData({ ...owner, vars }))}
+            onview={(route) => void openCodeView(id, route)}
+            onexport={(mode) => void exportCode(owner?.id ?? id, mode)}
+          />
         {:else if doc}
           <DocNode
             node={doc}
@@ -4006,9 +4375,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     {/snippet}
   </Flow>
   {/if}
-  {#if !viewOnly && showsEmptyState(nodes.length)}
-    <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
-  {/if}
   {#if componentPicking}
     {@const pickingId = componentPicking.id}
     {@const pickingAssets = cardAssets(compositionCards(pickingId, edges, nodes))}
@@ -4053,9 +4419,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
 
 
+  {#if cloud}
+    <CloudPicker provider={cloud.provider} mode={cloud.mode} projectId={data.projectId} returnTo={page.url.pathname} onpick={pickCloud} onclose={() => (cloud = null)} />
+  {/if}
+
   <NodeSearch {nodes} onjump={(id) => focusOn([id], undefined, FocusMode.Select)} />
 
-  {#if selectedIds.length}
+  {#if pairing}
+    <CompareOverlay {...pairing} onclose={() => (pairing = null)} />
+  {/if}
+
+  {#if viewing}
+    <OutputViewer runs={viewing.runs} start={viewing.start} kind={viewing.kind} urlFor={(assetId) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full)} onclose={() => (viewing = null)} />
+  {/if}
+
+  {#if selectedIds.length && !isOff(LocalOff.PublicLinks)}
     <button type="button" class="copy-link" data-testid="copy-selection-link" onclick={copySelectionLink}>{linkCopied ? 'Link copied' : 'Copy link to selection'}</button>
   {/if}
 
@@ -4124,9 +4502,32 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   .gen-download {
     position: absolute;
-    top: 6px;
-    right: 6px;
+    top: 8px;
+    right: 8px;
     z-index: 5;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity var(--ui-dur-fast) ease;
+  }
+  :global(.gen:hover) .gen-download,
+  .gen-download:focus-within {
+    opacity: 1;
+  }
+  .gen-open {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--ui-radius-md);
+    background: color-mix(in srgb, var(--ui-raised) 88%, transparent);
+    color: var(--ui-text);
+    box-shadow: var(--ui-shadow-float);
+    backdrop-filter: blur(8px);
+  }
+  .gen-open:hover {
+    background: var(--ui-raised);
   }
 
   .gen-text-wrap {
@@ -4215,7 +4616,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   .warning {
     position: absolute;
     z-index: 10;
-    top: 10px;
+    top: var(--chrome-top, 10px);
     left: 50%;
     transform: translateX(-50%);
     margin: 0;
@@ -4228,14 +4629,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   .warning.reload {
-    top: 40px;
+    top: calc(var(--chrome-top, 10px) + 30px);
     color: inherit;
   }
 
   .workflow-chip {
     position: absolute;
     z-index: 10;
-    top: 10px;
+    top: var(--chrome-top, 10px);
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -4256,18 +4657,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     text-decoration: underline;
     cursor: pointer;
   }
-  .ai-generated-mark {
-    position: absolute;
-    bottom: 6px;
-    left: 6px;
-    z-index: 2;
-    padding: 0 4px;
-    font-size: 0.625rem;
-    line-height: 1rem;
-    color: var(--paper, #fff);
-    background: rgb(0 0 0 / 0.6);
-    pointer-events: none;
-  }
   .uncensored-output {
     position: absolute;
     top: 6px;
@@ -4283,15 +4672,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   .copy-link {
     position: absolute;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     z-index: 5;
     transform: translateX(-50%);
     height: 28px;
-    padding: 0 10px;
-    border: 1px solid var(--ui-line-strong);
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-surface, var(--background));
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
     color: var(--ui-ink);
     font-size: var(--ui-text-xs);
     cursor: pointer;

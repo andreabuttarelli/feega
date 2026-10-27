@@ -2,7 +2,7 @@ import { env as publicEnv } from '$env/dynamic/public';
 import type { Db } from '$lib/server/db/client';
 import { embedRefusal, type PublishRefusal } from '$lib/gallery/refusals';
 import type { ProjectMode } from '$lib/project-mode';
-import { embedSettings, embedSource, embedUrl, hostedPage, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
+import { embedSettings, embedSource, embedUrl, gpuSource, hostedPage, upgradePlayer, type GpuSource, type InteractiveInput } from '$lib/motion/interactive/bundle';
 import { embedSnippet, type EmbedSettings } from '$lib/motion/interactive/loader';
 import { assetOf, hostAssets, type HostedAsset } from './embed-assets';
 import { EmbedAction } from './motion-tools';
@@ -115,4 +115,10 @@ export async function readEmbedAsset(fetchFn: typeof fetch, id: string, hash: st
 export async function readEmbedSettings(fetchFn: typeof fetch, id: string): Promise<EmbedSettings | null> {
   const page = await storedEmbed(fetchFn, id);
   return page === null ? null : embedSettings(page);
+}
+
+export async function readGpuSource(fetchFn: typeof fetch, id: string, origin: string): Promise<GpuSource | null> {
+  const page = await storedEmbed(fetchFn, id);
+  const source = page === null ? null : gpuSource(page, origin);
+  return source ? (JSON.parse(hostAssets(JSON.stringify(source), assetBase(origin, id))) as GpuSource) : null;
 }

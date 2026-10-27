@@ -1,5 +1,5 @@
-import type { PathItem } from '$lib/motion/gpu-full/display-list';
-import { dashes } from '$lib/motion/gpu-full/stroke';
+import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import type { Glyphs } from './chrome';
@@ -91,6 +91,13 @@ export function hoverItems(b: Box, zoom: number, theme: CoreTheme): PathItem[] {
   return [solid(`hover:${OverlayPart.Hover}`, line(rect(b.x, b.y, b.w, b.h), OVERLAY_LINE / zoom, true), theme.accent, HOVER_ALPHA)];
 }
 
-export function runningItems(b: Box & { id: string }, zoom: number, theme: CoreTheme): PathItem[] {
-  return [solid(`${b.id}:${OverlayPart.Running}`, line(rect(b.x, b.y, b.w, b.h), RUNNING_LINE / zoom, true), theme.accent)];
+function roundRing(b: Box, width: number, radius: number): number[][] {
+  const half = width / 2;
+  return [...roundRect(b.x - half, b.y - half, b.w + width, b.h + width, radius + half), ...roundRect(b.x + half, b.y + half, b.w - width, b.h - width, radius - half).map(reverse)];
+}
+
+export function runningItems(b: Box & { id: string; radius?: number }, zoom: number, theme: CoreTheme): PathItem[] {
+  const width = RUNNING_LINE / zoom;
+  const ring = b.radius ? roundRing(b, width, b.radius) : line(rect(b.x, b.y, b.w, b.h), width, true);
+  return [solid(`${b.id}:${OverlayPart.Running}`, ring, theme.accent)];
 }

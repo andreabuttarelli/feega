@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import MotionInspector from './MotionInspector.svelte';
 import MultiInspector from './MultiInspector.svelte';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip, setTransform } from '$lib/motion/timeline';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setTransform } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { EditMode } from '$lib/motion/edit-mode';
-import type { ComponentId } from '$lib/motion/components';
+import type { ComponentId } from '@feega/motion-core/motion/components';
 
 function withClip(component: ComponentId, id: string, doc: MotionDoc = newMotionDoc(MotionFormat.Landscape)): MotionDoc {
   const added = addClip(doc, { component, from: 0 }, id);
@@ -28,7 +28,7 @@ describe('Properties for one clip', () => {
   it('a title: its name and kind on top, then layout, layer, fill, effects, text, animation in that order', () => {
     const html = inspect('Title');
 
-    expect(html).toMatch(/class="name[^"]*">Better marketing</);
+    expect(html).toMatch(/class="name[^"]*"[^>]*value="Better marketing/);
     expect(html).toMatch(/class="kind[^"]*">Title</);
     const order = sections(html).filter((s) => ['layout', 'layer', 'fill', 'effects', 'text', 'animate'].includes(s));
     expect(order).toEqual(['layout', 'layer', 'fill', 'effects', 'text', 'animate']);
@@ -39,7 +39,7 @@ describe('Properties for one clip', () => {
 
     expect(html).toContain('>Spacing</span>');
     expect(html).toContain('>em</span>');
-    expect(html).toContain('>Offset X</span>');
+    expect(html).toContain('Transform');
     expect(html).not.toContain('>ΔX</span>');
     expect(html).not.toContain('>↔</span>');
   });
@@ -47,8 +47,10 @@ describe('Properties for one clip', () => {
   it('a title aligns with three icon toggles, not a dropdown', () => {
     const html = inspect('Title');
 
-    expect(html).toContain('data-segmented="Align"');
+    expect(html).toContain('data-segmented="Text align"');
     expect(html).toContain('aria-label="Align left"');
+    const textSection = html.split('data-section="text"')[1] ?? '';
+    expect(textSection).toContain('data-segmented="Text align"');
   });
 
   it('a colour is a swatch, a hex field and a picker, not a row of brand swatches', () => {

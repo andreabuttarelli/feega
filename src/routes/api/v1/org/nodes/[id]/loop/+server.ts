@@ -3,7 +3,8 @@ import type { RequestHandler } from './$types';
 import { reachableCaller } from '$lib/server/org-data/reach';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { findNode } from '$lib/server/repos/canvas';
-import { planLoop, enqueueLoop, cancelLoop } from '$lib/server/canvas/loop';
+import { planLoop, enqueueLoop } from '$lib/server/canvas/loop';
+import { cancelBatch } from '$lib/server/canvas/cancel-batch';
 
 /**
  * IL LOOP DI UN NODO DI GENERAZIONE, per la tela e per un agente MCP allo stesso modo.
@@ -78,6 +79,6 @@ export const DELETE: RequestHandler = async ({ request, params, url }) => {
   if (!writeAllowed) return json({ error: 'api_key_read_only' }, { status: 403 });
 
   const nodeId = params.id ?? '';
-  const outcome = await cancelLoop(db, { orgId, nodeId });
+  const outcome = await cancelBatch(db, { orgId, nodeId });
   return json(outcome);
 };

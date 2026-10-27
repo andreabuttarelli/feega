@@ -1,17 +1,20 @@
 import { z } from 'zod';
 import { ClipFamily } from './track-style';
 import type { LayoutStore } from './editor-layout';
-import { Control, Group } from './components';
-import { VAR_PREFIX } from './custom/component';
+import { Control, Group } from '@feega/motion-core/motion/components';
+import { VAR_PREFIX } from '@feega/motion-core/motion/custom/component';
 import { FieldFill } from './number-field';
-import { Source, type Transform } from './keyframes';
+import { Source, type Transform } from '@feega/motion-core/motion/keyframes';
 import { secondsLabel } from './inspector';
-import { clipName } from './organize';
-import type { MotionClip } from './doc';
+import { clipName } from '@feega/motion-core/motion/organize';
+import type { MotionClip } from '@feega/motion-core/motion/doc';
 
 export enum Section {
   Content = 'content',
   Layout = 'layout',
+  Align = 'align',
+  Constraints = 'constraints',
+  Transform = 'transform',
   Layer = 'layer',
   Fill = 'fill',
   Stroke = 'stroke',
@@ -25,14 +28,17 @@ export enum Section {
 }
 
 export const SECTION_ORDER: readonly Section[] = [
-  Section.Content,
   Section.Layout,
+  Section.Align,
+  Section.Constraints,
+  Section.Content,
   Section.Layer,
   Section.Fill,
   Section.Stroke,
   Section.Shape,
   Section.Effects,
   Section.Text,
+  Section.Transform,
   Section.Timing,
   Section.Animate,
   Section.ThreeD,
@@ -42,7 +48,10 @@ export const SECTION_ORDER: readonly Section[] = [
 export const SECTION_TITLE: Record<Section, string> = {
   [Section.Content]: 'Content',
   [Section.Layout]: 'Layout',
-  [Section.Layer]: 'Layer',
+  [Section.Align]: 'Alignment',
+  [Section.Constraints]: 'Constraints',
+  [Section.Transform]: 'Transform',
+  [Section.Layer]: 'Appearance',
   [Section.Fill]: 'Fill',
   [Section.Stroke]: 'Stroke',
   [Section.Text]: 'Text',
@@ -54,7 +63,7 @@ export const SECTION_TITLE: Record<Section, string> = {
   [Section.Parent]: 'Parent & mask'
 };
 
-const OPEN_FIRST: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text]);
+const OPEN_FIRST: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Align, Section.Constraints, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text]);
 
 const DEFAULT_OPEN = Object.fromEntries(SECTION_ORDER.map((s) => [s, OPEN_FIRST.has(s)])) as Record<Section, boolean>;
 
@@ -110,7 +119,7 @@ const TRANSFORM_SECTION: Record<string, Section> = {
 
 export const DIAL_KEYS: ReadonlySet<string> = new Set(['rotateX', 'rotateY', 'rotateZ']);
 
-export const transformSection = (key: string): Section => TRANSFORM_SECTION[key] ?? Section.Layout;
+export const transformSection = (key: string): Section => TRANSFORM_SECTION[key] ?? Section.Transform;
 
 const GROUP_SECTION: Record<Group, Section> = {
   [Group.Content]: Section.Content,
@@ -123,6 +132,7 @@ const GROUP_SECTION: Record<Group, Section> = {
 const TEXT_KEYS: ReadonlySet<string> = new Set(['font', 'weight', 'fontWeight', 'italic', 'size', 'tracking', 'leading', 'textCase', 'stretch', 'slant', 'axes', 'align', 'sizing', 'verticalAlign', 'paragraphSpacing', 'paragraphIndent', 'lineHeight', 'letterSpacing', 'maxLines', 'textWrap', 'leadingTrim', 'decoration', 'decorationStyle', 'decorationThickness', 'decorationOffset', 'decorationColor', 'skipInk', 'features']);
 
 const KEY_SECTION: Record<string, Section> = {
+  align: Section.Text,
   opacity: Section.Layer,
   roundness: Section.Layer,
   corners: Section.Layer,
@@ -244,7 +254,10 @@ const countOf = (n: number, noun: string) => (n ? `${n} ${noun}` : '');
 
 const SUMMARY: Record<Section, (clip: Summed, fps: number) => string> = {
   [Section.Content]: (clip) => clipName(clip),
-  [Section.Layout]: layoutSummary,
+  [Section.Layout]: () => '',
+  [Section.Align]: () => '',
+  [Section.Constraints]: () => '',
+  [Section.Transform]: layoutSummary,
   [Section.Timing]: (clip, fps) => `At ${secondsLabel(clip.from, fps)}s${SEP}${secondsLabel(clip.durationInFrames, fps)}s long`,
   [Section.Shape]: () => '',
   [Section.Layer]: () => '',
@@ -258,3 +271,15 @@ const SUMMARY: Record<Section, (clip: Summed, fps: number) => string> = {
 };
 
 export const sectionSummary = (section: Section, clip: Summed, fps: number): string => SUMMARY[section](clip, fps);
+
+const FIELD_LABEL: Record<string, string> = { align: 'Text align' };
+
+export const fieldLabel = (key: string, label: string): string => FIELD_LABEL[key] ?? label;
+
+const OPTION_LABEL: Record<string, string> = { rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', line: 'Line', arrow: 'Arrow', path: 'Path' };
+
+export const optionLabel = (option: string): string => OPTION_LABEL[option] ?? option.charAt(0).toUpperCase() + option.slice(1).replaceAll('-', ' ');
+
+const sizeOf = (value: unknown): number => (Array.isArray(value) ? value.length : value && typeof value === 'object' ? Object.keys(value).length : 0);
+
+export const emptyManaged = (control: Control, value: unknown): boolean => control === Control.Managed && sizeOf(value) === 0;

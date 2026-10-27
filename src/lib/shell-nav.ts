@@ -1,15 +1,19 @@
 import type { Viewport } from '$lib/breakpoints';
+import { env as publicEnv } from '$env/dynamic/public';
+import { isLocalMode } from '$lib/local-user';
 
 export type NavFamily = 'panel' | 'sheet' | 'route';
 
 export type NavEntry = {
   id: string;
   labelKey: string;
-  icon: 'images' | 'building' | 'user-round' | 'settings' | 'camera' | 'layers';
+  icon: 'images' | 'palette' | 'users-round' | 'settings' | 'camera' | 'layers';
   family: NavFamily;
   path: string;
   mobilePath?: string;
-  group: 'canvas' | 'panel' | 'workbench';
+  group: 'canvas' | 'panel' | 'workbench' | 'menu';
+  local?: true;
+  shortcut?: string;
 };
 
 /**
@@ -19,12 +23,12 @@ export type NavEntry = {
  * divisore: il raggruppamento stesso dice il comportamento, senza un `if` per voce altrove.
  */
 export const NAV_ENTRIES: NavEntry[] = [
-  { id: 'assets', labelKey: 'app.nav2.materials', icon: 'images', family: 'panel', path: '/assets', group: 'panel' },
-  { id: 'brands', labelKey: 'app.nav2.brands', icon: 'building', family: 'panel', path: '/brands', group: 'panel' },
-  { id: 'influencers', labelKey: 'app.nav2.influencers', icon: 'user-round', family: 'panel', path: '/influencers', group: 'panel' },
-  { id: 'studio', labelKey: 'app.nav2.studio', icon: 'camera', family: 'route', path: '/app/studio', group: 'workbench' },
+  { id: 'assets', labelKey: 'app.nav2.materials', icon: 'images', family: 'panel', path: '/assets', group: 'panel', local: true, shortcut: 'Alt+2' },
+  { id: 'brands', labelKey: 'app.nav2.brands', icon: 'palette', family: 'panel', path: '/brands', group: 'panel', shortcut: 'Alt+3' },
+  { id: 'influencers', labelKey: 'app.nav2.influencers', icon: 'users-round', family: 'panel', path: '/influencers', group: 'panel', shortcut: 'Alt+4' },
+  { id: 'studio', labelKey: 'app.nav2.studio', icon: 'camera', family: 'route', path: '/app/studio', group: 'menu' },
   { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/project', mobilePath: '/settings', group: 'workbench' },
-  { id: 'layers', labelKey: 'app.nav2.layers', icon: 'layers', family: 'panel', path: '', group: 'canvas' }
+  { id: 'layers', labelKey: 'app.nav2.layers', icon: 'layers', family: 'panel', path: '', group: 'canvas', local: true, shortcut: 'Alt+1' }
 ];
 
 export const PANEL_WIDTHS: Record<string, number> = {
@@ -35,7 +39,7 @@ export const PANEL_WIDTHS: Record<string, number> = {
 };
 
 export function navEntriesByGroup(group: NavEntry['group']): NavEntry[] {
-  return NAV_ENTRIES.filter((entry) => entry.group === group);
+  return NAV_ENTRIES.filter((entry) => entry.group === group && (entry.local || !isLocalMode(publicEnv)));
 }
 
 const projectPath = (projectId: string, path: string) => `/p/${projectId}${path}`;
@@ -75,7 +79,17 @@ export function sheetEntryForPath(path: string): NavEntry | null {
   );
 }
 
-export const BURGER_ENTRIES: NavEntry[] = [...navEntriesByGroup('panel'), ...navEntriesByGroup('workbench')];
+export const BURGER_ENTRIES: NavEntry[] = [...navEntriesByGroup('panel'), ...navEntriesByGroup('workbench'), ...navEntriesByGroup('menu')];
+
+export function panelForShortcut(e: KeyboardEvent): NavEntry | null {
+  if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) {
+    return null;
+  }
+
+  const digit = e.code.replace('Digit', '');
+  const shortcut = `Alt+${digit}`;
+  return [...navEntriesByGroup('canvas'), ...navEntriesByGroup('panel')].find((entry) => entry.shortcut === shortcut) ?? null;
+}
 
 export type DirectLoadMode = 'sheet' | 'page';
 

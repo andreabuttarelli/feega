@@ -1,7 +1,7 @@
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Screen } from '$lib/canvas/gpu/camera';
-import { ItemKind, type DisplayList, type ImageItem, type Item } from '$lib/motion/gpu-full/display-list';
-import { rgbaOf, type Rgba } from '$lib/motion/gpu-full/rgba';
+import { ItemKind, type DisplayList, type ImageItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import type { Box } from './canvas-scene';
 import { line, rect, solid } from './shapes';
 
@@ -14,12 +14,11 @@ export type Look = { paper: string; line: string };
 
 type Size = { width: number; height: number };
 
-const BLACK: Rgba = [0, 0, 0, 1];
 const BORDER_PX = 1;
 
 const LISTS: Record<Stand, (size: Size, look: Look) => DisplayList> = {
   [Stand.Card]: (size, look) => ({ ...size, background: rgbaOf(look.paper) ?? [1, 1, 1, 1], items: [solid('placeholder:border', line(rect(0, 0, size.width, size.height), BORDER_PX, true), look.line)], unsupported: [] }),
-  [Stand.Frame]: (size) => ({ ...size, background: BLACK, items: [], unsupported: [] })
+  [Stand.Frame]: (size) => ({ ...size, background: null, items: [], unsupported: [] })
 };
 
 const wholePixels = (size: Size): Size => ({ width: Math.max(1, Math.round(size.width)), height: Math.max(1, Math.round(size.height)) });

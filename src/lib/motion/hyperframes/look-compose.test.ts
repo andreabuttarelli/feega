@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type DocVerdict, type MotionDoc } from '../doc';
-import { addClip } from '../timeline';
-import { EnvPreset, LightKind } from '../look';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type DocVerdict, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { EnvPreset, LightKind } from '@feega/motion-core/motion/look';
 import { setLight, setLook } from '../look-ops';
-import { Target, composeHtml } from './compose';
-import { EnvLoad } from './three';
-import { APP_ORIGIN, Module, moduleUrl } from '../libs/catalog';
+import { Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { EnvLoad } from '@feega/motion-core/motion/hyperframes/three';
+import { APP_ORIGIN, Module, moduleUrl } from '@feega/motion-core/motion/libs/catalog';
 const OPENTYPE_URL = moduleUrl(APP_ORIGIN, Module.Opentype);
 
 const must = (r: DocVerdict): MotionDoc => {

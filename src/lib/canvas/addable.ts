@@ -38,13 +38,17 @@ export const CANVAS_ADDABLE = [
 
 export type Addable = (typeof CANVAS_ADDABLE)[number];
 
-const NOT_READY: readonly Addable[] = ['iframe', 'calendar'];
+const NOT_READY: readonly Addable[] = ['calendar'];
 
 export const CANVAS_ADD_BAR = CANVAS_ADDABLE.filter((w) => !NOT_READY.includes(w));
 
 export const CANVAS_BAR_MAIN: readonly Addable[] = [...GEN_MEDIUMS];
 
 export const CANVAS_BAR_MORE = CANVAS_ADD_BAR.filter((w) => !CANVAS_BAR_MAIN.includes(w));
+
+export const AI_ADDABLE: ReadonlySet<Addable> = new Set<Addable>(['text', 'image', 'video']);
+
+export const CLOUD_ADDABLE: ReadonlySet<Addable> = new Set<Addable>(['products', 'social_account_feed', 'studio_batch']);
 
 export function isAddable(x: string): x is Addable {
   return (CANVAS_ADDABLE as readonly string[]).includes(x);
@@ -68,7 +72,7 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   text: 'Generate text',
   image: 'Generate image',
   video: 'Generate video',
-  iframe: 'Web page',
+  iframe: 'Code frame',
   doc: 'Document',
   products: 'Products',
   social_account_feed: 'Social feed',

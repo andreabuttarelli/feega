@@ -1,4 +1,4 @@
-import { FORMATS, formatOf, type MotionDoc } from './doc';
+import { FORMATS, formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { secondsLabel } from './inspector';
 import { timecode } from './timeline-view';
 

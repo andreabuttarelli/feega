@@ -1,5 +1,5 @@
-import { MotionFormat } from '$lib/motion/doc';
-import type { LayoutId } from '$lib/canvas/composition/types';
+import { MotionFormat } from '@feega/motion-core/motion/doc';
+import type { LayoutId } from '@feega/motion-core/canvas/composition/types';
 import { BUILTIN_PREFIX } from './design-kit';
 import { EdgeTone, Energy, Joint, MediaAspect, SectionRole, TextAmount, type MediaNeed, type OnScreenBeat, type TemplateCard } from './card';
 

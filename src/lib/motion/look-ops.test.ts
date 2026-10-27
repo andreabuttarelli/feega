@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { MotionFormat, motionDocSchema, newMotionDoc, type DocVerdict, type MotionDoc } from './doc';
-import { EnvPreset, LightKind, hdriUrl } from './look';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, motionDocSchema, newMotionDoc, type DocVerdict, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { EnvPreset, LightKind, hdriUrl } from '@feega/motion-core/motion/look';
 import { removeLight, setLight, setLightKeyframes, setLook } from './look-ops';
 
 const must = (v: DocVerdict): MotionDoc => {

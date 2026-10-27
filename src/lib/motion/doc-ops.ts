@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { MotionClip, MotionDoc, MotionTrack } from './doc';
+import type { MotionClip, MotionDoc, MotionTrack } from '@feega/motion-core/motion/doc';
 
 export enum OpKind {
   DocSet = 'doc.set',

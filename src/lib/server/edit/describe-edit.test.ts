@@ -1,15 +1,35 @@
 import { describe, it, expect } from 'vitest';
 import { describeEdit } from './describe-edit';
-import { editCatalogue } from './edit-catalogue';
+import { Family, editCatalogue } from './edit-catalogue';
+
+const BARE_MAX_CHARS = 3_000;
 
 describe('describe lists every edit op, and gives strict schemas', () => {
-  it('with nothing asked, every op with its family, access and one line', async () => {
+  it('with nothing asked, only the families: counts by access and one line, under 3 KB', async () => {
     const answer = await describeEdit({});
 
-    expect('ops' in answer && answer.ops).toHaveLength(editCatalogue().size);
-    expect('ops' in answer && answer.ops).toContainEqual(expect.objectContaining({ name: 'move_node', family: 'canvas', access: 'write' }));
-    expect('ops' in answer && answer.ops).toContainEqual(expect.objectContaining({ name: 'add_shape', family: 'frame', access: 'write' }));
-    expect('ops' in answer && answer.ops).toContainEqual(expect.objectContaining({ name: 'generate_voiceover', access: 'spend' }));
+    expect(JSON.stringify(answer).length).toBeLessThan(BARE_MAX_CHARS);
+    expect(answer).toMatchObject({ families: expect.arrayContaining([expect.objectContaining({ family: 'frame', about: expect.any(String) })]) });
+    const total = (answer as { families: { ops: number }[] }).families.reduce((n, f) => n + f.ops, 0);
+    expect(total).toBe(editCatalogue().size);
+  });
+
+  it('a family gives its op names, access and one line each', async () => {
+    const canvas = await describeEdit({ family: Family.Canvas });
+    const frame = await describeEdit({ family: Family.Frame });
+
+    expect('ops' in canvas && canvas.ops).toContainEqual(expect.objectContaining({ name: 'move_node', access: 'write' }));
+    expect('ops' in frame && frame.ops).toContainEqual(expect.objectContaining({ name: 'add_shape', access: 'write' }));
+    expect('ops' in frame && frame.ops).toContainEqual(expect.objectContaining({ name: 'generate_voiceover', access: 'spend' }));
+  });
+
+  it('reads are tagged read, and what needs the editor says so', async () => {
+    const frame = await describeEdit({ family: Family.Frame });
+    const access = (name: string) => (frame as { ops: { name: string; access: string }[] }).ops.find((o) => o.name === name)?.access;
+
+    expect(access('list_shots')).toBe('read');
+    expect(access('get_motion_doc')).toBe('read');
+    expect(access('recreate_ui')).toBe('editor');
   });
 
   it('one op gives its JSON schema, from whichever registry owns it', async () => {

@@ -559,7 +559,7 @@
     "s5": "Credits meter AI usage across feega. Paid plans also include rolling chat windows so a single burst of conversation can’t burn the whole month in one sitting.",
     "s6": "How credits work",
     "s7": "Every AI action spends credits from your brand’s monthly allowance. Credits reset with your billing period.",
-    "s10": "How much a single action spends depends on what it asks for: a short chat reply is a few credits, a long article with its images is many more. The meter follows the work itself, not a fixed price per action.",
+    "s10": "How much a single action spends depends on what it asks for: a short chat reply is a few credits, a long article with its images is many more. The meter follows the work itself, not a fixed price per action: every AI generation and chat turn costs the provider’s price plus 20%.",
     "s11": "Monthly credits by plan",
     "s12": "Plan",
     "s13": "Credits / month",

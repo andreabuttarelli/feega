@@ -1,25 +1,25 @@
 <script lang="ts">
   import Layers from '@lucide/svelte/icons/layers';
   import type { Bounds } from '$lib/motion/scene-select';
-  import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+  import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { EditMode, editIn } from '$lib/motion/edit-mode';
   import { valueAt } from '$lib/motion/inspector';
-  import { withParams } from '$lib/motion/custom/params';
-  import { TRANSFORM, isAnimatable } from '$lib/motion/keyframes';
+  import { withParams } from '@feega/motion-core/motion/custom/params';
+  import { TRANSFORM, isAnimatable } from '@feega/motion-core/motion/keyframes';
   import { sliderOf, toShown, toStored } from '$lib/motion/units';
   import { fieldLook } from '$lib/motion/inspector-sections';
-  import { BLEND_MODES, blendLabel, type BlendMode } from '$lib/motion/blend';
+  import { BLEND_MODES, blendLabel, type BlendMode } from '@feega/motion-core/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { MIXED, shared, type Shared } from '$lib/motion/mixed';
   import { FieldKind } from '$lib/motion/number-field';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { aabb, quadOf, type Boxes } from '$lib/motion/scene-select';
   import { unionBounds } from '$lib/motion/multi-select';
-  import { HORIZONTALS, VERTICALS } from '$lib/motion/constraints/model';
+  import { HORIZONTALS, VERTICALS } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { PropKind, STYLE_PROPS, placeBox, setPropAcross, sharedConstraint, sharedProp, type BoxPatch } from '$lib/motion/selection-props';
   import { isBrandToken, recolour, selectionColours } from '$lib/motion/selection-colours';
-  import { BRAND_COLORS } from '$lib/motion/components';
+  import { BRAND_COLORS } from '@feega/motion-core/motion/components';
   import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
   import NumberField from './NumberField.svelte';
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ResizeMode, customSize, fitElementToNode, fitToNode } from './custom-size';
-import { Horizontal, Vertical } from './constraints/model';
-import { MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, formatOf, newMotionDoc, motionDocSchema, type MotionDoc } from './doc';
-import { setCanvas } from './timeline';
+import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
+import { MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, formatOf, newMotionDoc, motionDocSchema, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setCanvas } from '@feega/motion-core/motion/timeline';
 
 const ratio = (s: { width: number; height: number }) => s.width / s.height;
 

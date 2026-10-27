@@ -5,7 +5,7 @@ const WEB = 'https://feega.app';
 
 describe('in the bundle, public web pages open on the web', () => {
   it('a link to a public page goes to the web host, query kept', () => {
-    for (const path of ['/changelog', '/report', '/gallery', '/gallery/g1', '/privacy', '/terms', '/docs/api']) {
+    for (const path of ['/report', '/gallery', '/gallery/g1', '/docs/api']) {
       expect(webPageUrl(path, WEB), path).toBe(`${WEB}${path}`);
     }
     expect(webPageUrl('/report?about=x', WEB)).toBe(`${WEB}/report?about=x`);

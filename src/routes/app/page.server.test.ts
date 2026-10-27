@@ -42,6 +42,11 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships, setActiveOrg }));
 const loadAttachments = vi.fn(async (_db: unknown, input: { ids: string[] }) => input.ids.filter((id) => id !== 'stranger').map((id) => ({ assetId: id, kind: 'image', name: `${id}.png`, mimeType: 'image/png', bytes: 1 })));
 vi.mock('$lib/server/chat-attachments/register', () => ({ loadAttachments }));
 
+const importStoredCanvasFile = vi.fn(async (_db: unknown, input: { path: string; projectFor: (name: string) => Promise<string> }) =>
+  input.path.endsWith('bad.feega') ? { outcome: 'refused', refusal: 'damaged' } : { outcome: 'imported', canvas: { id: 'c-imported', projectId: await input.projectFor('Launch kit'), name: 'Launch kit', viewport: null } }
+);
+vi.mock('$lib/server/canvas/feega-file', async (original) => ({ ...(await original<object>()), importStoredCanvasFile }));
+
 const { load, actions } = await import('$lib/server/dashboard/pages/home');
 
 const locals = { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => ({}) };
@@ -104,6 +109,19 @@ describe('/app is the dashboard for a returning user', () => {
     expect(createProject).toHaveBeenCalledWith({}, expect.objectContaining({ orgId: 'org-b', name: 'Spring' }));
     expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-b', projectId: 'p-new', name: 'Untitled' });
     expect(redirected).toMatchObject({ status: 303, location: '/p/p-new/c/c-new' });
+  });
+
+  it('a .feega file opens as a new project named after its canvas', async () => {
+    const redirected = await thrown(() => actions.import_canvas_file({ locals, cookies: cookieJar({ 'dz-org': 'org-b' }), request: form({ path: 'org-b/imports/x.feega' }) } as never));
+
+    expect(createProject).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ orgId: 'org-b', name: 'Launch kit' }));
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p-new/c/c-imported' });
+  });
+
+  it('a damaged .feega file says why and opens nothing', async () => {
+    const out = await actions.import_canvas_file({ locals, cookies: cookieJar({ 'dz-org': 'org-b' }), request: form({ path: 'org-b/imports/bad.feega' }) } as never);
+
+    expect(out).toMatchObject({ status: 400, data: { error: expect.stringContaining('damaged') } });
   });
 
   it('a prompt opens a new canvas of its own and hands the words to the canvas chat', async () => {

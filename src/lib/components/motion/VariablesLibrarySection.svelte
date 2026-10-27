@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
-  import type { OpResult } from '$lib/motion/timeline';
-  import { DEFAULT_MODE, VARIABLE_NAME, VarType, type VarAlias, type VarLiteral } from '$lib/motion/variables-model';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { DEFAULT_MODE, VARIABLE_NAME, VarType, type VarAlias, type VarLiteral } from '@feega/motion-core/motion/variables-model';
   import { activeModeOf, addMode, defineVariable, removeVariable, setActiveMode } from '$lib/motion/variables';
   import { adoptCollection } from '$lib/motion/variable-library';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';

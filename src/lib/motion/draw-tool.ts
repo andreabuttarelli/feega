@@ -1,4 +1,4 @@
-import type { Outline, Pt } from './shape/geometry';
+import type { Outline, Pt } from '@feega/motion-core/motion/shape/geometry';
 
 export enum DrawTool {
   Select = 'select',

@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { ItemKind, type DisplayList, type Item } from '$lib/motion/gpu-full/display-list';
-import { BlendMode } from '$lib/motion/blend';
+import { ItemKind, type DisplayList, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import { BlendMode } from '@feega/motion-core/motion/blend';
 import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from './placeholders';
 
 const LOOK: Look = { paper: '#ffffff', line: '#e5e5e5' };
 const box = (x: number) => ({ x, y: 0, w: 200, h: 100 });
 
 describe('placeholders', () => {
-  it('a card stands in as its empty panel, a frame as its black stage, never as nothing', () => {
+  it('a card stands in as its empty panel, a frame not drawn yet as nothing, never a black box', () => {
     const card = placeholder(Stand.Card, { width: 200, height: 100 }, LOOK);
     const frame = placeholder(Stand.Frame, { width: 200, height: 100 }, LOOK);
     expect(card.list.background).toEqual([1, 1, 1, 1]);
     expect(card.list.items).toHaveLength(1);
-    expect(frame.list.background).toEqual([0, 0, 0, 1]);
+    expect(frame.list.background).toBeNull();
     expect(frame.list.items).toEqual([]);
   });
 

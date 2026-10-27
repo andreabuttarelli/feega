@@ -1,11 +1,11 @@
 <script lang="ts">
   import { ANIMATE_TO_KEYS, animateTo } from '$lib/motion/animate-to';
-  import { EASE_IDS, EASE_LABEL, Ease } from '$lib/motion/design';
-  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { withParams } from '$lib/motion/custom/params';
+  import { EASE_IDS, EASE_LABEL, Ease } from '@feega/motion-core/motion/design';
+  import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+  import { withParams } from '@feega/motion-core/motion/custom/params';
   import { parseDecimal, valueAt } from '$lib/motion/inspector';
-  import { TRANSFORM, type TransformKey } from '$lib/motion/keyframes';
-  import type { OpResult } from '$lib/motion/timeline';
+  import { TRANSFORM, type TransformKey } from '@feega/motion-core/motion/keyframes';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { toShown, toStored, unitOf } from '$lib/motion/units';
 
   let { doc, clip, frame, commit }: { doc: MotionDoc; clip: MotionClip; frame: number; commit: (result: OpResult, summary: string) => void } = $props();

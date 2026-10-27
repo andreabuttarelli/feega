@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setProps, type OpResult } from '../timeline';
-import { CheckState, ComponentMode, sourceHash } from './component';
+import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { CheckState, ComponentMode, sourceHash } from '@feega/motion-core/motion/custom/component';
 import { Occurrence, recordCheck, removeComponent, updateComponent, writeComponent } from './ops';
 
 function must(r: OpResult): MotionDoc {
@@ -57,6 +57,12 @@ describe('custom component ops', () => {
 
     expect(must(out).components.NodeGraph.source.css).toBe('.n{width:12px}');
     expect(out.ok && out.diff).toEqual([{ file: 'css', replaced: 1, before: '.n{width:10px}', after: '.n{width:12px}' }]);
+  });
+
+  it('a multi-line edit shows every line it touched, before and after', () => {
+    const out = updateComponent(withNodes(), 'NodeGraph', [{ file: 'css', find: '.n{width:10px}', replace: '.n{width:12px}\n.m{height:4px}' }]);
+
+    expect(out.ok && out.diff).toEqual([{ file: 'css', replaced: 1, before: '.n{width:10px}', after: '.n{width:12px}\n.m{height:4px}' }]);
   });
 
   it('refuses an update whose text is missing, or ambiguous when no occurrence is named', () => {

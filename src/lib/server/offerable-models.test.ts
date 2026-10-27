@@ -8,8 +8,13 @@ beforeEach(() => {
   testEnv.WIRO_API_KEY = 'wiro-test-key';
   delete testEnv.KIE_API_KEY;
 });
-import { GPT_IMAGE_2_MODEL, NANO_BANANA_PRO_MODEL, QWEN3_PRO_MODEL } from '$lib/image-models';
-import { SEEDANCE_25_MODEL, OPENROUTER_UPSCALE_MODEL, KLING_3_VIDEO_MODEL } from '$lib/video-models';
+import { GPT_IMAGE_2_MODEL, NANO_BANANA_2_MODEL, NANO_BANANA_PRO_MODEL, QWEN3_PRO_MODEL } from '$lib/image-models';
+import type { GenParams, ModelChoice } from '$lib/canvas/gen-node';
+import { creditsForRun } from '$lib/canvas/gen-cost';
+import { billedCreditsFor } from '$lib/credit-ladder';
+import { kieModelRows } from './kie-catalogue';
+import { KIE_FIXTURE_PRICES } from './kie-pricing.fixtures';
+import { SEEDANCE_25_MODEL, OPENROUTER_UPSCALE_MODEL, KLING_3_VIDEO_MODEL, GROK_IMAGINE_VIDEO_MODEL } from '$lib/video-models';
 import { mediaModelSlot } from '$lib/media-model-slots';
 import { offerableModels, offerableSlotChoices } from './offerable-models';
 
@@ -23,7 +28,8 @@ function fakeAdmin(
     supported_resolutions?: string[];
     param_schema?: Record<string, unknown>;
     pricing?: unknown;
-  }[]
+  }[],
+  allowlist: { org_id: string; medium: string; model_id: string }[] = []
 ) {
   type Query = { eq: (col: string, value: string) => Query; order: () => Query; limit: () => Query; then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => unknown };
   const query = (matching: typeof rows): Query => ({
@@ -33,10 +39,36 @@ function fakeAdmin(
     then: (resolve) => resolve({ data: matching, error: null })
   });
   const admin = {
-    from: (table: string) => ({ select: () => query(table === 'ai_models' ? rows : []) })
+    from: (table: string) => ({ select: () => query(table === 'ai_models' ? rows : table === 'org_model_allowlist' ? (allowlist as never) : []) })
   } as unknown as SupabaseClient;
   return admin;
 }
+
+describe('the org allow-list on offered models', () => {
+  const trellis = {
+    id: 'wiro/microsoft/trellis-2',
+    catalogue: 'model3d',
+    input_modalities: ['image'],
+    output_modalities: ['model3d'],
+    provider: 'wiro',
+    wire_spec: { owner: 'microsoft', project: 'trellis-2', fields: { images: ['inputImage'] } },
+    param_schema: {},
+    pricing: { lines: [{ inputs: {}, usd: 0.25, method: 'cpr' }] }
+  } as never;
+
+  it('hides a model the org did not list', async () => {
+    const admin = fakeAdmin([trellis], [{ org_id: 'org-1', medium: 'model3d', model_id: 'other' }]);
+
+    expect((await offerableModels(admin, 'model3d', undefined, 'org-1')).choices).toEqual([]);
+  });
+
+  it('offers it when listed, and to a call with no org', async () => {
+    const admin = fakeAdmin([trellis], [{ org_id: 'org-1', medium: 'model3d', model_id: 'wiro/microsoft/trellis-2' }]);
+
+    expect((await offerableModels(admin, 'model3d', undefined, 'org-1')).choices).toHaveLength(1);
+    expect((await offerableModels(admin, 'model3d')).choices).toHaveLength(1);
+  });
+});
 
 describe('the 3D models a node can pick', () => {
   it('offers a reviewed model with its price per run and only the settings we curated', async () => {
@@ -158,7 +190,7 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
     const out = await offerableModels(admin, 'image');
 
     const choice = out.choices.find((c) => c.id === GPT_IMAGE_2_MODEL);
-    expect(choice?.unitCredits).toBe(6);
+    expect(choice?.unitCredits).toBe(4);
   });
 
   it('un modello nuovo a prezzo fisso mostra la preview senza uno spec locale', async () => {
@@ -174,7 +206,7 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
 
     const out = await offerableModels(admin, 'image');
 
-    expect(out.choices.find((choice) => choice.id === 'meta/muse-image')?.unitCredits).toBe(7);
+    expect(out.choices.find((choice) => choice.id === 'meta/muse-image')?.unitCredits).toBe(4);
   });
 
   it('più provider usano il prezzo minimo senza fissare il provider', async () => {
@@ -195,7 +227,7 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
 
     const out = await offerableModels(admin, 'image');
 
-    expect(out.choices.find((choice) => choice.id === 'meta/muse-image')?.unitCredits).toBe(6);
+    expect(out.choices.find((choice) => choice.id === 'meta/muse-image')?.unitCredits).toBe(4);
   });
 
   it('un prezzo a consumo è dichiarato variabile invece di sparire', async () => {
@@ -288,8 +320,8 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
     const out = await offerableModels(admin, 'image');
     const choice = out.choices.find((candidate) => candidate.id === 'seedream-5-pro');
 
-    expect(choice?.unitCredits).toBe(9);
-    expect(choice?.creditOverrides).toEqual({ resolution: { '2K': 18 } });
+    expect(choice?.unitCredits).toBe(5);
+    expect(choice?.creditOverrides).toEqual({ resolution: { '2K': 11 } });
   });
 
   it('una variante usa il provider meno caro senza fissarlo', async () => {
@@ -325,8 +357,8 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
       (candidate) => candidate.id === 'seedream-5-pro'
     );
 
-    expect(choice?.unitCredits).toBe(6);
-    expect(choice?.creditOverrides).toEqual({ resolution: { '2K': 16 } });
+    expect(choice?.unitCredits).toBe(4);
+    expect(choice?.creditOverrides).toEqual({ resolution: { '2K': 10 } });
   });
 
   it('il minimo per risoluzione considera solo provider che la supportano', async () => {
@@ -358,7 +390,7 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
       (candidate) => candidate.id === 'seedream-5-pro'
     );
 
-    expect(choice?.creditOverrides).toEqual({ resolution: { '1K': 6, '2K': 16 } });
+    expect(choice?.creditOverrides).toEqual({ resolution: { '1K': 4, '2K': 10 } });
   });
 
   it('un modello sincronizzato SENZA una riga di integrazione nostra è offerto comunque, con la resa prudente', async () => {
@@ -706,5 +738,96 @@ describe('offerableModels — params dal param_schema sincronizzato', () => {
 
     const choice = out.choices.find((c) => c.id === SEEDANCE_25_MODEL);
     expect(choice?.params).toEqual([{ name: 'seed', label: 'Seed', kind: 'boolean' }]);
+  });
+});
+
+describe('every route of a model shows its own price, at the resolution the node asks for', () => {
+  const geminiRow = (id: string, costPerToken: number, resolutions: string[]) => ({
+    id,
+    catalogue: 'image',
+    input_modalities: ['text', 'image'],
+    output_modalities: ['image'],
+    supported_resolutions: resolutions,
+    pricing: { endpoints: [{ provider: 'google-ai-studio', lines: [{ billable: 'output_image', unit: 'token', cost_usd: costPerToken }] }] }
+  });
+
+  const kieRows = () => kieModelRows(KIE_FIXTURE_PRICES, [], '2026-10-27T00:00:00.000Z') as never[];
+
+  async function nanoBanana(id: string, rows: never[]) {
+    testEnv.KIE_API_KEY = 'kie-test-key';
+    const choice = (await offerableModels(fakeAdmin(rows), 'image')).choices.find((c) => c.id === id);
+    return JSON.parse(JSON.stringify(choice)) as ModelChoice;
+  }
+
+  const credits = (choice: ModelChoice, params: GenParams) => creditsForRun({ medium: 'image', model: choice, params });
+
+  it('Nano Banana 2 on OpenRouter is priced per resolution from its image tokens, not left blank', async () => {
+    const choice = await nanoBanana(NANO_BANANA_2_MODEL, [geminiRow('google/gemini-3.1-flash-image', 0.00006, ['512', '1K', '2K', '4K']) as never, ...kieRows()]);
+
+    expect(credits(choice, { provider: 'openrouter', resolution: '1K' })).toBe(billedCreditsFor(0.0672));
+    expect(credits(choice, { provider: 'openrouter', resolution: '2K' })).toBe(billedCreditsFor(0.1008));
+    expect(credits(choice, { provider: 'openrouter', resolution: '4K' })).toBe(billedCreditsFor(0.1512));
+    expect(credits(choice, { provider: 'openrouter' })).toBe(billedCreditsFor(0.0672));
+  });
+
+  it('Nano Banana 2 on Kie.ai is priced per resolution from the Kie list, 4K included', async () => {
+    const choice = await nanoBanana(NANO_BANANA_2_MODEL, [geminiRow('google/gemini-3.1-flash-image', 0.00006, ['512', '1K', '2K', '4K']) as never, ...kieRows()]);
+
+    expect(credits(choice, { provider: 'kie', resolution: '1K' })).toBe(billedCreditsFor(0.04));
+    expect(credits(choice, { provider: 'kie', resolution: '2K' })).toBe(billedCreditsFor(0.06));
+    expect(credits(choice, { provider: 'kie', resolution: '4K' })).toBe(billedCreditsFor(0.09));
+  });
+
+  it('Auto shows the price of the route it would pick: Kie where cheaper, OpenRouter where Kie has no price', async () => {
+    const choice = await nanoBanana(NANO_BANANA_2_MODEL, [geminiRow('google/gemini-3.1-flash-image', 0.00006, ['512', '1K', '2K', '4K']) as never, ...kieRows()]);
+
+    expect(credits(choice, { resolution: '2K' })).toBe(billedCreditsFor(0.06));
+    expect(credits(choice, { provider: 'auto', resolution: '512' })).toBe(billedCreditsFor(0.04482));
+  });
+
+  it('Nano Banana Pro prices 1K and 2K alike and 4K higher, on both routes', async () => {
+    const choice = await nanoBanana(NANO_BANANA_PRO_MODEL, [geminiRow('google/gemini-3-pro-image', 0.00012, ['1K', '2K', '4K']) as never, ...kieRows()]);
+
+    expect(credits(choice, { provider: 'openrouter', resolution: '2K' })).toBe(billedCreditsFor(0.1344));
+    expect(credits(choice, { provider: 'openrouter', resolution: '4K' })).toBe(billedCreditsFor(0.24));
+    expect(credits(choice, { provider: 'kie', resolution: '2K' })).toBe(billedCreditsFor(0.09));
+    expect(credits(choice, { provider: 'kie', resolution: '4K' })).toBe(billedCreditsFor(0.12));
+  });
+});
+
+describe('a video is priced per second from its own synced row, per resolution', () => {
+  const videoRow = (id: string, pricing: Record<string, string>, resolutions: string[]) => ({
+    id,
+    catalogue: 'video',
+    input_modalities: ['text', 'image'],
+    output_modalities: ['video'],
+    supported_resolutions: resolutions,
+    pricing
+  });
+
+  async function videoChoice(id: string, row: ReturnType<typeof videoRow>) {
+    return (await offerableModels(fakeAdmin([row]), 'video')).choices.find((c) => c.id === id) ?? null;
+  }
+
+  const credits = (choice: ModelChoice | null, params: GenParams) => creditsForRun({ medium: 'video', model: choice, params });
+
+  it('Grok Imagine 1.5 charges its per-second rate, 1080p included', async () => {
+    const choice = await videoChoice(GROK_IMAGINE_VIDEO_MODEL, videoRow('x-ai/grok-imagine-video-1.5', { cents_per_video_output_second_480p: '8', cents_per_video_output_second_720p: '14', cents_per_video_output_second_1080p: '25' }, ['480p', '720p', '1080p']));
+
+    expect(credits(choice, { resolution: '480p', duration: 6 })).toBe(billedCreditsFor(0.48));
+    expect(credits(choice, { resolution: '720p', duration: 6 })).toBe(billedCreditsFor(0.84));
+    expect(credits(choice, { resolution: '1080p', duration: 10 })).toBe(billedCreditsFor(2.5));
+  });
+
+  it('Kling 3.0 charges its with-audio per-second rate', async () => {
+    const choice = await videoChoice(KLING_3_VIDEO_MODEL, videoRow('kwaivgi/kling-v3.0-pro', { duration_seconds: '0.112', duration_seconds_with_audio: '0.168' }, ['720p', '1080p']));
+
+    expect(credits(choice, { resolution: '1080p', duration: 5 })).toBe(billedCreditsFor(0.84));
+  });
+
+  it('Seedance 2.5 charges its video tokens per second of output', async () => {
+    const choice = await videoChoice(SEEDANCE_25_MODEL, videoRow('bytedance/seedance-2.5', { video_tokens: '0.0000107' }, ['480p', '720p']));
+
+    expect(credits(choice, { resolution: '720p', duration: 5 })).toBe(billedCreditsFor(0.0000107 * 21600 * 5));
   });
 });

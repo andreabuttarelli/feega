@@ -1,6 +1,6 @@
-import type { ComponentId } from './components';
-import type { CAMERA_LANE } from './camera';
-import { MASK_KEYS, MASK_PROPS } from './mask';
+import type { ComponentId } from '@feega/motion-core/motion/components';
+import type { CAMERA_LANE } from '@feega/motion-core/motion/camera';
+import { MASK_KEYS, MASK_PROPS } from '@feega/motion-core/motion/mask';
 
 export type Owner = ComponentId | typeof CAMERA_LANE | null;
 

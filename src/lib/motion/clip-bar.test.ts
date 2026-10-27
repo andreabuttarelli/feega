@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
-import { addClip, type OpResult } from './timeline';
-import { precompose } from './precomp';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { Action } from './actions';
-import { barActions, clipActions, parentChoices } from './clip-bar';
+import { barActions, clipActions, headerActions, parentChoices } from './clip-bar';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -47,5 +47,20 @@ describe('clip bar', () => {
 
     expect(choices.map((c) => c.id)).toEqual([null, 'a']);
     expect(choices[1].name).toBe('One');
+  });
+});
+
+describe('the inspector header: one table decides inline, menu group or dropped', () => {
+  it('keeps duplicate inline, groups the rest with delete last, drops what lives elsewhere', () => {
+    const all = [Action.Split, Action.Duplicate, Action.Delete, Action.FlipHorizontal, Action.FlipVertical, Action.ParentTo, Action.SelectSeveral, Action.ClipProperties, Action.Group, Action.Union];
+
+    const { inline, groups } = headerActions(all);
+
+    expect(inline).toEqual([Action.Duplicate]);
+    expect(groups.flat()).not.toContain(Action.FlipHorizontal);
+    expect(groups.flat()).not.toContain(Action.ParentTo);
+    expect(groups.flat()).not.toContain(Action.ClipProperties);
+    expect(groups.at(-1)).toEqual([Action.Delete]);
+    expect(groups.flat()).toEqual(expect.arrayContaining([Action.Split, Action.Group, Action.Union]));
   });
 });

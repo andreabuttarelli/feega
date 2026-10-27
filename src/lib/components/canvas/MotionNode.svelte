@@ -18,14 +18,14 @@
   import FrameLiveControls from './FrameLiveControls.svelte';
   import { LiveHost } from '$lib/canvas/frame-live';
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
-  import { Background, FORMATS } from '$lib/motion/doc';
+  import { Background, FORMATS } from '@feega/motion-core/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
-  import { DRAWN_EVENT, TILE_PAINTED } from '$lib/motion/hyperframes/measure';
+  import { DRAWN_EVENT, TILE_PAINTED } from '@feega/motion-core/motion/hyperframes/measure';
   import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
   import { posterDue, tiles } from '$lib/canvas/live-tiles.svelte';
   import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
-  import { coverFrame } from '$lib/motion/still';
+  import { coverFrame } from '@feega/motion-core/motion/still';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, previewMode, releaseCapture, stop as stopIn } from '$lib/canvas/motion-preview';
 
   let { node, href, previewUrl, posterUrl = null, onenter = null, liveHost = LiveHost.Node, liveUrl = '' }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; onenter?: (() => void) | null; liveHost?: LiveHost; liveUrl?: string } = $props();

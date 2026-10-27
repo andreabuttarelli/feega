@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc } from './doc';
+import { MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { blocking, docProblems, Quality } from './direction';
 import { CURSOR_PIECE } from './clicks';
 

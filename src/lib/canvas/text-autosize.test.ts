@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { FrameKind } from '$lib/canvas/motion-node';
-import { textAutosize } from './text-autosize';
+import { applyTextFit, textAutosize } from './text-autosize';
 
 function texted(doc: MotionDoc, sizing: string): MotionDoc {
   const added = addClip(doc, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Hello', sizing, x: 0.5, y: 0.5, width: 1, height: 1 } }, 't');
@@ -43,5 +43,14 @@ describe('text boxes follow the laid text', () => {
     const fit = textAutosize(doc, { t: { left: 0, top: 0, width: doc.width, height: doc.height / 2 } }, FrameKind.Frame, { w: 1, h: 1 });
 
     expect(findClip(fit!.doc!, 't')!.clip.props.height).toBeCloseTo(0.5);
+  });
+});
+
+describe('a fitted text reaches the canvas whole', () => {
+  it('the new box lands in the same step as the new doc, or the canvas stretches one over the other', () => {
+    const steps: string[] = [];
+    const doc = element(268, 204);
+    applyTextFit({ doc, node: { w: 134, h: 102 } }, { amend: () => steps.push('amend'), show: () => steps.push('show'), place: () => steps.push('place') });
+    expect(steps).toEqual(['amend', 'show', 'place']);
   });
 });

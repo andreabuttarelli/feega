@@ -6,6 +6,11 @@ export type CanvasUpload = { project: string; fileName: string; bytes: Uint8Arra
 
 type Refusal = { error?: string; message?: string };
 type SignedUpload = Refusal & { path?: string; uploadUrl?: string };
+type SignedImport = SignedUpload & { mimeType?: string };
+type SavedFile = Refusal & { name?: string; url?: string };
+
+export type CanvasFile = { project: string; canvasId: string };
+export type CanvasFileImport = { project: string; bytes: Uint8Array };
 
 const MIME_OF_EXT: Record<string, string> = {
   png: 'image/png',
@@ -78,5 +83,31 @@ export const canvasApi = {
       refused(registered);
     }
     return registered;
+  },
+
+  saveFile: async (token: string, file: CanvasFile, org?: string) => {
+    const saved = await canvasApi.run<SavedFile>(token, { project: file.project, op: 'export_canvas_file', input: { canvasId: file.canvasId } }, org);
+    if (!saved.url || !saved.name) {
+      refused(saved);
+    }
+    const res = await fetch(saved.url);
+    if (!res.ok) {
+      throw new Error(`Download ${res.status}`);
+    }
+    return { name: saved.name, bytes: new Uint8Array(await res.arrayBuffer()) };
+  },
+
+  importFile: async (token: string, file: CanvasFileImport, org?: string) => {
+    const signed = await canvasApi.run<SignedImport>(token, { project: file.project, op: 'request_canvas_import', input: { bytes: file.bytes.byteLength } }, org);
+    if (!signed.path || !signed.uploadUrl) {
+      refused(signed);
+    }
+    await putBytes(signed.uploadUrl, file.bytes, signed.mimeType ?? UNKNOWN_MIME);
+
+    const imported = await canvasApi.run<Refusal & { canvas?: { id: string; name: string }; path?: string }>(token, { project: file.project, op: 'import_canvas_file', input: { path: signed.path } }, org);
+    if (!imported.canvas) {
+      refused(imported);
+    }
+    return imported;
   }
 };

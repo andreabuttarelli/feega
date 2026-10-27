@@ -1,0 +1,20 @@
+{
+  "name": "@feega/motion-core",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./canvas/composition": "./src/canvas/composition/index.ts",
+    "./*.json": "./src/*.json",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@feega/shader-fx": "*",
+    "acorn": "^8.18.0",
+    "acorn-walk": "^8.3.5",
+    "clipper-lib": "6.4.2",
+    "polygon-clipping": "^0.15.7",
+    "three": "^0.186.1",
+    "zod": "^4.4.3"
+  }
+}

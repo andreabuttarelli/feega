@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { attachmentUrl } from '$lib/motion/still-model';
+  import { attachmentUrl } from '@feega/motion-core/motion/still-model';
   import { EXPORT_PRESETS, FILE, FILE_FORMATS, FileFormat, LOSSY, MAX_SCALE, MIN_SCALE, SizeBy, type ExportRow } from '$lib/motion/export-rows';
 
   type Made = { url: string; name: string; files: string[]; skipped?: string[] };

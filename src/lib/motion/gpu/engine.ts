@@ -1,13 +1,13 @@
 import { Texture } from 'pixi8';
 import { Backend } from '../../canvas/gpu/backend';
-import { FrameFormat, Settle } from '../hyperframes/capture';
+import { FrameFormat, Settle } from '@feega/motion-core/motion/hyperframes/capture';
 import { mountCapturePlayer, type CapturePlayer } from '../hyperframes/capture-player';
 import { exportLayering, frameOf } from '../export/webgl-device';
 import { IDENTITY_3D } from './matrix';
 import { PaintKind } from './paint-of';
 import { createRenderer, SlotKind, type Slot } from './renderer';
 import { gpuEligible, runHtml, runsOf, type Run } from './runs';
-import { lanesWithin, webglPerLane } from '../export/webgl-budget';
+import { lanesWithin, webglPerLane } from '@feega/motion-core/motion/export/webgl-budget';
 import { shootInLanes } from '../export/lanes';
 import { withDeadline } from '../export/deadline';
 import { compileScene, frameAt, visibleAt, type Drawn, type Scene } from './scene';

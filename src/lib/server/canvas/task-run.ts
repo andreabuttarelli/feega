@@ -63,6 +63,7 @@ export const TASK_REFUSALS = {
   noOutput: 'task_failed: no output',
   needsImage: 'missing_input: this model needs an input image',
   needsVideo: 'missing_input: this model needs a source video',
+  needsMask: 'missing_input: this model needs a mask over the image',
   unpriced: 'price_unavailable: the provider did not quote this request'
 } as const;
 
@@ -75,6 +76,8 @@ export type TaskWireSpec = {
   fixed?: Readonly<Record<string, string>>;
   requiresImage?: boolean;
   requiresVideo?: boolean;
+  requiresMask?: boolean;
+  layers?: boolean;
   quotedAtSubmit?: boolean;
   requiredParams?: readonly string[];
   menuGroup?: string;
@@ -127,6 +130,7 @@ export type TaskRequest = {
   params: GenParams;
   imageUrls: string[];
   lastFrameUrl: string | null;
+  maskUrl?: string | null;
   videoUrls?: string[];
   audioUrls?: string[];
   provenance: ProvenanceEntry[];
@@ -155,9 +159,9 @@ async function slotFree(deps: TaskRunDeps, provider: TaskProviderName, place: Qu
   return !load || load.cap === null || AHEAD_OF[place](load) < load.cap;
 }
 
-function carriesInputs(req: Pick<TaskRequest, 'imageUrls' | 'lastFrameUrl' | 'videoUrls' | 'audioUrls' | 'provenance'>): boolean {
+function carriesInputs(req: Pick<TaskRequest, 'imageUrls' | 'lastFrameUrl' | 'maskUrl' | 'videoUrls' | 'audioUrls' | 'provenance'>): boolean {
   const media = [req.imageUrls, req.videoUrls ?? [], req.audioUrls ?? [], req.provenance];
-  return media.some((list) => list.length > 0) || req.lastFrameUrl !== null;
+  return media.some((list) => list.length > 0) || req.lastFrameUrl !== null || Boolean(req.maskUrl);
 }
 
 function consumedBy(fields: WireFields, req: TaskRequest): TaskRequest {
@@ -199,6 +203,9 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   if (model.spec.requiresVideo && !req.videoUrls?.length) {
     return refused(TASK_REFUSALS.needsVideo);
   }
+  if (model.spec.requiresMask && !req.maskUrl) {
+    return refused(TASK_REFUSALS.needsMask);
+  }
   const unchosen = model.spec.requiredParams?.find((name) => !(req.params as Record<string, unknown>)[name]);
   if (unchosen) {
     return refused(`missing_input: choose a ${labelOf(unchosen).toLowerCase()}`);
@@ -236,7 +243,7 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   }
 
   const inputs = wireInputs(model.spec, req, model.paramSchema);
-  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, requiresVideo: _requiresVideo, quotedAtSubmit: _quotedAtSubmit, requiredParams: _requiredParams, menuGroup: _menuGroup, unrunnable: _unrunnable, caps: _caps, ...ref } = model.spec;
+  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, requiresVideo: _requiresVideo, requiresMask: _requiresMask, layers: _layers, quotedAtSubmit: _quotedAtSubmit, requiredParams: _requiredParams, menuGroup: _menuGroup, unrunnable: _unrunnable, caps: _caps, ...ref } = model.spec;
   if (!(await slotFree(deps, provider, req.place ?? QueuePlace.New))) {
     return WAITING;
   }
@@ -261,7 +268,7 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
 export type TaskProgress =
   | { state: 'pending' }
   | { state: 'failed'; error: string }
-  | { state: 'landed'; asset: Asset; poster: Asset | null; costUsd: number | null; uncensored: boolean };
+  | { state: 'landed'; asset: Asset; poster: Asset | null; layers: Asset[]; costUsd: number | null; uncensored: boolean };
 
 export const TASK_TIMED_OUT = 'task_timeout';
 
@@ -361,11 +368,13 @@ export async function finishTaskJob(db: Db, deps: Pick<TaskRunDeps, 'providers' 
   bill(costUsd);
 
   const posterOutput = POSTER_OUTPUT[model.catalogue]?.(task.outputs);
-  const [asset, poster] = await Promise.all([
+  const layerOutputs = model.spec.layers ? task.outputs.filter((extra) => extra !== output) : [];
+  const [asset, poster, layers] = await Promise.all([
     deposit(db, job, provider, model, await download(output)),
-    posterOutput ? download(posterOutput).then((file) => deposit(db, job, provider, model, file)) : null
+    posterOutput ? download(posterOutput).then((file) => deposit(db, job, provider, model, file)) : null,
+    Promise.all(layerOutputs.map((layer) => download(layer).then((file) => deposit(db, job, provider, model, file))))
   ]);
-  return { state: 'landed', asset, poster, costUsd, uncensored: model.uncensored };
+  return { state: 'landed', asset, poster, layers, costUsd, uncensored: model.uncensored };
 }
 
 function elapsedMs(job: TaskJob): number {

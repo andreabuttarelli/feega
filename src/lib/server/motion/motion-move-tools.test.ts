@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { MoveOutcome } from './move-element';
 

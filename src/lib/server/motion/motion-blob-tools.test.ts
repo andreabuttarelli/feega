@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
-import { expressionValue } from '$lib/motion/expression/bake';
-import { BLOB_NUMBER_KEYS, BLOB_TINT } from '$lib/motion/blob/model';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { expressionValue } from '@feega/motion-core/motion/expression/bake';
+import { BLOB_NUMBER_KEYS, BLOB_TINT } from '@feega/motion-core/motion/blob/model';
 import { BLOB_INPUT } from '$lib/motion/blob/inputs';
 import { createMotionTools, type MotionSession } from './motion-tools';
 

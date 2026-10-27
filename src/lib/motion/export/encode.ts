@@ -5,7 +5,7 @@ import { exportSize, type Capabilities, type Size } from '../export-plan';
 import { Resolution } from '../render-quote';
 import type { Quality } from '../export-formats';
 import { bitrateLadder } from './bitrate';
-import type { MotionDoc } from '../doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { lumaOf, type JoltMeter } from '../smoothness';
 
 export const MP4_MIME = 'video/mp4';

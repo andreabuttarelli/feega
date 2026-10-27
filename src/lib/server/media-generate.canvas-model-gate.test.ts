@@ -94,7 +94,7 @@ describe('il canvas valida contro cio che il menu ha offerto, non contro uno slo
     });
 
     expect(out.ok).toBe(true);
-    expect(offerableModels).toHaveBeenCalledWith(admin, 'image');
+    expect(offerableModels).toHaveBeenCalledWith(admin, 'image', undefined, 'org-1');
     const opts = renderPostImage.mock.calls[0][1];
     expect(opts.model).toBe(NANO_BANANA_UNSPECCED);
   });
@@ -124,7 +124,7 @@ describe('il canvas valida contro cio che il menu ha offerto, non contro uno slo
     } as never);
 
     expect(out.ok).toBe(true);
-    expect(offerableModels).toHaveBeenCalledWith(admin, 'video');
+    expect(offerableModels).toHaveBeenCalledWith(admin, 'video', undefined, 'org-1');
     expect(submitAndTrackVideoRender).toHaveBeenCalled();
   });
 

@@ -5,7 +5,7 @@ const scheduleRebuild = vi.fn();
 vi.mock('$lib/server/motion/embed-rebuild-db', () => ({ scheduleRebuild }));
 
 const { GET } = await import('./+server');
-const { Chunk, chunkUrl } = await import('$lib/motion/hyperframes/runtime-chunks');
+const { Chunk, chunkUrl } = await import('@feega/motion-core/motion/hyperframes/runtime-chunks');
 
 const NODE = '6f1c2a8e-0b7d-4f1e-9a3c-2d5e8f7a1b40';
 
@@ -24,8 +24,8 @@ describe('/e/[id]', () => {
 
     scheduleRebuild.mockClear();
     const { embedSource } = await import('$lib/motion/interactive/bundle');
-    const { MotionFormat, newMotionDoc } = await import('$lib/motion/doc');
-    const { FEEGA_TOKENS } = await import('$lib/motion/brand');
+    const { MotionFormat, newMotionDoc } = await import('@feega/motion-core/motion/doc');
+    const { FEEGA_TOKENS } = await import('@feega/motion-core/motion/brand');
     await open(NODE, await embedSource({ doc: newMotionDoc(MotionFormat.Landscape), tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Clip', fetchBlob: vi.fn() }));
     expect(scheduleRebuild).not.toHaveBeenCalled();
   });

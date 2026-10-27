@@ -6,21 +6,22 @@
   import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
+  import Rulers from '$lib/components/canvas/Rulers.svelte';
   import LayoutGuidesOverlay from '$lib/components/motion/LayoutGuidesOverlay.svelte';
   import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
   import OutlineOverlay from '$lib/components/motion/OutlineOverlay.svelte';
   import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
-  import { findClip, type MotionDoc } from '$lib/motion/doc';
+  import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { EditMode } from '$lib/motion/edit-mode';
   import { Axis, Edge, alignSpace, distributeSpace, propBoxes } from '$lib/motion/space';
   import { canEditPoints, enterPointEdit } from '$lib/motion/shape/vector-edit';
   import { isTyping } from '$lib/motion/shortcuts';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { containFit } from '$lib/canvas/frame-hover';
-  import { withAutoLayout } from '$lib/motion/layout/resolve';
+  import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import type { Boxes } from '$lib/motion/scene-select';
   import { GridToggle } from '$lib/motion/pixel-grid';
   import { FRAME_VIEW_DEFAULT, FrameView, shows, type FrameViews } from '$lib/canvas/frame-view';
@@ -100,6 +101,7 @@
   {#if shown.has(FrameOverlay.Outlines)}<div class="beneath"><OutlineOverlay {doc} {frame} {boxes} /></div>{/if}
   <PixelGridOverlay width={doc.width} height={doc.height} toggle={shows(views, FrameView.PixelGrid) ? GridToggle.On : GridToggle.Off} />
   {#if shown.has(FrameOverlay.Guides)}<LayoutGuidesOverlay {doc} />{/if}
+  {#if shown.has(FrameOverlay.Rulers)}<Rulers {doc} size={{ width: fit.width, height: fit.height }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.Mask)}<MaskOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.Pen)}<PenOverlay {doc} clip={only} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
   {#if only && shown.has(FrameOverlay.Vector)}<VectorOverlay {doc} clip={only} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}

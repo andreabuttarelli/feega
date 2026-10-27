@@ -1,7 +1,7 @@
-import { findClip, type MotionClip, type MotionDoc } from '../doc';
-import type { OpResult } from '../timeline';
-import { EFFECT_PREFIX } from '../effects/model';
-import { clipShadersProblem, MAX_SHADERS_PER_CLIP, shaderValues, type ClipShader, type ShaderSnapshot } from './model';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { EFFECT_PREFIX } from '@feega/motion-core/motion/effects/model';
+import { clipShadersProblem, MAX_SHADERS_PER_CLIP, shaderValues, type ClipShader, type ShaderSnapshot } from '@feega/motion-core/motion/shaders/model';
 
 type Values = Record<string, number | string>;
 

@@ -1,5 +1,5 @@
-import { COMPONENTS, type ComponentId } from './components';
-import { ShapeKind } from './shape/schema';
+import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/components';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 
 const SHAPE_NAME: Partial<Record<string, string>> = {
   [ShapeKind.Rect]: 'Box',

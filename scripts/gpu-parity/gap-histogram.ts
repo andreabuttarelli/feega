@@ -6,9 +6,9 @@ import type { Db } from '$lib/server/db/client';
 import { markRlsScoped } from '$lib/server/rls-client';
 import { motionSource } from '$lib/server/motion/sources';
 import { motionTokens } from '$lib/server/motion/editor';
-import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
-import { loadFonts } from '$lib/motion/gpu-full/text/load';
-import { Smoothing } from '$lib/motion/gpu-full/text/painter';
+import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
+import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
+import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { posterSecond } from '$lib/motion/poster-capture';
 import { histogram, reasonOf, type FrameGaps } from './histogram';
 

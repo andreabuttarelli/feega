@@ -126,7 +126,7 @@ vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => {
       if (!store.head) {
         return null;
       }
-      const { newMotionDoc, MotionFormat } = await import('$lib/motion/doc');
+      const { newMotionDoc, MotionFormat } = await import('@feega/motion-core/motion/doc');
       return { version: store.head, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actorKind: 'user' };
     },
     appendRevision: async (_db: unknown, input: { expectedVersion: number; doc: unknown; summary?: string | null }) => {
@@ -186,6 +186,10 @@ describe('the canvas agent delegates motion videos', () => {
   it('offers the delegation tools, not the editor tools', () => {
     expect(Object.keys(tools()).sort()).toEqual([...MOTION_DELEGATION_TOOLS].sort());
     expect(Object.keys(tools())).not.toContain('add_clip');
+  });
+
+  it('shares a frame of this project only', async () => {
+    expect(await call(tools().share_motion_frame, { nodeId: 'not-here' })).toMatchObject({ error: 'motion_node_not_found' });
   });
 
   it('lists the motion videos of this project', async () => {

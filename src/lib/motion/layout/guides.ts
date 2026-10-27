@@ -1,11 +1,11 @@
-import { findClip, type MotionClip, type MotionDoc } from '../doc';
-import type { Box } from '../layout';
-import { pivotBox } from '../parent';
-import { Direction } from './auto-layout';
-import type { AutoLayout, Padding } from './model';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { Box } from '@feega/motion-core/motion/layout';
+import { pivotBox } from '@feega/motion-core/motion/parent';
+import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
+import type { AutoLayout, Padding } from '@feega/motion-core/motion/layout/model';
 import { reorderChild } from './ops';
-import { childrenInOrder, withAutoLayout } from './resolve';
-import type { OpResult } from '../timeline';
+import { childrenInOrder, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 export type Side = keyof Padding;
 export type Pt = [number, number];

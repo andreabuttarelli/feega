@@ -1,13 +1,13 @@
-import { CAMERA_PRESETS, type CameraPresetId } from '../canvas/composition/camera';
-import { CUSTOM_LAYOUT, layoutOf, type CompositionLayout } from '../canvas/composition/index';
-import type { LayoutSpec } from '../canvas/composition/spec';
-import type { LayoutId, LayoutParams } from '../canvas/composition/types';
+import { CAMERA_PRESETS, type CameraPresetId } from '@feega/motion-core/canvas/composition/camera';
+import { CUSTOM_LAYOUT, layoutOf, type CompositionLayout } from '@feega/motion-core/canvas/composition';
+import type { LayoutSpec } from '@feega/motion-core/canvas/composition/spec';
+import type { LayoutId, LayoutParams } from '@feega/motion-core/canvas/composition/types';
 import type { CompositionAspect, CompositionNode, UpstreamCard } from '../canvas/composition-node';
-import { COMP_CARD_LAYOUTS } from './card-layouts';
+import { COMP_CARD_LAYOUTS } from '@feega/motion-core/motion/card-layouts';
 import { embedMotion, motionCompId } from './embed';
-import { TrackKind, defaultProps, type CellSpec } from './components';
-import { FORMATS, MotionFormat, cloneDoc, formatOf, newClip, newMotionDoc, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
-import type { PropsOf } from './hyperframes/templates';
+import { TrackKind, defaultProps, type CellSpec } from '@feega/motion-core/motion/components';
+import { FORMATS, MotionFormat, cloneDoc, formatOf, newClip, newMotionDoc, parseMotionDoc, type DocVerdict, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import type { PropsOf } from '@feega/motion-core/motion/hyperframes/templates';
 
 export type ComposeMedia = PropsOf<'Composition'>['media'][number];
 

@@ -10,9 +10,12 @@ import { billedCreditsFor } from '$lib/credit-ladder';
 import { videoDurationOptions, VIDEO_RESOLUTIONS, MIN_DURATION } from '$lib/server/video';
 import { modelParamsOf } from '$lib/canvas/model-params';
 import { env } from '$env/dynamic/private';
+import { allowedIds, applyAllowlist } from './model-allowlist/allowlist';
 import { taskChoice } from './task-choice';
 import { configuredIn, taskProviderOf, TaskProviderName } from './generation/task-providers';
 import { discountBook, withDiscountPrices } from './generation/discount-routes';
+import { DEFAULT_IMAGE_RESOLUTION, IMAGE_OUTPUT_TOKENS } from './image-output-tokens';
+import { videoPerSecondCredits } from './video-pricing';
 import { model3dChoiceParams, REVIEWED_MODEL3D_MODELS } from '$lib/model3d-models';
 
 const VIDEO_SPEC_IDS = [
@@ -88,9 +91,7 @@ function genericImageChoice(row: SyncedRow): ModelChoice {
     wireId: row.id,
     inputModalities: row.input_modalities ?? [],
     resolutions: imageResolutionsFor(row.supported_resolutions),
-    unitCredits: imageUnitCredits(row.pricing),
-    creditOverrides: imageCreditOverrides(row),
-    variableCredits: hasVariableCredits(row.pricing),
+    ...imagePrice(row.id, row),
     params: modelParamsOf(row.param_schema ?? {})
   };
 }
@@ -145,7 +146,7 @@ function genericVideoChoice(row: SyncedRow): ModelChoice {
     ...providerOf(row.id),
     wireId: row.id,
     inputModalities: row.input_modalities ?? [],
-    unitCredits: undefined,
+    perSecondCredits: videoPerSecondCredits(row.pricing, videoResolutionsFor(row)),
     params: modelParamsOf(row.param_schema ?? {})
   };
 }
@@ -164,11 +165,31 @@ function imageChoice(
     wireId,
     inputModalities: row.input_modalities ?? [],
     resolutions: imageResolutionsFor(row.supported_resolutions),
-    unitCredits: imageUnitCredits(row.pricing),
-    creditOverrides: imageCreditOverrides(row),
-    variableCredits: hasVariableCredits(row.pricing),
+    ...imagePrice(wireId, row),
     params: modelParamsOf(row.param_schema ?? {})
   };
+}
+
+type ImagePrice = Pick<ModelChoice, 'unitCredits' | 'creditOverrides' | 'variableCredits'>;
+
+function tokenPrice(tokens: Readonly<Record<string, number>>, row: SyncedRow): ImagePrice | null {
+  const costs = pricingLines(row.pricing).filter((line) => line.billable === 'output_image' && line.unit === 'token').map((line) => line.cost_usd);
+  if (!costs.length) {
+    return null;
+  }
+  const perToken = Math.min(...costs);
+  const byResolution = Object.fromEntries(Object.entries(tokens).map(([resolution, count]) => [resolution, billedCreditsFor(count * perToken)]));
+  return {
+    unitCredits: byResolution[DEFAULT_IMAGE_RESOLUTION],
+    creditOverrides: { resolution: byResolution },
+    variableCredits: pricingLines(row.pricing).some((line) => (line.billable === 'input_image' || line.billable === 'input_reference') && line.cost_usd > 0)
+  };
+}
+
+function imagePrice(wireId: string, row: SyncedRow): ImagePrice {
+  const tokens = IMAGE_OUTPUT_TOKENS[wireId];
+  const priced = tokens ? tokenPrice(tokens, row) : null;
+  return priced ?? { unitCredits: imageUnitCredits(row.pricing), creditOverrides: imageCreditOverrides(row), variableCredits: hasVariableCredits(row.pricing) };
 }
 
 function imageUnitCredits(pricing: unknown): number | undefined {
@@ -313,6 +334,11 @@ const RESOLUTION_VARIANTS: Record<string, (resolutions: string[]) => string | un
     [...resolutions].sort((left, right) => resolutionPixels(left) - resolutionPixels(right)).at(-1)
 };
 
+function videoPrice(specId: string, row: SyncedRow): Pick<ModelChoice, 'unitCredits' | 'perSecondCredits'> {
+  const perSecondCredits = videoPerSecondCredits(row.pricing, videoResolutionsFor(row));
+  return perSecondCredits ? { perSecondCredits } : { unitCredits: videoCredits(specId) };
+}
+
 function videoChoice(spec: VideoModelSpec, row: SyncedRow, inputModalities: string[]): ModelChoice {
   return {
     id: spec.id,
@@ -329,7 +355,7 @@ function videoChoice(spec: VideoModelSpec, row: SyncedRow, inputModalities: stri
     ...providerOf(row.id),
     wireId: row.id,
     inputModalities,
-    unitCredits: videoCredits(spec.id),
+    ...videoPrice(spec.id, row),
     params: modelParamsOf(row.param_schema ?? {})
   };
 }
@@ -421,8 +447,17 @@ const OFFERABLE: Readonly<Record<SyncedCatalogue, (admin: SupabaseClient, view: 
   model3d: offerableModels3d
 };
 
-export async function offerableModels(admin: SupabaseClient, medium: SyncedCatalogue, view = PricingView.Offered): Promise<OfferableModels> {
-  return OFFERABLE[medium](admin, view);
+export async function offerableModels(
+  admin: SupabaseClient,
+  medium: SyncedCatalogue,
+  view = PricingView.Offered,
+  orgId?: string
+): Promise<OfferableModels> {
+  const offered = await OFFERABLE[medium](admin, view);
+  if (!orgId) {
+    return offered;
+  }
+  return { ...offered, choices: applyAllowlist(offered.choices, await allowedIds(admin, orgId, medium)) };
 }
 
 /**

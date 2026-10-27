@@ -1,7 +1,7 @@
-import { findClip, type MotionClip, type MotionDoc } from './doc';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { boxAround, hasBox, wrapInGroup } from './layout/ops';
 import { setParent } from './parent-ops';
-import { removeClips, type OpResult } from './timeline';
+import { removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 

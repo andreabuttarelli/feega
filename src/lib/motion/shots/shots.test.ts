@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawPiece } from '../ui-kit/render';
 import { writeComponent } from '../custom/ops';
-import { MAX_JS } from '../custom/component';
+import { MAX_JS } from '@feega/motion-core/motion/custom/component';
 import { lintSource } from '../custom/lint';
-import { addMarker } from '../organize';
+import { addMarker } from '@feega/motion-core/motion/organize';
 import { pieceAnchors } from '../ui-kit/anchors';
 import { vectorPiece } from '../vector-ui/piece';
 import { VectorKind, VectorRole, type VectorNode, type VectorUi } from '../vector-ui/model';

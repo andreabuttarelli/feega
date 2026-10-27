@@ -1,4 +1,4 @@
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { branchDiff, mergeBranch, type Choices, type Conflict } from '$lib/motion/branch-merge';
 
 export enum BranchOutcome {

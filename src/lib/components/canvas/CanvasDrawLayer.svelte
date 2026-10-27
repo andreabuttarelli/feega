@@ -1,9 +1,9 @@
 <script lang="ts">
   import DrawOverlay from '$lib/components/motion/DrawOverlay.svelte';
-  import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
+  import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CanvasTheme, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { drawnOnCanvas } from '$lib/canvas/canvas-draw';
 
   type Point = { x: number; y: number };

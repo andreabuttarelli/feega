@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scriptProblems, type LaunchScript } from '$lib/motion/script';
+import { scriptProblems, type LaunchScript } from '@feega/motion-core/motion/script';
 import { applyCopy, copyPrompt, copywrite } from './copywriter';
 
 const source = { url: 'https://supasito.com/', quote: 'Every site you run. Up to date. In one place.' };

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { newMotionDoc, MotionFormat } from '$lib/motion/doc';
+import { newMotionDoc, MotionFormat } from '@feega/motion-core/motion/doc';
 import { scenesLeftToRight, sequenceScenes } from '$lib/motion/scenes';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import { created, type FrameStore, type StoredFrame } from './move-element';

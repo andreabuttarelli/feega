@@ -1,0 +1,62 @@
+name: Native apps
+
+on:
+  pull_request:
+    paths: ['apps/**', '.github/workflows/native-apps.yml']
+  push:
+    branches: [dev]
+    paths: ['apps/**', '.github/workflows/native-apps.yml']
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: apps/desktop
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: bash scripts/vendor-capacitor.sh
+      - run: mkdir -p www && echo '<!doctype html>' > www/index.html && npx cap sync ios
+      - run: npm run ios:sim
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: mkdir -p www && echo '<!doctype html>' > www/index.html && npx cap sync android
+      - run: cd android && ./gradlew assembleDebug

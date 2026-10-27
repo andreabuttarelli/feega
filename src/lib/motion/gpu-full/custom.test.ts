@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { drawFrame, ItemKind, prepare, Unsupported } from './display-list';
-import { DomGap, DrawnKind, type DomRead } from './dom/read';
-import { FillRule, PaintKind } from './paint';
-import { BlendMode } from '../blend';
-import { MaskMode } from '../mask';
-import { CoverKind } from './mask-layers';
-import { FilterKind } from './filters';
-import type { Affine } from '../affine';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { drawFrame, ItemKind, prepare, Unsupported } from '@feega/motion-core/motion/gpu-full/display-list';
+import { DomGap, DrawnKind, type DomRead } from '@feega/motion-core/motion/gpu-full/dom/read';
+import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { MaskMode } from '@feega/motion-core/motion/mask';
+import { CoverKind } from '@feega/motion-core/motion/gpu-full/mask-layers';
+import { FilterKind } from '@feega/motion-core/motion/gpu-full/filters';
+import type { Affine } from '@feega/motion-core/motion/affine';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -53,6 +53,13 @@ describe('drawFrame on a custom component', () => {
       [1, 0, 0, 1, 5, 5],
       [1, 0, 0, 1, 5, 5]
     ]);
+  });
+
+  it('draws a component with an easing prop of its own that no clip move knows', () => {
+    const eased = structuredClone(doc);
+    eased.tracks.flatMap((t) => t.clips)[0].props.easing = 'expo';
+
+    expect(drawFrame(prepare(eased, FEEGA_TOKENS), 10, new Map([['poster', read]])).items).toHaveLength(2);
   });
 
   it('draws a component whose position, scale and mask are keyframed', () => {

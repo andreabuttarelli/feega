@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { MotionDoc } from '$lib/motion/doc';
-  import { CheckState, ComponentMode, checkState, modeOf, type CustomSource, type PropsSchema } from '$lib/motion/custom/component';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { CheckState, ComponentMode, checkState, modeOf, type CustomSource, type PropsSchema } from '@feega/motion-core/motion/custom/component';
   import { writeComponent } from '$lib/motion/custom/ops';
   import type { CodeLanguage, CodeView } from './code-editor';
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from './design';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { MaskKind } from './mask';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { MaskKind } from '@feega/motion-core/motion/mask';
 import { Grab, cornerAt, dragBox, dragPoint, editMaskAt, maskBox, pointAt } from './mask-handles';
-import { addClip, setKeyframes, setMask, type OpResult } from './timeline';
+import { addClip, setKeyframes, setMask, type OpResult } from '@feega/motion-core/motion/timeline';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

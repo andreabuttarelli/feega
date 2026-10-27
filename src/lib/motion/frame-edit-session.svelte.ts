@@ -1,4 +1,4 @@
-import { findClip, type MotionDoc } from './doc';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { DocOp } from './doc-ops';
 import { EditMode, nextMode } from './edit-mode';
 import { SaveState } from './editor-bar';
@@ -6,8 +6,8 @@ import { landed, outgoing, remote, type Revision, type Synced } from './frame-sy
 import { adoptHead, amend, followHead, record, redo, startHistory, undo, type History } from './history';
 import { liveEdits, type LiveEdits } from './live-edit';
 import { settleGroups } from './light-group';
-import { mergeView } from './precomp';
-import type { OpResult } from './timeline';
+import { mergeView } from '@feega/motion-core/motion/precomp';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 const SAVE_DEBOUNCE_MS = 250;
 const COALESCE_MS = 800;
@@ -32,7 +32,7 @@ export class FrameEditSession {
   history = $state.raw<History>(startHistory({} as MotionDoc));
   version = $state(0);
   selection = $state<string[]>([]);
-  mode = $state<EditMode>(EditMode.Motion);
+  mode = $state<EditMode>(EditMode.Design);
   saveState = $state<SaveState>(SaveState.Saved);
   notice = $state('');
   readonly live: LiveEdits<MotionDoc>;
@@ -52,7 +52,7 @@ export class FrameEditSession {
     this.history = startHistory(start.head.doc);
     this.version = start.head.version;
     this.selection = start.selection;
-    this.mode = start.mode ?? EditMode.Motion;
+    this.mode = start.mode ?? EditMode.Design;
     this.baseDoc = start.head.doc;
     this.live = liveEdits<MotionDoc>({
       show: (next) => this.port.show(next),
@@ -92,6 +92,7 @@ export class FrameEditSession {
     const root = settleGroups(mergeView(this.history.present, this.port.viewPath(), next));
     const typedOn = summary === this.lastEdit.summary && now - this.lastEdit.at < COALESCE_MS;
     this.history = typedOn ? amend(this.history, root) : record(this.history, root);
+    this.port.show(this.history.present);
     if (!typedOn) {
       this.port.stepped();
     }

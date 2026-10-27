@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateText, stepCountIs, type ModelMessage } from 'ai';
 import { PromptCache } from '../prompt-cache';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { VIEW_FRAMES } from './frames';
 import type { MotionSession, MotionToolDeps } from './motion-tools';
 

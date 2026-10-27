@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { FillType, fillsSchema, type FillOf } from '$lib/motion/fill/model';
-import { addClip } from '$lib/motion/timeline';
-import { findClip, MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { FillType, fillsSchema, type FillOf } from '@feega/motion-core/motion/fill/model';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { findClip, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { withFill } from './gradient-handles';
 import { Corner, MIN_WINDOW, appliedCrop, cornerZoom, imagePlacement, imageTarget, panned, windowOfFit, zoomedAt } from './crop-handles';
 
@@ -73,6 +73,13 @@ describe('zooming the picture', () => {
   it('cannot show more than the whole picture or less than a sliver', () => {
     expect(zoomedAt({ x: 0, y: 0, w: 1, h: 1 }, box, [0, 0], 0.5)).toEqual({ x: 0, y: 0, w: 1, h: 1 });
     expect(zoomedAt({ x: 0, y: 0, w: 0.5, h: 0.5 }, box, [0, 0], 1e9).w).toBe(MIN_WINDOW);
+  });
+
+  it('zooming out past the whole picture stops without stretching it', () => {
+    const cover = { x: 0, y: 0.04, w: 1, h: 0.92 };
+    const next = zoomedAt(cover, box, [0, 0], 0.5);
+    expect(next.w / next.h).toBeCloseTo(cover.w / cover.h);
+    expect(next).toEqual(cover);
   });
 
   it('dragging a corner away from the opposite one enlarges the picture, so the window shrinks', () => {

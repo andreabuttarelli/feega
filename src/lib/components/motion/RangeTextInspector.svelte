@@ -1,15 +1,16 @@
 <script lang="ts">
   import FontPicker from './FontPicker.svelte';
-  import type { MotionDoc } from '$lib/motion/doc';
-  import type { BrandTokens } from '$lib/motion/brand';
-  import { resolveColor } from '$lib/motion/brand';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
+  import { resolveColor } from '@feega/motion-core/motion/brand';
   import type { FontLibrary } from '$lib/motion/fonts/library';
-  import type { CatalogueFont } from '$lib/motion/fonts/model';
-  import { registerFont, withUploaded } from '$lib/motion/fonts/ops';
+  import type { CatalogueFont } from '@feega/motion-core/motion/fonts/model';
+  import { registerFont } from '$lib/motion/fonts/ops';
+  import { FontOrigin, withPicked } from '$lib/motion/fonts/local';
   import { textRange } from '$lib/canvas/text-range.svelte';
-  import { ListKind } from '$lib/motion/text-lists';
-  import { MIXED, RUN_CASES, linkOf, type GradientFill, type RunEdit, type StyleKey } from '$lib/motion/text-runs';
-  import { FILL_LABEL, FillType, addStop, removeStop } from '$lib/motion/fill/model';
+  import { ListKind } from '@feega/motion-core/motion/text-lists';
+  import { MIXED, RUN_CASES, linkOf, type GradientFill, type RunEdit, type StyleKey } from '@feega/motion-core/motion/text-runs';
+  import { FILL_LABEL, FillType, addStop, removeStop } from '@feega/motion-core/motion/fill/model';
   import { GRADIENT_TYPES, RunPaint, asGradient, gradientPatched, paintOf } from '$lib/motion/run-fill';
 
   let { doc, tokens, fonts = null, onchange }: { doc: MotionDoc; tokens: BrandTokens; fonts?: FontLibrary | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
@@ -54,8 +55,8 @@
     }
   }
 
-  function pickFont(asked: string, catalogue: CatalogueFont[]) {
-    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
+  function pickFont(asked: string, catalogue: CatalogueFont[], origin: FontOrigin) {
+    const { doc: base, family } = withPicked(doc, asked, origin, fonts?.families ?? []);
     const registered = registerFont(base, family, catalogue);
     if (registered.ok) {
       onchange(registered.doc, `Added the font ${family}`);

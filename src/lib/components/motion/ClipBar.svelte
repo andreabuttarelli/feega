@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { MotionDoc } from '$lib/motion/doc';
-  import { Caption, type ActionId } from '$lib/motion/actions';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { ActionId } from '$lib/motion/actions';
   import { PickMode, barActions } from '$lib/motion/clip-bar';
   import IconButton from './IconButton.svelte';
 
@@ -18,7 +18,7 @@
       <button type="button" class="done" onclick={ondone}>Done</button>
     {/if}
     {#each actions as id (id)}
-      <IconButton action={id} size={16} caption={Caption.Wide} onclick={() => onrun(id)} />
+      <IconButton action={id} size={16} onclick={() => onrun(id)} />
     {/each}
   </div>
 {/if}
@@ -26,11 +26,11 @@
 <style>
   .clip-bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--ui-hit-gap);
-    min-height: 52px;
-    padding: 0 var(--ui-space-3);
-    overflow-x: auto;
+    min-height: 44px;
+    padding: 6px var(--ui-space-3);
     background: var(--ui-raised);
     flex-shrink: 0;
   }

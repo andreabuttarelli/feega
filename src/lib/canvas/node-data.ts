@@ -20,17 +20,18 @@
  * primo campo aggiunto.
  */
 import { z } from 'zod';
+import { CODE_ENTRY, Framework } from './code-frame';
 import { mergeNodeData, type NodeData } from './node-patch';
 import { SOCIAL_PLATFORMS } from './social-platforms';
 import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS } from './source-filters';
 import { CUSTOM, EFFECTS } from './effects';
 import { nodeReferenceSchema } from './node-references';
 import type { EffectId, EffectParam } from './effects';
-import { LAYOUTS } from './composition/index';
-import { cellSchema } from '$lib/motion/components';
-import { CAMERA_PRESETS } from './composition/camera';
-import type { LayoutId } from './composition/types';
-import type { CameraPresetId } from './composition/camera';
+import { LAYOUTS } from '@feega/motion-core/canvas/composition';
+import { cellSchema } from '@feega/motion-core/motion/components';
+import { CAMERA_PRESETS } from '@feega/motion-core/canvas/composition/camera';
+import type { LayoutId } from '@feega/motion-core/canvas/composition/types';
+import type { CameraPresetId } from '@feega/motion-core/canvas/composition/camera';
 import { CALENDAR_VIEWS } from '$lib/calendar/period-grid';
 import { CALENDAR_SCOPES } from './calendar-node';
 import { elementNodeSchema, motionNodeSchema } from './motion-node';
@@ -158,11 +159,20 @@ function isEmbeddableUrl(raw: string): boolean {
 
 const iframeSchema = z
   .object({
-    url: z.string().refine(isEmbeddableUrl, { message: 'solo indirizzi http e https' }).optional(),
-    content: z.string().optional()
+    url: z.string().refine((u) => u === '' || isEmbeddableUrl(u), { message: 'solo indirizzi http e https' }).optional(),
+    content: z.string().optional(),
+    html: z.string().optional(),
+    framework: z.enum(Framework).optional(),
+    files: z.record(z.string(), z.string()).optional(),
+    vars: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+    sourceNodeId: z.string().optional(),
+    route: z.string().optional()
   })
-  .refine((v) => Boolean(v.url) || Boolean(v.content), {
-    message: 'needs a url or content: an embed with neither shows nothing'
+  .refine((v) => Boolean(v.url) || Boolean(v.content) || Boolean(v.html) || Boolean(v.files) || Boolean(v.sourceNodeId), {
+    message: 'needs a url, html or files: an embed with none shows nothing'
+  })
+  .refine((v) => !v.files || (v.framework !== undefined && CODE_ENTRY[v.framework] in v.files), {
+    message: 'a code frame needs framework (react|svelte) and its entry file: App.tsx for react, App.svelte for svelte'
   });
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();
@@ -404,6 +414,14 @@ const sectionSchema = z.object({
   fill: z.string().regex(HEX_COLOR, 'invalid colour, expected #rrggbb').default(SECTION_DEFAULT_FILL)
 });
 
+const techniqueSchema = z.object({
+  techniqueId: z.string().uuid(),
+  name: z.string().max(48),
+  runY: z.number().nullish(),
+  workflowId: z.string().nullish(),
+  ranVersion: z.number().int().nullish()
+});
+
 const calendarSchema = z.object({
   view: z.enum(CALENDAR_VIEWS),
   scope: z.enum(CALENDAR_SCOPES),
@@ -470,7 +488,8 @@ export const NODE_DATA_SCHEMAS = {
   motion: motionNodeSchema,
   element: elementNodeSchema,
   studio_batch: studioBatchNodeSchema,
-  section: sectionSchema
+  section: sectionSchema,
+  technique: techniqueSchema
 } as const;
 
 export type NodeType = keyof typeof NODE_DATA_SCHEMAS;
@@ -577,8 +596,8 @@ export function validateNodeData(type: string, data: unknown): NodeDataVerdict {
   }
 
   const schema = NODE_DATA_SCHEMAS[type];
-  const { rotation, groupId, ...own } = (data ?? {}) as Record<string, unknown>;
-  const layout = nodeLayoutSchema.safeParse({ rotation, groupId });
+  const { rotation, groupId, colorTag, ...own } = (data ?? {}) as Record<string, unknown>;
+  const layout = nodeLayoutSchema.safeParse({ rotation, groupId, colorTag });
   if (!layout.success) {
     return { ok: false, error: `${type}.data.${layout.error.issues[0].path.join('.')}: ${layout.error.issues[0].message}` };
   }
@@ -615,6 +634,8 @@ function fieldsOf(type: NodeType): string[] {
 export const SYSTEM_OWNED_FIELDS = [
   'refId',
   'sourceRefId',
+  'layerRefIds',
+  'layerBoxes',
   'mediaKind',
   'assetId',
   'runId',
@@ -629,6 +650,8 @@ export const SYSTEM_OWNED_FIELDS = [
 export const SERVER_WRITTEN_FIELDS: readonly string[] = [
   'refId',
   'sourceRefId',
+  'layerRefIds',
+  'layerBoxes',
   'mediaKind',
   'assetId',
   'runId',

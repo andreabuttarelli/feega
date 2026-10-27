@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb, type FakeDb } from '$lib/server/db/fake-db';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { addClip } from '$lib/motion/timeline';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
 import { OAUTH_RETURN_COOKIE } from '$lib/server/oauth';
 
 const state = vi.hoisted(() => ({ world: null as null | FakeDb, userId: null as string | null }));

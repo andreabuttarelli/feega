@@ -3,7 +3,7 @@ import Sizes from 'open-props/src/props.sizes.js';
 import Shadows from 'open-props/src/props.shadows.js';
 import Gradients from 'open-props/src/props.gradients.js';
 import Animations from 'open-props/src/props.animations.js';
-import { OPEN_PROPS_GLOBAL } from './open-props';
+import { OPEN_PROPS_GLOBAL } from '@feega/motion-core/motion/custom/open-props';
 
 type Ease = (p: number) => number;
 type Timeline = { to: (target: object, vars: object, at: number) => void; fromTo: (target: object, from: object, to: object, at: number) => void };

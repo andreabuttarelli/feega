@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { awaitRun, motionApi } from '../../lib/motion.ts';
-import { requireAuth, withAuth, fail, type ToolResult } from '../util.ts';
+import { requireAuth, withAuth, fail, okText, type ToolResult } from '../util.ts';
 import { MAX_ATTACHMENTS } from '../../lib/attachments.ts';
 
 const MAX_FRAMES = 6;
@@ -90,7 +90,7 @@ export function registerMotionTools(server: McpServer) {
       description:
         'Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link ' +
         '(expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file ' +
-        'to the project. Show the link to the user. `mode: "server"` renders on the farm, the same path and credit gate as the editor Render button; while server rendering is closed for everyone it answers 403 `server_render_unavailable`. ' +
+        'to the project. Show the link to the user. With no user, open `headless_url` in any headless Chromium: it starts with no click; keep it open until `get_render` says done. `mode: "server"` renders on the farm, the same path and credit gate as the editor Render button; while server rendering is closed for everyone it answers 403 `server_render_unavailable`. ' +
         'A live component (a game or generative piece) cannot be seeked: the video shows a still of it; publish it as an embed instead. ' +
         'Poll `get_render` with the `run_id` for the file.',
       inputSchema: z.object({
@@ -112,11 +112,22 @@ export function registerMotionTools(server: McpServer) {
     'get_render',
     {
       title: 'Read a render',
-      description: 'State of a `render_video` run: `status` (running, done, failed, expired), `mode`, and when done `asset_id` and a signed `file_url` valid one hour. Reads only.',
+      description: 'State of a `render_video` run: `status` (running, done, failed, expired), and when done `asset_id` and a signed `file_url` valid one hour; `error` when failed. Reads only.',
       inputSchema: z.object({ org, run_id: z.string() }),
       annotations: { readOnlyHint: true }
     },
-    async ({ org, run_id }) => withAuth((token) => motionApi.renderState(token, run_id, org))
+    async ({ org, run_id }) => {
+      const auth = await requireAuth();
+      if (!auth.ok) {
+        return auth.result;
+      }
+      try {
+        const { status, asset_id, file_url, error } = await motionApi.renderState(auth.session.access_token, run_id, org);
+        return okText({ status, ...(asset_id ? { asset_id } : {}), ...(file_url ? { file_url } : {}), ...(error ? { error } : {}) });
+      } catch (e) {
+        return fail(e instanceof Error ? e.message : String(e));
+      }
+    }
   );
 
   server.registerTool(
@@ -336,7 +347,7 @@ export function registerMotionTools(server: McpServer) {
         const { frames, ...notes } = await motionApi.frames(auth.session.access_token, node_id, { times, width }, org);
         const shown = { ...notes, times: frames.map((f) => f.time) };
         return {
-          content: [{ type: 'text', text: JSON.stringify(shown, null, 2) }, ...frames.map((f) => ({ type: 'image' as const, data: f.data, mimeType: f.mime }))],
+          content: [{ type: 'text', text: JSON.stringify(shown) }, ...frames.map((f) => ({ type: 'image' as const, data: f.data, mimeType: f.mime }))],
           structuredContent: shown
         };
       } catch (e) {

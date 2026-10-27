@@ -36,7 +36,8 @@ describe('NODE_DATA_SCHEMAS — una riga per tipo, tutti i 10 valori di nodes_ty
         'motion',
         'element',
         'studio_batch',
-        'section'
+        'section',
+        'technique'
       ].sort()
     );
   });

@@ -3,6 +3,7 @@
   import MultiInspector from '$lib/components/motion/MultiInspector.svelte';
   import LookInspector from '$lib/components/motion/LookInspector.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
+  import HeaderActions from '$lib/components/motion/HeaderActions.svelte';
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import InstanceInspector from '$lib/components/motion/InstanceInspector.svelte';
   import RangeTextInspector from '$lib/components/motion/RangeTextInspector.svelte';
@@ -18,15 +19,15 @@
   import FramePresetSection from '$lib/components/motion/FramePresetSection.svelte';
   import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
-  import type { BrandTokens } from '$lib/motion/brand';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
   import type { ComponentProps } from 'svelte';
-  import { THREE_D_COMPONENTS } from '$lib/motion/components';
+  import { THREE_D_COMPONENTS } from '@feega/motion-core/motion/components';
   import { PickMode } from '$lib/motion/clip-bar';
   import { PropertiesView } from '$lib/motion/properties-view';
   import { barActionLater, frameBarActions, inspectorOf } from '$lib/canvas/frame-inspector';
   import { loadOutliner } from '$lib/motion/fonts/outliner';
   import type { ActionId } from '$lib/motion/actions';
-  import type { OpResult } from '$lib/motion/timeline';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { mergeScope, scopeView } from '$lib/motion/instance-view';
 
   const FIRST_FRAME = 0;
@@ -71,6 +72,8 @@
   }
 </script>
 
+{#snippet headerBar()}{#if session && doc}<HeaderActions {doc} selection={session.selection} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} />{/if}{/snippet}
+
 {#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}
 
 {#if session && doc && tokens && !session.selection.length}
@@ -85,16 +88,16 @@
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
-    <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
     {#if shown.view === PropertiesView.Multiple}
+      <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
       <MultiInspector {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />
     {:else if shown.view === PropertiesView.Template}
-      <TemplateInspector gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
+      <TemplateInspector actions={headerBar} gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
     {:else}
       {@const Presets = CLIP_PRESETS[shown.clip.component]}
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector gesture={session.live} lead={partLead} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} />
+      <MotionInspector gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} />
       {#if Presets}<Presets doc={shownDoc!} clip={shown.clip} onchange={editShown} />{/if}
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}
     {/if}

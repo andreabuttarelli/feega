@@ -1,4 +1,4 @@
-import { FillType, type Fill, type FillOf, type Stop } from './model';
+import { FillType, type Fill, type FillOf, type Stop } from '@feega/motion-core/motion/fill/model';
 
 const PERCENT = 100;
 const NO_PICTURE = 'var(--ui-input)';

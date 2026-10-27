@@ -236,11 +236,11 @@ describe('creditsForRun — audio', () => {
 
   it('text to speech costs by the characters of the prompt', () => {
     const prompt = 'x'.repeat(1000);
-    expect(creditsForRun({ medium: 'audio', model: choice('eleven_multilingual_v2'), params: { operation: 'text_to_speech' }, prompt })).toBe(16);
+    expect(creditsForRun({ medium: 'audio', model: choice('eleven_multilingual_v2'), params: { operation: 'text_to_speech' }, prompt })).toBe(10);
   });
 
   it('music costs by the chosen duration', () => {
-    expect(creditsForRun({ medium: 'audio', model: choice('music_v1'), params: { operation: 'music', duration: 60 }, prompt: 'lofi' })).toBe(30);
+    expect(creditsForRun({ medium: 'audio', model: choice('music_v1'), params: { operation: 'music', duration: 60 }, prompt: 'lofi' })).toBe(18);
   });
 
   it('an operation on connected media has no price before it runs', () => {

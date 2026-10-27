@@ -1,9 +1,9 @@
-import { findClip, type MotionDoc } from './doc';
-import { BuiltinFont } from './fonts/model';
-import { outlineUrl } from './fonts/outline';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { BuiltinFont } from '@feega/motion-core/motion/fonts/model';
+import { outlineUrl } from '@feega/motion-core/motion/fonts/outline';
 import type { Outliner } from './fonts/outliner';
 import { textToPath } from './text-outline';
-import type { OpResult } from './timeline';
+import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 const REGULAR_WEIGHT = 400;
 

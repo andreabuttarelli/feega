@@ -1,8 +1,8 @@
-import { COMPONENTS } from './components';
-import { findClip, type MotionDoc } from './doc';
-import { listChanged, normalLists, type ListChange, type ListItem } from './text-lists';
-import { codePoints, styledRange, type Range, type RunEdit, type TextRun } from './text-runs';
-import { setProps, type OpResult } from './timeline';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { listChanged, normalLists, type ListChange, type ListItem } from '@feega/motion-core/motion/text-lists';
+import { codePoints, styledRange, type Range, type RunEdit, type TextRun } from '@feega/motion-core/motion/text-runs';
+import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 

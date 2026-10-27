@@ -1,34 +1,35 @@
 <script lang="ts">
-  import { Background } from '$lib/motion/doc';
+  import type { Boxes } from '@feega/motion-core/motion/custom/reflow';
+  import { Background } from '@feega/motion-core/motion/doc';
   import { onMount, type Snippet } from 'svelte';
-  import { FPS } from '$lib/motion/design';
-  import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
+  import { FPS } from '@feega/motion-core/motion/design';
+  import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '@feega/motion-core/motion/hyperframes/capture';
   import { CAPTURE_TIMEOUT_MS, Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
   import { crispFor } from '$lib/motion/hyperframes/crisp-scale';
-  import { listenTap, type FramePoint } from '$lib/motion/hyperframes/frame-tap';
+  import { listenTap, type FramePoint } from '@feega/motion-core/motion/hyperframes/frame-tap';
   import { laneVisibility, shootInLanes } from '$lib/motion/export/lanes';
-  import { engineOf } from '$lib/motion/engine';
-  import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
+  import { engineOf } from '@feega/motion-core/motion/engine';
+  import { lanesWithin, webglPerLane } from '@feega/motion-core/motion/export/webgl-budget';
   import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
   import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
-  import { DRAWN_EVENT, DRAWN_FALLBACK_MS, REDRAWN, MEASURE_REPLY, MEASURE_REQUEST, Pose, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
-  import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
-  import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
-  import type { VarValues } from '$lib/motion/interactive/var-model';
+  import { DRAWN_EVENT, DRAWN_FALLBACK_MS, REDRAWN, MEASURE_REPLY, MEASURE_REQUEST, Pose, type MeasureReply, type MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
+  import { InputKey, type InputValues } from '@feega/motion-core/motion/expression/inputs';
+  import { INPUT_MESSAGE } from '@feega/motion-core/motion/interactive/runtime';
+  import type { VarValues } from '@feega/motion-core/motion/interactive/var-model';
   import { RenderEngine } from '$lib/motion/gpu/engine-flag';
-  import { EditEnd, TEXT_EDIT, type TextEditMessage } from '$lib/motion/hyperframes/text-edit';
+  import { EditEnd, TEXT_EDIT, type TextEditMessage } from '@feega/motion-core/motion/hyperframes/text-edit';
   import GpuLayer from './GpuLayer.svelte';
   import GpuFullLayer from './GpuFullLayer.svelte';
-  import { FullBackend } from '$lib/motion/gpu-full/backends';
-  import type { BrandTokens } from '$lib/motion/brand';
-  import type { MotionDoc } from '$lib/motion/doc';
+  import { FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { previewHtml } from '$lib/canvas/gpu/memory-budget';
   import type { Compose } from '$lib/motion/gpu/engine';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
-  export type CapturedFrame = { time: number; data: string; layout: string; errors: ClipError[] };
+  export type CapturedFrame = { time: number; data: string; layout: string; boxes?: Boxes; errors: ClipError[] };
   export type FrameSize = { width: number; height: number };
 
   const CAPTURE_WIDTH = 640;
@@ -128,9 +129,22 @@
     }
   }
 
+  let crisp = () => {};
+  const sharpen = () => (crisp = shown ? crispFor(engineOf(navigator.userAgent), shown) : () => {});
+
+  async function atFullSize<T>(work: () => Promise<T>): Promise<T> {
+    crisp();
+    crisp = () => {};
+    try {
+      return await work();
+    } finally {
+      crisp();
+      sharpen();
+    }
+  }
+
   onMount(() => {
     let disposed = false;
-    let crisp = () => {};
     void import('@hyperframes/player').then(() => {
       if (disposed || !host) {
         return;
@@ -148,7 +162,7 @@
       el.addEventListener('ready', () => {
         crisp();
         shown = el.iframeElement;
-        crisp = shown ? crispFor(engineOf(navigator.userAgent), shown) : () => {};
+        sharpen();
         ready = true;
         const waiting = readyWaiters;
         readyWaiters = [];
@@ -243,13 +257,13 @@
     if (!host) {
       throw new Error('the preview is still loading');
     }
-    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
+    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY, boxes: true };
     const aside = await mountCapturePlayer(host, source);
     try {
       const frames: CapturedFrame[] = [];
       for (const time of times) {
         const reply = await aside.shoot(time, request);
-        frames.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', errors: reply.errors ?? [] });
+        frames.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', boxes: reply.boxes, errors: reply.errors ?? [] });
       }
       return frames;
     } finally {
@@ -373,7 +387,7 @@
   }
 
   async function renderOnCoreOf(spec: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> }, backend: FullBackend, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<boolean> {
-    const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }, { mountCustomReads }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('$lib/motion/gpu-full/display-list'), import('$lib/motion/gpu-full/text/load'), import('$lib/motion/gpu-full/text/painter'), import('$lib/motion/gpu-full/dom/custom')]);
+    const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }, { mountCustomReads }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('@feega/motion-core/motion/gpu-full/display-list'), import('@feega/motion-core/motion/gpu-full/text/load'), import('@feega/motion-core/motion/gpu-full/text/painter'), import('@feega/motion-core/motion/gpu-full/dom/custom')]);
     const prepared = prepare(spec.doc, spec.tokens, spec.assets, { fonts: await loadFonts(spec.doc, spec.assets, spec.tokens), smoothing: smoothingOf(navigator.userAgent) });
     const custom = await mountCustomReads(host ?? document.body, gpuCompose ?? (() => html), prepared);
     try {
@@ -396,7 +410,7 @@
     }
     exportedOn = RenderEngine.Html;
     const request = { format: FrameFormat.Bitmap, settle, layering: exportLayering(), ...size };
-    return borrowed(source, async () => {
+    return borrowed(source, () => atFullSize(async () => {
       const extra = host ? await Promise.all(Array.from({ length: lanesWithin(lanes(), webglPerLane(source)) - 1 }, () => mountCapturePlayer(host!, source))) : [];
       const sharedWait = CAPTURE_TIMEOUT_MS * (extra.length + 1);
       try {
@@ -405,7 +419,7 @@
       } finally {
         extra.forEach((p) => p.dispose());
       }
-    });
+    }));
   }
 
   $effect(() => {

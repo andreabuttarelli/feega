@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
+import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { EditMode } from './edit-mode';
 import { MIXED } from './mixed';
 import { aabb, quadOf } from './scene-select';
 import { propBoxes } from './space';
-import { addClip, type OpResult } from './timeline';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { unionBounds } from './multi-select';
 import { setConstraints } from './constraints/constraints';
-import { Horizontal, Vertical } from './constraints/model';
+import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
 import { placeBox, setPropAcross, sharedConstraint, sharedProp } from './selection-props';
 
 const must = (r: OpResult): MotionDoc => {

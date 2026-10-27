@@ -98,8 +98,10 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/lib/server/chat-models.ts': 'reads the model catalogue, calls no model',
   'src/lib/server/media-model-prefs.ts': 'reads video durations, calls no model',
   'src/lib/server/offerable-models.ts': 'reads video durations, calls no model',
+  'src/lib/server/local/local-models.ts': 'lists the provider catalogue, calls no model',
   'src/lib/server/studio-actions.ts': 'reads video durations, calls no model',
   'src/lib/server/settings/pages/video.ts': 'reads video durations, calls no model',
+  'src/lib/server/canvas/layer-detect.ts': 'sends a fixed element-listing prompt with an image of the user\'s own project; no user text',
   'src/lib/server/canvas/audio-description.ts': 'lists ElevenLabs voices',
   'src/routes/api/v1/org/audio/voices/+server.ts': 'lists ElevenLabs voices',
   'src/lib/server/canvas/canvas-page.ts': 'lists ElevenLabs voices; generation goes through runGenNode'

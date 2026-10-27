@@ -175,19 +175,30 @@ export async function importCanvasLink(db: Db, input: { orgId: string; projectId
     throw new UploadError(400, 'That link could not be fetched');
   }
 
-  const fileName = linkName(fetched.url);
-  const verdict = verdictForUpload(fetched.mime, fileName, fetched.bytes.length);
+  return importCanvasBytes(db, { orgId: input.orgId, projectId: input.projectId, fileName: linkName(fetched.url), mime: fetched.mime, bytes: fetched.bytes });
+}
+
+export type CanvasPlace = { canvasId: string; x: number; y: number };
+
+export async function importCanvasBytes(db: Db, input: { orgId: string; projectId: string; fileName: string; mime: string; bytes: Uint8Array; place?: CanvasPlace }) {
+  const fileName = input.fileName.replace(UNSAFE_NAME, '_');
+  const verdict = verdictForUpload(input.mime, fileName, input.bytes.length);
   if (!verdict.ok || !LINK_MEDIA.has(verdict.kind)) {
-    throw new UploadError(400, verdict.ok ? 'That link is not a picture or a video' : verdict.why);
+    throw new UploadError(400, verdict.ok ? 'That file is not a picture or a video' : verdict.why);
   }
 
   const path = `${canvasUploadPrefix(input.orgId, input.projectId)}${randomUUID()}-${fileName}`;
-  const stored = await db.storage.from('canvas-assets').upload(path, fetched.bytes, { contentType: fetched.mime });
+  const stored = await db.storage.from('canvas-assets').upload(path, input.bytes, { contentType: input.mime });
   if (stored.error) {
     throw new UploadError(400, 'The copy could not be stored');
   }
 
-  return registerUploadedAsset(db, { ...input, path, fileName, mimeType: fetched.mime, bytes: fetched.bytes.length });
+  const registered = { orgId: input.orgId, projectId: input.projectId, path, fileName, mimeType: input.mime, bytes: input.bytes.length };
+  if (input.place) {
+    const { asset, node } = await registerCanvasUpload(db, { ...registered, ...input.place });
+    return { asset, node, kind: verdict.kind };
+  }
+  return registerUploadedAsset(db, registered);
 }
 
 export async function discardCanvasUpload(db: Db, input: { path: string }): Promise<void> {

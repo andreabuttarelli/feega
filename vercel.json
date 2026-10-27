@@ -1,6 +1,6 @@
 {
   "installCommand": "npm ci",
-  "ignoreCommand": "bash scripts/vercel-ignore.sh . ':!cli' ':!changelog' ':!docs' ':!apps' ':!imgs' ':!supabase'",
+  "ignoreCommand": "bash scripts/vercel-ignore.sh . ':!cli' ':!changelog' ':!docs' ':!apps' ':!imgs' ':!supabase' ':!landing'",
   "headers": [
     {
       "source": "/motion-libs/(.*)",
@@ -61,6 +61,24 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/gpu-core/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "source": "/gpu-text/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
         }
       ]
     }

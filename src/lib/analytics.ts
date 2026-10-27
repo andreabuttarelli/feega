@@ -1,5 +1,6 @@
 import { browser, dev } from '$app/environment';
 import { env } from '$env/dynamic/public';
+import { LocalOff, localOff } from './local-user';
 import { Tracker, allows, consentModeState, type ConsentChoice } from './consent-model';
 
 type PostHog = {
@@ -42,7 +43,7 @@ export function isProdHost(hostname: string | null | undefined): boolean {
 /** Guard 1 — l'ambiente. Un solo posto a cui chiedere "qui si traccia?": lo usa anche il root
  * +layout.server.ts, così client e server rispondono uguale. */
 export function trackingAllowed(hostname: string | null | undefined): boolean {
-  return !dev && isProdHost(hostname);
+  return !dev && !localOff(LocalOff.Analytics, env) && isProdHost(hostname);
 }
 
 /**

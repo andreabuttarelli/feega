@@ -1,4 +1,4 @@
-import type { Item } from '$lib/motion/gpu-full/display-list';
+import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { BORDER, CardPart, UI_TRACKING, at, box, measure, write, type Ctx } from './card-kit';
 import { rect, solid } from './shapes';
 

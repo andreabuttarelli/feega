@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { PropFormat, customValues, Strictness } from '$lib/motion/custom/component';
-import { composeHtml } from '$lib/motion/hyperframes/compose';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { PropFormat, customValues, Strictness } from '@feega/motion-core/motion/custom/component';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { partUsage } from '$lib/motion/part-usage';
-import { PartEdit, PartKind, editablePart, parsePart, partKind } from '$lib/motion/poster-parts';
-import type { MotionClip } from '$lib/motion/doc';
+import { PartEdit, PartKind, editablePart, parsePart, partKind } from '@feega/motion-core/motion/poster-parts';
+import type { MotionClip } from '@feega/motion-core/motion/doc';
 import { POSTER_BATCH_6 } from './poster-batch-6';
 
 const TEXT: (string | undefined)[] = [undefined, PropFormat.Textarea];

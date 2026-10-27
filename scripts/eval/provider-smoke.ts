@@ -7,6 +7,7 @@ import { KIE_TEXT_MODELS } from '$lib/server/kie-chat';
 import { kieTextDeps, runKieText } from '$lib/server/kie-text-run';
 import type { AiCallLog } from '$lib/server/ai-log';
 import { kieModelRows } from '$lib/server/kie-catalogue';
+import { fetchKiePrices } from '$lib/server/kie-pricing';
 import { taskChoice, wireSpecOf } from '$lib/server/task-choice';
 import { wireInputs } from '$lib/server/generation/wire-inputs';
 import { defaultParamsFor } from '$lib/canvas/gen-node';
@@ -74,8 +75,10 @@ function taskCase(provider: TaskProviderName, medium: SmokeMedium, maxUsd: numbe
 
 const REFERENCE_IMAGE = 'https://cdn.wiro.ai/uploads/sampleinputs/nano-banana-2-1-advanced-sampleinput-1.webp';
 
+const KIE_ROWS = kieModelRows(await fetchKiePrices(), [], new Date().toISOString());
+
 function nodeCase(kieModel: string, medium: SmokeMedium, maxUsd: number, prompt: string, imageUrls: string[]): ProviderCase {
-  const row = kieModelRows(new Date().toISOString()).find((r) => r.wire_spec?.model === kieModel);
+  const row = KIE_ROWS.find((r) => r.wire_spec?.model === kieModel);
   const spec = wireSpecOf(row?.wire_spec);
   if (!row || !spec) {
     throw new Error(`kie catalogue has no ${kieModel}`);

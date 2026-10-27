@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { Ease } from '../design';
-import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
-import { addClip, setKeyframes, type OpResult } from '../timeline';
-import { FEEGA_TOKENS } from '../brand';
-import { composeHtml } from '../hyperframes/compose';
-import { setExpression } from '../expression/ops';
-import { AnimatorUnit, SelectorShape, animatorKey } from './model';
-import { addAnimator, applyPreset, PRESETS, removeAnimator, setAnimator, TEXT_PRESETS, TextPreset } from './ops';
+import { Ease } from '@feega/motion-core/motion/design';
+import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { setExpression } from '@feega/motion-core/motion/expression/ops';
+import { AnimatorUnit, SelectorShape, animatorKey } from '@feega/motion-core/motion/text-animators/model';
+import { addAnimator, applyPreset, PRESETS, removeAnimator, setAnimator, TEXT_PRESETS, TextPreset } from '@feega/motion-core/motion/text-animators/ops';
 import { restLook, startLook } from './preset-preview';
-import { selection, splitText, unitPositions } from './split';
+import { selection, splitText, unitPositions } from '@feega/motion-core/motion/text-animators/split';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {

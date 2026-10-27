@@ -145,6 +145,19 @@ describe('canvas_tool does what the canvas UI does', () => {
     expect(body.error).toBe('node_not_found');
   });
 
+  it('set_node_color tags the node, null clears it, an unknown colour is refused', async () => {
+    const { calls } = seed();
+
+    const tagged = await call('set_node_color', { nodeId: SOURCE, color: 'red' });
+    const cleared = await call('set_node_color', { nodeId: SOURCE, color: null });
+    const bad = await call('set_node_color', { nodeId: SOURCE, color: 'plaid' });
+
+    expect(tagged.body.outcome).toBe('written');
+    expect(cleared.body.outcome).toBe('written');
+    expect(JSON.stringify(updatesOf(calls, 'nodes').map((c) => c.payload))).toContain('"colorTag":"red"');
+    expect(bad.status).toBeGreaterThanOrEqual(400);
+  });
+
   it('share_canvas mints a view-only link and revokes it', async () => {
     seed();
 

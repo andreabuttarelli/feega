@@ -3,7 +3,7 @@ import { env } from '../_shims/env-private';
 import { createE2eSession, teardownE2eSession } from '../../tests/e2e/fixtures/session';
 import { designLayout } from '$lib/server/layouts/design';
 import { Outcome } from '$lib/server/repos/effects';
-import { bakeComposition, type CompositionProps } from '$lib/motion/hyperframes/composition';
+import { bakeComposition, type CompositionProps } from '@feega/motion-core/motion/hyperframes/composition';
 
 const PROMPT = 'twelve cards on a slowly turning ring that bobs up and down';
 const MISSING_TABLE = new Set(['42P01', 'PGRST205']);

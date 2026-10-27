@@ -1,3 +1,4 @@
+import { withScenes } from '$lib/canvas/scene-sources';
 import type { Db } from '$lib/server/db/client';
 import { findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findProjectById, type Project } from '$lib/server/repos/projects';
@@ -5,7 +6,7 @@ import { readHead } from '$lib/server/repos/motion-revisions';
 import { motionOf, type MotionNode } from '$lib/canvas/motion-node';
 import { embedUrl, interactiveBundle, BUNDLE_FILE } from '$lib/motion/interactive/bundle';
 import { embedSnippets } from '$lib/motion/interactive/loader';
-import type { MotionDoc } from '$lib/motion/doc';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { assetUrls, newHead, motionAssets, motionTokens, type AssetSigner } from './editor';
 import { embedPublished, isRefused, publishEmbed, removeEmbed } from './embed';
 import { libsOrigin } from './libs-origin';
@@ -65,7 +66,12 @@ export async function savedMotion(db: Db, scope: Scope): Promise<Saved | null> {
 async function bundleInput(db: Db, scope: PublishScope, saved: Saved) {
   const assets = await motionAssets({ db, orgId: scope.orgId, projectId: saved.project.id, canvasId: saved.record.canvasId, sign: scope.sign });
   const tokens = await motionTokens(db, { orgId: scope.orgId, brandId: saved.project.brandId });
-  return { doc: saved.doc, tokens, assetUrls: assetUrls(assets), title: saved.record.displayName ?? 'feega', fetchBlob };
+  const sceneHead = async (nodeId: string) => {
+    const head = await readHead(db, { orgId: scope.orgId, nodeId });
+    return head ? { doc: head.doc, assets: {} } : null;
+  };
+  const { doc } = await withScenes({ doc: saved.doc, assets: {} }, sceneHead);
+  return { doc, tokens, assetUrls: assetUrls(assets), title: saved.record.displayName ?? 'feega', fetchBlob };
 }
 
 export async function publishMotionEmbed(db: Db, scope: PublishScope, origin: string): Promise<EmbedAnswer> {

@@ -3,12 +3,12 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**52 tool** — 21 in lettura, 25 in scrittura, 6 che distruggono.
-Il payload di `tools/list` pesa **56.658 caratteri**, circa **14.165 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**69 tool** — 27 in lettura, 35 in scrittura, 7 che distruggono.
+Una sessione nuova ne lista 10 (`query`, `view`, `edit`, `describe`, `render_video`, `get_render`, `list_orgs`, `find_tools`, `load_tools`, `unload_tools`): `tools/list` pesa **3690 caratteri**, circa **923 token**. Gli altri si caricano con `find_tools`/`load_tools` o si chiamano via `edit` {op, input}; tutti insieme peserebbero 69.149 caratteri.
 
 | gruppo | tool |
 |---|---:|
-| Altro | 24 |
+| Altro | 41 |
 | Video motion | 16 |
 | Accesso diretto al database | 5 |
 | Nodi e generazione | 4 |
@@ -30,11 +30,25 @@ Applies one effect or a chain (`list_effects`) and lands the result as a new ass
 | `node_id` | string |  |
 | `effects`? | object[] |  |
 
+### `canvas_file` · W
+
+*Save a canvas to a .feega file, or import one*
+
+A canvas as a local .feega file, to carry work from a local feega to feega.app. save {project_id, canvas_id, path}: writes it (path = file or folder). import {project_id, path}: opens it as a new canvas. Free.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `action` | `save` \| `import` |  |
+| `project_id` | string |  |
+| `canvas_id`? | string | The canvas to save; required for save. |
+| `path` | string | Where to write the file (save) or the file to read (import). |
+
 ### `canvas_tool` · D
 
 *Work a project canvas*
 
-Deprecated, use `edit`. The canvas ops of the project chat, on one project (`project_id`), with `input` in camelCase. First call op "describe" with {} for every op with one line, or {op} for its strict JSON input schema. Frames and stills: draw_frame, then edit inside with motion_tool. Reads: list_canvases {}, estimate_text_cost {canvasId,nodeId,prompt?,model?} (token estimate of a text run), suggest_next_steps {canvasId,nodeId}, list_nodes {canvasId}, canvas_snapshot {canvasId} (nodes, connections, runs, products, socialPosts, influencers, revision), canvas_revision {canvasId} (live revision, or canvas/project gone), list_runs {nodeId}, list_models {medium} (models this project can run: provider, credits, uncensored, and routes[] — one per provider that serves it, for run_node provider), preview_node_loop {nodeId}, preview_run_graph {graph:"downstream",nodeId} | {graph:"stale",canvasId,nodeIds?} (ordered steps + credits: quote before run_graph). Writes, free: create_node {canvasId,type,x,y,displayName?,data?} (data per describe_node_types), update_node {nodeId,data} (only changed fields, null removes), move_node {nodeId,x,y,z?}, resize_node {nodeId,width,height}, rename_node {nodeId,name} (empty = default name), connect_nodes {canvasId,sourceNodeId,targetNodeId,sourceHandle?,targetHandle?} (a frame takes no inputs: use place_in_frame), delete_node {nodeId} (soft, drops its lines), cancel_node_loop {nodeId}, duplicate_nodes {canvasId,nodeIds}, write_nodes {canvasId,items:[{node_id,version,patch}]} (merge each patch, per-node written|conflict|not_found), paste_nodes {canvasId,nodes:[{type,data,x,y}],edges?:[{sourceIndex,targetIndex,sourceHandle?,targetHandle?}]}, list_connections {canvasId}, disconnect_nodes {connectionId}, set_edge_mode {connectionId,mode:fixed|iterate}, undo_gesture {canvasId,items} (replay a recorded gesture inverse; refused when the canvas moved on), run_demo {canvasId} (first-run example chain), end_onboarding {status:dismissed|completed}, create_canvas {}, rename_canvas {canvasId,name}, delete_canvas {canvasId}, rename_project {name}, share_canvas {canvasId,on} (view-only link), share_doc {nodeId,on}, list_templates {}, insert_template {canvasId,templateId,x,y}, add_frame_from_template {canvasId,templateId,format?,values?,x,y}, move_frame_element {frameId,elementId,toFrameId?,x?,y?,canvasX?,canvasY?}, copy_frame_element {same input as move_frame_element; copies, the source keeps the element}, create_formats {frameId,targets:[{format:1:1|4:5|9:16|16:9}|{size:{width,height}}]} (editable copies of a frame in other formats, content refitted, placed to its right), export_selection {frameIds?,elements?:[{frameId,elementId}],rows:[{format:png|jpg|webp|svg|pdf|lottie|dotlottie,by:scale|width|height,value,suffix?,quality?,transparent?}],name?} (one file or a zip; a pdf row is one file, a page per frame; svg/pdf are true vector, with shapes as paths and text as outlines; lottie (.json) and dotlottie (.lottie) are the frame animation, up to 30 s, text as shapes, no browser needed; answers url, and skipped = what a vector or Lottie file could not draw), place_in_frame {nodeId,toFrameId?,x?,y?}, draw_frame {canvasId,x,y,w,h?,format?,still?} (an empty frame, like the frame tool; a preset format sets h from w; still? = seconds to keep, making it a still graphic such as a post or poster), draw_element {canvasId,drawn:{tool:text|rectangle|ellipse,box:{left,top,width,height}}|{tool:pen,path}} (a free Text/Box/Ellipse/Path on the canvas, outside any frame), group_elements {canvasId,nodeIds} (2+ free elements into one Group), ungroup_element {canvasId,nodeId}, rotate_group {canvasId,nodeId,degrees} (turns the Group and its members around its centre), move_group {canvasId,nodeId,x,y} (moves the Group and its members), scale_group {canvasId,nodeId,width,height} (resizes the Group and scales its members), show_run {nodeId,runId} (show an older result), sync_node {nodeId} (products, social feed), preview_workflow {canvasId,nodeIds}, cancel_workflow {workflowId}, cancel_render {nodeId}, withdraw_from_gallery {itemId}. Upload a file into a new node: request_upload {fileName,mimeType,bytes} (checked like the canvas upload: image/document 4MB, video 200MB) answers path + uploadUrl; PUT the bytes there with the Content-Type, then register_upload {canvasId,path,fileName,mimeType,bytes,x?,y?} answers node + asset. Copy a picture or video from a link into the project library: import_link {url} answers asset (use its id in a media prop; a raw link does not render in frames). Custom voices: list_voices {}, voice_library {search?,language?,gender?,accent?,useCase?,page?}, use_library_voice {ownerId,voiceId,name}, save_voice {generatedVoiceId,name,description?}, delete_voice {id}. Spends credits: run_node {nodeId,medium,prompt?,model?,params?,provider?,expectedVersion}, run_node_loop {nodeId,confirm?}, retry_loop_combination {nodeId,outputListNodeId,label,runId?}, run_workflow {canvasId,nodeIds}, run_graph (same input as preview_run_graph; queued, each step after its inputs; cycles refused), design_voice {description} (previews to save_voice), read_video_reference {assetId} (a video asset into transcript, scenes with durations, on-screen text, UI, camera, transitions, pacing, palette, type; spends only on the first read), clone_voice {name,consentBasis:own_voice|consented_speaker,speaker?,attested:true,seconds:60-180,sampleBase64 (max 3MB),mimeType?} (only with the user's consent). Unknown op answers the list; bad input answers the issues.
+Deprecated, use `edit`. The canvas ops of the project chat, on one project (`project_id`), with `input` in camelCase. First call op "describe" with {} for every op with one line, or {op} for its strict JSON input schema. Frames and stills: draw_frame, then edit inside with motion_tool. Reads: list_canvases {}, estimate_text_cost {canvasId,nodeId,prompt?,model?} (token estimate of a text run), suggest_next_steps {canvasId,nodeId}, list_nodes {canvasId}, canvas_snapshot {canvasId} (nodes, connections, runs, products, socialPosts, influencers, revision), canvas_revision {canvasId} (live revision, or canvas/project gone), list_runs {nodeId}, list_models {medium} (models this project can run: provider, credits, uncensored, and routes[] — one per provider that serves it, for run_node provider), preview_node_loop {nodeId}, preview_run_graph {graph:"downstream",nodeId} | {graph:"stale",canvasId,nodeIds?} (ordered steps + credits: quote before run_graph). Writes, free: create_node {canvasId,type,x,y,displayName?,data?} (data per describe_node_types), update_node {nodeId,data} (only changed fields, null removes), move_node {nodeId,x,y,z?}, resize_node {nodeId,width,height}, rename_node {nodeId,name} (empty = default name), set_node_color {nodeId,color: red|orange|yellow|green|blue|purple|grey|null}, connect_nodes {canvasId,sourceNodeId,targetNodeId,sourceHandle?,targetHandle?} (a frame takes no inputs: use place_in_frame), delete_node {nodeId} (soft, drops its lines), cancel_node_loop {nodeId}, cancel_run {nodeId} (stop one running generation), duplicate_nodes {canvasId,nodeIds}, layers_to_frame {nodeId} (a split image into a frame of image elements), write_nodes {canvasId,items:[{node_id,version,patch}]} (merge each patch, per-node written|conflict|not_found), paste_nodes {canvasId,nodes:[{type,data,x,y}],edges?:[{sourceIndex,targetIndex,sourceHandle?,targetHandle?}]}, list_connections {canvasId}, disconnect_nodes {connectionId}, set_edge_mode {connectionId,mode:fixed|iterate}, undo_gesture {canvasId,items} (replay a recorded gesture inverse; refused when the canvas moved on), undo_last {canvasId} (revert your last write on the canvas, with those made in the same instant; moves are not recorded), align_nodes {canvasId,nodeIds,edge: left|center|right|top|middle|bottom}, distribute_nodes {canvasId,nodeIds (3+),axis: x|y} (equal gaps, outer two stay), tidy_nodes {canvasId,nodeIds} (untangle overlaps), stack_nodes {canvasId,nodeIds,gap?} (row or column), run_demo {canvasId} (first-run example chain), end_onboarding {status:dismissed|completed}, create_canvas {}, rename_canvas {canvasId,name}, delete_canvas {canvasId}, rename_project {name}, share_canvas {canvasId,on} (view-only link), share_doc {nodeId,on}, list_templates {}, insert_template {canvasId,templateId,x,y}, list_techniques {} (saved flows of the workspace with their input and output slots), save_technique {canvasId,nodeIds,name} (package a connected selection, 2+ nodes, as a reusable technique), place_technique {canvasId,techniqueId,x,y} (a live node that references the technique: editing the technique updates it), run_technique_node {nodeId} (runs the saved graph of the technique with the texts wired into the node; spends credits), detach_technique {canvasId,nodeId} (swaps the node for a copy of the graph), open_technique {techniqueId} (writes the graph on its own canvas to edit; save_technique with the same name bumps the version), run_technique {canvasId,techniqueId,x,y,inputs?:[{node,value}],run?} (places a copy of the flow, sets the prompt of each input slot, runs the inner graph; run:false only places it), delete_technique {techniqueId}, add_frame_from_template {canvasId,templateId,format?,values?,x,y}, move_frame_element {frameId,elementId,toFrameId?,x?,y?,canvasX?,canvasY?}, copy_frame_element {same input as move_frame_element; copies, the source keeps the element}, create_formats {frameId,targets:[{format:1:1|4:5|9:16|16:9}|{size:{width,height}}]} (editable copies of a frame in other formats, content refitted, placed to its right), export_selection {frameIds?,elements?:[{frameId,elementId}],rows:[{format:png|jpg|webp|svg|pdf|lottie|dotlottie,by:scale|width|height,value,suffix?,quality?,transparent?}],name?} (one file or a zip; a pdf row is one file, a page per frame; svg/pdf are true vector, with shapes as paths and text as outlines; lottie (.json) and dotlottie (.lottie) are the frame animation, up to 30 s, text as shapes, no browser needed; answers url, and skipped = what a vector or Lottie file could not draw), place_in_frame {nodeId,toFrameId?,x?,y?}, list_figma_frames {url} (the frames of a figma.com file; needs the Figma token saved in Settings), import_figma {canvasId,url,frameIds?,x,y} (draws Figma frames with layers, auto layout and images; a node-id in the link picks the frame when frameIds is left out), draw_frame {canvasId,x,y,w,h?,format?,still?} (an empty frame, like the frame tool; a preset format sets h from w; still? = seconds to keep, making it a still graphic such as a post or poster), draw_element {canvasId,drawn:{tool:text|rectangle|ellipse,box:{left,top,width,height}}|{tool:pen,path}} (a free Text/Box/Ellipse/Path on the canvas, outside any frame), group_elements {canvasId,nodeIds} (2+ free elements into one Group), ungroup_element {canvasId,nodeId}, rotate_group {canvasId,nodeId,degrees} (turns the Group and its members around its centre), move_group {canvasId,nodeId,x,y} (moves the Group and its members), scale_group {canvasId,nodeId,width,height} (resizes the Group and scales its members), show_run {nodeId,runId} (show an older result), sync_node {nodeId} (products, social feed), preview_workflow {canvasId,nodeIds}, cancel_workflow {workflowId}, cancel_render {nodeId}, withdraw_from_gallery {itemId}. Upload a file into a new node: request_upload {fileName,mimeType,bytes} (checked like the canvas upload: image/document 4MB, video 200MB) answers path + uploadUrl; PUT the bytes there with the Content-Type, then register_upload {canvasId,path,fileName,mimeType,bytes,x?,y?} answers node + asset. Copy a picture or video from a link into the project library: import_link {url} answers asset (use its id in a media prop; a raw link does not render in frames). Custom voices: list_voices {}, voice_library {search?,language?,gender?,accent?,useCase?,page?}, use_library_voice {ownerId,voiceId,name}, save_voice {generatedVoiceId,name,description?}, delete_voice {id}. Spends credits: run_node {nodeId,medium,prompt?,model?,params?,provider?,expectedVersion}, image_tool {nodeId,tool:remove_background|upscale|split_layers|inpaint|outpaint,factor?:2|4,prompt?,mask?,extend?} (upscale 2x or 4x; split_layers makes base + layers kept on the node; inpaint repaints a mask of strokes/regions as fractions, needs prompt and mask; outpaint grows sides by extend {left,top,right,bottom} fractions, needs prompt), run_node_loop {nodeId,confirm?}, retry_loop_combination {nodeId,outputListNodeId,label,runId?}, run_workflow {canvasId,nodeIds}, run_graph (same input as preview_run_graph; queued, each step after its inputs; cycles refused), design_voice {description} (previews to save_voice), read_video_reference {assetId} (a video asset into transcript, scenes with durations, on-screen text, UI, camera, transitions, pacing, palette, type; spends only on the first read), clone_voice {name,consentBasis:own_voice|consented_speaker,speaker?,attested:true,seconds:60-180,sampleBase64 (max 3MB),mimeType?} (only with the user's consent). Unknown op answers the list; bad input answers the issues.
 
 | campo | tipo | |
 |---|---|---|
@@ -43,16 +57,29 @@ Deprecated, use `edit`. The canvas ops of the project chat, on one project (`pro
 | `op` | string |  |
 | `input`? | object |  |
 
+### `describe` · R
+
+
+Families, op names, or exact input schemas.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `family`? | `canvas` \| `frame` \| `editor` |  |
+| `op`? | string |  |
+| `ops`? | string[] |  |
+
 ### `edit` · D
 
 *Edit the canvas and its frames*
 
-The one way to change a canvas: nodes, free elements, frames and what is inside a frame. You never pick an endpoint, the server routes by `op`. Call op "describe" first: {} lists every op (name, family canvas|frame|editor, access, one line); {op} or {ops:[...]} give strict JSON input schemas; {schemas:true} gives all of them (large). One op: {op, target?, element?, input?, version?, project_id?}. `target` = the node or frame id the op acts on (a frame op requires it); `element` = an element id inside that frame; they fill the id fields of the op's input (nodeId, frameId, elementId, clip_id, clip_ids) unless you set them. `project_id` is needed by a canvas op without a `target`. Batch: op "batch" with `ops:[{op,target?,element?,input?},...]` (up to 500), canvas and frame ops mixed, run in order. Consecutive ops on the same frame are ONE revision, all or none. Across steps nothing is atomic: it stops at the first failure and answers `applied` (steps done), `failed` (index) and each step's result; earlier steps stay. A later step cannot use an id created by an earlier one: create first, then batch. In a frame: element ids come from `view` canvas_summary/get; move or restyle with set_props/set_transform; `version` refuses a stale write. Free canvas element or node: move_node, resize_node, rename_node, update_node, delete_node. Between frames: move_frame_element. Names shared by two registries: the canvas op keeps the name, the frame tool becomes `frame_<name>`, the editor action `editor_<name>` (e.g. list_templates = canvas, frame_list_templates). Spending ops (run_node, generate_voiceover...) are marked access "spend" in describe and need credits. Errors answer the reason, with `fix` when known.
+The one way to change a canvas: nodes, free elements, frames and what is inside a frame. You never pick an endpoint, the server routes by `op`. Op "describe": {} gives the three families (canvas|frame|editor) with counts; {family} its op names, access (read|write|spend|editor) and one line; {op} or {ops:[...]} strict JSON input schemas. One op: {op, target?, element?, input?, version?, project_id?}. `target` = the node or frame id the op acts on (a frame op requires it); `element` = an element id inside that frame; they fill the id fields of the op's input (nodeId, frameId, elementId, clip_id, clip_ids) unless you set them. `project_id` is needed by a canvas op without a `target`. Batch: op "batch" with `ops:[{op,target?,element?,input?},...]` (up to 500), canvas and frame ops mixed, run in order. Consecutive ops on the same frame are ONE revision, all or none. Across steps nothing is atomic: it stops at the first failure and answers `applied` (steps done), `failed` (index) and each step's result; earlier steps stay. A later step cannot use an id created by an earlier one: create first, then batch. In a frame: element ids come from `view` canvas_summary/get; move or restyle with set_props/set_transform; `version` refuses a stale write. Free canvas element or node: move_node, resize_node, rename_node, update_node, delete_node. Between frames: move_frame_element. Names shared by two registries: the canvas op keeps the name, the frame tool becomes `frame_<name>`, the editor action `editor_<name>` (e.g. list_templates = canvas, frame_list_templates). Access in describe: read and write are free, spend costs credits (run_node, generate_voiceover), editor needs a chat turn in the app (recreate_ui, add_music). Errors answer the reason, with `fix` when known.
 
 | campo | tipo | |
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. |
 | `project_id`? | string |  |
+| `verbose`? | boolean | Whole documents back, not ids and changed fields. |
 | `ops`? | object[] |  |
 | `op`? | string | An op name from `describe`. |
 | `target`? | string | Id of the node or frame the op acts on. |
@@ -85,6 +112,17 @@ Rewrites a brief into the SHAPE the model you are about to render with wants —
 | `prompt` | string |  |
 | `model` | string |  |
 | `shot_mode`? | `hero` \| `flat-lay` \| `on-model` \| `close-up` \| `lifestyle` \| `studio` |  |
+
+### `find_tools` · R
+
+
+Search tools and ops by keywords.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `query`? | string |  |
+| `family`? | `canvas` \| `frame` \| `editor` \| `motion` \| `templates` \| `storyboard` \| `generation` \| `effects` \| `data` \| `gallery` \| `layouts` \| `team` \| `legacy` |  |
 
 ### `forget_app_account` · D
 
@@ -123,7 +161,7 @@ View the image, video, audio, 3D model or text a node holds, a generation run pr
 
 *Read a render*
 
-State of a `render_video` run: `status` (running, done, failed, expired), `mode`, and when done `asset_id` and a signed `file_url` valid one hour. Reads only.
+State of a `render_video` run: `status` (running, done, failed, expired), and when done `asset_id` and a signed `file_url` valid one hour; `error` when failed. Reads only.
 
 | campo | tipo | |
 |---|---|---|
@@ -189,6 +227,16 @@ Members with role, pending invites and whether the invite link is on, for `org_i
 |---|---|---|
 | `org_id`? | string |  |
 
+### `load_tools` · R
+
+
+Add tools to this session list.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `names` | string[] |  |
+
 ### `make_effects_pair` · W
 
 *Make a shape cutout A/B pair*
@@ -199,6 +247,18 @@ For an `effects` node with a `shape-cutout` step: creates its twin (same shapes 
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
+
+### `model_allowlist` · W
+
+*Read or set the models an org allows*
+
+Which image, video and 3D models the org offers. Without `medium` it reads: ids per medium, an empty list meaning every model. With `medium` (image, video, model3d) and `model_ids` it replaces that medium list, admins only and only when the user asks; an empty `model_ids` allows every model again. Free.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `medium`? | `image` \| `video` \| `model3d` |  |
+| `model_ids`? | string[] |  |
 
 ### `patch_effect` · W
 
@@ -231,7 +291,7 @@ Replaces the spec of a custom layout at its `version` (`list_layouts`); a stale 
 
 *Render a frame*
 
-Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link (expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file to the project. Show the link to the user. `mode: "server"` renders on the farm, the same path and credit gate as the editor Render button; while server rendering is closed for everyone it answers 403 `server_render_unavailable`. A live component (a game or generative piece) cannot be seeked: the video shows a still of it; publish it as an embed instead. Poll `get_render` with the `run_id` for the file.
+Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link (expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file to the project. Show the link to the user. With no user, open `headless_url` in any headless Chromium: it starts with no click; keep it open until `get_render` says done. `mode: "server"` renders on the farm, the same path and credit gate as the editor Render button; while server rendering is closed for everyone it answers 403 `server_render_unavailable`. A live component (a game or generative piece) cannot be seeked: the video shows a still of it; publish it as an embed instead. Poll `get_render` with the `run_id` for the file.
 
 | campo | tipo | |
 |---|---|---|
@@ -243,6 +303,137 @@ Render the saved revision of a motion video to MP4. Default `mode: "browser"`: f
 | `quality`? | `standard` \| `high` \| `max` |  |
 | `fps`? | number \| number \| number \| number \| number \| number | 120 renders on our servers only |
 | `gif`? | object | format gif only: loop forever (default), once or boomerang; fps 8-30 (15); width 64-1920 px (640); the video can be up to 30 s |
+
+### `spend_caps` · W
+
+*Read or set the spend caps of an org*
+
+The spend caps of the org. Without `scope` it reads them. With `scope` (org_member: each member anywhere; project_member: each member in `project_id`; project_total: the project as a whole) and `cap_usd` it sets one, admins only and only when the user asks; `cap_usd` null removes it. `reset` is none or monthly. A run refused by a cap answers with the error `cap_reached`. Free.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string |  |
+| `scope`? | `org_member` \| `project_member` \| `project_total` |  |
+| `project_id`? | string |  |
+| `cap_usd`? | number \| null |  |
+| `reset`? | `none` \| `monthly` |  |
+
+### `studio_approve` · W
+
+*Approve a photo studio item*
+
+Approves the first of `item_ids` in a Photo studio batch. Free. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_cancel` · D
+
+*Cancel a photo studio batch*
+
+Stops the items of a Photo studio batch still queued; finished ones stay. Returns how many it stopped. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_more` · W
+
+*Add photo studio variations*
+
+Adds `variations` per cell to a Photo studio batch and renders them. Spends credits. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_quote` · R
+
+*Quote a photo studio batch*
+
+Prices a Photo studio batch before it starts: image count, credits per image and in total, skipped combinations, and a `quoteId`. Pass that `quoteId` to `studio_start`. Free, spends nothing.
+
+| campo | tipo | |
+|---|---|---|
+| `selection` | object | `{ name, productIds, modelIds?, environments, shots, variations, model, styleRefs?, noPeopleConfirmed? }`, the same selection the Photo studio page builds. |
+| `project`? | string | Which project; the most recent one when omitted. |
+
+### `studio_regenerate` · W
+
+*Regenerate photo studio items*
+
+Requeues finished `item_ids` of a Photo studio batch for a new render. Spends credits. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_reject` · W
+
+*Reject a photo studio item*
+
+Rejects the first of `item_ids` in a Photo studio batch. Free. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_retry` · W
+
+*Retry photo studio items*
+
+Requeues the failed or cancelled `item_ids` of a Photo studio batch. Spends credits. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_run` · W
+
+*Run a photo studio batch*
+
+Renders the rest of a Photo studio batch after its previews. Spends credits. Follow with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
+| `item_ids`? | string[] |  |
+| `variations`? | integer |  |
+
+### `studio_start` · W
+
+*Start a photo studio batch*
+
+Starts a Photo studio batch and spends credits. Needs the `quoteId` of `studio_quote` for the SAME selection: a changed selection or price is a 409, ask the person again with a new quote. Returns the `batchId`; follow it with `studio_status`.
+
+| campo | tipo | |
+|---|---|---|
+| `selection` | object | `{ name, productIds, modelIds?, environments, shots, variations, model, styleRefs?, noPeopleConfirmed? }`, the same selection the Photo studio page builds. |
+| `quoteId` | string |  |
+| `project`? | string | Which project; the most recent one when omitted. |
+
+### `studio_status` · R
+
+*Photo studio batch status*
+
+The items of a Photo studio batch and their state. Free, reads only.
+
+| campo | tipo | |
+|---|---|---|
+| `batch_id` | string |  |
 
 ### `team_op` · W
 
@@ -259,6 +450,15 @@ One organisation or team change, only when the user asks; `org_id` defaults to t
 | `role`? | `admin` \| `member` \| `viewer` |  |
 | `invite_id`? | string |  |
 | `user_id`? | string |  |
+
+### `unload_tools` · R
+
+
+Drop loaded tools.
+
+| campo | tipo | |
+|---|---|---|
+| `names` | string[] |  |
 
 ### `view` · R
 
@@ -543,12 +743,13 @@ Add ONE row to any table in your org. `org_id` is filled in for you; naming a di
 | `org`? | string | Which org, if you belong to more than one. Omit to use the default. |
 | `table` | string |  |
 | `values` | object |  |
+| `verbose`? | boolean | Whole row back, not id and changed fields. |
 
 ### `query` · R
 
 *Query the database*
 
-READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts, ads, products, social accounts — every table, scoped to your org and nothing else. No SQL: name a table, columns and filters, and it issues one PostgREST read. Omit `table` to list every name. A project has no brand until one is attached (`projects.brand_id` is nullable, and that is the normal case). A canvas belongs to a project; nodes and their connections belong to a canvas. A post (`posts` table) is the promoted artifact — caption, media, brand — different from a node, which is raw canvas material; `post_sources` links a post back to the nodes it came from. Free.
+READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts, ads, products, social accounts — every table, scoped to your org and nothing else. No SQL: name a table, columns and `where` filters, and it issues one PostgREST read. Omit `table` to list every name. A project has no brand until one is attached (`projects.brand_id` is nullable, and that is the normal case). A canvas belongs to a project; nodes and their connections belong to a canvas. A post (`posts` table) is the promoted artifact — caption, media, brand — different from a node, which is raw canvas material; `post_sources` links a post back to the nodes it came from. Free.
 
 | campo | tipo | |
 |---|---|---|
@@ -559,6 +760,8 @@ READ ANYTHING in your org: projects, canvases, nodes, connections, assets, posts
 | `order`? | object \| array |  |
 | `embed`? | object[] |  |
 | `offset`? | integer |  |
+| `cursor`? | string | `next_cursor` of the previous page. |
+| `verbose`? | boolean | Long values whole, bigger page. |
 | `count`? | `estimated` \| `exact` |  |
 | `limit`? | integer |  |
 
@@ -574,14 +777,15 @@ Change columns on rows that already exist in your org. Only the columns you send
 | `table` | string |  |
 | `where` | object[] |  |
 | `values` | object |  |
+| `verbose`? | boolean | Whole rows back, not ids and changed fields. |
 
 ## Nodi e generazione
 
 ### `cancel_node_loop` · W
 
-*Cancel a queued loop*
+*Cancel a queued loop or variant batch*
 
-Stops the combinations still queued for this node — the ones a tick has already claimed finish regardless, and anything already produced stays in the output list. Returns how many combinations it actually stopped.
+Stops the combinations still queued for this node — the ones a tick has already claimed finish regardless, and anything already produced stays in the output list. It also stops the runs still pending of a `run_node_generation` variant batch started from this node. Returns how many runs it actually stopped.
 
 | campo | tipo | |
 |---|---|---|
@@ -603,12 +807,14 @@ How many combinations `run_node_loop` would queue on this node right now, and wh
 
 *Generate a node's content*
 
-Generate into an existing canvas node — text, image, video, audio or model3d. This is the same engine the canvas Generate button calls; it never creates a node (`insert_row` does that). `medium` MUST match the node's own type, or the call is refused before anything is spent. Pass `version` as the node's current `nodes.version`: a stale value comes back `conflict` (never a silent overwrite) — re-read the node and retry with the fresh version. A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on the run, and the render lands later, asynchronously — the node stays `running` until a later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. An `audio` node runs one ElevenLabs operation set in `params.operation` (see `audio_operations` in `describe_node_types`); `describe_node_types` with `type: audio` also lists the voices. Audio `dubbing` is queued like a video. A `model3d` node turns ONE connected image into a GLB 3D model on a `wiro/` image-to-3D model. With no image but a prompt or connected text, it first draws a white-background product shot on the cheapest image model (billed too), then models that; with neither it is refused. Settings go in `params` (Trellis/Pixal3D `pipeline_type`, Hunyuan3D `generate_texture`). A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). Omit `model` to keep the node's own model, or the recommended balanced one for the medium when it has none (`describe_node_types` lists the recommended ones). A model the canvas does not offer is refused with the recommended alternatives; an old or weak one still runs but the result carries a `warning` naming the recommended one. Models whose id starts with `wiro/` or `higgsfield/` run on that provider and are always queued like a video, after a safety screen that refuses with a readable reason. Some models run first on a cheaper route (Kie.ai) at its price and fall back to their own provider if it fails; you are charged once. `canvas_tool` `list_models` lists ids, providers and prices. Uncensored models run only in an uncensored project, when the org owner turned them on in Settings; minors and real, identifiable people are refused regardless. An uncensored model takes NO input of any kind — no upstream connections, no picked references, no image/mask/init params — and the call is refused before anything is spent if any are present. Spends credits; a `credits_exhausted` failure means the org is out.
+Generate into an existing canvas node — text, image, video, audio or model3d. This is the same engine the canvas Generate button calls; it never creates a node (`insert_row` does that). `medium` MUST match the node's own type, or the call is refused before anything is spent. Pass `version` as the node's current `nodes.version`: a stale value comes back `conflict` (never a silent overwrite) — re-read the node and retry with the fresh version. A `video` NEVER returns finished here: it comes back `queued` with an `external_job_id` on the run, and the render lands later, asynchronously — the node stays `running` until a later tick deposits the asset. Poll the node (`query`) rather than expecting a file now. An `audio` node runs one ElevenLabs operation set in `params.operation` (see `audio_operations` in `describe_node_types`); `describe_node_types` with `type: audio` also lists the voices. Audio `dubbing` is queued like a video. A `model3d` node turns ONE connected image into a GLB 3D model on a `wiro/` image-to-3D model. With no image but a prompt or connected text, it first draws a white-background product shot on the cheapest image model (billed too), then models that; with neither it is refused. Settings go in `params` (Trellis/Pixal3D `pipeline_type`, Hunyuan3D `generate_texture`). A finished result returns `asset_ids` and `media` with `preview_url`/`full_url` (see `get_media`). Omit `model` to keep the node's own model, or the recommended balanced one for the medium when it has none (`describe_node_types` lists the recommended ones). A model the canvas does not offer is refused with the recommended alternatives; an old or weak one still runs but the result carries a `warning` naming the recommended one. Models whose id starts with `wiro/` or `higgsfield/` run on that provider and are always queued like a video, after a safety screen that refuses with a readable reason. Some models run first on a cheaper route (Kie.ai) at its price and fall back to their own provider if it fails; you are charged once. `canvas_tool` `list_models` lists ids, providers and prices. Uncensored models run only in an uncensored project, when the org owner turned them on in Settings; minors and real, identifiable people are refused regardless. An uncensored model takes NO input of any kind — no upstream connections, no picked references, no image/mask/init params — and the call is refused before anything is spent if any are present. Spends credits; a `credits_exhausted` failure means the org is out. `variants` (1, 2, 4 or 8; video up to 4) makes several results in one call and spends that many times the price of one run: `into: "nodes"` (default) creates new output nodes next to this one, wired from the same inputs, and returns their `nodeIds`; `into: "history"` lands every result in this node's own history, the last one shown. The org's model allow-list and spend caps apply to the whole batch, which is refused before anything is spent if either blocks it. `cancel_node_loop` also stops a variant batch still running on this node.
 
 | campo | tipo | |
 |---|---|---|
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
+| `variants`? | integer | 1, 2, 4 or 8 (video up to 4). Omit for one result. |
+| `into`? | `nodes` \| `history` | With variants > 1: "nodes" (default) or "history". |
 | `medium` | `text` \| `image` \| `video` \| `audio` \| `model3d` |  |
 | `prompt` | string |  |
 | `model`? | string |  |

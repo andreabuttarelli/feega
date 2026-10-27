@@ -25,4 +25,15 @@ describe('searchNodes', () => {
   it('returns nothing for an empty query', () => {
     expect(searchNodes(nodes, '  ')).toEqual([]);
   });
+
+  it('filters by colour tag, with or without words', () => {
+    const tagged = [
+      { id: 'r', type: 'text', displayName: 'One', data: { colorTag: 'red' } },
+      { id: 'b', type: 'text', displayName: 'Two', data: { colorTag: 'blue' } },
+      { id: 'n', type: 'text', displayName: 'Three', data: {} }
+    ];
+    expect(searchNodes(tagged, '', 'red').map((n) => n.id)).toEqual(['r']);
+    expect(searchNodes(tagged, 'two', 'red')).toEqual([]);
+    expect(searchNodes(tagged, 'two', 'blue').map((n) => n.id)).toEqual(['b']);
+  });
 });

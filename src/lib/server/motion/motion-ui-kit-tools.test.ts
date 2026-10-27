@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { writeComponent } from '$lib/motion/custom/ops';
 import { UI_KINDS, UI_KIT, UI_SAFE, UiKind, uiScale } from '$lib/motion/ui-kit/kit';
-import { FORMATS } from '$lib/motion/doc';
+import { FORMATS } from '@feega/motion-core/motion/doc';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession } from './motion-tools';
@@ -46,6 +46,33 @@ describe('the UI recreation kit', () => {
     expect(clip.props).toMatchObject({ name: 'UiLinkShortener', url: 'https://dub.co/blog', short: 'dub.sh/blog' });
     expect(session.doc.components.UiLinkShortener).toBeDefined();
     expect(session.codeWrites).toBe(0);
+  });
+
+  it('list_ui_kinds gives each kind its own props with type and default, before anything is placed', async () => {
+    const { run } = setup();
+
+    const listed = (await run('list_ui_kinds', { kind: UiKind.LinkShortener })) as { kinds: { kind: string; props: Record<string, { type: string; default?: unknown }> }[] };
+
+    expect(listed.kinds).toHaveLength(1);
+    expect(listed.kinds[0].props.url).toMatchObject({ type: 'string' });
+    expect(listed.kinds[0].props.radius).toMatchObject({ type: 'number', default: 0 });
+  });
+
+  it('add_ui refuses a prop of the wrong type, naming it', async () => {
+    const { run } = setup();
+
+    const added = await run('add_ui', { kind: UiKind.LinkShortener, start: 0, duration: 3, props: { radius: 'round' } });
+
+    expect(added).toMatchObject({ ok: false, error: expect.stringContaining('radius') });
+  });
+
+  it('set_props radius on a kit UI sets its own radius prop, not a shape roundness', async () => {
+    const { session, run } = setup();
+    const added = await run('add_ui', { kind: UiKind.EditorCanvas, start: 0, duration: 3 });
+    const edited = await run('set_props', { clip_id: added.clip_id, props: { radius: 18 } });
+
+    expect(edited).toMatchObject({ ok: true });
+    expect(findClip(session.doc, String(added.clip_id))!.clip.props).toMatchObject({ radius: 18 });
   });
 
   it('focus_ui frames one part of an added UI, isolated, on the timeline seconds', async () => {

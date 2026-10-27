@@ -1,4 +1,4 @@
-import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
 import type { FrameRect } from '$lib/motion/gpu/pick';
 import { keepMark, peersIn, type FrameCursor, type FrameMark, type FramePeer, type FramePresence } from '$lib/realtime/frame-presence';
 

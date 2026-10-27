@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, parseMotionDoc, findClip, type MotionDoc } from './doc';
-import { addClip, setProps, type OpResult } from './timeline';
+import { MotionFormat, newMotionDoc, parseMotionDoc, findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { setAutoLayout } from './layout/ops';
-import { VarType } from './variables-model';
+import { VarType } from '@feega/motion-core/motion/variables-model';
 import { addMode, bindVariable, bindableTargets, defineVariable, removeVariable, resolveVariables, setActiveMode, unbindVariable } from './variables';
 
 function ok(r: OpResult): MotionDoc {

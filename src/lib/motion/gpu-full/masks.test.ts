@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FEEGA_TOKENS } from '../brand';
-import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
-import { MaskKind, MaskMode, Matte, maskSchema } from '../mask';
-import { CoverKind, displayListAt, ItemKind, Unsupported, type PathItem } from './display-list';
-import { apply2d } from '../affine';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { MaskKind, MaskMode, Matte, maskSchema } from '@feega/motion-core/motion/mask';
+import { CoverKind, displayListAt, ItemKind, Unsupported, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { apply2d } from '@feega/motion-core/motion/affine';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {

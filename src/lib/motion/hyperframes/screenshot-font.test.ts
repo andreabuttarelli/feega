@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { HOSTED, Script } from '$lib/motion/libs/catalog';
+import { HOSTED, Script } from '@feega/motion-core/motion/libs/catalog';
 
 type HtmlToImage = { toSvg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string> };
 

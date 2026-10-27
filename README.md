@@ -11,50 +11,120 @@
   <a href="https://feega.app"><img src="https://img.shields.io/badge/Get_started-feega.app-c485fe?style=flat&labelColor=131313" alt="Get started on feega.app" /></a>
 </p>
 
-![feega](./docs/readme-hero.png)
+![feega: design, motion and AI on one canvas](./docs/readme-hero.gif)
 
-An open-source infinite canvas for design that moves. Frames, vector tools, animation and a
-timeline sit on one canvas; generation (text, image, video, audio, 3D) and the agent work on the same
-nodes you do, from the sidebar chat, the [CLI / MCP server](cli/), or any MCP client. Use it hosted at
-[feega.app](https://feega.app) or run it yourself.
+**feega is an open-source infinite canvas where people and AI agents design, animate and generate
+together.** You draw frames, animate them on a timeline and export them; the chat agent, the
+[`feega` CLI and MCP server](cli/) work on the same nodes you do. Use it hosted at
+[feega.app](https://feega.app) or run the whole thing on your machine.
 
-## Features
+## What you can do
 
-- Frames, shapes, text, pen and shape tools, auto layout, components
-- Keyframe animation and a timeline, exported as PNG, JPG, WebP, SVG, PDF, GIF, MP4
-- Generate text, images, video, audio and 3D on the canvas, wired together as nodes
-- A chat agent that edits the canvas, plus an MCP server and a `feega` CLI
-- Realtime multiplayer, comments, versions, organisations
+- **Design**: frames, shapes, text, pen and boolean tools, auto layout, components, paste from Figma
+- **Animate**: keyframes and a timeline; export PNG, JPG, WebP, SVG, PDF, GIF, MP4, Lottie
+- **Generate**: text, images, video, audio and 3D as canvas nodes wired together
+- **Delegate**: a chat agent, an MCP server and a CLI that read and edit the canvas
+- **Collaborate**: realtime multiplayer, comments, versions, organisations
 
-## Stack
+## Run it locally
 
-- TypeScript and SvelteKit
-- Supabase (Postgres, Auth, Storage, Realtime)
-- Node.js 22
-- MCP server and CLI in [`cli/`](cli/)
+One canvas saved in one file: no account, no database, no Docker. You need Node 22.
 
-## Run locally
+```sh
+npx feega my-canvas.feega               # http://localhost:5173
+```
 
-You need Docker (or OrbStack). With only the required settings the canvas, animation and export work;
-AI features say which key to add.
+The first run downloads the app into `~/.feega/app/`; later starts update it when a newer one exists. From a clone,
+`npm run local -- my-canvas.feega` does the same and builds the app instead (a few minutes). The file is created if it does not exist and saved
+as you work. To continue in the cloud, import it at [feega.app](https://feega.app) with
+**Import .feega**. Sharing, comments and saved versions need the cloud and say so.
+
+To generate with your own provider keys, set `KIE_API_KEY` and/or `LLM_API_KEY` (OpenRouter) in the
+environment or in `.env`: the text, image and video nodes appear, no plan or credits. Keys never
+enter the `.feega` file.
+
+## Run it locally as an agent
+
+The same command, then the [`feega` CLI or MCP server](cli/) against it. No `feega login`: they find
+the server on port 5173 and it answers as the local user. Every edit appears live in the open
+browser tab.
+
+```sh
+npx feega work.feega --no-open &                   # 1. server on http://localhost:5173
+curl -s localhost:5173/api/v1/version              # 2. {"localMode":true,…}
+feega projects && feega canvases <projectId>       # 3. the one project and its one canvas
+```
+
+From the MCP server, `edit` and `view` work on that canvas; `canvas_file` with `action: "save"`
+writes a copy wherever you ask. Stopping the server (Ctrl-C) saves the file. The server listens on
+127.0.0.1 only and refuses to start otherwise.
+
+## Self-host the full app (Docker)
+
+Accounts, organisations, realtime multiplayer, every project. You need Docker (or OrbStack).
 
 ```sh
 git clone https://github.com/andreabuttarelli/feega && cd feega/infra/compose
-docker compose up          # Supabase + schema + demo data + the app, about 5 minutes the first time
+docker compose up
 ```
 
-Open http://localhost:3000 and sign in with `demo@feega.local` / `feega-demo-2026` (printed by the
-`migrate` service).
+Open http://localhost:3000 and sign in with `demo@feega.local` / `feega-demo-2026`.
 
-Developing the app instead of running the image:
+Non-interactive, with a check at the end, from the repository root:
+
+```sh
+docker info > /dev/null                                   # 1. Docker is running, or stop here
+(cd infra/compose && docker compose up -d --wait)         # 2. Supabase + schema + demo data + app
+npm ci && npx playwright install chromium && npm run smoke:selfhost   # 3. must exit 0
+```
+
+Step 2 pulls the prebuilt app image `ghcr.io/andreabuttarelli/feega` and starts in about a minute.
+`--wait` returns 0 only after the one-shot `migrate` service exits 0 (schema applied, demo user and
+canvas seeded) and the app is healthy. Without that image (a fork, or `APP_IMAGE` pointing at a
+tag that does not exist) compose builds it from source instead: about 28 minutes on a 7.7 GB Docker
+VM, and it can run out of memory if other containers hold that memory. Give Docker 8 GB or more,
+or stop other stacks. To rebuild from your checkout: `docker compose up -d --wait --build`.
+
+Step 3 needs Node 22. It signs in as the demo user, opens the demo canvas, draws a shape, animates
+it and exports a PNG; screenshots land in the current directory. If the app is not on port 3000,
+set `PUBLIC_APP_URL` to match.
+
+| | |
+|---|---|
+| App | http://localhost:3000 |
+| Supabase API | http://localhost:8000 |
+| Postgres | `localhost:5432`, password in `infra/compose/.env` |
+| Login | `demo@feega.local` / `feega-demo-2026` |
+| Stop / reset | `docker compose down` / `docker compose down -v` |
+
+To work on the code instead of the image, use the Supabase CLI:
 
 ```sh
 supabase start && npm ci && npm run setup && npm run dev    # http://localhost:5173
 ```
 
-Optional keys (AI providers, Stripe, Sentry, email) are listed by feature in
-[`.env.example`](.env.example). Nothing is credit-gated: `BILLING_PROVIDER=open`. Full guide, limits
-and timings: [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
+`npm run setup` is idempotent: it writes `.env` from the running stack, applies the schema and seeds
+the demo user. The CLI and MCP server find a dev server on port 5173 by themselves; for the Docker
+app set `PUBLIC_APP_URL=http://localhost:3000`. Connecting an agent:
+[`docs/agents-quickstart.md`](docs/agents-quickstart.md).
+
+When something fails:
+
+| Signal | Fix |
+|---|---|
+| First `docker compose up` failed, every later one fails too | `docker compose down -v`, then start again |
+| macOS: the database container hangs with no error | clone outside `~/Documents`, `~/Desktop`, `~/Downloads`, or grant Docker access to that folder |
+| Port 3000, 8000 or 5432 taken | in `infra/compose/.env` set `APP_PORT`, `KONG_HTTP_PORT`, `POSTGRES_PORT`, and the URLs that carry them (`PUBLIC_APP_URL`, `SITE_URL`, `SUPABASE_PUBLIC_URL`, `API_EXTERNAL_URL` ending in `/auth/v1`); for the dev server or `npm run dev -- --port 5301` with `PUBLIC_APP_URL` set to match |
+| AI feature answers "Add … to .env" | add that key; the list by feature is in [`.env.example`](.env.example) |
+
+Nothing is credit-gated (`BILLING_PROVIDER=open`). Full guide, limits and timings:
+[`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
+
+## Stack
+
+TypeScript, SvelteKit, Supabase (Postgres, Auth, Storage, Realtime), Node.js 22, a WebGPU canvas
+with a WebGL fallback. The marketing site (feega.app) is a separate SvelteKit project in
+`landing/`: `npm --prefix landing ci && npm --prefix landing run dev`.
 
 ## Contributing
 

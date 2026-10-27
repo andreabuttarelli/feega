@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { nameVersion, namedRevisions } from './version-names';
 
 const scope = { orgId: 'org', nodeId: 'n' };

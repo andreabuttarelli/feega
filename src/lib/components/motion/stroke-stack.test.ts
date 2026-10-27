@@ -2,8 +2,8 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FEEGA_TOKENS } from '$lib/motion/brand';
-import { strokesSchema, type Stroke } from '$lib/motion/stroke/model';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { strokesSchema, type Stroke } from '@feega/motion-core/motion/stroke/model';
 import StrokeStack from './StrokeStack.svelte';
 
 const dir = dirname(fileURLToPath(import.meta.url));

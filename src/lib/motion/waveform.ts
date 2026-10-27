@@ -1,4 +1,4 @@
-import { FPS } from './design';
+import { FPS } from '@feega/motion-core/motion/design';
 
 export const PEAKS_PER_SECOND = FPS;
 

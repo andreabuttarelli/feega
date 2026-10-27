@@ -1,3 +1,4 @@
+import { codeVarsError } from '$lib/server/canvas/code-source';
 import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
 import type { NarrowedDatabase } from '$lib/server/db/typed-database';
@@ -202,6 +203,14 @@ export async function renameCanvas(
   return data ? toCanvas(data) : null;
 }
 
+export async function canvasProject(db: Db, input: { orgId: string; canvasId: string }): Promise<string | null> {
+  const { data, error } = await db.from('canvases').select('project_id').eq('id', input.canvasId).eq('org_id', input.orgId).is('deleted_at', null).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return data?.project_id ?? null;
+}
+
 /** Soft delete: nodi, archi e post_sources sopravvivono — un post pubblicato tiene la sua origine. */
 export async function deleteCanvas(db: Db, input: { orgId: string; canvasId: string }): Promise<void> {
   const { error } = await db
@@ -348,6 +357,7 @@ export async function createNode(
     type: string;
     x: number;
     y: number;
+    z?: number;
     displayName?: string | null;
     data?: Record<string, unknown>;
     width?: number;
@@ -369,6 +379,7 @@ export async function createNode(
     display_name: input.displayName ?? null,
     x: input.x,
     y: input.y,
+    ...(input.z === undefined ? {} : { z: input.z }),
     data: input.data ?? {},
     ...(input.width === undefined ? {} : { width: input.width }),
     ...(input.height === undefined ? {} : { height: input.height }),
@@ -572,6 +583,10 @@ export async function patchNodeData(
       const verdict = validateNodeData(before.type, data);
       if (!verdict.ok) {
         return { outcome: 'invalid', error: verdict.error };
+      }
+      const badVars = codeVarsError(before.type, data);
+      if (badVars) {
+        return { outcome: 'invalid', error: badVars };
       }
     }
 

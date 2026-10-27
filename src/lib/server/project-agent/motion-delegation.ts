@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
-import { MOTION_FORMATS, type MotionFormat } from '$lib/motion/doc';
+import { MOTION_FORMATS, type MotionFormat } from '@feega/motion-core/motion/doc';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { Preset, settingsOf } from '$lib/motion/export-formats';
 import { findMotionNode } from '$lib/server/motion/editor';
@@ -17,6 +17,7 @@ import { MAX_FRAMES_PER_VIEW } from '$lib/server/motion/frames';
 import { framePaths, framesPrefix, putFrames, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { motionEmbedState, publishMotionEmbed, type EmbedAnswer } from '$lib/server/motion/agent-embed';
+import { shareMotionFrame } from '$lib/server/motion/agent-share';
 
 const PICK_RELAY = 'The motion agent asks the user which references to follow: call ask_reference_pick with this question and these candidates (same ids) so the user picks here, then pass their answer to ask_motion_agent as reference_pick (follow and avoid ids, note; or rejected true with their query and avoid_all when they turned them all down).';
 
@@ -46,7 +47,8 @@ export const MOTION_DELEGATION_TOOLS = [
   'render_motion_video',
   'get_motion_render',
   'publish_motion_embed',
-  'get_motion_embed'
+  'get_motion_embed',
+  'share_motion_frame'
 ] as const;
 
 export type MotionDelegationDeps = { db: Db; orgId: string; projectId: string; userId: string; origin: string; model?: string; canvasId?: string | null; pollMs?: number };
@@ -267,6 +269,15 @@ export function motionRows(deps: MotionDelegationDeps): ToolRow[] {
       summary: 'Whether a motion video of THIS project is published as an embed, with its url and snippet. Free.',
       input: z.object({ nodeId: z.string() }).strict(),
       run: async (input: { nodeId: string }) => ((await inProject(input.nodeId)) ? embedBody(await motionEmbedState(db, { orgId, nodeId: input.nodeId }, deps.origin)) : NOT_FOUND)
+    },
+
+    {
+      name: 'share_motion_frame',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Write,
+      summary: 'The public viewer link of ONE frame of THIS project: a full-screen page that plays it on a loop. Publishes its embed if needed and turns the canvas share link on; returns url and embed_url. Only when the user asked to share. Free.',
+      input: z.object({ nodeId: z.string() }).strict(),
+      run: async (input: { nodeId: string }) => ((await inProject(input.nodeId)) ? embedBody(await shareMotionFrame(db, { orgId, nodeId: input.nodeId }, deps.origin)) : NOT_FOUND)
     }
   ];
 }

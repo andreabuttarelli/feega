@@ -3,8 +3,8 @@
   import { Action } from '$lib/motion/actions';
   import { onMount } from 'svelte';
   import Download from '@lucide/svelte/icons/download';
-  import type { MotionDoc } from '$lib/motion/doc';
-  import { Background, FORMATS, formatOf } from '$lib/motion/doc';
+  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { Background, FORMATS, formatOf } from '@feega/motion-core/motion/doc';
   import { Resolution } from '$lib/motion/render-quote';
   import { eta, exportSize, outputSize, type Capabilities, type ExportScope, type Size } from '$lib/motion/export-plan';
   import { audioPlan } from '$lib/motion/audio-plan';
@@ -15,15 +15,16 @@
   import { joltNote } from '$lib/motion/smoothness';
   import type { FrameSize } from './MotionPreview.svelte';
   import { liveNote, stillStandIns, unverified } from '$lib/motion/custom/determinism';
-  import { CheckState } from '$lib/motion/custom/component';
+  import { localFontNote } from '$lib/motion/fonts/local';
+  import { CheckState } from '@feega/motion-core/motion/custom/component';
   import { postPageAction } from '$lib/api/page-action';
   import { HOLD_BUFFER, renderQuote } from '$lib/motion/render-quote';
   import { EXPORT_FORMATS, ExportFormat, FORMAT, GIF_LIMITS, GifLoop, Preset, Quality, estimateBytes, exportProblem, gifOf, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
-  import { FRAME_RATES } from '$lib/motion/design';
+  import { FRAME_RATES } from '@feega/motion-core/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
   import { RenderStage, STALL_AFTER_MS, Stall, framesDone, renderStall, watchProgress, type ProgressWatch, type RenderView, type ServerRender } from '$lib/motion/server-render';
-  import type { BrandTokens } from '$lib/motion/brand';
-  import type { AudioAnalysis } from '$lib/motion/audio-analysis';
+  import type { BrandTokens } from '@feega/motion-core/motion/brand';
+  import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
   import InteractiveExport from './InteractiveExport.svelte';
   import ExportRows from './ExportRows.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
@@ -163,6 +164,7 @@
   const busy = $derived(phase === Phase.Mixing || phase === Phase.Rendering || phase === Phase.Saving);
   const blockers = $derived(unverified(doc));
   const live = $derived(stillStandIns(doc));
+  const localNote = $derived(localFontNote(doc.fonts));
   const BLOCKER_LABEL: Record<CheckState, string> = { [CheckState.Unchecked]: 'is still being checked', [CheckState.Failed]: 'failed the seek check', [CheckState.Passed]: '' };
   const hasAudio = $derived(withAudio && sounds.length > 0);
   const place = $derived(caps && device ? renderPlace({ doc: target, settings, capabilities: caps, device, background, hasAudio }) : null);
@@ -448,6 +450,7 @@
       {#if live.length}
         <p class="warn" role="alert" data-testid="export-live">{liveNote(live)}. <button type="button" class="link" onclick={() => (mode = ExportMode.Interactive)}>Embed on a website</button></p>
       {/if}
+      {#if localNote}<p class="warn" role="alert" data-testid="export-local-fonts">{localNote}</p>{/if}
 
       {#if PROGRESS_LABEL[phase]}
         <div class="progress" data-testid="export-progress">
