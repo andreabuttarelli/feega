@@ -1,0 +1,36 @@
+---
+title: Wire a free image into a generator
+description: Any image on the canvas can feed Generate image, video or text as a reference.
+sidebar:
+  order: 15
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="image-output-port" caption="Drag from a free image's green port to a Generate image node's image input." />
+
+An image that sits on the canvas, outside any frame, has a green **image** output port on its right edge, the same port a Generate image node has.
+
+## What counts as a free image
+
+- An uploaded or pasted image node.
+- An image dragged out of the asset library, a brand logo or a colour swatch.
+- A free image element: a single image placed outside a frame, for example from a Figma import.
+
+A free element with anything else in it, or with more than one layer, has no output port.
+
+## Wire it
+
+1. Drag from the green port to an image input on a generating node. Video nodes also offer **first frame** and **last frame**.
+2. The line takes the port you drop on. Dropping on the node itself picks the first image port that accepts it.
+3. Run the node. The image reaches the model as a reference, exactly like the output of another Generate image node.
+
+Private images are signed for the run; nothing is made public.
+
+## Images inside frames
+
+A layer inside a frame is not a node, so it cannot be wired. To use it as a reference, move it out of the frame onto the canvas, where it becomes a free image.
+
+## Agents
+
+`connect_nodes` accepts a free image element as `sourceNodeId`, with `targetHandle` naming the port (`images`, `first_frame`, `last_frame`). It refuses an element that holds no single image.

@@ -23,7 +23,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   undo_gesture: 'Replay the inverse of a recorded gesture; refused when the canvas moved on.',
   run_demo: 'Build the first-run example chain.',
   end_onboarding: 'Mark onboarding dismissed or completed.',
-  connect_nodes: 'Draw a line from a source node to a target node (a frame takes no inputs: use place_in_frame).',
+  connect_nodes: 'Draw a line from a source node to a target node (a frame takes no inputs: use place_in_frame; a free image element is a source, output images, refused when it holds no single image).',
   create_formats: 'Editable copies of a frame in other formats, content refitted, placed to its right.',
   combine_scenes: 'One video frame that plays the picked scene frames left to right; the scenes stay live, referenced not copied.',
   export_selection: 'Export frames or frame elements as png, jpg, webp, svg or pdf, one file or a zip; answers a url.',
