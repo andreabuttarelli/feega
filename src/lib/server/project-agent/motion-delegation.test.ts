@@ -192,6 +192,10 @@ describe('the canvas agent delegates motion videos', () => {
     expect(await call(tools().share_motion_frame, { nodeId: 'not-here' })).toMatchObject({ error: 'motion_node_not_found' });
   });
 
+  it('shares the prototype of a frame of this project only', async () => {
+    expect(await call(tools().get_play_link, { nodeId: 'not-here' })).toMatchObject({ error: 'motion_node_not_found' });
+  });
+
   it('lists the motion videos of this project', async () => {
     const out = await call(tools().list_motion_videos, {});
     expect(out.videos).toEqual([expect.objectContaining({ node_id: NODE, editor_url: `/p/${PROJECT}/c/${CANVAS}?frame=${NODE}` })]);

@@ -30,14 +30,13 @@ describe('il pannello sinistro della tela (Assets/Brands)', () => {
     expect(leftPanel).not.toMatch(/brand-agent\/AssetsPanel/);
   });
 
-  it('gli riceve il progetto e il kind, non il brand: un progetto può non averne uno', () => {
+  it('gli riceve il progetto, non il brand: un progetto può non averne uno', () => {
     expect(leftPanel).toMatch(/<ProjectDragPanel[^>]*projectId/);
-    expect(leftPanel).toMatch(/<ProjectDragPanel[^>]*kind/);
+    expect(leftPanel).toMatch(/<BrandsPanel[^>]*projectId/);
   });
 
   it('costruisce il pacchetto pieno con lo stesso builder delle pagine dedicate', () => {
     expect(panel).toMatch(/assetDrag/);
-    expect(panel).toMatch(/brandFieldDrag/);
   });
 
   it('porta entrambi i MIME al dragstart, pieno e il fallback vuoto', () => {
@@ -45,9 +44,4 @@ describe('il pannello sinistro della tela (Assets/Brands)', () => {
     expect(panel).toMatch(/CANVAS_DRAG_MEDIUM/);
   });
 
-  it('kind sceglie un pannello alla volta: assets o brands, non solo "both"', () => {
-    expect(panel).toMatch(/kind\s*=\s*'both'/);
-    expect(panel).toMatch(/showAssets/);
-    expect(panel).toMatch(/showBrands/);
-  });
 });

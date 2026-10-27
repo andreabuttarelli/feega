@@ -110,7 +110,7 @@ function windowOf(clip: MotionClip, comp: MotionComp): Window {
   return { from: clip.from, end: clipEnd(clip), offset: clip.from - clip.trimStart, length, loops: Array.from({ length: last - first }, (_, i) => first + i), held: !clip.props.loop && Boolean(clip.props.hold) };
 }
 
-function placeOne(clip: MotionClip, w: Window, k: number, prefix: string): MotionClip | null {
+function placeOne(clip: MotionClip, w: Window, k: number, prefix: string, host: string): MotionClip | null {
   const start = w.offset + k * w.length + clip.from;
   const lastFrame = w.held && clipEnd(clip) >= w.length;
   const stop = lastFrame ? Math.max(w.end, start + w.length - clip.from) : start + Math.min(clip.durationInFrames, w.length - clip.from);
@@ -123,7 +123,7 @@ function placeOne(clip: MotionClip, w: Window, k: number, prefix: string): Motio
   return {
     ...clip,
     id: `${prefix}${k}${SEPARATOR}${clip.id}`,
-    parent: clip.parent ? `${prefix}${k}${SEPARATOR}${clip.parent}` : null,
+    parent: clip.parent ? `${prefix}${k}${SEPARATOR}${clip.parent}` : host,
     from,
     durationInFrames: end - from,
     trimStart: clip.trimStart + cut,
@@ -136,10 +136,10 @@ function placeOne(clip: MotionClip, w: Window, k: number, prefix: string): Motio
 function placed(host: MotionClip, comp: MotionComp, tracks: MotionTrack[]): MotionTrack[] {
   const w = windowOf(host, comp);
   const prefix = `${host.id}${SEPARATOR}`;
-  const loopTrack = (t: MotionTrack, k: number) => ({ ...t, id: w.loops.length > 1 ? `${prefix}${k}${SEPARATOR}${t.id}` : `${prefix}${t.id}`, clips: (t.clips as MotionClip[]).flatMap((c) => placeOne(c, w, k, prefix) ?? []) });
+  const loopTrack = (t: MotionTrack, k: number) => ({ ...t, id: w.loops.length > 1 ? `${prefix}${k}${SEPARATOR}${t.id}` : `${prefix}${t.id}`, clips: (t.clips as MotionClip[]).flatMap((c) => placeOne(c, w, k, prefix, host.id) ?? []) });
   const laid = w.loops.flatMap((k) => tracks.map((t) => loopTrack(t, k)));
   const present = new Set(laid.flatMap((t) => t.clips.map((c) => c.id)));
-  return laid.map((t) => ({ ...t, clips: t.clips.map((c) => (c.parent && !present.has(c.parent) ? { ...c, parent: null } : c)) }));
+  return laid.map((t) => ({ ...t, clips: t.clips.map((c) => (c.parent && c.parent !== host.id && !present.has(c.parent) ? { ...c, parent: null } : c)) }));
 }
 
 type Overrides = Record<string, Record<string, unknown>>;

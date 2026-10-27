@@ -4,7 +4,7 @@ import { newMotionDoc, MotionFormat, type MotionClip, type MotionDoc } from '@fe
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { createComponent, instanceOf } from './main-component';
-import { defineProperty, removeProperty, resetProperty, setProperty } from './component-properties';
+import { defineProperty, instanceProperties, removeProperty, resetProperty, setPreferred, setProperty } from './component-properties';
 import { PropertyKind } from '@feega/motion-core/motion/property-resolve';
 
 const must = (r: OpResult): MotionDoc => {
@@ -64,6 +64,30 @@ describe('component properties', () => {
     expect(texts(defined)).toContain('Buy now');
     expect(texts(must(setProperty(defined, cardInstance.id, 'Content', tagComp)))).not.toContain('Buy now');
     expect(texts(must(setProperty(defined, cardInstance.id, 'Content', tagComp)))).toContain('Tag');
+  });
+
+  it('preferred swaps are listed first for the instance', () => {
+    const { doc, compId } = buttonDoc();
+    const withTag = must(addClip(doc, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Tag' } }, 'tag'));
+    const tagged = must(createComponent(withTag, ['tag'], newId, 'Tag'));
+    const tagComp = String(hostOf(tagged).find((c) => c.props.comp !== compId)!.props.comp);
+    const nested = hostOf(tagged, compId)[0];
+    const card = must(createComponent(tagged, [nested.id], newId, 'Card'));
+    const cardComp = String(hostOf(card).find((c) => c.props.comp !== tagComp)!.props.comp);
+    const cardInstance = hostOf(card, cardComp)[0];
+    const defined = must(defineProperty(card, cardComp, 'Content', { kind: PropertyKind.Swap, target: nested.id, default: compId }));
+    const preferred = must(setPreferred(defined, cardComp, 'Content', [tagComp]));
+
+    expect(instanceProperties(preferred, cardInstance.id)[0].preferred).toEqual([tagComp]);
+    expect(instanceProperties(defined, cardInstance.id)[0].preferred).toEqual([]);
+  });
+
+  it('refuses a preferred value that is not a component or a property that is not a swap', () => {
+    const { doc, compId } = buttonDoc();
+    const text = must(defineProperty(doc, compId, 'Label', { kind: PropertyKind.Text, target: 'label', default: 'Buy now' }));
+
+    expect(setPreferred(text, compId, 'Label', [compId]).ok).toBe(false);
+    expect(setPreferred(text, compId, 'Missing', [compId]).ok).toBe(false);
   });
 
   it('a nested instance property is exposed on the top instance', () => {

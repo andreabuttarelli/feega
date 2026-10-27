@@ -131,7 +131,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: var(--grey-0);
+    background: var(--ui-panel-raised);
     color: var(--ui-ink);
     font-family: var(--sans);
     --ui-ink-2: var(--ui-text-2);
@@ -150,7 +150,7 @@
     z-index: 2;
     flex: 0 0 auto;
     padding: 8px 12px 6px;
-    background: var(--grey-0);
+    background: var(--ui-panel-raised);
     border-bottom: 1px solid var(--ui-divider);
   }
 

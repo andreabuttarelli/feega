@@ -14,3 +14,4 @@ These pages are produced from the code by `npm --prefix web-docs run gen` and ne
 | [Keyboard shortcuts](/reference/generated/shortcuts/) | `src/lib/motion/shortcuts.ts` |
 | [Export formats](/reference/generated/export-formats/) | `src/lib/motion/export-formats.ts` |
 | [Changelog](/reference/generated/changelog/) | `src/lib/content/changelog/` (dated entries; the older `legacy` list is not included) |
+| [Model prices](/reference/generated/model-prices/) | the `ai_models` catalogue, the Kie price list and the audio operations, priced in credits |

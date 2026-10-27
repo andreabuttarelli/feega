@@ -34,4 +34,11 @@ describe('glyphsOf', () => {
   it('tracks by the caller\'s amount when given', () => {
     expect(glyphs('ab', 10, { tracking: 0 }).width).toBeCloseTo(10);
   });
+
+  it('lays the same text out once', () => {
+    const laid = glyphsOf(boxBook(), 'DM Sans', 400);
+
+    expect(laid('Image', 12, { width: 80 })).toBe(laid('Image', 12, { width: 80 }));
+    expect(laid('Image', 12, { width: 90 })).not.toBe(laid('Image', 12, { width: 80 }));
+  });
 });

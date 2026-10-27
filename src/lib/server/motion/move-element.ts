@@ -12,7 +12,7 @@ import { DrawTool } from '$lib/motion/draw-tool';
 import { gradientFillSchema } from '@feega/motion-core/motion/fill/model';
 import { FILL_RULES } from '@feega/motion-core/motion/shape/schema';
 import { frameShape } from './start';
-import { figmaPlan, type FigmaImage, type PlanItem } from '$lib/canvas/figma/figma-doc';
+import { figmaPlan, type FigmaImage, type FigmaPlan, type PlanItem } from '$lib/canvas/figma/figma-doc';
 import { Destination } from '$lib/canvas/figma/scene';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
@@ -579,9 +579,10 @@ const ITEM_SHAPE: Record<Destination, (item: PlanItem) => DocNodeShape> = {
 
 export async function pasteFigmaAt(store: FrameStore, place: Place, html: string, centre: Point, newId: NewId): Promise<FigmaPasteOutcome> {
   const plan = figmaPlan(html, newId);
-  if (!plan) {
-    return null;
-  }
+  return plan ? placeFigmaPlan(store, place, plan, centre) : null;
+}
+
+export async function placeFigmaPlan(store: FrameStore, place: Place, plan: FigmaPlan, centre: Point): Promise<NonNullable<FigmaPasteOutcome>> {
   const frameIds: string[] = [];
   const undo: UndoItem[] = [];
   const fills: FigmaFill[] = [];

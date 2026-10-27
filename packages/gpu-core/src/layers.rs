@@ -4,6 +4,7 @@ use crate::canvas::Canvas;
 use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
 use crate::fragments::Fragments;
 use crate::filters::{reach as filter_reach, Fold, Fx, Reach, Runner};
+use crate::canvas::shader_only;
 use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
 
 const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
@@ -55,7 +56,7 @@ pub fn prepare<S: Surface>(surface: &mut S, list: &DisplayList, pictures: &Shelf
 }
 
 fn composited_blend(item: &Item, blending: Blending) -> bool {
-    blending == Blending::Composited && item.look().is_some_and(|l| l.blend != "normal")
+    item.look().is_some_and(|l| l.blend != "normal" && (blending == Blending::Composited || shader_only(&l.blend)))
 }
 
 fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option<Rgba>, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Layers<Pic<S>>, S::Error> {
@@ -71,9 +72,13 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
             let layer = behind(surface, items, i, background, &layers, pictures, sigma)?;
             layers.behind.insert(i, layer);
         }
+        if layer_worthy(item) && !composited_blend(item, blending) && off_frame(surface, item, pictures) {
+            layers.culled.insert(i);
+            continue;
+        }
         let recalled = if layer_worthy(item) { surface.recall(item) } else { None };
         if let (Item::Group(group), None) = (item, &recalled) {
-            let inner = prepare_items(surface, &group.items, None, pictures, blending, &Fragments::default())?;
+            let inner = prepare_items(surface, &group.items, None, pictures, blending, fragments)?;
             layers.groups.insert(i, inner);
         }
         if layer_worthy(item) {
@@ -131,18 +136,25 @@ fn refracted<S: Surface>(surface: &mut S, under: &[Item], layers: &Layers<Pic<S>
     Ok(surface.place(fx.refracted(&content, &lens.params()), frame))
 }
 
-fn region<S: Surface>(surface: &S, item: &Item, look: &Look, pictures: &Shelf<Pic<S>>) -> Rect {
-    let frame = surface.frame();
+fn inflated<C: Canvas>(item: &Item, look: &Look, pictures: &Shelf<C::Picture>) -> Option<Rect> {
     let filtered = match &look.filters {
         Some(filters) => filter_reach(filters, look.space.unwrap_or(UNIT_SPACE)),
         None => Some(Reach::default()),
-    };
-    let (Some(filtered), Some(own)) = (filtered, bounds::<S::Canvas>(item, pictures)) else {
-        return frame;
-    };
+    }?;
+    let own = bounds::<C>(item, pictures)?;
     let feather = look.masks.iter().flatten().map(|m| m.feather).fold(0.0, f64::max);
     let margin = reach(look.blur) + reach(feather) + filtered.px;
-    snapped(own.inflate(margin + own.width() * filtered.share, margin + own.height() * filtered.share), frame)
+    Some(own.inflate(margin + own.width() * filtered.share, margin + own.height() * filtered.share))
+}
+
+fn region<S: Surface>(surface: &S, item: &Item, look: &Look, pictures: &Shelf<Pic<S>>) -> Rect {
+    let frame = surface.frame();
+    inflated::<S::Canvas>(item, look, pictures).map_or(frame, |r| snapped(r, frame))
+}
+
+fn off_frame<S: Surface>(surface: &S, item: &Item, pictures: &Shelf<Pic<S>>) -> bool {
+    let Some(look) = item.look() else { return false };
+    look.backdrop.is_none() && inflated::<S::Canvas>(item, look, pictures).is_some_and(|r| !r.overlaps(surface.frame()))
 }
 
 fn body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, inner: Option<&Layers<Pic<S>>>) -> Result<Placed<Pic<S>>, S::Error> {

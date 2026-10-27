@@ -68,9 +68,27 @@ describe('node chrome in the overlay', () => {
     expect(overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, chrome: [{ ...(frame as object), layers: ChromeLayers.State } as never] })).toHaveLength(0);
   });
 
+  it('keeps the port dots of a selected node the DOM draws, without its label or ring', () => {
+    const selected = { ...at, ring: NodeChrome.None, handles: false, label: 'Generate image', inputs: [{ type: 'text', state: PortState.Quiet }], outputs: [{ type: 'images', state: PortState.Quiet }], layers: ChromeLayers.Ports } as never;
+    const items = overlayOf({ curves: [], selected: ['n'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, chrome: [selected] });
+
+    expect(items.map((i) => i.clip.split(':').pop())).toEqual(['port-in', 'port-out']);
+  });
+
   it('turns the chrome of a rotated node about its pivot', () => {
     const [ring] = overlayOf({ curves: [], selected: ['n'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, chrome: [{ ...at, turn: { degrees: 90, about: { x: 50, y: 25 } } }] });
 
     expect(ring.matrix.map((v) => Math.round(v))).toEqual([0, 1, -1, 0, 75, -25]);
+  });
+});
+
+describe('world overlay across zoom', () => {
+  it('keeps the wire and chrome items when only the zoom changes', () => {
+    const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], theme, ...none, hovered: { x: 0, y: 0, w: 10, h: 10 } };
+    const near = overlayOf({ ...base, zoom: 1 });
+    const far = overlayOf({ ...base, zoom: 0.5 });
+
+    expect(far[0]).toBe(near[0]);
+    expect(far.at(-1)).not.toBe(near.at(-1));
   });
 });

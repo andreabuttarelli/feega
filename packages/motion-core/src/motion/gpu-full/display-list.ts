@@ -125,7 +125,7 @@ type Painted = Content[] | Partly | Unsupported;
 type Env = { clip: MotionClip; animators: TextAnimator[]; onPath: OnPath | null; props: Record<string, unknown>; size: Size; box: Box; stage: Size; unit: number; colour: (v: string) => Rgba; css: (v: string) => string; time: number; media: number; fps: number; still: number | null; asset: (id: unknown) => string | null; logo: string | null; typeset: Typeset; read: DomRead | null };
 type Painter = (env: Env) => Painted;
 
-const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment']);
+const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment', 'Light']);
 const DRAWN_SOURCES: ReadonlySet<Source> = new Set([Source.Transform, Source.Prop, Source.Param]);
 const SAMPLED_IN_PLACE: ReadonlySet<Source> = new Set([Source.Mask]);
 const SOLID_PATTERN = 'solid';

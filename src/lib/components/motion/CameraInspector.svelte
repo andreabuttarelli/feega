@@ -4,6 +4,8 @@
   import { clipsOf, type DocVerdict, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { CAMERA, CAMERA_LANE, Space, type CameraKey } from '@feega/motion-core/motion/camera';
   import { CAMERA_PRESETS, CameraPreset, PRESETS, applyPreset, cameraEditAt, cameraKeyToggle, cameraValueAt, focusOn, removeCamera, setCamera } from '@feega/motion-core/motion/camera-ops';
+  import { STAGE_LIGHT_ABOUT, STAGE_LIGHT_KINDS, type StageLightKind } from '@feega/motion-core/motion/lights';
+  import { addStageLight } from '@feega/motion-core/motion/lights-ops';
   import { parseDecimal } from '$lib/motion/inspector';
   import { sliderOf, toShown, toStored } from '$lib/motion/units';
   import NumberField from './NumberField.svelte';
@@ -32,6 +34,12 @@
   let seconds = $state(String(DEFAULT_MOVE_SECONDS));
   let rackFrom = $state('');
   let rackTo = $state('');
+
+  const lights = $derived(clipsOf(doc).filter((c) => c.component === 'Light'));
+
+  function newLight(kind: StageLightKind) {
+    commit(addStageLight(doc, { kind, from: 0, durationInFrames: doc.durationInFrames }, crypto.randomUUID().slice(0, 8)), `Added a ${kind} light`);
+  }
 
   const worldClips = $derived(clipsOf(doc).filter((c) => c.space === Space.World && COMPONENTS[c.component].track === 'visual'));
 
@@ -170,6 +178,17 @@
         </select>
       </div>
       {@render valueRow('aperture')}
+    </section>
+
+    <section data-testid="camera-lights">
+      <h4>Lights</h4>
+      <div class="row two">
+        {#each STAGE_LIGHT_KINDS as kind (kind)}
+          <button type="button" class="tool" title={STAGE_LIGHT_ABOUT[kind]} data-testid={`light-add-${kind}`} onclick={() => newLight(kind)}>{kind}</button>
+        {/each}
+      </div>
+      {#each lights as light (light.id)}<p class="hint">{light.props.kind} light · select its clip to edit</p>{/each}
+      <p class="hint">Lights shade flat layers by their tilt. Turn a layer (Rotate X/Y) to see it catch light.</p>
     </section>
 
     <section data-testid="camera-presets">

@@ -26,7 +26,7 @@
   import MobileViewSwitch from '$lib/components/canvas/MobileViewSwitch.svelte';
   import { watchKeyboard } from '$lib/canvas/keyboard-inset';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
-  import { NAV_ENTRIES, PANEL_WIDTHS, sheetEntryForPath, directLoadMode, navHref, type NavEntry } from '$lib/shell-nav';
+  import { NAV_ENTRIES, PANEL_WIDTHS, sheetEntryForPath, directLoadMode, navHref, panelForShortcut, type NavEntry } from '$lib/shell-nav';
   import { goto } from '$app/navigation';
   import { INITIAL_MOBILE_VIEW, chatBadge, showView, turnEnded, type MobileView, type ChatTurn } from '$lib/canvas/mobile-view';
   import { anyChatRunning } from '$lib/components/brand-agent/chat-session.svelte';
@@ -129,6 +129,16 @@
     leftPanel = leftPanel === entry.id ? null : (entry.id as LeftPanelKind);
   }
 
+  function onPanelKey(e: KeyboardEvent) {
+    const entry = panelForShortcut(e);
+    if (!entry) {
+      return;
+    }
+
+    e.preventDefault();
+    onRailPanel(entry);
+  }
+
   function onRailSheet(entry: NavEntry) {
     // Un `preloadData` fallito (rete, un `load` che lancia) non deve sparire senza traccia: chi
     // clicca vedrebbe la rail non fare niente, senza un solo indizio del perché.
@@ -210,6 +220,8 @@
 
   const canEdit = $derived(can(data.org.role, OrgAction.Edit));
 </script>
+
+<svelte:window onkeydown={onPanelKey} />
 
 <ChatLeaveGuard {projectId} />
 {#if browser}<RightBar {projectId} viewOnly={!canEdit} />{/if}
@@ -296,7 +308,6 @@
             kind={leftPanel}
             labelKey={NAV_ENTRIES.find((entry) => entry.id === leftPanel)?.labelKey ?? ''}
             onclose={() => (leftPanel = null)}
-            onkind={(kind) => (leftPanel = kind)}
           />
         {/await}
       {/if}

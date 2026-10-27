@@ -87,4 +87,25 @@ describe('GET canvas asset', () => {
     await Promise.resolve(call(asset({ source: 'upload', url: 'org-1/p1/x.png' }))).catch(() => null);
     expect(vi.mocked(signAssetPaths).mock.calls[0][4]).toBeUndefined();
   });
+
+  it('with ?proxy=1 a video that has a proxy is signed from the proxy file', async () => {
+    vi.mocked(signAssetPaths).mockClear();
+    const row = asset({ type: 'video', source: 'upload', url: 'org-1/p1/x.mov', proxy_url: 'org-1/p1/x.mov.proxy.mp4' });
+    await Promise.resolve(call(row, '?proxy=1')).catch(() => null);
+    expect(vi.mocked(signAssetPaths).mock.calls[0][2]).toEqual({ generated: [], uploaded: ['org-1/p1/x.mov.proxy.mp4'] });
+  });
+
+  it('with ?proxy=1 a video without a proxy falls back to the original', async () => {
+    vi.mocked(signAssetPaths).mockClear();
+    const row = asset({ type: 'video', source: 'upload', url: 'org-1/p1/y.mp4', proxy_url: null });
+    await Promise.resolve(call(row, '?proxy=1')).catch(() => null);
+    expect(vi.mocked(signAssetPaths).mock.calls[0][2]).toEqual({ generated: [], uploaded: ['org-1/p1/y.mp4'] });
+  });
+
+  it('without ?proxy=1 the original is signed even when a proxy exists', async () => {
+    vi.mocked(signAssetPaths).mockClear();
+    const row = asset({ type: 'video', source: 'upload', url: 'org-1/p1/z.mov', proxy_url: 'org-1/p1/z.mov.proxy.mp4' });
+    await Promise.resolve(call(row)).catch(() => null);
+    expect(vi.mocked(signAssetPaths).mock.calls[0][2]).toEqual({ generated: [], uploaded: ['org-1/p1/z.mov'] });
+  });
 });
