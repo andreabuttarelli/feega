@@ -213,6 +213,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleLayoutGuides]: VIEW,
   [Command.TogglePivot]: VIEW,
   [Command.ToggleOutlines]: VIEW,
+  [Command.ToggleDevMode]: motion('read_layer_css'),
   [Command.Help]: VIEW,
   [Command.Precompose]: motion('precompose'),
   [Command.Group]: motion('frame_clips'),

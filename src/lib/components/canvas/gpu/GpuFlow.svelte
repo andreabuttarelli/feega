@@ -1726,7 +1726,13 @@
     }
     frameProperties.publish(panelNodeId, panelSession, panelTokens, panelExtras);
     frameProperties.part = pickedPart;
+    frameProperties.toggleDev = () => (frameViews = flipView(frameViews, FrameView.Dev));
+    frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
     return () => frameProperties.clear();
+  });
+
+  $effect(() => {
+    frameProperties.dev = shows(frameViews, FrameView.Dev);
   });
 
   const Step = { Back: 'back', Forward: 'forward' } as const;
@@ -2192,7 +2198,7 @@
   }
 
   function measuredIn(nodeId: string): Gap[] {
-    const live = altHeld && inside?.nodeId === nodeId && pickHover?.nodeId === nodeId && !frameGuides ? liveOf(nodeId) : null;
+    const live = (altHeld || shows(frameViews, FrameView.Dev)) && inside?.nodeId === nodeId && pickHover?.nodeId === nodeId && !frameGuides ? liveOf(nodeId) : null;
     if (!live || !pickHover) {
       return [];
     }

@@ -6,6 +6,7 @@ import AlignEndVertical from '@lucide/svelte/icons/align-end-vertical';
 import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
+import Code from '@lucide/svelte/icons/code';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 import PenLine from '@lucide/svelte/icons/pen-line';
 import Combine from '@lucide/svelte/icons/combine';
@@ -349,6 +350,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.PreviewActual]: { name: 'Preview at 100%', icon: SquareDashed, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.TogglePixelGrid]: { name: 'Pixel grid', icon: Grid3x3, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleLayoutGuides]: { name: 'Layout guides', icon: LayoutGrid, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.ToggleDevMode]: { name: 'Dev mode', icon: Code, group: GuideGroup.View, menu: MenuSection.View },
   [Command.TogglePivot]: { name: 'Rotation origin', icon: Crosshair, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleOutlines]: { name: 'Outline view', icon: VectorSquare, group: GuideGroup.View, menu: MenuSection.View },
   [Command.PreviewSelection]: { name: 'Zoom to selection', icon: Scan, group: GuideGroup.View, menu: MenuSection.View },
