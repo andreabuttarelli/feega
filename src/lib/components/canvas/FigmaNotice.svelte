@@ -55,7 +55,7 @@
     position: absolute;
     z-index: 10;
     left: 16px;
-    bottom: 16px;
+    top: calc(var(--chrome-top, 10px) + 52px);
     width: max-content;
     max-width: min(420px, calc(100% - 32px));
     padding: 8px 10px;

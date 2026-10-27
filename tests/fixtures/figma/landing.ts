@@ -58,6 +58,9 @@ export function landingPage(): Landing {
     }
   });
 
-  const nodes = [...page, root, ...nav, unsized, tiny, paragraph, main, label, icon, plain, changed];
+  const hero = node('RECTANGLE', root.id, { x: 40, y: 100, w: 600, h: 400, fillPaints: [{ type: 'IMAGE', opacity: 1, visible: true, image: { hash: Uint8Array.from({ length: 20 }, (_, i) => i + 1) } }], name: 'Hero', slot: 'm' });
+  const sticky = node('STICKY', root.id, { x: 700, y: 100, w: 120, h: 120, name: 'Note', slot: 'n' });
+
+  const nodes = [...page, root, ...nav, unsized, tiny, paragraph, hero, sticky, main, label, icon, plain, changed];
   return { message: { meta: { fileKey: 'landing' }, blobs: [], nodes }, texts: [...NAV_LABELS, 'Copyright', 'Terms', LONG_PARAGRAPH] };
 }
