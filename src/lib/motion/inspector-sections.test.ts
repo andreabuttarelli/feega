@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClipFamily } from './track-style';
-import { Part, SECTION_ORDER, SECTION_TITLE, emptyManaged, optionLabel, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection } from './inspector-sections';
+import { Part, SECTION_ORDER, SECTION_TITLE, emptyManaged, optionLabel, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection, TextTier, textTier } from './inspector-sections';
 import { Control, Group } from '@feega/motion-core/motion/components';
 import { FieldFill } from './number-field';
 import { Source } from '@feega/motion-core/motion/keyframes';
@@ -123,5 +123,27 @@ describe('inspector sections', () => {
     expect(emptyManaged(Control.Managed, [])).toBe(true);
     expect(emptyManaged(Control.Managed, [1])).toBe(false);
     expect(emptyManaged(Control.Text, [])).toBe(false);
+  });
+
+  describe('text tiers', () => {
+    it('keeps the everyday type controls primary', () => {
+      for (const key of ['font', 'weight', 'size', 'leading', 'tracking', 'align', 'verticalAlign', 'italic', 'decoration', 'textCase']) {
+        expect(textTier(key, 'none')).toBe(TextTier.Primary);
+      }
+    });
+
+    it('folds axes, paragraph, features and overrides into advanced', () => {
+      for (const key of ['stretch', 'slant', 'axes', 'maxLines', 'paragraphSpacing', 'paragraphIndent', 'features', 'lineHeight', 'letterSpacing']) {
+        expect(textTier(key, 'none')).toBe(TextTier.Advanced);
+      }
+    });
+
+    it('shows decoration details only while a line is drawn', () => {
+      for (const key of ['decorationStyle', 'decorationThickness', 'decorationOffset', 'decorationColor', 'skipInk']) {
+        expect(textTier(key, 'none')).toBe(TextTier.Hidden);
+        expect(textTier(key, 'underline')).toBe(TextTier.Advanced);
+        expect(textTier(key, 'strikethrough')).toBe(TextTier.Advanced);
+      }
+    });
   });
 });
