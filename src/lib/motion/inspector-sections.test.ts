@@ -95,7 +95,7 @@ describe('inspector sections', () => {
     expect(fieldSection(field('size', Control.Range, Group.Style), Typed.Yes)).toBe(Section.Text);
     expect(fieldSection(field('align', Control.Select, Group.Layout), Typed.Yes)).toBe(Section.Text);
     expect(fieldSection(field('align', Control.Select, Group.Layout), Typed.No)).toBe(Section.Text);
-    expect(fieldSection(field('color', Control.Color, Group.Style), Typed.Yes)).toBe(Section.Fill);
+    expect(fieldSection(field('color', Control.Color, Group.Style), Typed.Yes)).toBe(Section.Text);
     expect(fieldSection(field('paper', Control.Color, Group.Style), Typed.No)).toBe(Section.Fill);
     expect(fieldSection(field('strokeWidth', Control.Range, Group.Style), Typed.No)).toBe(Section.Stroke);
     expect(fieldSection(field('corners', Control.Corners, Group.Content), Typed.No)).toBe(Section.Layer);
@@ -133,7 +133,7 @@ describe('inspector sections', () => {
     });
 
     it('folds axes, paragraph, features and overrides into advanced', () => {
-      for (const key of ['stretch', 'slant', 'axes', 'maxLines', 'paragraphSpacing', 'paragraphIndent', 'features', 'lineHeight', 'letterSpacing']) {
+      for (const key of ['stretch', 'slant', 'axes', 'maxLines', 'paragraphSpacing', 'paragraphIndent', 'features']) {
         expect(textTier(key, 'none')).toBe(TextTier.Advanced);
       }
     });
@@ -144,6 +144,22 @@ describe('inspector sections', () => {
         expect(textTier(key, 'underline')).toBe(TextTier.Advanced);
         expect(textTier(key, 'strikethrough')).toBe(TextTier.Advanced);
       }
+    });
+
+    it('hides the string overrides from the UI', () => {
+      expect(textTier('lineHeight', 'none')).toBe(TextTier.Hidden);
+      expect(textTier('letterSpacing', 'none')).toBe(TextTier.Hidden);
+    });
+
+    it('moves colour into text for typed elements and leaves it in fill otherwise', () => {
+      const colour = { key: 'color', control: Control.Color, group: Group.Style };
+      expect(fieldSection(colour, Typed.Yes)).toBe(Section.Text);
+      expect(fieldSection(colour, Typed.No)).toBe(Section.Fill);
+      expect(textTier('color', 'none')).toBe(TextTier.Primary);
+      const fills = { key: 'fills', control: Control.Fills, group: Group.Style };
+      expect(fieldSection(fills, Typed.Yes)).toBe(Section.Text);
+      expect(fieldSection(fills, Typed.No)).toBe(Section.Fill);
+      expect(textTier('fills', 'none')).toBe(TextTier.Primary);
     });
   });
 });

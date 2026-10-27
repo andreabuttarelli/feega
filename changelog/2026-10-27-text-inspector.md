@@ -6,8 +6,7 @@ with no underline, and long labels truncated at 88px.
 
 **Now.** `TEXT_TIER` (next to the text keys in `inspector-sections.ts`) maps every text property to
 Primary, Advanced, Decorated or Hidden. Primary renders as a fixed layout (font, weight+size,
-line+spacing, aligns, I/U/S + case). Everything else sits in a native `<details>` closed by default;
-decoration details appear only while underline/strikethrough is on. The two string overrides stay in
-Advanced, relabelled "Line override"/"Spacing override".
+line+spacing, aligns, I/U/S + case). Colour (the fill stack of a text element) follows the toggles. Everything else opens in a `SidePopover` (same as the Fill editor) from a settings button;
+decoration details appear only while underline/strikethrough is on. The `lineHeight`/`letterSpacing` string overrides are hidden from the UI, still in the data model and reachable by agents via MCP.
 
 **Discarded.** A new font picker: `FontPicker` already exists and feat/org-fonts extends it.
