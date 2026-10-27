@@ -57,6 +57,14 @@ describe('Figma token in settings', () => {
     expect(await testFigmaToken(post({}))).toMatchObject({ status: 422, data: { figmaError: 'rejected' } });
   });
 
+  it('a token without the Current user scope still passes, with a note', async () => {
+    store.read.mockResolvedValue('figd_abc12345');
+    const err = 'Invalid scope(s): file_content:read. This endpoint requires the current_user:read scope';
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ status: 403, err }), { status: 403 }));
+
+    expect(await testFigmaToken(post({}))).toEqual({ figmaTested: '', figmaNote: 'scope' });
+  });
+
   it('testing without a stored token asks for one', async () => {
     store.read.mockResolvedValue(null);
 

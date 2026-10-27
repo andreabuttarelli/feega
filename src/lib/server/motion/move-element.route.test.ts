@@ -386,3 +386,26 @@ describe('pasteFigma action', () => {
     expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
   });
 });
+
+describe('importLottie action', () => {
+  const still = (k: unknown) => ({ a: 0, k });
+  const solid = { ddd: 0, ind: 1, ty: 1, nm: 'bg', sw: 300, sh: 200, sc: '#00ff00', ks: { o: still(100), r: still(0), p: still([150, 100, 0]), a: still([150, 100, 0]), s: still([100, 100, 100]) }, ip: 0, op: 30, st: 0, ef: [{}] };
+  const lottie = { v: '5.7.0', fr: 30, ip: 0, op: 30, w: 300, h: 200, layers: [solid], assets: [] };
+
+  it('lands as one frame of the animation size, centred on the pointer, with editable clips', async () => {
+    const input = event({ lottie: JSON.stringify(lottie), at: JSON.stringify({ x: 1000, y: 600 }) });
+
+    expect(await actions.importLottie(input as never)).toMatchObject({ outcome: 'done', skipped: ['bg: effects'] });
+    const rows = input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { x: number; y: number; width: number });
+    expect(rows).toMatchObject([{ x: 850, y: 500, width: 300 }]);
+    const revision = input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')!.payload as { doc: MotionDoc };
+    expect(revision.doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual(['Shape']);
+  });
+
+  it('something that is not a Lottie is a 400, nothing written', async () => {
+    const input = event({ lottie: JSON.stringify({ hello: 1 }), at: JSON.stringify({ x: 0, y: 0 }) });
+
+    expect(await actions.importLottie(input as never)).toMatchObject({ status: 400 });
+    expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
+  });
+});

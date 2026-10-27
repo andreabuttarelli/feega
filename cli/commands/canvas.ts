@@ -1,6 +1,6 @@
 import { loadSession } from '../lib/auth.ts';
-import { readFile, writeFile } from 'node:fs/promises';
-import { basename } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 import { canvasApi } from '../lib/canvas.ts';
 import { exportAsk, type ExportFlags } from '../lib/export-ask.ts';
 
@@ -23,6 +23,25 @@ export async function cmdCanvasUpload(project: string, file: string, opts: { can
   const bytes = new Uint8Array(await readFile(file));
   const result = await canvasApi.upload(await token(), { project, fileName: basename(file), bytes, canvasId: opts.canvas, x: opts.x, y: opts.y }, opts.org);
   console.log(JSON.stringify(result, null, 2));
+}
+
+type CodeExport = { folder?: string; files?: Record<string, string>; message?: string };
+
+export async function cmdCanvasExportCode(project: string, nodeId: string, opts: { config?: boolean; out?: string; org?: string }) {
+  const input = { nodeId, mode: opts.config ? 'config' : 'inline' };
+  const result = (await canvasApi.run(await token(), { project, op: 'export_code_frame', input }, opts.org)) as CodeExport;
+  if (!result.files) {
+    console.error(result.message ?? 'Export failed');
+    process.exit(1);
+  }
+
+  const root = opts.out ?? result.folder ?? 'code-frame';
+  for (const [path, text] of Object.entries(result.files)) {
+    const file = join(root, path);
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, text);
+  }
+  console.log(`${root}\n  cd ${root} && npm install && npm run dev`);
 }
 
 export async function cmdCanvasSave(project: string, canvasId: string, opts: { out?: string; org?: string }) {

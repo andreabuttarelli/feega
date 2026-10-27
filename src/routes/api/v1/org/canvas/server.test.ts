@@ -105,6 +105,19 @@ describe('POST /api/v1/org/canvas — the chat canvas ops, for CLI and MCP', () 
     expect(insert.payload).toMatchObject({ type: 'motion', x: 10, y: 20, width: 720, height: 450 });
   });
 
+  it('imports a Lottie as a frame of the animation size', async () => {
+    const { db, calls } = fakeDb({ projects: [projectRow], nodes: [nodeRow], canvases: [{ id: CANVAS, org_id: ORG, project_id: PROJECT }] }, { filter: true });
+    caller(db);
+    const still = (k: unknown) => ({ a: 0, k });
+    const solid = { ddd: 0, ind: 1, ty: 1, nm: 'bg', sw: 300, sh: 200, sc: '#00ff00', ks: { o: still(100), r: still(0), p: still([150, 100, 0]), a: still([150, 100, 0]), s: still([100, 100, 100]) }, ip: 0, op: 30, st: 0 };
+
+    const { res, body } = await call({ project_id: PROJECT, op: 'import_lottie', input: { canvasId: CANVAS, x: 500, y: 300, lottie: { v: '5.7.0', fr: 30, ip: 0, op: 30, w: 300, h: 200, layers: [solid], assets: [] } } });
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({ outcome: 'done', skipped: [] });
+    expect(calls.find((c) => c.op === 'insert' && c.table === 'nodes')!.payload).toMatchObject({ type: 'motion', x: 350, y: 200, width: 300, height: 200 });
+  });
+
   it('refuses an op it does not know, naming the ones it does', async () => {
     caller(fakeDb({ projects: [projectRow] }, { filter: true }).db);
 

@@ -329,3 +329,23 @@ describe('the shortcut sheet', () => {
     expect([label('select-all'), label('deselect'), label('redo'), label('paste'), label('fit'), label('zoom-in'), label('zoom-out')]).toEqual(['Select all', 'Deselect', 'Redo', 'Paste', 'Zoom to fit', 'Zoom in', 'Zoom out']);
   });
 });
+
+describe('a focused control keeps its own activation keys', () => {
+  const press = (key: string, target: object) =>
+    matchCanvasShortcut({ key, code: '', shiftKey: false, metaKey: false, ctrlKey: false, altKey: false, target } as unknown as KeyboardEvent);
+
+  it.each([
+    ['button', { tagName: 'BUTTON' }],
+    ['link', { tagName: 'A', getAttribute: (n: string) => (n === 'href' ? '#' : null) }],
+    ['role=button', { tagName: 'DIV', getAttribute: (n: string) => (n === 'role' ? 'button' : null) }],
+    ['checkbox', { tagName: 'INPUT', type: 'checkbox' }]
+  ])('Enter and Space on a %s are left to it', (_name, target) => {
+    expect(press('Enter', target)).toBeNull();
+    expect(press(' ', target)).toBeNull();
+  });
+
+  it('other shortcuts still work with a button focused, and Enter on the canvas still enters', () => {
+    expect(press('Delete', { tagName: 'BUTTON' })).toEqual({ id: 'delete' });
+    expect(press('Enter', { tagName: 'DIV', isContentEditable: false })).toEqual({ id: 'enter' });
+  });
+});

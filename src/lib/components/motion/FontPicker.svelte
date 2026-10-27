@@ -1,6 +1,7 @@
 <script lang="ts">
   import { BuiltinFont, fontStack, nearestWeight, searchFonts, type CatalogueFont, type FontFace } from '@feega/motion-core/motion/fonts/model';
   import { MAX_FONT_MB, type FontLibrary } from '$lib/motion/fonts/library';
+  import { FontOrigin, LocalFonts, readLocalFonts, type LocalFontsRead } from '$lib/motion/fonts/local';
 
   let {
     value,
@@ -12,7 +13,7 @@
     value: string;
     fonts: FontFace[];
     brand?: string[];
-    onpick: (family: string, catalogue: CatalogueFont[]) => void;
+    onpick: (family: string, catalogue: CatalogueFont[], origin: FontOrigin) => void;
     library?: FontLibrary | null;
   } = $props();
 
@@ -27,9 +28,19 @@
   let uploading = $state(false);
   let uploadError = $state('');
   let renaming = $state<string | null>(null);
+  let installed = $state<LocalFontsRead | null>(null);
+  let reading = $state(false);
+
+  const LOCAL_NOTE = {
+    [LocalFonts.Unsupported]: 'Installed fonts need Chrome or Edge on desktop.',
+    [LocalFonts.Denied]: 'Access to installed fonts was refused. Allow it in the browser site settings to try again.',
+    [LocalFonts.Ready]: 'Only on this computer: other computers and server renders show a fallback font.'
+  };
 
   const uploaded = $derived((library?.families ?? []).filter((f) => f.family.toLowerCase().includes(query.trim().toLowerCase())));
   const missing = $derived(library?.missing.includes(value) ?? false);
+
+  const installedMatches = $derived(installed?.state === LocalFonts.Ready ? installed.families.filter((f) => f.toLowerCase().includes(query.trim().toLowerCase())).slice(0, RESULTS) : []);
 
   const results = $derived(searchFonts(catalogue, query, brand, RESULTS));
   const brandSet = $derived(new Set(brand));
@@ -61,9 +72,22 @@
     document.head.appendChild(link);
   });
 
-  function pick(family: string) {
-    onpick(family, catalogue);
+  async function pickInstalled(family: string) {
+    if (installed?.state === LocalFonts.Ready) {
+      await installed.load(family);
+    }
+    pick(family, FontOrigin.Local);
+  }
+
+  function pick(family: string, origin: FontOrigin = FontOrigin.Catalogue) {
+    onpick(family, catalogue, origin);
     open = false;
+  }
+
+  async function showInstalled() {
+    reading = true;
+    installed = await readLocalFonts(window);
+    reading = false;
   }
 
   async function upload(input: HTMLInputElement) {
@@ -130,6 +154,19 @@
           {/each}
         </ul>
       {/if}
+      <p class="group">Installed on this computer</p>
+      {#if installed?.state === LocalFonts.Ready}
+        <ul data-testid="font-installed">
+          {#each installedMatches as family (family)}
+            <li><button type="button" class:on={family === value} style={`font-family: '${family}', system-ui`} onclick={() => pickInstalled(family)}>{family}<span class="tag">local</span></button></li>
+          {:else}
+            <li class="muted">No installed font matches.</li>
+          {/each}
+        </ul>
+      {:else if !installed}
+        <button type="button" class="act" data-testid="font-installed-show" disabled={reading} onclick={showInstalled}>{reading ? 'Reading installed fonts…' : 'Show installed fonts…'}</button>
+      {/if}
+      {#if installed}<p class="muted" data-testid="font-installed-note">{LOCAL_NOTE[installed.state]}</p>{/if}
       <p class="group">Google Fonts{brand.length ? ' · brand first' : ''}</p>
       <ul class="results" data-testid="font-results">
         {#each results as font (font.f)}

@@ -81,6 +81,7 @@ export type FlowProps = {
   onLayersToFrame?: (nodeId: string) => void;
   onInpaint?: (nodeId: string) => void;
   onOutpaint?: (nodeId: string) => void;
+  onReframe?: (nodeId: string) => void;
   onExport?: (frameIds: string[]) => void;
   onEdgeDelete?: (edgeId: string) => void;
   onEdgeRetype?: (edgeId: string, kind: CanvasEdgeKind) => void;
@@ -101,6 +102,7 @@ export type FlowProps = {
   onPaste?: (at: { x: number; y: number }) => void;
   onTemplate?: (id: string, at: { x: number; y: number }) => void;
   onFrameTemplates?: (at: { x: number; y: number }) => void;
+  onFigmaImport?: (at: { x: number; y: number }) => void;
   onNodeClicked?: (id: string) => void;
   onNodeDoubled?: (id: string) => void;
   barContext?: BarContext;
@@ -121,6 +123,7 @@ export type FlowProps = {
   onRunWorkflow?: (ids: string[]) => void;
   onSaveTechnique?: (ids: string[]) => void;
   onRunTechnique?: (ids: string[]) => void;
+  onRunTechniqueRows?: (ids: string[]) => void;
   onEditTechnique?: (ids: string[]) => void;
   onDetachTechnique?: (ids: string[]) => void;
   techniques?: { id: string; name: string; nodes: number }[];
