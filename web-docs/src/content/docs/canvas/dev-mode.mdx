@@ -1,0 +1,60 @@
+---
+title: Dev mode
+description: Read a layer as CSS or Tailwind, measure distances, and export it, without editing anything.
+sidebar:
+  order: 14
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="dev-mode" caption="Select a layer, read its CSS, copy it, measure to a neighbour." />
+
+Dev mode is a read-only view of a frame for handing a design to code. Nothing you do in it changes the frame.
+
+## What it shows
+
+For the selected layer:
+
+- **Measures**: X, Y, width and height in pixels of the frame.
+- **CSS**: position, size, fill, corner radius, opacity, rotation and, for text, colour, font, size, weight, letter spacing, line height and alignment.
+- **Tailwind**: the same declarations as utility classes with arbitrary values (`w-[480px]`, `text-[#112233]`).
+- **Variables**: the brand colours the layer uses by name (`brand.accent` and its value), its font, named styles and bound variables. Click one to copy its name.
+
+Brand colours that cannot be resolved are written as variables, for example `var(--brand-accent)`.
+
+## Use it
+
+1. Open a frame and select a layer.
+2. Press `Shift+D`, choose **View, Dev mode**, or click **Dev mode** at the top of the properties panel.
+3. Click **Copy** next to CSS or Tailwind.
+4. Hover another layer: the distance between it and the selection is drawn on the frame.
+5. Click **Export layer** to open the export dialog for the selection (PNG, JPG, WebP, SVG at 1x to 4x).
+
+Press `Shift+D` again, or **Exit dev mode**, to go back to editing.
+
+## From an agent
+
+The `read_layer_css` tool returns the same data for any layer of a video. It is read-only.
+
+```json
+{ "tool": "read_layer_css", "input": { "clip_id": "card" } }
+```
+
+```json
+{
+  "ok": true,
+  "name": "Shape",
+  "box": { "left": 720, "top": 486, "width": 480, "height": 108 },
+  "css": "position: absolute;\nleft: 720px;\n...",
+  "tailwind": "absolute left-[720px] top-[486px] w-[480px] h-[108px] ...",
+  "tokens": [{ "role": "colour", "name": "brand.accent", "value": null }]
+}
+```
+
+Through MCP, call it with `edit` and the frame id as `target`, the layer as `element`:
+
+```json
+{ "op": "read_layer_css", "target": "<frameId>", "element": "card" }
+```
+
+To export a layer, use `export_selection`.

@@ -30,6 +30,14 @@ export function selectedNodes(raw: unknown): string[] {
   return raw.filter((id): id is string => typeof id === 'string' && NODE_ID.test(id)).slice(0, MAX_SELECTED);
 }
 
+const CODE_FRAME_GUIDANCE = [
+  'A code frame is an iframe node with data { framework: "react" | "svelte", files: { "App.tsx" | "App.svelte": "...", ...more files } }: real component code rendered live, npm imports from esm.sh, Tailwind available.',
+  "Every piece of copy, colour, size or toggle a person may want to change is a typed variable declared in the code, never a hard-coded literal: feega.var('heroTitle', { type: 'text', default: 'Build faster', label: 'Hero title' }). Always give type, default and label; add min/max/step for range and number, options for select. Types: text, longtext, color, range, number, boolean, select, image, font. Shorthands like feega.color('accent', '#ff5100') are fine when no metadata is needed.",
+  'Set values with update_node data { vars: { heroTitle: "…" } }: a value that does not fit its declared type is refused.',
+  'For several pages of one site side by side, create views: iframe nodes with data { sourceNodeId: "<code frame id>", route: "/pricing" }. In React wrap routes in <MemoryRouter initialEntries={[feega.route]}>; in Svelte read location.hash.',
+  'export_code_frame returns the site as a plain Vite project without feega.'
+].join(' ');
+
 const MODE_WORD: Record<DocMode, string> = { [DocMode.Still]: 'a still', [DocMode.Video]: 'a video' };
 
 function frameLine(frame: OpenFrame | null | undefined): string {
@@ -70,6 +78,7 @@ export function projectAgentPrompt(scope: PromptScope): string {
     'Building or rebuilding a whole video is the motion agent\'s job, which runs the quality checks: create_motion_video or ask_motion_agent hand it the request (pass canvas node ids in media for pictures, clips or sound it should use), then get_motion_run waits for it and view_motion_frames shows the result. Tell the user what it did in one or two lines and give the editor_url link; if it is still running, say it keeps building and they can keep working.',
     'A social post, story or poster is an editable still frame, not a picture from an image node: its text has to stay editable. Make each with create_motion_video (format 4:5 for a post, 9:16 for a story), one call per post, with a brief that says it is a still graphic (one frame, set_canvas still) and its copy. An image node is for a photo or an illustration the user asked for, which a frame can then use through media.',
     WEB_GUIDANCE,
+    CODE_FRAME_GUIDANCE,
     'To put a picture you found on the canvas, import_image it, then create a Generate image node (type image) with data { assetId: "<asset_id>" }.',
     'Anything that spends credits needs the user to ask for it first.',
     'Answer in the language the user writes in. Be brief: say what you did and what came back, not how you did it.'

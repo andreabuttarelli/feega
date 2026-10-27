@@ -36,6 +36,7 @@ import { autoLayoutSchema, layoutItemSchema } from './layout/model';
 import { constraintsSchema } from './constraints/model';
 import { interactionsSchema } from './prototype/model';
 import { layoutGuidesSchema } from './layout-guides/model';
+import { userGuidesSchema } from './user-guides/model';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -125,6 +126,7 @@ const clipSchema = z.object({
   constraints: constraintsSchema.optional(),
   interactions: interactionsSchema.optional(),
   lockRatio: z.boolean().optional(),
+  acceptsLights: z.boolean().optional(),
   partStyles: partStylesSchema.optional(),
   styleRef: z.string().min(1).optional(),
   effectStyleRef: z.string().min(1).optional(),
@@ -149,7 +151,7 @@ const templateMarkSchema = z.object({
   keyFields: keyFieldsSchema
 });
 
-export const propertyDefSchema = z.object({ kind: z.enum(['boolean', 'text', 'swap', 'nested']), target: z.string().min(1).max(80), default: z.union([z.string().max(2000), z.boolean()]).optional(), nested: z.string().min(1).max(40).optional() }).strict();
+export const propertyDefSchema = z.object({ kind: z.enum(['boolean', 'text', 'swap', 'nested']), target: z.string().min(1).max(80), default: z.union([z.string().max(2000), z.boolean()]).optional(), nested: z.string().min(1).max(40).optional(), preferred: z.array(z.string().min(1).max(80)).max(40).optional() }).strict();
 
 export const mainComponentSchema = z.object({ name: z.string().min(1).max(60), set: z.string().min(1).max(60).optional(), variant: z.record(z.string().min(1).max(40), z.string().min(1).max(40)).optional(), properties: z.record(z.string().min(1).max(40), propertyDefSchema).optional() }).strict();
 
@@ -220,6 +222,7 @@ export const motionDocSchema = z
     still: stillSchema.optional(),
     freeSize: z.boolean().optional(),
     layoutGuides: layoutGuidesSchema,
+    userGuides: userGuidesSchema,
     links: z.record(z.string().min(1), z.string().min(1)).optional(),
     styles: stylesSchema,
     variables: variablesSchema

@@ -5,6 +5,7 @@ import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mas
 import { RING_NUMBERS, RING_NUMBER_KEYS } from '../canvas/composition/ring';
 import { PARTICLE_COLOURS, PARTICLE_COLOUR_KEYS, PARTICLE_NUMBERS, PARTICLE_NUMBER_KEYS } from './particles/model';
 import { GLASS_NUMBERS, GLASS_NUMBER_KEYS, GLASS_TINT } from './glass/model';
+import { STAGE_LIGHT, STAGE_LIGHT_COLOUR, STAGE_LIGHT_KEYS } from './lights';
 import { BLOB_NUMBERS, BLOB_NUMBER_KEYS, BLOB_TINT } from './blob/model';
 
 export type Bezier = [number, number, number, number];
@@ -145,6 +146,16 @@ export const SOUND = {
 
 const soundProps: AnimProp[] = (Object.keys(SOUND) as (keyof typeof SOUND)[]).map((key) => ({ key, kind: ValueKind.Number, source: Source.Sound, ...SOUND[key] }));
 
+const BOX_SIZE = {
+  width: { label: 'Width', min: 0.02, max: 1, step: 0.01 },
+  height: { label: 'Height', min: 0.002, max: 1, step: 0.001 }
+} as const;
+
+const box = (width: number, height: number): AnimProp[] =>
+  (Object.keys(BOX_SIZE) as (keyof typeof BOX_SIZE)[]).map((key) => ({ key, ...BOX_SIZE[key], fallback: key === 'width' ? width : height, kind: ValueKind.Number, source: Source.Param }));
+
+const adjustmentProps: AnimProp[] = transformProps.filter((p) => p.key === 'opacity');
+
 const visual = (...extra: AnimProp[][]): AnimProp[] => [...transformProps, ...extra.flat(), ...maskProps];
 
 const typeNumbers: AnimProp[] = (
@@ -202,6 +213,11 @@ const BLOB_PROPS: AnimProp[] = [
   { key: BLOB_TINT.key, label: BLOB_TINT.label, kind: ValueKind.Color, source: Source.Param, min: 0, max: 0, step: 0, fallback: 0 }
 ];
 
+const LIGHT_PROPS: AnimProp[] = [
+  { key: STAGE_LIGHT_COLOUR.key, label: STAGE_LIGHT_COLOUR.label, kind: ValueKind.Color, source: Source.Prop, min: 0, max: 0, step: 0, fallback: 0 },
+  ...STAGE_LIGHT_KEYS.map((key) => ({ key, ...STAGE_LIGHT[key], kind: ValueKind.Number, source: Source.Prop }))
+];
+
 const RING_PROPS: AnimProp[] = RING_NUMBER_KEYS.map((key) => {
   const { label, min, max, step, fallback } = RING_NUMBERS[key];
   return { key, label, min, max, step, fallback, kind: ValueKind.Number, source: Source.Layout };
@@ -216,12 +232,12 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Video: visual(remapProps, soundProps),
   Audio: soundProps,
   Shape: visual(colours(['fill', 'Fill'], ['fill2', 'Gradient end'], ['stroke', 'Stroke colour']), SHAPE_NUMBERS),
-  Logo: visual(),
+  Logo: visual(box(0.2, 0.2)),
   Null: transformProps,
   BrandBackground: visual(colours(['fill', 'Fill'])),
   ProductCard: visual(colours(['color', 'Colour'], ['card', 'Card'])),
-  SocialMockup: visual(),
-  CanvasMock: visual(),
+  SocialMockup: visual(box(0.5, 0.75)),
+  CanvasMock: visual(box(0.9, 0.8)),
   Model3D: visual(sceneProps),
   Shape3D: visual(sceneProps),
   Text3D: visual(sceneProps),
@@ -233,7 +249,8 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   LiquidBlob: BLOB_PROPS,
   ShaderEffect: visual(),
   Precomp: visual(),
-  Adjustment: [],
+  Light: [...transformProps, ...LIGHT_PROPS],
+  Adjustment: adjustmentProps,
   Custom: visual()
 };
 

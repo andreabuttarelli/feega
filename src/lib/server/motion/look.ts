@@ -12,6 +12,7 @@ const READS: ReadonlySet<string> = new Set([
   DESCRIBE_FRAMES,
   VIEW_FRAMES,
   'get_motion_doc',
+  'read_layer_css',
   'list_components',
   'list_assets',
   'list_effects',

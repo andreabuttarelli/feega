@@ -39,6 +39,7 @@ const ROLE: Record<ComponentId, Role> = {
   LiquidBlob: Role.Content,
   Precomp: Role.Content,
   Adjustment: Role.Scenery,
+  Light: Role.Scenery,
   Custom: Role.Content
 };
 
