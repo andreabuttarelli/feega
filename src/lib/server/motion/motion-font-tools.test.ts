@@ -77,3 +77,23 @@ describe('motion agent font tools', () => {
     }
   });
 });
+
+describe('motion agent local fonts', () => {
+  it('register_font with local adds a local-flagged family and list_fonts flags it', async () => {
+    const { session, run } = setup();
+
+    expect((await run('register_font', { family: 'Avenir Next', origin: 'local' })).ok).toBe(true);
+    expect(session.doc.fonts[0]).toMatchObject({ family: 'Avenir Next', source: 'local' });
+    const listed = (await run('list_fonts', { query: '' })) as { inVideo: { family: string; local: boolean }[] };
+
+    expect(listed.inVideo).toContainEqual({ family: 'Avenir Next', source: 'local', local: true });
+  });
+
+  it('list_fonts marks Google fonts in the video as not local', async () => {
+    const { run } = setup();
+    await run('register_font', { family: 'Space Grotesk' });
+    const listed = (await run('list_fonts', { query: '' })) as { inVideo: { family: string; local: boolean }[] };
+
+    expect(listed.inVideo).toContainEqual({ family: 'Space Grotesk', source: 'google', local: false });
+  });
+});

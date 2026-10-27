@@ -3,7 +3,7 @@ import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
-import { circle, line, rect, solid } from './shapes';
+import { circle, line, rect, reverse, roundRect, solid } from './shapes';
 
 export enum ChromePart {
   Hover = 'hover',
@@ -43,6 +43,7 @@ export type ChromeTile = {
   icon: number[][] | null;
   tag?: string | null;
   addBeside?: boolean;
+  radius?: number;
 };
 
 export type ChromeState = { ring: NodeChrome; handles: boolean; hovered: boolean; ringColor: string; names: boolean };
@@ -88,7 +89,16 @@ function outline(t: ChromeTile, width: number): number[] {
   return rect(t.x - inset, t.y - inset, t.width + 2 * inset, t.height + 2 * inset);
 }
 
-const band = (t: ChromeTile, width: number) => line(outline(t, width), width, true);
+function roundBand(t: ChromeTile, width: number, radius: number): number[][] {
+  const inner = RING_OFFSET;
+  const outer = RING_OFFSET + width;
+  return [
+    ...roundRect(t.x - outer, t.y - outer, t.width + 2 * outer, t.height + 2 * outer, radius + outer),
+    ...roundRect(t.x - inner, t.y - inner, t.width + 2 * inner, t.height + 2 * inner, radius + inner).map(reverse)
+  ];
+}
+
+const band = (t: ChromeTile, width: number) => (t.radius ? roundBand(t, width, t.radius) : line(outline(t, width), width, true));
 
 function hover(t: StateTile): PathItem[] {
   if (!t.hovered || t.ring !== NodeChrome.None) {
@@ -106,15 +116,16 @@ const RINGS: Record<NodeChrome, (t: StateTile) => PathItem[]> = {
 const spaced = (t: ChromeTile, i: number, n: number) => t.y + ((i + 1) / (n + 1)) * t.height;
 
 function port(t: ChromeTile, part: ChromePart, left: number, centre: number, m: PortMark): PathItem[] {
-  const top = centre - PORT_SIZE / 2;
   const colour = CONNECTOR_STYLE[m.type].color;
   const look = PORT_LOOK[m.state];
   const inset = PORT_RING + PORT_RING / 2;
-  const ring = look.ring ? [item(t, ChromePart.PortRing, line(rect(left - inset, top - inset, PORT_SIZE + 2 * inset, PORT_SIZE + 2 * inset), PORT_RING, true), colour)] : [];
-  return [item(t, part, [rect(left, top, PORT_SIZE, PORT_SIZE)], colour, look.opacity), ...ring];
+  const cx = left + PORT_SIZE / 2;
+  const outer = PORT_SIZE / 2 + inset + PORT_RING / 2;
+  const ring = look.ring ? [item(t, ChromePart.PortRing, [...circle(cx, centre, outer), ...circle(cx, centre, outer - PORT_RING).map(reverse)], colour)] : [];
+  return [item(t, part, circle(cx, centre, PORT_SIZE / 2), colour, look.opacity), ...ring];
 }
 
-function ports(t: ChromeTile): PathItem[] {
+export function ports(t: ChromeTile): PathItem[] {
   const inputs = t.inputs.flatMap((m, i) => port(t, ChromePart.PortIn, t.x - PORT_SIZE, spaced(t, i, t.inputs.length), m));
   const outputs = t.outputs.flatMap((m, i) => port(t, ChromePart.PortOut, t.x + t.width, spaced(t, i, t.outputs.length), m));
   return [...inputs, ...outputs];
@@ -125,11 +136,12 @@ function handles(t: StateTile): PathItem[] {
     return [];
   }
   const half = HANDLE_SIZE / 2;
+  const out = RING_OFFSET + RING_WIDTH / 2;
   const corners = [
-    [t.x, t.y],
-    [t.x + t.width, t.y],
-    [t.x, t.y + t.height],
-    [t.x + t.width, t.y + t.height]
+    [t.x - out, t.y - out],
+    [t.x + t.width + out, t.y - out],
+    [t.x - out, t.y + t.height + out],
+    [t.x + t.width + out, t.y + t.height + out]
   ];
   return corners.flatMap(([cx, cy]) => [
     item(t, ChromePart.Handle, [rect(cx - half, cy - half, HANDLE_SIZE, HANDLE_SIZE)], t.ringColor),

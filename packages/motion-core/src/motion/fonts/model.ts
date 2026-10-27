@@ -7,7 +7,8 @@ export enum BuiltinFont {
 
 export enum FontSource {
   Google = 'google',
-  Upload = 'upload'
+  Upload = 'upload',
+  Local = 'local'
 }
 
 export enum FontCategory {
@@ -43,7 +44,7 @@ const FALLBACK: Record<FontCategory, string> = {
 
 export const fontFaceSchema = z.object({
   family: z.string().regex(FONT_NAME),
-  source: z.enum([FontSource.Google, FontSource.Upload]),
+  source: z.enum([FontSource.Google, FontSource.Upload, FontSource.Local]),
   category: z.enum(Object.values(FontCategory) as [FontCategory, ...FontCategory[]]).default(FontCategory.Sans),
   weights: z.array(z.number().int().min(MIN_WEIGHT).max(MAX_WEIGHT)).min(1).max(MAX_WEIGHT / MIN_WEIGHT),
   italic: z.boolean().default(false),

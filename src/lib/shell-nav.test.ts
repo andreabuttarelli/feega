@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode } from './shell-nav';
+import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode, panelForShortcut } from './shell-nav';
 
 describe('la rail: due gruppi, un comportamento a testa', () => {
   it('il gruppo "panel" è Assets, Brands e Influencers, in quest\'ordine', () => {
@@ -11,8 +11,22 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(BURGER_ENTRIES.map((e) => e.id)).not.toContain('layers');
   });
 
-  it('il gruppo "workbench" è Studio, Settings, in quest\'ordine', () => {
-    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['studio', 'settings']);
+  it('the rail toggles panels and sheets only: the photo studio, a page of its own, lives in the burger', () => {
+    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['settings']);
+    expect(BURGER_ENTRIES.map((e) => e.id)).toContain('studio');
+  });
+
+  it('every rail panel has an Alt+digit shortcut, in rail order', () => {
+    const rail = [...navEntriesByGroup('canvas'), ...navEntriesByGroup('panel')];
+    expect(rail.map((e) => e.shortcut)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4']);
+  });
+
+  it('Alt+digit resolves to the panel that carries it, nothing else does', () => {
+    const key = (code: string, altKey = true) => ({ code, altKey, metaKey: false, ctrlKey: false, shiftKey: false }) as KeyboardEvent;
+    expect(panelForShortcut(key('Digit1'))?.id).toBe('layers');
+    expect(panelForShortcut(key('Digit3'))?.id).toBe('brands');
+    expect(panelForShortcut(key('Digit1', false))).toBeNull();
+    expect(panelForShortcut(key('Digit9'))).toBeNull();
   });
 
   it('ogni voce del gruppo panel apre un pannello, ogni voce workbench un foglio o una pagina sua', () => {
@@ -59,7 +73,7 @@ describe('sheetEntryForPath: quale voce apre il foglio', () => {
 describe('il burger mobile legge la stessa tabella della rail', () => {
   it('offre ogni voce della rail, nello stesso ordine', () => {
     const rail = [...navEntriesByGroup('panel'), ...navEntriesByGroup('workbench')];
-    expect(BURGER_ENTRIES.map((e) => e.id)).toEqual(rail.map((e) => e.id));
+    expect(BURGER_ENTRIES.map((e) => e.id)).toEqual([...rail.map((e) => e.id), 'studio']);
   });
 });
 

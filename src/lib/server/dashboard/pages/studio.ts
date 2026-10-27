@@ -3,6 +3,7 @@ import type { Actions, ServerLoad as PageServerLoad } from '@sveltejs/kit';
 import { toolScope } from '$lib/server/dashboard/tool-scope';
 import { studioOptions } from '$lib/server/studio/studio-options';
 import { selectionSchema, startBatch, quoteSelection } from '$lib/server/studio/studio-batch';
+import { summarize } from '$lib/server/studio/studio-quote';
 import { addPhotoProduct } from '$lib/server/studio/studio-upload';
 import { listBatches } from '$lib/server/repos/product-batches';
 import { referenceLibrary } from '$lib/server/canvas/reference-library';
@@ -11,7 +12,6 @@ import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { orgCreditBalance } from '$lib/server/credits';
 import { ENVIRONMENTS } from '$lib/studio/environments';
 import { SHOTS } from '$lib/studio/shots';
-import { SKIP_TEXT } from '$lib/studio/plan';
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_PAYMENT_REQUIRED = 402;
@@ -79,16 +79,7 @@ export const actions: Actions = {
     if ('error' in quote) {
       return fail(HTTP_UNPROCESSABLE, { error: quote.error });
     }
-    return {
-      quote: {
-        count: quote.plan.items.length,
-        overLimit: quote.plan.overLimit,
-        perImage: quote.model.credits,
-        total: quote.model.credits * quote.plan.items.length,
-        droppedRefs: quote.droppedRefs,
-        skipped: quote.plan.skipped.map((s) => `${s.productTitle} · ${SHOTS[s.shot].label}: ${SKIP_TEXT[s.reason]}`)
-      }
-    };
+    return { quote: summarize(quote) };
   },
 
   generate: async (event) => {

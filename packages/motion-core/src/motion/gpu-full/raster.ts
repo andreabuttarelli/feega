@@ -144,7 +144,17 @@ const BLEND_MODE: Record<BlendMode, number> = {
   [BlendMode.Hue]: 12,
   [BlendMode.Saturation]: 13,
   [BlendMode.Color]: 14,
-  [BlendMode.Luminosity]: 15
+  [BlendMode.Luminosity]: 15,
+  [BlendMode.LinearBurn]: 16,
+  [BlendMode.LinearDodge]: 17,
+  [BlendMode.VividLight]: 18,
+  [BlendMode.LinearLight]: 19,
+  [BlendMode.PinLight]: 20,
+  [BlendMode.HardMix]: 21,
+  [BlendMode.Subtract]: 22,
+  [BlendMode.Divide]: 23,
+  [BlendMode.DarkerColor]: 24,
+  [BlendMode.LighterColor]: 25
 };
 
 const FOLD_MODE: Record<MaskMode, number> = { [MaskMode.Add]: 0, [MaskMode.Subtract]: 1, [MaskMode.Intersect]: 2, [MaskMode.Difference]: 3 };

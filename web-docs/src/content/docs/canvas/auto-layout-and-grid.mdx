@@ -1,0 +1,56 @@
+---
+title: Auto layout and grid
+description: Let a container place its children.
+sidebar:
+  order: 6
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+`Shift+A` adds auto layout to the selection, or removes it from an auto layout. Auto layout is a field on a parent that is resolved into plain boxes at render time ([ADR 0008](/architecture/adr/0008-auto-layout-is-resolved-at-render/)).
+
+## Stack
+
+- Direction horizontal or vertical, wrap, gap, cross gap, padding per side.
+- Padding takes CSS shorthand: `8`, `8 16`, `8 16 24`, `8 16 24 32`.
+- Wrapped layouts can spread lines over the full height, draw the first child on top, and count inside strokes as padding.
+- Children size fixed, hug or fill, with min and max.
+
+## Grid
+
+Grid auto layout has fixed, fractional and hug columns and rows, spans, per-cell alignment and column-first fill.
+
+## Arrange a selection
+
+<DemoVideo name="arrange-selection" caption="Tidy up and stack four image nodes from the context menu, then the same ops from the CLI, and undo_last." />
+
+1. Select two or more nodes: click one, hold `Shift` and click the others, or drag a box around them.
+2. Right-click one of the selected nodes. With two or more selected, the menu lists **Align left / horizontal centres / right / top / vertical centres / bottom**, **Tidy up** and **Stack**.
+3. **Tidy up** untangles overlaps, **Stack** puts the selection in a row or column, the align items line up the edges. Distribute is in the toolbar when three or more are selected.
+4. `Cmd+Z` undoes the arrangement.
+
+### From an agent, MCP or CLI
+
+The same moves are canvas ops, free to run. Each takes the `canvasId` and the `nodeIds`; ids not on the canvas come back in `missing`.
+
+| Op | Input | Result |
+|---|---|---|
+| `align_nodes` | `edge`: `left`, `center`, `right`, `top`, `middle`, `bottom` | the nodes moved |
+| `distribute_nodes` | `axis`: `x` or `y`, 3 or more nodes | equal gaps, the outer two stay |
+| `tidy_nodes` | none | overlaps untangled |
+| `stack_nodes` | `gap?` | a row or a column |
+| `undo_last` | `canvasId` | reverts your last write on the canvas, with the ones made in the same instant |
+
+```bash
+feega canvas $PROJECT align_nodes --input '{"canvasId":"<canvas>","nodeIds":["<a>","<b>","<c>"],"edge":"top"}'
+feega canvas $PROJECT undo_last --input '{"canvasId":"<canvas>"}'
+```
+
+Over MCP the call is `canvas_tool({ project_id, op: "align_nodes", input })`. `undo_last` reverts what `canvas_events` recorded for the same actor: creates, deletes, data edits. Moves and resizes are not recorded, so undo an arrangement with `move_node`.
+
+## Related
+
+- `Shift+A` on selected tiles on the canvas stacks them into a row or column.
+- Tidy up: `Ctrl+Alt+T`. Distribute with an exact gap by typing it next to the distribute buttons.
+- Layout guides take an auto count, min, max or centre alignment, a colour and an opacity; elements snap to their edges.
+- Lock the aspect ratio of an element from the inspector; hold `Ctrl` to resize freely.

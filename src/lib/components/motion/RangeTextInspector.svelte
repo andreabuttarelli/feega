@@ -5,7 +5,8 @@
   import { resolveColor } from '@feega/motion-core/motion/brand';
   import type { FontLibrary } from '$lib/motion/fonts/library';
   import type { CatalogueFont } from '@feega/motion-core/motion/fonts/model';
-  import { registerFont, withUploaded } from '$lib/motion/fonts/ops';
+  import { registerFont } from '$lib/motion/fonts/ops';
+  import { FontOrigin, withPicked } from '$lib/motion/fonts/local';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import { ListKind } from '@feega/motion-core/motion/text-lists';
   import { MIXED, RUN_CASES, linkOf, type GradientFill, type RunEdit, type StyleKey } from '@feega/motion-core/motion/text-runs';
@@ -54,8 +55,8 @@
     }
   }
 
-  function pickFont(asked: string, catalogue: CatalogueFont[]) {
-    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
+  function pickFont(asked: string, catalogue: CatalogueFont[], origin: FontOrigin) {
+    const { doc: base, family } = withPicked(doc, asked, origin, fonts?.families ?? []);
     const registered = registerFont(base, family, catalogue);
     if (registered.ok) {
       onchange(registered.doc, `Added the font ${family}`);

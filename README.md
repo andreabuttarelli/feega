@@ -31,11 +31,11 @@ together.** You draw frames, animate them on a timeline and export them; the cha
 One canvas saved in one file: no account, no database, no Docker. You need Node 22.
 
 ```sh
-git clone https://github.com/andreabuttarelli/feega && cd feega && npm install
-npm run local -- my-canvas.feega        # http://localhost:5173
+npx feega my-canvas.feega               # http://localhost:5173
 ```
 
-The first run builds the app (a few minutes). The file is created if it does not exist and saved
+The first run downloads the app into `~/.feega/app/`; later starts update it when a newer one exists. From a clone,
+`npm run local -- my-canvas.feega` does the same and builds the app instead (a few minutes). The file is created if it does not exist and saved
 as you work. To continue in the cloud, import it at [feega.app](https://feega.app) with
 **Import .feega**. Sharing, comments and saved versions need the cloud and say so.
 
@@ -50,7 +50,7 @@ the server on port 5173 and it answers as the local user. Every edit appears liv
 browser tab.
 
 ```sh
-npm run local -- work.feega &                      # 1. server on http://localhost:5173
+npx feega work.feega --no-open &                   # 1. server on http://localhost:5173
 curl -s localhost:5173/api/v1/version              # 2. {"localMode":true,…}
 feega projects && feega canvases <projectId>       # 3. the one project and its one canvas
 ```
