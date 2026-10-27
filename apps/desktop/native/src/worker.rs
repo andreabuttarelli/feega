@@ -139,7 +139,7 @@ impl Core {
                 let look = self.last_look.ok_or("nothing presented yet")?;
                 snapshot(&self.gpu.device, &self.gpu.queue, &mut self.reprojector, &self.retained, look, self.size, &path)?;
             }
-            Command::SetOverlay(json) => self.compositor.set_overlay(parse_overlay(&json).map_err(failure)?),
+            Command::SetOverlay(json) => self.compositor.set_overlay(parse_overlay(&json).map_err(failure)?, &mut self.library),
         }
         Ok(())
     }
