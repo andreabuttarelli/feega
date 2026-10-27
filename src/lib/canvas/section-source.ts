@@ -34,7 +34,7 @@ export function expandSectionEdges(nodes: readonly Held[], edges: readonly Upstr
         continue;
       }
 
-      const added: UpstreamEdge = { ...wire, id: `${wire.id}~${item.id}`, sourceNodeId: item.id };
+      const added: UpstreamEdge = { ...wire, id: `${wire.id}~${item.id}`, sourceNodeId: item.id, sourceHandle: null, targetHandle: null };
       if (hasUpstreamCycle([...result, added], wire.targetNodeId)) {
         continue;
       }

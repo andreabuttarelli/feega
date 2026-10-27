@@ -22,6 +22,12 @@ describe('a section wired into a node', () => {
     expect(sources(edges, 'out')).toEqual(['clip', 'gen', 'pic', 'voice']);
   });
 
+  it('fans out by member type whatever input port the section edge was dropped on', () => {
+    const edges = expandSectionEdges(nodes, [{ ...edge('e1', 's', 'out'), targetHandle: 'first_frame' }]);
+
+    expect(edges.filter((e) => e.targetNodeId === 'out').every((e) => e.targetHandle === null)).toBe(true);
+  });
+
   it('leaves out the consuming node when it sits inside the section', () => {
     const edges = expandSectionEdges(nodes, [edge('e1', 's', 'gen')]);
 
