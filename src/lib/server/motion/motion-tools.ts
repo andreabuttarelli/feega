@@ -163,6 +163,8 @@ import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type
 import { removeLight, removeLook, setLight, setLightKeyframes, setLook } from '$lib/motion/look-ops';
 import { DEVICE, DEVICES } from '@feega/motion-core/motion/devices';
 import { DEVICE_PRESETS, PRESET as DEVICE_PRESET, addDeviceRow, applyDevicePreset } from '$lib/motion/device-presets';
+import { STAGE_LIGHT, STAGE_LIGHT_ABOUT, STAGE_LIGHT_COLOUR, STAGE_LIGHT_KINDS } from '@feega/motion-core/motion/lights';
+import { addStageLight, setAcceptsLights, setStageLight } from '@feega/motion-core/motion/lights-ops';
 import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCameraKeyframes, setClipDepth } from '@feega/motion-core/motion/camera-ops';
 import { ParentOpacity } from '@feega/motion-core/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
@@ -435,6 +437,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         keyframes: inSeconds(shownKeyframes(c.component, c.keyframes, doc)),
         depth: c.depth,
         space: c.space,
+        acceptsLights: c.acceptsLights ?? true,
         parent: c.parent,
         parentOpacity: c.parentOpacity,
         autoLayout: c.autoLayout ?? null,
@@ -1690,8 +1693,56 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     set_clip_depth: tool({
       description: 'Place a clip in the camera world: depth in pixels behind the focus plane 0 (negative comes forward; a far background 1500–4000, a foreground card -200..0). It keeps its size at rest and shows parallax when the camera moves. space "screen" keeps a caption or overlay flat on top, ignoring the camera.',
-      inputSchema: z.object({ clip_id: z.string(), depth: z.number().optional(), space: z.enum(SPACES).optional() }),
-      execute: async (input) => apply(setClipDepth(session.doc, input.clip_id, { depth: input.depth, space: input.space }), `placed ${input.clip_id} in depth`)
+      inputSchema: z.object({ clip_id: z.string(), depth: z.number().optional(), space: z.enum(SPACES).optional(), accepts_lights: z.boolean().optional() }),
+      execute: async (input) => {
+        const placed = setClipDepth(session.doc, input.clip_id, { depth: input.depth, space: input.space });
+        const lit = placed.ok && input.accepts_lights !== undefined ? setAcceptsLights(placed.doc, input.clip_id, input.accepts_lights) : placed;
+        return apply(lit, `placed ${input.clip_id} in depth`);
+      }
+    }),
+
+    set_stage_light: tool({
+      description: `Add a light to the camera world (clip_id omitted, needs a camera) or change one (clip_id of a Light clip). Like an After Effects light it shades the flat layers of the world, per layer: Lambert from the layer's own rotateX/rotateY/rotateZ, so turn a layer to see it catch light. Once any light is on, a layer no light reaches is black, so add an ambient light for a base. kind: ${STAGE_LIGHT_KINDS.map((k) => `${k} (${STAGE_LIGHT_ABOUT[k]})`).join('; ')}. color #rrggbb. intensity ${STAGE_LIGHT.intensity.min}..${STAGE_LIGHT.intensity.max}, falloff radius in px (0 none), cone_angle degrees and cone_feather 0..1 for spot. x/y in px of the frame from the centre, depth in px behind the focus plane (negative is in front of the layers, default -600), aim_x tilts down and aim_y turns right, in degrees (spot, parallel). start/duration in seconds. Animate with set_keyframes on the returned clip_id: color, intensity, falloff, coneAngle, coneFeather, x, y, rotateX, rotateY. set_clip_depth accepts_lights false keeps a layer out of the lighting; 3D clips keep their own.`,
+      inputSchema: z.object({
+        clip_id: z.string().optional(),
+        kind: z.enum(STAGE_LIGHT_KINDS).optional(),
+        color: z.string().regex(STAGE_LIGHT_COLOUR.pattern).optional(),
+        intensity: z.number().optional(),
+        falloff: z.number().optional(),
+        cone_angle: z.number().optional(),
+        cone_feather: z.number().optional(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        depth: z.number().optional(),
+        aim_x: z.number().optional(),
+        aim_y: z.number().optional(),
+        start: z.number().min(0).optional(),
+        duration: z.number().positive().optional(),
+        ...PLACED
+      }),
+      execute: async (input) => {
+        if (!input.clip_id && !session.doc.camera) {
+          return apply({ ok: false, error: 'lights shade the camera world: turn the camera on first (set_camera)' }, 'added a light');
+        }
+        const props = Object.fromEntries(
+          Object.entries({ kind: input.kind, [STAGE_LIGHT_COLOUR.key]: input.color, intensity: input.intensity, falloff: input.falloff, coneAngle: input.cone_angle, coneFeather: input.cone_feather }).filter(([, v]) => v !== undefined)
+        );
+        const transform = Object.fromEntries(
+          Object.entries({
+            x: input.x === undefined ? undefined : toStored('Light', 'x', input.x, session.doc),
+            y: input.y === undefined ? undefined : toStored('Light', 'y', input.y, session.doc),
+            rotateX: input.aim_x,
+            rotateY: input.aim_y
+          }).filter(([, v]) => v !== undefined)
+        );
+        if (input.clip_id) {
+          return apply(setStageLight(session.doc, input.clip_id, { props, transform, depth: input.depth }), `changed light ${input.clip_id}`);
+        }
+        const id = deps.newId();
+        const added = addStageLight(session.doc, { kind: input.kind ?? 'point', from: frames(input.start ?? 0), durationInFrames: input.duration === undefined ? undefined : frames(input.duration), trackId: input.track_id, props, transform }, id);
+        const placed = added.ok && input.depth !== undefined ? setStageLight(added.doc, id, { depth: input.depth }) : added;
+        return created(apply(placed, 'added a light'), id);
+      }
     }),
 
     add_null: tool({
