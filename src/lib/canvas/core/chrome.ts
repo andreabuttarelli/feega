@@ -125,7 +125,7 @@ function port(t: ChromeTile, part: ChromePart, left: number, centre: number, m: 
   return [item(t, part, circle(cx, centre, PORT_SIZE / 2), colour, look.opacity), ...ring];
 }
 
-function ports(t: ChromeTile): PathItem[] {
+export function ports(t: ChromeTile): PathItem[] {
   const inputs = t.inputs.flatMap((m, i) => port(t, ChromePart.PortIn, t.x - PORT_SIZE, spaced(t, i, t.inputs.length), m));
   const outputs = t.outputs.flatMap((m, i) => port(t, ChromePart.PortOut, t.x + t.width, spaced(t, i, t.outputs.length), m));
   return [...inputs, ...outputs];
