@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { byId } from '$lib/canvas/by-id';
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
@@ -742,6 +743,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let nodes = $state<Tile[]>((data.nodes as CanvasNodeRecord[]).map((n) => toTile(n)));
+  const nodeById = $derived(byId(nodes));
 
   /**
    * QUANTO IL CONTENUTO DI UN NODO TESTO CHIEDE, misurato dal DOM — mai scritto in database, mai
@@ -4240,9 +4242,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {#each livePins(id) as thread (thread.id)}
         <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(picked) => commentsPanel.focus(picked)} />
       {/each}
-      {@const over = liveHost === LiveHost.Canvas ? nodes.find((n) => n.id === id) : null}
+      {@const hoverNode = nodeById.get(id)}
+      {@const over = liveHost === LiveHost.Canvas ? hoverNode : null}
       {@const overMotion = over ? motionOf(over) : null}
-      {@const hoverNode = nodes.find((n) => n.id === id)}
       {@const hoverMotion = hoverNode ? motionOf(hoverNode) : null}
       {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && !core}
         <FrameHover nodeId={id} revision={hoverMotion.docHeadRevision} previewUrl={motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} width={FORMATS[hoverMotion.format].width} height={FORMATS[hoverMotion.format].height} />
@@ -4252,7 +4254,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
     {/snippet}
     {#snippet tile({ id, selected })}
-      {@const row = nodes.find((n) => n.id === id)}
+      {@const row = nodeById.get(id)}
       {#if row}
         {@const gen = genOf(row)}
         {@const frame = frameOf(row)}

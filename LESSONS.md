@@ -12,6 +12,12 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** a fresh database applies every file and the app still answers `PGRST205` for `orgs`. **Move:** the new schema was never a migration; `supabase/baseline` is generated from production catalogs and `db:migrate` applies it, then only files dated after its cutoff. Never delete or rename the legacy files.
 
+## Canvas performance
+
+### Panning zoomed in stalls on `submit` and the wasm encoder: count layers per frame
+
+**Signal:** pan at 70%+ zoom falls under 20 fps with frames of 500 ms to 2 s, a CPU profile led by `GPUQueue.submit`, `createBindGroup` and `PathEncoder` inside `gpu_core_bg.wasm`, nothing in JS; zoomed out it holds 60. **Move:** read the inclusive time of `layers::body` and `layers::mask`, not the self time: every item with a mask, blur or filter is its own texture, vello render and queue submit, and one imported SVG carries about 600 masked paths. Hard path masks that only intersect are clips now (`clip_covers` in `scene.rs`); anything softer still costs a layer, so keep layers out of the frame being painted (`Layers::culled`). Run the harness at least three times: a run where the heavy frames are still caching while the pan starts looks fine or terrible at random.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them

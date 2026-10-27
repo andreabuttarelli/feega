@@ -156,11 +156,34 @@ fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect, contou
 }
 
 fn used(u: &UseItem, group: &DisplayList, start: usize) -> Vec<Item> {
+    used_where(u, group, start, |_| true)
+}
+
+fn used_within(u: &UseItem, group: &DisplayList, start: usize, view: Rect) -> Vec<Item> {
+    if group.items.iter().any(|i| matches!(i, Item::Lens(_))) {
+        return used(u, group, start);
+    }
+    let scale = scale_of(u.matrix);
+    used_where(u, group, start, |i| reaches(i, u.matrix, scale, view))
+}
+
+fn reaches(item: &Item, m: Affine, scale: f64, view: Rect) -> bool {
+    let Some(look) = item.look() else { return true };
+    if look.filters.is_some() || look.backdrop.is_some() {
+        return true;
+    }
+    let Some(own) = bounds::<Scene>(item, &Pictures::new()) else { return true };
+    let feather = look.masks.iter().flatten().map(|l| l.feather).fold(0.0, f64::max);
+    let margin = (look.blur + feather) * scale * BLUR_REACH + CULL_SLACK_PX;
+    screen_rect(m, own).inflate(margin, margin).overlaps(view)
+}
+
+fn used_where(u: &UseItem, group: &DisplayList, start: usize, keep: impl Fn(&Item) -> bool) -> Vec<Item> {
     let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
     let scale = scale_of(u.matrix);
     let back = group.background.map(|c| background(&u.clip, c, frame, turned_corners(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64))));
     let first = start + back.iter().count();
-    let items = group.items.iter().map(|i| match placed(i, u.matrix, frame, scale) {
+    let items = group.items.iter().filter(|i| keep(i)).map(|i| match placed(i, u.matrix, frame, scale) {
         Item::Lens(mut l) => {
             l.under += first;
             Item::Lens(l)
@@ -176,6 +199,7 @@ pub fn report(skipped: &[Skipped]) -> String {
 
 const CACHE_PREFIX: &str = "cache:";
 const RGBA_BYTES: u64 = 4;
+const CULL_SLACK_PX: f64 = 2.0;
 const SHARPEST: f64 = 1.02;
 const SOFTEST: f64 = 0.8;
 const IDENTITY: Affine = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
@@ -396,6 +420,16 @@ impl Library {
         (list.clone(), vec![])
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn drawable_owned(&self, list: DisplayList) -> (DisplayList, Vec<Skipped>) {
+        (list, vec![])
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn drawable_owned(&self, list: DisplayList) -> (DisplayList, Vec<Skipped>) {
+        self.drawable(&list)
+    }
+
     pub fn put_group(&mut self, key: &str, list: &DisplayList) {
         let (drawn, _) = self.drawable(list);
         self.groups.put(key, drawn);
@@ -446,6 +480,13 @@ impl Library {
         let list = self.groups.get(group)?;
         let seed = self.seeds.remove(group);
         self.encodings.entry(group.to_string()).or_insert_with(|| encode(list, seed)).clone()
+    }
+
+    fn expanded(&self, u: &UseItem, group: &DisplayList, start: usize, view: Rect) -> Vec<Item> {
+        if self.composes {
+            return used_within(u, group, start, view);
+        }
+        used(u, group, start)
     }
 
     fn cheapened(&self, items: Vec<Item>, view: Rect) -> Vec<Item> {
@@ -518,7 +559,7 @@ impl Library {
             if !u.cache || want <= 0.0 || w.max(h) > limits.side {
                 if on_screen {
                     let start = items.len();
-                    items.extend(self.cheapened(used(u, group, start), view));
+                    items.extend(self.cheapened(self.expanded(u, group, start, view), view));
                 }
                 continue;
             }
@@ -573,8 +614,8 @@ impl Library {
         let mut evicted = std::mem::replace(&mut self.stale, std::mem::take(&mut self.retiring));
         evicted.extend(gone.iter().map(|k| cache_clip(k)));
         evicted.extend(abandoned.iter().map(|k| building_clip(k)));
-        let rasters = rasters.into_iter().map(|r| Raster { list: self.drawable(&r.list).0, ..r }).collect();
-        let (mut screen, unset) = self.drawable(&DisplayList { items, ..list.clone_empty() });
+        let rasters = rasters.into_iter().map(|r| Raster { list: self.drawable_owned(r.list).0, clip: r.clip }).collect();
+        let (mut screen, unset) = self.drawable_owned(DisplayList { items, ..list.clone_empty() });
         screen.fragments = Fragments::new(encoded);
         Plan { screen, rasters, evicted, pending, skipped: named(missing, "group").chain(unset).collect(), finished, waiting }
     }
