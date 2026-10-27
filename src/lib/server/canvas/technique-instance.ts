@@ -7,7 +7,10 @@ import { RUN_ROW_HEIGHT, RUNS_CANVAS, TECHNIQUE_NODE, editCanvasName, instanceIn
 import { nodeSize } from '$lib/canvas/node-size';
 import { GENERATIVE_TYPES } from '$lib/canvas/workflow-plan';
 import { writePlan } from './duplicate';
-import { enqueueWorkflow } from './workflow';
+import { BATCH_MAX_ROWS, autoMapping, batchRowValues, type ColumnMapping } from '$lib/canvas/technique-batch';
+import { runsByIds } from '$lib/server/repos/node-runs';
+import type { GenMedium } from '$lib/canvas/gen-node';
+import { cancelWorkflow, enqueueWorkflow, estimateWorkflowCredits } from './workflow';
 import { runTechnique, TechniqueRun } from './techniques';
 
 const CHECK_VIOLATION = '23514';
@@ -25,6 +28,9 @@ type Refused = { outcome: 'refused'; error: string };
 export type PlaceOutcome = { outcome: 'placed'; mode: InstancePlaced; nodeIds: string[]; message?: string } | Refused;
 export type RunInstanceOutcome = { outcome: 'queued'; workflowId: string; canvasId: string } | Refused;
 export type DetachOutcome = { outcome: 'detached'; nodeIds: string[]; removedId: string } | Refused;
+export type PreviewOutcome = { outcome: 'preview'; rows: number; creditsPerRow: number; credits: number } | Refused;
+export type RowsOutcome = { outcome: 'queued'; canvasId: string; workflowIds: string[]; runIds: string[] } | Refused;
+export type RowsProgress = { total: number; done: number; failed: number; running: number };
 export type OpenOutcome = { outcome: 'opened'; canvasId: string; name: string } | Refused;
 
 const refused = (error: string): Refused => ({ outcome: 'refused', error });
@@ -151,4 +157,68 @@ export async function openDefinition(db: Db, input: Scope & { techniqueId: strin
   const canvasId = await editCanvas(db, input, technique, input.actor);
   await writePlan(db, { orgId: input.orgId, projectId: input.projectId, canvasId, actor: input.actor }, techniquePlan(technique, { x: 0, y: 0 }));
   return { outcome: 'opened', canvasId, name: editCanvasName(technique.name) };
+}
+
+const mediumOf = (type: string): GenMedium => (type === 'text' || type === 'video' ? type : 'image');
+
+export async function previewRows(db: Db, input: { orgId: string; techniqueId: string; rowCount: number }): Promise<PreviewOutcome> {
+  const technique = await findTechnique(db, input.orgId, input.techniqueId);
+  if (!technique) {
+    return refused(NOT_FOUND);
+  }
+
+  const steps = technique.plan.nodes
+    .filter((n) => GENERATIVE_TYPES.has(n.type))
+    .map((n) => ({ medium: mediumOf(n.type), model: typeof n.data.model === 'string' ? n.data.model : null }));
+  const creditsPerRow = estimateWorkflowCredits(steps);
+  return { outcome: 'preview', rows: input.rowCount, creditsPerRow, credits: creditsPerRow * input.rowCount };
+}
+
+export async function runRows(
+  db: Db,
+  input: Scope & { userId: string; techniqueId: string; rows: string[][]; mapping: ColumnMapping | null; actor: Actor }
+): Promise<RowsOutcome> {
+  if (input.rows.length === 0) {
+    return refused('no_rows');
+  }
+  if (input.rows.length > BATCH_MAX_ROWS) {
+    return refused('too_many_rows');
+  }
+
+  const technique = await findTechnique(db, input.orgId, input.techniqueId);
+  if (!technique) {
+    return refused(NOT_FOUND);
+  }
+
+  const runs = await runsCanvas(db, input);
+  const first = nextRunRow(runs.ys);
+  const workflowIds: string[] = [];
+  const runIds: string[] = [];
+  const mapping = input.mapping ?? autoMapping(technique.inputs.length, Math.max(...input.rows.map((r) => r.length)));
+  for (const [i, row] of input.rows.entries()) {
+    const values = batchRowValues(technique.inputs, mapping, row);
+    const plan = withInputs(techniquePlan(technique, { x: 0, y: first + i * RUN_ROW_HEIGHT }), values);
+    const written = await writePlan(db, { orgId: input.orgId, projectId: input.projectId, canvasId: runs.id, actor: input.actor }, plan);
+    const generative = written.nodes.filter((n) => GENERATIVE_TYPES.has(n.type)).map((n) => n.id);
+    const queued = await enqueueWorkflow(db, { orgId: input.orgId, projectId: input.projectId, canvasId: runs.id, nodeIds: generative, userId: input.userId, actor: input.actor });
+    if (queued.kind === 'refused') {
+      return refused(queued.error);
+    }
+
+    workflowIds.push(queued.workflowId);
+    runIds.push(...Object.values(queued.runIdByNodeId));
+  }
+
+  return { outcome: 'queued', canvasId: runs.id, workflowIds, runIds };
+}
+
+export async function cancelRows(db: Db, input: { orgId: string; workflowIds: string[] }): Promise<{ cancelled: number }> {
+  const outcomes = await Promise.all(input.workflowIds.map((workflowId) => cancelWorkflow(db, { orgId: input.orgId, workflowId })));
+  return { cancelled: outcomes.reduce((total, o) => total + o.cancelled, 0) };
+}
+
+export async function rowsProgress(db: Db, input: { runIds: string[] }): Promise<RowsProgress> {
+  const runs = await runsByIds(db, { ids: input.runIds });
+  const count = (status: string) => runs.filter((r) => r.status === status).length;
+  return { total: input.runIds.length, done: count('done'), failed: count('failed') + count('expired'), running: count('running') + count('finishing') };
 }

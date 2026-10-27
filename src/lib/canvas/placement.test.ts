@@ -55,3 +55,14 @@ describe('a node pushed off the centre of the view is brought into sight', () =>
     expect(offCentre(centre, placeNear(centre, size, [there]), size)).toBe(true);
   });
 });
+
+describe('placeInRow', () => {
+  it('mette la vista a destra della sorgente, dopo le viste già aperte', async () => {
+    const { placeInRow, PLACEMENT_GAP } = await import('./placement');
+    const source = { x: 0, y: 0, w: 100, h: 80 };
+    const first = { x: 100 + PLACEMENT_GAP, y: 0, w: 100, h: 80 };
+
+    expect(placeInRow(source, [source])).toEqual({ x: 100 + PLACEMENT_GAP, y: 0 });
+    expect(placeInRow(source, [source, first])).toEqual({ x: 2 * (100 + PLACEMENT_GAP), y: 0 });
+  });
+});

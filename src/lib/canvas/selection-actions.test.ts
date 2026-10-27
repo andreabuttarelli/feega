@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FRAME_DIALOG_ACTIONS } from './frame-dialogs';
-import { CANVAS_MENU, actionsIn, enabledFor, menuFor, shownFor } from './selection-actions';
+import { CANVAS_MENU, SELECTION_ACTIONS, actionsIn, enabledFor, menuFor, shownFor, toolbarSlots } from './selection-actions';
 
 describe('group and ungroup', () => {
   const box = { id: '1', type: 'motion', data: { kind: 'element' } };
@@ -39,6 +39,7 @@ describe('group and ungroup', () => {
       ['tidy-up', 'Mod+Alt+T'],
       ['stack', 'Shift+A'],
       ['section-selection', 'Shift+S'],
+      ['run-technique-rows', null],
       ['edit-technique', null],
       ['detach-technique', null],
       ['save-technique', null],
@@ -150,6 +151,8 @@ describe('enabledFor', () => {
     expect(shownFor('run-technique', [technique])).toBe(true);
     expect(shownFor('detach-technique', [technique])).toBe(true);
     expect(shownFor('edit-technique', [technique, technique])).toBe(false);
+    expect(shownFor('run-technique-rows', [technique])).toBe(true);
+    expect(shownFor('run-technique-rows', [technique, technique])).toBe(false);
     expect(shownFor('run-technique', [{ type: 'text', data: {} }])).toBe(false);
   });
 
@@ -201,5 +204,17 @@ describe('combine into video', () => {
     expect(shownFor('combine-video', [frame])).toBe(false);
     expect(shownFor('combine-video', [frame, { type: 'motion', data: { format: '16:9', kind: 'element' } }])).toBe(false);
     expect(CANVAS_MENU.map((a) => a.id)).toContain('combine-video');
+  });
+});
+
+describe('the selection bar shows a few actions and folds the rest', () => {
+  const byId = (ids: string[]) => SELECTION_ACTIONS.filter((a) => ids.includes(a.id));
+
+  it('pins the most used actions in priority order and moves the rest to the overflow, delete last', () => {
+    const slots = toolbarSlots(byId(['upscale-image', 'connect-new', 'duplicate', 'run-downstream', 'remove-background', 'export', 'delete']));
+
+    expect(slots.pinned.map((a) => a.id)).toEqual(['duplicate', 'run-downstream', 'upscale-image']);
+    expect(slots.overflow.map((a) => a.id)).toEqual(['remove-background', 'connect-new', 'export']);
+    expect(slots.danger.map((a) => a.id)).toEqual(['delete']);
   });
 });

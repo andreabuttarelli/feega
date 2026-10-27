@@ -161,7 +161,7 @@ test.describe('free text on the canvas @real', () => {
     for (const name of ['Weight', 'Size', 'Tracking', 'Leading']) {
       await expect(props.locator(`[data-field="${name}"]`), `${name} is in the inspector`).toBeVisible();
     }
-    for (const label of ['Font', 'Align', 'Resizing', 'Fill']) {
+    for (const label of ['Font', 'Text align', 'Resizing', 'Fill']) {
       await expect(props.getByText(label, { exact: true }).first(), `${label} is in the inspector`).toBeAttached();
     }
     const shownPx = Number(await field.inputValue());

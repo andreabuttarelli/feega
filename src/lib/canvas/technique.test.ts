@@ -88,3 +88,13 @@ describe('withInputs', () => {
     expect(withInputs(plan, [{ node: 9, value: 'x' }])).toEqual(plan);
   });
 });
+
+describe('withInputs media slots', () => {
+  it('puts an image slot value in the url of that node', () => {
+    const plan = { nodes: [{ sourceIndex: 0, type: 'image', x: 0, y: 0, width: 1, height: 1, data: {} }], edges: [] } as never;
+
+    const out = withInputs(plan, [{ node: 0, value: 'https://x/i.png' }]);
+
+    expect(out.nodes[0].data).toMatchObject({ url: 'https://x/i.png' });
+  });
+});

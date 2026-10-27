@@ -11,6 +11,10 @@ export type Packaged = { ok: true; technique: Technique } | { ok: false; reason:
 
 const DOC_TYPE = 'doc';
 
+const MEDIA_TYPES = new Set(['image', 'video', 'audio']);
+
+const slotKey = (type: string) => (type === DOC_TYPE ? 'content' : MEDIA_TYPES.has(type) ? 'url' : 'prompt');
+
 export function packageTechnique(input: { ids: string[]; nodes: DuplicateNode[]; edges: DuplicateEdge[] }): Packaged {
   const asGenerative = new Map(input.ids.map((id) => [id, [...GENERATIVE_TYPES][0]]));
   const valid = planWorkflow(input.ids, input.edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target })), asGenerative);
@@ -45,8 +49,7 @@ export function withInputs(plan: DuplicatePlan, values: SlotValue[]): DuplicateP
       return n;
     }
 
-    const key = n.type === DOC_TYPE ? 'content' : 'prompt';
-    return { ...n, data: { ...n.data, [key]: given.value } };
+    return { ...n, data: { ...n.data, [slotKey(n.type)]: given.value } };
   });
 
   return { ...plan, nodes };
