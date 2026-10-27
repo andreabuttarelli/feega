@@ -28,6 +28,7 @@
     onselect: (id: string, provider: string | null) => void;
   } = $props();
 
+  const ROW = 'data-highlighted:bg-foreground/10 data-[state=open]:bg-foreground/10';
   const SUB_MENU = 'z-50 w-64 max-h-96 overflow-y-auto rounded-md bg-ui-raised p-1 text-ui-text shadow-ui-float';
 
   let open = $state(false);
@@ -78,7 +79,7 @@
   {@const tiers = medium ? routeTiers(choice, medium, params) : {}}
   {#each choice.routes ?? [] as route (route.provider)}
     {@const chosen = choice.id === value && (provider ?? AUTO_ROUTE) === route.provider}
-    <DropdownMenu.Item class="items-start" data-testid={`route-${route.provider}`} onSelect={() => pick(choice.id, route.provider)}>
+    <DropdownMenu.Item class="items-start {ROW}" data-testid={`route-${route.provider}`} onSelect={() => pick(choice.id, route.provider)}>
       <span class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span class="flex items-center gap-2">
           <span class="truncate font-medium">{route.provider === AUTO_ROUTE ? 'Auto' : route.label}</span>
@@ -101,7 +102,7 @@
   {@const chosen = choice.id === value}
   {#if routed(choice)}
     <DropdownMenu.Sub>
-      <DropdownMenu.SubTrigger data-testid={`model-${choice.id}`}>
+      <DropdownMenu.SubTrigger class={ROW} data-testid={`model-${choice.id}`}>
         <span class="truncate">{choice.label}</span>
         {@render badges(choice)}
         {#if chosen}<Check class="ml-auto size-3.5" aria-hidden="true" />{/if}
@@ -114,7 +115,7 @@
       </DropdownMenu.Portal>
     </DropdownMenu.Sub>
   {:else}
-    <DropdownMenu.Item data-testid={`model-${choice.id}`} onSelect={() => pick(choice.id, null)}>
+    <DropdownMenu.Item class={ROW} data-testid={`model-${choice.id}`} onSelect={() => pick(choice.id, null)}>
       <span class="truncate">{choice.label}</span>
       {@render badges(choice)}
       <Check class="ml-auto size-3.5 {chosen ? '' : 'invisible'}" aria-hidden="true" />
@@ -161,7 +162,7 @@
     {:else}
       {#each groups as group (group.id)}
         <DropdownMenu.Sub>
-          <DropdownMenu.SubTrigger data-testid={`family-${group.id}`}>
+          <DropdownMenu.SubTrigger class={ROW} data-testid={`family-${group.id}`}>
             {#if group.id !== RECOMMENDED_GROUP}<ProviderIcon provider={group.id} />{/if}
             <span class="truncate">{group.label}</span>
           </DropdownMenu.SubTrigger>

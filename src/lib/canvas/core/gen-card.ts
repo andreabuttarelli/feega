@@ -43,13 +43,17 @@ const BORDER = 1;
 const SHADOW_DROP = 2;
 const SHADOW_OPACITY = 0.06;
 const SHADOW = '#000000';
-const CARD_RADIUS = 10;
+export const CARD_RADIUS = 10;
 const INSET = 6;
 const WELL_RADIUS = 6;
 const FOOT_PAD = { top: 6, side: INSET, bottom: INSET };
 const PROMPT = { size: 12.5, leading: 1.45, padX: 10, padY: 8, rows: 2 };
 const ACTIONS_GAP = 6;
-const BUTTON = { size: 12, leading: 1.5, padX: 12, height: 30, gap: 8, radius: WELL_RADIUS };
+const BUTTON = { size: 12, leading: 1.5, padX: 10, height: 28, gap: 6, radius: WELL_RADIUS };
+const BAR = { inset: 8, height: 40, radius: WELL_RADIUS, pad: 6, textPad: 4, tool: 28, alpha: 0.94 };
+const COMPACT_MEDIA: ReadonlySet<GenTileView['medium']> = new Set(['text', 'image', 'video']);
+
+export const cardRadiusOf = (kind: string): number | undefined => (COMPACT_MEDIA.has(kind as GenTileView['medium']) ? CARD_RADIUS : undefined);
 const CREDIT = { icon: 12.6, gap: 3.6 };
 const CREDIT_ALPHA = 0.75;
 const WARN = { size: 11, leading: 1.5 };
@@ -351,18 +355,89 @@ function bands(c: Box, v: GenTileView) {
   return { refs, strip, foot, body: { x: INSET, y: INSET, w: c.w - 2 * INSET, h: foot - strip - refs - INSET } };
 }
 
-export const genBody = (c: Box, v: GenTileView): Box => bands(c, v).body;
+const isCompact = (v: GenTileView) => COMPACT_MEDIA.has(v.medium);
+
+const showsBar = (v: GenTileView) => v.state !== 'done' || v.medium === 'text';
+
+const barBox = (c: Box): Box => ({ x: BAR.inset, y: c.h - BAR.inset - BAR.height, w: c.w - 2 * BAR.inset, h: BAR.height });
+
+const fullBody = (c: Box): Box => ({ x: BORDER, y: BORDER, w: c.w - 2 * BORDER, h: c.h - 2 * BORDER });
+
+const aboveBar = (c: Box, v: GenTileView): Box => ({ ...fullBody(c), h: (showsBar(v) ? barBox(c).y : c.h - BORDER) - BORDER });
+
+const PROMPT_LINE = PROMPT.size * PROMPT.leading;
+
+function bar(x: Ctx, v: GenTileView): PathItem[] {
+  const { c, theme } = x;
+  const b = barBox(c);
+  const mid = b.y + b.h / 2;
+  const run = button(x, GenPart.Run, v.run, b.x + b.w - BAR.pad, mid, true);
+  const loop = v.loop ? button(x, GenPart.Loop, v.loop, run.left - BUTTON.gap, mid, false) : null;
+  const edge = (loop ?? run).left - BUTTON.gap;
+  const typed = !!v.prompt;
+  const takesRefs = v.medium !== 'text';
+  const tool = { x: b.x + BAR.pad, y: mid - BAR.tool / 2, w: BAR.tool, h: BAR.tool };
+  const refs = takesRefs
+    ? [
+        solid(x.clip(GenPart.References), at(x, roundRect(tool.x, tool.y, tool.w, tool.h, BAR.radius)), theme.paper2),
+        { ...solid(x.clip(GenPart.References, 1), at(x, x.icons.references.map((k) => k.map((p, i) => (i % 2 === 0 ? p + tool.x + (BAR.tool - REFS.icon) / 2 : p + tool.y + (BAR.tool - REFS.icon) / 2)))), theme.inkSoft), rule: FillRule.Union }
+      ]
+    : [];
+  const textLeft = (takesRefs ? tool.x + tool.w + BAR.pad : b.x + BAR.pad) + BAR.textPad;
+  const prompt = v.hasBody
+    ? write(x, GenPart.PromptText, typed ? v.prompt : v.placeholder, PROMPT.size, typed ? theme.ink : theme.inkSoft, textLeft, mid - PROMPT_LINE / 2, { leading: PROMPT.leading, width: edge - textLeft, height: PROMPT_LINE }, x.glyphs, typed ? 1 : PLACEHOLDER_ALPHA)
+    : [];
+  return [
+    solid(x.clip(GenPart.Footer), at(x, roundRect(b.x, b.y, b.w, b.h, BAR.radius)), theme.line),
+    solid(x.clip(GenPart.Prompt), at(x, roundRect(b.x + BORDER, b.y + BORDER, b.w - 2 * BORDER, b.h - 2 * BORDER, BAR.radius - BORDER)), theme.paper, BAR.alpha),
+    ...refs,
+    ...prompt,
+    ...(loop?.items ?? []),
+    ...run.items
+  ];
+}
+
+function fullPrompt(x: Ctx, v: GenTileView): PathItem[] {
+  const { c, theme } = x;
+  const typed = !!v.prompt;
+  const left = BAR.inset + BAR.pad + BAR.textPad;
+  const top = BAR.inset + PROMPT.padY;
+  return write(x, GenPart.PromptText, typed ? v.prompt : v.placeholder, PROMPT.size, typed ? theme.ink : theme.inkSoft, left, top, { leading: PROMPT.leading, width: c.w - 2 * left, height: barBox(c).y - top - BAR.inset }, x.glyphs, typed ? 1 : PLACEHOLDER_ALPHA);
+}
+
+function compactItems(x: Ctx, v: GenTileView): PathItem[] {
+  const { c, theme } = x;
+  const b = fullBody(c);
+  const room = aboveBar(c, v);
+  const body = v.hasBody ? [solid(x.clip(GenPart.Body), at(x, roundRect(b.x, b.y, b.w, b.h, CARD_RADIUS - BORDER)), theme.paper2), ...BODIES[v.state](x, v, room)] : [];
+  const history = v.runs > 1 ? past(x, v, BAR.inset - PAST.padY) : [];
+  const prompt = v.hasBody ? [] : fullPrompt(x, v);
+  return [...panel(x, v.state === 'running'), ...body, ...prompt, ...history, ...(showsBar(v) ? bar(x, v) : [])];
+}
+
+export const genBody = (c: Box, v: GenTileView): Box => (isCompact(v) ? fullBody(c) : bands(c, v).body);
+
+const MATTE_INK = '#000000';
+
+export function genMatte(c: At, v: GenTileView): PathItem {
+  const b = genBody(c, v);
+  const radius = isCompact(v) ? CARD_RADIUS - BORDER : WELL_RADIUS;
+  return solid(`${c.id}:${GenPart.Body}:matte`, roundRect(c.x + b.x, c.y + b.y, b.w, b.h, radius), MATTE_INK);
+}
 
 export function genMark(c: At, v: GenTileView, kit: GenKit): PathItem[] {
   if (v.state !== 'done') {
     return [];
   }
   const x: Ctx = { ...kit, c, clip: (p, n) => (n ? `${c.id}:${p}:${n}` : `${c.id}:${p}`) };
-  return mark(x, bands(c, v).body);
+  return mark(x, genBody(c, v));
 }
 
 export function genItems(c: At, v: GenTileView, kit: GenKit): PathItem[] {
   const x: Ctx = { ...kit, c, clip: (p, n) => (n ? `${c.id}:${p}:${n}` : `${c.id}:${p}`) };
+  if (isCompact(v)) {
+    return compactItems(x, v);
+  }
   const { refs, strip, foot, body: bodyBox } = bands(c, v);
   const body = v.hasBody ? [solid(x.clip(GenPart.Body), at(x, roundRect(bodyBox.x, bodyBox.y, bodyBox.w, bodyBox.h, WELL_RADIUS)), kit.theme.paper2), ...BODIES[v.state](x, v, bodyBox)] : [];
   const history = strip ? past(x, v, foot - strip - refs) : [];

@@ -3,7 +3,7 @@ import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
-import { circle, line, rect, solid } from './shapes';
+import { circle, line, rect, reverse, roundRect, solid } from './shapes';
 
 export enum ChromePart {
   Hover = 'hover',
@@ -43,6 +43,7 @@ export type ChromeTile = {
   icon: number[][] | null;
   tag?: string | null;
   addBeside?: boolean;
+  radius?: number;
 };
 
 export type ChromeState = { ring: NodeChrome; handles: boolean; hovered: boolean; ringColor: string; names: boolean };
@@ -88,7 +89,16 @@ function outline(t: ChromeTile, width: number): number[] {
   return rect(t.x - inset, t.y - inset, t.width + 2 * inset, t.height + 2 * inset);
 }
 
-const band = (t: ChromeTile, width: number) => line(outline(t, width), width, true);
+function roundBand(t: ChromeTile, width: number, radius: number): number[][] {
+  const inner = RING_OFFSET;
+  const outer = RING_OFFSET + width;
+  return [
+    ...roundRect(t.x - outer, t.y - outer, t.width + 2 * outer, t.height + 2 * outer, radius + outer),
+    ...roundRect(t.x - inner, t.y - inner, t.width + 2 * inner, t.height + 2 * inner, radius + inner).map(reverse)
+  ];
+}
+
+const band = (t: ChromeTile, width: number) => (t.radius ? roundBand(t, width, t.radius) : line(outline(t, width), width, true));
 
 function hover(t: StateTile): PathItem[] {
   if (!t.hovered || t.ring !== NodeChrome.None) {

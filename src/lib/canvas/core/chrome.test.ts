@@ -192,3 +192,15 @@ describe('tileChrome', () => {
     expect(right).toBeLessThanOrEqual(400);
   });
 });
+
+describe('a rounded node gets a rounded selection ring', () => {
+  const ringOf = (over: Partial<StateTile>) => stateChrome(tile({ ring: NodeChrome.Selected, ...over }), glyphs).find((i) => i.clip === `n1:${ChromePart.Ring}`)!;
+
+  it('follows the corner radius instead of drawing a square around it', () => {
+    const square = ringOf({});
+    const round = ringOf({ radius: 10 });
+
+    expect(box(round.contours)).toEqual(box(square.contours));
+    expect(round.contours.flat().length).toBeGreaterThan(square.contours.flat().length);
+  });
+});

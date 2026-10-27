@@ -4159,6 +4159,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             example={exampleFor(row)}
             skills={skillShelf.list}
             onsaveskill={(name, body) => saveSkill(data.projectId, name, body)}
+            {selected}
           >
             {#snippet result({ refId, text })}
               <!-- `/c/<tela>/assets/<id>` firma lo storage al volo: un URL firmato messo qui

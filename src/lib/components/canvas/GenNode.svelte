@@ -40,7 +40,8 @@
     references,
     example = null,
     skills = [],
-    onsaveskill
+    onsaveskill,
+    selected = false
   }: {
     node: GenNode;
     choices?: ModelChoice[];
@@ -69,7 +70,11 @@
     example?: DemoResult | null;
     skills?: PromptSkill[];
     onsaveskill?: (name: string, body: string) => Promise<boolean>;
+    selected?: boolean;
   } = $props();
+
+  const COMPACT_MEDIA: ReadonlySet<GenNode['medium']> = new Set(['text', 'image', 'video']);
+  const compact = $derived(COMPACT_MEDIA.has(node.medium));
 
   let slash = $state<SlashQuery | null>(null);
   let picked = $state(0);
@@ -187,7 +192,35 @@
   }
 </script>
 
-<div class="gen" class:is-running={runState === 'running' || loopQueued > 0} use:measureHeight>
+{#snippet prompt()}
+  <textarea
+    class="gen-prompt nodrag"
+    class:is-full={!hasBody}
+    rows={compact && hasBody ? 1 : 2}
+    placeholder={PROMPT_PLACEHOLDER[node.medium]}
+    value={node.prompt}
+    bind:this={promptEl}
+    oninput={(e) => {
+      onchange?.({ prompt: e.currentTarget.value });
+      trackSlash(e.currentTarget);
+    }}
+    onkeydown={pickKey}
+    onblur={() => setTimeout(() => (slash = null), 150)}
+    use:scrollGuard
+  ></textarea>
+{/snippet}
+
+{#snippet refs()}
+  {#if references && node.medium !== 'text'}
+    {#if choice?.uncensored}
+      <p class="gen-uncensored-note nodrag">Uncensored models don't accept references</p>
+    {:else}
+      {@render references()}
+    {/if}
+  {/if}
+{/snippet}
+
+<div class="gen" class:is-compact={compact} class:is-done={runState === 'done'} class:is-selected={selected} class:is-running={runState === 'running' || loopQueued > 0} use:measureHeight>
   {#if hasBody}
     <div class="gen-body">
       {#if runState === 'running'}
@@ -244,30 +277,17 @@
     <p class="gen-route-note nodrag" data-testid="route-note">{node.routeNote}</p>
   {/if}
 
-  {#if references && node.medium !== 'text'}
-    {#if choice?.uncensored}
-      <p class="gen-uncensored-note nodrag">Uncensored models don't accept references</p>
-    {:else}
-      {@render references()}
-    {/if}
+  {#if !compact}
+    {@render refs()}
   {/if}
 
   <footer class="gen-foot" class:is-full={!hasBody}>
-    <textarea
-      class="gen-prompt nodrag"
-      class:is-full={!hasBody}
-      rows="2"
-      placeholder={PROMPT_PLACEHOLDER[node.medium]}
-      value={node.prompt}
-      bind:this={promptEl}
-      oninput={(e) => {
-        onchange?.({ prompt: e.currentTarget.value });
-        trackSlash(e.currentTarget);
-      }}
-      onkeydown={pickKey}
-      onblur={() => setTimeout(() => (slash = null), 150)}
-      use:scrollGuard
-    ></textarea>
+    {#if tooLong && blocked}
+      <span class="gen-warn">{blocked}{#if choice?.maxPromptChars} ({node.prompt.length}/{choice.maxPromptChars}){/if}</span>
+    {/if}
+    {#if !compact || !hasBody}
+      {@render prompt()}
+    {/if}
 
     {#if slash && matches.length > 0}
       <ul class="gen-skills nodrag" role="listbox" data-testid="skill-picker">
@@ -282,23 +302,26 @@
       </ul>
     {/if}
 
+    {#if naming !== null}
+      <form class="gen-skill-name nodrag" onsubmit={(e) => { e.preventDefault(); void saveNamed(); }}>
+        <input placeholder="skill-name" bind:value={naming} data-testid="skill-name" />
+        <button type="submit" disabled={!SKILL_NAME.test(naming.trim())}>Save</button>
+        <button type="button" onclick={() => (naming = null)}>Cancel</button>
+      </form>
+    {/if}
+
     <div class="gen-actions">
-      {#if onsaveskill && node.prompt.trim()}
-        {#if naming === null}
-          <button type="button" class="gen-skill-save nodrag" data-testid="skill-save" title="Save this prompt as a skill" onclick={() => (naming = '')}><BookmarkPlus size={14} strokeWidth={1.75} />Save as skill</button>
-        {:else}
-          <form class="gen-skill-name nodrag" onsubmit={(e) => { e.preventDefault(); void saveNamed(); }}>
-            <input placeholder="skill-name" bind:value={naming} data-testid="skill-name" />
-            <button type="submit" disabled={!SKILL_NAME.test(naming.trim())}>Save</button>
-            <button type="button" onclick={() => (naming = null)}>Cancel</button>
-          </form>
+      {#if compact}
+        {@render refs()}
+        {#if hasBody}
+          {@render prompt()}
         {/if}
       {/if}
-      {#if blocked}
-        <span class="gen-warn" class:is-soft={!tooLong}>
-          {blocked}{#if tooLong && choice?.maxPromptChars}
-            ({node.prompt.length}/{choice.maxPromptChars}){/if}
-        </span>
+      {#if onsaveskill && node.prompt.trim() && naming === null}
+        <button type="button" class="gen-skill-save nodrag" data-testid="skill-save" title="Save this prompt as a skill" aria-label="Save this prompt as a skill" onclick={() => (naming = '')}><BookmarkPlus size={14} strokeWidth={1.75} /></button>
+      {/if}
+      {#if !compact && blocked && !tooLong}
+        <span class="gen-warn is-soft">{blocked}</span>
       {/if}
       {#if variantsInFlight > 0 && oncancelloop}
         <button type="button" class="gen-loop" onclick={() => oncancelloop?.()}>
@@ -314,7 +337,7 @@
         </button>
       {/if}
       <span class="gen-run">
-        <button type="button" class="gen-cta" data-testid="gen-run" onclick={() => onrun?.()} disabled={!canRun}>
+        <button type="button" class="gen-cta" data-testid="gen-run" title={blocked ?? undefined} onclick={() => onrun?.()} disabled={!canRun}>
           {runLabelOf(quote)}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
         </button>
         {#if providerQuotes.length && !variableTextInput}
@@ -832,5 +855,136 @@
     .gen {
       transition: none;
     }
+  }
+  .gen.is-compact {
+    padding: 0;
+  }
+  .is-compact .gen-body {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    border-radius: calc(var(--ui-radius-lg, 10px) - 1px);
+  }
+  .is-compact:not(.is-done) .gen-body {
+    padding-bottom: 48px;
+  }
+  .is-compact .gen-foot {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 3;
+    padding: 0;
+    transition: opacity var(--ui-dur-fast, 120ms) ease;
+  }
+  .is-compact .gen-foot.is-full {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 8px 8px;
+  }
+  .is-compact.is-done:not(.is-selected):not(:hover):not(:focus-within) .gen-foot {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .is-compact .gen-actions {
+    height: auto;
+    min-height: 40px;
+    margin: 0;
+    align-items: flex-end;
+    gap: 6px;
+    padding: 5px;
+    border: 1px solid var(--line, #e5e5e5);
+    border-radius: var(--gen-well);
+    background: color-mix(in srgb, var(--paper, #fff) 94%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 6px 20px -10px rgb(0 0 0 / 0.35);
+  }
+  .is-compact .gen-actions .gen-prompt {
+    flex: 1;
+    min-width: 0;
+    height: 28px;
+    padding: 5px 4px;
+    border: 0;
+    border-radius: var(--ui-radius-sm, 4px);
+    background: transparent;
+    overflow: hidden;
+    transition: height var(--ui-dur, 200ms) var(--ui-ease, ease);
+  }
+  .is-compact .gen-actions .gen-prompt:focus {
+    height: 96px;
+    overflow: auto;
+    background: transparent;
+    box-shadow: none;
+  }
+  .is-compact .gen-foot.is-full .gen-prompt {
+    flex: 1;
+    margin: 8px 0;
+    padding: 0 10px;
+    border: 0;
+    background: transparent;
+  }
+  .is-compact .gen-foot.is-full .gen-prompt:focus {
+    box-shadow: none;
+  }
+  .is-compact .gen-actions :global(.refs) {
+    padding: 0;
+    gap: 4px;
+    flex-wrap: nowrap;
+  }
+  .is-compact .gen-actions :global(.refs-add) {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+    border: 0;
+  }
+  .is-compact .gen-actions :global(.refs-label) {
+    display: none;
+  }
+  .is-compact .gen-actions :global(.ref) {
+    width: 28px;
+    height: 28px;
+  }
+  .is-compact .gen-actions button,
+  .is-compact .gen-actions :global(button) {
+    height: 28px;
+  }
+  .is-compact .gen-skill-save {
+    width: 28px;
+    margin: 0;
+    padding: 0;
+    justify-content: center;
+  }
+  .is-compact .gen-past {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 3;
+    padding: 0;
+  }
+  .is-compact .gen-route-note {
+    position: absolute;
+    left: 12px;
+    bottom: 54px;
+    z-index: 3;
+  }
+  .gen-warn {
+    display: block;
+    margin-bottom: 4px;
+  }
+  .gen-skill-name {
+    margin: 0 0 6px;
+  }
+  .is-compact .gen-uncensored-note {
+    padding: 0 4px;
+    align-self: center;
+  }
+  .is-compact .gen-skills {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 6px);
   }
 </style>

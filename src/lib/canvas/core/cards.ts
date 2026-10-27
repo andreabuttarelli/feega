@@ -9,7 +9,7 @@ import { embedItems } from './embed-card';
 import { batchItems, effectsItems } from './media-card';
 import { selectItems } from './select-card';
 import { personItems, previewItems } from './source-card';
-import { genBody, genItems, genMark } from './gen-card';
+import { genBody, genItems, genMark, genMatte } from './gen-card';
 import { BODY_SIZE, BORDER, CardPart, DONE, ERROR, FOOTER_LINES, Fit, HEAD_H, HEAD_SIZE, PAD, ROW_GAP, ROW_H, ROW_THUMB, DOT_RADIUS, PILL_H, PILL_PAD, PROMPT_HINT, RUNNING, AUTO_MODEL, STAGE, STATUS_RADIUS, STATUS_TEXT_GAP, THUMB_GAP, at, body, image, panel, text, whole, type CardIcons, type CoreCard, type Ctx } from './card-kit';
 
 export { CardPart, type CoreCard };
@@ -22,7 +22,7 @@ function live(x: Ctx): Item[] | null {
   if (!gen || !icons) {
     return null;
   }
-  const media = c.face.media && gen.state === 'done' ? [image(x, CardPart.Media, c.face.media, genBody(c, gen), Fit.Contain)] : [];
+  const media = c.face.media && gen.state === 'done' ? [{ ...image(x, CardPart.Media, c.face.media, genBody(c, gen), Fit.Contain), matte: { items: [genMatte(c, gen)], luma: false, invert: false } }] : [];
   const kit = { theme: x.theme, glyphs: x.glyphs, bold: x.bold, icons };
   return [...genItems(c, gen, kit), ...media, ...genMark(c, gen, kit)];
 }

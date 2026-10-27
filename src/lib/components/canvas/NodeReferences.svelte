@@ -55,9 +55,9 @@
       </button>
     </span>
   {/each}
-  <button type="button" class="refs-add" data-control="references" onclick={() => (open = true)}>
+  <button type="button" class="refs-add" data-control="references" title="Add references" aria-label="Add references" onclick={() => (open = true)}>
     <ImagePlus size={14} strokeWidth={1.7} />
-    {references.length ? `References · ${references.length}` : 'Add references'}
+    <span class="refs-label">{references.length ? `References · ${references.length}` : 'Add references'}</span>
   </button>
 </div>
 

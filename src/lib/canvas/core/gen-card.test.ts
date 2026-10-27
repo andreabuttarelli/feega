@@ -39,20 +39,27 @@ const bounds = (i: PathItem) => {
 };
 
 describe('genItems', () => {
-  it('lays out an image node like the DOM tile: body, references band, footer', () => {
+  it('lets the media fill an image node, with the prompt bar floating over its bottom edge', () => {
     const items = draw(view());
 
-    expect(bounds(parts(items, GenPart.Body)[0])).toEqual([6, 6, 354, 313.8]);
-    expect(bounds(parts(items, GenPart.References)[0]).slice(0, 2)).toEqual([6, 319.8]);
-    expect(bounds(parts(items, GenPart.Prompt)[0])).toEqual([6, 363.8, 354, 418]);
+    expect(bounds(parts(items, GenPart.Body)[0])).toEqual([1, 1, 359, 459]);
+    expect(bounds(parts(items, GenPart.Footer)[0])).toEqual([8, 412, 352, 452]);
+    expect(bounds(parts(items, GenPart.References)[0])).toEqual([14, 418, 42, 446]);
     expect(parts(items, GenPart.Hint)).toHaveLength(1);
   });
 
-  it('fades a disabled run button and keeps it right aligned', () => {
+  it('shows only the media once an image is done', () => {
+    const items = draw(view({ state: 'done' }));
+
+    expect(parts(items, GenPart.Footer)).toHaveLength(0);
+    expect(parts(items, GenPart.Run)).toHaveLength(0);
+  });
+
+  it('fades a disabled run button and keeps it right aligned inside the bar', () => {
     const [button] = parts(draw(view()), GenPart.Run);
 
     expect(button.opacity).toBe(1);
-    expect(bounds(button)[2]).toBe(354);
+    expect(bounds(button)[2]).toBe(346);
     expect(button.paint).toEqual({ kind: 'solid', color: rgbaOf(mix(theme.accent, theme.paper, 0.35)) });
   });
 
@@ -69,7 +76,7 @@ describe('genItems', () => {
 
     expect(parts(items, GenPart.Body)).toHaveLength(0);
     expect(parts(items, GenPart.References)).toHaveLength(0);
-    expect(bounds(parts(items, GenPart.Prompt)[0])[1]).toBe(6);
+    expect(bounds(parts(items, GenPart.PromptText)[0])[1]).toBe(16);
   });
 
   it('shows dots and an unlock button while running, a reason and retry when failed', () => {
@@ -78,11 +85,10 @@ describe('genItems', () => {
     expect(parts(draw(view({ state: 'failed', error: 'boom' })), GenPart.FailWhy)).toHaveLength(1);
   });
 
-  it('draws the loop button and the warning when the tile has them', () => {
+  it('draws the loop button in the bar when the tile has one', () => {
     const items = draw(view({ loop: { label: 'Loop ×2', credits: '~0.08', variable: false, enabled: false, cancel: false } }));
 
     expect(parts(items, GenPart.Loop).length).toBeGreaterThan(0);
-    expect(parts(items, GenPart.Warn)).toHaveLength(1);
   });
 
   it('marks a finished output as AI-generated, and nothing before', () => {
