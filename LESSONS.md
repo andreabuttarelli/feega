@@ -14,6 +14,12 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Canvas performance
 
+### Perf numbers swing 6 to 57 fps on the same build: the machine is loaded
+**Signal:** zoom p5 at x4 reads 57, 29, 31, 56, 6 across five runs of one build; `uptime` load average is above 20 (other agents, Spotlight indexing a fresh build). **Move:** never compare a before batch with a later after batch. Serve both builds at once (two `vite preview` ports) and alternate before/after runs one at a time, so the load hits both alike; report the per-run values next to the median.
+
+### A sibling worktree turns unreadable mid-session
+**Signal:** `ls` in `../dazero-<task>` answers `Operation not permitted`, and the preview served from it dies with `ERR_CONNECTION_REFUSED`. The agent sandbox only allows the session's own checkout. **Move:** put the task worktree inside the allowed checkout (`.claude/worktrees/<name>`, gitignored), or work on a branch in the checkout itself.
+
 ### Panning zoomed in stalls on `submit` and the wasm encoder: count layers per frame
 
 **Signal:** pan at 70%+ zoom falls under 20 fps with frames of 500 ms to 2 s, a CPU profile led by `GPUQueue.submit`, `createBindGroup` and `PathEncoder` inside `gpu_core_bg.wasm`, nothing in JS; zoomed out it holds 60. **Move:** read the inclusive time of `layers::body` and `layers::mask`, not the self time: every item with a mask, blur or filter is its own texture, vello render and queue submit, and one imported SVG carries about 600 masked paths. Hard path masks that only intersect are clips now (`clip_covers` in `scene.rs`); anything softer still costs a layer, so keep layers out of the frame being painted (`Layers::culled`). Run the harness at least three times: a run where the heavy frames are still caching while the pan starts looks fine or terrible at random.
