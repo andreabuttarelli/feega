@@ -41,10 +41,10 @@
  * per una volta, non sono in conflitto.
  */
 
-import { Framework as FrameworkName, type CodeFiles, type Framework } from './code-frame';
+import { Framework as FrameworkName, type CodeFiles, type Framework, type VarValues } from './code-frame';
 
 /** I due modi di riempire la tile. Quale sia lo dice quale campo è pieno: vedi `sourceOf`. */
-export const IFRAME_SOURCES = ['url', 'html', 'code'] as const;
+export const IFRAME_SOURCES = ['url', 'html', 'code', 'view'] as const;
 
 export type IframeSource = (typeof IFRAME_SOURCES)[number];
 
@@ -90,6 +90,9 @@ export type IframeNode = {
   html: string;
   framework: Framework;
   files: CodeFiles;
+  vars: VarValues;
+  sourceNodeId: string;
+  route: string;
 };
 
 export type UrlVerdict = { ok: true; url: string } | { ok: false; why: string };
@@ -147,7 +150,11 @@ export function normalizeEmbedUrl(raw: string): UrlVerdict {
  * SALVARLA così, ma un nodo appena nato sullo schermo lo è ancora, e deve aprirsi su un campo
  * invece di esplodere.
  */
-export function sourceOf(row: { url?: string | null; html?: string | null; files?: CodeFiles | null }): IframeSource {
+export function sourceOf(row: { url?: string | null; html?: string | null; files?: CodeFiles | null; sourceNodeId?: string | null }): IframeSource {
+  if (row.sourceNodeId) {
+    return 'view';
+  }
+
   if (row.files && Object.keys(row.files).length > 0) {
     return 'code';
   }

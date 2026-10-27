@@ -6,7 +6,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool cancel_node_loop 1`] = `"f92dcb4ab3229951252b7ca1976793be73be4eb5c58d91f4d0cd6639efc9318f"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool canvas_tool 1`] = `"548bd5fb5338897e525617b7217f5e8755c09e32e966e607782af8ea4fb23427"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool canvas_tool 1`] = `"598e5373cf8ab09f750b17690ba38896b570ea59b51626b8c106f9816286693e"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool connect_nodes 1`] = `"c750f821558c17d14b967ffcb1709f66491241d2eec28037415d46fd856ccb96"`;
 
@@ -285,6 +285,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op estimate_text_cost 1`] = `"da5ad9c9cd0a761bdb9f68cfbc06d0a2fddd735bf25e2af7f75c66e86eaf869a"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op export_canvas_file 1`] = `"5afe3a597c5b75e87f9ad263d768300f19f11d004a2bd2ac346077386f54d9a5"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op export_code_frame 1`] = `"7273293919fea65923edcb5e5596c4a0320882ef1231b83e74f497a0d741d9b5"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op export_image 1`] = `"67bfe09d99419024937d5b0c08733654343fb6b7c3c61a4a30954d53da9f5d82"`;
 
@@ -739,6 +741,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema estimate_text_cost 1`] = `"4ec71def23eab3aaaf4f6ba5cf7d6ecb92724d63a2fd9c3674b2052e93563097"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema export_canvas_file 1`] = `"58b2d26ec12a51bb2b6921b48ed7aef6fe28480f5f7edfd15844f25aea426f7a"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema export_code_frame 1`] = `"e10bd49d80a62b3bc16b8c655d0631439cb3147ffb85d343eaac07956868b791"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema export_image 1`] = `"d6bdbd37d8cab71ea4fc8c50f345cde8748bdfe2d1c41412e9defd74a0aec1d1"`;
 

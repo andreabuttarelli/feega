@@ -18,12 +18,15 @@ const node = (over: Partial<IframeNode> = {}): IframeNode => ({
   html: '',
   framework: Framework.React,
   files: {},
+  vars: {},
+  sourceNodeId: '',
+  route: '/',
   ...over
 });
 
 describe('i due modi di riempire un iframe', () => {
-  it('sono tre, e nient altro', () => {
-    expect(IFRAME_SOURCES).toEqual(['url', 'html', 'code']);
+  it('sono quattro, e nient altro', () => {
+    expect(IFRAME_SOURCES).toEqual(['url', 'html', 'code', 'view']);
   });
 
   it('rifiuta un modo inventato prima che arrivi al check', () => {

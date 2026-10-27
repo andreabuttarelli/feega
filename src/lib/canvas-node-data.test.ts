@@ -124,7 +124,10 @@ describe('una pagina incorporata, letta dalla riga', () => {
       url: 'https://esempio.it',
       html: '',
       framework: 'react',
-      files: {}
+      files: {},
+      vars: {},
+      sourceNodeId: '',
+      route: '/'
     });
   });
 

@@ -81,7 +81,7 @@ export enum ActionKind {
   Write = 'write'
 }
 
-const READ_ACTIONS: ReadonlySet<string> = new Set(['snapshot', 'revision', 'estimate_text_cost', 'audio_voices', 'voice_library', 'canvasComments']);
+const READ_ACTIONS: ReadonlySet<string> = new Set(['snapshot', 'revision', 'estimate_text_cost', 'audio_voices', 'voice_library', 'canvasComments', 'exportCode']);
 
 export function actionKind(action: string): ActionKind {
   return READ_ACTIONS.has(action) ? ActionKind.Read : ActionKind.Write;

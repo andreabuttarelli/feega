@@ -1,30 +1,86 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { CODE_ENTRY, codeFrameHtml, type CodeFiles, type Framework } from '$lib/canvas/code-frame';
+  import { onMount, untrack } from 'svelte';
+  import { CODE_ENTRY, codeFrameHtml, type CodeFiles, type Framework, type VarValues } from '$lib/canvas/code-frame';
+  import { varDecl, type VarDecl } from '$lib/canvas/code-vars';
   import { IFRAME_REFERRER_POLICY, IFRAME_SANDBOX } from '$lib/canvas/iframe-node';
-  import { CodeLanguage, type CodeView } from '$lib/components/motion/code-editor';
+  import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
+  import type { CodeLanguage, CodeView } from '$lib/components/motion/code-editor';
+  import CodeVarsPanel from './CodeVarsPanel.svelte';
+  import { forgetVars, rememberVars, varsOf } from '$lib/canvas/code-vars-registry.svelte';
 
   const RENDER_DEBOUNCE_MS = 500;
 
-  const LANGUAGE_BY_EXTENSION: [RegExp, CodeLanguage][] = [
-    [/\.css$/, CodeLanguage.Css],
-    [/\.svelte$/, CodeLanguage.Svelte],
-    [/./, CodeLanguage.Tsx]
+  const LANGUAGE_BY_EXTENSION: [RegExp, `${CodeLanguage}`][] = [
+    [/\.css$/, 'css'],
+    [/\.svelte$/, 'svelte'],
+    [/./, 'tsx']
   ];
 
-  const languageOf = (path: string) => LANGUAGE_BY_EXTENSION.find(([test]) => test.test(path))![1];
+  const languageOf = (path: string) => LANGUAGE_BY_EXTENSION.find(([test]) => test.test(path))![1] as CodeLanguage;
+
+  type FrameMessage = { type: 'feega:vars'; vars: { name: string; spec: unknown; shorthand: string }[] } | { type: 'feega:set'; name: string; value: string } | { type: 'feega:ready' };
 
   let {
     framework,
     files,
     editing,
-    onchange
+    route = '/',
+    vars,
+    selected = false,
+    label = 'Code frame',
+    owner,
+    onchange,
+    onvars
   }: {
     framework: Framework;
     files: CodeFiles;
     editing: boolean;
-    onchange: (files: CodeFiles) => void;
+    route?: string;
+    vars: VarValues;
+    selected?: boolean;
+    label?: string;
+    owner: string;
+    onchange?: (files: CodeFiles) => void;
+    onvars: (vars: VarValues) => void;
   } = $props();
+
+  let frame = $state<HTMLIFrameElement | null>(null);
+
+  function post(values: VarValues) {
+    frame?.contentWindow?.postMessage({ type: 'feega:values', values: $state.snapshot(values) }, '*');
+  }
+
+  $effect(() => post(vars));
+
+  function portalFirst(node: HTMLElement, target: HTMLElement) {
+    target.prepend(node);
+    return { destroy: () => node.remove() };
+  }
+
+  $effect(() => {
+    if (selected) {
+      untrack(() => rightBar.select(BarTab.Properties));
+    }
+  });
+
+  $effect(() => {
+    const listen = (e: MessageEvent<FrameMessage>) => {
+      if (!frame || e.source !== frame.contentWindow || !e.data) {
+        return;
+      }
+      if (e.data.type === 'feega:ready') {
+        post(vars);
+      }
+      if (e.data.type === 'feega:vars') {
+        rememberVars(owner, e.data.vars.map((v) => varDecl(v.name, v.spec, v.shorthand as VarDecl['type'])).filter((d): d is VarDecl => d !== null));
+      }
+      if (e.data.type === 'feega:set') {
+        onvars({ ...vars, [e.data.name]: e.data.value });
+      }
+    };
+    addEventListener('message', listen);
+    return () => removeEventListener('message', listen);
+  });
 
   const entry = $derived(CODE_ENTRY[framework]);
 
@@ -49,13 +105,14 @@
     }
   });
 
-  const html = $derived(codeFrameHtml(framework, shown));
+  const html = $derived(codeFrameHtml(framework, shown, { route, values: untrack(() => $state.snapshot(vars)) }));
 
   function commit() {
     timer = null;
+    forgetVars(owner);
     shown = { ...draft };
     committed = JSON.stringify(draft);
-    onchange({ ...draft });
+    onchange?.({ ...draft });
   }
 
   function edited(text: string) {
@@ -130,12 +187,19 @@
 <div class="code-body">
   <iframe
     title="Code frame"
+    bind:this={frame}
     data-testid="code-frame"
     srcdoc={html}
     sandbox={IFRAME_SANDBOX}
     referrerpolicy={IFRAME_REFERRER_POLICY}
   ></iframe>
 </div>
+
+{#if selected && rightBar.propertiesPane}
+  <div class="code-vars" use:portalFirst={rightBar.propertiesPane}>
+    <CodeVarsPanel {label} declared={varsOf(owner)} values={vars} onchange={onvars} />
+  </div>
+{/if}
 
 {#if editing}
   <footer class="code-editor nodrag nopan nowheel">

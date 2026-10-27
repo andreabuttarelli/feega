@@ -114,6 +114,12 @@ a fact of the model, not the node.
 An `iframe` node is also a **code frame**: `data.framework` (`react` | `svelte`) and `data.files`
 (path → source, entry `App.tsx` or `App.svelte` with a default export) render live React/Svelte on
 the canvas, with relative imports between files and bare npm imports from esm.sh.
+Copy, colours and settings go in **typed variables**, never literals: declare each with type,
+default and label, e.g. `feega.var('heroTitle', { type: 'text', default: 'Build faster', label: 'Hero title' })`
+(types: text, longtext, color, range/number with min/max/step, boolean, select with options, image,
+font). Set values with `update_node` `data.vars`; a value that breaks its type is refused. Views of
+other pages: iframe nodes with `{ sourceNodeId, route }`. `export_code_frame` returns a feega-free
+Vite project.
 
 `effects` holds a stack of image filters (pixelate, posterize, duotone, dither, halftone, noise,
 rgb-shift, glitch, wave, swirl, pinch, ascii, random-colors, shape-mosaic, shape-cutout) over an

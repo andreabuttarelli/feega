@@ -83,7 +83,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { CoachStep, ONBOARDING_EVENT, OnboardingStatus, chainOf, stepOf, type CoachChain } from '$lib/onboarding/coach';
   import { DEMO_PRESET, exampleFor, isDemoMedium } from '$lib/onboarding/demo';
   import OnboardingCoach from '$lib/components/canvas/OnboardingCoach.svelte';
-  import { offCentre, placeBeside, placeNear, type Rect } from '$lib/canvas/placement';
+  import { offCentre, placeBeside, placeInRow, placeNear, type Rect } from '$lib/canvas/placement';
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
@@ -94,6 +94,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
+  import type { ExportMode } from '$lib/canvas/code-frame';
   import DocNode from '$lib/components/canvas/DocNode.svelte';
   import ProductsNode from '$lib/components/canvas/ProductsNode.svelte';
   import SocialFeedNode from '$lib/components/canvas/SocialFeedNode.svelte';
@@ -2151,6 +2152,48 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return { items: [{ kind: 'node.create', nodeId: node.id, after: { type: node.type, position: node.position, data: node.data } }] };
   }
 
+  async function openCodeView(sourceId: string, route: string) {
+    const source = nodes.find((n) => n.id === sourceId);
+    if (!source) {
+      return;
+    }
+
+    const spot = placeInRow({ x: source.x, y: source.y, w: source.w, h: source.h }, occupiedRects());
+    const res = await post('create', {
+      type: 'iframe',
+      x: spot.x,
+      y: spot.y,
+      width: source.w,
+      height: source.h,
+      data: JSON.stringify({ sourceNodeId: sourceId, route })
+    });
+    const created = (res?.node ?? null) as CanvasNodeRecord | null;
+    if (!created) {
+      return;
+    }
+
+    nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })];
+    pushGesture(createGesture(created));
+    focusOn([created.id]);
+  }
+
+  async function exportCode(id: string, mode: ExportMode) {
+    const res = await post('exportCode', { node_id: id, mode });
+    const files = res?.files as Record<string, string> | undefined;
+    if (!files) {
+      return;
+    }
+
+    const folder = String(res?.folder ?? 'code-frame');
+    const { zipFolder } = await import('$lib/canvas/code-zip');
+    const zip = zipFolder(folder, files);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([zip as BlobPart], { type: 'application/zip' }));
+    link.download = `${folder}.zip`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
   async function create(what: Addable, at: { x: number; y: number }) {
     const size = sizeForAddable(what);
     const spot = placeNear(at, size, occupiedRects());
@@ -4186,7 +4229,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             {/snippet}
           </GenNode>
         {:else if frame}
-          <IframeNode node={frame} onchange={(patch) => write(id, frameData({ ...frame, ...patch }))} />
+          {@const codeRow = frame.source === 'view' ? nodes.find((n) => n.id === frame.sourceNodeId) : null}
+          {@const code = codeRow ? frameOf(codeRow) : null}
+          {@const owner = frame.source === 'view' ? code : frame}
+          <IframeNode
+            node={frame}
+            {code}
+            {selected}
+            onchange={(patch) => write(id, frameData({ ...frame, ...patch }))}
+            onvars={(vars) => owner && write(owner.id, frameData({ ...owner, vars }))}
+            onview={(route) => void openCodeView(id, route)}
+            onexport={(mode) => void exportCode(owner?.id ?? id, mode)}
+          />
         {:else if doc}
           <DocNode
             node={doc}
