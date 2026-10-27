@@ -3380,3 +3380,12 @@ Signal: clicking `<a href="#/pricing">` in a code frame leaves an empty page at 
 ### A below-the-fold image collage costs Lighthouse mobile points even with `loading="lazy"`
 
 **Signal:** home mobile score drops from 90 to 87 and LCP from 3.2 s to 3.7 s after adding a section of images a viewport below the hero; the LCP element is still the hero poster. **Move:** native lazy loading fetches within about a viewport and a half, and those requests compete with the poster and the hero video. Mount the tiles from an `IntersectionObserver` (`Collage.svelte`) and reserve the height with `aspect-ratio` so CLS stays 0. Measure against a build of `origin/dev`, not against the target alone.
+
+### A perf harness run through tsx reports 0 frames
+**Signal:** every sweep in `scripts/perf` prints `fps null`/`frames 0`, yet the page's own HUD shows 59 fps. **Move:** tsx (esbuild `keepNames`) wraps named functions in `__name(...)`, which the page does not define, so an `addInitScript` callback throws on its first line. Add `page.addInitScript({ content: 'window.__name = (f) => f;' })` before the others.
+
+### Core canvas frames are slow but the main thread is idle
+**Signal:** long frames on the core renderer with a flat JS profile; a Chrome trace shows `CrRendererMain` idle and `CrGpuMain` in `Queue::Submit` for 25+ ms. CPU throttling does not touch the GPU process. **Move:** record a Metal System Trace (`xcrun xctrace record --template 'Metal System Trace' --all-processes`) and look at Chrome's encoders: blits at the start of a command buffer are vello atlas copies. Never mark pictures dirty per render; vello 0.11 only loses the atlas after a patch-free scene (0x0 atlas), which `Engine` prevents with an off-target gradient.
+
+### A rebuilt wasm measured under `vite preview` is not the wasm you built
+**Signal:** after copying a new `gpu_core_bg.wasm` into `.svelte-kit/output/client`, the console shows `[canvas] core off: WebAssembly compilation aborted` and `ERR_CONTENT_LENGTH_MISMATCH`; the page silently runs the fallback renderer and the numbers look great. **Move:** sirv stats files at startup: restart `vite preview` after every swap. `scripts/perf/big-canvas.ts` now throws on `core off`.
