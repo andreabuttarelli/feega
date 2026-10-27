@@ -6,7 +6,7 @@ import { BROWSER_RENDER_DEADLINE_MS } from '$lib/motion/render-link';
 import { releaseHold } from '$lib/server/motion/render-run';
 import { MOTION_ASK_KIND } from '$lib/server/motion/ask-kind';
 import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
-import { promptRequired, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
+import { promptRequired, snapResolution, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { nearestVideoDuration, upscaleLimitsOf } from '$lib/video-models';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
 import {
@@ -738,9 +738,8 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
       const { generateImagesWithoutBrand } = await import('$lib/server/media-generate');
       const { offerableModels } = await import('$lib/server/offerable-models');
       const { extraParamsOf } = await import('$lib/canvas/model-params');
-      const declared = input.model
-        ? (await offerableModels(db, 'image')).choices.find((c) => c.id === input.model)?.params ?? []
-        : [];
+      const imageChoice = input.model ? (await offerableModels(db, 'image')).choices.find((c) => c.id === input.model) : undefined;
+      const declared = imageChoice?.params ?? [];
       const out = await generateImagesWithoutBrand(db as never, {
         orgId: input.orgId,
         userId: input.userId,
@@ -748,7 +747,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
         model: input.model ?? undefined,
         count: ONE_RENDER,
         aspectRatio: input.params.aspectRatio as never,
-        resolution: input.params.resolution,
+        resolution: imageChoice ? snapResolution(imageChoice, input.params.resolution) : input.params.resolution,
         // Un solo riferimento: `ImageJob.baseMediaId` è un campo, non una lista — anche quando il
         // modello ne accetterebbe di più (`upstream.referenceImageUrls`, dal catalogo in
         // `graph.ts`). Il tetto vero sta lì; qui si spedisce solo quel che il trasporto sa portare.
@@ -793,7 +792,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
       model: input.model ?? undefined,
       aspectRatio: input.params.aspectRatio as never,
       durationSeconds: offeredDuration(videoChoice?.durationOptions, input.params.duration),
-      resolution: input.params.resolution,
+      resolution: videoChoice ? snapResolution(videoChoice, input.params.resolution) : input.params.resolution,
       baseMediaId: upstream.startFrameUrl ?? undefined,
       lastFrameUrl: lastFrame[0],
       // `audio` è il campo che il toolbar scrive (ModelChoice.generateAudio, il suo controllo

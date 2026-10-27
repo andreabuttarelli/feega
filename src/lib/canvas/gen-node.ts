@@ -63,6 +63,7 @@ export type ModelChoice = {
     estimatedOutputTokens?: number;
   };
   creditOverrides?: Record<string, Record<string, number>>;
+  perSecondCredits?: PerSecondCredits;
   variableCredits?: boolean;
   /** I campi extra dichiarati da `ai_models.param_schema` per questo modello, oltre a quelli con
    *  un controllo già dedicato (`aspectRatio`, `resolution`…) — v. `model-params.ts`. Assente per
@@ -79,7 +80,14 @@ export type ModelChoice = {
   recommendedWhy?: string;
 };
 
-export type RoutePrice = Pick<ModelChoice, 'unitCredits' | 'pricedInputs' | 'creditOverrides' | 'variableCredits'>;
+export enum VideoAudio {
+  With = 'with',
+  Without = 'without'
+}
+
+export type PerSecondCredits = Partial<Record<VideoAudio, Record<string, number>>>;
+
+export type RoutePrice = Pick<ModelChoice, 'unitCredits' | 'pricedInputs' | 'creditOverrides' | 'variableCredits' | 'perSecondCredits'>;
 
 export type RouteStats = { successRate: number | null; p95Ms: number | null; healthy: boolean };
 
@@ -223,11 +231,18 @@ export function defaultParamsFor(choice: ModelChoice): GenParams {
  * gradino di snap per i due medium che hanno risoluzioni — `ModelChoice.resolutions` non dice da
  * quale medium viene.
  */
+export const PROVIDER_DEFAULT_RESOLUTION = '1K';
+
+export function defaultResolution(choice: ModelChoice): string | undefined {
+  const options = choice.resolutions;
+  return options?.includes(PROVIDER_DEFAULT_RESOLUTION) ? PROVIDER_DEFAULT_RESOLUTION : options?.[0];
+}
+
 export function snapResolution(choice: ModelChoice, saved: string | undefined): string | undefined {
   const options = choice.resolutions;
   if (!options?.length) return undefined;
   if (saved && options.includes(saved)) return saved;
-  return options[0];
+  return defaultResolution(choice);
 }
 
 export function snapAspectRatio(choice: ModelChoice, saved: string | undefined): string | undefined {
@@ -251,8 +266,8 @@ export function promptTooLong(prompt: string, choice: ModelChoice): boolean {
  */
 const GEN_NODE_SIZES: Record<GenMedium, { w: number; h: number }> = {
   text: { w: 360, h: 220 },
-  image: { w: 360, h: 460 },
-  video: { w: 360, h: 460 },
+  image: { w: 360, h: 360 },
+  video: { w: 448, h: 252 },
   audio: { w: 360, h: 320 },
   model3d: { w: 360, h: 420 }
 };

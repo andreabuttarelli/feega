@@ -9,18 +9,24 @@ import {
   sourceOf,
   type IframeNode
 } from './iframe-node';
+import { Framework } from './code-frame';
 
 const node = (over: Partial<IframeNode> = {}): IframeNode => ({
   id: 'i1',
   source: 'url',
   url: 'https://example.com',
   html: '',
+  framework: Framework.React,
+  files: {},
+  vars: {},
+  sourceNodeId: '',
+  route: '/',
   ...over
 });
 
 describe('i due modi di riempire un iframe', () => {
-  it('sono due, e nient altro', () => {
-    expect(IFRAME_SOURCES).toEqual(['url', 'html']);
+  it('sono quattro, e nient altro', () => {
+    expect(IFRAME_SOURCES).toEqual(['url', 'html', 'code', 'view']);
   });
 
   it('rifiuta un modo inventato prima che arrivi al check', () => {

@@ -183,13 +183,16 @@
     width: 26px;
     height: 26px;
     padding: 0;
-    border: 1px solid var(--line, #e5e5e5);
-    background: var(--paper, #fff);
-    color: var(--ink, #1d1d1f);
+    border: 0;
+    border-radius: var(--ui-radius-md);
+    background: color-mix(in srgb, var(--ui-raised) 88%, transparent);
+    color: var(--ui-text);
+    box-shadow: var(--ui-shadow-float);
+    backdrop-filter: blur(8px);
     cursor: pointer;
   }
   .node-download-trigger:hover {
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-raised);
   }
 
   .node-download-menu {
@@ -200,6 +203,8 @@
     display: flex;
     flex-direction: column;
     min-width: 110px;
+    overflow: hidden;
+    border-radius: var(--ui-radius-md);
     border: 1px solid var(--line, #e5e5e5);
     background: var(--paper, #fff);
     box-shadow: 0 8px 24px -12px rgb(0 0 0 / 0.3);

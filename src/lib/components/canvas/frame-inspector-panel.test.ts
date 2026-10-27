@@ -58,11 +58,12 @@ describe('frame inspector panel', () => {
     expect(render(FrameInspectorPanel, { props: { session: null, tokens: FEEGA_TOKENS } }).body).toContain('data-testid="properties-empty"');
   });
 
-  it('shows the motion inspector and the clip bar for one element', () => {
+  it('shows the motion inspector with its actions in the header, not a clip bar strip, for one element', () => {
     const body = html(['a']);
 
     expect(body).toContain('data-testid="frame-inspector"');
-    expect(body).toContain('data-testid="clip-bar"');
+    expect(body).toContain('data-testid="header-actions"');
+    expect(body).not.toContain('data-testid="clip-bar"');
   });
 
   it('shows the inspector for several elements', () => {
