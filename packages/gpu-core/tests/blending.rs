@@ -33,3 +33,20 @@ fn a_blended_layer_composited_on_its_backdrop_matches_the_native_blend() {
     }
     assert_ne!(at(&native, 32, 16), at(&native, 4, 16));
 }
+
+const ADDED: &str = r#"{ "width": 64, "height": 32, "background": [0.5, 0.25, 0.1, 1], "items": [
+  { "kind": "path", "clip": "p", "contours": [[16, 0, 48, 0, 48, 32, 16, 32]], "rule": "nonzero",
+    "paint": { "kind": "solid", "color": [0.2, 0.4, 0.3, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blur": 0, "blend": "linear-dodge" } ] }"#;
+
+#[test]
+fn linear_dodge_adds_the_layer_to_its_backdrop_on_the_native_path() {
+    let mut renderer = Renderer::new().expect("a GPU adapter").blending(Blending::Native);
+    let pixels = renderer.render(&parse(ADDED).unwrap(), &Pictures::new()).unwrap().pixels;
+
+    let inside = at(&pixels, 32, 16);
+    let outside = at(&pixels, 4, 16);
+    for (value, channel) in [(0.7f32, 0usize), (0.65, 1), (0.4, 2)] {
+        assert!((inside[channel] as f32 / 255.0 - value).abs() < 0.02, "{inside:?}");
+    }
+    assert!((outside[0] as f32 / 255.0 - 0.5).abs() < 0.02, "{outside:?}");
+}

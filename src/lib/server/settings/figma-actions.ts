@@ -43,7 +43,10 @@ export async function testFigmaToken({ locals }: Ev) {
     return fail(409, { figmaError: 'none' });
   }
   const me = await figmaMe(fetch, token);
-  return me.ok ? { figmaTested: me.handle } : fail(422, { figmaError: 'rejected' });
+  if (!me.ok) {
+    return fail(422, { figmaError: 'rejected' });
+  }
+  return me.handle === null ? { figmaTested: '', figmaNote: 'scope' } : { figmaTested: me.handle };
 }
 
 export async function removeFigmaToken({ locals }: Ev) {

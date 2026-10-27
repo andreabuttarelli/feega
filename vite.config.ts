@@ -107,6 +107,7 @@ export default defineConfig({
       'src/**/*.{test,spec}.{js,ts}',
       'packages/*/src/**/*.{test,spec}.{js,ts}',
       'packages/*.{test,spec}.{js,ts}',
+      'npx/**/*.test.mjs',
       'scripts/**/*.{test,spec}.{js,ts}',
       'docker/**/*.{test,spec}.{js,mjs,ts}',
       // I test della CLI sono scritti per `bun:test` e giravano solo se qualcuno lanciava

@@ -18,3 +18,11 @@ export function formatCredits(units: number, { approx = false }: { approx?: bool
     maximumFractionDigits: 2
   })}`;
 }
+
+export function formatPrice(units: number): string {
+  const value = units / DISPLAY_UNITS_PER_CREDIT;
+  if (value > 0 && value < MIN_DISPLAYED_VALUE) {
+    return `< $${MIN_DISPLAYED_VALUE.toFixed(2)}`;
+  }
+  return `$${value.toFixed(2)}`;
+}

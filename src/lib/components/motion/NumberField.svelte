@@ -243,12 +243,18 @@
   .named {
     background: linear-gradient(90deg, transparent var(--named-label), var(--ui-input) var(--named-label));
     border-color: transparent;
+    background-clip: padding-box;
     --named-label: 96px;
   }
 
   .named:hover,
   .named:focus-within {
     border-color: transparent;
+  }
+
+  .named::before {
+    left: var(--named-label);
+    border-radius: var(--ui-radius-sm);
   }
 
   .named .num:focus-visible {

@@ -58,7 +58,11 @@
 {:else if form?.figmaSaved}
   <Notice tone="success">{$_('app.settings.profile.figmaSaved')}</Notice>
 {:else if form?.figmaTested !== undefined}
-  <Notice tone="success">{$_('app.settings.profile.figmaTested')}</Notice>
+  <Notice tone="success">{$_(form.figmaNote === 'scope' ? 'app.settings.profile.figmaTestedScope' : 'app.settings.profile.figmaTested')}</Notice>
+{:else if form?.cloudDisconnected}
+  <Notice tone="success">{$_('app.settings.profile.cloudDisconnected')}</Notice>
+{:else if form?.cloudError}
+  <Notice tone="error">{$_('app.settings.profile.cloudInvalid')}</Notice>
 {:else if form?.figmaRemoved}
   <Notice tone="success">{$_('app.settings.profile.figmaRemoved')}</Notice>
 {:else if form?.figmaError}
@@ -158,6 +162,19 @@
       {/if}
     </div>
   </form>
+</Panel>
+
+<Panel title={$_('app.settings.profile.cloudTitle')} description={$_('app.settings.profile.cloudDesc')}>
+  {#each data.cloud as option (option.provider)}
+    <form method="POST" action="?/disconnectCloud" use:enhance={withBusy(option.provider)} class="m-0" data-testid={`cloud-${option.provider}`}>
+      <input type="hidden" name="provider" value={option.provider} />
+      <Field label={option.label} hint={option.connected ? $_('app.settings.profile.cloudConnected') : option.configured ? $_('app.settings.profile.cloudNotConnected') : $_('app.settings.profile.cloudNotConfigured')} layout={FieldLayout.Row}>
+        {#if option.connected}
+          <Button variant="secondary" type="submit" disabled={isBusy(option.provider)}>{$_('app.settings.profile.cloudDisconnect')}</Button>
+        {/if}
+      </Field>
+    </form>
+  {/each}
 </Panel>
 
 <Panel title={$_('app.settings.profile.session')}>

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db/client';
+const proxied = vi.hoisted(() => vi.fn(async () => null));
+vi.mock('./video-proxy', () => ({ createVideoProxy: proxied }));
+vi.mock('$lib/server/background-work', () => ({ runInBackground: (work: () => Promise<unknown>) => void work() }));
+
 import { registerCanvasUpload, registerUploadedAsset, UploadError } from './upload';
 
 const scope = { orgId: 'org', projectId: 'project', canvasId: 'canvas', x: 10, y: 20 };
@@ -129,5 +133,23 @@ describe('registrare un asset senza nodo (la libreria del progetto, non una tela
     });
 
     expect(kind).toBe('document');
+  });
+});
+
+describe('the proxy of an uploaded video', () => {
+  it('is requested for a video, from the stored original', async () => {
+    proxied.mockClear();
+    const { db } = storageDb();
+    await registerUploadedAsset(db, { orgId: scope.orgId, projectId: scope.projectId, path: 'org/project/clip.mp4', fileName: 'clip.mp4', mimeType: 'video/mp4', bytes: 100 });
+
+    expect(proxied).toHaveBeenCalledWith(db, { orgId: scope.orgId, assetId: 'asset-1', path: 'org/project/clip.mp4' });
+  });
+
+  it('is not requested for an image', async () => {
+    proxied.mockClear();
+    const { db } = storageDb();
+    await registerUploadedAsset(db, { orgId: scope.orgId, projectId: scope.projectId, path, fileName: 'foto.png', mimeType: 'image/png', bytes: 100 });
+
+    expect(proxied).not.toHaveBeenCalled();
   });
 });

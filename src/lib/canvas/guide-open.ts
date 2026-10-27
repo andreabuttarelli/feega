@@ -1,8 +1,7 @@
 import { writable } from 'svelte/store';
-import type { GuideSlug } from '$lib/content/guides';
 
-export const guideOpenRequest = writable<GuideSlug | null>(null);
+export const guideOpenRequest = writable<string | null>(null);
 
-export function requestGuide(slug: GuideSlug) {
-  guideOpenRequest.set(slug);
+export function requestGuide(path: string) {
+  guideOpenRequest.set(path);
 }

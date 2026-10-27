@@ -28,6 +28,12 @@ describe('image tools', () => {
     expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.RemoveBackground }).success).toBe(true);
   });
 
+  it('reframe reuses the edit model and needs an aspect, not a prompt', () => {
+    expect(IMAGE_TOOL_MODEL[ImageTool.Reframe]).toBe(IMAGE_TOOL_MODEL[ImageTool.Outpaint]);
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Reframe, aspect: '9:16' }).success).toBe(true);
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Reframe }).success).toBe(false);
+  });
+
   it('outpaint reuses the edit model, and needs a prompt and an extension', () => {
     expect(IMAGE_TOOL_MODEL[ImageTool.Outpaint]).toBe(IMAGE_TOOL_MODEL[ImageTool.Inpaint]);
     expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Outpaint, prompt: 'more sky', extend: { top: 0.3 } }).success).toBe(true);
