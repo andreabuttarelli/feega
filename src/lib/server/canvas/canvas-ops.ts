@@ -29,6 +29,8 @@ import { parseVariantsAsk } from '$lib/canvas/variants';
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
 import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-frame';
 import { imageToolAskSchema } from '$lib/image-tools';
+import { videoReframeAskSchema } from '$lib/reframe';
+import { VIDEO_REFRAME_DEPS, startVideoReframe } from '$lib/server/canvas/video-reframe';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
@@ -1041,12 +1043,21 @@ export const CANVAS_OPS = {
     input: imageToolAskSchema,
     run: async (ctx, input) => {
       const started = await ctx.billed(() =>
-        startImageTool(ctx.db, IMAGE_TOOL_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, tool: input.tool, factor: input.factor, prompt: input.prompt, mask: input.mask, extend: input.extend, actor: ctx.actor })
+        startImageTool(ctx.db, IMAGE_TOOL_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, tool: input.tool, factor: input.factor, prompt: input.prompt, mask: input.mask, extend: input.extend, aspect: input.aspect, actor: ctx.actor })
       );
       if (!started.ok) {
         return { error: started.error };
       }
       return { nodeId: started.nodeId, ...outcomeOf(started.outcome) };
+    }
+  }),
+
+  video_reframe: op({
+    access: Access.Write,
+    input: videoReframeAskSchema,
+    run: async (ctx, input) => {
+      const started = await startVideoReframe(ctx.db, VIDEO_REFRAME_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, aspect: input.aspect, focus: input.focus, actor: ctx.actor });
+      return started.ok ? { outcome: 'done', nodeId: started.nodeId } : { error: started.error };
     }
   }),
 

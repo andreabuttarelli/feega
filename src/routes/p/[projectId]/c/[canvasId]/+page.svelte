@@ -232,6 +232,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import FigmaImportDialog from '$lib/components/canvas/FigmaImportDialog.svelte';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
   import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
+  import ReframeDialog from '$lib/components/canvas/ReframeDialog.svelte';
+  import type { Focus } from '$lib/reframe';
   import type { Extend } from '$lib/outpaint';
   import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
@@ -3452,6 +3454,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let formatsFor = $state<string | null>(null);
   let inpaintFor = $state<string | null>(null);
   let outpaintFor = $state<string | null>(null);
+  let reframeFor = $state<string | null>(null);
   let exportFor = $state<string[] | null>(null);
   let exportElements = $state<{ frameId: string; elementIds: string[] } | null>(null);
 
@@ -3489,6 +3492,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function outpaint(nodeId: string, prompt: string, extend: Extend) {
     landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
+    void invalidate('app:credits');
+  }
+
+  async function reframe(nodeId: string, aspect: string, focus: Focus) {
+    const isVideo = nodes.find((n) => n.id === nodeId)?.type === 'video';
+    if (isVideo) {
+      landed(await post('videoReframe', { node_id: nodeId, aspect, focus: JSON.stringify(focus) }));
+      return;
+    }
+    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Reframe, aspect }));
     void invalidate('app:credits');
   }
 
@@ -4067,6 +4080,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if outpaintFor}
     <OutpaintDialog onapply={(prompt, extend) => outpaint(outpaintFor!, prompt, extend)} onclose={() => (outpaintFor = null)} />
   {/if}
+  {#if reframeFor}
+    <ReframeDialog medium={nodes.find((n) => n.id === reframeFor)?.type === 'video' ? 'video' : 'image'} onapply={(aspect, focus) => reframe(reframeFor!, aspect, focus)} onclose={() => (reframeFor = null)} />
+  {/if}
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(String(nodes.find((n) => n.id === inpaintFor)?.data?.refId ?? '')) ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
   {/if}
@@ -4116,6 +4132,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onImageTool={imageTool}
     onLayersToFrame={layersToFrame}
     onInpaint={(id) => (inpaintFor = id)}
+    onReframe={(id) => (reframeFor = id)}
     onOutpaint={(id) => (outpaintFor = id)}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}

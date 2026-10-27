@@ -3156,6 +3156,7 @@
     'upscale-image': (ids) => props.onImageTool?.(ids[0], ImageTool.Upscale),
     inpaint: (ids) => props.onInpaint?.(ids[0]),
     outpaint: (ids) => props.onOutpaint?.(ids[0]),
+    reframe: (ids) => props.onReframe?.(ids[0]),
     'split-layers': (ids) => props.onImageTool?.(ids[0], ImageTool.SplitLayers),
     'layers-to-frame': (ids) => props.onLayersToFrame?.(ids[0]),
     export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
