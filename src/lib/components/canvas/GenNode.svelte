@@ -272,7 +272,7 @@
           {:else if shownExample.medium === 'video'}
             <video src={shownExample.src} autoplay muted loop playsinline></video>
           {:else}
-            <img src={shownExample.src} alt={EXAMPLE_LABEL} />
+            <img draggable="false" src={shownExample.src} alt={EXAMPLE_LABEL} />
           {/if}
         </div>
       {:else}
@@ -285,7 +285,7 @@
       <span class="gen-strip-count">{withOutput.length}</span>
       {#each [...withOutput].reverse() as run (run.id)}
         <button type="button" class="gen-strip-one" class:is-shown={run.mediaId === node.refId} title={run.prompt} aria-label="Show this generation" aria-pressed={run.mediaId === node.refId} onclick={() => onshow?.(run.id)}>
-          <img src={thumbUrl(run.mediaId ?? '')} alt="" loading="lazy" decoding="async" />
+          <img draggable="false" src={thumbUrl(run.mediaId ?? '')} alt="" loading="lazy" decoding="async" />
         </button>
       {/each}
     </div>

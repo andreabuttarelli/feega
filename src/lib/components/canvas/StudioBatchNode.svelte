@@ -59,7 +59,7 @@
   {:else if card}
     <div class="thumbs" data-count={card.thumbs.length}>
       {#each card.thumbs as thumb (thumb)}
-        <img src={thumb} alt="" loading="lazy" />
+        <img draggable="false" src={thumb} alt="" loading="lazy" />
       {:else}
         <span class="empty"><Camera size={22} strokeWidth={1.5} /></span>
       {/each}
