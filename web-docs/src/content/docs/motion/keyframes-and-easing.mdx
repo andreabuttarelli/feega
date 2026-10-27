@@ -1,0 +1,51 @@
+---
+title: Keyframes and easing
+description: Animate properties over time.
+sidebar:
+  order: 2
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+## Design and Animate
+
+A switch under every frame (key `E`):
+
+- **Design:** moving an element moves the whole animation.
+- **Animate:** a change is keyed at the playhead.
+
+## Keyframes
+
+- **Animate to:** pick a property, type where it should end up; keyframes are created from the current value.
+- **In / Out presets:** one click for fade, slide, scale, blur, pop and typewriter. See [In and Out presets](/motion/in-out-presets/).
+- Reveal animated properties of the selection with the reveal commands (position, scale, rotation, opacity).
+- Logo, social post and canvas mock layers also animate width and height. An adjustment layer animates opacity, which is its strength: 0 leaves the picture untouched, 1 applies its effects fully.
+- Gradient stop colours, positions, angle, centre and radius can be keyframed.
+- A shape can morph into any other shape.
+- **Convert to keys** turns an expression into plain keyframes you can edit by hand.
+- Copy and paste keyframes with `Cmd+C` / `Cmd+V`.
+
+### Grow a logo, step by step
+
+<DemoVideo name="keyframe-size-strength" caption="Key a logo's width and height at two moments, then play it." />
+
+1. Select the logo layer in the timeline. Animate mode is on (key `E`, or the Animate switch under the frame).
+2. With the playhead at the start, set W and H in the Layout section: this keys the starting size.
+3. Move the playhead later in the ruler and set a bigger W and H: a second key is created.
+4. Press play. The logo grows between the two keys.
+
+Mockups (social post, canvas) work the same. For an adjustment layer, select it, set **Opacity** at two moments: the effect fades in or out.
+
+### From an agent, MCP or CLI
+
+`animate_to` keys the current value and a target for any animatable property:
+
+```json
+{ "op": "animate_to", "input": { "clip_id": "logo", "to": { "width": 0.3, "height": 0.3 }, "start": 0, "duration": 2 } }
+```
+
+`set_keyframes` gives full control over each key and its easing; for an adjustment layer use `prop: "opacity"`. `list_components` says what each component animates.
+
+## Easing
+
+**Unverified:** the list of easing curves and where the picker lives. The design rule in `DESIGN.md` is strong in-out expo-like curves with a tiny settle at the end; the editor's own list is in the motion code.

@@ -1,0 +1,63 @@
+---
+title: Connect Figma
+description: Add a Figma personal access token so pasted designs bring their images.
+sidebar:
+  order: 4
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="connect-figma" caption="Settings, Profile: paste a personal access token in the Figma panel and save it." />
+
+Pasting from Figma works without a token: layers and text land as they are. A token adds the images. Figma only puts an image's id on the clipboard, so feega needs your token to ask Figma for the picture.
+
+## Create the token in Figma
+
+1. In Figma, open your account menu, then **Settings**.
+2. Open the **Security** tab and find **Personal access tokens**.
+3. Choose **Generate new token**, give it a name such as `feega`, and set an expiry.
+4. Under scopes, turn on **File content: Read-only**. This is what feega calls to fetch a file's images.
+5. Optional: turn on **Current user: Read-only**. It only lets Test show your Figma handle. Without it, Test still passes and says the account name is hidden.
+6. Generate, then copy the token. Figma shows it once.
+
+## Add it to feega
+
+1. Open **Settings** in the left rail, then **Profile** under Account.
+2. In the **Figma** panel, paste the token into **Personal access token** and choose **Save token**.
+3. Choose **Test**. "Connected to Figma." means Figma accepted it. Without the Current user scope it says so and notes that images still work.
+
+Paste a Figma selection onto the canvas again. The grey placeholders fill with the real images in one step, and undo takes them back out.
+
+## Where the token lives
+
+The token belongs to you, not to the organisation or the project. It is stored encrypted and never sent back to the browser: the field is always empty, and a note says when one is saved. Paste a new token over it to replace it.
+
+To disconnect, open Settings, Profile, and choose **Remove** in the Figma panel. To cut access from Figma's side, delete the token under Personal access tokens in Figma.
+
+## Limits
+
+- 40 images per request, 12 requests per minute per person.
+- The token only sees files your Figma account can open.
+- Images are downloaded over https, up to 4 MB each.
+
+## Troubleshooting
+
+| What you see | Why | Fix |
+| --- | --- | --- |
+| "Add a Figma token in Settings to import images", after a paste | No token saved | Add one as above |
+| "Figma refused the token…" after a paste | Token expired, revoked, missing **File content** scope, or no access to that file | Generate a new token and paste again |
+| "Too many Figma image requests…" | The rate limit was hit | Wait a minute and paste again |
+| "Figma did not answer…" | Figma was down or unreachable | Paste again in a moment |
+| "Paste a valid Figma token." | The field was empty or the length is out of range | Copy the whole token |
+| "Figma did not accept this token." on Test | Token expired or revoked | Generate a new one |
+| "Save a token first." on Test | Nothing saved | Save a token, then Test |
+| "Figma tokens are not available yet." | The server cannot store tokens | Self-hosted: apply the latest database migrations |
+
+## From the CLI, MCP and API
+
+The token is set in the app only, and agents never see it. `feega figma-token <projectId>` and the MCP tool `figma_token_status` say whether one is saved. Once a token is saved, images fill automatically on paste in the app. The endpoints behind it:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/projects/{projectId}/figma-token` | `{ connected }` |
+| `POST` | `/api/v1/projects/{projectId}/figma-images` | `{ fileKey, hashes }`; answers `409 no_token` without a token, `422 token_rejected`, `429 rate_limited`, `502 unavailable` |

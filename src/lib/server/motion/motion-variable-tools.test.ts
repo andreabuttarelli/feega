@@ -28,4 +28,29 @@ describe('variable tools', () => {
     expect((await run('set_props', { clip_id: id, props: { color: '#ff0000' } })).ok).toBe(false);
     expect(((await run('variable', { action: 'list' })).variables as Record<string, unknown>).Theme).toBeDefined();
   });
+
+  it('bind_variable and unbind_variable link and free one prop', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0 });
+    const id = session.doc.tracks[0].clips[0].id;
+    await run('variable', { action: 'define', collection: 'Theme', name: 'ink', type: 'colour', values: { Light: '#111111', Dark: '#eeeeee' }, modes: ['Light', 'Dark'] });
+
+    expect((await run('bind_variable', { clip_id: id, target: 'color', variable: 'Theme/ink' })).ok).toBe(true);
+    expect(session.doc.tracks[0].clips[0].bind).toEqual({ color: 'Theme/ink' });
+
+    await run('variable', { action: 'mode', collection: 'Theme', mode: 'Dark' });
+    expect(session.doc.tracks[0].clips[0].props.color).toBe('#eeeeee');
+
+    expect((await run('unbind_variable', { clip_id: id, target: 'color' })).ok).toBe(true);
+    expect(session.doc.tracks[0].clips[0].bind).toBeUndefined();
+    expect((await run('set_props', { clip_id: id, props: { color: '#ff0000' } })).ok).toBe(true);
+  });
+
+  it('bind_variable refuses a variable of the wrong type with the targets that fit', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0 });
+    const id = session.doc.tracks[0].clips[0].id;
+    await run('variable', { action: 'define', collection: 'Size', name: 'big', type: 'number', values: { Default: 0.2 } });
+    expect((await run('bind_variable', { clip_id: id, target: 'color', variable: 'Size/big' })).ok).toBe(false);
+  });
 });

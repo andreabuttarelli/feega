@@ -1,6 +1,5 @@
 <script lang="ts">
   import { apiEnhance } from '$lib/dashboard/api-enhance';
-  import HomeHero from '$lib/components/app/HomeHero.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
@@ -147,8 +146,6 @@
   </div>
 
   <div class="scroll" data-testid="home-scroll">
-    <HomeHero />
-
     <div class="column">
       {#if recents.length}
         <section class="recents" aria-labelledby="recents-heading">

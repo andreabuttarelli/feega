@@ -9,6 +9,7 @@ import { faceEngineOf, loadFontsWith } from './text/engines';
 import type { Raster } from './raster';
 import { BACKENDS, type FullBackend } from './backends';
 import { createMedia } from './media';
+import type { VideoFrames } from './video-frames';
 import { mountCustomReads, type CustomReads } from './dom/custom';
 import type { Compose } from './dom/reader';
 
@@ -24,6 +25,7 @@ export type PlayerMount = {
   onfallback: (reason: unknown) => void;
   ongaps?: (gaps: number) => void;
   inputs?: () => LiveInputs;
+  frames?: VideoFrames;
 };
 
 export type Player = { show: (shown: Shown) => void; dispose: () => void; linkAt: (point: Point) => string | null; clipAt: (point: Point) => string | null };
@@ -38,7 +40,7 @@ const MS_PER_SECOND = 1000;
 export function mountPlayer(mount: PlayerMount): Player {
   const { canvas, host, backend, size, time, onfallback } = mount;
   const loadFonts = loadFontsWith(faceEngineOf(mount.faces ?? null));
-  const media = createMedia();
+  const media = createMedia({ frames: mount.frames });
   let shown: Shown | null = null;
   let typeset: Typeset = NO_TYPESET;
   let reads: Reads | null = null;

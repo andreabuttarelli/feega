@@ -7,6 +7,7 @@
   import { NAV_ICONS } from './nav-icons';
   import { ProjectMode, sectionAllowed } from '$lib/project-mode';
   import { page } from '$app/state';
+  import { Kbd } from '$lib/components/ui/shell';
 
   /**
    * LA RAIL FLOTTANTE: due gruppi separati da un divisore, e il divisore stesso dice il
@@ -72,7 +73,10 @@
         </button>
       {/snippet}
     </Tooltip.Trigger>
-    <Tooltip.Content side="right">{$_(entry.labelKey)}</Tooltip.Content>
+    <Tooltip.Content side="right">
+      {$_(entry.labelKey)}
+      {#if entry.shortcut}<Kbd shortcut={entry.shortcut} class="opacity-70" />{/if}
+    </Tooltip.Content>
   </Tooltip.Root>
 {/snippet}
 

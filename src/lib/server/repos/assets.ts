@@ -22,6 +22,7 @@ export type Asset = {
   projectId: string | null;
   type: AssetType;
   url: string | null;
+  proxyUrl: string | null;
   content: string | null;
   mimeType: string | null;
   bytes: number | null;
@@ -35,7 +36,7 @@ export type Asset = {
 };
 
 const ASSET_COLUMNS =
-  'id, project_id, type, url, content, mime_type, bytes, width, height, duration_s, source, source_node_id, uncensored, created_at';
+  'id, project_id, type, url, proxy_url, content, mime_type, bytes, width, height, duration_s, source, source_node_id, uncensored, created_at';
 
 type AssetColumns = Omit<AssetRow, 'org_id' | 'embedding' | 'updated_at' | 'uncensored_project' | 'ai_marked'>;
 
@@ -45,6 +46,7 @@ function toAsset(row: AssetColumns): Asset {
     projectId: row.project_id,
     type: row.type as AssetType,
     url: row.url,
+    proxyUrl: row.proxy_url,
     content: row.content,
     mimeType: row.mime_type,
     bytes: row.bytes === null ? null : Number(row.bytes),

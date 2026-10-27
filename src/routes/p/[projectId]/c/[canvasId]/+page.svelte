@@ -7,7 +7,7 @@
   import OutputViewer from '$lib/components/canvas/OutputViewer.svelte';
   import { OUTPUT_KIND_OF, viewableRuns, type OutputKind, type ViewerRun } from '$lib/canvas/run-info';
   import CloudPicker from '$lib/components/canvas/CloudPicker.svelte';
-  import { CloudMode, type CloudProviderId } from '$lib/canvas/cloud-picker';
+  import { CloudMode, cloudFailure, type CloudProviderId } from '$lib/canvas/cloud-picker';
   import NodeSearch from '$lib/components/canvas/NodeSearch.svelte';
   import { NODES_PARAM, idsFromLink, selectionLink } from '$lib/canvas/selection-link';
   import type { CommentThread } from '$lib/canvas/comment-threads';
@@ -18,6 +18,7 @@
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
   import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
+  import TechniqueRowsDialog from '$lib/components/canvas/TechniqueRowsDialog.svelte';
   import CanvasVersionsDialog from '$lib/components/canvas/CanvasVersionsDialog.svelte';
   import type { CanvasVersion } from '$lib/server/canvas/canvas-versions';
   import { localStore } from '$lib/browser-storage';
@@ -58,7 +59,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { syncOf } from '$lib/canvas/sync-status';
   import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
@@ -69,7 +70,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
   import { adoptCommitted, commitHub, rowsOf } from '$lib/canvas/commit-note';
   import { peerTracks } from '$lib/realtime/peer-tracks';
-  import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
+  import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, presentControlsShown, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import { LocalOff, isOff } from '$lib/local-user';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
@@ -185,6 +186,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   } from '$lib/canvas/list-node';
   import { verdictForUpload, canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { isFeegaFile } from '$lib/canvas/feega-file';
+  import { isLottieFile } from '$lib/canvas/lottie-file';
+  import { lottieSource } from '$lib/motion/import-lottie';
   import { importFeega } from '$lib/canvas/feega-transfer';
   import { FONT_FILE } from '$lib/motion/fonts/library';
   import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
@@ -209,7 +212,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
-  import { historyItemsOf, producedRuns } from '$lib/canvas/gen-history';
+  import { diffRuns, type RunDifference } from '$lib/canvas/run-diff';
+  import { historyItemsOf, producedRuns, shownOutput } from '$lib/canvas/gen-history';
   import { genTileView, type GenTileView } from '$lib/canvas/gen-tile-view';
   import { runQuoteOf, type RunQuote } from '$lib/canvas/run-quote';
   import { DEFAULT_INTO, DEFAULT_VARIANTS, VariantInto, browserVariantsStorage, effectiveVariants, readRemembered, variantsIntoOf, writeRemembered, type RememberedVariants } from '$lib/canvas/variants';
@@ -220,11 +224,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { connectorsFor, orphanedByModelChange, type ConnectorType, type GenerativeNodeKind, connectorsForNode } from '$lib/canvas/connectors';
   import { portsOf } from '$lib/canvas/node-ports';
   import { TECHNIQUE_NODE, TECHNIQUE_EDIT_PREFIX, instancePorts } from '$lib/canvas/technique-instance';
+  import type { ColumnMapping } from '$lib/canvas/technique-batch';
+  import type { TechniqueSlot } from '$lib/canvas/technique';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
+  import FigmaImportDialog from '$lib/components/canvas/FigmaImportDialog.svelte';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
   import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
+  import ReframeDialog from '$lib/components/canvas/ReframeDialog.svelte';
+  import type { Focus } from '$lib/reframe';
   import type { Extend } from '$lib/outpaint';
   import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
@@ -265,7 +274,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { BILLING_PATH } from '$lib/billing-path';
   import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
   import type { FigmaJob } from '$lib/canvas/figma/images';
-  import { ImagesOutcome } from '$lib/canvas/figma/fetch-images';
+  import { ImagesOutcome, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
+  import { connectionMessage } from '$lib/canvas/connection-messages';
 
   const LINK_COPIED_MS = 1500;
 
@@ -303,7 +313,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let viewing = $state<{ runs: ViewerRun[]; start: number; kind: OutputKind } | null>(null);
 
-  let pairing = $state<{ left: string; right: string; leftLabel: string; rightLabel: string } | null>(null);
+  let pairing = $state<{ left: string; right: string; leftLabel: string; rightLabel: string; diff?: RunDifference[] } | null>(null);
 
   function compareOutputs(ids: string[]) {
     const [a, b] = ids.map((id) => nodes.find((n) => n.id === id));
@@ -313,6 +323,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const urlOf = (assetId: string) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full);
     const nameOf = (n: typeof a) => n.displayName ?? (typeof n.data.prompt === 'string' ? n.data.prompt.slice(0, 24) : 'Image');
     pairing = { left: urlOf(a.data.refId), right: urlOf(b.data.refId), leftLabel: nameOf(a), rightLabel: nameOf(b) };
+  }
+
+  function compareRuns(nodeId: string, runA: string, runB: string) {
+    const all = runsByNode[nodeId] ?? [];
+    const a = all.find((r) => r.id === runA);
+    const b = all.find((r) => r.id === runB);
+    if (!a?.mediaId || !b?.mediaId) {
+      return;
+    }
+    const urlOf = (assetId: string) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full);
+    pairing = { left: urlOf(a.mediaId), right: urlOf(b.mediaId), leftLabel: 'A', rightLabel: 'B', diff: diffRuns(a, b) };
   }
 
   function viewOutput(id: string) {
@@ -345,7 +366,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       const res = await fetch(`${base}/import`, { method: 'POST', body: JSON.stringify({ fileId: target, place: { canvasId: data.canvas.id, x: at.x, y: at.y } }) });
       const body = (await res.json().catch(() => ({}))) as { node?: CanvasNodeRecord | null; error?: string };
       if (!res.ok || !body.node) {
-        failed = body.error ?? 'Import failed';
+        failed = cloudFailure(mode, body.error);
         return;
       }
       const created = body.node;
@@ -360,7 +381,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const res = await fetch(`${base}/export`, { method: 'POST', body: JSON.stringify({ assetId, folder: target }) });
     if (!res.ok) {
-      failed = 'Export failed';
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      failed = cloudFailure(mode, body.error);
       return;
     }
     cloud = null;
@@ -877,6 +899,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     model: string | null;
     startedAt: string;
     text?: string | null;
+    params?: Record<string, unknown> | null;
   }) {
     return {
       id: run.id,
@@ -884,7 +907,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       prompt: run.prompt ?? '',
       model: run.model,
       createdAt: run.startedAt,
-      text: run.text ?? null
+      text: run.text ?? null,
+      params: run.params ?? null
     };
   }
 
@@ -1412,6 +1436,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const OFFLINE_RUN_NOTICE = 'Offline: generating needs a connection. Your edits are kept and will save when you are back.';
   const LINE_REFUSED_NOTICE = 'A line change was refused by the canvas and was undone.';
   let outbox: Outbox | null = null;
+  const batchWrites = inFlightWrites();
   const saves = createSaveScheduler({
     send: sendSave,
     debounceMs: SAVE_DEBOUNCE_MS,
@@ -1873,7 +1898,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   function postAtVersion(action: string, id: string, fields: Fields): Promise<Record<string, unknown> | null> {
     let release = () => {};
     const asked = actAtVersion({
-      settle: async () => { await saves.flush(id); release = saves.hold(id); },
+      settle: async () => { await Promise.all([batchWrites.settled(), saves.flush(), lines.drain()]); release = saves.hold(id); },
       version: () => nodes.find((node) => node.id === id)?.version ?? 0,
       send: (version) => send(action, { ...fields, node_id: id, version }),
       reread: refresh
@@ -1939,6 +1964,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     if (isSvgFile(file)) {
       await pasteSvg(await file.text(), at);
+      return;
+    }
+    if (isLottieFile(file)) {
+      await importLottie(new Uint8Array(await file.arrayBuffer()), at);
       return;
     }
     const verdict = verdictForUpload(file.type, file.name, file.size);
@@ -2314,7 +2343,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const row = nodes.find((n) => n.id === id);
     const gen = row ? genOf(row) : null;
     const items = gen ? historyItemsOf({ ...gen, runs: runsByNode[id] ?? [] }) : [];
-    return gen && items.length ? { items, urlOf: assetUrl, onshow: (runId: string) => void restore(id, gen, runId) } : null;
+    return gen && items.length ? { items, urlOf: assetUrl, onshow: (runId: string) => void restore(id, gen, runId), oncompare: (a: string, b: string) => compareRuns(id, a, b) } : null;
   }
 
   function variantsInFlightFor(id: string): number {
@@ -2350,7 +2379,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  async function run(id: string, gen: GenNodeState) {
+  async function run(id: string, clicked: GenNodeState) {
+    await batchWrites.settled();
+    const row = nodes.find((node) => node.id === id);
+    const gen = (row ? genOf(row) : null) ?? clicked;
     if (gen.running) {
       return;
     }
@@ -2564,11 +2596,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    */
   /** Rimettere in vetrina un giro di prima: lo decide il server, che sa quale asset è quel giro. */
   async function restore(id: string, gen: GenNodeState, runId: string) {
-    const hit = (runsByNode[id] ?? []).find((r) => r.id === runId);
-    if (hit?.mediaId) {
+    const mediaId = (runsByNode[id] ?? []).find((r) => r.id === runId)?.mediaId;
+    if (mediaId) {
       nodes = nodes.map((node) =>
         node.id === id
-          ? { ...node, data: { ...node.data, refId: hit.mediaId, running: false, error: null } }
+          ? { ...node, data: shownOutput(node.data, { id: runId, mediaId }) }
           : node
       );
     }
@@ -3293,11 +3325,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       };
     });
 
-    const result = await post('batchWrite', { items: JSON.stringify(items) });
+    const patches = new Map(items.map((item) => [item.node_id, item.patch as Record<string, unknown>]));
+    nodes = nodes.map((n) => (patches.has(n.id) ? { ...n, data: { ...n.data, ...patches.get(n.id) } } : n));
+
+    const result = await batchWrites.track(ids, post('batchWrite', { items: JSON.stringify(items) }));
     const results = (result?.results ?? []) as { nodeId: string; outcome: string; node?: CanvasNodeRecord }[];
     const conflicts = results.filter((r) => r.outcome === 'conflict');
     if (conflicts.length) {
       failed = `${conflicts.length} node(s) not saved: changed by someone else meanwhile`;
+    }
+    if (!result || conflicts.length) {
+      await refresh();
     }
 
     const written = results.filter((r) => r.outcome === 'written' && r.node).map((r) => r.node as CanvasNodeRecord);
@@ -3418,6 +3456,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let formatsFor = $state<string | null>(null);
   let inpaintFor = $state<string | null>(null);
   let outpaintFor = $state<string | null>(null);
+  let reframeFor = $state<string | null>(null);
   let exportFor = $state<string[] | null>(null);
   let exportElements = $state<{ frameId: string; elementIds: string[] } | null>(null);
 
@@ -3455,6 +3494,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function outpaint(nodeId: string, prompt: string, extend: Extend) {
     landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
+    void invalidate('app:credits');
+  }
+
+  async function reframe(nodeId: string, aspect: string, focus: Focus) {
+    const isVideo = nodes.find((n) => n.id === nodeId)?.type === 'video';
+    if (isVideo) {
+      landed(await post('videoReframe', { node_id: nodeId, aspect, focus: JSON.stringify(focus) }));
+      return;
+    }
+    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Reframe, aspect }));
     void invalidate('app:credits');
   }
 
@@ -3540,11 +3589,49 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
+  const LOTTIE_SKIPPED = 'Imported from Lottie. Not carried over:';
+
+  async function importLottie(bytes: Uint8Array, at: { x: number; y: number }) {
+    const source = lottieSource(bytes);
+    if (typeof source === 'string') {
+      failed = source;
+      return;
+    }
+    const res = await post('importLottie', { lottie: JSON.stringify(source), at: JSON.stringify(at) });
+    const landedNodes = res?.outcome === 'done' ? ((res.nodes ?? []) as CanvasNodeRecord[]) : [];
+    if (!landedNodes.length) {
+      failed = 'This file is not a Lottie animation this canvas can read.';
+      return;
+    }
+    nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
+    const skipped = (res?.skipped ?? []) as string[];
+    if (skipped.length) {
+      failed = `${LOTTIE_SKIPPED} ${skipped.join('; ')}`;
+    }
+  }
+
+  let figmaImportAt = $state<{ x: number; y: number } | null>(null);
+
+  function figmaImported(landed: { nodes: unknown[]; undo: unknown[]; skipped: string[] }) {
+    const landedNodes = landed.nodes as CanvasNodeRecord[];
+    nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
+    pushGesture({ items: landed.undo as UndoItem[] });
+    focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
+    if (landed.skipped.length) {
+      failed = `${FIGMA_SKIPPED} ${landed.skipped.join('; ')}`;
+    }
+  }
+
   let figmaJobs = $state<FigmaJob[]>([]);
   let figmaTokenMissing = $state(false);
 
-  function figmaImagesAnswered(outcome: ImagesOutcome) {
-    figmaTokenMissing = outcome === ImagesOutcome.NoToken;
+  function figmaImagesAnswered(answer: ImagesAnswer) {
+    figmaTokenMissing = answer.outcome === ImagesOutcome.NoToken;
+    if (answer.outcome === ImagesOutcome.Failed) {
+      failed = connectionMessage(answer.error);
+    }
   }
 
   async function pasteSvg(svg: string, at: { x: number; y: number }) {
@@ -3684,6 +3771,35 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       techniqueNotice = 'Running. Results land on the Technique runs canvas.';
       void refresh();
     }
+  }
+
+  let rowsTechnique = $state<{ id: string; name: string; inputs: TechniqueSlot[] } | null>(null);
+
+  function openTechniqueRows(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const technique = node ? techniqueOfTile(node) : null;
+    rowsTechnique = technique ? { id: technique.id, name: technique.name, inputs: technique.inputs } : null;
+  }
+
+  const rowsFields = (rows: string[][], mapping: ColumnMapping) => ({ technique_id: rowsTechnique?.id ?? '', rows: JSON.stringify(rows), mapping: JSON.stringify(mapping) });
+
+  async function previewTechniqueRows(rows: string[][], mapping: ColumnMapping) {
+    const out = await post('preview_technique_rows', rowsFields(rows, mapping));
+    return out ? { rows: Number(out.rows), creditsPerRow: Number(out.creditsPerRow), credits: Number(out.credits) } : null;
+  }
+
+  async function startTechniqueRows(rows: string[][], mapping: ColumnMapping) {
+    const out = await post('run_technique_rows', rowsFields(rows, mapping));
+    return out ? { workflowIds: out.workflowIds as string[], runIds: out.runIds as string[] } : null;
+  }
+
+  async function techniqueRowsProgress(runIds: string[]) {
+    const out = await post('technique_rows_progress', { run_ids: JSON.stringify(runIds) });
+    return out ? { total: Number(out.total), done: Number(out.done), failed: Number(out.failed), running: Number(out.running) } : null;
+  }
+
+  async function cancelTechniqueRows(workflowIds: string[]) {
+    await post('cancel_technique_rows', { workflow_ids: JSON.stringify(workflowIds) });
   }
 
   async function editTechnique(ids: string[]) {
@@ -3882,12 +3998,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 <svelte:window onpointermovecapture={readResizeMode} onpointerupcapture={readResizeMode} />
 
 <div class="canvas" class:view-only={viewOnly}>
-  {#if peers.length || canvasPeers.length}
+  {#if peers.length || canvasPeers.length || presenting}
+    {@const onspotlight = isOff(LocalOff.Present) || !presentControlsShown({ others: peers.length, presenting }) ? undefined : spotlight}
     {#if topPeers}
-      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></Portal>
+      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /></Portal>
     {:else}
-      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></div>
+      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /></div>
     {/if}
+  {/if}
+  {#if presenting}
+    <div class="presenting" role="status" data-testid="presenting-banner">
+      You're presenting · {peers.length} here
+      <button type="button" data-testid="presenting-stop" onclick={() => spotlight(false)}>Stop</button>
+    </div>
   {/if}
   <CursorChat onchat={(chat) => cursors.port.update({ chat })} />
   <CanvasShortcutHelp />
@@ -3945,14 +4068,31 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if exportElements}
     <ExportDialog count={exportElements.elementIds.length} onexport={(rows) => exportPicked(exportElements!, rows)} onclose={() => (exportElements = null)} />
   {/if}
+  {#if rowsTechnique}
+    <TechniqueRowsDialog
+      name={rowsTechnique.name}
+      inputs={rowsTechnique.inputs}
+      onpreview={previewTechniqueRows}
+      onstart={startTechniqueRows}
+      onprogress={techniqueRowsProgress}
+      oncancel={cancelTechniqueRows}
+      onclose={() => (rowsTechnique = null)}
+    />
+  {/if}
   {#if versionsPanel.open}
     <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
   {/if}
   {#if outpaintFor}
     <OutpaintDialog onapply={(prompt, extend) => outpaint(outpaintFor!, prompt, extend)} onclose={() => (outpaintFor = null)} />
   {/if}
+  {#if reframeFor}
+    <ReframeDialog medium={nodes.find((n) => n.id === reframeFor)?.type === 'video' ? 'video' : 'image'} onapply={(aspect, focus) => reframe(reframeFor!, aspect, focus)} onclose={() => (reframeFor = null)} />
+  {/if}
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(String(nodes.find((n) => n.id === inpaintFor)?.data?.refId ?? '')) ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
+  {/if}
+  {#if figmaImportAt}
+    <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/p/{data.projectId}/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />
   {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
@@ -3997,6 +4137,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onImageTool={imageTool}
     onLayersToFrame={layersToFrame}
     onInpaint={(id) => (inpaintFor = id)}
+    onReframe={(id) => (reframeFor = id)}
     onOutpaint={(id) => (outpaintFor = id)}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}
@@ -4036,9 +4177,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onTechnique={insertTechnique}
     onSaveTechnique={saveTechnique}
     onRunTechnique={runTechniqueNode}
+    onRunTechniqueRows={openTechniqueRows}
     onEditTechnique={editTechnique}
     onDetachTechnique={detachTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
+    onFigmaImport={(at) => (figmaImportAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
     onRedo={() => inTurn(redo)}
