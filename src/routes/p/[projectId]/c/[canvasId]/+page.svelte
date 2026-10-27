@@ -186,6 +186,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   } from '$lib/canvas/list-node';
   import { verdictForUpload, canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { isFeegaFile } from '$lib/canvas/feega-file';
+  import { isLottieFile } from '$lib/canvas/lottie-file';
+  import { lottieSource } from '$lib/motion/import-lottie';
   import { importFeega } from '$lib/canvas/feega-transfer';
   import { FONT_FILE } from '$lib/motion/fonts/library';
   import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
@@ -1960,6 +1962,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       await pasteSvg(await file.text(), at);
       return;
     }
+    if (isLottieFile(file)) {
+      await importLottie(new Uint8Array(await file.arrayBuffer()), at);
+      return;
+    }
     const verdict = verdictForUpload(file.type, file.name, file.size);
     if (!verdict.ok) {
       failed = verdict.why;
@@ -3565,6 +3571,29 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const fills = (res?.fills ?? []) as { nodeId: string; images: FigmaImage[] }[];
     if (fileKey && fills.length) {
       figmaJobs = [...figmaJobs, ...fills.map((f) => ({ ...f, fileKey }))];
+    }
+  }
+
+  const LOTTIE_SKIPPED = 'Imported from Lottie. Not carried over:';
+
+  async function importLottie(bytes: Uint8Array, at: { x: number; y: number }) {
+    const source = lottieSource(bytes);
+    if (typeof source === 'string') {
+      failed = source;
+      return;
+    }
+    const res = await post('importLottie', { lottie: JSON.stringify(source), at: JSON.stringify(at) });
+    const landedNodes = res?.outcome === 'done' ? ((res.nodes ?? []) as CanvasNodeRecord[]) : [];
+    if (!landedNodes.length) {
+      failed = 'This file is not a Lottie animation this canvas can read.';
+      return;
+    }
+    nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
+    const skipped = (res?.skipped ?? []) as string[];
+    if (skipped.length) {
+      failed = `${LOTTIE_SKIPPED} ${skipped.join('; ')}`;
     }
   }
 

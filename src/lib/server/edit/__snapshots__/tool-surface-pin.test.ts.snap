@@ -8,7 +8,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool cancel_node_loop 1`] = `"f92dcb4ab3229951252b7ca1976793be73be4eb5c58d91f4d0cd6639efc9318f"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool canvas_tool 1`] = `"6142132587d1b45539f375352f8645b3cd56eb5be631df104fee40f0e97a0e99"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool canvas_tool 1`] = `"2c6c18e73a5f5c24bd21c3bb1e80d241ed9b53fbd3c13448a609cd36930d1c4a"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool connect_nodes 1`] = `"c750f821558c17d14b967ffcb1709f66491241d2eec28037415d46fd856ccb96"`;
 
@@ -355,6 +355,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op import_figma 1`] = `"e58aae93c04f4bc347124638d07b39b56c8202219101d3babdfe1aa9d7e675c3"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op import_link 1`] = `"9f4e090a7d039000edde4cf63678ab82ce0f6ebf5d60c0ddc0ae61a92cd005c7"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op import_lottie 1`] = `"7dc2ab736b66c1fb74c212638ab3e9c96530af4e924e8cf1ca2e1250f4721b28"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op insert_template 1`] = `"e87e7e5958ca2d56b969bd1fecaf394643166e271394f53c968f0fccba654088"`;
 
@@ -833,6 +835,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema import_figma 1`] = `"2f51b1efcd8a1b172eb57672efc3466fc13dc65d859a0466c5c9de49a358d8a7"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema import_link 1`] = `"7f5249c70e9c48034420f38419c15fdb3f6dd15f1bf6c1b5d05836d10e74a05a"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema import_lottie 1`] = `"6c84780155750f3a22ada45130b67948b328936397eae864cfc5d80e3b5d90c2"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema insert_template 1`] = `"c9843a91d41a032e8932897df34e70835f171da186fc59d5d7f69b68ddaf4483"`;
 
