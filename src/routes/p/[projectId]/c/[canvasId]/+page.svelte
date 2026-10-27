@@ -69,7 +69,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
   import { adoptCommitted, commitHub, rowsOf } from '$lib/canvas/commit-note';
   import { peerTracks } from '$lib/realtime/peer-tracks';
-  import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
+  import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, presentControlsShown, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import { LocalOff, isOff } from '$lib/local-user';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
@@ -3892,12 +3892,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 <svelte:window onpointermovecapture={readResizeMode} onpointerupcapture={readResizeMode} />
 
 <div class="canvas" class:view-only={viewOnly}>
-  {#if peers.length || canvasPeers.length}
+  {#if peers.length || canvasPeers.length || presenting}
+    {@const onspotlight = isOff(LocalOff.Present) || !presentControlsShown({ others: peers.length, presenting }) ? undefined : spotlight}
     {#if topPeers}
-      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></Portal>
+      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /></Portal>
     {:else}
-      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></div>
+      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /></div>
     {/if}
+  {/if}
+  {#if presenting}
+    <div class="presenting" role="status" data-testid="presenting-banner">
+      You're presenting · {peers.length} here
+      <button type="button" data-testid="presenting-stop" onclick={() => spotlight(false)}>Stop</button>
+    </div>
   {/if}
   <CursorChat onchat={(chat) => cursors.port.update({ chat })} />
   <CanvasShortcutHelp />
