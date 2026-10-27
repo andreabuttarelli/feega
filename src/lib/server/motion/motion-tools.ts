@@ -2332,6 +2332,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => VARIABLE_ACTIONS[input.action](input)
     }),
 
+    bind_variable: tool({
+      description: 'Bind one prop of a clip to a variable, as the bind chip next to an inspector field does: a colour variable to fill, stroke or color, a number to roundness, opacity, width, height, size or autoLayout.gap, a string to a text prop, a boolean to a toggle. variable is "Collection/name". The prop then follows the active mode of its collection; set_props on it is refused until unbind_variable.',
+      inputSchema: z.object({ clip_id: z.string(), target: z.string(), variable: z.string() }),
+      execute: async (input) => apply(bindVariable(session.doc, input.clip_id, input.target, input.variable), `bound ${input.target} of ${input.clip_id} to ${input.variable}`)
+    }),
+
+    unbind_variable: tool({
+      description: 'Free a prop from its variable, as the unbind button on the bind chip does. The prop keeps the value it has now.',
+      inputSchema: z.object({ clip_id: z.string(), target: z.string() }),
+      execute: async (input) => apply(unbindVariable(session.doc, input.clip_id, input.target), `unbound ${input.target} of ${input.clip_id}`)
+    }),
+
     register_font: tool({
       description: `Add a Google Fonts family or an uploaded font (list_fonts uploaded) to the video. Call it before add_clip names the family in props.font, and for a custom component font param (then set_props with that family). origin ${FontOrigin.Local} adds a font installed on the user's computer by exact family name: it is flagged local in the video and shows a fallback font on other computers and in server renders.`,
       inputSchema: z.object({ family: z.string().max(64), origin: z.enum(FontOrigin).optional() }),
