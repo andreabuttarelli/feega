@@ -1,106 +1,168 @@
 <script lang="ts">
-  import type { ModelChoice, RouteOption } from '$lib/canvas/gen-node';
-  import { RECOMMENDED_GROUP, TIER_LABEL } from '$lib/canvas/model-picker';
-  import { AUTO_ROUTE, parseRouteValue, routeMenuGroups, routeOf, routeStatsLabel, routeValue } from '$lib/canvas/model-routes';
-  import { ListMenu, MIXED_TEXT } from '$lib/components/ui/control/index.js';
-  import CreditAmount from '$lib/components/CreditAmount.svelte';
-  import ModalityIcons from './ModalityIcons.svelte';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import Check from '@lucide/svelte/icons/check';
+  import type { GenMedium, GenParams, ModelChoice } from '$lib/canvas/gen-node';
+  import { modelGroupsOf, RECOMMENDED_GROUP, TIER_LABEL } from '$lib/canvas/model-picker';
+  import { AUTO_ROUTE, routeOf, routeStatsLabel } from '$lib/canvas/model-routes';
+  import { routeTiers } from '$lib/canvas/route-tiers';
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+  import { CONTROL_HEIGHT, MIXED_TEXT } from '$lib/components/ui/control/index.js';
   import ProviderIcon from './ProviderIcon.svelte';
-  import { listedCredits } from '$lib/canvas/gen-cost';
 
   let {
     choices,
     value,
     provider = null,
     mixed = false,
+    medium = null,
+    params = {},
     onselect
   }: {
     choices: ModelChoice[];
     value: string | null;
     provider?: string | null;
     mixed?: boolean;
+    medium?: GenMedium | null;
+    params?: GenParams;
     onselect: (id: string, provider: string | null) => void;
   } = $props();
 
-  const groups = $derived(routeMenuGroups(choices));
+  const SUB_MENU = 'z-50 w-64 max-h-96 overflow-y-auto rounded-md bg-ui-raised text-ui-text shadow-ui-float';
+
+  let open = $state(false);
+  let query = $state('');
+
   const byId = $derived(new Map(choices.map((c) => [c.id, c])));
+  const groups = $derived(modelGroupsOf(choices));
   const current = $derived(value ? byId.get(value) : undefined);
   const currentRoute = $derived(routeOf(current, provider ?? undefined));
-  const selected = $derived(current?.routes?.length && value ? routeValue(value, currentRoute?.provider ?? AUTO_ROUTE) : value);
+  const matches = $derived.by(() => {
+    const q = query.trim().toLowerCase();
+    return q ? choices.filter((c) => `${c.label} ${c.providerLabel}`.toLowerCase().includes(q)) : [];
+  });
 
-  function select(entry: string) {
-    const { model, provider: picked } = parseRouteValue(entry);
-    onselect(model, picked);
+  $effect(() => {
+    if (!open) {
+      query = '';
+    }
+  });
+
+  function routed(choice: ModelChoice): boolean {
+    return (choice.routes?.length ?? 0) > 1;
   }
 
-  function routePrice(choice: ModelChoice, route: RouteOption | undefined): number | undefined {
-    return listedCredits(route ? { ...choice, ...route.price } : choice);
+  function pick(id: string, route: string | null) {
+    onselect(id, route);
+    open = false;
+  }
+
+  function searchKeys(event: KeyboardEvent) {
+    if (event.key === 'ArrowDown' || event.key === 'Escape' || event.key === 'Tab') {
+      return;
+    }
+    event.stopPropagation();
   }
 </script>
 
-{#snippet tier(choice: ModelChoice)}
+{#snippet badges(choice: ModelChoice)}
   {#if choice.uncensored}
-    <span class="shrink-0 border border-destructive px-1 text-[0.625rem] leading-4 text-destructive" data-testid="uncensored-badge">Uncensored</span>
+    <span class="shrink-0 rounded-xs border border-destructive px-1 text-[0.625rem] leading-4 text-destructive" data-testid="uncensored-badge">Uncensored</span>
   {/if}
   {#if choice.tiers?.[0]}
-    <span class="shrink-0 border border-line-2 px-1 text-[0.625rem] leading-4 text-muted-foreground">{TIER_LABEL[choice.tiers[0]]}</span>
+    <span class="shrink-0 rounded-xs border border-line-2 px-1 text-[0.625rem] leading-4 text-muted-foreground">{TIER_LABEL[choice.tiers[0]]}</span>
   {/if}
 {/snippet}
 
-<ListMenu
-  label="Model"
-  control="model"
-  {groups}
-  value={mixed ? null : selected}
-  onselect={select}
-  searchable
-  placeholder="Search model or provider…"
-  triggerClass="max-w-72"
-  contentClass="w-96"
->
-  {#snippet trigger()}
+{#snippet routes(choice: ModelChoice)}
+  {@const tiers = medium ? routeTiers(choice, medium, params) : {}}
+  {#each choice.routes ?? [] as route (route.provider)}
+    {@const chosen = choice.id === value && (provider ?? AUTO_ROUTE) === route.provider}
+    <DropdownMenu.Item class="items-start" data-testid={`route-${route.provider}`} onSelect={() => pick(choice.id, route.provider)}>
+      <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span class="flex items-center gap-2">
+          <span class="truncate font-medium">{route.provider === AUTO_ROUTE ? 'Auto' : route.label}</span>
+          <span class="ml-auto font-mono text-[0.6875rem] text-muted-foreground" data-testid={`tier-${route.provider}`}>{tiers[route.provider] ?? ''}</span>
+        </span>
+        {#if routeStatsLabel(route)}
+          <span class="truncate text-[0.6875rem] {route.stats?.healthy === false ? 'text-destructive' : 'text-muted-foreground'}">{routeStatsLabel(route)}</span>
+        {/if}
+      </span>
+      <Check class="mt-0.5 size-3.5 {chosen ? '' : 'invisible'}" aria-hidden="true" />
+    </DropdownMenu.Item>
+  {/each}
+{/snippet}
+
+{#snippet model(choice: ModelChoice)}
+  {@const chosen = choice.id === value}
+  {#if routed(choice)}
+    <DropdownMenu.Sub>
+      <DropdownMenu.SubTrigger data-testid={`model-${choice.id}`}>
+        <span class="truncate">{choice.label}</span>
+        {@render badges(choice)}
+        {#if chosen}<Check class="ml-auto size-3.5" aria-hidden="true" />{/if}
+      </DropdownMenu.SubTrigger>
+      <DropdownMenu.SubContent class={SUB_MENU} data-testid="route-menu">
+        <DropdownMenu.Label class="text-[0.6875rem] text-muted-foreground">Run {choice.label} on</DropdownMenu.Label>
+        {@render routes(choice)}
+      </DropdownMenu.SubContent>
+    </DropdownMenu.Sub>
+  {:else}
+    <DropdownMenu.Item data-testid={`model-${choice.id}`} onSelect={() => pick(choice.id, null)}>
+      <span class="truncate">{choice.label}</span>
+      {@render badges(choice)}
+      <Check class="ml-auto size-3.5 {chosen ? '' : 'invisible'}" aria-hidden="true" />
+    </DropdownMenu.Item>
+  {/if}
+{/snippet}
+
+<DropdownMenu.Root bind:open>
+  <DropdownMenu.Trigger
+    aria-label="Model"
+    data-control="model"
+    class="{CONTROL_HEIGHT} inline-flex max-w-72 min-w-0 items-center gap-1.5 rounded-sm border border-line-2 bg-background px-2 text-left text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-expanded:bg-muted"
+  >
     {#if mixed}
       <span class="truncate">{MIXED_TEXT}</span>
     {:else if current}
       <ProviderIcon provider={current.provider} />
       <span class="truncate font-medium">{current.label}</span>
       {#if currentRoute}<span class="shrink-0 text-muted-foreground" data-testid="route-trigger">· {currentRoute.provider === AUTO_ROUTE ? 'Auto' : currentRoute.label}</span>{/if}
-      {@render tier(current)}
+      {@render badges(current)}
     {:else}
       <span class="truncate text-muted-foreground">Choose model</span>
     {/if}
-  {/snippet}
-
-  {#snippet groupLabel(group)}
-    {@const routed = byId.get(group.id)}
-    {#if routed}<ProviderIcon provider={routed.provider} />{:else if group.id !== RECOMMENDED_GROUP}<ProviderIcon provider={group.id} />{/if}
-    <span>{group.label}</span>
-  {/snippet}
-
-  {#snippet item(entry)}
-    {@const parsed = parseRouteValue(entry.value)}
-    {@const choice = byId.get(parsed.model)}
-    {@const route = routeOf(choice, parsed.provider ?? undefined)}
-    {#if choice}
-      <span class="flex min-w-0 flex-col gap-0.5" data-testid={route ? `route-${route.provider}` : undefined}>
-        <span class="flex min-w-0 items-center gap-1.5">
-          <span class="truncate font-medium">{route ? route.label : choice.label}</span>
-          {@render tier(choice)}
-          <span class="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
-            {#if !route}<ModalityIcons inputModalities={choice.inputModalities ?? []} />{/if}
-            {#if typeof routePrice(choice, route) === 'number'}
-              <CreditAmount amount={routePrice(choice, route) ?? 0} />
-            {:else}
-              <span class="text-[0.625rem]">varies</span>
-            {/if}
-          </span>
-        </span>
-        {#if route && routeStatsLabel(route)}
-          <span class="truncate text-[0.6875rem] {route.stats?.healthy === false ? 'text-destructive' : 'text-muted-foreground'}">{routeStatsLabel(route)}</span>
-        {:else if !route && choice.recommendedWhy}
-          <span class="truncate text-[0.6875rem] text-muted-foreground">{choice.recommendedWhy}</span>
-        {/if}
-      </span>
+    <ChevronDown class="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+  </DropdownMenu.Trigger>
+  <DropdownMenu.Content class="w-64 max-h-[28rem]" data-testid="model-menu">
+    <input
+      type="search"
+      class="mb-1 h-9 w-full rounded-sm border border-line-2 bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label="Search model"
+      placeholder="Search model…"
+      bind:value={query}
+      onkeydown={searchKeys}
+    />
+    {#if query.trim()}
+      {#each matches as choice (choice.id)}
+        {@render model(choice)}
+      {:else}
+        <p class="px-2 py-3 text-xs text-muted-foreground">No match</p>
+      {/each}
+    {:else}
+      {#each groups as group (group.id)}
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger data-testid={`family-${group.id}`}>
+            {#if group.id !== RECOMMENDED_GROUP}<ProviderIcon provider={group.id} />{/if}
+            <span class="truncate">{group.label}</span>
+          </DropdownMenu.SubTrigger>
+          <DropdownMenu.SubContent class={SUB_MENU}>
+            {#each group.items as entry (entry.value)}
+              {@const choice = byId.get(entry.value)}
+              {#if choice}{@render model(choice)}{/if}
+            {/each}
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
+      {/each}
     {/if}
-  {/snippet}
-</ListMenu>
+  </DropdownMenu.Content>
+</DropdownMenu.Root>
