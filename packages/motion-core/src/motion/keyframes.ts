@@ -146,6 +146,16 @@ export const SOUND = {
 
 const soundProps: AnimProp[] = (Object.keys(SOUND) as (keyof typeof SOUND)[]).map((key) => ({ key, kind: ValueKind.Number, source: Source.Sound, ...SOUND[key] }));
 
+const BOX_SIZE = {
+  width: { label: 'Width', min: 0.02, max: 1, step: 0.01 },
+  height: { label: 'Height', min: 0.002, max: 1, step: 0.001 }
+} as const;
+
+const box = (width: number, height: number): AnimProp[] =>
+  (Object.keys(BOX_SIZE) as (keyof typeof BOX_SIZE)[]).map((key) => ({ key, ...BOX_SIZE[key], fallback: key === 'width' ? width : height, kind: ValueKind.Number, source: Source.Param }));
+
+const adjustmentProps: AnimProp[] = transformProps.filter((p) => p.key === 'opacity');
+
 const visual = (...extra: AnimProp[][]): AnimProp[] => [...transformProps, ...extra.flat(), ...maskProps];
 
 const typeNumbers: AnimProp[] = (
@@ -222,12 +232,12 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Video: visual(remapProps, soundProps),
   Audio: soundProps,
   Shape: visual(colours(['fill', 'Fill'], ['fill2', 'Gradient end'], ['stroke', 'Stroke colour']), SHAPE_NUMBERS),
-  Logo: visual(),
+  Logo: visual(box(0.2, 0.2)),
   Null: transformProps,
   BrandBackground: visual(colours(['fill', 'Fill'])),
   ProductCard: visual(colours(['color', 'Colour'], ['card', 'Card'])),
-  SocialMockup: visual(),
-  CanvasMock: visual(),
+  SocialMockup: visual(box(0.5, 0.75)),
+  CanvasMock: visual(box(0.9, 0.8)),
   Model3D: visual(sceneProps),
   Shape3D: visual(sceneProps),
   Text3D: visual(sceneProps),
@@ -239,8 +249,8 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   LiquidBlob: BLOB_PROPS,
   ShaderEffect: visual(),
   Precomp: visual(),
-  Adjustment: [],
   Light: [...transformProps, ...LIGHT_PROPS],
+  Adjustment: adjustmentProps,
   Custom: visual()
 };
 

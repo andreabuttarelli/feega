@@ -35,6 +35,7 @@ const DOC: Record<string, Access> = {
   still: { write: ['set_canvas'], read: 'still' },
   freeSize: { write: ['set_canvas'], read: 'format' },
   layoutGuides: { write: ['set_canvas'], read: 'layoutGuides' },
+  userGuides: { write: ['add_guide', 'remove_guide'], read: 'userGuides' },
   styles: { write: ['named_style'], read: 'styles' },
   variables: { write: ['variable'], read: 'variables' },
   links: { fixed: 'written by the canvas when a generative node is connected to the frame (connect_nodes)' }

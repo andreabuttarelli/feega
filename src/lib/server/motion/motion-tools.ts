@@ -16,6 +16,8 @@ import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { scaleClips } from '$lib/motion/scale-tool';
 import { setLayoutGuides } from '$lib/motion/layout-guides/guides';
+import { addGuide, removeGuide } from '$lib/canvas/user-guides';
+import { GuideAxis, MAX_USER_GUIDES } from '@feega/motion-core/motion/user-guides/model';
 import { MAX_LAYOUT_GUIDES, layoutGuideSchema } from '@feega/motion-core/motion/layout-guides/model';
 import { HORIZONTALS, VERTICALS } from '@feega/motion-core/motion/constraints/model';
 import { setConstraints, withConstraints } from '$lib/motion/constraints/constraints';
@@ -182,15 +184,16 @@ import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { clearTextRuns, listTextRange, styleTextRange } from '$lib/motion/text-run-ops';
 import { ListChange } from '@feega/motion-core/motion/text-lists';
 import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, pushOverrides, resetOverride, resetOverrides } from '$lib/motion/main-component';
-import { addVariant, pickVariant, swapInstance } from '$lib/motion/variants';
-import { defineProperty, removeProperty, resetProperty, setProperty } from '$lib/motion/component-properties';
+import { addVariant, defineVariantProp, pickVariant, setVariant, swapInstance } from '$lib/motion/variants';
+import { defineProperty, removeProperty, resetProperty, setPreferred, setProperty } from '$lib/motion/component-properties';
 import { propertyDefSchema } from '@feega/motion-core/motion/doc';
 import type { PropertyDef } from '@feega/motion-core/motion/property-resolve';
 import { placeInstance } from '$lib/motion/canvas-components';
 import { runEditSchema, type RunEdit } from '@feega/motion-core/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
-import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '@feega/motion-core/motion/fonts/model';
+import { BuiltinFont, FONT_WEIGHTS, FontSource, fontRefProblem, searchFonts } from '@feega/motion-core/motion/fonts/model';
 import { registerFont, removeFont, replaceFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+import { FontOrigin, withPicked } from '$lib/motion/fonts/local';
 import type { FontFamily } from '$lib/motion/fonts/library';
 import { EFFECTS, EFFECT_KINDS } from '@feega/motion-core/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
@@ -252,6 +255,9 @@ import { outlineUrl } from '@feega/motion-core/motion/fonts/outline';
 import { pivotBox } from '@feega/motion-core/motion/parent';
 import { propsFromPx, pxRead, strokesFromPx, PX_FIELDS_GUIDE } from '$lib/motion/px-fields';
 import { UNITS_GUIDE, unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
+
+const GUIDE_AXES = ['vertical', 'horizontal'] as const;
+const AXIS_OF: Record<(typeof GUIDE_AXES)[number], GuideAxis> = { vertical: GuideAxis.Vertical, horizontal: GuideAxis.Horizontal };
 
 const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
 
@@ -465,6 +471,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     fields: doc.fields,
     referenceLook: doc.referenceLook ?? null,
     layoutGuides: doc.layoutGuides ?? [],
+    userGuides: doc.userGuides ?? [],
     fonts: doc.fonts,
     styles: stylesOf(doc),
     variables: doc.variables ?? {},
@@ -2253,9 +2260,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_fonts: tool({
-      description: `Search the fonts: uploaded (the org's own font files, usable by family name in set_font, register_font and font params) and the Google Fonts catalogue (${GOOGLE_FONTS.length} families, most popular first): family, category, weights, italic. Built-ins: ${Object.values(BuiltinFont).join(', ')}. Fonts this video already has are in get_motion_doc fonts.`,
+      description: `Search the fonts: uploaded (the org's own font files, usable by family name in set_font, register_font and font params) and the Google Fonts catalogue (${GOOGLE_FONTS.length} families, most popular first): family, category, weights, italic. Built-ins: ${Object.values(BuiltinFont).join(', ')}. Fonts this video already has are in inVideo, each with source and local: true for a font installed on one computer only (it shows a fallback font on other computers and in server renders).`,
       inputSchema: z.object({ query: z.string().max(60).default(''), limit: z.number().int().min(1).max(MAX_FONT_RESULTS).default(DEFAULT_FONT_RESULTS) }),
       execute: async (input) => ({
+        inVideo: session.doc.fonts.map((f) => ({ family: f.family, source: f.source, local: f.source === FontSource.Local })),
         uploaded: (await uploadedFonts()).filter((f) => f.family.toLowerCase().includes(input.query.trim().toLowerCase())).map((f) => ({ family: f.family, weights: [...new Set(f.variants.map((v) => v.weight))], italic: f.variants.some((v) => v.italic) })),
         fonts: searchFonts(GOOGLE_FONTS, input.query, [], input.limit).map((f) => ({ family: f.f, category: f.c, weights: f.w, italic: f.i === 1 }))
       })
@@ -2293,10 +2301,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     register_font: tool({
-      description: 'Add a Google Fonts family or an uploaded font (list_fonts uploaded) to the video. Call it before add_clip names the family in props.font, and for a custom component font param (then set_props with that family).',
-      inputSchema: z.object({ family: z.string().max(64) }),
+      description: `Add a Google Fonts family or an uploaded font (list_fonts uploaded) to the video. Call it before add_clip names the family in props.font, and for a custom component font param (then set_props with that family). origin ${FontOrigin.Local} adds a font installed on the user's computer by exact family name: it is flagged local in the video and shows a fallback font on other computers and in server renders.`,
+      inputSchema: z.object({ family: z.string().max(64), origin: z.enum(FontOrigin).optional() }),
       execute: async (input) => {
-        const picked = withUploaded(session.doc, input.family, await uploadedFonts());
+        const picked = withPicked(session.doc, input.family, input.origin ?? FontOrigin.Catalogue, await uploadedFonts());
         return apply(registerFont(picked.doc, picked.family, GOOGLE_FONTS), `registered font ${picked.family}`);
       }
     }),
@@ -2457,6 +2465,24 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         const guided = pinned.ok && input.layout_guides ? setLayoutGuides(pinned.doc, input.layout_guides) : pinned;
         return apply(guided, 'changed the canvas');
+      }
+    }),
+
+    add_guide: tool({
+      description: `Pull a guide onto the frame, as the rulers do in the editor: a vertical guide at x px from the left edge or a horizontal one at y px from the top, inside the frame. Layers snap to it while they move; it is drawn in the editor, never in the export. Up to ${MAX_USER_GUIDES} per frame. remove_guide takes it away.`,
+      inputSchema: z.object({ axis: z.enum(GUIDE_AXES), at: z.number().describe('px from the left edge (vertical) or the top edge (horizontal)') }),
+      execute: async (input) => apply(addGuide(session.doc, { axis: AXIS_OF[input.axis], at: input.at }), `added a ${input.axis} guide at ${Math.round(input.at)}`)
+    }),
+
+    remove_guide: tool({
+      description: 'Take a guide off the frame: give its axis and position, or nothing to clear every guide the frame holds.',
+      inputSchema: z.object({ axis: z.enum(GUIDE_AXES).optional(), at: z.number().optional() }),
+      execute: async (input) => {
+        if (input.axis === undefined || input.at === undefined) {
+          const { userGuides: _, ...rest } = session.doc;
+          return apply({ ok: true, doc: rest }, 'cleared the guides');
+        }
+        return apply(removeGuide(session.doc, { axis: AXIS_OF[input.axis], at: input.at }), `removed the ${input.axis} guide at ${Math.round(input.at)}`);
       }
     }),
 
@@ -2909,8 +2935,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     component: tool({
-      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop).',
-      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.union([z.string(), z.boolean()]).optional(), property: propertyDefSchema.optional() }),
+      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop). Variant matrix: define-variant (comp, prop = axis e.g. Size, values e.g. [S,M,L]): adds the axis and fills every Size x State combination; set-variant (clip_id, variant {Size:L,State:hover}): switch an instance on several axes at once, overrides kept. set-preferred (comp, prop = a swap property, preferred = main comp ids): suggested swaps listed first.',
+      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.union([z.string(), z.boolean()]).optional(), property: propertyDefSchema.optional(), values: z.array(z.string().min(1).max(40)).max(20).optional(), preferred: z.array(z.string()).max(40).optional() }),
       execute: async (input) => {
         const ids: string[] = [];
         const newId = () => {
@@ -2932,7 +2958,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           [ComponentAction.DefineProp]: () => (input.property ? defineProperty(session.doc, input.comp ?? '', input.prop ?? '', input.property as PropertyDef) : { ok: false, error: 'define-prop needs property' }),
           [ComponentAction.RemoveProp]: () => removeProperty(session.doc, input.comp ?? '', input.prop ?? ''),
           [ComponentAction.SetProp]: () => (input.value === undefined ? { ok: false, error: 'set-prop needs value' } : setProperty(session.doc, id, input.prop ?? '', input.value)),
-          [ComponentAction.ResetPropValue]: () => resetProperty(session.doc, id, input.prop ?? '')
+          [ComponentAction.ResetPropValue]: () => resetProperty(session.doc, id, input.prop ?? ''),
+          [ComponentAction.DefineVariant]: () => defineVariantProp(session.doc, input.comp ?? '', input.prop ?? '', input.values ?? [], newId),
+          [ComponentAction.SetVariant]: () => setVariant(session.doc, id, input.variant ?? {}),
+          [ComponentAction.SetPreferred]: () => setPreferred(session.doc, input.comp ?? '', input.prop ?? '', input.preferred ?? [])
         };
         const out = apply(run[input.action](), `component ${input.action}`);
         if (out.ok && input.action === ComponentAction.Place) {

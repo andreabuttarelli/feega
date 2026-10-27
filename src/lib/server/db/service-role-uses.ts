@@ -49,6 +49,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['node_runs', 'nodes', 'canvas_events', 'assets', 'ai_calls', 'social_accounts', 'credit_ledger', 'orgs', 'org_uncensored_optins', 'influencers', 'moderation_checks', 'product_batches', 'product_batch_items']
   },
   {
+    path: 'src/lib/server/canvas/selection-feed.ts — channelFeed (op get_selection)',
+    why: "Un agente MCP con chiave API non ha un JWT con cui entrare nel canale privato `canvas:<id>`. L'op lo apre solo dopo aver provato che la tela è del progetto dell'org del chiamante, ascolta soltanto i broadcast `canvas-peer` per al più 3,5 s, tiene i segni del solo utente chiamante e non scrive nulla.",
+    tables: ['realtime.messages']
+  },
+  {
     path: 'le callback dei provider, src/routes/api/v1/webhooks/** (non ancora scritte: fase 3 e 5)',
     why: 'Zernio e i provider di generazione chiamano senza una sessione utente. La riga da aggiornare si trova dal loro id esterno, che è già legato a una org; la firma della richiesta è ciò che autentica, non un JWT. Programmazione e stato di pubblicazione si leggono da Zernio, non da una tabella nostra (scheduled_posts è stata rimossa, 2026-09-22): un eventuale webhook scriverebbe solo posts.zernio_post_ids.',
     tables: ['posts', 'node_runs', 'ai_calls']
