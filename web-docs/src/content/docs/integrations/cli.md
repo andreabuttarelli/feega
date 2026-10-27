@@ -34,6 +34,8 @@ Local dev servers on `localhost:5173` are auto-detected; override with `PUBLIC_A
 | `allowlist`, `allowlist set <medium> [ids...]` | [Model allow-list](/ai/model-allow-list/) |
 | `caps`, `caps set <scope> <usd>` | [Spend limits](/ai/spend-limits/) |
 | `app-account <projectId>` | The test app account a project remembers |
+| `cloud status\|files\|import\|export\|disconnect` | [Drive and Dropbox](/integrations/connect-drive-dropbox/) files |
+| `figma-token <projectId>` | Whether a [Figma token](/integrations/connect-figma/) is saved |
 | `media` | Signed links to node, run or asset media |
 | `health`, `update` | API status, self-update |
 
