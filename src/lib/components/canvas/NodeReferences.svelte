@@ -55,10 +55,10 @@
       </button>
     </span>
   {/each}
-  <Button variant="secondary" size="sm" class="h-8 px-2 text-xs" data-control="references" onclick={() => (open = true)}>
-    <ImagePlus strokeWidth={1.7} />
+  <button type="button" class="refs-add" data-control="references" onclick={() => (open = true)}>
+    <ImagePlus size={14} strokeWidth={1.7} />
     {references.length ? `References · ${references.length}` : 'Add references'}
-  </Button>
+  </button>
 </div>
 
 <Dialog.Root bind:open>
@@ -93,17 +93,35 @@
 </Dialog.Root>
 
 <style>
-  .refs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px; border-top: 1px solid var(--line, #e5e5e5); }
-  .ref { position: relative; width: 32px; height: 32px; background: var(--paper-2, #f5f5f5); border: 1px solid var(--line, #e5e5e5); }
-  .ref img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .ref-remove {
-    position: absolute; top: -8px; right: -8px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0;
-    color: var(--ink, #1d1d1f); border: 1px solid var(--line-2, #d2d2d7); background: var(--paper, #fff); cursor: pointer;
+  .refs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0; }
+  .refs-add {
+    display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
+    font: inherit; font-size: 12px; font-weight: 500; line-height: 1;
+    color: var(--ink, #1d1d1f); background: var(--paper-2, #f9f9f9);
+    border: 1px solid var(--line-2, #d2d2d7); border-radius: var(--ui-radius-md, 6px); cursor: pointer;
+    transition: background var(--ui-dur-fast, 120ms) ease, border-color var(--ui-dur-fast, 120ms) ease;
   }
-  .ref-remove:hover { background: var(--paper-2, #f5f5f5); }
+  .refs-add :global(svg) { color: var(--ink-soft, #6e6e73); }
+  .refs-add:hover { background: var(--paper, #fff); border-color: var(--ink-soft, #6e6e73); }
+  .refs-add:focus-visible { outline: none; box-shadow: var(--ui-focus); }
+  .ref {
+    position: relative; width: 32px; height: 32px; border-radius: var(--ui-radius-md, 6px);
+    background: var(--paper-2, #f5f5f5); box-shadow: inset 0 0 0 1px var(--line, #e5e5e5);
+  }
+  .ref img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
+  .ref-remove {
+    position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 18px; height: 18px; padding: 0;
+    color: var(--ink, #1d1d1f); border: 0; border-radius: var(--ui-radius-full, 9999px);
+    background: var(--ui-raised, #fff); box-shadow: var(--ui-shadow-float); cursor: pointer;
+    opacity: 0; transition: opacity var(--ui-dur-fast, 120ms) ease;
+  }
+  .ref:hover .ref-remove, .ref-remove:focus-visible { opacity: 1; }
 
   .picker-grid { overflow: auto; padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-  .picker-item { aspect-ratio: 1; padding: 0; border: 2px solid transparent; background: var(--paper-2, #f5f5f5); cursor: pointer; }
+  .picker-item {
+    aspect-ratio: 1; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: var(--ui-radius-md, 6px);
+    background: var(--paper-2, #f5f5f5); cursor: pointer;
+  }
   .picker-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .picker-item.picked { border-color: var(--accent, #6d4aff); }
+  .picker-item.picked { border-color: var(--ui-accent, #0099ff); }
 </style>

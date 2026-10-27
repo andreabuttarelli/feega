@@ -348,9 +348,15 @@
     transform: translate(-50%, calc(-100% - var(--toolbar-gap))) scale(var(--toolbar-scale, 1));
     padding: 4px;
     font-family: var(--sans);
-    background: var(--ui-panel);
-    border: 1px solid var(--ui-divider-strong);
-    box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
+    background: var(--ui-raised);
+    border: 1px solid var(--ui-divider);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-float);
+  }
+
+  .toolbar :global(button),
+  .toolbar :global([data-control]) {
+    border-radius: var(--ui-radius-md);
   }
 
   @media (max-width: 767px) {

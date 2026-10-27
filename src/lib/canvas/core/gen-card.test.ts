@@ -42,9 +42,9 @@ describe('genItems', () => {
   it('lays out an image node like the DOM tile: body, references band, footer', () => {
     const items = draw(view());
 
-    expect(bounds(parts(items, GenPart.Body)[0])).toEqual([1, 1, 359, 304.5]);
-    expect(bounds(parts(items, GenPart.References)[0])).toEqual([1, 304.5, 359, 305.5]);
-    expect(bounds(parts(items, GenPart.Prompt)[0])).toEqual([10, 358.5, 350, 408.7]);
+    expect(bounds(parts(items, GenPart.Body)[0])).toEqual([6, 6, 354, 313.8]);
+    expect(bounds(parts(items, GenPart.References)[0]).slice(0, 2)).toEqual([6, 319.8]);
+    expect(bounds(parts(items, GenPart.Prompt)[0])).toEqual([6, 363.8, 354, 418]);
     expect(parts(items, GenPart.Hint)).toHaveLength(1);
   });
 
@@ -52,8 +52,8 @@ describe('genItems', () => {
     const [button] = parts(draw(view()), GenPart.Run);
 
     expect(button.opacity).toBe(1);
-    expect(bounds(button)[2]).toBe(350);
-    expect(button.paint).toEqual({ kind: 'solid', color: rgbaOf(mix(theme.ink, theme.paper, 0.35)) });
+    expect(bounds(button)[2]).toBe(354);
+    expect(button.paint).toEqual({ kind: 'solid', color: rgbaOf(mix(theme.accent, theme.paper, 0.35)) });
   });
 
   it('writes the prompt instead of the placeholder once there is one', () => {
@@ -69,7 +69,7 @@ describe('genItems', () => {
 
     expect(parts(items, GenPart.Body)).toHaveLength(0);
     expect(parts(items, GenPart.References)).toHaveLength(0);
-    expect(bounds(parts(items, GenPart.Prompt)[0])[1]).toBe(10);
+    expect(bounds(parts(items, GenPart.Prompt)[0])[1]).toBe(6);
   });
 
   it('shows dots and an unlock button while running, a reason and retry when failed', () => {

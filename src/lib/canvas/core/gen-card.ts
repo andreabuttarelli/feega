@@ -43,20 +43,25 @@ const BORDER = 1;
 const SHADOW_DROP = 2;
 const SHADOW_OPACITY = 0.06;
 const SHADOW = '#000000';
-const FOOT_PAD = { top: 8, side: 9, bottom: 9 };
-const PROMPT = { size: 12.5, leading: 1.45, padX: 8, padY: 6, rows: 2 };
-const ACTIONS_GAP = 13;
-const BUTTON = { size: 12, leading: 1.5, padX: 12, height: 28.3, gap: 8 };
+const CARD_RADIUS = 10;
+const INSET = 6;
+const WELL_RADIUS = 6;
+const FOOT_PAD = { top: 6, side: INSET, bottom: INSET };
+const PROMPT = { size: 12.5, leading: 1.45, padX: 10, padY: 8, rows: 2 };
+const ACTIONS_GAP = 6;
+const BUTTON = { size: 12, leading: 1.5, padX: 12, height: 30, gap: 8, radius: WELL_RADIUS };
 const CREDIT = { icon: 12.6, gap: 3.6 };
+const CREDIT_ALPHA = 0.75;
 const WARN = { size: 11, leading: 1.5 };
 const FAIL_WARN = '#c0392b';
 const DISABLED = 0.35;
+const ON_ACCENT = '#ffffff';
 const HINT = { size: 12, leading: 1.5 };
-const DOTS = { size: 6, gap: 5, below: 10, opacity: 0.25 };
-const SMALL = { size: 11.5, leading: 1.5, padX: 12, padY: 4 };
+const DOTS = { size: 6, gap: 5, below: 12, opacity: 0.6 };
+const SMALL = { size: 11.5, leading: 1.5, padX: 12, padY: 4, radius: WELL_RADIUS };
 const FAIL = { title: 12.5, titleLeading: 1.5, why: 11, whyLeading: 1.4, gap: 6, whyWidth: 135 };
-const REFS = { band: 45, pad: 6, height: 32, padX: 8, gap: 6, icon: 14, size: 12, radius: 4, leading: 16 / 12 };
-const PAST = { band: 30.75, padX: 9, padY: 5, size: 10.5, leading: 1.5, padCell: 5, min: 20, gap: 4 };
+const REFS = { band: 44, pad: 6, height: 32, padX: 10, gap: 6, icon: 14, size: 12, radius: WELL_RADIUS, leading: 16 / 12 };
+const PAST = { band: 30, padX: INSET, padY: 5, size: 10.5, leading: 1.5, padCell: 7, min: 22, gap: 4 };
 const TOGGLE = { height: 24.8, size: 10.5, leading: 1.5 };
 const OUTPUT = { pad: 12, size: 12, leading: 1.5 };
 const MARK = { inset: 7, below: 5, height: 16, padX: 6, size: 10, radius: 4, fill: '#000000', fillAlpha: 0.6, ink: '#ffffff' };
@@ -98,26 +103,25 @@ function button(x: Ctx, part: GenPart, b: GenButton, right: number, mid: number,
   const { theme } = x;
   const w = buttonWidth(x, b);
   const textH = BUTTON.size * BUTTON.leading;
-  const h = BUTTON.height + (primary ? 0 : 2 * BORDER);
+  const h = BUTTON.height;
   const left = right - w;
   const top = mid - h / 2;
   const tone = (colour: string) => (b.enabled ? colour : mix(colour, theme.paper, DISABLED));
-  const ink = tone(primary ? theme.paper : theme.ink);
-  const fill = tone(primary ? theme.ink : theme.paper);
+  const ink = tone(primary ? ON_ACCENT : theme.ink);
+  const fill = tone(primary ? theme.accent : theme.paper2);
   const label = `${b.label}${b.credits ? ' · ' : ''}`;
   const labelW = words(x, label, BUTTON.size, { leading: BUTTON.leading }).width;
   const textTop = mid - textH / 2;
   const iconLeft = left + BUTTON.padX + labelW;
   const credit = b.credits
     ? [
-        { ...solid(x.clip(part, 3), at(x, x.icons.credit.map((k) => k.map((v, i) => (i % 2 === 0 ? v + iconLeft : v + mid - CREDIT.icon / 2)))), tone(theme.inkSoft)), rule: FillRule.Union },
+        { ...solid(x.clip(part, 3), at(x, x.icons.credit.map((k) => k.map((v, i) => (i % 2 === 0 ? v + iconLeft : v + mid - CREDIT.icon / 2)))), ink, CREDIT_ALPHA), rule: FillRule.Union },
         ...write(x, part, b.credits, BUTTON.size, ink, iconLeft + CREDIT.icon + CREDIT.gap, textTop, { leading: BUTTON.leading }).map((i) => ({ ...i, clip: x.clip(part, 4) }))
       ]
     : [];
-  const border = primary ? [] : [{ ...solid(x.clip(part, 1), frame(x, { x: left, y: top, w, h }), tone(theme.line2)) }];
   return {
     left,
-    items: [solid(x.clip(part), box(x, { x: left, y: top, w, h }), fill), ...border, ...write(x, part, label, BUTTON.size, ink, left + BUTTON.padX, textTop, { leading: BUTTON.leading }).map((i) => ({ ...i, clip: x.clip(part, 2) })), ...credit]
+    items: [solid(x.clip(part), at(x, roundRect(left, top, w, h, BUTTON.radius)), fill), ...write(x, part, label, BUTTON.size, ink, left + BUTTON.padX, textTop, { leading: BUTTON.leading }).map((i) => ({ ...i, clip: x.clip(part, 2) })), ...credit]
   };
 }
 
@@ -126,7 +130,7 @@ function small(x: Ctx, part: GenPart, s: string, cx: number, top: number): PathI
   const w = centred(x, s, SMALL.size, { leading: SMALL.leading }) + SMALL.padX * 2;
   const h = SMALL.size * SMALL.leading + SMALL.padY * 2 + 2 * BORDER;
   const left = cx - w / 2;
-  return [solid(x.clip(part), box(x, { x: left, y: top, w, h }), theme.paper), solid(x.clip(part, 1), frame(x, { x: left, y: top, w, h }), theme.line2), ...write(x, part, s, SMALL.size, theme.ink, left + SMALL.padX, top + BORDER + SMALL.padY, { leading: SMALL.leading }).map((i) => ({ ...i, clip: x.clip(part, 2) }))];
+  return [solid(x.clip(part), at(x, roundRect(left, top, w, h, SMALL.radius)), theme.line2), solid(x.clip(part, 1), at(x, roundRect(left + BORDER, top + BORDER, w - 2 * BORDER, h - 2 * BORDER, SMALL.radius - BORDER)), theme.paper), ...write(x, part, s, SMALL.size, theme.ink, left + SMALL.padX, top + BORDER + SMALL.padY, { leading: SMALL.leading }).map((i) => ({ ...i, clip: x.clip(part, 2) }))];
 }
 
 const smallHeight = () => SMALL.size * SMALL.leading + SMALL.padY * 2 + 2 * BORDER;
@@ -141,7 +145,7 @@ function busy(x: Ctx, b: Box): PathItem[] {
   const top = b.y + (b.h - total) / 2;
   const cx = b.x + b.w / 2;
   const row = 3 * DOTS.size + 2 * DOTS.gap;
-  const dots = [0, 1, 2].map((i) => solid(x.clip(GenPart.Dots, i), box(x, { x: cx - row / 2 + i * (DOTS.size + DOTS.gap), y: top, w: DOTS.size, h: DOTS.size }), x.theme.accent, DOTS.opacity));
+  const dots = [0, 1, 2].map((i) => solid(x.clip(GenPart.Dots, i), at(x, circle(cx - row / 2 + i * (DOTS.size + DOTS.gap) + DOTS.size / 2, top + DOTS.size / 2, DOTS.size / 2)), x.theme.accent, DOTS.opacity));
   return [...dots, ...small(x, GenPart.Unlock, UNLOCK, cx, top + DOTS.size + DOTS.below)];
 }
 
@@ -195,19 +199,18 @@ const BODIES: Record<GenTileView['state'], (x: Ctx, v: GenTileView, b: Box) => P
 
 function past(x: Ctx, v: GenTileView, top: number): PathItem[] {
   const { theme } = x;
-  const items: PathItem[] = [solid(x.clip(GenPart.Past), box(x, { x: BORDER, y: top, w: x.c.w - 2 * BORDER, h: BORDER }), theme.line)];
-  let left = BORDER + PAST.padX;
-  const cellTop = top + BORDER + PAST.padY;
-  const cellH = PAST.size * PAST.leading + 2 * BORDER;
+  const items: PathItem[] = [];
+  let left = PAST.padX;
+  const cellTop = top + PAST.padY;
+  const cellH = PAST.size * PAST.leading + 2 * BORDER + 2;
   for (let i = 0; i < v.runs; i++) {
     const label = String(i + 1);
     const tw = words(x, label, PAST.size, { leading: PAST.leading }).width;
     const w = Math.max(PAST.min, tw + 2 * PAST.padCell + 2 * BORDER);
     const on = i === v.shown;
     items.push(
-      solid(x.clip(GenPart.Past, 3 * i + 1), box(x, { x: left, y: cellTop, w, h: cellH }), on ? theme.ink : theme.paper2),
-      solid(x.clip(GenPart.Past, 3 * i + 2), frame(x, { x: left, y: cellTop, w, h: cellH }), on ? theme.ink : theme.line2),
-      ...write(x, GenPart.Past, label, PAST.size, on ? theme.paper : theme.inkSoft, left + (w - tw) / 2, cellTop + BORDER, { leading: PAST.leading }).map((it) => ({ ...it, clip: x.clip(GenPart.Past, 3 * i + 3) }))
+      solid(x.clip(GenPart.Past, 3 * i + 1), at(x, roundRect(left, cellTop, w, cellH, cellH / 2)), on ? theme.ink : theme.paper2),
+      ...write(x, GenPart.Past, label, PAST.size, on ? theme.paper : theme.inkSoft, left + (w - tw) / 2, cellTop + BORDER + 1, { leading: PAST.leading }).map((it) => ({ ...it, clip: x.clip(GenPart.Past, 3 * i + 3) }))
     );
     left += w + PAST.gap;
   }
@@ -273,21 +276,21 @@ function references(x: Ctx, top: number): PathItem[] {
   const { theme } = x;
   const label = words(x, ADD_REFERENCES, REFS.size, { leading: REFS.leading }, x.bold);
   const w = REFS.padX * 2 + REFS.icon + REFS.gap + label.width;
-  const b = { x: BORDER + REFS.pad, y: top + BORDER + REFS.pad, w, h: REFS.height };
+  const b = { x: INSET, y: top + REFS.pad, w, h: REFS.height };
   const iconTop = b.y + (REFS.height - REFS.icon) / 2;
   return [
-    solid(x.clip(GenPart.References), box(x, { x: BORDER, y: top, w: x.c.w - 2 * BORDER, h: BORDER }), theme.line),
-    solid(x.clip(GenPart.References, 1), at(x, roundRect(b.x, b.y, b.w, b.h, REFS.radius)), theme.chip),
-    { ...solid(x.clip(GenPart.References, 2), at(x, x.icons.references.map((k) => k.map((v, i) => (i % 2 === 0 ? v + b.x + REFS.padX : v + iconTop)))), theme.chipInk), rule: FillRule.Union },
-    ...write(x, GenPart.References, ADD_REFERENCES, REFS.size, theme.chipInk, b.x + REFS.padX + REFS.icon + REFS.gap, b.y + (REFS.height - REFS.size * REFS.leading) / 2, { leading: REFS.leading }, x.bold).map((i) => ({ ...i, clip: x.clip(GenPart.References, 3) }))
+    solid(x.clip(GenPart.References), at(x, roundRect(b.x, b.y, b.w, b.h, REFS.radius)), theme.line2),
+    solid(x.clip(GenPart.References, 1), at(x, roundRect(b.x + BORDER, b.y + BORDER, b.w - 2 * BORDER, b.h - 2 * BORDER, REFS.radius - BORDER)), theme.paper2),
+    { ...solid(x.clip(GenPart.References, 2), at(x, x.icons.references.map((k) => k.map((v, i) => (i % 2 === 0 ? v + b.x + REFS.padX : v + iconTop)))), theme.inkSoft), rule: FillRule.Union },
+    ...write(x, GenPart.References, ADD_REFERENCES, REFS.size, theme.ink, b.x + REFS.padX + REFS.icon + REFS.gap, b.y + (REFS.height - REFS.size * REFS.leading) / 2, { leading: REFS.leading }, x.bold).map((i) => ({ ...i, clip: x.clip(GenPart.References, 3) }))
   ];
 }
 
-const actionsHeight = (v: GenTileView) => BUTTON.height + (v.loop ? 2 * BORDER : 0);
+const actionsHeight = () => BUTTON.height;
 
 function actions(x: Ctx, v: GenTileView, top: number): PathItem[] {
-  const right = x.c.w - BORDER - FOOT_PAD.side;
-  const mid = top + actionsHeight(v) / 2;
+  const right = x.c.w - FOOT_PAD.side;
+  const mid = top + actionsHeight() / 2;
   const run = button(x, GenPart.Run, v.run, right, mid, true);
   const loop = v.loop ? button(x, GenPart.Loop, v.loop, run.left - BUTTON.gap, mid, false) : null;
   const edge = (loop ?? run).left - BUTTON.gap;
@@ -300,23 +303,26 @@ const promptRows = () => PROMPT.size * PROMPT.leading * PROMPT.rows + PROMPT.pad
 
 function footer(x: Ctx, v: GenTileView, top: number): PathItem[] {
   const { c, theme } = x;
-  const inner = { x: BORDER + FOOT_PAD.side, w: c.w - 2 * BORDER - 2 * FOOT_PAD.side };
-  const promptTop = top + BORDER + FOOT_PAD.top;
-  const promptH = v.hasBody ? promptRows() : c.h - BORDER - FOOT_PAD.bottom - actionsHeight(v) - ACTIONS_GAP - promptTop;
+  const inner = { x: FOOT_PAD.side, w: c.w - 2 * FOOT_PAD.side };
+  const promptTop = top + FOOT_PAD.top;
+  const promptH = v.hasBody ? promptRows() : c.h - FOOT_PAD.bottom - actionsHeight() - ACTIONS_GAP - promptTop;
   const p = { x: inner.x, y: promptTop, w: inner.w, h: promptH };
   const typed = !!v.prompt;
   const textTop = p.y + BORDER + PROMPT.padY;
-  const text = write(x, GenPart.PromptText, typed ? v.prompt : v.placeholder, PROMPT.size, theme.ink, p.x + BORDER + PROMPT.padX, textTop, { leading: PROMPT.leading, width: p.w - 2 * (BORDER + PROMPT.padX), height: p.y + p.h - BORDER - textTop }, x.glyphs, typed ? 1 : PLACEHOLDER_ALPHA);
-  const rule = [solid(x.clip(GenPart.Footer), box(x, { x: BORDER, y: top, w: c.w - 2 * BORDER, h: BORDER }), theme.line)];
-  return [...rule, solid(x.clip(GenPart.Prompt), box(x, p), theme.paper2), solid(x.clip(GenPart.Prompt, 1), frame(x, p), theme.line2), ...text, ...actions(x, v, p.y + p.h + ACTIONS_GAP)];
+  const text = write(x, GenPart.PromptText, typed ? v.prompt : v.placeholder, PROMPT.size, typed ? theme.ink : theme.inkSoft, p.x + BORDER + PROMPT.padX, textTop, { leading: PROMPT.leading, width: p.w - 2 * (BORDER + PROMPT.padX), height: p.y + p.h - BORDER - textTop }, x.glyphs, typed ? 1 : PLACEHOLDER_ALPHA);
+  return [solid(x.clip(GenPart.Prompt), at(x, roundRect(p.x, p.y, p.w, p.h, WELL_RADIUS)), theme.line), solid(x.clip(GenPart.Prompt, 1), at(x, roundRect(p.x + BORDER, p.y + BORDER, p.w - 2 * BORDER, p.h - 2 * BORDER, WELL_RADIUS - BORDER)), theme.paper2), ...text, ...actions(x, v, p.y + p.h + ACTIONS_GAP)];
 }
 
-const footHeight = (v: GenTileView) => BORDER + FOOT_PAD.top + promptRows() + ACTIONS_GAP + actionsHeight(v) + FOOT_PAD.bottom;
+const footHeight = () => FOOT_PAD.top + promptRows() + ACTIONS_GAP + actionsHeight() + FOOT_PAD.bottom;
 
 function panel(x: Ctx, running: boolean): PathItem[] {
   const { c, theme } = x;
-  const border = running ? [] : [solid(x.clip(GenPart.Panel, 2), frame(x, { x: 0, y: 0, w: c.w, h: c.h }), theme.line)];
-  return [solid(x.clip(GenPart.Panel), box(x, { x: 0, y: SHADOW_DROP, w: c.w, h: c.h }), SHADOW, SHADOW_OPACITY), solid(x.clip(GenPart.Panel, 1), box(x, { x: 0, y: 0, w: c.w, h: c.h }), theme.paper), ...border];
+  const edge = running ? theme.accent : theme.line;
+  return [
+    solid(x.clip(GenPart.Panel), at(x, roundRect(0, SHADOW_DROP, c.w, c.h, CARD_RADIUS)), SHADOW, SHADOW_OPACITY),
+    solid(x.clip(GenPart.Panel, 2), at(x, roundRect(0, 0, c.w, c.h, CARD_RADIUS)), edge),
+    solid(x.clip(GenPart.Panel, 1), at(x, roundRect(BORDER, BORDER, c.w - 2 * BORDER, c.h - 2 * BORDER, CARD_RADIUS - BORDER)), theme.paper)
+  ];
 }
 
 const FORM_LINE = FORM.size * FORM.leading;
@@ -341,8 +347,8 @@ const formHeight = (v: GenTileView) => (v.form.length ? BORDER + FORM.padY * 2 +
 function bands(c: Box, v: GenTileView) {
   const refs = v.hasBody && v.medium !== 'text' ? (v.form.length ? formHeight(v) : REFS.band) : 0;
   const strip = v.runs > 1 ? PAST.band : 0;
-  const foot = c.h - BORDER - footHeight(v);
-  return { refs, strip, foot, body: { x: BORDER, y: BORDER, w: c.w - 2 * BORDER, h: foot - strip - refs - BORDER } };
+  const foot = c.h - footHeight();
+  return { refs, strip, foot, body: { x: INSET, y: INSET, w: c.w - 2 * INSET, h: foot - strip - refs - INSET } };
 }
 
 export const genBody = (c: Box, v: GenTileView): Box => bands(c, v).body;
@@ -358,8 +364,8 @@ export function genMark(c: At, v: GenTileView, kit: GenKit): PathItem[] {
 export function genItems(c: At, v: GenTileView, kit: GenKit): PathItem[] {
   const x: Ctx = { ...kit, c, clip: (p, n) => (n ? `${c.id}:${p}:${n}` : `${c.id}:${p}`) };
   const { refs, strip, foot, body: bodyBox } = bands(c, v);
-  const body = v.hasBody ? [solid(x.clip(GenPart.Body), box(x, bodyBox), kit.theme.paper2), ...BODIES[v.state](x, v, bodyBox)] : [];
+  const body = v.hasBody ? [solid(x.clip(GenPart.Body), at(x, roundRect(bodyBox.x, bodyBox.y, bodyBox.w, bodyBox.h, WELL_RADIUS)), kit.theme.paper2), ...BODIES[v.state](x, v, bodyBox)] : [];
   const history = strip ? past(x, v, foot - strip - refs) : [];
   const refsBand = refs ? (v.form.length ? form(x, v, foot - refs) : references(x, foot - refs)) : [];
-  return [...panel(x, v.state === 'running'), ...body, ...history, ...refsBand, ...footer(x, v, v.hasBody ? foot : BORDER)];
+  return [...panel(x, v.state === 'running'), ...body, ...history, ...refsBand, ...footer(x, v, v.hasBody ? foot : 0)];
 }

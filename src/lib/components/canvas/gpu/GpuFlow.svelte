@@ -1261,7 +1261,7 @@
       startCrop(id, deeper.clip);
       return;
     }
-    if (id) {
+    if (id && !target.closest('textarea, input, [contenteditable="true"]')) {
       props.onNodeDoubled?.(id);
     }
     const stage = id ? wrap?.querySelector<HTMLElement>(`[data-motion-node="${id}"] [data-frame-stage]`)?.getBoundingClientRect() : null;

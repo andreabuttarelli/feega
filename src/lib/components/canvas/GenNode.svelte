@@ -1,17 +1,4 @@
 <script lang="ts">
-  /**
-   * IL NODO CHE PRODUCE, disegnato.
-   *
-   * Due fasce, e l'ordine non è estetico: sopra quel che è VENUTO FUORI, sotto COSA si chiede. Il
-   * prompt sta in fondo perché è la riga che si riscrive dieci volte guardando il risultato che le
-   * sta sopra — al contrario, ogni modifica spingerebbe il risultato fuori dallo sguardo.
-   *
-   * MODELLO, FORMATO, DURATA E RIPETIZIONE NON STANNO PIÙ QUI: stanno nella barra della selezione
-   * (`SelectionToolbar.svelte`), che compare quando il nodo è scelto — la stessa barra che porta
-   * duplica/collega/elimina, non una seconda accanto. Questo file resta il PRODOTTO — prompt,
-   * risultato, storia — e legge ancora il catalogo (`choices`) perché `tooLong` e il motivo per
-   * cui "Genera" è spento dipendono dal modello scelto, che il nodo continua a sapere.
-   */
   import { runStateOf, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
   import { shownIndex } from '$lib/canvas/gen-history';
   import { PROMPT_PLACEHOLDER, RUN_LABEL, hasGenBody } from '$lib/canvas/gen-tile-view';
@@ -23,6 +10,7 @@
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { untrack } from 'svelte';
   import OutputDragHandle from './OutputDragHandle.svelte';
+  import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
   import { EXAMPLE_LABEL, type DemoResult } from '$lib/onboarding/demo';
 
   let {
@@ -55,57 +43,27 @@
     onsaveskill
   }: {
     node: GenNode;
-    /** I modelli che questo medium può usare, dal catalogo del brand. */
     choices?: ModelChoice[];
-    /**
-     * Il catalogo che alimenta `choices` ha almeno una riga per questo medium. `false` con
-     * `choices` vuoto vuol dire "il sync non è ancora passato", non "questo medium non ha
-     * modelli": un menù vuoto senza dirlo sembra un difetto, non la conseguenza accettata della
-     * regola "non sincronizzato, non offerto" (`offerable-models.ts`).
-     */
     catalogueSynced?: boolean;
-    /** Il prezzo di UNA riscrittura "Migliora prompt" per questo medium (`canvas-catalogue.ts`),
-     *  dallo stesso listino di `TEXT_NODE_CREDITS` — assente = costo ignoto, il preventivo non
-     *  aggiunge un extra. */
     enhanceUnitCredits?: number;
     estimatedTextInputTokens?: number;
     estimatedTextOutputTokens?: number;
     estimateRevision?: string;
     variableTextInput?: boolean;
-    /** Un testo a monte collegato conta come prompt quando il nodo non ne ha uno suo
-     *  (`hasPrompt`, `gen-node.ts`) — chi usa il nodo lo calcola da `edges`/`nodes`, che il nodo
-     *  stesso non conosce. */
     hasUpstreamText?: boolean;
-    /** Quanti biglietti di loop sono ancora in coda per QUESTO nodo — 0 = nessun loop in corso.
-     *  Chi lo usa lo calcola da `node_runs` (`params.loop.phase === 'queued'`): il nodo non ha un
-     *  `db`, mostra solo quel che gli si passa, come ogni altro suo stato. */
     loopQueued?: number;
-    /** Se un loop è possibile per questo nodo — un filo `iterate` la cui sorgente porta
-     *  >=2 valori (un asse). Chi lo usa lo calcola da `edges`/`nodes` (`loop-axes.ts::loopAffordance`):
-     *  senza un asse, il bottone non ha niente da combinare e resta nascosto. */
     loopVisible?: boolean;
-    /** Quante combinazioni il loop girerebbe — mostrato sul bottone ("Loop ×N"). */
     loopCombinationCount?: number;
     onchange?: (patch: Partial<GenNode>) => void;
     onrun?: () => void;
-    /** Genera in loop — N combinazioni degli archi `iterate`, o N varianti (`repeat`) senza
-     *  assi. Il nodo non pianifica né chiede conferma da sé: chi lo usa lo fa (`loop_plan`
-     *  prima, poi `run_loop`, che METTE IN CODA — il cron gira le combinazioni nei minuti
-     *  successivi, non questa chiamata). */
     onrunloop?: () => void;
     variantsInFlight?: number;
     remembered?: RememberedVariants | null;
-    /** Ferma i biglietti non ancora reclamati — quelli già in corso finiscono comunque. */
     oncancelloop?: () => void;
-    /** Rimettere in vetrina un giro di prima. Il nodo non sa scrivere: chiede a chi lo usa. */
     onshow?: (runId: string) => void;
-    /** Sblocca una corsa che non torna più. Senza, il bottone resta spento per sempre. */
     onunlock?: () => void;
-    /** Solo per `medium === 'text'`: l'altezza reale del contenuto (prompt + risultato), a ogni
-     *  cambio — mai scritta, chi la usa la clampa (`text-node-grow.ts`) e la mostra soltanto. */
     onmeasure?: (contentHeight: number) => void;
     onestimate?: (prompt: string, model: string | null, revision: string) => void;
-    /** Come si disegna quel che è uscito. Il nodo non sa da dove venga l'URL firmato. */
     result?: import('svelte').Snippet<[{ refId: string; text: string | null }]>;
     references?: import('svelte').Snippet;
     example?: DemoResult | null;
@@ -163,12 +121,6 @@
     }
   }
 
-  /**
-   * IL MODELLO CHE CONTA È QUELLO RISOLTO, non `node.model`: un nodo nato prima del default per
-   * il suo medium (`default-models.ts`) non ha mai scritto un `model` in `nodes.data`, e senza
-   * questo il bottone resterebbe spento su ogni nodo vecchio finché qualcuno non riapre un menù
-   * che non c'è più.
-   */
   const resolvedModel = $derived(effectiveModel(node.medium, node.model, choices));
   const quote = $derived(
     runQuoteOf({ node, choices, hasUpstreamText, variableTextInput, enhanceUnitCredits, estimatedTextInputTokens, estimatedTextOutputTokens, remembered })
@@ -199,36 +151,13 @@
   const canRun = $derived(quote.enabled);
   const shown = $derived(shownIndex(node));
 
-  /** Quanto costerebbe UN giro, con lo stesso modello/parametri che "Genera" spedirebbe adesso —
-   *  `null` quando il catalogo non porta un prezzo per questo modello, mai un numero inventato. */
   const runCredits = $derived(quote.credits);
   const loopCredits = $derived(loopCreditsOf(quote, loopCombinationCount, variableTextInput));
 
-  /**
-   * SE QUESTO NODO HA UNA FASCIA `.gen-body` DA MOSTRARE — la stessa regola che decide se
-   * disegnarla (sotto), tenuta in UN POSTO SOLO perché anche il layout del prompt la legge: senza
-   * un corpo, il prompt riempie tutto il nodo invece di restare una striscia di due righe sopra
-   * uno spazio vuoto.
-   */
   const shownExample = $derived(node.refId ? null : example);
   const hasBody = $derived(hasGenBody(node.medium, runState, node.refId, !!shownExample));
 
 
-  /**
-   * QUANTO È ALTO IL CONTENUTO VERO, per il nodo testo — `scrollHeight`, non i caratteri del
-   * prompt: conta a capo, la lunghezza reale della riga resa e il font dell'utente, che una
-   * stima a caratteri indovinerebbe male.
-   *
-   * `.gen-body` e `.gen-prompt` sono entrambi vincolati alla propria fascia (`overflow` interno):
-   * lo `scrollHeight` che conta è quello del testo VERO dentro — `.gen-text`, che ha `overflow:
-   * auto` e quindi uno `scrollHeight` che riflette il contenuto, non la fascia che lo contiene.
-   * Il primo figlio di `.gen-body` (`.gen-text-wrap`) è `height: 100%`: il suo `scrollHeight`
-   * torna sempre uguale allo spazio che GIÀ ha, mai a quanto il testo chiederebbe — misurarlo
-   * lì avrebbe chiuso il nodo su se stesso, crescita che non cresce mai. `.gen-prompt`, la
-   * `textarea`, sommata — non il suo contenitore, che resterebbe fisso all'altezza assegnata.
-   * `ResizeObserver` su entrambi, non una lettura sola: il corpo cresce mentre si digita o mentre
-   * il risultato arriva a pezzi, non solo al montaggio.
-   */
   function measureHeight(el: HTMLElement) {
     if (node.medium !== 'text' || !onmeasure) return {};
 
@@ -259,14 +188,6 @@
 </script>
 
 <div class="gen" class:is-running={runState === 'running' || loopQueued > 0} use:measureHeight>
-  <!-- Il risultato, quando c'è. Il testo lo mostra qui perché è esso stesso il prodotto; immagine
-       e video li disegna chi usa il nodo, che sa da dove viene l'URL firmato.
-
-       UN NODO TESTO SENZA ANCORA NIENTE DA MOSTRARE non ha un corpo: la fascia con «Scrivi cosa
-       vuoi»/«Pronto» al centro era un riquadro vuoto sopra una casella di scrittura che dice la
-       stessa cosa — running/failed restano visibili, sono uno stato del giro, non un placeholder
-       del risultato. Immagine e video tengono il proprio placeholder: la fascia è la loro unica
-       anteprima prima di girare, non una ripetizione di quel che il prompt già dice. -->
   {#if hasBody}
     <div class="gen-body">
       {#if runState === 'running'}
@@ -301,13 +222,6 @@
       {/if}
     </div>
   {/if}
-
-  <!-- LA STORIA, sotto il risultato e sopra il prompt: si guarda quel che è uscito, si sceglie
-       fra i giri fatti, si riscrive la frase. Una striscia e non frecce, perché con le frecce per
-       sapere quante generazioni ci sono bisogna premerle fino in fondo.
-
-       Compare da DUE giri in su: con uno solo sarebbe una fila di un elemento che dice quel che il
-       corpo del nodo già mostra, e ruberebbe altezza al risultato. -->
   {#if node.runs.length > 1}
     <div class="gen-past" role="group" aria-label="Earlier generations">
       {#each node.runs as run, i (run.id)}
@@ -368,21 +282,18 @@
       </ul>
     {/if}
 
-    {#if onsaveskill && node.prompt.trim()}
-      {#if naming === null}
-        <button type="button" class="gen-skill-save nodrag" data-testid="skill-save" onclick={() => (naming = '')}>Save as skill</button>
-      {:else}
-        <form class="gen-skill-name nodrag" onsubmit={(e) => { e.preventDefault(); void saveNamed(); }}>
-          <input placeholder="skill-name" bind:value={naming} data-testid="skill-name" />
-          <button type="submit" disabled={!SKILL_NAME.test(naming.trim())}>Save</button>
-          <button type="button" onclick={() => (naming = null)}>Cancel</button>
-        </form>
-      {/if}
-    {/if}
-
     <div class="gen-actions">
-      <!-- Il perché sta ACCANTO al bottone spento, non altrove: un motivo che non si vede da dove
-           si preme è un motivo che nessuno legge. -->
+      {#if onsaveskill && node.prompt.trim()}
+        {#if naming === null}
+          <button type="button" class="gen-skill-save nodrag" data-testid="skill-save" title="Save this prompt as a skill" onclick={() => (naming = '')}><BookmarkPlus size={14} strokeWidth={1.75} />Save as skill</button>
+        {:else}
+          <form class="gen-skill-name nodrag" onsubmit={(e) => { e.preventDefault(); void saveNamed(); }}>
+            <input placeholder="skill-name" bind:value={naming} data-testid="skill-name" />
+            <button type="submit" disabled={!SKILL_NAME.test(naming.trim())}>Save</button>
+            <button type="button" onclick={() => (naming = null)}>Cancel</button>
+          </form>
+        {/if}
+      {/if}
       {#if blocked}
         <span class="gen-warn" class:is-soft={!tooLong}>
           {blocked}{#if tooLong && choice?.maxPromptChars}
@@ -403,7 +314,7 @@
         </button>
       {/if}
       <span class="gen-run">
-        <button type="button" onclick={() => onrun?.()} disabled={!canRun}>
+        <button type="button" class="gen-cta" data-testid="gen-run" onclick={() => onrun?.()} disabled={!canRun}>
           {runLabelOf(quote)}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
         </button>
         {#if providerQuotes.length && !variableTextInput}
@@ -423,31 +334,24 @@
 </div>
 
 <style>
-  /*
-   * UN NODO GALLEGGIA, non è appoggiato.
-   *
-   * Su una tela è tutto su un piano solo: un bordo da un pixel è l'unica cosa che separa il nodo
-   * dallo sfondo, e a zoom ridotto sparisce — restano rettangoli che si confondono col pattern.
-   * L'ombra dà la profondità che il bordo da solo non ha, e cresce con la selezione perché il
-   * nodo su cui si sta lavorando deve stare AVANTI agli altri, non solo essere contornato.
-   *
-   * `--paper` e non `--paper-2`: il nodo è il foglio, e la tela è ciò che gli sta sotto. Invertiti
-   * — come erano — il nodo era più scuro dello sfondo, che è il contrario di quel che galleggia.
-   */
   .gen {
+    --gen-inset: 6px;
+    --gen-well: var(--ui-radius-md, 6px);
     position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;
     min-height: 0;
+    padding: 0 var(--gen-inset) var(--gen-inset);
     background: var(--paper, #fff);
     border: 1px solid var(--line, #e5e5e5);
+    border-radius: var(--ui-radius-lg, 10px);
     box-shadow:
       0 1px 2px rgb(0 0 0 / 0.05),
       0 8px 24px -12px rgb(0 0 0 / 0.2);
     transition:
-      box-shadow 140ms ease,
-      border-color 140ms ease;
+      box-shadow var(--ui-dur-fast, 120ms) ease,
+      border-color var(--ui-dur-fast, 120ms) ease;
   }
   .gen:hover {
     box-shadow:
@@ -461,12 +365,13 @@
     content: '';
     position: absolute;
     inset: -1px;
-    padding: 2px;
+    padding: 1.5px;
+    border-radius: inherit;
     pointer-events: none;
     background: conic-gradient(
       from var(--gen-running-angle),
       transparent 0deg,
-      var(--accent, #c485fe) 70deg,
+      var(--ui-accent, #0099ff) 70deg,
       transparent 140deg,
       transparent 360deg
     );
@@ -490,39 +395,37 @@
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .gen.is-running::after {
-      animation: none;
-      background: var(--accent, #c485fe);
-    }
-    .gen {
-      transition: none;
-    }
-  }
-
-  /*
-   * IL RISULTATO ARRIVA AI BORDI. Il nodo esiste per guardare quel che è uscito: dentro un
-   * `padding` diventa una miniatura con una cornice attorno, e su una clip verticale la cornice
-   * è più larga del contenuto. Il taglio col raggio del guscio è quel che dà il bordo pulito
-   * senza che l'immagine debba saperlo.
-   *
-   * Il taglio vale per il CONTENUTO, non per il nodo: `overflow: hidden` sul nodo intero
-   * mangerebbe la fascia delle proprietà, che sporge apposta.
-   */
   .gen-body {
     position: relative;
     flex: 1;
     min-height: 0;
+    margin-top: var(--gen-inset);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    border-radius: var(--gen-well);
     background: var(--paper-2, #f9f9f9);
   }
 
-  /* Il contenuto che il chiamante disegna riempie la fascia invece di galleggiarci dentro:
-     `contain` e non `cover` perché un'immagine tagliata a metà non si può giudicare, ed è il
-     giudizio la ragione per cui sta lì. */
+  .gen.is-running .gen-body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--ui-accent, #0099ff) 9%, transparent) 50%, transparent 80%);
+    background-size: 220% 100%;
+    animation: gen-shimmer 1.8s ease-in-out infinite;
+  }
+
+  @keyframes gen-shimmer {
+    from {
+      background-position: 120% 0;
+    }
+    to {
+      background-position: -120% 0;
+    }
+  }
+
   .gen-body :global(img),
   .gen-body :global(video) {
     width: 100%;
@@ -560,6 +463,7 @@
     left: 6px;
     z-index: 2;
     padding: 0 6px;
+    border-radius: var(--ui-radius-sm, 4px);
     font-size: 0.6875rem;
     font-weight: 600;
     line-height: 1.25rem;
@@ -576,10 +480,11 @@
   }
 
   .gen-busy {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     padding: 12px;
   }
 
@@ -610,7 +515,9 @@
     padding: 4px 12px;
     font: inherit;
     font-size: 11.5px;
+    line-height: 1.5;
     border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--gen-well);
     background: var(--paper, #fff);
     color: var(--ink, #1d1d1f);
     cursor: pointer;
@@ -623,35 +530,24 @@
     cursor: default;
   }
 
-  /* `margin-top: auto` spinge il piede in fondo quando `.gen-body` manca (un nodo testo mai
-     girato, CLAUDE.md): senza, l'altezza fissa del nodo lascerebbe uno spazio vuoto sotto la
-     casella invece del bordo del nodo. Con `.gen-body` presente non cambia niente: `flex: 1` ha
-     già preso lo spazio restante. */
   .gen-route-note {
     margin: 0;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.125rem 0;
     font-size: 0.6875rem;
     color: var(--muted-foreground);
   }
 
   .gen-uncensored-note {
     margin: 0;
-    padding: 6px 9px;
+    padding: 8px 2px 0;
     font-size: 11px;
     color: var(--ink-soft, #6e6e73);
-    border-top: 1px solid var(--line, #e5e5e5);
   }
 
   .gen-foot {
     margin-top: auto;
-    padding: 8px 9px 9px;
-    border-top: 1px solid var(--line, #e5e5e5);
-    background: var(--paper, #fff);
+    padding-top: var(--gen-inset);
   }
-  /* SENZA `.gen-body` — un nodo testo che non ha ancora prodotto niente — il prompt è l'unica
-     cosa sul nodo: riempie tutto lo spazio invece di restare una striscia di due righe sopra un
-     vuoto. `flex: 1` sulla fascia e sulla textarea, non un'altezza fissa: la crescita resta
-     quella di `text-node-grow.ts`, non una seconda regola scritta qui. */
   .gen-foot.is-full {
     display: flex;
     flex-direction: column;
@@ -659,16 +555,40 @@
     min-height: 0;
   }
   .gen-prompt {
+    display: block;
     width: 100%;
     resize: none;
-    border: 1px solid var(--line-2, #d2d2d7);
-    padding: 6px 8px;
+    border: 1px solid var(--line, #e5e5e5);
+    border-radius: var(--gen-well);
+    padding: 8px 10px;
     font: inherit;
     font-size: 12.5px;
     line-height: 1.45;
     color: var(--ink, #1d1d1f);
     background: var(--paper-2, #f9f9f9);
+    transition:
+      border-color var(--ui-dur-fast, 120ms) ease,
+      box-shadow var(--ui-dur-fast, 120ms) ease,
+      background var(--ui-dur-fast, 120ms) ease;
   }
+  .gen-prompt::placeholder {
+    color: var(--ink-soft, #6e6e73);
+    opacity: 0.55;
+  }
+  .gen-prompt.is-full {
+    flex: 1;
+    min-height: 0;
+  }
+  .gen-prompt:hover {
+    border-color: var(--line-2, #d2d2d7);
+  }
+  .gen-prompt:focus {
+    outline: none;
+    background: var(--paper, #fff);
+    border-color: var(--ui-accent, #0099ff);
+    box-shadow: 0 0 0 3px var(--ui-accent-wash, rgb(0 153 255 / 0.1));
+  }
+
   .gen-skills {
     list-style: none;
     margin: 4px 0 0;
@@ -678,11 +598,13 @@
     border: 1px solid var(--line-2, #d2d2d7);
     border-radius: var(--ui-radius-md, 6px);
     background: var(--paper, #fff);
+    box-shadow: var(--ui-shadow-float);
   }
   .gen-skills button {
     display: flex;
     gap: 8px;
     width: 100%;
+    height: auto;
     padding: 4px 6px;
     border: 0;
     border-radius: var(--ui-radius-sm, 4px);
@@ -702,97 +624,133 @@
     white-space: nowrap;
     color: var(--ink-3, #6e6e73);
   }
-  .gen-skill-save {
-    margin-top: 4px;
-    padding: 0;
-    border: 0;
-    background: none;
-    font: inherit;
-    font-size: 11.5px;
-    color: var(--ink-3, #6e6e73);
-    cursor: pointer;
-  }
-  .gen-skill-name {
-    display: flex;
-    gap: 4px;
-    margin-top: 4px;
-    font-size: 12px;
-  }
-  .gen-skill-name input {
-    flex: 1;
-    min-width: 0;
-    font: inherit;
-  }
-  .gen-prompt.is-full {
-    flex: 1;
-    min-height: 0;
-  }
-  .gen-prompt:focus {
-    outline: none;
-    border-color: var(--accent, #c485fe);
-  }
 
   .gen-actions {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 6px;
+    height: 30px;
+    margin-top: var(--gen-inset);
+  }
+  .gen-skill-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: auto;
+    height: 26px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--gen-well);
+    background: none;
+    font: inherit;
+    font-size: 11.5px;
+    color: var(--ink-soft, #6e6e73);
+    cursor: pointer;
+  }
+  .gen-skill-save:hover {
+    background: var(--paper-2, #f2f2f2);
+    color: var(--ink, #1d1d1f);
+  }
+  .gen-skill-name {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: auto;
+    min-width: 0;
+    font-size: 12px;
+  }
+  .gen-skill-name input {
+    flex: 1;
+    min-width: 0;
+    height: 26px;
+    padding: 0 8px;
+    font: inherit;
+    border: 1px solid var(--line-2, #d2d2d7);
+    border-radius: var(--gen-well);
+    background: var(--paper, #fff);
+    color: var(--ink, #1d1d1f);
+  }
+  .gen-skill-name button {
+    height: 26px;
+    padding: 0 8px;
+    font-size: 11.5px;
   }
   .gen-warn {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 11px;
-    color: #c0392b;
+    color: var(--ui-danger, #e5484d);
   }
-  /* «Manca ancora qualcosa» non è un errore: in rosso, aprire un nodo nuovo sembrerebbe aver già
-     sbagliato qualcosa. Il rosso resta a quel che il modello rifiuterebbe davvero. */
   .gen-warn.is-soft {
     color: var(--ink-soft, #6e6e73);
   }
 
-  /*
-   * LA STRISCIA DEI GIRI FATTI. Numeri e non miniature: una miniatura dentro una fascia alta
-   * venti pixel è illeggibile — si distinguerebbero due immagini simili solo aprendole — e
-   * caricarne dieci costringerebbe il nodo a scaricare dieci file per una fila che spesso nessuno
-   * guarda. Il prompt di quel giro sta nel `title`, che è dove si cerca quando i numeri non
-   * bastano.
-   */
   .gen-past {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
-    padding: 5px 9px;
-    border-top: 1px solid var(--line, #e5e5e5);
-    background: var(--paper, #fff);
+    padding-top: 5px;
   }
   .gen-past-one {
-    min-width: 20px;
-    padding: 1px 5px;
+    min-width: 22px;
+    height: auto;
+    padding: 1px 7px;
     font-size: 10.5px;
     line-height: 1.5;
     color: var(--ink-soft, #6e6e73);
     background: var(--paper-2, #f9f9f9);
-    border: 1px solid var(--line-2, #d2d2d7);
+    border: 1px solid transparent;
+    border-radius: var(--ui-radius-full, 9999px);
     cursor: pointer;
+  }
+  .gen-past-one:hover {
+    color: var(--ink, #1d1d1f);
   }
   .gen-past-one.is-shown {
     color: var(--paper, #fff);
     background: var(--ink, #1d1d1f);
-    border-color: var(--ink, #1d1d1f);
   }
+
   button {
-    padding: 4px 12px;
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 12px;
     font: inherit;
     font-size: 12px;
     border: none;
-    background: var(--ink, #1d1d1f);
-    color: var(--paper, #fff);
+    border-radius: var(--gen-well);
+    background: var(--paper-2, #f2f2f2);
+    color: var(--ink, #1d1d1f);
     cursor: pointer;
+    white-space: nowrap;
   }
   button:disabled {
     opacity: 0.35;
     cursor: default;
   }
-  /* Secondario a "Genera": stesso posto, meno peso — il loop è l'azione meno frequente delle due. */
+  .gen-cta {
+    gap: 4px;
+    font-weight: 500;
+    background: var(--ui-accent, #0099ff);
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 1px 2px rgb(0 0 0 / 0.12);
+    transition: filter var(--ui-dur-fast, 120ms) ease;
+  }
+  .gen-cta:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .gen-cta:active:not(:disabled) {
+    filter: brightness(0.95);
+  }
+  .gen-cta:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus);
+  }
+
   .gen-run {
     position: relative;
     display: inline-flex;
@@ -803,11 +761,12 @@
     right: 0;
     bottom: 100%;
     margin: 0 0 6px;
-    padding: 6px;
+    padding: 4px;
     list-style: none;
     min-width: 220px;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
+    background: var(--ui-raised, #fff);
+    border-radius: var(--ui-radius-md, 6px);
+    box-shadow: var(--ui-shadow-float);
     font-size: 12px;
     z-index: 5;
   }
@@ -820,18 +779,19 @@
     gap: 8px;
     align-items: center;
     justify-content: space-between;
-    padding: 3px 4px;
+    padding: 4px 6px;
+    border-radius: var(--ui-radius-sm, 4px);
   }
   .gen-providers li.is-selected {
     font-weight: 600;
+    background: var(--paper-2, #f2f2f2);
   }
   .gen-providers li.is-cheapest em {
     font-style: normal;
-    color: var(--accent, #c485fe);
+    color: var(--ui-ok, #1f9d55);
   }
   .gen-loop {
     background: var(--paper, #fff);
-    color: var(--ink, #1d1d1f);
     border: 1px solid var(--line-2, #d2d2d7);
   }
   .gen-loop:hover:not(:disabled) {
@@ -845,7 +805,8 @@
   .gen-dots i {
     width: 6px;
     height: 6px;
-    background: var(--accent, #c485fe);
+    border-radius: 50%;
+    background: var(--ui-accent, #0099ff);
     animation: gen-blink 1.2s infinite;
   }
   .gen-dots i:nth-child(2) {
@@ -858,7 +819,18 @@
     0%, 60%, 100% { opacity: 0.25; }
     30% { opacity: 1; }
   }
+
   @media (prefers-reduced-motion: reduce) {
-    .gen-dots i { animation: none; opacity: 0.5; }
+    .gen.is-running::after {
+      animation: none;
+      background: var(--ui-accent, #0099ff);
+    }
+    .gen.is-running .gen-body::before,
+    .gen-dots i {
+      animation: none;
+    }
+    .gen {
+      transition: none;
+    }
   }
 </style>
