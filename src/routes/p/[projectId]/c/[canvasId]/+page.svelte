@@ -90,7 +90,6 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { onMount, untrack } from 'svelte';
-  import { Renderer, rendererOf } from '$lib/canvas/gpu/renderer-flag';
   import { feedView, personView, productsView } from '$lib/canvas/source-thumbs';
 import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type NodeView } from '$lib/canvas/node-view';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
@@ -136,7 +135,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import { AssetKind } from '@feega/motion-core/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
-  import FrameHover from '$lib/components/canvas/FrameHover.svelte';
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
   import { TileBody } from '$lib/canvas/motion-node';
   import OutputDragHandle from '$lib/components/canvas/OutputDragHandle.svelte';
@@ -144,7 +142,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
-  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
@@ -1552,7 +1550,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     cursors.port.update({ selection: ids });
   }
 
-  const core = $derived(rendererOf(page.url) === Renderer.Core);
   const liveHost = LiveHost.Canvas;
 
   $effect(() => {
@@ -4120,7 +4117,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if viewOnly}<p class="view-only-badge" data-testid="view-only">View only</p>{/if}
   {#if Flow}
   <Flow
-    {core}
     mode={canvasMode}
     postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
@@ -4206,8 +4202,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
     viewOf={sourceView}
-    cardPreviews={data.cardPreviews}
-    previewsAt={`/p/${data.projectId}/c/${data.canvas.id}/card-previews`}
     peers={drawnPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
     onLive={(live) => {
@@ -4246,9 +4240,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {@const over = liveHost === LiveHost.Canvas ? hoverNode : null}
       {@const overMotion = over ? motionOf(over) : null}
       {@const hoverMotion = hoverNode ? motionOf(hoverNode) : null}
-      {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && !core}
-        <FrameHover nodeId={id} revision={hoverMotion.docHeadRevision} previewUrl={motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} width={FORMATS[hoverMotion.format].width} height={FORMATS[hoverMotion.format].height} />
-      {/if}
       {@const hoverGen = hoverNode ? genOf(hoverNode) : null}
       {#if body === TileBody.Standin && hoverGen?.refId && !hoverGen.running}<OutputDragHandle nodeId={id} />{/if}
       {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
