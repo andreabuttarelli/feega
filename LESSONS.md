@@ -3416,3 +3416,7 @@ Signal: a test of code under `packages/` hangs or ignores your edit in a worktre
 ## A mask's polarity belongs to the model, and green tests don't know it
 
 Signal: inpaint keeps the painted area and regenerates the rest; reframe returns the grey padding untouched. Cause: `kie/ideogram/v3-edit` repaints BLACK and keeps white, while the mask builder painted the area to change white; a fake model accepts either. Move: the convention lives in one table next to the model (`MASK_PAINT` in `src/lib/image-tools.ts`), and a new model with a mask is verified with one real generation before the row is trusted. A provider that answers `internal error` with a request body that matches its docs is down, not misused: capture the body first, then swap the model in one row.
+
+## GPU memory on the web is freed by GC, not by Rust's drop
+
+**Signal:** a WebGPU page that runs smoothly and then gets killed on iPhone; on desktop the GPU memory "leaks" but never crashes. Counting `GPUDevice.createTexture` minus `GPUTexture.destroy` shows thousands of live textures (24 GB after 5 min on the heavy canvas). **Move:** wgpu's WebGPU backend makes `Drop` a no-op for textures and buffers; the memory goes only when JS GC collects the wrapper, and Safari's GC does not see GPU pressure. Call `texture.destroy()` / `buffer.destroy()` (after the last submit that uses it) for every short-lived GPU resource. `scripts/perf/mobile-memory.ts` counts them.
