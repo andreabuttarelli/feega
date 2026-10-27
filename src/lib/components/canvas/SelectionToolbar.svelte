@@ -181,6 +181,8 @@
               value={modelValue}
               provider={providerValue}
               mixed={properties.model.kind === 'mixed'}
+              medium={runQuote?.cost.medium ?? null}
+              params={runQuote?.cost.params ?? {}}
               onselect={(id, provider) => onpropertychange?.({ model: id || null, dynamicParams: { [PROVIDER_PARAM]: provider } })}
             />
           {/if}
