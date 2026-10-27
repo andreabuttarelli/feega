@@ -56,8 +56,9 @@ icons 12 / 14 / 16 / 20 (`--ui-icon-xs/sm/—/lg`). Motion: 120 / 200 / 320 ms o
 
 These rules apply to every panel, including the Properties inspector:
 
-- **Elevation reads at a glance:** canvas darkest, side panels one step lighter, inputs one more
-  step (`--ui-canvas` < `--ui-panel` < `--ui-input`). Never a border where a step will do.
+- **Elevation reads at a glance:** canvas darkest, side panels one step lighter; fields are the
+  exception and sit darker than the panel or floating bar they are on (`--ui-input` below
+  `--ui-panel` and `--ui-panel-raised`, in both themes). Never a border where a step will do.
 - **Generous targets:** rows 32px (`--ui-row`), inputs 32px, panel header 48px; 44px on touch.
 - **Panel tabs:** a `SegmentedControl` at the top of a panel switches its views (right panel:
   Chat / Properties). No underlined tabs.
