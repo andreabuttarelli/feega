@@ -126,6 +126,8 @@ const ARRANGE: Record<(typeof ARRANGE_OPS)[number], (doc: MotionDoc, ids: string
 import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { COUNTER_FORMATS } from '@feega/motion-core/motion/text-counter';
 import { setTextCounter } from '$lib/motion/text-counter-ops';
+import { actionSchema, transitionSchema, triggerSchema, ACTION_KINDS, TRANSITION_KINDS as LINK_TRANSITIONS, TRIGGER_KINDS } from '@feega/motion-core/motion/prototype/model';
+import { putInteraction, removeInteraction } from '$lib/motion/prototype/ops';
 import { animateTo } from '$lib/motion/animate-to';
 import { IN_OUT_PRESETS, InOutPreset, PresetSide, applyInOut } from '$lib/motion/in-out-presets';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '@feega/motion-core/motion/graph';
@@ -445,6 +447,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         autoLayout: c.autoLayout ?? null,
         layoutItem: c.layoutItem ?? null,
         constraints: c.constraints ?? null,
+        interactions: c.interactions ?? [],
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
@@ -2388,6 +2391,28 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const out = apply(applyTextPreset(session.doc, input.clip_id, input.preset, { start: frames(input.start), duration: frames(input.duration) }, id), `${input.preset} on ${input.clip_id}`);
         return out.ok ? { ...out, animator_id: id } : out;
       }
+    }),
+
+    add_interaction: tool({
+      description: `Link a layer to something that happens when the viewer acts on it in a prototype. trigger kind ${TRIGGER_KINDS.join('|')} (after_delay needs delayMs). action kind ${ACTION_KINDS.join('|')}: navigate and open_overlay take target, the id of another frame on the canvas (see the canvas frames), scroll_to takes the target id, back takes none. transition kind ${LINK_TRANSITIONS.join('|')}; slide and push take direction left|right|up|down, dissolve slide and push take easing and durationMs (default 300). Default transition is instant. Pass interaction_id of an existing link to replace it. At most 16 per layer.`,
+      inputSchema: z.object({ clip_id: z.string(), interaction_id: z.string().optional(), trigger: triggerSchema, action: actionSchema, transition: transitionSchema.optional() }),
+      execute: async ({ clip_id, interaction_id, ...link }) => {
+        const id = interaction_id ?? deps.newId();
+        const out = apply(putInteraction(session.doc, clip_id, { id, ...link }), `linked ${clip_id} (${link.trigger.kind} to ${link.action.kind})`);
+        return out.ok ? { ...out, interaction_id: id } : out;
+      }
+    }),
+
+    remove_interaction: tool({
+      description: 'Remove one prototype link from a layer. interaction_id comes from list_interactions.',
+      inputSchema: z.object({ clip_id: z.string(), interaction_id: z.string() }),
+      execute: async ({ clip_id, interaction_id }) => apply(removeInteraction(session.doc, clip_id, interaction_id), `unlinked ${interaction_id} from ${clip_id}`)
+    }),
+
+    list_interactions: tool({
+      description: 'List every prototype link of this frame: the layer (clip_id), its trigger, action (with target frame) and transition. Links between frames are drawn as arrows on the canvas.',
+      inputSchema: z.object({}),
+      execute: async () => ({ interactions: clipsOf(session.doc).flatMap((c) => (c.interactions ?? []).map((i) => ({ clip_id: c.id, interaction_id: i.id, trigger: i.trigger, action: i.action, transition: i.transition }))) })
     }),
 
     set_text_counter: tool({

@@ -9,6 +9,7 @@
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import InstanceInspector from '$lib/components/motion/InstanceInspector.svelte';
   import RangeTextInspector from '$lib/components/motion/RangeTextInspector.svelte';
+  import PrototypeSection from '$lib/components/motion/PrototypeSection.svelte';
   import VariablesLibrarySection from '$lib/components/motion/VariablesLibrarySection.svelte';
   import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
   import { textRange } from '$lib/canvas/text-range.svelte';
@@ -59,6 +60,7 @@
   const edit = (next: NonNullable<typeof doc>, summary: string) => session?.edit(next, summary);
   const shownDoc = $derived(doc && shown ? scopeView(doc, shown) : doc);
   const editShown = (next: NonNullable<typeof doc>, summary: string) => doc && shown && edit(mergeScope(doc, shown, next), summary);
+  const commitShown = (result: OpResult, summary: string) => result.ok && editShown(result.doc, summary);
   const editGuides = (result: OpResult, summary: string) => result.ok && edit(result.doc, summary);
 
   async function runBar(id: ActionId) {
@@ -112,6 +114,7 @@
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
       <MotionInspector gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} />
+      <PrototypeSection doc={shownDoc!} clip={shown.clip} commit={commitShown} />
       {#if Presets}<Presets doc={shownDoc!} clip={shown.clip} onchange={editShown} />{/if}
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}
     {/if}

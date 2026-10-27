@@ -75,6 +75,7 @@ const CLIP: Record<string, Access> = {
   autoLayout: { write: ['add_auto_layout', 'set_auto_layout', 'reorder_auto_layout'], read: 'autoLayout' },
   layoutItem: { write: ['add_auto_layout', 'set_layout_item'], read: 'layoutItem' },
   constraints: { write: ['set_layout_item', 'set_constraints'], read: 'constraints' },
+  interactions: { write: ['add_interaction', 'remove_interaction'], read: 'interactions' },
   partStyles: { write: ['set_part_fill'], read: 'partStyles' },
   styleRef: { write: ['named_style'], read: 'styleRef' },
   bind: { write: ['variable'], read: 'bind' },

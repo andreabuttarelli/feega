@@ -13,6 +13,10 @@
   import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
+  import PrototypeArrows from '../PrototypeArrows.svelte';
+  import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
+  import { prototypeLinks } from '$lib/motion/prototype/links';
+  import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { alignSide } from '$lib/canvas/frame-tools';
   import { FRAME_ELEMENT_MENU, canRunInFrame, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
@@ -350,6 +354,11 @@
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
   const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
+  const prototypeDocs = $derived(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
+  const arrowLinks = $derived(prototypeLinks(prototypeDocs));
+  $effect(() => {
+    prototypeLink.targets = coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!) }));
+  });
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
     if (coreOn && !coreType) {
@@ -2250,6 +2259,19 @@
     props.onComment?.(commentPlacement(w, tile ? { id: tile.id, x: tile.x, y: tile.y } : null));
   }
 
+  function linkPrototype(targetId: string): boolean {
+    const draft = prototypeLink.draft;
+    const source = inside?.nodeId;
+    const live = source ? liveOf(source) : null;
+    const onCanvas = coreFrames.some((f) => f.id === targetId && kindOfNode(f.id) === FrameKind.Frame);
+    if (!draft || !source || !live || source === targetId || !onCanvas) {
+      return false;
+    }
+    commit(source, linkToFrame(live.doc, draft, targetId, () => crypto.randomUUID().slice(0, 8)), 'Linked to a frame');
+    prototypeLink.stop();
+    return true;
+  }
+
   function onDown(e: PointerEvent) {
     glide = null;
     dropHover();
@@ -2272,6 +2294,10 @@
     }
     const target = e.target as HTMLElement;
     const hit = boxHit(hitAt(w), target);
+    if (prototypeLink.draft && e.button === PRIMARY_BUTTON && hit.kind === HitKind.Node && linkPrototype(hit.nodeId)) {
+      e.preventDefault();
+      return;
+    }
     if (hit.kind === HitKind.Node && (extendPick(e, w) || pickElement(e, w))) {
       e.preventDefault();
       return;
@@ -3454,6 +3480,7 @@
         {/if}
       {/snippet}
     </FrameOverlays>
+    <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} />
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom});--zoom:${view.zoom}`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
         {#each curves as c (c.edge.id)}
