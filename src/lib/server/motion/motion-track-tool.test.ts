@@ -83,4 +83,17 @@ describe('motion agent track_point and apply_track', () => {
 
     expect(await run('track_point', { clip_id: 'id1', x: 10, y: 10 })).toMatchObject({ ok: false, error: expect.stringContaining('asset') });
   });
+
+  it('applies a track in a later call that starts from the saved doc', async () => {
+    const first = setup({ trackReader: () => squareReader });
+    await withClips(first.run);
+    const tracked = await first.run('track_point', { clip_id: 'id1', time: 0, x: pxX(0), y: pxY(0), to: 1 });
+
+    const later = setup({ trackReader: () => squareReader });
+    later.session.doc = first.session.doc;
+    const applied = await later.run('apply_track', { track_id: tracked.track_id, target_clip_id: 'id2', ...FOLLOW });
+
+    expect(applied.ok).toBe(true);
+    expect(findClip(later.session.doc, 'id2')!.clip.keyframes.x).toHaveLength(31);
+  });
 });
