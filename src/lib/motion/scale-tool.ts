@@ -37,7 +37,12 @@ const PIXEL_PARAMS: Partial<Record<EffectKind, readonly string[]>> = {
   [EffectKind.Glow]: ['radius'],
   [EffectKind.Stroke]: ['width'],
   [EffectKind.ChromaticAberration]: ['offset'],
-  [EffectKind.Wave]: ['amount', 'scale', 'speed']
+  [EffectKind.Wave]: ['amount', 'scale', 'speed'],
+  [EffectKind.DisplacementMap]: ['amount'],
+  [EffectKind.LensBlur]: ['radius'],
+  [EffectKind.Bulge]: ['radius'],
+  [EffectKind.Twirl]: ['radius'],
+  [EffectKind.Sharpen]: ['radius']
 };
 
 const TINY = 1e-6;

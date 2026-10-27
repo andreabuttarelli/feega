@@ -141,7 +141,14 @@ The canvas and motion agents browse the web themselves (`web_search`, `read_page
 Custom composition layouts: `write_layout` writes a spec layout (placement, slots, animation) for the
 workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists them.
 
+Photo studio batches: `studio_quote` prices a selection (count, credits, a `quoteId`), `studio_start` starts it
+and spends credits only with that `quoteId` (a changed selection or price is a 409), `studio_status` follows the batch.
+`studio_run`, `studio_more` (`variations`), `studio_cancel`, `studio_retry`, `studio_regenerate`,
+`studio_approve` and `studio_reject` act on a batch (`batch_id`, `item_ids`); run, more, retry and regenerate spend credits.
+
 Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
+
+Cloud files: `cloud` lists, imports and exports Google Drive and Dropbox files and disconnects a provider; `figma_token_status` says whether a Figma token is saved. CLI: `feega cloud status|files|import|export|disconnect`, `feega figma-token`.
 
 ## Edit and see a canvas: `edit` and `view`
 
@@ -271,7 +278,8 @@ modes? }` creates or edits one (every mode needs a value); `"add_mode"` adds a m
 switches the video to a mode and every bound clip takes that mode's value; `"bind"` `{ collection,
 name, clip_id, target }` links a prop (a colour to fill/stroke/color, a number to roundness, opacity,
 width, `autoLayout.gap`, `autoLayout.padding`...); `"unbind"`, `"remove"`, `"list"`. `set_props` on
-a bound prop is refused. Through `motion_tool`. Across the frames of a canvas: edit op `variables`
+a bound prop is refused. The bind chip next to an inspector field is `bind_variable` `{ clip_id, target,
+variable: "Collection/name" }` and `unbind_variable` `{ clip_id, target }`. Through `motion_tool`. Across the frames of a canvas: edit op `variables`
 (list; define a value, synced to every frame that has the collection; switch a mode per frame with
 `frames`; bind `ids` as `frameId:elementId`).
 
@@ -280,7 +288,7 @@ batch status) run through `motion_editor_op` `{ node_id, op, input }` with the s
 the page. CLI: `feega motion op <nodeId> <op> --input '{...}'`.
 
 Graphic elements (Text, Box, Ellipse, Path, Image) live in frames or free on the canvas; Generate
-text/image/video nodes generate. `canvas_tool` ops `draw_frame` draws an empty frame (`feega canvas frame`), `draw_element` draws a free element,
+text/image/video nodes generate. `canvas_tool` ops `draw_frame` draws an empty frame (`feega canvas frame`), `draw_element` draws a free element, `import_lottie` turns a Lottie (JSON or https URL) into an editable frame,
 `group_elements` / `ungroup_element` group free elements; `move_frame_element` moves an element
 into another frame (or onto the canvas as a free element) keeping props and keyframes; op `place_in_frame` puts a generative node's output into a frame as an element; the
 motion `motion_tool` `move_to_frame` does the same from inside a video. A frame takes no inputs: a line into it is refused. CLI:

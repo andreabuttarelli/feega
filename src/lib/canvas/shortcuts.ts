@@ -67,7 +67,9 @@ const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
 const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
   [Command.TogglePixelGrid]: FrameView.PixelGrid,
   [Command.ToggleLayoutGuides]: FrameView.Guides,
+  [Command.ToggleRulers]: FrameView.Rulers,
   [Command.ToggleOutlines]: FrameView.Outlines,
+  [Command.ToggleDevMode]: FrameView.Dev,
   [Command.TogglePivot]: FrameView.Pivot
 };
 
@@ -135,7 +137,9 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.ToolShapeBuilder]: { id: 'tool', tool: DrawTool.ShapeBuilder },
   [Command.TogglePixelGrid]: { id: 'view', view: FrameView.PixelGrid },
   [Command.ToggleLayoutGuides]: { id: 'view', view: FrameView.Guides },
+  [Command.ToggleRulers]: { id: 'view', view: FrameView.Rulers },
   [Command.ToggleOutlines]: { id: 'view', view: FrameView.Outlines },
+  [Command.ToggleDevMode]: { id: 'view', view: FrameView.Dev },
   [Command.TogglePivot]: { id: 'view', view: FrameView.Pivot },
   [Command.MoveLeft]: nudgeBy(-1, 0, NUDGE_STEP),
   [Command.MoveRight]: nudgeBy(1, 0, NUDGE_STEP),

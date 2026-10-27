@@ -249,6 +249,12 @@ describe('outline view key', () => {
   });
 });
 
+describe('dev mode key', () => {
+  it('⇧D switches the frame to dev mode and back', () => {
+    expect(press('D', { shift: true, code: 'KeyD' })).toBe(Command.ToggleDevMode);
+  });
+});
+
 describe('select matching key', () => {
   it('⌥⌘A selects every layer like the selected ones', () => {
     expect(press('å', { mod: true, alt: true, code: 'KeyA' })).toBe(Command.SelectMatching);

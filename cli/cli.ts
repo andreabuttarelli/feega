@@ -641,6 +641,98 @@ layouts
     await cmdLayoutsPatch(layoutId, opts);
   });
 
+const studio = program.command('studio').description('Photo studio batches: quote, start and follow them');
+
+studio
+  .command('quote')
+  .description('Price a batch selection: image count, credits and a quote id, free')
+  .requiredOption('--file <path>', 'JSON selection: { name, productIds, environments, shots, variations, model, ... }')
+  .option('--project <id>', 'Which project')
+  .action(async (opts) => {
+    const { cmdStudioQuote } = await import('./commands/studio.ts');
+    await cmdStudioQuote(opts);
+  });
+
+studio
+  .command('start')
+  .description('Start a batch from a quoted selection, spends credits')
+  .requiredOption('--file <path>', 'The same JSON selection you quoted')
+  .requiredOption('--quote <id>', 'The quote id `studio quote` printed')
+  .option('--project <id>', 'Which project')
+  .action(async (opts) => {
+    const { cmdStudioStart } = await import('./commands/studio.ts');
+    await cmdStudioStart(opts);
+  });
+
+studio
+  .command('run <batchId>')
+  .description('Render the rest of a batch after its previews, spends credits')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('run', batchId, opts);
+  });
+
+studio
+  .command('more <batchId>')
+  .description('Add variations per cell and render them, spends credits')
+  .option('--variations <n>', 'Variations per cell')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('more', batchId, opts);
+  });
+
+studio
+  .command('cancel <batchId>')
+  .description('Stop the items still queued, free')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('cancel', batchId, opts);
+  });
+
+studio
+  .command('retry <batchId>')
+  .description('Requeue failed or cancelled items, spends credits')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('retry', batchId, opts);
+  });
+
+studio
+  .command('regenerate <batchId>')
+  .description('Requeue finished items for a new render, spends credits')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('regenerate', batchId, opts);
+  });
+
+studio
+  .command('approve <batchId>')
+  .description('Approve an item, free')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('approve', batchId, opts);
+  });
+
+studio
+  .command('reject <batchId>')
+  .description('Reject an item, free')
+  .option('--items <ids...>', 'Item ids from `studio status`')
+  .action(async (batchId: string, opts) => {
+    const { cmdStudioAct } = await import('./commands/studio.ts');
+    await cmdStudioAct('reject', batchId, opts);
+  });
+
+studio
+  .command('status <batchId>')
+  .description('Show a batch: its items and their state, free')
+  .action(async (batchId: string) => {
+    const { cmdStudioStatus } = await import('./commands/studio.ts');
+    await cmdStudioStatus(batchId);
+  });
+
 program
   .command('app-account <projectId>')
   .description('Show the TEST account of your app the project chat logs in with, or --forget it')
@@ -648,6 +740,63 @@ program
   .action(async (projectId: string, opts) => {
     const { cmdAppAccount } = await import('./commands/app-account.ts');
     await cmdAppAccount(projectId, opts);
+  });
+
+const cloud = program.command('cloud').description('Google Drive and Dropbox files of a project');
+
+cloud
+  .command('status <projectId>')
+  .description('Show whether Google Drive and Dropbox are connected')
+  .action(async (projectId: string) => {
+    const { cmdCloud } = await import('./commands/cloud.ts');
+    await cmdCloud(projectId);
+  });
+
+cloud
+  .command('files <projectId> <provider>')
+  .description('List a folder (provider: google_drive or dropbox)')
+  .option('--folder <id>', 'Folder id or path; the root when missing')
+  .option('--cursor <cursor>', 'The cursor of the previous page')
+  .action(async (projectId: string, provider: string, opts) => {
+    const { cmdCloudFiles } = await import('./commands/cloud.ts');
+    await cmdCloudFiles(projectId, provider as 'dropbox', opts);
+  });
+
+cloud
+  .command('import <projectId> <provider> <fileId>')
+  .description('Import a file into the project, optionally placed on a canvas')
+  .option('--canvas <id>', 'Place it on this canvas')
+  .option('--x <n>', 'Canvas x')
+  .option('--y <n>', 'Canvas y')
+  .action(async (projectId: string, provider: string, fileId: string, opts) => {
+    const { cmdCloudImport } = await import('./commands/cloud.ts');
+    await cmdCloudImport(projectId, provider as 'dropbox', fileId, opts);
+  });
+
+cloud
+  .command('export <projectId> <provider> <assetId>')
+  .description('Export an asset into a folder of the provider')
+  .option('--folder <id>', 'Destination folder; the root when missing')
+  .option('--name <name>', 'File name')
+  .action(async (projectId: string, provider: string, assetId: string, opts) => {
+    const { cmdCloudExport } = await import('./commands/cloud.ts');
+    await cmdCloudExport(projectId, provider as 'dropbox', assetId, opts);
+  });
+
+cloud
+  .command('disconnect <projectId> <provider>')
+  .description('Forget the connection and revoke it at the provider')
+  .action(async (projectId: string, provider: string) => {
+    const { cmdCloudDisconnect } = await import('./commands/cloud.ts');
+    await cmdCloudDisconnect(projectId, provider as 'dropbox');
+  });
+
+program
+  .command('figma-token <projectId>')
+  .description('Show whether a Figma token is saved (it is set in the app)')
+  .action(async (projectId: string) => {
+    const { cmdFigmaToken } = await import('./commands/cloud.ts');
+    await cmdFigmaToken(projectId);
   });
 
 program

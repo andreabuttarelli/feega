@@ -141,7 +141,7 @@
   </header>
   {#if first}
     {#if bounds}
-      <section class="section" data-section="box">
+      <section class="section ui-section" data-section="box">
         <h3>Selection</h3>
         <div class="grid2">
           {#each BOX_FIELDS as f (f.key)}
@@ -152,7 +152,7 @@
         </div>
       </section>
     {/if}
-    <section class="section" data-section="spacing">
+    <section class="section ui-section" data-section="spacing">
       <h3>Spacing</h3>
       <div class="grid2">
         {#each GAP_FIELDS as f (f.axis)}
@@ -162,7 +162,7 @@
         {/each}
       </div>
     </section>
-    <section class="section" data-section="layout">
+    <section class="section ui-section" data-section="layout">
       <h3>Layout</h3>
       <div class="grid2">
         {#each SHARED_KEYS as key (key)}
@@ -175,7 +175,7 @@
       </div>
     </section>
     {#if styleProps.length}
-      <section class="section" data-section="style">
+      <section class="section ui-section" data-section="style">
         <h3>Style</h3>
         {#each styleProps as f (f.key)}
           {#if f.kind === PropKind.Number}
@@ -198,7 +198,7 @@
       </section>
     {/if}
     {#if colours.length}
-      <section class="section" data-section="colours">
+      <section class="section ui-section" data-section="colours">
         <h3>Selection colours</h3>
         {#each colours as colour (colour)}
           <label class="line" data-colour={colour}>
@@ -214,7 +214,7 @@
         {/each}
       </section>
     {/if}
-    <section class="section" data-section="constraints">
+    <section class="section ui-section" data-section="constraints">
       <h3>Constraints</h3>
       {#each [{ axis: 'horizontal', label: 'Horizontal', value: horizontal, options: HORIZONTALS }, { axis: 'vertical', label: 'Vertical', value: vertical, options: VERTICALS }] as c (c.axis)}
         <label class="line">
@@ -226,7 +226,7 @@
         </label>
       {/each}
     </section>
-    <section class="section" data-section="layer">
+    <section class="section ui-section" data-section="layer">
       <h3>Layer</h3>
       <label class="line">
         <span>Blend</span>
@@ -276,10 +276,6 @@
     display: grid;
     gap: 6px;
     padding: 0 var(--ui-space-4) var(--ui-space-4);
-  }
-
-  .section + .section {
-    border-top: 1px solid var(--ui-line);
   }
 
   h3 {

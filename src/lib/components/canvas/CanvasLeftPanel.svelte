@@ -6,6 +6,7 @@
   import { _ } from 'svelte-i18n';
   import ProjectDragPanel from './ProjectDragPanel.svelte';
   import InfluencersPanel from './InfluencersPanel.svelte';
+  import BrandsPanel from './BrandsPanel.svelte';
   import LayersPanel from './LayersPanel.svelte';
   import ComponentsList from './ComponentsList.svelte';
   import X from '@lucide/svelte/icons/x';
@@ -52,9 +53,11 @@
     <div class="left-panel-body">
       {#if kind === 'layers'}
         <LayersPanel />
+      {:else if kind === 'brands'}
+        <BrandsPanel {projectId} />
       {:else}
-        {#if kind === 'assets'}<ComponentsList />{/if}
-        <ProjectDragPanel {projectId} {kind} />
+        <ComponentsList />
+        <ProjectDragPanel {projectId} />
       {/if}
     </div>
   </div>

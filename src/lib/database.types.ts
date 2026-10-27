@@ -652,6 +652,7 @@ export type Database = {
           mime_type: string | null
           org_id: string
           project_id: string | null
+          proxy_url: string | null
           source: string | null
           source_node_id: string | null
           type: string
@@ -673,6 +674,7 @@ export type Database = {
           mime_type?: string | null
           org_id: string
           project_id?: string | null
+          proxy_url?: string | null
           source?: string | null
           source_node_id?: string | null
           type: string
@@ -694,6 +696,7 @@ export type Database = {
           mime_type?: string | null
           org_id?: string
           project_id?: string | null
+          proxy_url?: string | null
           source?: string | null
           source_node_id?: string | null
           type?: string

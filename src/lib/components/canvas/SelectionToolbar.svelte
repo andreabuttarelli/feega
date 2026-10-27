@@ -75,7 +75,7 @@
     onrun?: () => void;
     oncancelvariants?: () => void;
     variantsInFlight?: number;
-    history?: { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void } | null;
+    history?: { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void; oncompare: (a: string, b: string) => void } | null;
     onaction?: (id: SelectionActionId) => void;
     onpropertychange?: (patch: SelectionPatch & { model?: string | null; variants?: number; variantsInto?: VariantInto }) => void;
     onsectionchange?: (id: string, patch: { title?: string; fill?: string }) => void;
@@ -214,7 +214,7 @@
       {#if runQuote || primary.length}
         <div class="group" role="group" aria-label="Run">
           {#if history && properties.type && runQuote}
-            <HistoryMenu items={history.items} medium={properties.type} urlOf={history.urlOf} onshow={history.onshow} />
+            <HistoryMenu items={history.items} medium={properties.type} urlOf={history.urlOf} onshow={history.onshow} oncompare={history.oncompare} />
           {/if}
           {#if runQuote?.variants}
             <VariantsMenu quote={runQuote.variants} onchange={(patch) => onpropertychange?.(patch)} />

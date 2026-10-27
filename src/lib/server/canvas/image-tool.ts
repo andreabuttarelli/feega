@@ -3,12 +3,13 @@ import { createConnection, createNode, findNode, type CanvasNodeRecord } from '$
 import type { Actor } from '$lib/server/repos/actor';
 import { runGenNode, type RunOutcome } from '$lib/server/canvas/generate';
 import { detectLayers } from '$lib/server/canvas/layer-detect';
-import { IMAGE_TOOL_MODEL, ImageTool, imageToolParams } from '$lib/image-tools';
+import { IMAGE_TOOL_MODEL, ImageTool, imageToolParams, REFRAME_PROMPT } from '$lib/image-tools';
 import { layerPrompt } from '$lib/layer-boxes';
 import { paddedPng, pixelSizeOf, storePng } from '$lib/server/canvas/edit-assets';
-import { maskPng } from '$lib/server/image-mask';
+import { maskPng, type PixelSize } from '$lib/server/image-mask';
 import type { Mask } from '$lib/image-mask';
 import { outpaintPlan, type Extend } from '$lib/outpaint';
+import { ratioOf, reframeExtend } from '$lib/reframe';
 
 const COLUMN_GAP = 80;
 const DEFAULT_NODE_WIDTH = 320;
@@ -36,6 +37,7 @@ type ImageToolInput = {
   prompt?: string;
   mask?: Mask;
   extend?: Extend;
+  aspect?: string;
   actor?: Actor;
 };
 
@@ -48,6 +50,23 @@ type Plan = { ok: true; name: string; prompt: string; params: Record<string, str
 type PlanContext = { db: Db; deps: ImageToolDeps; input: ImageToolInput; source: CanvasNodeRecord };
 
 const planOf = (name: string, params: Record<string, string>): Plan => ({ ok: true, name, prompt: '', params, extra: {} });
+
+async function paddedPlan({ db, deps, input, source }: PlanContext, name: string, prompt: string, extendFor: (size: PixelSize) => Extend | null): Promise<Plan> {
+  const scope = { orgId: input.orgId, assetId: String(source.data.refId) };
+  const size = await deps.pixelSizeOf(db, scope);
+  if (!size) {
+    return { ok: false, error: 'source_size_unknown' };
+  }
+  const extend = extendFor(size);
+  if (!extend) {
+    return { ok: false, error: 'already_this_aspect' };
+  }
+  const plan = outpaintPlan(size, extend);
+  const [padded, mask] = await Promise.all([deps.paddedPng(db, scope, size, plan), maskPng(plan.padded, { regions: plan.regions })]);
+  const owner = { orgId: input.orgId, projectId: input.projectId, userId: input.userId, nodeId: source.id, ...plan.padded };
+  const [paddedAsset, maskAsset] = await Promise.all([deps.storePng(db, { ...owner, png: padded }), deps.storePng(db, { ...owner, png: mask })]);
+  return { ok: true, name, prompt, params: imageToolParams(input.tool, input.factor), extra: { editImageRefId: paddedAsset.id, maskRefId: maskAsset.id } };
+}
 
 const PLAN: Record<ImageTool, (context: PlanContext) => Promise<Plan>> = {
   [ImageTool.RemoveBackground]: async ({ input }) => planOf('Remove background', imageToolParams(input.tool, input.factor)),
@@ -77,23 +96,21 @@ const PLAN: Record<ImageTool, (context: PlanContext) => Promise<Plan>> = {
     const stored = await deps.storePng(db, { orgId: input.orgId, projectId: input.projectId, userId: input.userId, nodeId: source.id, png, ...size });
     return { ok: true, name: 'Inpaint', prompt: input.prompt, params: imageToolParams(input.tool, input.factor), extra: { maskRefId: stored.id } };
   },
-  [ImageTool.Outpaint]: async ({ db, deps, input, source }) => {
-    if (!input.prompt) {
+  [ImageTool.Outpaint]: async (context) => {
+    if (!context.input.prompt) {
       return { ok: false, error: 'prompt_required' };
     }
-    if (!input.extend) {
+    if (!context.input.extend) {
       return { ok: false, error: 'extend_required' };
     }
-    const scope = { orgId: input.orgId, assetId: String(source.data.refId) };
-    const size = await deps.pixelSizeOf(db, scope);
-    if (!size) {
-      return { ok: false, error: 'source_size_unknown' };
+    return paddedPlan(context, 'Outpaint', context.input.prompt, () => context.input.extend!);
+  },
+  [ImageTool.Reframe]: async (context) => {
+    const { aspect } = context.input;
+    if (!aspect) {
+      return { ok: false, error: 'aspect_required' };
     }
-    const plan = outpaintPlan(size, input.extend);
-    const [padded, mask] = await Promise.all([deps.paddedPng(db, scope, size, plan), maskPng(plan.padded, { regions: plan.regions })]);
-    const owner = { orgId: input.orgId, projectId: input.projectId, userId: input.userId, nodeId: source.id, ...plan.padded };
-    const [paddedAsset, maskAsset] = await Promise.all([deps.storePng(db, { ...owner, png: padded }), deps.storePng(db, { ...owner, png: mask })]);
-    return { ok: true, name: 'Outpaint', prompt: input.prompt, params: imageToolParams(input.tool, input.factor), extra: { editImageRefId: paddedAsset.id, maskRefId: maskAsset.id } };
+    return paddedPlan(context, `Reframe ${aspect}`, REFRAME_PROMPT, (size) => reframeExtend(size, ratioOf(aspect)));
   }
 };
 

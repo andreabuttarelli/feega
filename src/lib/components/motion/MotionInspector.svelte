@@ -9,6 +9,7 @@
   import { AssetKind, COMPONENTS, Control, TrackKind } from '@feega/motion-core/motion/components';
   import { DEPTH, Space } from '@feega/motion-core/motion/camera';
   import { setClipDepth } from '@feega/motion-core/motion/camera-ops';
+  import { setAcceptsLights } from '@feega/motion-core/motion/lights-ops';
   import { ParentOpacity, parentChoices } from '@feega/motion-core/motion/parent';
   import { setParent, setParentOpacity } from '$lib/motion/parent-ops';
   import { clipsOf, findClip } from '@feega/motion-core/motion/doc';
@@ -63,12 +64,16 @@
   import LutPicker from './LutPicker.svelte';
   import TextCounterSection from './TextCounterSection.svelte';
   import AnimateToSection from './AnimateToSection.svelte';
+  import InOutPresetsSection from './InOutPresetsSection.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
-  import { registerFont, replaceFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+  import BindChip from './BindChip.svelte';
+  import { fillTarget } from '$lib/motion/variables';
+  import { registerFont, replaceFont, setFont } from '$lib/motion/fonts/ops';
+  import { FontOrigin, withPicked } from '$lib/motion/fonts/local';
   import { isBuiltin } from '@feega/motion-core/motion/fonts/model';
   import type { FontLibrary } from '$lib/motion/fonts/library';
   import type { CatalogueFont } from '@feega/motion-core/motion/fonts/model';
@@ -257,14 +262,14 @@
 
   const missingFont = (family: string) => !isBuiltin(family) && !doc.fonts.some((f) => f.family === family);
 
-  function swapFont(from: string, asked: string, catalogue: CatalogueFont[]) {
-    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
+  function swapFont(from: string, asked: string, catalogue: CatalogueFont[], origin: FontOrigin) {
+    const { doc: base, family } = withPicked(doc, asked, origin, fonts?.families ?? []);
     replacing = false;
     commit(replaceFont(base, from, family, catalogue), `Replaced ${from} with ${family}`);
   }
 
-  function pickFont(field: Field, asked: string, catalogue: CatalogueFont[]) {
-    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
+  function pickFont(field: Field, asked: string, catalogue: CatalogueFont[], origin: FontOrigin) {
+    const { doc: base, family } = withPicked(doc, asked, origin, fonts?.families ?? []);
     if (clip.component !== 'Custom') {
       commit(setFont(base, clip.id, { family }, catalogue), `Set the font to ${family}`);
       return;
@@ -612,24 +617,37 @@
 {#snippet fieldRow(field: Field)}
   {@const keyed = keyedField(clip.component, field.key, animated.params)}
   {#if field.control === Control.Range}
-    <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
+    <div class="stack bindable" data-prop={field.key}>
+      {#if clip.bind?.[field.key]}<BindChip {doc} {clip} target={field.key} {commit} />{:else}{@render rangeField(field)}<BindChip {doc} {clip} target={field.key} {commit} />{/if}
+    </div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
-    <div class="stack" data-prop={field.key}><FillStack {gesture} {palette} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} /></div>
+    {@const fillBind = fillTarget(clip)}
+    <div class="stack bindable" data-prop={field.key}>
+      {#if fillBind && clip.bind?.[fillBind]}<BindChip {doc} {clip} target={fillBind} {commit} />{:else}
+        <FillStack {gesture} {palette} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
+        {#if fillBind}<BindChip {doc} {clip} target={fillBind} {commit} />{/if}
+      {/if}
+    </div>
   {:else if field.control === Control.Strokes}
     <div class="stack" data-prop={field.key}><StrokeStack {gesture} {palette} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
   {:else if field.control === Control.Textarea}
-    <div class="stack">
-      <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} onkeydown={leaveOnEscape} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
+    <div class="stack bindable">
+      {#if clip.bind?.[field.key]}<BindChip {doc} {clip} target={field.key} {commit} />{:else}
+        <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} onkeydown={leaveOnEscape} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
+        <BindChip {doc} {clip} target={field.key} {commit} />
+      {/if}
     </div>
   {:else}
     <div class="line">
       <label for={`f-${field.key}`}>{field.label}</label>
       <div class="control">
-        {#if field.control === Control.Text}
+        {#if clip.bind?.[field.key]}
+          <BindChip {doc} {clip} target={field.key} {commit} />
+        {:else if field.control === Control.Text}
           <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
         {:else if field.control === Control.Select}
           <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
@@ -647,7 +665,7 @@
           <MediaListField label={field.label} value={value(field)} {assets} {upload} onchange={(list) => setProp(field, list)} />
         {:else if field.control === Control.Font}
           <div class="comp">
-            <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => (replacing ? swapFont(String(value(field)), family, catalogue) : pickFont(field, family, catalogue))} library={fonts} />
+            <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue, origin) => (replacing ? swapFont(String(value(field)), family, catalogue, origin) : pickFont(field, family, catalogue, origin))} library={fonts} />
             {#if !isBuiltin(String(value(field)))}
               <button type="button" class:on={replacing} data-testid="replace-font" title={missingFont(String(value(field))) ? 'Missing font: pick a replacement for the whole video' : 'Pick a font to replace this one in the whole video'} aria-pressed={replacing} onclick={() => (replacing = !replacing)}>{missingFont(String(value(field))) ? 'Missing · Replace' : 'Replace all'}</button>
             {/if}
@@ -674,6 +692,7 @@
           <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
         {/if}
       </div>
+      {#if !clip.bind?.[field.key]}<BindChip {doc} {clip} target={field.key} {commit} />{/if}
       {#if keyed}{@render diamond(field.key)}{/if}
     </div>
   {/if}
@@ -684,7 +703,7 @@
   {@const radii = cornerRadii(Number(clip.props.roundness ?? 0), corners)}
   {@const split = corners.length > 0}
   <div class="radius" data-testid="radius">
-    <div class="radius-main">{@render rangeField(round)}</div>
+    <div class="radius-main bindable">{#if clip.bind?.[round.key]}<BindChip {doc} {clip} target={round.key} {commit} />{:else}{@render rangeField(round)}<BindChip {doc} {clip} target={round.key} {commit} />{/if}</div>
     {#if cornersField}
       <button type="button" class="radius-split" class:on={split} data-testid="radius-per-corner" aria-pressed={split} aria-label="Per-corner radius" title="Per-corner radius" onclick={() => setProp(cornersField, split ? [] : radii)}><SquareDashed size={15} /></button>
     {/if}
@@ -851,6 +870,7 @@
 
 {#snippet animateBody()}
   {#if visual && clip.component !== 'Null'}
+    <InOutPresetsSection {doc} {clip} {frame} {commit} />
     <AnimateToSection {doc} {clip} {frame} {commit} />
   {/if}
   {#if TEXT_COMPONENTS.has(clip.component)}
@@ -1017,6 +1037,9 @@
         <NumberField label={DEPTH.label} kind={FieldKind.Named} name="Depth" value={clip.depth} range={depthRange} unit={depthRange.unit ?? ''} disabled={clip.space === Space.Screen} onchange={(v) => commit(setClipDepth(doc, clip.id, { depth: v }), 'Changed depth')} />
       </div>
       <label class="check"><input type="checkbox" data-testid="screen-space" checked={clip.space === Space.Screen} onchange={(e) => commit(setClipDepth(doc, clip.id, { space: e.currentTarget.checked ? Space.Screen : Space.World }), 'Changed space')} />Screen space: ignores the camera</label>
+      {#if doc.camera && clip.component !== 'Light'}
+        <label class="check"><input type="checkbox" data-testid="accepts-lights" checked={clip.acceptsLights !== false} onchange={(e) => commit(setAcceptsLights(doc, clip.id, e.currentTarget.checked), 'Changed accepts lights')} />Accepts lights</label>
+      {/if}
       {#if !doc.camera}<p class="hint">Depth shows once the video has a camera.</p>{/if}
     </div>
   {/if}
@@ -1167,6 +1190,17 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 6px;
+  }
+
+  .bindable {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .bindable > :global(:first-child) {
+    flex: 1;
+    min-width: 0;
   }
 
   .stackable {
