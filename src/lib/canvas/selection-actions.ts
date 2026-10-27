@@ -283,3 +283,38 @@ export function enabledFor(
 ): Gate {
   return GATES[id]?.({ nodeSummaries, edges, stale }) ?? ALWAYS;
 }
+
+const PINNED_LIMIT = 3;
+
+const TOOLBAR_PRIORITY: readonly SelectionActionId[] = [
+  'duplicate',
+  'run-downstream',
+  'upscale-image',
+  'remove-background',
+  'run-technique',
+  'run-stale',
+  'inpaint',
+  'outpaint',
+  'connect-new',
+  'connect-existing',
+  'split-layers',
+  'layers-to-frame',
+  'group',
+  'ungroup'
+];
+
+const rankOf = (id: SelectionActionId) => {
+  const at = TOOLBAR_PRIORITY.indexOf(id);
+  return at === -1 ? TOOLBAR_PRIORITY.length : at;
+};
+
+export type ToolbarSlots = { pinned: SelectionAction[]; overflow: SelectionAction[]; danger: SelectionAction[] };
+
+export function toolbarSlots(actions: readonly SelectionAction[]): ToolbarSlots {
+  const ranked = actions.filter((a) => a.group === 'secondary').sort((a, b) => rankOf(a.id) - rankOf(b.id));
+  return {
+    pinned: ranked.slice(0, PINNED_LIMIT),
+    overflow: [...ranked.slice(PINNED_LIMIT), ...actions.filter((a) => a.group === 'overflow')],
+    danger: actions.filter((a) => a.group === 'danger')
+  };
+}

@@ -8,8 +8,13 @@ beforeEach(() => {
   testEnv.WIRO_API_KEY = 'wiro-test-key';
   delete testEnv.KIE_API_KEY;
 });
-import { GPT_IMAGE_2_MODEL, NANO_BANANA_PRO_MODEL, QWEN3_PRO_MODEL } from '$lib/image-models';
-import { SEEDANCE_25_MODEL, OPENROUTER_UPSCALE_MODEL, KLING_3_VIDEO_MODEL } from '$lib/video-models';
+import { GPT_IMAGE_2_MODEL, NANO_BANANA_2_MODEL, NANO_BANANA_PRO_MODEL, QWEN3_PRO_MODEL } from '$lib/image-models';
+import type { GenParams, ModelChoice } from '$lib/canvas/gen-node';
+import { creditsForRun } from '$lib/canvas/gen-cost';
+import { billedCreditsFor } from '$lib/credit-ladder';
+import { kieModelRows } from './kie-catalogue';
+import { KIE_FIXTURE_PRICES } from './kie-pricing.fixtures';
+import { SEEDANCE_25_MODEL, OPENROUTER_UPSCALE_MODEL, KLING_3_VIDEO_MODEL, GROK_IMAGINE_VIDEO_MODEL } from '$lib/video-models';
 import { mediaModelSlot } from '$lib/media-model-slots';
 import { offerableModels, offerableSlotChoices } from './offerable-models';
 
@@ -733,5 +738,96 @@ describe('offerableModels — params dal param_schema sincronizzato', () => {
 
     const choice = out.choices.find((c) => c.id === SEEDANCE_25_MODEL);
     expect(choice?.params).toEqual([{ name: 'seed', label: 'Seed', kind: 'boolean' }]);
+  });
+});
+
+describe('every route of a model shows its own price, at the resolution the node asks for', () => {
+  const geminiRow = (id: string, costPerToken: number, resolutions: string[]) => ({
+    id,
+    catalogue: 'image',
+    input_modalities: ['text', 'image'],
+    output_modalities: ['image'],
+    supported_resolutions: resolutions,
+    pricing: { endpoints: [{ provider: 'google-ai-studio', lines: [{ billable: 'output_image', unit: 'token', cost_usd: costPerToken }] }] }
+  });
+
+  const kieRows = () => kieModelRows(KIE_FIXTURE_PRICES, [], '2026-10-27T00:00:00.000Z') as never[];
+
+  async function nanoBanana(id: string, rows: never[]) {
+    testEnv.KIE_API_KEY = 'kie-test-key';
+    const choice = (await offerableModels(fakeAdmin(rows), 'image')).choices.find((c) => c.id === id);
+    return JSON.parse(JSON.stringify(choice)) as ModelChoice;
+  }
+
+  const credits = (choice: ModelChoice, params: GenParams) => creditsForRun({ medium: 'image', model: choice, params });
+
+  it('Nano Banana 2 on OpenRouter is priced per resolution from its image tokens, not left blank', async () => {
+    const choice = await nanoBanana(NANO_BANANA_2_MODEL, [geminiRow('google/gemini-3.1-flash-image', 0.00006, ['512', '1K', '2K', '4K']) as never, ...kieRows()]);
+
+    expect(credits(choice, { provider: 'openrouter', resolution: '1K' })).toBe(billedCreditsFor(0.0672));
+    expect(credits(choice, { provider: 'openrouter', resolution: '2K' })).toBe(billedCreditsFor(0.1008));
+    expect(credits(choice, { provider: 'openrouter', resolution: '4K' })).toBe(billedCreditsFor(0.1512));
+    expect(credits(choice, { provider: 'openrouter' })).toBe(billedCreditsFor(0.0672));
+  });
+
+  it('Nano Banana 2 on Kie.ai is priced per resolution from the Kie list, 4K included', async () => {
+    const choice = await nanoBanana(NANO_BANANA_2_MODEL, [geminiRow('google/gemini-3.1-flash-image', 0.00006, ['512', '1K', '2K', '4K']) as never, ...kieRows()]);
+
+    expect(credits(choice, { provider: 'kie', resolution: '1K' })).toBe(billedCreditsFor(0.04));
+    expect(credits(choice, { provider: 'kie', resolution: '2K' })).toBe(billedCreditsFor(0.06));
+    expect(credits(choice, { provider: 'kie', resolution: '4K' })).toBe(billedCreditsFor(0.09));
+  });
+
+  it('Auto shows the price of the route it would pick: Kie where cheaper, OpenRouter where Kie has no price', async () => {
+    const choice = await nanoBanana(NANO_BANANA_2_MODEL, [geminiRow('google/gemini-3.1-flash-image', 0.00006, ['512', '1K', '2K', '4K']) as never, ...kieRows()]);
+
+    expect(credits(choice, { resolution: '2K' })).toBe(billedCreditsFor(0.06));
+    expect(credits(choice, { provider: 'auto', resolution: '512' })).toBe(billedCreditsFor(0.04482));
+  });
+
+  it('Nano Banana Pro prices 1K and 2K alike and 4K higher, on both routes', async () => {
+    const choice = await nanoBanana(NANO_BANANA_PRO_MODEL, [geminiRow('google/gemini-3-pro-image', 0.00012, ['1K', '2K', '4K']) as never, ...kieRows()]);
+
+    expect(credits(choice, { provider: 'openrouter', resolution: '2K' })).toBe(billedCreditsFor(0.1344));
+    expect(credits(choice, { provider: 'openrouter', resolution: '4K' })).toBe(billedCreditsFor(0.24));
+    expect(credits(choice, { provider: 'kie', resolution: '2K' })).toBe(billedCreditsFor(0.09));
+    expect(credits(choice, { provider: 'kie', resolution: '4K' })).toBe(billedCreditsFor(0.12));
+  });
+});
+
+describe('a video is priced per second from its own synced row, per resolution', () => {
+  const videoRow = (id: string, pricing: Record<string, string>, resolutions: string[]) => ({
+    id,
+    catalogue: 'video',
+    input_modalities: ['text', 'image'],
+    output_modalities: ['video'],
+    supported_resolutions: resolutions,
+    pricing
+  });
+
+  async function videoChoice(id: string, row: ReturnType<typeof videoRow>) {
+    return (await offerableModels(fakeAdmin([row]), 'video')).choices.find((c) => c.id === id) ?? null;
+  }
+
+  const credits = (choice: ModelChoice | null, params: GenParams) => creditsForRun({ medium: 'video', model: choice, params });
+
+  it('Grok Imagine 1.5 charges its per-second rate, 1080p included', async () => {
+    const choice = await videoChoice(GROK_IMAGINE_VIDEO_MODEL, videoRow('x-ai/grok-imagine-video-1.5', { cents_per_video_output_second_480p: '8', cents_per_video_output_second_720p: '14', cents_per_video_output_second_1080p: '25' }, ['480p', '720p', '1080p']));
+
+    expect(credits(choice, { resolution: '480p', duration: 6 })).toBe(billedCreditsFor(0.48));
+    expect(credits(choice, { resolution: '720p', duration: 6 })).toBe(billedCreditsFor(0.84));
+    expect(credits(choice, { resolution: '1080p', duration: 10 })).toBe(billedCreditsFor(2.5));
+  });
+
+  it('Kling 3.0 charges its with-audio per-second rate', async () => {
+    const choice = await videoChoice(KLING_3_VIDEO_MODEL, videoRow('kwaivgi/kling-v3.0-pro', { duration_seconds: '0.112', duration_seconds_with_audio: '0.168' }, ['720p', '1080p']));
+
+    expect(credits(choice, { resolution: '1080p', duration: 5 })).toBe(billedCreditsFor(0.84));
+  });
+
+  it('Seedance 2.5 charges its video tokens per second of output', async () => {
+    const choice = await videoChoice(SEEDANCE_25_MODEL, videoRow('bytedance/seedance-2.5', { video_tokens: '0.0000107' }, ['480p', '720p']));
+
+    expect(credits(choice, { resolution: '720p', duration: 5 })).toBe(billedCreditsFor(0.0000107 * 21600 * 5));
   });
 });

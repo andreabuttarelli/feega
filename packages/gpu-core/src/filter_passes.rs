@@ -64,9 +64,13 @@ const TABLE: &str = r#"
 fn lookup(ch: u32, c: f32) -> f32 {
   let kind = u32(p[ch]);
   if (kind == 2u) { return p[8u + ch] * c + p[12u + ch]; }
+  let base = 16u + ch * 32u;
+  if (kind == 3u) {
+    let steps = i32(p[4u + ch]);
+    return p[base + u32(clamp(i32(floor(c * f32(steps))), 0, max(steps - 1, 0)))];
+  }
   if (kind != 1u) { return c; }
   let n = i32(p[4u + ch]) - 1;
-  let base = 16u + ch * 32u;
   if (n <= 0) { return p[base]; }
   let k = clamp(i32(floor(c * f32(n))), 0, n - 1);
   let lo = p[base + u32(k)];
@@ -268,6 +272,9 @@ fn soft(b: f32, s: f32) -> f32 {
   let d = select(sqrt(b), ((16.0 * b - 12.0) * b + 4.0) * b, b <= 0.25);
   return select(b + (2.0 * s - 1.0) * (d - b), b - (1.0 - 2.0 * s) * b * (1.0 - b), s <= 0.5);
 }
+fn quot(b: f32, s: f32) -> f32 { if (s <= 0.0) { return 1.0; } return b / s; }
+fn vivid(b: f32, s: f32) -> f32 { return select(dodge(b, 2.0 * s - 1.0), burn(b, 2.0 * s), s <= 0.5); }
+fn pin(b: f32, s: f32) -> f32 { return select(max(b, 2.0 * s - 1.0), min(b, 2.0 * s), s <= 0.5); }
 fn mixed(b: vec3<f32>, s: vec3<f32>) -> vec3<f32> {
   switch u32(p[0]) {
     case 1u: { return b * s; }
@@ -285,6 +292,16 @@ fn mixed(b: vec3<f32>, s: vec3<f32>) -> vec3<f32> {
     case 13u: { return set_lum(set_sat(b, sat(s)), lum(b)); }
     case 14u: { return set_lum(s, lum(b)); }
     case 15u: { return set_lum(b, lum(s)); }
+    case 16u: { return b + s - 1.0; }
+    case 17u: { return b + s; }
+    case 18u: { return vec3<f32>(vivid(b.r, s.r), vivid(b.g, s.g), vivid(b.b, s.b)); }
+    case 19u: { return b + 2.0 * s - 1.0; }
+    case 20u: { return vec3<f32>(pin(b.r, s.r), pin(b.g, s.g), pin(b.b, s.b)); }
+    case 21u: { return step(vec3<f32>(1.0), b + s); }
+    case 22u: { return b - s; }
+    case 23u: { return vec3<f32>(quot(b.r, s.r), quot(b.g, s.g), quot(b.b, s.b)); }
+    case 24u: { return select(s, b, lum(b) <= lum(s)); }
+    case 25u: { return select(s, b, lum(b) >= lum(s)); }
     default: { return s; }
   }
 }

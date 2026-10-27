@@ -1,55 +1,31 @@
 const VIDEO_BASE = 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website';
 
-export enum Aspect {
-  Square = '1 / 1',
-  Wide = '16 / 9',
-  Portrait = '4 / 5',
-  Tall = '9 / 16'
-}
+export const COLLAGE_STAGE = { width: 1440, height: 900 } as const;
 
-export type ShowcaseVideo = { readonly file: string; readonly aspect: Aspect };
+type Placement = { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
 
-const video = (file: string, aspect: Aspect): ShowcaseVideo => ({ file: `${VIDEO_BASE}/${file}`, aspect });
+export type CollageTile = Placement &
+  ({ readonly kind: 'image'; readonly file: string } | { readonly kind: 'video'; readonly file: string });
 
-const V = {
-  liquidGlass: video('liquid-glass-1x1.MP4', Aspect.Square),
-  uiMorph: video('ui-morph-v2.mp4', Aspect.Square),
-  draft: video('draft-wide.mp4', Aspect.Wide),
-  split: video('split-headline-16x9.mp4', Aspect.Wide),
-  featureScroll: video('feature-scroll-dark-centred-16x9.mp4', Aspect.Wide),
-  ring: video('ring-through-title-16x9.MP4', Aspect.Wide),
-  masking: video('masking-loop-v3.MP4', Aspect.Wide),
-  launch: video('launch.MP4', Aspect.Wide),
-  sting: video('sting-loop-1x1.mp4', Aspect.Square),
-  preview: video('preview-wide.mp4', Aspect.Wide),
-  melting: video('melting-type-poster-4x5.MP4', Aspect.Portrait),
-  showcase: video('feega-showcase-v2.mp4', Aspect.Wide),
-  demo: video('demo-v2.MP4', Aspect.Wide),
-  pills: video('2-dark-pill-chips.mp4', Aspect.Wide),
-  scrollStory: video('scroll-story-default.mp4', Aspect.Wide),
-  phoneChat: video('phone-chat-1x1-720.MP4', Aspect.Square),
-  uiRing: video('ui-ring-farm.MP4', Aspect.Wide),
-  poster: video('poster-liquid-glass-4x5.MP4', Aspect.Portrait),
-  floating: video('floating-media-default.mp4', Aspect.Wide),
-  blobs: video('iridescent-blobs-9x16-720%20(1).MP4', Aspect.Tall),
-  mediaCloud: video('media-cloud-white-16x9-720p.MP4', Aspect.Wide)
-};
+const image = (file: string, x: number, y: number, w: number, h: number): CollageTile => ({ kind: 'image', file, x, y, w, h });
+const video = (file: string, x: number, y: number, w: number, h: number): CollageTile => ({ kind: 'video', file: `${VIDEO_BASE}/${file}`, x, y, w, h });
 
-export const SHOWCASE_WIDE: readonly (readonly ShowcaseVideo[])[] = [
-  [V.liquidGlass, V.uiMorph, V.draft, V.split, V.featureScroll, V.ring],
-  [V.masking, V.launch, V.sting, V.preview, V.melting],
-  [V.showcase, V.demo, V.pills, V.scrollStory, V.phoneChat],
-  [V.uiRing, V.poster, V.floating, V.blobs, V.mediaCloud]
+export const COLLAGE: readonly CollageTile[] = [
+  image('c-e', 588, 132, 175, 233),
+  video('ui-ring-farm.MP4', 773, 132, 140, 79),
+  image('c-d', 786, 232, 276, 276),
+  image('c-h', 860, 430, 298, 298),
+  image('c-a', 237, 233, 330, 400),
+  video('ring-through-title-16x9.MP4', 318, 170, 256, 144),
+  image('c-c', 108, 447, 260, 314),
+  image('c-b', 276, 590, 298, 275),
+  image('c-g', 616, 762, 210, 113),
+  image('c-i', 513, 181, 413, 581),
+  video('media-cloud-white-16x9-720p.MP4', 314, 519, 299, 168),
+  video('ui-morph-v2.mp4', 1005, 275, 286, 286)
 ];
 
-export const SHOWCASE_NARROW: readonly (readonly ShowcaseVideo[])[] = [
-  [V.liquidGlass, V.showcase, V.uiMorph, V.demo, V.draft, V.pills, V.split, V.scrollStory, V.featureScroll, V.phoneChat, V.ring],
-  [V.masking, V.uiRing, V.launch, V.poster, V.sting, V.floating, V.preview, V.blobs, V.melting, V.mediaCloud]
-];
-
-export const DISCIPLINES = ['Art Direction', 'Brand Identity', 'Visual Design', 'Fashion', 'Ecommerce', 'Filmmaking'] as const;
-
-export const DISCIPLINE_IMAGES = ['more-2', 'more-1', 'more-3', 'more-4'] as const;
+export const IMAGINE = ['Photography', 'UGC Videos', 'Fashion Shoots', '3D Models', 'Brand Identity', 'Art Direction', 'Video Trailers', 'Remix Ads'] as const;
 
 export type Model = { readonly name: string; readonly slug: string };
 

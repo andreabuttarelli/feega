@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cardRadiusOf } from '$lib/canvas/core/gen-card';
   import { LocalOff, isOff } from '$lib/local-user';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
@@ -100,8 +101,8 @@
   import NodeBoundary from '../NodeBoundary.svelte';
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
-  import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
+  import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
@@ -118,7 +119,6 @@
   import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
-  import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
@@ -173,6 +173,7 @@
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
@@ -232,7 +233,6 @@
   let surface = $state<HTMLDivElement | null>(null);
   let scene = $state<GpuScene | null>(null);
   let failed = $state<string | null>(null);
-  let lossNote = $state<string | null>(null);
   let view = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
 
   $effect(() => {
@@ -319,16 +319,32 @@
     }
   });
   const LIVE_POSTER_CAP = 3;
+  const LIVE_CODE_CAP = 4;
+  const IFRAME_TYPE = 'iframe';
   let settledView = $state<Viewport | null>(null);
+  const liveCode = $derived([...visibleIds(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)), view, area)].slice(0, LIVE_CODE_CAP));
   const domIds = $derived.by(() => {
     const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => holdsDoc(t.kind ?? '') && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
     const posters = placed.filter((t) => holdsDoc(t.kind ?? '') && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
     const sharp = !coreOn && BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
-    const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
+    const next = new Set([...editIds, ...sticky.keys(), ...liveCode, ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
+  let core = $state.raw<ReturnType<typeof CoreFrames> | null>(null);
+  let ramRuns = $state<FrameRange[]>([]);
+  let ramRun: AbortController | null = null;
+  let ramNode = $state('');
+
+  function cacheRam(nodeId: string, doc: MotionDoc) {
+    ramRun?.abort();
+    ramRun = new AbortController();
+    ramRuns = [];
+    ramNode = nodeId;
+    const range = doc.workArea ?? { from: 0, to: doc.durationInFrames };
+    void core?.cache(nodeId, range, ramRun.signal, (runs) => (ramRuns = runs));
+  }
   let coreDrawn = $state(new Set<string>());
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
   const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
@@ -375,19 +391,20 @@
       return [];
     }
     return placed.flatMap((t) => {
-      if (!coreDrawn.has(t.id)) {
+      const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
+      if (!coreDrawn.has(t.id) && !handed) {
         return [];
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
-      const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : ChromeLayers.State;
+      const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
       }
       const marks = portMarks(t);
       const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id) } : { label: null, icon: null };
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), turn: turnOf(t), layers }];
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
     });
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
@@ -1260,7 +1277,7 @@
       startCrop(id, deeper.clip);
       return;
     }
-    if (id) {
+    if (id && !target.closest('textarea, input, [contenteditable="true"]')) {
       props.onNodeDoubled?.(id);
     }
     const stage = id ? wrap?.querySelector<HTMLElement>(`[data-motion-node="${id}"] [data-frame-stage]`)?.getBoundingClientRect() : null;
@@ -2675,7 +2692,7 @@
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
           hovered: hovered && !selected.includes(hovered) && layersSource.hovered?.nodeId !== hovered ? (byId.get(hovered) ?? null) : null,
-          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})),
+          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })),
           chrome: coreChrome
         })
       : []
@@ -2979,7 +2996,7 @@
     [Pasted.Figma]: ({ html }) => ({ figma: html })
   };
   const PASTED_SUMMARY = 'Pasted';
-  const FIGMA_SKIPPED = 'Pasted from Figma. Not carried over:';
+  const FIGMA_SKIPPED = 'Pasted from Figma. Approximated or skipped:';
 
   function pasteInFrame(data: PasteData<File>, at: Point): boolean {
     const paste = (IN_FRAME[data.kind] as ((d: PasteData<File>) => FramePaste) | undefined)?.(data);
@@ -3284,7 +3301,6 @@
     const recover = (lost: GpuScene) => {
       const next = nextBackend(lost.backend);
       console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'none'}`);
-      lossNote = `${lost.backend} lost`;
       scene = null;
       built = null;
       try {
@@ -3353,6 +3369,8 @@
         onaction={(id) => void runFrameAction(id)}
         marks={props.commentMarks?.(nodeId, timeline.doc.fps) ?? []}
         onmark={(id) => props.onMark?.(id)}
+        ram={ramNode === nodeId ? ramRuns : []}
+        onram={() => cacheRam(nodeId, timeline!.doc)}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
       />
@@ -3380,7 +3398,7 @@
   >
     {#if coreOn}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>
@@ -3533,9 +3551,6 @@
     />
   {/if}
 
-  {#if dev}
-    <RendererBadge renderer={scene?.backend ?? (coreOn ? CORE : 'starting')} reason={lossNote} />
-  {/if}
 
   {#if refusal}
     <p class="edge-refusal" role="status">{refusal}</p>
@@ -3570,6 +3585,7 @@
       techniques={props.techniques}
       ontechnique={props.onTechnique ? (id) => props.onTechnique?.(id, viewCentre()) : undefined}
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
+      onfigma={props.onFigmaImport ? () => props.onFigmaImport?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
       onimage={insertImageInFrame}
       oncomment={props.onCommenting ? () => props.onCommenting?.(!props.commenting) : undefined}
@@ -3894,7 +3910,7 @@
 
   .remix-banner {
     position: absolute;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     translate: -50% 0;
     max-width: calc(100% - 32px);
@@ -3917,7 +3933,7 @@
   .edge-refusal {
     position: absolute;
     z-index: 12;
-    top: 12px;
+    top: var(--chrome-top, 12px);
     left: 50%;
     transform: translateX(-50%);
     margin: 0;

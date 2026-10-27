@@ -40,7 +40,7 @@ export const EXCLUSION_RULES = [
   "docs/",
   "!docs/SELF_HOSTING.md",
   "!docs/api/",
-  "!docs/readme-hero.png",
+  "!docs/readme-hero.gif",
   "basename:DRAFT-*.sql.disabled",
   "gen-hero.mjs",
   "bun.lock",
@@ -600,7 +600,7 @@ async function main() {
     (file) => isExcluded(file, rules) && !STUB_MODULES.includes(file),
   )
 
-  const missing = ["LICENSE", "README.md", "docs/SELF_HOSTING.md", "docs/readme-hero.png"].filter(
+  const missing = ["LICENSE", "README.md", "docs/SELF_HOSTING.md", "docs/readme-hero.gif"].filter(
     (required) => !exported.includes(required),
   )
 

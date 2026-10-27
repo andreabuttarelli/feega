@@ -51,6 +51,7 @@ export const STILL_OPEN_ID = 'still-open';
 export const LAST_LOOK_ID = 'last-look';
 export const CRITIC_ID = 'critic-sheet';
 export const LOOP_SEAM_ID = 'loop-seam';
+export const CUT_PROBE_ID = 'cut-probe';
 export const CUT_REVIEW_ID = 'cut-review';
 export const SHEET_FILE = 'sheet.jpg';
 

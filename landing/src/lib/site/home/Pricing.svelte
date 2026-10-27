@@ -5,11 +5,11 @@
 
 <section class="pricing" id="pricing">
   <div class="site-wrap">
-    <h2>Pricing</h2>
+    <h2>100% open source &amp; free.<br />Pay only for AI usage or use with your own agent via MCP</h2>
 
     <div class="intro">
-      <p class="lead">A pricing for builders who want to scale</p>
-      <p>1 credit = $1<br />eg. 8/mo = 8 credits included, ~100 pictures</p>
+      <p class="lead">Pricing for AI usage (chatbot, AI generations)</p>
+      <p>1 credit = $1<br />eg. 8/mo = 8 credits included, ~60 pictures</p>
     </div>
 
     <div class="plans">
@@ -20,7 +20,7 @@
             <li>{f}</li>
           {/each}
         </ul>
-        <a class="start" href={APP_URL}>Start now</a>
+        <a class="start" href={APP_URL}>Start Now</a>
       </div>
 
       <div class="costs">
@@ -64,6 +64,9 @@
 
   .plans {
     margin-top: 80px;
+    padding: 20px;
+    border-radius: 4px;
+    background: #000;
     line-height: 1.4;
   }
 
@@ -95,9 +98,13 @@
   .start {
     display: inline-block;
     margin-top: 9px;
-    padding: 24px 40px;
-    background: #0043fc;
-    line-height: 1.2;
+    padding: 14px 28px;
+    border: 2px solid #ff5100;
+    border-radius: 10px;
+    font-size: 18px;
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+    color: rgba(255, 255, 255, 0.8);
   }
 
   .costs {
@@ -140,8 +147,8 @@
     }
 
     .intro {
-      align-items: center;
-      margin-top: 24px;
+      align-items: start;
+      margin-top: 34px;
     }
 
     .lead {
@@ -156,7 +163,7 @@
     }
 
     .plans {
-      margin-top: 33px;
+      margin-top: 22px;
     }
 
     .start {

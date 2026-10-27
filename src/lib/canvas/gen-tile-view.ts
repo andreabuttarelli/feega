@@ -1,4 +1,4 @@
-import { formatCredits } from '$lib/components/credit-amount-format';
+import { formatPrice } from '$lib/components/credit-amount-format';
 import { audioFormOf, type AudioField } from './audio-form';
 import { shownIndex } from './gen-history';
 import { runStateOf, type GenMedium, type GenNode, type RunState } from './gen-node';
@@ -48,7 +48,7 @@ export const RUN_LABEL: Record<RunState, string> = {
   failed: 'Failed'
 };
 
-const approx = (credits: number | null) => (credits === null ? null : formatCredits(credits, { approx: true }));
+const approx = (credits: number | null) => (credits === null ? null : formatPrice(credits));
 
 function loopOf(quote: RunQuote, x: GenTileExtras): GenTileView['loop'] {
   if (x.variantsInFlight > 0) {
