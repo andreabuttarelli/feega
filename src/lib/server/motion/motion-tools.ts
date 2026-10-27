@@ -180,8 +180,8 @@ import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { clearTextRuns, listTextRange, styleTextRange } from '$lib/motion/text-run-ops';
 import { ListChange } from '@feega/motion-core/motion/text-lists';
 import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, pushOverrides, resetOverride, resetOverrides } from '$lib/motion/main-component';
-import { addVariant, pickVariant, swapInstance } from '$lib/motion/variants';
-import { defineProperty, removeProperty, resetProperty, setProperty } from '$lib/motion/component-properties';
+import { addVariant, defineVariantProp, pickVariant, setVariant, swapInstance } from '$lib/motion/variants';
+import { defineProperty, removeProperty, resetProperty, setPreferred, setProperty } from '$lib/motion/component-properties';
 import { propertyDefSchema } from '@feega/motion-core/motion/doc';
 import type { PropertyDef } from '@feega/motion-core/motion/property-resolve';
 import { placeInstance } from '$lib/motion/canvas-components';
@@ -2858,8 +2858,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     component: tool({
-      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop).',
-      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.union([z.string(), z.boolean()]).optional(), property: propertyDefSchema.optional() }),
+      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop). Variant matrix: define-variant (comp, prop = axis e.g. Size, values e.g. [S,M,L]): adds the axis and fills every Size x State combination; set-variant (clip_id, variant {Size:L,State:hover}): switch an instance on several axes at once, overrides kept. set-preferred (comp, prop = a swap property, preferred = main comp ids): suggested swaps listed first.',
+      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.union([z.string(), z.boolean()]).optional(), property: propertyDefSchema.optional(), values: z.array(z.string().min(1).max(40)).max(20).optional(), preferred: z.array(z.string()).max(40).optional() }),
       execute: async (input) => {
         const ids: string[] = [];
         const newId = () => {
@@ -2881,7 +2881,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           [ComponentAction.DefineProp]: () => (input.property ? defineProperty(session.doc, input.comp ?? '', input.prop ?? '', input.property as PropertyDef) : { ok: false, error: 'define-prop needs property' }),
           [ComponentAction.RemoveProp]: () => removeProperty(session.doc, input.comp ?? '', input.prop ?? ''),
           [ComponentAction.SetProp]: () => (input.value === undefined ? { ok: false, error: 'set-prop needs value' } : setProperty(session.doc, id, input.prop ?? '', input.value)),
-          [ComponentAction.ResetPropValue]: () => resetProperty(session.doc, id, input.prop ?? '')
+          [ComponentAction.ResetPropValue]: () => resetProperty(session.doc, id, input.prop ?? ''),
+          [ComponentAction.DefineVariant]: () => defineVariantProp(session.doc, input.comp ?? '', input.prop ?? '', input.values ?? [], newId),
+          [ComponentAction.SetVariant]: () => setVariant(session.doc, id, input.variant ?? {}),
+          [ComponentAction.SetPreferred]: () => setPreferred(session.doc, input.comp ?? '', input.prop ?? '', input.preferred ?? [])
         };
         const out = apply(run[input.action](), `component ${input.action}`);
         if (out.ok && input.action === ComponentAction.Place) {
