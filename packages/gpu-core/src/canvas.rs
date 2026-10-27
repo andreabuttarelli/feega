@@ -69,6 +69,10 @@ pub fn brush<I>(paint: &Paint) -> Brush<I> {
     }
 }
 
+pub fn shader_only(name: &str) -> bool {
+    matches!(name, "linear-burn" | "linear-dodge" | "vivid-light" | "linear-light" | "pin-light" | "hard-mix" | "subtract" | "divide" | "darker-color" | "lighter-color")
+}
+
 pub fn mix(name: &str) -> Mix {
     match name {
         "multiply" => Mix::Multiply,

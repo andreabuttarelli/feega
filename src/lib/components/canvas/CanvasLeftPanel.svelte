@@ -9,7 +9,7 @@
   import LayersPanel from './LayersPanel.svelte';
   import ComponentsList from './ComponentsList.svelte';
   import X from '@lucide/svelte/icons/x';
-  import { IconButton, IconSize, SegmentedControl, Side } from '$lib/components/ui/shell';
+  import { IconButton, IconSize, Side } from '$lib/components/ui/shell';
   import { PANEL_WIDTHS } from '$lib/shell-nav';
 
   /**
@@ -25,37 +25,26 @@
     projectId,
     kind,
     labelKey,
-    onclose,
-    onkind
+    onclose
   }: {
     projectId: string;
     kind: LeftPanelKind;
     labelKey: string;
     onclose: () => void;
-    onkind?: (kind: LeftPanelKind) => void;
   } = $props();
 
-  const TABS: { value: LeftPanelKind; labelKey: string }[] = [
-    { value: 'layers', labelKey: 'app.nav2.layers' },
-    { value: 'assets', labelKey: 'app.nav2.materials' }
-  ];
-  const tabbed = $derived(!!onkind && TABS.some((tab) => tab.value === kind));
 
   const panelWidth = $derived(PANEL_WIDTHS[kind] ?? PANEL_WIDTHS.assets);
 </script>
 
 {#if kind === 'influencers'}
-  <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 84px));`}>
+  <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 92px));`}>
     <InfluencersPanel {projectId} {onclose} />
   </div>
 {:else}
-  <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 84px));`}>
+  <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 92px));`}>
     <div class="left-panel-head">
-      {#if tabbed && onkind}
-        <SegmentedControl label={$_('app.shell.rail')} value={kind} onchange={(value) => onkind(value as LeftPanelKind)} options={TABS.map((tab) => ({ value: tab.value, label: $_(tab.labelKey) }))} />
-      {:else}
-        <h3>{$_(labelKey)}</h3>
-      {/if}
+      <h3>{$_(labelKey)}</h3>
       <IconButton label={$_('app.shell.closePanel')} shortcut="Escape" size={IconSize.Md} side={Side.Bottom} onclick={onclose}>
         <X />
       </IconButton>
@@ -73,12 +62,24 @@
 
 <style>
   .left-panel {
-    flex: 0 0 auto;
-    align-self: stretch;
+    position: absolute;
+    left: 68px;
+    top: 56px;
+    bottom: 12px;
+    z-index: 30;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: var(--ui-panel);
+    overflow: hidden;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
+  }
+
+  @media (max-width: 1180px) {
+    .left-panel {
+      bottom: calc(var(--dock-lift, 0px) + 76px);
+    }
   }
 
   .left-panel-head {
@@ -88,7 +89,6 @@
     justify-content: space-between;
     height: var(--ui-header-h);
     padding: 0 6px 0 12px;
-    border-bottom: 1px solid var(--ui-divider);
   }
   .left-panel-head h3 {
     margin: 0;
