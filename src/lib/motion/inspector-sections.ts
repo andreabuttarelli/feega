@@ -129,7 +129,7 @@ const GROUP_SECTION: Record<Group, Section> = {
   [Group.Camera]: Section.ThreeD
 };
 
-const TEXT_KEYS: ReadonlySet<string> = new Set(['font', 'weight', 'fontWeight', 'italic', 'size', 'tracking', 'leading', 'textCase', 'stretch', 'slant', 'axes', 'align', 'sizing', 'verticalAlign', 'paragraphSpacing', 'paragraphIndent', 'lineHeight', 'letterSpacing', 'maxLines', 'textWrap', 'leadingTrim', 'decoration', 'decorationStyle', 'decorationThickness', 'decorationOffset', 'decorationColor', 'skipInk', 'features']);
+const TEXT_KEYS: ReadonlySet<string> = new Set(['color', 'fills', 'font', 'weight', 'fontWeight', 'italic', 'size', 'tracking', 'leading', 'textCase', 'stretch', 'slant', 'axes', 'align', 'sizing', 'verticalAlign', 'paragraphSpacing', 'paragraphIndent', 'lineHeight', 'letterSpacing', 'maxLines', 'textWrap', 'leadingTrim', 'decoration', 'decorationStyle', 'decorationThickness', 'decorationOffset', 'decorationColor', 'skipInk', 'features']);
 
 export enum TextTier {
   Primary = 'primary',
@@ -160,8 +160,10 @@ const TEXT_TIER: Record<string, TextTier> = {
   leadingTrim: TextTier.Advanced,
   sizing: TextTier.Advanced,
   features: TextTier.Advanced,
-  lineHeight: TextTier.Advanced,
-  letterSpacing: TextTier.Advanced,
+  lineHeight: TextTier.Hidden,
+  letterSpacing: TextTier.Hidden,
+  color: TextTier.Primary,
+  fills: TextTier.Primary,
   decorationStyle: TextTier.Decorated,
   decorationThickness: TextTier.Decorated,
   decorationOffset: TextTier.Decorated,
@@ -323,7 +325,7 @@ const SUMMARY: Record<Section, (clip: Summed, fps: number) => string> = {
 
 export const sectionSummary = (section: Section, clip: Summed, fps: number): string => SUMMARY[section](clip, fps);
 
-const FIELD_LABEL: Record<string, string> = { align: 'Text align', lineHeight: 'Line override', letterSpacing: 'Spacing override' };
+const FIELD_LABEL: Record<string, string> = { align: 'Text align' };
 
 export const fieldLabel = (key: string, label: string): string => FIELD_LABEL[key] ?? label;
 

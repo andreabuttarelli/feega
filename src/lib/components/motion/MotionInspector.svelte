@@ -35,6 +35,7 @@
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
+  import Settings2 from '@lucide/svelte/icons/settings-2';
   import SquareDashed from '@lucide/svelte/icons/square-dashed';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
@@ -224,6 +225,8 @@
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
   const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
   const headKind = $derived(customName ? 'Component' : spec.label);
+  let advancedRow = $state<HTMLElement | null>(null);
+  let advancedOpen = $state(false);
   const textFields = $derived(fieldsIn(Section.Text));
   const textField = (key: string) => textFields.find((f) => f.key === key);
   const decorationNow = $derived(clip.props.decoration);
@@ -757,13 +760,14 @@
   {@const aligns = ['align', 'verticalAlign'].map(textField).filter((f) => f !== undefined)}
   {@const italic = textField('italic')}
   {@const casing = textField('textCase')}
+  {@const colour = textField('fills') ?? textField('color')}
   {@const advanced = textFields.filter((f) => textTier(f.key, decorationNow) === TextTier.Advanced)}
   <div class="text-primary">
     {#if font}{@render fieldRow(font)}{/if}
     <div class="grid2">{@render pair(['weight', 'fontWeight', 'size'])}</div>
     <div class="grid2">{@render pair(['leading', 'tracking'])}</div>
     {#if aligns.length}<div class="grid2">{#each aligns as field (field.key)}{@render alignCell(field)}{/each}</div>{/if}
-    <div class="tgl-row" data-testid="text-styles">
+    <div class="tgl-row" data-testid="text-styles" bind:this={advancedRow}>
       {#if italic}<button type="button" class="tgl" class:on={value(italic) === true} data-testid="text-italic" aria-label="Italic" title="Italic" aria-pressed={value(italic) === true} onclick={() => setProp(italic, value(italic) !== true)}><i>I</i></button>{/if}
       {@render lineToggle('Underline', 'U', 'underline')}
       {@render lineToggle('Strikethrough', 'S', 'strikethrough')}
@@ -772,13 +776,14 @@
           {#each casing.options ?? [] as option (option)}<option value={option}>{optionLabel(option)}</option>{/each}
         </select>
       {/if}
+      <button type="button" class="tgl" class:on={advancedOpen} data-testid="advanced-type-toggle" aria-label="Advanced type" title="Advanced type" aria-pressed={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}><Settings2 size={14} /></button>
     </div>
+    {#if colour}{@render fieldRow(colour)}{/if}
   </div>
-  {#if advanced.length}
-    <details class="advanced" data-testid="advanced-type">
-      <summary>Advanced type</summary>
-      <div class="adv">{@render fieldList(advanced)}</div>
-    </details>
+  {#if advancedOpen && advancedRow && advanced.length}
+    <SidePopover anchor={advancedRow} title="Advanced type" onclose={() => (advancedOpen = false)}>
+      <div class="adv" data-testid="advanced-type">{@render fieldList(advanced)}</div>
+    </SidePopover>
   {/if}
 {/snippet}
 
