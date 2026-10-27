@@ -3,6 +3,7 @@
  * These can also be reused by +page.server.ts files to avoid duplication.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { tallyBrandStatus } from '$lib/canvas/brand-switcher';
 
 // ── Brand list ──────────────────────────────────────────────────────────
 
@@ -26,9 +27,18 @@ export async function getBrandsList(supabase: SupabaseClient, onlyIds: string[] 
   const pendingCounts = new Map<string, number>();
   for (const p of posts ?? []) pendingCounts.set(p.brand_id, (pendingCounts.get(p.brand_id) ?? 0) + 1);
 
+  const [readyRes, accountsRes] = await Promise.all([
+    supabase.from('posts').select('brand_id, status, planned_for').in('brand_id', ids).eq('status', 'ready'),
+    supabase.from('social_accounts').select('brand_id, status').in('brand_id', ids)
+  ]);
+  if (readyRes.error) throw readyRes.error;
+  if (accountsRes.error) throw accountsRes.error;
+  const status = tallyBrandStatus({ posts: readyRes.data ?? [], accounts: accountsRes.data ?? [] }, new Date());
+
   return brands.map(b => ({
     ...b,
     pendingCount: pendingCounts.get(b.id) ?? 0,
+    ...(status.get(b.id) ?? { scheduled: 0, accounts: 0, accountsDown: 0 }),
   }));
 }
 
