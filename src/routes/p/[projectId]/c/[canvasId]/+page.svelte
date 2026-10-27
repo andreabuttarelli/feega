@@ -209,6 +209,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
+  import { diffRuns, type RunDifference } from '$lib/canvas/run-diff';
   import { historyItemsOf, producedRuns, shownOutput } from '$lib/canvas/gen-history';
   import { genTileView, type GenTileView } from '$lib/canvas/gen-tile-view';
   import { runQuoteOf, type RunQuote } from '$lib/canvas/run-quote';
@@ -304,7 +305,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let viewing = $state<{ runs: ViewerRun[]; start: number; kind: OutputKind } | null>(null);
 
-  let pairing = $state<{ left: string; right: string; leftLabel: string; rightLabel: string } | null>(null);
+  let pairing = $state<{ left: string; right: string; leftLabel: string; rightLabel: string; diff?: RunDifference[] } | null>(null);
 
   function compareOutputs(ids: string[]) {
     const [a, b] = ids.map((id) => nodes.find((n) => n.id === id));
@@ -314,6 +315,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const urlOf = (assetId: string) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full);
     const nameOf = (n: typeof a) => n.displayName ?? (typeof n.data.prompt === 'string' ? n.data.prompt.slice(0, 24) : 'Image');
     pairing = { left: urlOf(a.data.refId), right: urlOf(b.data.refId), leftLabel: nameOf(a), rightLabel: nameOf(b) };
+  }
+
+  function compareRuns(nodeId: string, runA: string, runB: string) {
+    const all = runsByNode[nodeId] ?? [];
+    const a = all.find((r) => r.id === runA);
+    const b = all.find((r) => r.id === runB);
+    if (!a?.mediaId || !b?.mediaId) {
+      return;
+    }
+    const urlOf = (assetId: string) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full);
+    pairing = { left: urlOf(a.mediaId), right: urlOf(b.mediaId), leftLabel: 'A', rightLabel: 'B', diff: diffRuns(a, b) };
   }
 
   function viewOutput(id: string) {
@@ -878,6 +890,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     model: string | null;
     startedAt: string;
     text?: string | null;
+    params?: Record<string, unknown> | null;
   }) {
     return {
       id: run.id,
@@ -885,7 +898,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       prompt: run.prompt ?? '',
       model: run.model,
       createdAt: run.startedAt,
-      text: run.text ?? null
+      text: run.text ?? null,
+      params: run.params ?? null
     };
   }
 
@@ -2316,7 +2330,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const row = nodes.find((n) => n.id === id);
     const gen = row ? genOf(row) : null;
     const items = gen ? historyItemsOf({ ...gen, runs: runsByNode[id] ?? [] }) : [];
-    return gen && items.length ? { items, urlOf: assetUrl, onshow: (runId: string) => void restore(id, gen, runId) } : null;
+    return gen && items.length ? { items, urlOf: assetUrl, onshow: (runId: string) => void restore(id, gen, runId), oncompare: (a: string, b: string) => compareRuns(id, a, b) } : null;
   }
 
   function variantsInFlightFor(id: string): number {
