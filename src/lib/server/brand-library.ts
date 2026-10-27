@@ -214,7 +214,7 @@ async function uploadedFamilies(db: Db, orgId: string, ids: string[]): Promise<M
   if (!ids.length) {
     return new Map();
   }
-  const { data, error } = await (db as unknown as { from: (t: string) => ReturnType<Db['from']> })
+  const { data, error } = await db
     .from('org_fonts')
     .select('id, family')
     .eq('org_id', orgId)
@@ -222,7 +222,7 @@ async function uploadedFamilies(db: Db, orgId: string, ids: string[]): Promise<M
   if (error) {
     return new Map();
   }
-  return new Map(((data ?? []) as Array<{ id: string; family: string }>).map((r) => [r.id, r.family]));
+  return new Map((data ?? []).map((r) => [r.id, r.family]));
 }
 
 function voiceItems(voice: unknown): LibraryItem[] {

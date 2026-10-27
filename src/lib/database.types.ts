@@ -778,6 +778,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "brand_fonts_org_font_fk"
+            columns: ["org_font_id"]
+            isOneToOne: false
+            referencedRelation: "org_fonts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "brand_fonts_brand_id_fkey"
             columns: ["brand_id"]
             isOneToOne: false

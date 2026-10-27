@@ -40,7 +40,7 @@ export type BrandKitView = {
 
 async function orgFontsOf(supabase: SupabaseClient, orgId: string): Promise<Array<{ id: string; family: string }>> {
   const { data, error } = await supabase.from('org_fonts').select('id, family').eq('org_id', orgId);
-  return error ? [] : ((data ?? []) as Array<{ id: string; family: string }>);
+  return error ? [] : (data ?? []);
 }
 
 export async function loadKit(supabase: SupabaseClient, scope: Scope): Promise<BrandKitView> {
