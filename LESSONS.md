@@ -3389,3 +3389,11 @@ Signal: clicking `<a href="#/pricing">` in a code frame leaves an empty page at 
 
 ### A rebuilt wasm measured under `vite preview` is not the wasm you built
 **Signal:** after copying a new `gpu_core_bg.wasm` into `.svelte-kit/output/client`, the console shows `[canvas] core off: WebAssembly compilation aborted` and `ERR_CONTENT_LENGTH_MISMATCH`; the page silently runs the fallback renderer and the numbers look great. **Move:** sirv stats files at startup: restart `vite preview` after every swap. `scripts/perf/big-canvas.ts` now throws on `core off`.
+
+## Unit tests fail in a worktree only after a demo or e2e run copied `.env` into it
+
+**Signal:** `robots.txt`, `sitemap.xml`, `credits` and `/api/v1/motion/[nodeId]/embed` server tests go red in a worktree that was green, with no code change near them. **Move:** a worktree has no `.env`; copying the main one in to run a demo or the dev server makes `$env` values real and those tests read them. Move `.env` aside (`mv .env .env.bak`) for the unit run, put it back for the demo, and delete it with the worktree.
+
+## Worktree tests resolve @feega/* from the main checkout
+
+Signal: a test of code under `packages/` hangs or ignores your edit in a worktree whose `node_modules` is a symlink; `svelte-check` says the new module does not exist. Cause: `node_modules/@feega/*` are relative symlinks, resolved from the real path, so they point at the main checkout. Move: a scratch vitest config that merges `vite.config.ts` and aliases `@feega/motion-core/(.*)` to `packages/motion-core/src/$1` (and a scratch tsconfig with the same `paths` plus `$lib`); do not commit them.

@@ -22,7 +22,8 @@ export enum LocalOff {
   AiNodes = 'ai_nodes',
   TermsNotice = 'terms_notice',
   PublicLinks = 'public_links',
-  NextSteps = 'next_steps'
+  NextSteps = 'next_steps',
+  Present = 'present'
 }
 
 type Env = Record<string, string | undefined>;
@@ -48,7 +49,8 @@ const OFF_IN_LOCAL_MODE: Record<LocalOff, (env: Env) => boolean> = {
   [LocalOff.AiNodes]: withoutAiKey,
   [LocalOff.TermsNotice]: always,
   [LocalOff.PublicLinks]: always,
-  [LocalOff.NextSteps]: always
+  [LocalOff.NextSteps]: always,
+  [LocalOff.Present]: always
 };
 
 export const localOff = (feature: LocalOff, env: Env) => isLocalMode(env) && OFF_IN_LOCAL_MODE[feature](env);

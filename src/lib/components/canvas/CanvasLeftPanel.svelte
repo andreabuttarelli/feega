@@ -6,10 +6,11 @@
   import { _ } from 'svelte-i18n';
   import ProjectDragPanel from './ProjectDragPanel.svelte';
   import InfluencersPanel from './InfluencersPanel.svelte';
+  import BrandsPanel from './BrandsPanel.svelte';
   import LayersPanel from './LayersPanel.svelte';
   import ComponentsList from './ComponentsList.svelte';
   import X from '@lucide/svelte/icons/x';
-  import { IconButton, IconSize, SegmentedControl, Side } from '$lib/components/ui/shell';
+  import { IconButton, IconSize, Side } from '$lib/components/ui/shell';
   import { PANEL_WIDTHS } from '$lib/shell-nav';
 
   /**
@@ -25,21 +26,14 @@
     projectId,
     kind,
     labelKey,
-    onclose,
-    onkind
+    onclose
   }: {
     projectId: string;
     kind: LeftPanelKind;
     labelKey: string;
     onclose: () => void;
-    onkind?: (kind: LeftPanelKind) => void;
   } = $props();
 
-  const TABS: { value: LeftPanelKind; labelKey: string }[] = [
-    { value: 'layers', labelKey: 'app.nav2.layers' },
-    { value: 'assets', labelKey: 'app.nav2.materials' }
-  ];
-  const tabbed = $derived(!!onkind && TABS.some((tab) => tab.value === kind));
 
   const panelWidth = $derived(PANEL_WIDTHS[kind] ?? PANEL_WIDTHS.assets);
 </script>
@@ -51,11 +45,7 @@
 {:else}
   <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 92px));`}>
     <div class="left-panel-head">
-      {#if tabbed && onkind}
-        <SegmentedControl label={$_('app.shell.rail')} value={kind} onchange={(value) => onkind(value as LeftPanelKind)} options={TABS.map((tab) => ({ value: tab.value, label: $_(tab.labelKey) }))} />
-      {:else}
-        <h3>{$_(labelKey)}</h3>
-      {/if}
+      <h3>{$_(labelKey)}</h3>
       <IconButton label={$_('app.shell.closePanel')} shortcut="Escape" size={IconSize.Md} side={Side.Bottom} onclick={onclose}>
         <X />
       </IconButton>
@@ -63,9 +53,11 @@
     <div class="left-panel-body">
       {#if kind === 'layers'}
         <LayersPanel />
+      {:else if kind === 'brands'}
+        <BrandsPanel {projectId} />
       {:else}
-        {#if kind === 'assets'}<ComponentsList />{/if}
-        <ProjectDragPanel {projectId} {kind} />
+        <ComponentsList />
+        <ProjectDragPanel {projectId} />
       {/if}
     </div>
   </div>

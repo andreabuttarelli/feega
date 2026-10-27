@@ -44,6 +44,7 @@ export const SUPPORT: Record<ComponentId, Support> = {
   ShaderEffect: Support.HtmlTexture,
   Precomp: Support.Structural,
   Adjustment: Support.HtmlTexture,
+  Light: Support.Structural,
   Custom: Support.HtmlTexture
 };
 

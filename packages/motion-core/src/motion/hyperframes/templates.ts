@@ -303,6 +303,11 @@ const Adjustment: Template<'Adjustment'> = {
   html: () => ''
 };
 
+const Light: Template<'Light'> = {
+  timing: Timing.Media,
+  html: () => ''
+};
+
 const LiquidGlass: Template<'LiquidGlass'> = {
   timing: Timing.Media,
   html: () => ''
@@ -506,5 +511,6 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   ShaderEffect,
   Precomp,
   Adjustment,
+  Light,
   Custom
 };

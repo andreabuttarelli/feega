@@ -186,9 +186,23 @@ slots, place, camera?, motion?, params?, tilt?, scale?, animate? }` with `place`
 scatter. `patch_layout` (`{ org, layout_id, version, spec }`) replaces it; `list_layouts` lists them.
 Free.
 
+`studio_quote` (`{ selection, project? }`) prices a Photo studio batch: `count`, `perImage`, `total`, skipped
+combinations and a `quoteId`. Free. `studio_start` (`{ selection, quoteId, project? }`) starts it and spends
+credits; the `quoteId` must belong to the same selection and price, else 409. `studio_status` (`{ batch_id }`)
+reads the batch. CLI: `feega studio quote|start|status`.
+`studio_run`, `studio_more` (`variations`), `studio_cancel`, `studio_retry`, `studio_regenerate`,
+`studio_approve` and `studio_reject` act on a batch (`batch_id`, `item_ids`); run, more, retry and regenerate spend credits.
+CLI: `feega studio run|more|cancel|retry|regenerate|approve|reject <batchId>`.
+
 `get_app_account` (`{ project_id }`) shows the TEST login of the user's app the project chat remembers
 (login url, email, session expiry; never the password). `forget_app_account` (`{ project_id }`) deletes it
 and its session. Free.
+
+`cloud` (`{ project_id, action, provider?, ... }`) works the Google Drive and Dropbox files of the signed-in
+person: `status` (connected or not), `files` (`folder`, `cursor` for the next page), `import` (`file_id`,
+optional `canvas_id`, `x`, `y`), `export` (`asset_id`, `folder`, `name?`) and `disconnect`. Connecting is a
+browser sign-in in the app. `figma_token_status` (`{ project_id }`) says whether a Figma token is saved,
+never the token. Free.
 
 ## Edit and view
 
@@ -213,13 +227,13 @@ lists them all and gives strict schemas. `view({ org, op, input })` reads: `canv
 | `canvas_file` | save or open a canvas as a `.feega` file on the local disk |
 
 `canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
-through the same code (op `describe` `{}` lists them all, `{ op }` gives one input schema; `draw_frame` `{ canvasId, x, y, w, format?, still? }` makes a frame or still): `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`, `list_models` (models this project can run, with provider, credits, uncensored flag and `routes[]` — one row per provider that serves the model; pass its `provider` to `run_node`),
+through the same code (op `describe` `{}` lists them all, `{ op }` gives one input schema; `draw_frame` `{ canvasId, x, y, w, format?, still? }` makes a frame or still): `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `get_selection` (what the user has selected on the open canvas + view, per open session; reason `no_open_session` when none), `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`, `list_models` (models this project can run, with provider, credits, uncensored flag and `routes[]` — one row per provider that serves the model; pass its `provider` to `run_node`),
 `list_templates`, `create_node`, `update_node`, `move_node`, `resize_node`, `rename_node`, `duplicate_nodes`,
 `write_nodes`, `paste_nodes`,
-`connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,
+`connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `undo_last`, `align_nodes`, `distribute_nodes`, `tidy_nodes`, `stack_nodes`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,
 `rename_canvas`, `delete_canvas`, `rename_project`, `share_canvas`, `share_doc`,
-`insert_template`, `list_techniques`, `save_technique`, `place_technique`, `run_technique_node`, `detach_technique`, `open_technique`, `run_technique`, `delete_technique`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
-`show_run`, `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
+`insert_template`, `list_techniques`, `save_technique`, `place_technique`, `run_technique_node`, `preview_technique_rows`, `run_technique_rows`, `technique_rows_progress`, `cancel_technique_rows`, `detach_technique`, `open_technique`, `run_technique`, `delete_technique`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
+`compare_runs` (what differs between two runs), `show_run` (pins a past run as the node output), `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
 `retry_loop_combination`, `preview_workflow`, `run_workflow`, `cancel_workflow`,
 `preview_run_graph`, `run_graph`, `cancel_render`, `withdraw_from_gallery`, `request_upload`,
 `register_upload`, `import_link`, `list_voices`, `voice_library`, `use_library_voice`, `design_voice`,
@@ -282,6 +296,7 @@ list. Returns how many combinations it actually stopped.
 | `publish_motion_embed` | `feega motion embed <nodeId> [--unpublish]` |
 | `get_motion_embed` | `feega motion embed <nodeId> --status` |
 | `share_motion_frame` | `feega motion share <nodeId>` |
+| `get_play_link` | `feega motion play <nodeId>` |
 | `motion_budget` | `feega motion budget <nodeId> [--raise]` |
 | `view_motion_frames` | `feega motion frames <nodeId> --at 1,2.5,4 [--width 640] [--out dir]` |
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |

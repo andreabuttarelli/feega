@@ -14,7 +14,7 @@
   }: { title: string; open: boolean; section: string; summary?: string; ontoggle: () => void; actions?: Snippet; children: Snippet } = $props();
 </script>
 
-<section class="section" data-section={section}>
+<section class="section ui-section" data-section={section}>
   <div class="head">
     <button type="button" class="section-head" aria-expanded={open} onclick={ontoggle}>
       <span class="title">{title}</span>
@@ -27,14 +27,14 @@
 </section>
 
 <style>
-  .section + .section {
-    border-top: 1px solid var(--ui-divider);
-  }
-
   .head {
     display: flex;
     align-items: center;
     padding-right: var(--ui-space-2);
+  }
+
+  .head:hover {
+    background: var(--ui-hover);
   }
 
   .section-head {

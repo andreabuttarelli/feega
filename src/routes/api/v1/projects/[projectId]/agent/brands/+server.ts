@@ -2,22 +2,11 @@ import { json } from '@sveltejs/kit';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findReachableProject } from '$lib/server/projects/lookup';
 import { findOrCreateImportedAsset } from '$lib/server/repos/assets';
+import { tallyBrandStatus } from '$lib/canvas/brand-switcher';
 import type { RequestHandler } from './$types';
 
-/**
- * I BRAND DELL'ORG, PER LA SIDEBAR — draggabili sulla tela che è già aperta, come `brands/+page`.
- * `brands` non porta `project_id` (vedi CLAUDE.md): questa rotta mostra ogni brand dell'org del
- * progetto aperto, non solo quello a cui il progetto è collegato.
- *
- * `logoAssetId` NASCE QUI, come in `brands/+page.server.ts`: un nodo statico ha bisogno di
- * `data.assetId` (`uploaded-node.ts`), e `dragstart` è sincrono — non può aspettare un giro al
- * server. `findOrCreateImportedAsset` è idempotente.
- *
- * Session cookie, non Bearer — stesso motivo di `agent/assets`.
- *
- * GET → { brands: [{ id, name, slug, logoUrl, logoAssetId, shortDescription, content }] }
- */
 const BRAND_COLUMNS = 'id, name, slug, logo_url, short_description, content';
+const NO_STATUS = { scheduled: 0, accounts: 0, accountsDown: 0 };
 
 export const GET: RequestHandler = async ({ params, locals }) => {
   const { user } = await locals.safeGetSession();
@@ -36,18 +25,20 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 
   const { orgId } = found;
 
-  const { data, error } = await db
-    .from('brands')
-    .select(BRAND_COLUMNS)
-    .eq('org_id', orgId)
-    .order('name', { ascending: true });
+  const [brandsRes, postsRes, accountsRes] = await Promise.all([
+    db.from('brands').select(BRAND_COLUMNS).eq('org_id', orgId).order('name', { ascending: true }),
+    db.from('posts').select('brand_id, status, planned_for').eq('org_id', orgId).eq('status', 'ready'),
+    db.from('social_accounts').select('brand_id, status').eq('org_id', orgId)
+  ]);
 
-  if (error) {
+  if (brandsRes.error || postsRes.error || accountsRes.error) {
     return json({ error: 'query_failed' }, { status: 500 });
   }
 
+  const status = tallyBrandStatus({ posts: postsRes.data ?? [], accounts: accountsRes.data ?? [] }, new Date());
+
   const brands = await Promise.all(
-    (data ?? []).map(async (row) => {
+    (brandsRes.data ?? []).map(async (row) => {
       const logoAsset = row.logo_url
         ? await findOrCreateImportedAsset(db, { orgId, type: 'image', url: row.logo_url })
         : null;
@@ -59,10 +50,11 @@ export const GET: RequestHandler = async ({ params, locals }) => {
         logoUrl: row.logo_url,
         logoAssetId: logoAsset?.id ?? null,
         shortDescription: row.short_description,
-        content: row.content
+        content: row.content,
+        ...(status.get(row.id) ?? NO_STATUS)
       };
     })
   );
 
-  return json({ brands });
+  return json({ brands, projectBrandId: found.project.brandId ?? null });
 };

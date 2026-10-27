@@ -35,8 +35,8 @@
   {/each}
   {#if onspotlight}
     <li>
-      <button type="button" class="spotlight" class:on={presenting} aria-pressed={presenting} data-testid="spotlight" onclick={() => onspotlight(!presenting)}>
-        {presenting ? 'Stop presenting' : 'Spotlight me'}
+      <button type="button" class="spotlight" class:on={presenting} aria-pressed={presenting} data-testid="spotlight" title="Present to others — collaborators follow your view" onclick={() => onspotlight(!presenting)}>
+        {presenting ? 'Stop presenting' : 'Present'}
       </button>
     </li>
   {/if}

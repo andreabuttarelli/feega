@@ -16,10 +16,12 @@ export async function cmdBrands() {
   console.log(c.bold(`\n${brands.length} brand\n`));
 
   table(
-    ['Brand', 'Slug'],
+    ['Brand', 'Slug', 'Scheduled', 'Accounts'],
     brands.map((b) => [
       c.bold(b.name),
       c.dim(b.slug),
+      String(b.scheduled ?? 0),
+      b.accountsDown ? `${b.accounts} (${b.accountsDown} to reconnect)` : String(b.accounts ?? 0),
     ])
   );
 }

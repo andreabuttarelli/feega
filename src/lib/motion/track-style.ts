@@ -67,6 +67,7 @@ const COMPONENT_FAMILY: Record<ComponentId, ClipFamily> = {
   LiquidGlass: ClipFamily.Adjustment,
   LiquidBlob: ClipFamily.Adjustment,
   Adjustment: ClipFamily.Adjustment,
+  Light: ClipFamily.Adjustment,
   Custom: ClipFamily.Custom
 };
 
