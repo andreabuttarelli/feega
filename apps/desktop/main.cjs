@@ -2,7 +2,7 @@ const { app, BrowserWindow, shell, dialog, nativeTheme } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { watchUpdates } = require('./updates.cjs');
 const { frameless, overlay } = require('./chrome.cjs');
-const { start, authReturn, staysInside, DEEP_LINK_SCHEME } = require('./routing.cjs');
+const { start, authReturn, staysInside, keepInside, DEEP_LINK_SCHEME } = require('./routing.cjs');
 
 const START_URL_ENV = 'FEEGA_URL';
 const home = start(process.env[START_URL_ENV]);
@@ -42,13 +42,7 @@ function open() {
     return { action: 'deny' };
   });
 
-  window.webContents.on('will-navigate', (event, url) => {
-    if (staysInside(url, home.href)) {
-      return;
-    }
-    event.preventDefault();
-    shell.openExternal(url);
-  });
+  keepInside(window.webContents, home.href, (url) => shell.openExternal(url));
 
   window.loadURL(home.href);
 }
