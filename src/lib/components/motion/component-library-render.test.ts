@@ -81,7 +81,7 @@ describe('a component opened in the library', () => {
     const key = body.slice(body.indexOf('data-testid="key-fields"'), body.indexOf('data-testid="advanced-fields"'));
 
     expect(key).toContain('Typed text');
-    expect(key).toContain('type="color"');
+    expect(key).toContain('data-colour=');
     expect(key).not.toContain('data-testid="field-group"');
     expect(body).toContain('Add to video');
     expect(body).toContain('Add sounds');

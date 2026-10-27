@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from '$lib/components/motion/ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import Maximize2 from '@lucide/svelte/icons/maximize-2';
@@ -196,7 +198,7 @@
       {#if section}
         <div class="group" role="group" aria-label="Section">
           <input class="section-title" aria-label="Section title" value={sectionTitle} onchange={(e) => onsectionchange?.(section.id, { title: e.currentTarget.value.trim() || 'Section' })} onkeydown={(e) => e.stopPropagation()} />
-          <input class="section-fill" type="color" aria-label="Section fill" value={sectionFill} onchange={(e) => onsectionchange?.(section.id, { fill: e.currentTarget.value })} />
+          <ColorField name="Section fill" display={ColourDisplay.Chip} value={sectionFill} onchange={(v) => onsectionchange?.(section.id, { fill: v })} />
         </div>
       {/if}
 
@@ -452,13 +454,6 @@
     background: transparent;
   }
 
-  .section-fill {
-    width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    border: 0;
-    background: transparent;
-  }
 
   .warn {
     padding: 0 8px;

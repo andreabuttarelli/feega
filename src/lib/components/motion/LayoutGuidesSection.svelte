@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from './ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { GuideAlign, GuideKind, newGuide, setLayoutGuides, type LayoutGuide } from '$lib/motion/layout-guides/guides';
@@ -63,7 +65,7 @@
           {/if}
         {/if}
       {/if}
-      <input type="color" aria-label="Guide colour" title="Colour" value={guide.color} onchange={(e) => patch(i, { color: e.currentTarget.value })} />
+      <ColorField name="Guide colour" display={ColourDisplay.Chip} value={guide.color} onchange={(v) => patch(i, { color: v })} />
       <input type="number" min="0" max="100" step="5" aria-label="Guide opacity" title="Opacity %" value={Math.round(guide.opacity * 100)} onchange={(e) => patch(i, { opacity: Math.min(1, Math.max(0, Number(e.currentTarget.value) / 100)) })} />
       <label class="toggle" title="Show this grid"><input type="checkbox" checked={!guide.hidden} onchange={(e) => patch(i, { hidden: !e.currentTarget.checked })} /></label>
       <button type="button" class="remove" aria-label="Remove grid" onclick={() => write(guides.filter((_, j) => j !== i), 'Removed a layout grid')}>Remove</button>
@@ -125,13 +127,6 @@
     background: var(--ui-hover);
   }
 
-  input[type='color'] {
-    width: 100%;
-    height: 28px;
-    padding: 0;
-    border: 0;
-    background: none;
-  }
 
   .toggle input {
     margin: 0;

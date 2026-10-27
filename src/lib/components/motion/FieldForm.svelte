@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from './ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import { AssetKind } from '@feega/motion-core/motion/components';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { FieldType } from '@feega/motion-core/motion/template/field-model';
@@ -9,7 +11,6 @@
   import { MediaAccept, MediaKind, acceptOf, itemOfPick, pickOfItem, type MediaPick } from '$lib/motion/media/pick';
   import MediaPicker from './MediaPicker.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
-  import { liveColour } from './live-colour';
   import MediaListField from './MediaListField.svelte';
   import type { MediaUploader } from './media-upload';
 
@@ -85,7 +86,7 @@
       <textarea rows="2" value={String(f.value ?? '')} onchange={(e) => set(f, e.currentTarget.value)}></textarea>
     {:else if f.type === FieldType.Color}
       <span class="colour">
-        <input type="color" value={HEX_VALUE.test(String(f.value)) ? String(f.value).slice(0, 7) : '#000000'} use:liveColour={{ gesture, apply: (value) => set(f, value) }} />
+        <ColorField name={f.label} display={ColourDisplay.Chip} value={HEX_VALUE.test(String(f.value)) ? String(f.value).slice(0, 7) : '#000000'} {gesture} onchange={(value) => set(f, value)} />
         <output>{HEX_VALUE.test(String(f.value)) ? f.value : 'none'}</output>
       </span>
     {:else if f.type === FieldType.Number && ranged(f)}

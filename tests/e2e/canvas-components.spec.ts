@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { setColour } from './fixtures/colour';
 
 const SHOTS = process.env.FIG_SHOTS ?? `${homedir()}/Documents/feega-videos/e2e`;
 const SETTLE_MS = 2500;
@@ -74,7 +75,7 @@ test.describe('components inside a canvas frame @real', () => {
 
     await page.keyboard.press('Alt+Meta+k');
     await expect(page.getByTestId('instance-inspector')).toBeVisible({ timeout: 15_000 });
-    await page.getByTestId('instance-fill').fill('#ff0000');
+    await setColour(page, page.getByTestId('instance-fill'), '#ff0000');
     await expect(page.getByTestId('instance-reset-fills')).toBeVisible();
     await page.waitForTimeout(SETTLE_MS);
     await page.screenshot({ path: `${SHOTS}/w2a-1-fill-override.png` });

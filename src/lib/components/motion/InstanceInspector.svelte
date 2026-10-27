@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from './ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import Diamond from '@lucide/svelte/icons/diamond';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { Paint, instanceElements, instanceOf, instanceTexts, overrideInstance, recolorInstance, resetOverride } from '$lib/motion/main-component';
@@ -95,14 +97,14 @@
         {#if el.fill}
           <label class="field">
             <span class:overridden={el.overridden.includes('fills')}>Fill</span>
-            <input type="color" value={el.fill} data-testid="instance-fill" onchange={(e) => recolor(el.innerId, Paint.Fill, e.currentTarget.value)} />
+            <span data-testid="instance-fill"><ColorField name="Fill" display={ColourDisplay.Chip} value={el.fill} onchange={(v) => recolor(el.innerId, Paint.Fill, v)} /></span>
             {#if el.overridden.includes('fills')}<button type="button" class="reset" data-testid="instance-reset-fills" onclick={() => reset(el.innerId, 'fills')}>Reset</button>{/if}
           </label>
         {/if}
         {#if el.stroke}
           <label class="field">
             <span class:overridden={el.overridden.includes('strokes')}>Stroke</span>
-            <input type="color" value={el.stroke} data-testid="instance-stroke" onchange={(e) => recolor(el.innerId, Paint.Stroke, e.currentTarget.value)} />
+            <span data-testid="instance-stroke"><ColorField name="Stroke" display={ColourDisplay.Chip} value={el.stroke} onchange={(v) => recolor(el.innerId, Paint.Stroke, v)} /></span>
             {#if el.overridden.includes('strokes')}<button type="button" class="reset" data-testid="instance-reset-strokes" onclick={() => reset(el.innerId, 'strokes')}>Reset</button>{/if}
           </label>
         {/if}

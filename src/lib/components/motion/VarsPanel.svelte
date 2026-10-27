@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from './ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { interactiveOf } from '@feega/motion-core/motion/interactive/settings';
@@ -77,7 +79,7 @@
         </select>
         <input type="text" class="options" value={decl.options.join(', ')} aria-label={`${decl.name} options`} onchange={(e) => setOptions(decl, e.currentTarget.value)} />
       {:else if decl.kind === VarKind.Color}
-        <input type="color" value={valueOf(decl)} oninput={(e) => preview(decl, e.currentTarget.value)} />
+        <ColorField name={decl.name} display={ColourDisplay.Chip} value={valueOf(decl)} onchange={(v) => preview(decl, v)} />
       {:else}
         <input type="text" value={valueOf(decl)} oninput={(e) => preview(decl, e.currentTarget.value)} />
       {/if}

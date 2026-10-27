@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from '$lib/components/motion/ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import { parseColour } from '$lib/motion/colour-field';
   import { Button } from '$lib/components/ui/button';
   /**
@@ -382,14 +384,7 @@
         <div class="colour-list">
           {#each draft.colours as c, i (i)}
             <div class="colour-row">
-              <label class="colour-swatch-label" style={`background:${c}`}>
-                <input
-                  type="color"
-                  class="colour-swatch-input"
-                  value={/^#[0-9a-fA-F]{6}$/.test(c) ? c : '#000000'}
-                  oninput={(e) => (draft.colours[i] = (e.currentTarget as HTMLInputElement).value)}
-                />
-              </label>
+              <ColorField name={`Colour ${i + 1}`} display={ColourDisplay.Chip} value={/^#[0-9a-fA-F]{6}$/.test(c) ? c : '#000000'} onchange={(v) => (draft.colours[i] = v)} />
               <input type="text" value={c} placeholder="#rrggbb" onchange={(e) => (e.currentTarget.value = draft.colours[i] = parseColour(e.currentTarget.value)?.colour ?? c)} />
               <Button variant="ghost" size="sm" onclick={() => (draft.colours = draft.colours.filter((_, idx) => idx !== i))}>Remove</Button>
             </div>
@@ -701,25 +696,6 @@
   .colour-row input[type='text'] { flex: 1 1 auto; min-width: 0; }
   .colour-row :global([data-slot='button']) { flex: 0 0 auto; }
 
-  .colour-swatch-label {
-    position: relative;
-    flex: 0 0 auto;
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--line);
-    cursor: pointer;
-    overflow: hidden;
-  }
-  .colour-swatch-input {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    padding: 0;
-    border: 0;
-    opacity: 0;
-    cursor: pointer;
-  }
 
   .preview { border: 1px solid var(--line); padding: 16px; background: var(--paper-2); }
 

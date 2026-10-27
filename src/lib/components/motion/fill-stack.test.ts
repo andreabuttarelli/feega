@@ -92,7 +92,7 @@ describe('the fill stack in Properties', () => {
   it('a colour has its own alpha, apart from the layer opacity', () => {
     const onchange = show(TWO);
     click(rows()[1]);
-    change(byId<HTMLInputElement>('fill-alpha'), '50');
+    change(byId<HTMLInputElement>('colour-opacity'), '50');
     expect(sent(onchange)[0]).toMatchObject({ color: '#11111180', opacity: 1 });
   });
 
@@ -179,7 +179,7 @@ describe('the fill stack in Properties', () => {
     const onchange = show(stack([{ type: 'linear-gradient', angle: 45, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }]));
     click(rows()[0]);
     expect(document.querySelectorAll('[data-testid="fill-stop"]')).toHaveLength(2);
-    change(byId<HTMLInputElement>('fill-alpha'), '25');
+    change(byId<HTMLInputElement>('colour-opacity'), '25');
     expect((sent(onchange)[0] as { stops: { color: string }[] }).stops[0].color).toBe('#00000040');
     change(byId<HTMLInputElement>('fill-angle'), '180');
     expect(sent(onchange)[0]).toMatchObject({ angle: 180 });
@@ -258,7 +258,7 @@ describe('the fill stack in Properties', () => {
   it('a typed shorthand of the same colour still shows the full hex', () => {
     show(stack([{ type: 'solid', color: '#ffffff' }]));
     click(inRow(0, 'fill-swatch'));
-    const hex = byId('fill-editor').querySelector<HTMLInputElement>('input.hex')!;
+    const hex = byId('fill-editor').querySelector<HTMLInputElement>('[data-testid="colour-channel"]')!;
     change(hex, 'ff');
     expect(hex.value).toBe('FFFFFF');
   });
@@ -266,7 +266,7 @@ describe('the fill stack in Properties', () => {
   it('a typed rgba sets colour and opacity in one change', () => {
     const onchange = show(stack([{ type: 'solid', color: '#111111' }]));
     click(inRow(0, 'fill-swatch'));
-    change(byId('fill-editor').querySelector<HTMLInputElement>('input.hex')!, 'rgba(255, 0, 0, 0.5)');
+    change(byId('fill-editor').querySelector<HTMLInputElement>('[data-testid="colour-channel"]')!, 'rgba(255, 0, 0, 0.5)');
     expect(sent(onchange)[0]).toMatchObject({ type: 'solid', color: '#ff000080' });
   });
 });
