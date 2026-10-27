@@ -31,11 +31,7 @@ async function call(handler: unknown, method: string, init: { body?: BodyInit; q
   return { res, body: await res.json() };
 }
 
-const upload = (bytes: Uint8Array, name: string) => {
-  const form = new FormData();
-  form.append('file', new File([bytes], name));
-  return form;
-};
+const upload = (bytes: Uint8Array, name: string) => JSON.stringify({ name, base64: Buffer.from(bytes).toString('base64') });
 
 const storeOf = () => fakeDb({ assets: [], org_fonts: [] }, { filter: true, store: true, mutate: true, files: {} });
 

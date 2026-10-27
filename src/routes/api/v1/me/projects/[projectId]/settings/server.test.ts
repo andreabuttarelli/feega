@@ -44,6 +44,7 @@ const ROUTES: Record<SettingsSection, () => Promise<{ load?: (e: never) => unkno
   [SettingsSection.Danger]: () => import('$lib/server/settings/pages/danger'),
   [SettingsSection.Products]: () => import('$lib/server/settings/pages/products'),
   [SettingsSection.Models]: () => import('$lib/server/settings/pages/models'),
+  [SettingsSection.Fonts]: () => import('$lib/server/settings/pages/fonts'),
   [SettingsSection.Spend]: () => import('$lib/server/settings/pages/spend')
 };
 const shellApi = await import('./+server');

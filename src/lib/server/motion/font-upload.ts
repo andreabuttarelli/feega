@@ -5,6 +5,7 @@ import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { FONT_NAME } from '@feega/motion-core/motion/fonts/model';
 import { familyFromFileName, fontFamilies, type FontFamily, type FontFile } from '$lib/motion/fonts/library';
 import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
+import type { OrgFontFace } from '$lib/fonts/org-fonts';
 import { readFontMeta } from './font-meta';
 
 export { orgFontPrefix };
@@ -125,8 +126,6 @@ export async function storeFontFile(db: Db, input: { orgId: string; userId: stri
   }
   return registerFont(db, { orgId: input.orgId, userId: input.userId, path, bytes: input.bytes });
 }
-
-export type OrgFontFace = FontFile & { url: string | null };
 
 export async function orgFontFaces(db: Db, orgId: string, sign: (paths: string[]) => Promise<Map<string, string>>): Promise<OrgFontFace[]> {
   const fonts = await listOrgFonts(db, orgId);

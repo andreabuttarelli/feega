@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { z } from 'zod';
 import type { RequestHandler } from './$types';
 import { callerOf, forbidden } from '$lib/server/effects/http';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
@@ -6,6 +7,9 @@ import { deleteFontFamily, orgFontFaces, storeFontFile } from '$lib/server/motio
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_CREATED = 201;
+const MAX_BASE64 = 14_000_000;
+
+const uploadSchema = z.object({ name: z.string().min(1).max(200), base64: z.string().min(1).max(MAX_BASE64) });
 
 export const GET: RequestHandler = async ({ request, url }) => {
   const resolved = await callerOf(request, url);
@@ -27,13 +31,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return forbidden();
   }
 
-  const file = (await request.formData().catch(() => null))?.get('file');
-  if (!(file instanceof File)) {
-    return json({ error: 'missing_file' }, { status: HTTP_BAD_REQUEST });
+  const body = uploadSchema.safeParse(await request.json().catch(() => null));
+  if (!body.success) {
+    return json({ error: 'invalid_body', detail: 'send { name, base64 }' }, { status: HTTP_BAD_REQUEST });
   }
 
   const { db, orgId, userId } = resolved.caller;
-  const saved = await storeFontFile(db, { orgId, userId, name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
+  const saved = await storeFontFile(db, { orgId, userId, name: body.data.name, bytes: new Uint8Array(Buffer.from(body.data.base64, 'base64')) });
   return saved.ok ? json({ font: saved.font }, { status: HTTP_CREATED }) : json({ error: saved.error }, { status: HTTP_BAD_REQUEST });
 };
 

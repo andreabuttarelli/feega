@@ -34,15 +34,15 @@ describe('fontsApi', () => {
     expect(seen.at(-1)).toMatchObject({ method: 'GET', path: '/api/v1/org/fonts?org=org-1' });
   });
 
-  it('uploads a local file as multipart', async () => {
+  it('uploads a local file as JSON, which the CSRF check lets through', async () => {
     const file = join(mkdtempSync(join(tmpdir(), 'fonts-')), 'Acme.woff2');
     writeFileSync(file, new Uint8Array([0x77, 0x4f, 0x46, 0x32]));
 
     await fontsApi.upload('t', file);
 
     expect(seen.at(-1)?.method).toBe('POST');
-    expect(seen.at(-1)?.type).toContain('multipart/form-data');
-    expect(seen.at(-1)?.body).toContain('filename="Acme.woff2"');
+    expect(seen.at(-1)?.type).toContain('application/json');
+    expect(JSON.parse(seen.at(-1)?.body ?? '{}')).toEqual({ name: 'Acme.woff2', base64: 'd09GMg==' });
   });
 
   it('deletes a family by name', async () => {

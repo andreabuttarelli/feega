@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
-import { appUrl } from './config.ts';
 import { request } from './api.ts';
 
 export type OrgFont = { assetId: string; family: string; weight: number; italic: boolean; url: string | null };
@@ -13,13 +12,8 @@ const withQuery = (query: Record<string, string | undefined>) => {
 };
 
 async function upload(token: string, file: string, org?: string): Promise<{ font: OrgFont }> {
-  const form = new FormData();
-  form.append('file', new Blob([await readFile(file)]), basename(file));
-  const res = await fetch(`${appUrl()}${withQuery({ org })}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
-  if (!res.ok) {
-    throw new Error(`API ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
-  }
-  return res.json() as Promise<{ font: OrgFont }>;
+  const body = JSON.stringify({ name: basename(file), base64: (await readFile(file)).toString('base64') });
+  return request<{ font: OrgFont }>(withQuery({ org }), token, { method: 'POST', body });
 }
 
 export const fontsApi = {
