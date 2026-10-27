@@ -7,9 +7,6 @@
   import { FrameFit, framePicker, type WorldRect } from '$lib/canvas/frame-pick';
   import { onDestroy, onMount, untrack } from 'svelte';
   import { TILE_PAINTED } from '@feega/motion-core/motion/hyperframes/measure';
-  import { iconBitmap } from './icon-bitmap';
-  import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
-  import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
   import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
   import FrameOverlays from '../FrameOverlays.svelte';
@@ -175,39 +172,29 @@
   import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
-  import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
+  import { faceOf } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
   import { Fling, type Glide } from '$lib/canvas/core/inertia';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
-  import type { GpuScene, Card } from '$lib/canvas/gpu/scene';
   import { themeOf } from '$lib/canvas/gpu/theme';
-  import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
-  import { backendOf } from '$lib/canvas/gpu/renderer-flag';
-  import { Counter, count, exposeLoss, exposeReveal, exposeSettled, recordFrame } from '$lib/canvas/gpu/frame-stats';
-  import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
-  import { POSTER_WIDTH } from '$lib/motion/poster-capture';
-  import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
-  import { baseRatio, cellBox, cellBytes, cellCss, cellKey, detailRatio, neededCells, softPosters, type Cell } from '$lib/canvas/gpu/detail-plan';
-  import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
+  import { exposeReveal, exposeSettled } from '$lib/canvas/gpu/frame-stats';
+  import { currentDevice } from '$lib/canvas/gpu/memory-budget';
   import type { GenTileView } from '$lib/canvas/gen-tile-view';
   import type { NodeView } from '$lib/canvas/node-view';
-  import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
-  import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
+  import { isRunning } from '$lib/canvas/gpu/snapshot-queue';
   import { revealIn as revealDelay } from '$lib/canvas/gpu/reveal-gate';
   import { CANVAS_LOAD_EVENT, LoadKind, claimLoad, loadTiming } from '$lib/canvas/gpu/load-timing';
   import { engineOf } from '@feega/motion-core/motion/engine';
   import { track } from '$lib/analytics';
-  import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
+  import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (outcome: ImagesOutcome) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
   const CORE = 'core';
-  const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
-  const SHELF_TICK_MS = 5000;
   const MOVE_SLOP_PX = 3;
   const LONG_PRESS_MS = 500;
   const LABEL_CLEARANCE = 24;
@@ -230,7 +217,6 @@
 
   let wrap = $state<HTMLDivElement | null>(null);
   let surface = $state<HTMLDivElement | null>(null);
-  let scene = $state<GpuScene | null>(null);
   let failed = $state<string | null>(null);
   let view = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
 
@@ -299,7 +285,6 @@
   const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
-  let drawn = $state(new Set<string>());
   let sticky = $state(new Map<string, number>());
   let wasEditing = new Set<string>();
   $effect(() => {
@@ -317,27 +302,21 @@
       sticky = keep;
     }
   });
-  const LIVE_POSTER_CAP = 3;
   const LIVE_CODE_CAP = 4;
   const IFRAME_TYPE = 'iframe';
-  let settledView = $state<Viewport | null>(null);
   const liveCode = $derived([...visibleIds(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)), view, area)].slice(0, LIVE_CODE_CAP));
   const domIds = $derived.by(() => {
-    const liveFrames = coreOn ? [] : domPainted(placed.filter((t) => holdsDoc(t.kind ?? '') && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
-    const posters = placed.filter((t) => holdsDoc(t.kind ?? '') && !liveFrames.includes(t.id) && !coreDrawn.has(t.id));
-    const sharp = !coreOn && BUDGET[currentDevice()].shootsSnapshots ? softPosters(posters, settledView ?? view, area, devicePixelRatio, POSTER_WIDTH, LIVE_POSTER_CAP) : [];
-    const next = new Set([...editIds, ...sticky.keys(), ...liveCode, ...liveFrames, ...sharp, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
+    const next = new Set([...editIds, ...sticky.keys(), ...liveCode, ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
-  let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
-  const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
+  const coreFrames = $derived(framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}));
   const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
-    if (coreOn && !coreType) {
+    if (!coreType) {
       void coreText(NODE_TYPES).then((t) => (coreType = t)).catch((e: unknown) => console.warn('[canvas] core text not loaded', e));
     }
   });
@@ -351,7 +330,7 @@
   const coreCards = $derived.by(() => {
     const text = coreType;
     const draw = drawCard;
-    if (!coreOn || !text || !draw) {
+    if (!text || !draw) {
       return [];
     }
     return placed.filter(drawsCard).flatMap((t) => {
@@ -373,7 +352,7 @@
   const coreChrome = $derived.by(() => {
     const look = coreLook;
     const text = coreType;
-    if (!coreOn || !look || !text) {
+    if (!look || !text) {
       return [];
     }
     return placed.flatMap((t) => {
@@ -423,7 +402,6 @@
     const kind = t.kind && isNodeType(t.kind) ? t.kind : null;
     return t.tag === NameTag.Hidden ? null : t.displayName?.trim() || (kind ? NODE_KIND_LABEL[kind] : null);
   };
-  const chromeOf = (t: Tile) => (chromeIds.has(t.id) ? null : idleChrome(t, labelOf(t), t.kind && isNodeType(t.kind) ? t.kind : null, (port) => CONNECTOR_STYLE[port].color));
   const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
   function drawnByCore(ids: Set<string>) {
     if (!sameSet(untrack(() => coreDrawn), ids)) {
@@ -431,23 +409,6 @@
     }
   }
 
-  const SNAPSHOT_SETTLE_MS = 120;
-  const SNAPSHOT_TIMEOUT_MS = 4000;
-  const crossOrigin = (src: string) => {
-    try {
-      return new URL(src, location.href).origin !== location.origin;
-    } catch {
-      return false;
-    }
-  };
-  const tainted = (canvas: HTMLCanvasElement) => {
-    try {
-      canvas.getContext('2d')?.getImageData(0, 0, 1, 1);
-      return false;
-    } catch {
-      return true;
-    }
-  };
   const BUSY_MS = 400;
   const IDLE_SLICE_MS = 12;
   const QUIET_MAX_WAIT_MS = 5000;
@@ -471,93 +432,7 @@
       };
       check();
     });
-  const withTimeout = <T,>(work: Promise<T>, ms: number) => Promise.race([work, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('snapshot timed out')), ms))]);
-  const HOVER_INTENT_MS = 150;
-  const SNAPSHOT_PIXEL_RATIO = 2;
-  let hoverLive = $state<string | null>(null);
   let focusLive = $state<string | null>(null);
-  let hoverTimer: ReturnType<typeof setTimeout> | null = null;
-  let pictured = $state(new Map<string, string>());
-  let shotJob = $state<string | null>(null);
-  let shelfHost = $state<HTMLDivElement | null>(null);
-  let fontCss: string | null = null;
-
-  const snapshotKind = (t: Tile) => !!t.kind && !holdsDoc(t.kind) && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
-  const shotKeyOf = (id: string) => {
-    const t = byId.get(id);
-    return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.viewOf?.(id) ?? null) : '';
-  };
-  let shown = $state(new Map<string, string>());
-  const shotOf = (id: string) => shown.get(id) ?? null;
-  const shootsTiles = () => !!scene;
-  const showSnapshot = (id: string, key: string, bitmap: ImageBitmap) => {
-    void scene?.setSnapshot(id, key, bitmap).then(() => (shown = new Map(shown).set(id, key)));
-  };
-  const preloaded = new Set<string>();
-  let looking = $state(new Set<string>());
-  const remote = new Map(Object.entries(props.cardPreviews ?? {}).map(([id, p]) => [id, p.hash]));
-  const lookedUp = (id: string) => {
-    const next = new Set(looking);
-    next.delete(id);
-    looking = next;
-  };
-  const publish = async (id: string, key: string, blob: Blob | null) => {
-    const hash = await digest(key);
-    if (!blob || !props.previewsAt || remote.get(id) === hash) {
-      return;
-    }
-    remote.set(id, hash);
-    await uploadSnapshot(props.previewsAt, id, key, blob);
-  };
-  const blobOf = async (bitmap: ImageBitmap) => {
-    const c = new OffscreenCanvas(bitmap.width, bitmap.height);
-    c.getContext('2d')!.drawImage(bitmap, 0, 0);
-    return c.convertToBlob({ type: 'image/webp', quality: 0.92 });
-  };
-
-  async function lookUp(t: Tile) {
-    const key = untrack(() => shotKeyOf(t.id));
-    const local = await latestSnapshot(t.id);
-    if (local) {
-      if (!shown.has(t.id)) {
-        showSnapshot(t.id, local.key, local.bitmap);
-      }
-      if (local.key === key) {
-        pictured = new Map(pictured).set(t.id, key);
-        count(Counter.CachedSnapshot);
-        void blobOf(local.bitmap).then((blob) => publish(t.id, key, blob));
-      }
-      return;
-    }
-    const far = props.cardPreviews?.[t.id];
-    const bitmap = far ? await remoteSnapshot(far.url) : null;
-    if (!far || !bitmap || shown.has(t.id)) {
-      return;
-    }
-    showSnapshot(t.id, key, bitmap);
-    if (far.hash === (await digest(key))) {
-      pictured = new Map(pictured).set(t.id, key);
-      count(Counter.CachedSnapshot);
-    }
-  }
-
-  $effect(() => {
-    if (!shootsTiles()) {
-      return;
-    }
-    const fresh = placed.filter((t) => !preloaded.has(t.id) && snapshotKind(t));
-    if (!fresh.length) {
-      return;
-    }
-    untrack(() => {
-      looking = new Set([...looking, ...fresh.map((t) => t.id)]);
-    });
-    for (const t of fresh) {
-      preloaded.add(t.id);
-      void lookUp(t).finally(() => lookedUp(t.id));
-    }
-  });
-
   let openedAt = 0;
   const mountedAt = performance.now();
   let loadTimer: ReturnType<typeof loadTiming> | null = null;
@@ -575,20 +450,14 @@
     if (domIds.has(t.id)) {
       return !holdsDoc(t.kind ?? '') || domDrawn(t.id);
     }
-    if (coreOn) {
-      return coreDrawn.has(t.id);
-    }
-    if (snapshotKind(t)) {
-      return shown.has(t.id) || !looking.has(t.id);
-    }
-    return !scene?.awaitsMedia(t.id);
+    return coreDrawn.has(t.id);
   };
   const cullIndex = $derived(new SpatialIndex(placed));
   const unpreviewed = () => [...cullIndex.visible(view, area)].filter((id) => byId.get(id) && !previewed(byId.get(id)!));
 
   $effect(() => {
     void revealTick;
-    if (revealed || !(scene || coreOn)) {
+    if (revealed) {
       return;
     }
     if (!area.width || (tiles.length && !fitted)) {
@@ -596,15 +465,12 @@
       return () => clearTimeout(t);
     }
     openedAt ||= performance.now();
-    void drawn;
-    void shown;
-    void looking;
     const missing = unpreviewed();
     const wait = revealDelay(missing.length, performance.now() - openedAt);
     if (!wait) {
       revealed = true;
       exposeReveal(Math.round(performance.now() - openedAt), missing);
-      loadTimer = spec.chrome ? canvasLoadTiming(scene?.backend ?? CORE) : null;
+      loadTimer = spec.chrome ? canvasLoadTiming(CORE) : null;
       loadTimer?.revealed(missing.length, performance.now() - openedAt);
       return;
     }
@@ -615,8 +481,6 @@
   let settled = false;
   $effect(() => {
     void revealTick;
-    void drawn;
-    void shown;
     if (!revealed || settled) {
       return;
     }
@@ -631,271 +495,9 @@
     return () => clearTimeout(t);
   });
 
-  $effect(() => {
-    const id = hovered;
-    if (hoverTimer) {
-      clearTimeout(hoverTimer);
-      hoverTimer = null;
-    }
-    if (coreOn || !id || !byId.get(id) || !snapshotKind(byId.get(id)!)) {
-      untrack(() => {
-        if (hoverLive && !wrap?.querySelector(`.gpu-dom-node[data-id="${hoverLive}"]:hover, .gpu-dom-node[data-id="${hoverLive}"]:focus-within`)) {
-          hoverLive = null;
-        }
-      });
-      return;
-    }
-    hoverTimer = setTimeout(() => void quiet().then(() => (hoverLive = hovered === id ? id : hoverLive)), HOVER_INTENT_MS);
-  });
-
   function trackFocus(e: FocusEvent) {
     focusLive = (e.target as HTMLElement | null)?.closest<HTMLElement>('.gpu-dom-node')?.dataset.id ?? null;
   }
-
-  const shelfReady = async (host: HTMLElement) => {
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    await quiet();
-    for (const img of host.querySelectorAll('img')) {
-      img.loading = 'eager';
-    }
-    await withTimeout(Promise.all([...host.querySelectorAll('img')].map((img) => img.decode().catch(() => undefined))), SNAPSHOT_TIMEOUT_MS).catch(() => undefined);
-    await new Promise((r) => setTimeout(r, SNAPSHOT_SETTLE_MS));
-  };
-
-  const capture = async (el: HTMLElement, extra: Record<string, unknown>) => {
-    const { getFontEmbedCSS, toCanvas } = await import('html-to-image');
-    fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
-    const options = { ...extra, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL };
-    const foreign = [...el.querySelectorAll('img')].some((img) => crossOrigin(img.currentSrc || img.src));
-    const keep = (n: Node) => !(n instanceof HTMLImageElement && crossOrigin(n.currentSrc || n.src));
-    await quiet();
-    const canvas = await withTimeout(toCanvas(el, foreign ? { ...options, filter: keep } : options), SNAPSHOT_TIMEOUT_MS);
-    if (foreign && tainted(canvas)) {
-      throw new Error('tainted snapshot');
-    }
-    return canvas;
-  };
-
-  let schedulerTick = $state(0);
-  $effect(() => {
-    void schedulerTick;
-    if (shotJob || detailJob || !shootsTiles() || !BUDGET[currentDevice()].shootsSnapshots) {
-      return;
-    }
-    if (performance.now() < busyUntil) {
-      const t = setTimeout(() => schedulerTick++, BUSY_MS);
-      return () => clearTimeout(t);
-    }
-    const due = placed.filter(snapshotKind);
-    const seen = visibleIds(due, view, area);
-    const s = screenSize();
-    const next = nextSnapshot(due, shotKeyOf, untrack(() => pictured), seen, domIds, toWorld(view, { x: s.width / 2, y: s.height / 2 }));
-    if (next) {
-      shotJob = next;
-    }
-  });
-
-  let shotMount = $state<string | null>(null);
-
-  type DetailJob = { id: string; key: string; ratio: number; size: number; cell: Cell };
-  const DETAIL_SETTLE_MS = 200;
-  let detailJob = $state<DetailJob | null>(null);
-  const tried = new Set<string>();
-  const triedKey = (id: string, ratio: number, c: Cell) => `${id}|${ratio}|${cellKey(c)}`;
-  $effect(() => {
-    const v = view;
-    const t = setTimeout(() => {
-      tried.clear();
-      settledView = v;
-    }, DETAIL_SETTLE_MS);
-    return () => clearTimeout(t);
-  });
-
-  const nextDetail = (s: GpuScene, v: Viewport): DetailJob | null => {
-    const screen = screenSize();
-    const dpr = window.devicePixelRatio || 1;
-    const worldView = { x: -v.x / v.zoom, y: -v.y / v.zoom, w: screen.width / v.zoom, h: screen.height / v.zoom };
-    const seen = visibleIds(placed.filter(snapshotKind), v, area);
-    let spent = s.detailBytes();
-    for (const id of s.detailIds()) {
-      if (!seen.has(id) || domIds.has(id)) {
-        s.dropDetail(id);
-      }
-    }
-    spent = s.detailBytes();
-    const budget = BUDGET[currentDevice()].detailBytes;
-    const centre = { x: worldView.x + worldView.w / 2, y: worldView.y + worldView.h / 2 };
-    const candidates = placed.filter((t) => seen.has(t.id) && !domIds.has(t.id) && pictured.get(t.id) === shotKeyOf(t.id)).sort((a, b) => Math.hypot(a.x + a.w / 2 - centre.x, a.y + a.h / 2 - centre.y) - Math.hypot(b.x + b.w / 2 - centre.x, b.y + b.h / 2 - centre.y));
-    for (const t of candidates) {
-      const ratio = detailRatio(v.zoom, dpr, baseRatio(t, SNAPSHOT_PIXEL_RATIO, BUDGET[currentDevice()].snapshotEdge));
-      if (!ratio) {
-        s.dropDetail(t.id);
-        continue;
-      }
-      const key = shotKeyOf(t.id);
-      const have = s.detailOf(t.id);
-      const size = cellCss(ratio);
-      const same = have && have.ratio === ratio && have.key === key ? have : null;
-      const missing = neededCells(t, worldView, size).filter((c) => !same?.cells.has(cellKey(c)) && !tried.has(triedKey(t.id, ratio, c)));
-      if (!missing.length) {
-        s.trimDetail(t.id);
-        continue;
-      }
-      const cell = missing[0];
-      if (spent + cellBytes(cellBox({ x: 0, y: 0, w: t.w, h: t.h }, size, cell), ratio) > budget) {
-        continue;
-      }
-      return { id: t.id, key, ratio, size, cell };
-    }
-    return null;
-  };
-
-  $effect(() => {
-    const v = settledView;
-    void schedulerTick;
-    void detailJob;
-    void shotJob;
-    void pictured;
-    if (!v || !scene || detailJob || shotJob || !BUDGET[currentDevice()].shootsSnapshots) {
-      return;
-    }
-    if (performance.now() < busyUntil) {
-      const t = setTimeout(() => schedulerTick++, BUSY_MS);
-      return () => clearTimeout(t);
-    }
-    detailJob = untrack(() => nextDetail(scene!, v));
-  });
-
-  $effect(() => {
-    const job = detailJob;
-    const host = shelfHost;
-    if (!job || !host) {
-      return;
-    }
-    let cancelled = false;
-    tried.add(triedKey(job.id, job.ratio, job.cell));
-    void (async () => {
-      try {
-        await shelfReady(host);
-        const el = host.querySelector<HTMLElement>('.snapshot-node');
-        const box = cellBox({ x: 0, y: 0, w: byId.get(job.id)?.w ?? 0, h: byId.get(job.id)?.h ?? 0 }, job.size, job.cell);
-        if (cancelled || !el || !scene || shotKeyOf(job.id) !== job.key) {
-          return;
-        }
-        const style = { transform: `translate(${-box.x}px, ${-box.y}px)`, transformOrigin: 'top left' };
-        const canvas = await capture(el, { pixelRatio: job.ratio, width: box.w, height: box.h, style });
-        if (!cancelled && scene && shotKeyOf(job.id) === job.key) {
-          await scene.addDetailCell(job.id, job.key, job.ratio, job.size, job.cell, await createImageBitmap(canvas));
-          count(Counter.Snapshot);
-        }
-      } catch (err) {
-        console.warn(`[canvas] detail ${job.id}`, err);
-      }
-      if (!cancelled) {
-        detailJob = null;
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  $effect(() => {
-    const id = shotJob;
-    if (!id) {
-      return;
-    }
-    const key = untrack(() => shotKeyOf(id));
-    let cancelled = false;
-    const finish = () => {
-      if (!cancelled) {
-        pictured = new Map(pictured).set(id, key);
-        shotMount = null;
-        shotJob = null;
-      }
-    };
-    void cachedSnapshot(key).then((bitmap) => {
-      if (cancelled) {
-        return;
-      }
-      if (bitmap && shootsTiles()) {
-        showSnapshot(id, key, bitmap);
-        count(Counter.CachedSnapshot);
-        finish();
-        return;
-      }
-      shotMount = id;
-    });
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  $effect(() => {
-    const id = shotMount;
-    const host = shelfHost;
-    if (!id || !host) {
-      return;
-    }
-    const key = untrack(() => shotKeyOf(id));
-    let cancelled = false;
-    void (async () => {
-      await shelfReady(host);
-      if (cancelled) {
-        return;
-      }
-      const el = host.querySelector<HTMLElement>('.snapshot-node');
-      try {
-        if (el && shootsTiles()) {
-          const canvas = await capture(el, { pixelRatio: SNAPSHOT_PIXEL_RATIO });
-          showSnapshot(id, key, await createImageBitmap(canvas));
-          void storeSnapshot(id, key, canvas).then((blob) => publish(id, key, blob));
-          count(Counter.Snapshot);
-        }
-      } catch (err) {
-        console.warn(`[canvas] snapshot ${id}`, err);
-      }
-      if (!cancelled) {
-        pictured = new Map(pictured).set(id, key);
-        shotMount = null;
-        shotJob = null;
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  let parked = $state(new Map<string, number>());
-  let shelfClock = $state(0);
-  const shelf = $derived(new Set(coreOn ? [] : shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock).slice(0, BUDGET[currentDevice()].posterShelf)));
-  const shelfSince = new Map<string, number>();
-  $effect(() => {
-    const now = Date.now();
-    for (const id of shelf) {
-      if (!shelfSince.has(id)) {
-        shelfSince.set(id, now);
-      }
-    }
-    for (const id of [...shelfSince.keys()]) {
-      if (!shelf.has(id)) {
-        shelfSince.delete(id);
-      }
-    }
-  });
-  onMount(() => {
-    const timer = setInterval(() => {
-      shelfClock = Date.now();
-      const next = parkStuck(shelfSince, parked, shelfClock);
-      if (next.size !== parked.size || [...next].some(([id, at]) => parked.get(id) !== at)) {
-        for (const id of next.keys()) {
-          shelfSince.delete(id);
-        }
-        parked = next;
-      }
-    }, SHELF_TICK_MS);
-    return () => clearInterval(timer);
-  });
 
   function portFor(nodeId: string, side: PortSide, handle: string | null | undefined): Port | null {
     const own = ports.filter((p) => p.nodeId === nodeId && p.side === side);
@@ -910,69 +512,9 @@
     })
   );
 
-  function faceFor(t: Tile) {
-    const face = faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.viewOf?.(t.id) ?? null);
-    return coreDrawn.has(t.id) ? handedToCore(face) : face;
-  }
-
-  const cards = $derived(
-    placed.map(
-      (t): Card => ({
-        id: t.id,
-        x: t.x,
-        y: t.y,
-        w: t.w,
-        h: t.h,
-        rotation: t.rotation ?? 0,
-        face: faceFor(t),
-        hidden: handedOver(t) || coreDrawn.has(t.id),
-        snapshot: shotOf(t.id),
-        running: isRunning(summaries.get(t.id)?.data ?? {}),
-        chrome: coreDrawn.has(t.id) ? null : chromeOf(t)
-      })
-    )
-  );
-
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
   const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && spec.flow.nodesDraggable ? selectedBoxes[0] : null);
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && spec.flow.nodesDraggable);
-
-  $effect(() => {
-    scene?.setCards(cards);
-  });
-
-  const iconed = new Set<string>();
-  $effect(() => {
-    const target = scene;
-    if (!target) {
-      return;
-    }
-    for (const t of placed) {
-      const kind = t.kind && isNodeType(t.kind) ? t.kind : null;
-      if (!kind || iconed.has(kind)) {
-        continue;
-      }
-      iconed.add(kind);
-      void iconBitmap(NODE_KIND_ICON[kind] as never).then((bitmap) => target.setIcon(kind, bitmap)).catch(() => iconed.delete(kind));
-    }
-  });
-
-  $effect(() => {
-    const ghostCurve = ghost ? (ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from)) : null;
-    scene?.setOverlay({
-      selected: selectedBoxes,
-      resizable,
-      marquee: coreOn ? null : marquee,
-      ghost: ghostCurve,
-      ghostOk: ghost?.ok ?? false,
-      hovered: hovered && !selected.includes(hovered) ? (byId.get(hovered) ?? null) : null,
-      peers: []
-    });
-  });
-
-  $effect(() => {
-    scene?.setCamera(view);
-  });
 
   $effect(() => {
     const incoming = tiles;
@@ -990,7 +532,7 @@
     if (gone.length) {
       select(selected.filter((id) => known.has(id)));
     }
-    if (fitted || !(scene || coreOn)) {
+    if (fitted) {
       return;
     }
     fitted = true;
@@ -2488,7 +2030,7 @@
         if (a.kind === GestureKind.Pan && !a.moved && e.button === 0) {
           clearSelection();
         }
-        if (a.kind === GestureKind.Pan && a.moved && coreOn) {
+        if (a.kind === GestureKind.Pan && a.moved) {
           startGlide();
         }
       },
@@ -2659,11 +2201,11 @@
 
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
-  const corePeers = $derived(coreOn && coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
+  const corePeers = $derived(coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
   const stackOrder = $derived(placed.map((t) => t.id));
   const viewZoom = $derived(view.zoom);
   const coreOverlay = $derived(
-    coreOn && coreLook && coreType
+    coreLook && coreType
       ? overlayOf({
           curves,
           selected,
@@ -3251,81 +2793,19 @@
   }
 
   onMount(() => {
-    let alive = true;
-    let built: GpuScene | null = null;
     const observer = new ResizeObserver(() => {
       measureSurface();
-      built?.resize();
       area = { width: surface!.clientWidth, height: surface!.clientHeight };
     });
-    const start = (backend: Backend) =>
-      import('$lib/canvas/gpu/scene')
-        .then(({ GpuScene }) => GpuScene.create(surface!, backend, themeOf(wrap!)))
-        .then((s) => {
-          if (!alive) {
-            s.destroy();
-            return;
-          }
-          built = s;
-          s.onFrame = recordFrame;
-          s.onReady = (shown) => (drawn = shown);
-          s.onLost = () => recover(s);
-          exposeLoss(() => s.loseForTest());
-          scene = s;
-          console.info(`[canvas] renderer ${s.backend}`);
-          props.onFlow?.(toFlow);
-          observer.observe(surface!);
-          if (!fitted && tiles.length) {
-            view = fitView(tiles);
-          }
-          fitted = true;
-        })
-        .catch((err: unknown) => {
-          failed = err instanceof Error ? err.message : String(err);
-        });
-    const recover = (lost: GpuScene) => {
-      const next = nextBackend(lost.backend);
-      console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'none'}`);
-      scene = null;
-      built = null;
-      try {
-        lost.destroy();
-      } catch {
-        lost.canvas.remove();
-      }
-      if (!next) {
-        failed = 'GPU context lost';
-        return;
-      }
-      void start(next);
-    };
-    bootScene = () => void start(backendOf(page.url));
-    if (coreOn) {
-      observer.observe(surface!);
-      props.onFlow?.(toFlow);
-    } else {
-      bootScene();
-    }
-    return () => {
-      alive = false;
-      observer.disconnect();
-      built?.destroy();
-    };
+    observer.observe(surface!);
+    props.onFlow?.(toFlow);
+    return () => observer.disconnect();
   });
 
-  let bootScene: (() => void) | null = null;
   function coreOff(why: string) {
     console.warn(`[canvas] core off: ${why}`);
-    coreOn = false;
+    failed = why;
     coreDrawn = new Set();
-    bootScene?.();
-  }
-
-  function fitView(boxes: Box[]): Viewport {
-    const b = boundsOf(boxes)!;
-    const s = screenSize();
-    const zoom = Math.max(MIN_ZOOM, Math.min(READABLE_ZOOM, MAX_ZOOM, Math.min(s.width / (b.width * (1 + FIT_PADDING)), s.height / (b.height * (1 + FIT_PADDING)))));
-    return { zoom, x: s.width / 2 - (b.x + b.width / 2) * zoom, y: s.height / 2 - (b.y + b.height / 2) * zoom };
   }
 
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
@@ -3339,7 +2819,7 @@
 }} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} onpointermove={(e) => (pointer = { x: e.clientX, y: e.clientY })} oncopy={(e) => onCopy(e, false)} oncut={(e) => onCopy(e, true)} onpaste={onPasteEvent} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? (coreOn ? CORE : 'pending')} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
   {#if timeline}
     {@const nodeId = timeline.nodeId}
     <div style="display: contents" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
@@ -3379,7 +2859,7 @@
     style:cursor={handleCursor}
     data-owns-pinch
   >
-    {#if coreOn}
+    {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
         <CoreFrames frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
@@ -3429,7 +2909,7 @@
       {/snippet}
     </FrameOverlays>
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom});--zoom:${view.zoom}`}>
-      <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">
+      <svg class="gpu-edges core" aria-hidden="true">
         {#each curves as c (c.edge.id)}
           <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} class:iterate={(c.edge.mode ?? 'fixed') === 'iterate'} class:linked={selected.includes(c.edge.source) || selected.includes(c.edge.target)} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
             <path class="svelte-flow__edge-path" d={`M${c.curve.from.x},${c.curve.from.y} C${c.curve.c1.x},${c.curve.c1.y} ${c.curve.c2.x},${c.curve.c2.y} ${c.curve.to.x},${c.curve.to.y}`} />
@@ -3466,7 +2946,7 @@
           {#if !domIds.has(t.id) && holdsDoc(t.kind ?? '')}
             {@const kind = kindOfNode(t.id)}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
-              <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage data-drawn={drawn.has(t.id) || coreDrawn.has(t.id)}>
+              <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage data-drawn={coreDrawn.has(t.id)}>
                 {#if t.poster}
                   <div class="frame-standin-poster" data-testid="motion-node-poster"></div>
                 {/if}
@@ -3486,34 +2966,11 @@
       {@render props.canvasOver?.()}
       <PeerLayer peers={corePeers.length ? (props.peers ?? []).filter((p) => p.chat) : (props.peers ?? [])} outlined={!corePeers.length} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
       {#if measured.length || snapGuides.length || snapSpacing.length}
-        <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={coreOn ? [] : snapGuides} zoom={view.zoom} />
+        <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={[]} zoom={view.zoom} />
       {/if}
     </div>
   </div>
 
-
-  <div class="snapshot-shelf" aria-hidden="true" bind:this={shelfHost}>
-    {#if (shotMount ?? detailJob?.id) && byId.get((shotMount ?? detailJob?.id)!)}
-      {@const t = byId.get((shotMount ?? detailJob?.id)!)!}
-      {#key t.id}
-        <div class="snapshot-node" data-snapshot={t.id} style={`width:${t.w}px;height:${t.h}px`}>
-          <NodeBoundary>
-            {@render props.tile({ id: t.id, selected: false })}
-          </NodeBoundary>
-        </div>
-      {/key}
-    {/if}
-  </div>
-
-  <div class="poster-shelf" aria-hidden="true">
-    {#each placed.filter((t) => shelf.has(t.id)) as t (t.id)}
-      <div class="shelf-node" data-shelf={t.id} style={`width:${t.w}px;height:${t.h}px`}>
-        <NodeBoundary>
-          {@render props.tile({ id: t.id, selected: false })}
-        </NodeBoundary>
-      </div>
-    {/each}
-  </div>
 
   {#if failed}
     <p class="edge-refusal" role="alert">GPU renderer unavailable: {failed}</p>
@@ -3543,7 +3000,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && (scene || coreOn) && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && !inside}
+  {#if props.onDraw && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && !inside}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
@@ -3810,35 +3267,6 @@
 
   .wire-iterate-badge :global(svg) {
     color: var(--ui-wire-iterate);
-  }
-
-  .snapshot-shelf {
-    position: fixed;
-    left: 0;
-    top: 0;
-    opacity: 0;
-    z-index: -1;
-    pointer-events: none;
-    background: var(--ui-canvas);
-  }
-
-  .snapshot-node {
-    position: relative;
-  }
-
-  .poster-shelf {
-    position: fixed;
-    left: 0;
-    top: 0;
-    opacity: 0;
-    pointer-events: none;
-    z-index: -1;
-  }
-
-  .shelf-node {
-    position: absolute;
-    left: 0;
-    top: 0;
   }
 
   .frame-standin {

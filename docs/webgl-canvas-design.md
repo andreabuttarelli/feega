@@ -1,6 +1,6 @@
 # feega canvas — hybrid GPU renderer (WebGPU first, WebGL2 fallback)
 
-Status: design + spike (`webgl-canvas-spike`, draft PR to dev). 2026-10-17.
+Status: superseded. The Pixi canvas was removed on 2026-10-27; the core renderer replaced it (ADR 0020). Kept as history.
 
 ## 1. Choice
 
