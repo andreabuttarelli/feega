@@ -9,5 +9,5 @@ export async function GET() {
     .filter((page) => GUIDE_SECTIONS.includes(page.path.split('/')[0]))
     .sort((a, b) => GUIDE_SECTIONS.indexOf(a.path.split('/')[0]) - GUIDE_SECTIONS.indexOf(b.path.split('/')[0]) || a.order - b.order)
     .map(({ path, title }) => ({ path, title, section: path.split('/')[0] }));
-  return new Response(JSON.stringify(guides), { headers: { 'Content-Type': 'application/json' } });
+  return new Response(JSON.stringify(guides), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
 }

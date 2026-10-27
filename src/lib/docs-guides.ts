@@ -1,4 +1,4 @@
-export const DOCS_ORIGIN = 'https://docs.feega.app';
+export const DOCS_ORIGIN = import.meta.env.VITE_DOCS_URL ?? 'https://docs.feega.app';
 export const GUIDES_INDEX_URL = `${DOCS_ORIGIN}/guides.json`;
 
 export type Guide = { path: string; title: string; section: string };

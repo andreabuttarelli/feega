@@ -50,9 +50,10 @@
     <iframe class="guide-frame" title="docs" src={guideUrl(openPath)} data-testid="guide-frame"></iframe>
   </div>
 {:else}
+  <div class="guide-index">
   <input class="guide-search" type="search" placeholder={$_('app.shell.guideSearch')} bind:value={query} data-testid="guide-search" />
   {#each sections as section (section)}
-    <h3 class="guide-section">{section}</h3>
+    <h3 class="guide-section">{section.replace('-', ' ')}</h3>
     <ul class="guide-list">
       {#each shown.filter((guide) => guide.section === section) as guide (guide.path)}
         <li>
@@ -67,9 +68,16 @@
       <p class="guide-offline">{$_('app.shell.guideEmpty')}</p>
     {/if}
   {/each}
+  </div>
 {/if}
 
 <style>
+  .guide-index {
+    display: block;
+    height: 100%;
+    overflow: auto;
+  }
+
   .guide-list {
     display: flex;
     flex-direction: column;

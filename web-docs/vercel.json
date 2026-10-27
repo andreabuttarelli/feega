@@ -15,10 +15,6 @@
           "value": "frame-ancestors 'self' https://app.feega.app https://feega.app https://*.feega.app http://localhost:* http://127.0.0.1:* capacitor://localhost"
         }
       ]
-    },
-    {
-      "source": "/guides.json",
-      "headers": [{ "key": "Access-Control-Allow-Origin", "value": "*" }]
     }
   ]
 }
