@@ -4,6 +4,7 @@ use crate::canvas::Canvas;
 use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
 use crate::fragments::Fragments;
 use crate::filters::{reach as filter_reach, Fold, Fx, Reach, Runner};
+use crate::canvas::shader_only;
 use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
 
 const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
@@ -55,7 +56,7 @@ pub fn prepare<S: Surface>(surface: &mut S, list: &DisplayList, pictures: &Shelf
 }
 
 fn composited_blend(item: &Item, blending: Blending) -> bool {
-    blending == Blending::Composited && item.look().is_some_and(|l| l.blend != "normal")
+    item.look().is_some_and(|l| l.blend != "normal" && (blending == Blending::Composited || shader_only(&l.blend)))
 }
 
 fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option<Rgba>, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Layers<Pic<S>>, S::Error> {

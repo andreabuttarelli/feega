@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { sharedFrames } from '$lib/motion/gpu/webcodecs-decoder';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
-  import { createMedia, Readiness, VideoPreload } from '@feega/motion-core/motion/gpu-full/media';
+  import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
+  import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Outcome } from '@feega/motion-core/motion/gpu-full/core-outcome';
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
@@ -48,7 +50,7 @@
   const put = new Set<string>();
   const pictured = new Set<string>();
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
-  const media = createMedia({ videoPreload: VideoPreload.Metadata });
+  const media = createMedia({ videoPreload: VideoPreload.Metadata, frames: sharedFrames() });
   const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
   const keyOf = (f: FrameAt) => `${f.id}:${f.revision}${f.scenes ? `:${f.scenes}` : ''}`;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
@@ -108,6 +110,21 @@
     const still = frameOfLive(source);
     const custom = await readDom(f, source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
     return { list: drawFrame(prepared, still, custom?.reads), custom };
+  }
+
+  const RUNS_EVERY = 5;
+
+  export async function cache(id: string, range: FrameRange, signal: AbortSignal, onRuns: (runs: FrameRange[]) => void) {
+    const f = frames.find((x) => x.id === id);
+    const held = live.get(id);
+    if (!f || !held) {
+      return;
+    }
+    const source = await withScenes({ revision: f.revision, ...held }, sceneSource(f.scenes ?? ''));
+    const prepared = prepare(source.doc, source.tokens, source.assets);
+    const ram = createRamPreview({ frames: sharedFrames(), uses: (frame) => videoUses(drawFrame(prepared, frame).items) });
+    await ram.fill(range, signal, (done) => done % RUNS_EVERY === 0 && onRuns(ram.runs(range)));
+    onRuns(ram.runs(range));
   }
 
   async function load(f: FrameAt) {

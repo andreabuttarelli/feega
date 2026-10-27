@@ -142,7 +142,7 @@
   ondrop={dropped}
 >
   {#if shown}
-    <div class="flex items-center gap-2" data-testid="media-preview">
+    <div class="flex min-w-0 flex-wrap items-center gap-2" data-testid="media-preview">
       <div class="relative size-12 shrink-0 overflow-hidden rounded-sm border border-ui-divider bg-ui-input">
         {@render thumb(shown.src, shown.kind)}
         {#if shown.kind === MediaKind.Video && shown.seconds}<span class="absolute right-0.5 bottom-0.5 rounded-xs bg-black/70 px-1 text-[10px] text-white tabular-nums" data-testid="media-duration">{clock(shown.seconds)}</span>{/if}

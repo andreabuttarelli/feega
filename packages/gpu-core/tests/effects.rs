@@ -74,6 +74,19 @@ mod gpu {
     }
 
     #[test]
+    fn a_discrete_transfer_steps_the_colour() {
+        let pixels = render(&square(
+            r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [
+          { "tag": "feComponentTransfer", "attrs": {}, "children": [
+            { "tag": "feFuncR", "attrs": { "type": "discrete", "tableValues": "0 1" } },
+            { "tag": "feFuncG", "attrs": { "type": "discrete", "tableValues": "0.2 0.4 0.6" } } ] } ] }] }"#,
+        ));
+
+        assert_eq!(px(&pixels, 32, 32)[0], 255);
+        assert!((152..=154).contains(&px(&pixels, 32, 32)[1]));
+    }
+
+    #[test]
     fn an_offset_moves_the_item() {
         let pixels = render(&square(r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [{ "tag": "feOffset", "attrs": { "dx": 8, "dy": 0 } }] }] }"#));
 

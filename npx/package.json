@@ -1,0 +1,12 @@
+{
+  "name": "feega",
+  "version": "0.1.0",
+  "description": "Run feega's infinite canvas locally, saved to a .feega file. No account, no database.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": { "feega": "bin/feega.mjs" },
+  "files": ["bin", "launcher.mjs"],
+  "engines": { "node": ">=22" },
+  "repository": { "type": "git", "url": "git+https://github.com/andreabuttarelli/feega.git", "directory": "npx" },
+  "homepage": "https://feega.app"
+}

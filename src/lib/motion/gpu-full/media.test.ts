@@ -92,6 +92,29 @@ describe('createMedia', () => {
     await createMedia({ videoPreload: VideoPreload.Metadata }).ready(withVideo);
     expect(made[0].preload).toBe('metadata');
   });
+
+  const decoded = { image: { tag: 'bitmap' } as never, width: 8, height: 6 };
+  const framesOf = (frame: typeof decoded | null) => ({ has: () => false, at: vi.fn().mockResolvedValue(frame), cached: () => [], forget: () => {}, bytes: () => 0, dispose: vi.fn() });
+
+  it('shows the frame the decoder returns for the source time, without making a video element', async () => {
+    const made = fakeVideos();
+    const frames = framesOf(decoded);
+    const media = createMedia({ frames });
+    await media.ready({ ...withVideo, items: [{ ...video, mediaTime: 1.5, size: { width: 640, height: 360 } } as ImageItem] });
+
+    expect(frames.at).toHaveBeenCalledWith('/v.mp4', 1.5, 640);
+    expect(media.pictures(video)).toEqual({ source: decoded.image, size: { width: 8, height: 6 } });
+    expect(made).toHaveLength(0);
+  });
+
+  it('falls back to the video element when the decoder has no frame', async () => {
+    const made = fakeVideos();
+    const media = createMedia({ frames: framesOf(null) });
+    await media.ready({ ...withVideo, items: [{ ...video, size: { width: 640, height: 360 } } as ImageItem] });
+
+    expect(made).toHaveLength(1);
+    expect(media.pictures(video)?.size).toEqual({ width: 4, height: 4 });
+  });
 });
 
 describe('imageRect', () => {

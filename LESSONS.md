@@ -3360,6 +3360,22 @@ in console.
 Signal: a poster is a white card on gpu-core; the console shows `UNSUPPORTED ... "unread"` and `core DOM read failed ... DataCloneError: Non-origin-clean ImageBitmap`. Cause: an element the DOM read cannot draw (SVG `<image>`) makes the whole frame undrawable, and a remote image drawn to a canvas without CORS taints the bitmap so it cannot leave the reader iframe. Move: log `list.unsupported` in `drawsWhole` to see which gap; load probe images with `crossOrigin = "anonymous"`; a data URL hides the taint, so test with a real storage URL.
 
 
+## A Playwright click inside a canvas iframe hits the wrong element
+Signal: `frameLocator(...).click()` on a link in a code frame passes, but nothing happens; a capture listener in the frame logs the click on a parent (`NAV`). Cause: the tile is CSS-scaled with the canvas zoom and Playwright places in-iframe points without that scale. Move: compute the point yourself: `frame.boundingBox().x + rect.x * (frame.width / innerWidth)`, then `page.mouse.click`. Real clicks are fine.
+
+## A link `#/page` in a srcdoc iframe blanks the frame
+Signal: clicking `<a href="#/pricing">` in a code frame leaves an empty page at `about:blank#/pricing`. Cause: srcdoc documents resolve relative URLs against the parent's base, so the hash link is a cross-document navigation. Move: `<base href="about:srcdoc">` in the srcdoc head. `new URL('/x', location.href)` still throws there, so react-router's HashRouter/BrowserRouter cannot work: use MemoryRouter.
+
+## Landing
+
+### A below-the-fold image collage costs Lighthouse mobile points even with `loading="lazy"`
+
+**Signal:** home mobile score drops from 90 to 87 and LCP from 3.2 s to 3.7 s after adding a section of images a viewport below the hero; the LCP element is still the hero poster. **Move:** native lazy loading fetches within about a viewport and a half, and those requests compete with the poster and the hero video. Mount the tiles from an `IntersectionObserver` (`Collage.svelte`) and reserve the height with `aspect-ratio` so CLS stays 0. Measure against a build of `origin/dev`, not against the target alone.
+
+## Worktree tests resolve @feega/* from the main checkout
+
+Signal: a test of code under `packages/` hangs or ignores your edit in a worktree whose `node_modules` is a symlink; `svelte-check` says the new module does not exist. Cause: `node_modules/@feega/*` are relative symlinks, resolved from the real path, so they point at the main checkout. Move: a scratch vitest config that merges `vite.config.ts` and aliases `@feega/motion-core/(.*)` to `packages/motion-core/src/$1` (and a scratch tsconfig with the same `paths` plus `$lib`); do not commit them.
+
 ## Desktop native canvas
 
 ### A render thread that reads the camera, then waits for a drawable, shows a stale frame
