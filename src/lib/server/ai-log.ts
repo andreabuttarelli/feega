@@ -229,8 +229,10 @@ function toolTag(): string | undefined {
  * brand yet, and an unattributed row (`brand_id is null` finds the gaps) beats a 500 at the user.
  */
 export function requireBrandContext(opts?: { brandId?: string }): string | null {
-  const id = opts?.brandId ?? brandStorage.getStore()?.brandId;
+  const scope = brandStorage.getStore();
+  const id = opts?.brandId ?? scope?.brandId;
   if (id) return id;
+  if (scope?.orgId) return null;
   console.error('[ai-log] AI call without brand context — credits will not be billed to any brand. Wrap the entry point in withBrandContext(brandId, fn).');
   return null;
 }
