@@ -3,7 +3,11 @@
 Run feega on your own machine or server: the infinite canvas, design and motion editing, image
 export, and the agent and MCP surface. Nothing is credit-gated.
 
-Two ways in, both end at a demo login and a canvas with one frame on it:
+For one canvas on your machine, no account and no database, skip all of this:
+`npx feega my-canvas.feega` (Node 22+) starts local mode and saves to that file. See
+[local mode](../web-docs/src/content/docs/getting-started/local-mode.md).
+
+For the full multi-user app, two ways in, both end at a demo login and a canvas with one frame on it:
 
 | | Needs | One command |
 |---|---|---|

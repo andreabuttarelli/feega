@@ -55,6 +55,22 @@ export function defineProperty(doc: MotionDoc, compId: string, key: string, def:
   return withDefs(doc, compId, { ...definitionsOf(doc, compId), [key]: def });
 }
 
+export function setPreferred(doc: MotionDoc, compId: string, key: string, comps: string[]): OpResult {
+  const def = definitionsOf(doc, compId)[key];
+  if (!def) {
+    return fail(`${compId} has no property ${key}`);
+  }
+  if (def.kind !== PropertyKind.Swap) {
+    return fail(`${key} is not an instance swap`);
+  }
+  const stranger = comps.find((id) => !doc.comps[id]?.component);
+  if (stranger) {
+    return fail(`${stranger} is not a component`);
+  }
+  const { preferred: _old, ...rest } = def;
+  return withDefs(doc, compId, { ...definitionsOf(doc, compId), [key]: comps.length ? { ...rest, preferred: [...new Set(comps)] } : rest });
+}
+
 export function removeProperty(doc: MotionDoc, compId: string, key: string): OpResult {
   if (!doc.comps[compId]?.component) {
     return fail(`${compId} is not a component`);
@@ -100,7 +116,7 @@ export function resetProperty(doc: MotionDoc, instanceId: string, key: string): 
   return setProps(doc, instanceId, { propValues: Object.keys(rest).length ? rest : undefined });
 }
 
-export type InstanceProperty = { key: string; control: PropertyKind.Boolean | PropertyKind.Text | PropertyKind.Swap; value: PropertyValue; overridden: boolean };
+export type InstanceProperty = { key: string; control: PropertyKind.Boolean | PropertyKind.Text | PropertyKind.Swap; value: PropertyValue; overridden: boolean; preferred: string[] };
 
 function controlOf(doc: MotionDoc, compId: string, def: PropertyDef): InstanceProperty['control'] {
   if (def.kind !== PropertyKind.Nested) {
@@ -125,7 +141,7 @@ export function instanceProperties(doc: MotionDoc, instanceId: string): Instance
   const values = (instance.clip.props.propValues as PropertyValues | undefined) ?? {};
   return Object.entries(definitionsOf(doc, instance.compId)).map(([key, def]) => {
     const control = controlOf(doc, instance.compId, def);
-    return { key, control, value: values[key] ?? defaultOf(def, control), overridden: key in values };
+    return { key, control, value: values[key] ?? defaultOf(def, control), overridden: key in values, preferred: def.preferred ?? [] };
   });
 }
 

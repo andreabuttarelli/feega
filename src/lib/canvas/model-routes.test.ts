@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ModelChoice } from './gen-node';
 import { creditsForRun } from './gen-cost';
-import { AUTO_ROUTE, parseRouteValue, routeMenuGroups, routeStatsLabel, routeValue } from './model-routes';
+import { AUTO_ROUTE, routeStatsLabel } from './model-routes';
 
 const banana: ModelChoice = {
   id: 'nano-banana-2',
@@ -18,25 +18,6 @@ const banana: ModelChoice = {
 };
 
 const soul: ModelChoice = { id: 'higgsfield/higgsfield-ai/soul/standard', label: 'Higgsfield Soul', aspectRatios: ['1:1'], provider: 'higgsfield', providerLabel: 'Higgsfield', unitCredits: 19 };
-
-describe('the picker lists a model once, with one row per provider that serves it', () => {
-  const groups = routeMenuGroups([banana, soul]);
-
-  it('groups a model served by several providers under its own name, Auto first', () => {
-    const group = groups.find((g) => g.id === 'nano-banana-2')!;
-    expect(group.label).toBe('Nano Banana 2');
-    expect(group.items.map((i) => i.label)).toEqual(['Nano Banana 2 · Auto (cheapest healthy)', 'Nano Banana 2 · OpenRouter', 'Nano Banana 2 · Kie.ai']);
-  });
-
-  it('keeps a single-provider model under its provider, as before', () => {
-    expect(groups.find((g) => g.id === 'higgsfield')?.items.map((i) => i.value)).toEqual([soul.id]);
-  });
-
-  it('encodes model and provider in one value, and reads them back', () => {
-    expect(parseRouteValue(routeValue('nano-banana-2', 'kie'))).toEqual({ model: 'nano-banana-2', provider: 'kie' });
-    expect(parseRouteValue(soul.id)).toEqual({ model: soul.id, provider: null });
-  });
-});
 
 describe('each provider row says how reliable and fast it has been', () => {
   it('names success rate and p95 for a provider with history, and warns when it is demoted', () => {

@@ -14,7 +14,7 @@
 import GenerateText from '$lib/components/canvas/icons/GenerateText.svelte';
 import GenerateImage from '$lib/components/canvas/icons/GenerateImage.svelte';
 import GenerateVideo from '$lib/components/canvas/icons/GenerateVideo.svelte';
-import Globe from '@lucide/svelte/icons/globe';
+import CodeXml from '@lucide/svelte/icons/code-xml';
 import FileText from '@lucide/svelte/icons/file-text';
 import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
 import Rss from '@lucide/svelte/icons/rss';
@@ -35,7 +35,7 @@ export const ADDABLE_ICON: Record<Addable, Component> = {
   text: GenerateText,
   image: GenerateImage,
   video: GenerateVideo,
-  iframe: Globe,
+  iframe: CodeXml,
   doc: FileText,
   products: ShoppingBag,
   social_account_feed: Rss,
