@@ -357,6 +357,7 @@
   const prototypeDocs = $derived(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   const arrowLinks = $derived(prototypeLinks(prototypeDocs));
   $effect(() => {
+    prototypeLink.docs = prototypeDocs;
     prototypeLink.targets = coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!) }));
   });
   let coreType = $state<CoreText | null>(null);

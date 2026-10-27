@@ -40,4 +40,10 @@ describe('interactionSchema', () => {
     expect(parse({ id: 'i1', trigger: { kind: 'shake' }, action: { kind: ActionKind.Back } }).success).toBe(false);
     expect(parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.Back }, transition: { kind: TransitionKind.Dissolve, easing: 'enter', durationMs: 0 } }).success).toBe(false);
   });
+
+  it('smart animate takes an easing and a duration and defaults them', () => {
+    const parsed = parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.Navigate, target: 'frame-b' }, transition: { kind: TransitionKind.SmartAnimate } });
+
+    expect(parsed.success && parsed.data.transition).toEqual({ kind: TransitionKind.SmartAnimate, easing: 'standard', durationMs: 300 });
+  });
 });

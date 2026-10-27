@@ -19,7 +19,8 @@ export enum TransitionKind {
   Instant = 'instant',
   Dissolve = 'dissolve',
   Slide = 'slide',
-  Push = 'push'
+  Push = 'push',
+  SmartAnimate = 'smart_animate'
 }
 
 export enum Direction {
@@ -62,7 +63,8 @@ export const transitionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal(TransitionKind.Instant) }),
   z.object({ kind: z.literal(TransitionKind.Dissolve), ...timing }),
   z.object({ kind: z.literal(TransitionKind.Slide), direction: z.enum(DIRECTIONS).default(Direction.Left), ...timing }),
-  z.object({ kind: z.literal(TransitionKind.Push), direction: z.enum(DIRECTIONS).default(Direction.Left), ...timing })
+  z.object({ kind: z.literal(TransitionKind.Push), direction: z.enum(DIRECTIONS).default(Direction.Left), ...timing }),
+  z.object({ kind: z.literal(TransitionKind.SmartAnimate), ...timing })
 ]);
 
 export const interactionSchema = z.object({
@@ -107,7 +109,8 @@ export const TRANSITION_LABEL: Record<TransitionKind, string> = {
   [TransitionKind.Instant]: 'Instant',
   [TransitionKind.Dissolve]: 'Dissolve',
   [TransitionKind.Slide]: 'Slide in',
-  [TransitionKind.Push]: 'Push'
+  [TransitionKind.Push]: 'Push',
+  [TransitionKind.SmartAnimate]: 'Smart animate'
 };
 
 export const DIRECTION_LABEL: Record<Direction, string> = {
