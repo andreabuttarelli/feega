@@ -22,3 +22,8 @@ button, so the keyboard could not run a node. `matchCanvasShortcut` now leaves E
 Space to any focused control (button, link, role=button, checkbox…). Other keys still reach
 the canvas: blocking Delete or arrows whenever a toolbar button kept focus after a click
 would break them.
+
+**Every input, not just the route:** a run reads the whole graph, not only its node. Before
+it starts, `postAtVersion` now waits for every write in flight on the canvas (picker writes,
+debounced node edits on any node, queued connections), not only the run node's own saves.
+An upstream text node edited and then Generate clicked used to send its old text.

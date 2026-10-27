@@ -51,6 +51,21 @@ describe('inFlightWrites: Generate waits for a model or route change still on th
     expect(await sent).toEqual({ type: 'success', data: { route: 'kie' } });
   });
 
+  it('with no node named, it waits for every write in flight: an upstream node feeds the run too', async () => {
+    const writes = inFlightWrites();
+    let land = () => {};
+    void writes.track(['text-upstream'], new Promise<void>((resolve) => { land = resolve; }));
+
+    let settled = false;
+    const all = writes.settled().then(() => { settled = true; });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(settled).toBe(false);
+
+    land();
+    await all;
+    expect(settled).toBe(true);
+  });
+
   it('a failed write still releases the action, and other nodes never wait', async () => {
     const writes = inFlightWrites();
     void writes.track(['n1'], Promise.reject(new Error('offline'))).catch(() => {});

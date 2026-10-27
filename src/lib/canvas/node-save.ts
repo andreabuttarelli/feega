@@ -269,7 +269,9 @@ export function inFlightWrites() {
       });
       return write;
     },
-    settled: (id: string): Promise<void> => pending.get(id) ?? Promise.resolve()
+    settled: async (id?: string): Promise<void> => {
+      await (id === undefined ? Promise.all(pending.values()) : pending.get(id));
+    }
   };
 }
 

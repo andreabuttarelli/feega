@@ -1874,7 +1874,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   function postAtVersion(action: string, id: string, fields: Fields): Promise<Record<string, unknown> | null> {
     let release = () => {};
     const asked = actAtVersion({
-      settle: async () => { await batchWrites.settled(id); await saves.flush(id); release = saves.hold(id); },
+      settle: async () => { await Promise.all([batchWrites.settled(), saves.flush(), lines.drain()]); release = saves.hold(id); },
       version: () => nodes.find((node) => node.id === id)?.version ?? 0,
       send: (version) => send(action, { ...fields, node_id: id, version }),
       reread: refresh
@@ -2352,7 +2352,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function run(id: string, clicked: GenNodeState) {
-    await batchWrites.settled(id);
+    await batchWrites.settled();
     const row = nodes.find((node) => node.id === id);
     const gen = (row ? genOf(row) : null) ?? clicked;
     if (gen.running) {
