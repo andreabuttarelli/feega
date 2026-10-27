@@ -60,6 +60,7 @@
   import LutPicker from './LutPicker.svelte';
   import TextCounterSection from './TextCounterSection.svelte';
   import AnimateToSection from './AnimateToSection.svelte';
+  import InOutPresetsSection from './InOutPresetsSection.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
@@ -800,6 +801,7 @@
 
 {#snippet animateBody()}
   {#if visual && clip.component !== 'Null'}
+    <InOutPresetsSection {doc} {clip} {frame} {commit} />
     <AnimateToSection {doc} {clip} {frame} {commit} />
   {/if}
   {#if TEXT_COMPONENTS.has(clip.component)}

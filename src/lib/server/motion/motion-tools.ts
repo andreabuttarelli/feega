@@ -124,6 +124,7 @@ import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { COUNTER_FORMATS } from '@feega/motion-core/motion/text-counter';
 import { setTextCounter } from '$lib/motion/text-counter-ops';
 import { animateTo } from '$lib/motion/animate-to';
+import { IN_OUT_PRESETS, InOutPreset, PresetSide, applyInOut } from '$lib/motion/in-out-presets';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '@feega/motion-core/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '@feega/motion-core/motion/keyframes';
 import type { MotionAsset } from './editor';
@@ -1199,6 +1200,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const owner = ownerOf(input.clip_id);
         const targets = Object.fromEntries(Object.entries(input.to).map(([prop, value]) => [prop, typeof value === 'number' ? toStored(owner, prop, value, session.doc) : value]));
         return apply(animateTo(session.doc, input.clip_id, targets, { start: frames(input.start), duration: Math.max(1, frames(input.duration)), ease: input.ease }, (c) => c), `animated ${input.clip_id} to ${Object.keys(input.to).join(', ')}`);
+      }
+    }),
+
+    apply_preset: tool({
+      description: `One-click entrance or exit for a clip, with the house ease (expo in-out, soft settle). side in plays at the clip start, out ends on its last frame; at (s from the clip start) plays it there instead. duration in s (default per preset). Keys in the span are replaced. Presets: ${Object.values(InOutPreset).map((p) => `${p} (${IN_OUT_PRESETS[p].label}, ${IN_OUT_PRESETS[p].sides.join('/')}, ${IN_OUT_PRESETS[p].seconds}s)`).join('; ')}. typewriter goes on text clips only.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        preset: z.nativeEnum(InOutPreset),
+        side: z.nativeEnum(PresetSide),
+        duration: z.number().positive().optional(),
+        at: z.number().min(0).optional()
+      }),
+      execute: async (input) => {
+        const options = { preset: input.preset, side: input.side, duration: input.duration === undefined ? undefined : frames(input.duration), at: input.at === undefined ? undefined : frames(input.at) };
+        return apply(applyInOut(session.doc, input.clip_id, options, deps.newId), `${input.preset} ${input.side} on ${input.clip_id}`);
       }
     }),
 

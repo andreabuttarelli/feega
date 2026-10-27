@@ -15,6 +15,7 @@ A switch under every frame (key `E`):
 ## Keyframes
 
 - **Animate to:** pick a property, type where it should end up; keyframes are created from the current value.
+- **In / Out presets:** one click for fade, slide, scale, blur, pop and typewriter. See [In and Out presets](/motion/in-out-presets/).
 - Reveal animated properties of the selection with the reveal commands (position, scale, rotation, opacity).
 - Gradient stop colours, positions, angle, centre and radius can be keyframed.
 - A shape can morph into any other shape.
