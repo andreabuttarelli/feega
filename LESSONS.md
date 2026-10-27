@@ -3387,6 +3387,9 @@ Signal: `frameLocator(...).click()` on a link in a code frame passes, but nothin
 ## A link `#/page` in a srcdoc iframe blanks the frame
 Signal: clicking `<a href="#/pricing">` in a code frame leaves an empty page at `about:blank#/pricing`. Cause: srcdoc documents resolve relative URLs against the parent's base, so the hash link is a cross-document navigation. Move: `<base href="about:srcdoc">` in the srcdoc head. `new URL('/x', location.href)` still throws there, so react-router's HashRouter/BrowserRouter cannot work: use MemoryRouter.
 
+## A video exports on HTML although gpu-core is wired
+**Signal:** the export finishes, `data-export-engine="html"` on `[data-testid=motion-preview]`, no error. **Move:** `MotionPreview.render` takes the core path only when it is handed a scene (`fullDoc`, or the 8th argument) and `prefer` is a core engine; a caller that passes a bare `render` gets HTML silently. Read the attribute after one real export before reporting a surface as moved. Videos with line/vector shapes, motion blur or 3D devices fall back by design (`coreExportable`).
+
 ## Landing
 
 ### A below-the-fold image collage costs Lighthouse mobile points even with `loading="lazy"`
