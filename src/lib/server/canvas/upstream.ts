@@ -5,6 +5,7 @@ import { listInfluencerViews, signInfluencerViewFiles } from '$lib/server/repos/
 import { listItems } from '$lib/server/repos/product-batches';
 import { studioBatchOf, studioBatchSummary } from '$lib/canvas/studio-batch-node';
 import { findReferenceImages, signReferenceImages } from '$lib/server/repos/reference-images';
+import { expandSectionEdges } from '$lib/canvas/section-source';
 import { referencesOf } from '$lib/canvas/node-references';
 import { itemsOf, outputsAt, sourceOutputsOf, syncedSourceRows } from './synced-items';
 import { selectOf } from '$lib/canvas-node-data';
@@ -489,7 +490,7 @@ export async function upstreamInputsFor(
   const nodes = await Promise.all(
     nodeRows.map((n) => toUpstreamNode(db, scope.orgId, n, connectionRows, nodesById, iterateSelection))
   );
-  const edges = connectionRows.map(toUpstreamEdge);
+  const edges = expandSectionEdges(nodeRows, connectionRows.map(toUpstreamEdge));
 
   const target = nodesById.get(scope.nodeId);
   const referenceUrls = target ? await pickedReferenceUrls(db, scope.orgId, target) : [];

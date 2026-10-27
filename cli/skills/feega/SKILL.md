@@ -176,6 +176,16 @@ write passes the checks the chat applies (node schema, model, uncensored targets
 Op `describe` with `{}` lists every op with one line; `{ op }` gives its strict JSON input schema.
 An unknown `op` answers the list of ops. `draw_frame` takes `format` and `still` (seconds): a poster or post is one call.
 
+## Feed a section into a node
+
+A `section` node is a source. `edit` connect from the section to a generative node (`text`, `image`,
+`video`; the node can sit inside or outside the section). The target then receives, at run time,
+everything with `data.groupId` equal to the section: text and doc content go to the prompt, images and
+videos become references (capped at the model's reference limit), generated nodes give their current
+output. Explicit edges are kept and deduped; the target never receives itself and no loop is created.
+Exclude an item for one target with `data.sectionExcluded: [nodeId, ...]` on that target. Changing the
+section never regenerates. Applies to every run path: `run_node_generation`, loops, the UI.
+
 ## Loop a node over many combinations
 
 `run_node_loop` queues every combination from a node's `iterate` wires (or a plain "repeat N")

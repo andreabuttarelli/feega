@@ -54,7 +54,7 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   motion: { inputs: NONE, output: 'motions' },
   element: { inputs: NONE, output: null },
   studio_batch: { inputs: NONE, output: 'images' },
-  section: { inputs: NONE, output: null },
+  section: { inputs: NONE, output: 'text' },
   technique: { inputs: InputRule.Technique, output: OutputRule.Technique }
 };
 

@@ -32,7 +32,7 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   motion: { inputs: false, output: true },
   element: { inputs: false, output: false },
   studio_batch: { inputs: false, output: true },
-  section: { inputs: false, output: false },
+  section: { inputs: false, output: true },
   technique: { inputs: false, output: false }
 };
 
