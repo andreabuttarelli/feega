@@ -93,6 +93,12 @@ describe('group and ungroup', () => {
     }
   });
 
+  it('offers the image tools on an uploaded image that holds only an asset', () => {
+    for (const id of ['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers'] as const) {
+      expect(shownFor(id, [{ type: 'image', data: { assetId: 'up1' } }])).toBe(true);
+    }
+  });
+
   it('offers Layers to frame only on an image that was split into layers', () => {
     const split = { type: 'image', data: { refId: 'a1', layerRefIds: ['l1', 'l2'] } };
 
