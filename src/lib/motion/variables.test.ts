@@ -3,7 +3,7 @@ import { MotionFormat, newMotionDoc, parseMotionDoc, findClip, type MotionDoc } 
 import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { setAutoLayout } from './layout/ops';
 import { VarType } from '@feega/motion-core/motion/variables-model';
-import { addMode, bindVariable, bindableTargets, defineVariable, removeVariable, resolveVariables, setActiveMode, unbindVariable } from './variables';
+import { addMode, bindChip, bindVariable, bindableTargets, defineVariable, removeVariable, resolveVariables, setActiveMode, unbindVariable, variableValue, fillTarget } from './variables';
 
 function ok(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -135,5 +135,41 @@ describe('variables', () => {
   it('resolving twice changes nothing', () => {
     const bound = ok(bindVariable(themed(), 's1', 'fill', 'Theme/surface'));
     expect(resolveVariables(bound)).toEqual(bound);
+  });
+
+  it('the chip of a colour field offers the colour variables only', () => {
+    const doc = ok(defineVariable(themed(), 'Size', 'radius', { type: VarType.Number, values: { Default: 0.25 } }));
+    const chip = bindChip(findClip(doc, 's1')!.clip, 'fill', doc.variables);
+    expect(chip).toMatchObject({ type: VarType.Colour, bound: null });
+    expect(chip!.options.map((o) => o.key)).toEqual(['Theme/surface']);
+  });
+
+  it('the chip names the bound variable', () => {
+    const doc = ok(bindVariable(themed(), 's1', 'fill', 'Theme/surface'));
+    expect(bindChip(findClip(doc, 's1')!.clip, 'fill', doc.variables)).toMatchObject({ bound: 'Theme/surface' });
+  });
+
+  it('a field no variable of its type could drive has no chip', () => {
+    expect(bindChip(findClip(themed(), 's1')!.clip, 'roundness', themed().variables)).toBeNull();
+    expect(bindChip(findClip(themed(), 's1')!.clip, 'shape', themed().variables)).toBeNull();
+  });
+
+  it('the value behind a variable follows the active mode', () => {
+    const dark = ok(setActiveMode(themed(), 'Theme', 'Dark'));
+    expect(variableValue(themed().variables, 'Theme/surface')).toBe('#ffffff');
+    expect(variableValue(dark.variables, 'Theme/surface')).toBe('#101010');
+  });
+
+  it('binding the fill of a shape that has a fill stack hands the fill to the variable', () => {
+    const stacked = ok(setProps(themed(), 's1', { fills: [{ type: 'solid', color: '#ff0000', opacity: 1, visible: true, blend: 'normal' }] }));
+    const bound = ok(bindVariable(stacked, 's1', 'fill', 'Theme/surface'));
+    const clip = findClip(bound, 's1')!.clip;
+    expect(clip.props.fills).toBeUndefined();
+    expect(clip.props.fill).toBe('#ffffff');
+  });
+
+  it('the fill target is the colour key the fill stack replaces', () => {
+    expect(fillTarget(findClip(docWith(), 's1')!.clip)).toBe('fill');
+    expect(fillTarget(findClip(docWith(), 't1')!.clip)).toBe('color');
   });
 });

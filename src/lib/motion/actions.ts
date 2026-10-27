@@ -1,12 +1,15 @@
 import type { Component } from 'svelte';
 import Play from '@lucide/svelte/icons/play';
+import MemoryStick from '@lucide/svelte/icons/memory-stick';
 import AlignStartVertical from '@lucide/svelte/icons/align-start-vertical';
 import AlignCenterVertical from '@lucide/svelte/icons/align-center-vertical';
 import AlignEndVertical from '@lucide/svelte/icons/align-end-vertical';
 import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
+import Code from '@lucide/svelte/icons/code';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+import Ruler from '@lucide/svelte/icons/ruler';
 import PenLine from '@lucide/svelte/icons/pen-line';
 import Combine from '@lucide/svelte/icons/combine';
 import ComponentIcon from '@lucide/svelte/icons/component';
@@ -211,6 +214,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   ...OPACITY_ACTIONS,
   [Command.TogglePlay]: { name: 'Play / pause', icon: Play, group: GuideGroup.Playback, place: Place.Transport },
   [Command.Play]: { name: 'Play', icon: Play, group: GuideGroup.Playback, place: Place.Transport },
+  [Command.RamPreview]: { name: 'RAM preview', icon: MemoryStick, group: GuideGroup.Playback, place: Place.Transport },
   [Command.Pause]: { name: 'Pause', icon: Pause, group: GuideGroup.Playback, place: Place.Transport },
   [Command.Rewind]: { name: 'Back one second', icon: Rewind, group: GuideGroup.Playback, gesture: DRAG_PLAYHEAD, menu: MenuSection.Time },
   [Command.GoStart]: { name: 'Go to start', icon: SkipBack, group: GuideGroup.Playback, place: Place.Transport },
@@ -347,7 +351,9 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.PreviewFit]: { name: 'Fit preview', icon: Scan, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.PreviewActual]: { name: 'Preview at 100%', icon: SquareDashed, group: GuideGroup.View, menu: MenuSection.View, gesture: DOUBLE_TAP_PREVIEW },
   [Command.TogglePixelGrid]: { name: 'Pixel grid', icon: Grid3x3, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.ToggleRulers]: { name: 'Rulers', icon: Ruler, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleLayoutGuides]: { name: 'Layout guides', icon: LayoutGrid, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.ToggleDevMode]: { name: 'Dev mode', icon: Code, group: GuideGroup.View, menu: MenuSection.View },
   [Command.TogglePivot]: { name: 'Rotation origin', icon: Crosshair, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleOutlines]: { name: 'Outline view', icon: VectorSquare, group: GuideGroup.View, menu: MenuSection.View },
   [Command.PreviewSelection]: { name: 'Zoom to selection', icon: Scan, group: GuideGroup.View, menu: MenuSection.View },

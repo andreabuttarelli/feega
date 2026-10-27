@@ -10,8 +10,40 @@
     items,
     medium,
     urlOf,
-    onshow
-  }: { items: HistoryItem[]; medium: GenMedium; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void } = $props();
+    onshow,
+    oncompare
+  }: {
+    items: HistoryItem[];
+    medium: GenMedium;
+    urlOf: (mediaId: string) => string | null;
+    onshow: (runId: string) => void;
+    oncompare: (a: string, b: string) => void;
+  } = $props();
+
+  const COMPARE_PICKS = 2;
+  const comparable = $derived(medium === 'image');
+
+  let comparing = $state(false);
+  let picked = $state<string[]>([]);
+
+  function choose(runId: string) {
+    if (!comparing) {
+      onshow(runId);
+      return;
+    }
+    picked = picked.includes(runId) ? picked.filter((id) => id !== runId) : [...picked, runId];
+    if (picked.length < COMPARE_PICKS) {
+      return;
+    }
+    oncompare(picked[0], picked[1]);
+    picked = [];
+    comparing = false;
+  }
+
+  function toggleCompare() {
+    comparing = !comparing;
+    picked = [];
+  }
 </script>
 
 <Popover.Root>
@@ -27,15 +59,26 @@
     <span class="tabular-nums">{items.length}</span>
   </Popover.Trigger>
   <Popover.Content class="w-80">
+    {#if comparable}
+      <div class="flex items-center justify-between gap-2 px-2 pt-2 text-xs">
+        <span class="text-muted-foreground" data-testid="history-hint">{comparing ? `Pick two (${picked.length}/${COMPARE_PICKS})` : 'Click one to pin it as the output'}</span>
+        <button type="button" class="border border-line-2 px-2 py-0.5 hover:bg-muted" aria-pressed={comparing} data-testid="history-compare" onclick={toggleCompare}>
+          {comparing ? 'Cancel' : 'Compare'}
+        </button>
+      </div>
+    {/if}
     <div class="grid grid-cols-4 gap-1 p-2" data-testid="variants-history" role="group" aria-label="Results of this node">
       {#each items as item (item.runId)}
         {@const url = urlOf(item.mediaId)}
         <button
           type="button"
-          class={cn('relative aspect-square overflow-hidden border border-line-2 bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring', item.shown && 'ring-2 ring-foreground')}
+          class={cn(
+            'relative aspect-square overflow-hidden border border-line-2 bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            (comparing ? picked.includes(item.runId) : item.shown) && 'ring-2 ring-foreground'
+          )}
           aria-label={`Result ${item.position} of ${items.length}`}
-          aria-pressed={item.shown}
-          onclick={() => onshow(item.runId)}
+          aria-pressed={comparing ? picked.includes(item.runId) : item.shown}
+          onclick={() => choose(item.runId)}
         >
           {#if url && medium === 'video'}
             <video src={url} muted playsinline preload="metadata" class="size-full object-cover"></video>

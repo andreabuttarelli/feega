@@ -9,6 +9,7 @@ import { precompose } from '@feega/motion-core/motion/precomp';
 import { boxBook } from '$lib/motion/gpu-full/text/test-face';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { sequenceScenes } from '$lib/motion/scenes';
+import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
 import { buildFrame, frameBuilder, type BuildAsk, type BuildWorker } from './frame-build';
 
 function must(r: OpResult): MotionDoc {
@@ -72,6 +73,15 @@ describe('the builder', () => {
     expect(worker.asked.map((a) => a.url)).toEqual(['/a', '/b']);
     expect(a?.width).toBe(1);
     expect(b?.width).toBe(1);
+  });
+
+  it('hands the worker the local font files it cannot see from its own thread', async () => {
+    keepLocalFiles('Avenir Next', [{ url: 'blob:x', weight: 400, italic: false }]);
+    const worker = echo();
+    await frameBuilder(() => worker)('/a', Smoothing.Plain);
+    forgetLocalFiles();
+
+    expect(worker.asked[0].locals).toEqual([['Avenir Next', [{ url: 'blob:x', weight: 400, italic: false }]]]);
   });
 
   it('a worker that dies fails what it was building and is not asked again', async () => {

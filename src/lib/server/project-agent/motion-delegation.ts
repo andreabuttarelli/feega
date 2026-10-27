@@ -18,6 +18,7 @@ import { framePaths, framesPrefix, putFrames, type FrameBucket } from '$lib/serv
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { motionEmbedState, publishMotionEmbed, type EmbedAnswer } from '$lib/server/motion/agent-embed';
 import { shareMotionFrame } from '$lib/server/motion/agent-share';
+import { sharePlay } from '$lib/server/motion/agent-play';
 
 const PICK_RELAY = 'The motion agent asks the user which references to follow: call ask_reference_pick with this question and these candidates (same ids) so the user picks here, then pass their answer to ask_motion_agent as reference_pick (follow and avoid ids, note; or rejected true with their query and avoid_all when they turned them all down).';
 
@@ -48,7 +49,8 @@ export const MOTION_DELEGATION_TOOLS = [
   'get_motion_render',
   'publish_motion_embed',
   'get_motion_embed',
-  'share_motion_frame'
+  'share_motion_frame',
+  'get_play_link'
 ] as const;
 
 export type MotionDelegationDeps = { db: Db; orgId: string; projectId: string; userId: string; origin: string; model?: string; canvasId?: string | null; pollMs?: number };
@@ -278,6 +280,15 @@ export function motionRows(deps: MotionDelegationDeps): ToolRow[] {
       summary: 'The public viewer link of ONE frame of THIS project: a full-screen page that plays it on a loop. Publishes its embed if needed and turns the canvas share link on; returns url and embed_url. Only when the user asked to share. Free.',
       input: z.object({ nodeId: z.string() }).strict(),
       run: async (input: { nodeId: string }) => ((await inProject(input.nodeId)) ? embedBody(await shareMotionFrame(db, { orgId, nodeId: input.nodeId }, deps.origin)) : NOT_FOUND)
+    },
+
+    {
+      name: 'get_play_link',
+      family: ToolFamily.Motion,
+      access: ToolAccess.Write,
+      summary: 'The public play link of a prototype of THIS project: a full-screen player that runs the clicks, hovers, drags and delays linked between frames. Starts on this frame; publishes every frame it can reach and turns the canvas share link on. Returns url, the reachable frames and the flows (starting points, set with set_flow). Only when the user asked to share. Free.',
+      input: z.object({ nodeId: z.string() }).strict(),
+      run: async (input: { nodeId: string }) => ((await inProject(input.nodeId)) ? embedBody(await sharePlay(db, { orgId, nodeId: input.nodeId }, deps.origin)) : NOT_FOUND)
     }
   ];
 }

@@ -16,4 +16,15 @@ describe('inspector section', () => {
     expect(html(true)).toContain('<p>fields</p>');
     expect(html(true)).not.toContain('Scale 150%');
   });
+
+  it('every section carries the shared full-bleed divider class', () => {
+    expect(html(true)).toMatch(/<section class="[^"]*\bui-section\b/);
+    expect(html(false)).toMatch(/<section class="[^"]*\bui-section\b/);
+  });
+
+  it('the header toggle spans the row and reports its state', () => {
+    const open = html(true);
+    expect(open).toMatch(/<button[^>]*class="section-head[^"]*"[^>]*aria-expanded="true"/);
+    expect(html(false)).toMatch(/aria-expanded="false"/);
+  });
 });

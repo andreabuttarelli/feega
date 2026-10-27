@@ -1,0 +1,105 @@
+# Every push to main ships `npx feega`: a GitHub release app-v<version> carrying the bundle,
+# then the npm package at the same version. The version lives in the app-v* tags only: the
+# next one is the newest tag with its patch bumped (npx/package.json seeds the first). Nothing
+# is committed back to main. A rerun on the same commit reuses that commit's tag and skips
+# whatever already landed; the asset is uploaded before npm publish, so a failure never leaves
+# an npm version without its bundle. workflow_dispatch from any branch only builds the bundle.
+name: App release (npx feega)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: app-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PUBLIC_SUPABASE_URL: http://supabase.invalid
+      PUBLIC_SUPABASE_ANON_KEY: local
+      PUBLISH: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify npm token before anything irreversible
+        if: env.PUBLISH == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::NPM_TOKEN is not set. Add it in Settings → Secrets → Actions."
+            exit 1
+          fi
+          npm whoami
+
+      - name: Pick the version
+        id: version
+        run: |
+          OWN=$(git tag --points-at HEAD 'app-v*' | head -1)
+          LAST=$(git tag -l 'app-v*' --sort=-v:refname | head -1)
+          if [ -n "$OWN" ]; then
+            V="${OWN#app-v}"
+          elif [ -n "$LAST" ]; then
+            V=$(echo "${LAST#app-v}" | awk -F. '{ print $1 "." $2 "." $3 + 1 }')
+          else
+            V=$(node -p 'require("./npx/package.json").version')
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Version $V"
+
+      - run: npm ci
+
+      - name: Launcher tests
+        run: npx vitest run npx
+
+      - name: Build the bundle
+        run: scripts/app-bundle.sh dist-app
+
+      - name: Upload bundle (manual runs)
+        if: env.PUBLISH != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: feega-app
+          path: dist-app/feega-app.tar.gz
+
+      - name: GitHub release with the bundle
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "app-v$V" >/dev/null 2>&1; then
+            gh release upload "app-v$V" dist-app/feega-app.tar.gz --clobber
+          else
+            gh release create "app-v$V" dist-app/feega-app.tar.gz --target "$GITHUB_SHA" \
+              --title "feega app $V" --notes "Bundle for \`npx feega\`."
+          fi
+
+      - name: Publish to npm
+        if: env.PUBLISH == 'true'
+        working-directory: npx
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          if npm view "feega@$V" version >/dev/null 2>&1; then
+            echo "feega@$V already on npm"
+            exit 0
+          fi
+          npm version --no-git-tag-version --allow-same-version "$V"
+          npm publish --access public
