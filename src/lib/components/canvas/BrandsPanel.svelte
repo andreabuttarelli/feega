@@ -13,8 +13,6 @@
 
   type PanelBrand = SwitcherBrand & PanelBrandBase & { shortDescription: string | null };
 
-  const PINS_KEY = 'feega:brand-pins';
-
   let { projectId }: { projectId: string } = $props();
 
   let brands = $state<PanelBrand[]>([]);
@@ -23,7 +21,7 @@
   let failed = $state(false);
   let reload = $state(0);
   let query = $state('');
-  let pinned = $state<string[]>(readPins());
+  let pinned = $state<string[]>([]);
   let openId = $state<string | null>(null);
 
   let tab = $state<LibraryTab>(LibraryTab.Kit);
@@ -37,7 +35,7 @@
   };
 
   const TAB_EMPTY: Record<LibraryTab, string> = {
-    [LibraryTab.Kit]: '',
+    [LibraryTab.Kit]: 'No logos, palette, fonts or voice yet. Add them in the brand settings.',
     [LibraryTab.Products]: 'No products. Sync the store from the brand settings.',
     [LibraryTab.Posts]: 'No posts or social posts yet.',
     [LibraryTab.Ads]: 'No competitor ads tracked for this brand.'
@@ -57,7 +55,7 @@
   }
 
   $effect(() => {
-    if (openId && tab !== LibraryTab.Kit && !library[libraryKey]) {
+    if (openId && !library[libraryKey]) {
       void loadLibrary(libraryKey, openId, tab);
     }
   });
@@ -65,20 +63,14 @@
   const open = $derived(brands.find((b) => b.id === openId) ?? null);
   const newBrandHref = $derived(`/p/${projectId}/brands/new?returnTo=${encodeURIComponent(page.url.pathname)}`);
 
-  function readPins(): string[] {
-    try {
-      return JSON.parse(localStorage.getItem(PINS_KEY) ?? '[]');
-    } catch {
-      return [];
-    }
-  }
-
-  function pin(brandId: string) {
+  async function pin(brandId: string) {
+    const before = pinned;
+    const wasPinned = pinned.includes(brandId);
     pinned = togglePin(pinned, brandId);
-    try {
-      localStorage.setItem(PINS_KEY, JSON.stringify(pinned));
-    } catch {
-      return;
+
+    const res = await fetch(`/api/v1/projects/${projectId}/agent/brands/${brandId}/pin`, { method: wasPinned ? 'DELETE' : 'POST' }).catch(() => null);
+    if (!res?.ok) {
+      pinned = before;
     }
   }
 
@@ -92,12 +84,13 @@
 
     fetch(`/api/v1/projects/${id}/agent/brands`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((body: { brands: PanelBrand[]; projectBrandId: string | null }) => {
+      .then((body: { brands: PanelBrand[]; projectBrandId: string | null; pinned: string[] }) => {
         if (!live) {
           return;
         }
         brands = body.brands;
         projectBrandId = body.projectBrandId;
+        pinned = body.pinned;
         openId ??= body.projectBrandId;
       })
       .catch(() => {
@@ -133,14 +126,15 @@
     </div>
     <SegmentedControl label="Brand material" value={tab} onchange={(value) => (tab = value as LibraryTab)} options={LIBRARY_TABS.map((value) => ({ value, label: TAB_LABEL[value] }))} />
     <div class="tab-body">
-      {#if tab === LibraryTab.Kit}
-        {#key open.id}
-          <BrandKit {projectId} brand={open} />
-        {/key}
-      {:else if library[libraryKey] === 'failed'}
+      {#if library[libraryKey] === 'failed'}
         <button type="button" class="retry" onclick={() => openId && loadLibrary(libraryKey, openId, tab)}>Retry</button>
       {:else if Array.isArray(library[libraryKey])}
         <BrandLibrary items={library[libraryKey] as LibraryItem[]} {thumb} empty={TAB_EMPTY[tab]} />
+        {#if tab === LibraryTab.Kit}
+          {#key open.id}
+            <BrandKit {projectId} brand={open} />
+          {/key}
+        {/if}
       {:else}
         <p class="hint">Loading…</p>
       {/if}

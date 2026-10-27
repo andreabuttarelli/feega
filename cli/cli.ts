@@ -16,7 +16,7 @@ program
   .addHelpText('after', `
 Esempi:
   $ feega brands                   Lista tutti i brand
-  $ feega library <slug> [tab]     Prodotti, post e ads di un brand
+  $ feega library <slug> [tab]     Kit, prodotti, post e ads di un brand
   $ feega motion list              Lista i video
 
 Documentazione completa: cli/README.md
@@ -61,10 +61,10 @@ program
 
 program
   .command('library <slug> [tab]')
-  .description('Materiale del brand trascinabile sulla tela: products, posts, ads')
+  .description('Materiale del brand trascinabile sulla tela: kit, products, posts, ads')
   .action(async (slug: string, tab: string | undefined) => {
     const { cmdLibrary } = await import('./commands/library.ts');
-    await cmdLibrary(slug, tab ?? 'products');
+    await cmdLibrary(slug, tab ?? 'kit');
   });
 
 program

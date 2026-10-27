@@ -17,7 +17,7 @@
     void load();
   });
 
-  const KIT_KINDS = new Set<BrandPiece['kind']>(['logo', 'colour', 'content', 'handle', 'store', 'website']);
+  const KIT_KINDS = new Set<BrandPiece['kind']>(['content', 'handle', 'store', 'website']);
 
   const PIECE_LABEL: Record<BrandPiece['kind'], (piece: BrandPiece) => string> = {
     logo: () => 'Logo',
