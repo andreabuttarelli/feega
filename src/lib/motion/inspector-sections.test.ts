@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClipFamily } from './track-style';
-import { Part, SECTION_ORDER, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection } from './inspector-sections';
+import { Part, SECTION_ORDER, SECTION_TITLE, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection } from './inspector-sections';
 import { Control, Group } from '@feega/motion-core/motion/components';
 import { FieldFill } from './number-field';
 import { Source } from '@feega/motion-core/motion/keyframes';
@@ -11,10 +11,10 @@ function memory() {
 }
 
 describe('inspector sections', () => {
-  it('keeps one predictable order: layout, layer, fill, stroke, effects, text, animation', () => {
-    const order = [Section.Layout, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text, Section.Animate];
+  it('orders by importance: layout, alignment, constraints, content, appearance, effects, text, then transform', () => {
+    const order = [Section.Layout, Section.Align, Section.Constraints, Section.Content, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text, Section.Transform, Section.Animate];
     expect(SECTION_ORDER.filter((s) => order.includes(s))).toEqual(order);
-    expect(SECTION_ORDER[0]).toBe(Section.Content);
+    expect(SECTION_ORDER[0]).toBe(Section.Layout);
     expect(SECTION_ORDER.indexOf(Section.Animate)).toBeGreaterThan(SECTION_ORDER.indexOf(Section.Effects));
     expect(SECTION_ORDER.indexOf(Section.ThreeD)).toBeGreaterThan(SECTION_ORDER.indexOf(Section.Effects));
   });
@@ -28,10 +28,20 @@ describe('inspector sections', () => {
     expect(isOpen({}, ClipFamily.Text, Section.Animate)).toBe(false);
   });
 
+  it('opens layout, alignment and constraints, keeps transform closed', () => {
+    expect(isOpen({}, ClipFamily.Shape, Section.Align)).toBe(true);
+    expect(isOpen({}, ClipFamily.Shape, Section.Constraints)).toBe(true);
+    expect(isOpen({}, ClipFamily.Shape, Section.Transform)).toBe(false);
+  });
+
+  it('names the look section Appearance', () => {
+    expect(SECTION_TITLE[Section.Layer]).toBe('Appearance');
+  });
+
   it('sums a closed section up in one line', () => {
     const clip = { from: 30, durationInFrames: 60, transform: { scale: 1.5, rotateZ: 10 }, keyframes: { opacity: [], x: [{ frame: 0, value: 0, ease: 'linear' as const }] }, effects: [], blend: 'normal', parent: null, mask: null, component: 'Title' as const, props: { text: 'Hello\nworld' } };
 
-    expect(sectionSummary(Section.Layout, clip, 30)).toBe('Scale 150% · Rotate 10°');
+    expect(sectionSummary(Section.Transform, clip, 30)).toBe('Scale 150% · Rotate 10°');
     expect(sectionSummary(Section.Timing, clip, 30)).toBe('At 1s · 2s long');
     expect(sectionSummary(Section.Animate, clip, 30)).toBe('1 animated');
     expect(sectionSummary(Section.Content, clip, 30)).toBe('Hello');
@@ -60,8 +70,9 @@ describe('inspector sections', () => {
     expect(shows(Part.Transitions, ClipFamily.Text)).toBe(true);
   });
 
-  it('sends 2D transform to Layout, opacity and blur to Layer, depth and tilt to 3D', () => {
-    expect(transformSection('x')).toBe(Section.Layout);
+  it('sends 2D transform to Transform, opacity and blur to Layer, depth and tilt to 3D', () => {
+    expect(transformSection('x')).toBe(Section.Transform);
+    expect(transformSection('skewX')).toBe(Section.Transform);
     expect(transformSection('opacity')).toBe(Section.Layer);
     expect(transformSection('blur')).toBe(Section.Layer);
     expect(transformSection('rotateX')).toBe(Section.ThreeD);

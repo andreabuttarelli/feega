@@ -30,3 +30,21 @@ were left out: they double the chrome height and the tooltips already name every
   running/queued runs.
 - The `core` renderer chip is gone; it was dev-only and the engine is assumed right.
 - Under 1180px the floating side panels stop above the add bar.
+
+## Follow-up: timeline, inspector
+
+- Frame timeline floats as an `lg` card between the side panels (`--shell-left`/`--shell-right`
+  on `.canvas-row`, set from the open left panel and right bar). Under 1180px it spans the canvas
+  and the side panels stop above it (`--dock-lift`, measured with `followDocks`).
+- Overlays pinned to the stage top (copy-link, warnings, workflow chip, remix banner, edge
+  refusal) start at `--chrome-top` so they no longer sit under the floating top bar.
+- Inspector sections, one table in `inspector-sections.ts`: Layout (X/Y top-left, W/H,
+  rotation), Alignment, Constraints, Content, Appearance (was Layer), Fill, Stroke, Path,
+  Effects, Text, Transform (offset/scale/skew, closed by default), Timing, Animation, 3D, Parent.
+  The duplicate centre X/Y fields are gone; the constraints toggle became the section chevron.
+- Appearance: Blend on its own labelled row, opacity one scrub field, Radius one value plus a
+  per-corner toggle.
+- Overflow: `.position` grid had an auto column sized by content; the clip bar scrolled
+  sideways. Both fixed; `tests/e2e/inspector-overflow.spec.ts` asserts nothing passes the card
+  edge (needs `E2E_REAL_STACK=1`, not run here).
+- The right bar tabs sit in a solid header.

@@ -39,7 +39,7 @@ describe('Properties for one clip', () => {
 
     expect(html).toContain('>Spacing</span>');
     expect(html).toContain('>em</span>');
-    expect(html).toContain('>Offset X</span>');
+    expect(html).toContain('Transform');
     expect(html).not.toContain('>ΔX</span>');
     expect(html).not.toContain('>↔</span>');
   });
