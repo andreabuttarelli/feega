@@ -11,12 +11,22 @@ export type CustomFrame = { reads: DomReads; picture: (item: ImageItem | LayerIt
 
 export type CustomReads = { readAt: (frame: number) => Promise<CustomFrame>; dispose: () => void };
 
-const READ: ReadonlySet<string> = new Set(['Custom', 'Device3D']);
+const READ: ReadonlySet<string> = new Set(['Custom', 'Device3D', 'Composition']);
 
-export function readClips(doc: MotionDoc): { read: string[]; composed: ReadonlySet<string> } {
+type Props = Record<string, unknown>;
+
+const PICTURED: Record<string, (props: Props, logo: string | null) => boolean> = {
+  Image: (props) => Boolean(props.assetId),
+  Video: (props) => Boolean(props.assetId),
+  Logo: (props, logo) => Boolean(props.assetId || logo)
+};
+
+const readsDom = (clip: { component: string; props: Props }, logo: string | null) => READ.has(clip.component) || PICTURED[clip.component]?.(clip.props, logo) === false;
+
+export function readClips(doc: MotionDoc, logo: string | null = null): { read: string[]; composed: ReadonlySet<string> } {
   const clips = flattenComps(doc).tracks.flatMap((t) => t.clips);
   const screens = screenFrames(doc).map((s) => s.prefix);
-  const read = clips.filter((c) => READ.has(c.component)).map((c) => c.id);
+  const read = clips.filter((c) => readsDom(c, logo)).map((c) => c.id);
   const onScreen = clips.filter((c) => screens.some((prefix) => c.id.startsWith(prefix))).map((c) => c.id);
   return { read, composed: new Set([...read, ...onScreen]) };
 }
@@ -24,7 +34,7 @@ const NO_FRAME: CustomFrame = { reads: new Map(), picture: () => null };
 
 export async function mountCustomReads(host: HTMLElement, compose: Compose, prepared: Prepared): Promise<CustomReads> {
   const { doc } = prepared;
-  const { read: clips, composed } = readClips(doc);
+  const { read: clips, composed } = readClips(doc, prepared.tokens.logoUrl);
   if (!clips.length) {
     return { readAt: async () => NO_FRAME, dispose: () => {} };
   }

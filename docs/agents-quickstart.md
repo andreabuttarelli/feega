@@ -68,6 +68,7 @@ feega canvas op <projectId> draw_frame --input '{"canvasId":"...","x":0,"y":0,"w
 feega motion ask <frameId> "make the title red"
 feega motion render <frameId> --resolution 1080p
 feega motion share <frameId>
+feega motion play <frameId>
 feega canvas export <projectId> <frameId> --format lottie --out launch.json
 ```
 
@@ -292,6 +293,10 @@ full-screen looping viewer) and `embed_url`:
 ```json
 { "node_id": "<combined_frame>" }
 ```
+
+`get_play_link` does the same for a prototype: it publishes every frame the links can reach and answers
+`url` (a full-screen player that runs the links, starting on that frame), `frames` and the canvas
+`flows`. `set_flow` (frame tool) names a frame as a flow's starting point.
 
 Share the whole canvas read-only instead (`edit`, answers `{ "shared": true, "path": "/s/<token>" }`):
 

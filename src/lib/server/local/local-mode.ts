@@ -1,5 +1,6 @@
 import { json, redirect, type RequestEvent, type ResolveOptions } from '@sveltejs/kit';
 import { stringify } from 'devalue';
+import { hasAiKey } from '$lib/local-ai-keys';
 import { LOCAL_USER, openFeegaStore, type FeegaStore, type LocalPlace } from './feega-store';
 
 type Env = Record<string, string | undefined>;
@@ -101,7 +102,17 @@ export function localStore(env: Env = process.env): FeegaStore | null {
   const opened = openFeegaStore(path, { origin: env.PUBLIC_APP_URL ?? 'http://localhost:5173' });
   process.once('exit', () => opened.flushNow());
   store = opened;
+  if (hasAiKey(env)) {
+    void syncModels(opened, env);
+    void import('./local-ticker').then(({ startLocalTicker }) => startLocalTicker(opened.db));
+  }
   return store;
+}
+
+async function syncModels(opened: FeegaStore, env: Env): Promise<void> {
+  const { syncLocalModels } = await import('./local-models');
+  const outcome = await syncLocalModels(opened.db, env).catch((e: unknown) => ({ ok: false as const, reason: e instanceof Error ? e.message : String(e) }));
+  console.log(outcome.ok ? `feega local: ${outcome.synced} models available` : `feega local: model list unavailable (${outcome.reason})`);
 }
 
 export const canvasPath = (place: LocalPlace) => `/p/${place.projectId}/c/${place.canvasId}`;

@@ -1,6 +1,6 @@
 # One domain: the app and the marketing site both live on feega.app
 
-Status: proposed (2026-10-19). Nothing below is live until the user orders the cutover.
+Status: superseded (2026-10-26). The marketing site moved to its own project in `landing/`; the app no longer serves it.
 
 ## Decision
 

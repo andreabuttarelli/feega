@@ -1,0 +1,53 @@
+name: Desktop release
+
+on:
+  push:
+    tags: ['desktop-v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: apps/desktop
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - run: npm version --no-git-tag-version "${GITHUB_REF_NAME#desktop-v}"
+      - name: Signing secrets, when present
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$CSC_LINK" ] || [ "$RUNNER_OS" != "macOS" ]; then
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [ -n "${!name}" ]; then echo "$name=${!name}" >> "$GITHUB_ENV"; fi
+          done
+      - run: npm run build
+      - name: Attach to the version release and the update feed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          files=$(ls dist/*.{dmg,zip,exe,AppImage,deb,blockmap,yml} 2>/dev/null | grep -v builder-debug)
+          for tag in "$GITHUB_REF_NAME" desktop-latest; do
+            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "$tag" --latest=false --notes "feega desktop" || true
+            gh release upload "$tag" $files --clobber
+          done

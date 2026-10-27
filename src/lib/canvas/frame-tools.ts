@@ -6,6 +6,7 @@ import { FrameView, shows, type FrameViews } from './frame-view';
 export enum FrameOverlay {
   Draw = 'draw',
   Guides = 'guides',
+  Rulers = 'rulers',
   Align = 'align',
   Mask = 'mask',
   Pen = 'pen',
@@ -48,6 +49,7 @@ const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
   [FrameOverlay.Draw]: (c) => c.tool !== DrawTool.Select && c.tool !== DrawTool.ShapeBuilder,
   [FrameOverlay.ShapeBuilder]: (c) => c.tool === DrawTool.ShapeBuilder && c.picks >= MIN_ALIGNED,
   [FrameOverlay.Guides]: (c) => Boolean(c.doc.layoutGuides?.length) && shows(c.views, FrameView.Guides),
+  [FrameOverlay.Rulers]: (c) => shows(c.views, FrameView.Rulers),
   [FrameOverlay.Align]: (c) => c.picks >= MIN_ALIGNED,
   [FrameOverlay.Mask]: (c) => Boolean(c.clip?.mask) && c.active,
   [FrameOverlay.Pen]: (c) => pointsOf(c) === FrameOverlay.Pen,

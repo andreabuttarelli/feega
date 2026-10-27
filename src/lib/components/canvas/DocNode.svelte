@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LocalOff, isOff } from '$lib/local-user';
   /**
    * IL DOCUMENTO, disegnato.
    *
@@ -93,16 +94,18 @@
       </button>
     </div>
 
-    {#if node.public}
-      <button type="button" class="doc-share is-on" onclick={toggleShare} title="Revoke link">
-        <LinkOff size={14} strokeWidth={1.7} />
-        <span>Revoke</span>
-      </button>
-    {:else}
-      <button type="button" class="doc-share" onclick={toggleShare} title="Create a public link">
-        <Link size={14} strokeWidth={1.7} />
-        <span>Public link</span>
-      </button>
+    {#if !isOff(LocalOff.PublicLinks)}
+      {#if node.public}
+        <button type="button" class="doc-share is-on" onclick={toggleShare} title="Revoke link">
+          <LinkOff size={14} strokeWidth={1.7} />
+          <span>Revoke</span>
+        </button>
+      {:else}
+        <button type="button" class="doc-share" onclick={toggleShare} title="Create a public link">
+          <Link size={14} strokeWidth={1.7} />
+          <span>Public link</span>
+        </button>
+      {/if}
     {/if}
   </header>
 

@@ -1,15 +1,20 @@
-import { describe, expect, it } from 'vitest';
-import { gaussianKernel, MAX_TAPS } from '@feega/motion-core/motion/gpu-full/kernel';
-import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
+import { describe, expect, it } from "vitest";
+import {
+  gaussianKernel,
+  MAX_TAPS,
+} from "@feega/motion-core/motion/gpu-full/kernel";
+import { rgbaOf } from "@feega/motion-core/motion/gpu-full/rgba";
 
-describe('gaussianKernel', () => {
-  it('sums to one so a blur keeps the layer brightness', () => {
+describe("gaussianKernel", () => {
+  it("sums to one so a blur keeps the layer brightness", () => {
     const { weights } = gaussianKernel(6);
 
-    expect(weights[0] + 2 * weights.slice(1).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 5);
+    expect(
+      weights[0] + 2 * weights.slice(1).reduce((a, b) => a + b, 0),
+    ).toBeCloseTo(1, 5);
   });
 
-  it('reaches three deviations, strided once that needs more taps than a shader holds', () => {
+  it("reaches three deviations, strided once that needs more taps than a shader holds", () => {
     expect(gaussianKernel(4)).toMatchObject({ step: 1 });
     expect(gaussianKernel(4).weights).toHaveLength(13);
     expect(gaussianKernel(200).weights.length).toBeLessThanOrEqual(MAX_TAPS);
@@ -17,12 +22,19 @@ describe('gaussianKernel', () => {
   });
 });
 
-describe('rgbaOf', () => {
-  it('reads the colour notations the doc stores', () => {
-    expect(rgbaOf('#ff000080')).toEqual([1, 0, 0, 128 / 255]);
-    expect(rgbaOf('#fff')).toEqual([1, 1, 1, 1]);
-    expect(rgbaOf('rgba(255, 0, 0, 0.5)')).toEqual([1, 0, 0, 0.5]);
-    expect(rgbaOf('transparent')).toEqual([0, 0, 0, 0]);
-    expect(rgbaOf('var(--x)')).toBeNull();
+describe("rgbaOf", () => {
+  it("reads the colour notations the doc stores", () => {
+    expect(rgbaOf("#ff000080")).toEqual([1, 0, 0, 128 / 255]);
+    expect(rgbaOf("#fff")).toEqual([1, 1, 1, 1]);
+    expect(rgbaOf("rgba(255, 0, 0, 0.5)")).toEqual([1, 0, 0, 0.5]);
+    expect(rgbaOf("transparent")).toEqual([0, 0, 0, 0]);
+    expect(rgbaOf("var(--x)")).toBeNull();
+  });
+
+  it("reads the srgb colour a computed color-mix() resolves to", () => {
+    expect(rgbaOf("color(srgb 1 0.5 0)")).toEqual([1, 0.5, 0, 1]);
+    expect(rgbaOf("color(srgb 0.2 0.4 0.6 / 0.38)")).toEqual([
+      0.2, 0.4, 0.6, 0.38,
+    ]);
   });
 });

@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
-  import { createMedia, Readiness, VideoPreload } from '@feega/motion-core/motion/gpu-full/media';
+  import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
+  import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Outcome } from '@feega/motion-core/motion/gpu-full/core-outcome';
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
@@ -16,7 +18,7 @@
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentOverlay, SentUses } from '$lib/canvas/core/use-diff';
   import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
-  import { drawsWhole, frameOfLive, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, logGaps, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
@@ -47,7 +49,7 @@
   const put = new Set<string>();
   const pictured = new Set<string>();
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
-  const media = createMedia({ videoPreload: VideoPreload.Metadata });
+  const media = createMedia({ videoPreload: VideoPreload.Metadata, frames: sharedFrames() });
   const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
   const keyOf = (f: FrameAt) => `${f.id}:${f.revision}${f.scenes ? `:${f.scenes}` : ''}`;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
@@ -109,6 +111,21 @@
     return { list: drawFrame(prepared, still, custom?.reads), custom };
   }
 
+  const RUNS_EVERY = 5;
+
+  export async function cache(id: string, range: FrameRange, signal: AbortSignal, onRuns: (runs: FrameRange[]) => void) {
+    const f = frames.find((x) => x.id === id);
+    const held = live.get(id);
+    if (!f || !held) {
+      return;
+    }
+    const source = await withScenes({ revision: f.revision, ...held }, sceneSource(f.scenes ?? ''));
+    const prepared = prepare(source.doc, source.tokens, source.assets);
+    const ram = createRamPreview({ frames: sharedFrames(), uses: (frame) => videoUses(drawFrame(prepared, frame).items) });
+    await ram.fill(range, signal, (done) => done % RUNS_EVERY === 0 && onRuns(ram.runs(range)));
+    onRuns(ram.runs(range));
+  }
+
   async function load(f: FrameAt) {
     const url = new URL(`${sourceUrl(f.id)}?revision=${f.revision}`, location.href).href;
     const away = f.scenes ? null : await buildAway(url, smoothing).catch(() => null);
@@ -119,6 +136,7 @@
     if (built.custom) {
       customPictures.set(keyOf(f), built.custom.picture);
     }
+    logGaps(f.id, built.list);
     lists = new Map(lists).set(keyOf(f), onStage(built.list, f.kind));
   }
 
@@ -137,6 +155,7 @@
       return;
     }
     const key = `${f.id}:live${generation}`;
+    logGaps(f.id, built.list);
     lists = new Map(lists).set(key, onStage(built.list, f.kind));
     liveGroup = new Map(liveGroup).set(f.id, key);
     liveAtRevision.set(f.id, f.revision);
@@ -190,7 +209,7 @@
   const framePuts = $derived(
     frames.flatMap((f): HeldFrame[] => {
       const list = lists.get(groupOf(f));
-      return list && drawsWhole(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
+      return list && drawsAny(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
     })
   );
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));
@@ -568,7 +587,7 @@
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
 <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {#key backend}
-  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
 {/key}
 
 <style>

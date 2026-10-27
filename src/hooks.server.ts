@@ -20,7 +20,7 @@ import { redirectFor } from '$lib/server/host-redirects';
 import { corsPreflight, extraOrigins, withCors } from '$lib/server/api-cors';
 import { SessionSource, bearerSession, bearerTokenOf, sessionSourceOf } from '$lib/server/bearer-session';
 import { grantBearerOf } from '$lib/server/canvas/asset-grant';
-import { SiteVisibility, rootShowsSite, siteVisibility } from '$lib/site/visibility';
+import { landingUrlFor } from '$lib/marketing';
 import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
@@ -114,21 +114,12 @@ const hostRedirect: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
-const SITE_ROUTES = '/(site)';
-const SEE_OTHER = 303;
-const APP_HOME = '/app';
+const MOVED_PERMANENTLY = 301;
 
-function siteEnv() {
-  return { vercelEnv: privateEnv.VERCEL_ENV, flag: publicEnv.PUBLIC_SITE_ENABLED };
-}
-
-export function siteShown(): boolean {
-  return siteVisibility(siteEnv()) === SiteVisibility.Shown;
-}
-
-export const siteGate: Handle = async ({ event, resolve }) => {
-  if (event.route.id?.startsWith(SITE_ROUTES) && !siteShown()) {
-    throw redirect(SEE_OTHER, APP_HOME);
+export const marketingRedirect: Handle = async ({ event, resolve }) => {
+  const target = landingUrlFor(event.url);
+  if (target) {
+    throw redirect(MOVED_PERMANENTLY, target);
   }
   return resolve(event);
 };
@@ -187,7 +178,7 @@ const localMode: Handle = ({ event, resolve }) => {
   return local ? serveLocal(event, resolve, local) : resolve(event);
 };
 
-export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, localMode, Sentry.sentryHandle(), async ({ event, resolve }) => {
+export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, csrf, localMode, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
@@ -249,7 +240,7 @@ export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, local
 
   seedMetaClickCookies(event.cookies, event.url, event.route.id);
 
-  if (isRootPath(event.url.pathname) && !rootShowsSite(event.url, siteEnv())) {
+  if (isRootPath(event.url.pathname)) {
     rememberCampaign(event.cookies, event.url);
     if (event.url.searchParams.has('code') || event.url.searchParams.has('error_description')) {
       throw redirect(303, `/auth/callback${event.url.search}`);

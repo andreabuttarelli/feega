@@ -330,7 +330,7 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
-      # Not `/`: HIDE_MARKETING 303s the homepage to /app, and busybox wget treats
+      # Not `/`: it redirects to /login or the dashboard, and busybox wget treats
       # 3xx as a failed spider. robots.txt is always 200 and does not need a session.
       test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:${APP_PORT:-3000}/robots.txt']
       timeout: 5s

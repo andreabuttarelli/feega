@@ -21,7 +21,8 @@ const BLACK: Rgba = [0.0, 0.0, 0.0, 1.0];
 const WHITE: Rgba = [1.0, 1.0, 1.0, 1.0];
 
 const COMPOSITE_OPS: [(&str, f32); 6] = [("over", 0.), ("in", 1.), ("out", 2.), ("atop", 3.), ("xor", 4.), ("arithmetic", 5.)];
-const BLENDS: [&str; 16] = ["normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity"];
+const WARP_MODES: [(&str, f32); 4] = [("bulge", 0.), ("twirl", 1.), ("radial", 2.), ("lens", 3.)];
+const BLENDS: [&str; 26] = ["normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity", "linear-burn", "linear-dodge", "vivid-light", "linear-light", "pin-light", "hard-mix", "subtract", "divide", "darker-color", "lighter-color"];
 const CHANNEL_INDEX: [(&str, f32); 4] = [("R", 0.), ("G", 1.), ("B", 2.), ("A", 3.)];
 
 pub type Linear = [f64; 4];
@@ -233,10 +234,11 @@ impl<R: Runner> Fx<'_, R> {
         for (ch, tag) in ["feFuncR", "feFuncG", "feFuncB", "feFuncA"].iter().enumerate() {
             let Some(f) = funcs.iter().find(|f| f.tag == *tag) else { continue };
             let kind = text(f.attrs.get("type"));
-            let values: Vec<f32> = if kind == "table" { numbers(f.attrs.get("tableValues")).into_iter().take(MAX_TABLE).collect() } else { vec![] };
+            let values: Vec<f32> = if kind == "table" || kind == "discrete" { numbers(f.attrs.get("tableValues")).into_iter().take(MAX_TABLE).collect() } else { vec![] };
             params[ch] = match kind.as_str() {
                 "table" => 1.0,
                 "linear" => 2.0,
+                "discrete" => 3.0,
                 _ => 0.0,
             };
             params[4 + ch] = values.len() as f32;
@@ -309,6 +311,19 @@ impl<R: Runner> Fx<'_, R> {
         self.op(Op::Displace, &src.tex, &map.tex, &[(num(n.attrs.get("scale"), 0.0) * s) as f32, channel("xChannelSelector"), channel("yChannelSelector")])
     }
 
+    fn warp(&self, src: &Img<R::Tex>, n: &SvgNode, s: f64) -> Img<R::Tex> {
+        let mode = lookup(&WARP_MODES, &text(n.attrs.get("mode")), 0.0);
+        let amount = num(n.attrs.get("amount"), 0.0);
+        let (amount, extra) = match mode as u32 {
+            1 => (amount * DEG, 0.0),
+            2 => (amount, num(n.attrs.get("spin"), 0.0) * DEG),
+            3 => (amount * s, num(n.attrs.get("boost"), 0.0)),
+            _ => (amount, 0.0),
+        };
+        let at = |k: &str| num(n.attrs.get(k), HALF) as f32;
+        self.op(Op::Warp, &src.tex, &src.tex, &[mode, at("cx"), at("cy"), (num(n.attrs.get("radius"), 1.0) * s) as f32, amount as f32, extra as f32])
+    }
+
     fn svg_graph(&self, source: Img<R::Tex>, filter: &SvgNode, space: Linear, origin: [f64; 2]) -> Img<R::Tex> {
         let mut results: HashMap<String, Img<R::Tex>> = HashMap::new();
         let mut last = source.clone();
@@ -359,6 +374,7 @@ impl<R: Runner> Fx<'_, R> {
                 "feDiffuseLighting" => self.lighting(&source, node, s),
                 "feTurbulence" => self.turbulence(&source, node),
                 "feTile" => self.tile(&input(a("in"))),
+                "feWarp" => self.warp(&input(a("in")), node, s),
                 "feDisplacementMap" => self.displace(&input(a("in")), &input(a("in2")), node, s),
                 _ => continue,
             };

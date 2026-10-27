@@ -1,7 +1,7 @@
 import { env } from '$env/dynamic/public';
 import { bundleApiBase } from './bundle-fetch';
 
-const WEB_PAGES: readonly string[] = ['/changelog', '/report', '/gallery', '/privacy', '/terms', '/docs'];
+const WEB_PAGES: readonly string[] = ['/report', '/gallery', '/docs'];
 const NEW_TAB = '_blank';
 
 function isWebPage(pathname: string): boolean {

@@ -2,7 +2,7 @@ export const MEDIA_LIST = String.raw`
 const VIDEO_MARK = 'video:';
 const LINK = /^(https?:|data:|blob:|\/)/;
 
-const picked = (item) => ({ src: item.src, video: item.kind === 'video' });
+const picked = (item) => ({ src: item.src || assets[item.assetId], video: item.kind === 'video' });
 
 const mediaList = (raw) => Array.isArray(raw) ? raw.map(picked).filter((m) => m.src) : String(raw || '').split(',').map((s) => s.trim()).filter(Boolean).map((item) => {
   const video = item.startsWith(VIDEO_MARK);

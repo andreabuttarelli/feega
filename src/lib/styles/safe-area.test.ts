@@ -39,6 +39,64 @@ describe('safe area shell', () => {
   });
 });
 
+describe('desktop window without a title bar', () => {
+  const WINDOW_CSS = read('src/lib/styles/desktop-window.css');
+
+  async function style(window: string, markup: string, probe: string, pseudo?: string): Promise<string> {
+    const page = await browser.newPage();
+    await page.setContent(`<html data-window="${window}"><style>${SAFE_AREA_CSS}${WINDOW_CSS}</style>${markup}</html>`);
+    const value = await page.locator('#probe').evaluate(
+      (el, [prop, pseudoEl]) => getComputedStyle(el, pseudoEl ?? null).getPropertyValue(prop),
+      [probe, pseudo] as const
+    );
+    await page.close();
+    return value;
+  }
+
+  it('starts the UI at the top, like the browser', async () => {
+    expect(await style('mac', '<div id="probe" class="safe-shell"></div>', 'padding-top')).toBe('0px');
+  });
+
+  it('drags the window from the canvas bar, clear of the traffic lights', async () => {
+    const bar = '<header id="probe" class="canvas-topbar"><button>x</button></header>';
+    expect(await style('mac', bar, 'app-region')).toBe('drag');
+    expect(await style('mac', bar, 'padding-left')).toBe('80px');
+    expect(await style('overlay', bar, 'padding-right')).toBe('140px');
+  });
+
+  it('keeps controls inside a drag area clickable', async () => {
+    expect(await style('mac', '<header class="canvas-topbar"><button id="probe">x</button></header>', 'app-region')).toBe('no-drag');
+  });
+
+  it('turns the sidebar wordmark into a bar as tall as the canvas bar, clear of the traffic lights', async () => {
+    const side = '<nav class="app-sidebar"><a id="probe" class="wordmark" href="/app">feega</a></nav>';
+    expect(await style('mac', side, 'app-region')).toBe('drag');
+    expect(await style('mac', side, 'height')).toBe('48px');
+    expect(await style('mac', side, 'padding-left')).toBe('80px');
+  });
+
+  it('hides links to marketing pages', async () => {
+    expect(await style('mac', '<a id="probe" href="/changelog">Changelog</a>', 'display')).toBe('none');
+    expect(await style('mac', '<a id="probe" href="/docs/x">Docs</a>', 'display')).toBe('none');
+  });
+
+  it('marks only the Electron shell, by platform, never the mobile one or the browser', async () => {
+    const marker = read('src/app.html').match(/<script>(\(function\(u\)[^<]*data-window[^<]*)<\/script>/)![1];
+    const shell = async (userAgent: string) => {
+      const context = await browser.newContext({ userAgent });
+      const page = await context.newPage();
+      await page.setContent(`<script>${marker}</script>`);
+      const value = await page.evaluate(() => document.documentElement.dataset.window ?? 'browser');
+      await context.close();
+      return value;
+    };
+    expect(await shell('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/140 Electron/38.2.0 FeegaNative/0.1.0')).toBe('mac');
+    expect(await shell('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140 Electron/38.2.0 FeegaNative/0.1.0')).toBe('overlay');
+    expect(await shell('Mozilla/5.0 (iPhone) AppleWebKit/605 FeegaNative/1.0')).toBe('browser');
+    expect(await shell('Mozilla/5.0 Chrome/140 Safari/537.36')).toBe('browser');
+  });
+});
+
 describe('layouts that render under viewport-fit=cover', () => {
   it('ship the safe-area rules app-wide', () => {
     expect(read('src/app.css')).toContain("@import './lib/styles/safe-area.css'");

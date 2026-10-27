@@ -83,22 +83,26 @@
 
 <div class="park" bind:this={park}>
   <div class="right-bar" bind:this={bar} data-testid="right-bar" onscrollcapture={remember}>
-    <div class="chat-tabs" role="tablist" aria-label={$_('app.shell.rail')}>
-      {#each rightBar.tabs as each (each)}
-        <button type="button" class="chat-tab" role="tab" aria-selected={tab === each} class:is-active={tab === each} data-testid={TEST_IDS[each]} onclick={() => pick(each)}>
-          {LABELS[each]()}{#if each === BarTab.Chat && tab !== BarTab.Chat && anyChatRunning()}<span class="activity" data-testid="chat-activity" aria-label="Agent running"></span>{/if}
-        </button>
-      {/each}
+    <div class="bar-head">
+      <div class="chat-tabs" role="tablist" aria-label={$_('app.shell.rail')}>
+        {#each rightBar.tabs as each (each)}
+          <button type="button" class="chat-tab" role="tab" aria-selected={tab === each} class:is-active={tab === each} data-testid={TEST_IDS[each]} onclick={() => pick(each)}>
+            {LABELS[each]()}{#if each === BarTab.Chat && tab !== BarTab.Chat && anyChatRunning()}<span class="activity" data-testid="chat-activity" aria-label="Agent running"></span>{/if}
+          </button>
+        {/each}
+      </div>
     </div>
-    <div class="pane" hidden={tab !== BarTab.Chat}>
-      {#if viewOnly}
-        <p class="chat-view-only" data-testid="chat-view-only">View only: the chat edits the canvas and spends credits. Ask an admin for edit access.</p>
-      {:else}
-        {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
-          <ChatPanel {projectId} prefill={rightBar.prefill} reload={rightBar.reload} context={() => binding?.context?.() ?? {}} onturnend={() => binding?.onturnend?.()} ondata={(part) => binding?.ondata?.(part)} {onbusy} />
-        {/await}
-      {/if}
-    </div>
+    {#if rightBar.tabs.includes(BarTab.Chat)}
+      <div class="pane" hidden={tab !== BarTab.Chat}>
+        {#if viewOnly}
+          <p class="chat-view-only" data-testid="chat-view-only">View only: the chat edits the canvas and spends credits. Ask an admin for edit access.</p>
+        {:else}
+          {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
+            <ChatPanel {projectId} prefill={rightBar.prefill} reload={rightBar.reload} context={() => binding?.context?.() ?? {}} onturnend={() => binding?.onturnend?.()} ondata={(part) => binding?.ondata?.(part)} {onbusy} />
+          {/await}
+        {/if}
+      </div>
+    {/if}
     <div class="pane is-guide" hidden={tab !== BarTab.Guide}>
       {#if guideSeen}
         <CanvasGuideTab initialSlug={$guideOpenRequest} onopened={() => guideOpenRequest.set(null)} />
@@ -127,7 +131,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: var(--grey-0);
+    background: var(--ui-panel-raised);
     color: var(--ui-ink);
     font-family: var(--sans);
     --ui-ink-2: var(--ui-text-2);
@@ -141,12 +145,18 @@
     pointer-events: none;
   }
 
-  .chat-tabs {
+  .bar-head {
+    position: relative;
+    z-index: 2;
     flex: 0 0 auto;
-    align-self: flex-start;
+    padding: 8px 12px 6px;
+    background: var(--ui-panel-raised);
+    border-bottom: 1px solid var(--ui-divider);
+  }
+
+  .chat-tabs {
     display: flex;
     gap: 2px;
-    margin: 8px 12px 4px;
     padding: 2px;
     border-radius: var(--ui-radius-md);
     background: var(--ui-input);
@@ -154,8 +164,10 @@
 
   .chat-tab {
     position: relative;
+    flex: 1;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     height: 28px;
     padding: 0 12px;

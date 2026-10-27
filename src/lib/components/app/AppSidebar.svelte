@@ -4,7 +4,6 @@
   import { chooseWorkspace, createWorkspace } from '$lib/dashboard/api';
   import { goto } from '$app/navigation';
   import { _ } from 'svelte-i18n';
-  import Folder from '@lucide/svelte/icons/folder';
   import Plus from '@lucide/svelte/icons/plus';
   import Upload from '@lucide/svelte/icons/upload';
   import FeegaFile from '$lib/components/canvas/FeegaFile.svelte';
@@ -18,7 +17,6 @@
   let {
     pathname,
     projectId,
-    projects,
     profile,
     org,
     workspaces,
@@ -26,7 +24,6 @@
   }: {
     pathname: string;
     projectId: string | null;
-    projects: { id: string; name: string }[];
     profile: { name: string | null; email: string; avatarUrl: string | null };
     org: { id: string; name: string };
     workspaces: { id: string; name: string }[];
@@ -148,33 +145,28 @@
 {/snippet}
 
 <nav class="app-sidebar" aria-label="App" data-testid="app-sidebar">
-  <a class="wordmark" href="/app">feega</a>
+  <div class="scroll">
+    <a class="wordmark" href="/app">feega</a>
 
-  <div class="group">
-    {#each inSection(NavSection.Main) as item (item.id)}
-      {@render entry(item)}
-    {/each}
-  </div>
+    <div class="group">
+      {#each inSection(NavSection.Main) as item (item.id)}
+        {@render entry(item)}
+      {/each}
+    </div>
 
-  <div class="group" data-testid="app-sidebar-canvas">
-    <span class="heading">Projects</span>
-    {#each projects as project (project.id)}
-      <a class="row" href="/p/{project.id}">
-        <Folder size={ICON} strokeWidth={STROKE} />
-        <span class="label">{project.name}</span>
-      </a>
-    {/each}
-    <form method="POST" action="/app?/project" use:apiEnhance>
-      <button type="submit" class="row new-project" data-testid="app-sidebar-new-project">
-        <Plus size={ICON} strokeWidth={STROKE} />
-        <span class="label">New project</span>
+    <div class="group" data-testid="app-sidebar-canvas">
+      <form method="POST" action="/app?/project" use:apiEnhance>
+        <button type="submit" class="row new-project" data-testid="app-sidebar-new-project">
+          <Plus size={ICON} strokeWidth={STROKE} />
+          <span class="label">New project</span>
+        </button>
+      </form>
+      <button type="button" class="row new-project" data-testid="app-sidebar-import-feega" onclick={() => feegaFile?.pick()}>
+        <Upload size={ICON} strokeWidth={STROKE} />
+        <span class="label">Import .feega</span>
       </button>
-    </form>
-    <button type="button" class="row new-project" data-testid="app-sidebar-import-feega" onclick={() => feegaFile?.pick()}>
-      <Upload size={ICON} strokeWidth={STROKE} />
-      <span class="label">Import .feega</span>
-    </button>
-    <FeegaFile bind:this={feegaFile} page={PAGE_PATH[DashboardPage.Home]} />
+      <FeegaFile bind:this={feegaFile} page={PAGE_PATH[DashboardPage.Home]} />
+    </div>
   </div>
 
   <div class="foot" bind:this={foot} onfocusout={left}>
@@ -226,12 +218,19 @@
   .app-sidebar {
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-6);
     height: 100%;
-    padding: var(--ui-space-3) var(--ui-space-2);
-    overflow-y: auto;
     font-size: var(--ui-type-body);
     color: var(--ui-text-secondary);
+  }
+
+  .scroll {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    gap: var(--ui-space-6);
+    min-height: 0;
+    padding: var(--ui-space-3) var(--ui-space-2) 0;
+    overflow-y: auto;
   }
 
   .wordmark {
@@ -374,15 +373,16 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    flex: none;
     gap: var(--ui-space-2);
-    margin-top: auto;
+    padding: var(--ui-space-2) var(--ui-space-2) var(--ui-space-3);
   }
 
   .menu {
     position: absolute;
     bottom: calc(100% + var(--ui-space-1));
-    left: 0;
-    right: 0;
+    left: var(--ui-space-2);
+    right: var(--ui-space-2);
     z-index: 10;
     display: flex;
     flex-direction: column;

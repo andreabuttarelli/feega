@@ -179,7 +179,7 @@ raggi con un ruolo per gradino** (`--ui-radius-*` in `src/app.css`, esposta da T
 `rounded-xs/sm/md/lg`; `--radius` in `src/lib/styles/tailwind.css` vale `md`): `none` 0 per
 tele, contenuto dei nodi, pannelli e barre a tutta altezza; `xs` 2px per kbd, checkbox, swatch;
 `sm` 4px per bottoni, input, righe, segmenti; `md` 6px per menu, popover, card; `lg` 10px per
-dialog, sheet e barre flottanti; `full` per avatar, pallini, pill. Si sceglie il gradino per
+dialog, sheet, barre e pannelli flottanti della tela; `full` per avatar, pallini, pill. Si sceglie il gradino per
 ruolo, mai un valore libero (`border-radius: 7px` no). Il dettaglio sta in `DESIGN.md`. Il
 contenuto dei video e dei template segue le sue regole, non questa.
 
@@ -220,7 +220,8 @@ entry** — two PRs in parallel touch different files and the changelogs never c
    customer reads. It is **English only**, one `ChangelogEntry` as export default; the loader
    (`src/lib/content/changelog/index.ts`) sorts them newest first. One line per feature, few
    words, release-note style ("Motion videos now have voice-over and music by default"), not a
-   paragraph. The page `src/routes/[[lang=locale]]/changelog/+page.svelte` is not touched: it
+   paragraph. The page `landing/src/routes/changelog/+page.svelte` (the
+   standalone marketing site, `landing/`) reads this folder at build: it is not touched, it
    already shows everything.
 
 They are two different texts, not the same text translated. The public one doesn't name files,

@@ -1,17 +1,28 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { hasAiKey } from '../src/lib/local-ai-keys.js';
+
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const DOTENV = resolve(ROOT, '.env');
 const HANDLER = resolve(ROOT, 'build/handler.js');
 const DEFAULT_FILE = 'canvas.feega';
 const DEFAULT_PORT = '5173';
 const LOOPBACK = '127.0.0.1';
 
-export function localEnv(file, port, base = process.env) {
+export function dotenv(path = DOTENV) {
+  return existsSync(path) ? parseEnv(readFileSync(path, 'utf8')) : {};
+}
+
+export function localEnv(file, port, base = process.env, fromFile = dotenv()) {
+  const merged = { ...fromFile, ...base };
+
   return {
-    ...base,
+    ...merged,
+    PUBLIC_FEEGA_LOCAL_AI: hasAiKey(merged) ? '1' : '0',
     FEEGA_LOCAL_FILE: resolve(file),
     HOST: LOOPBACK,
     PORT: port,

@@ -21,8 +21,9 @@ export function propertiesFor(selection: { count: number; clip: string | null; p
 }
 
 const ALL: readonly Section[] = SECTION_ORDER;
-const VISUAL = [Section.Content, Section.Layout, Section.Layer, Section.Fill, Section.Effects, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
-const PICTURE = [Section.Content, Section.Layout, Section.Layer, Section.Effects, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
+const PLACED = [Section.Layout, Section.Align, Section.Constraints, Section.Transform];
+const VISUAL = [Section.Content, ...PLACED, Section.Layer, Section.Fill, Section.Effects, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
+const PICTURE = [Section.Content, ...PLACED, Section.Layer, Section.Effects, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
 
 const FAMILY_SECTIONS: Record<ClipFamily, readonly Section[]> = {
   [ClipFamily.Text]: [...VISUAL, Section.Stroke, Section.Text],
@@ -32,14 +33,14 @@ const FAMILY_SECTIONS: Record<ClipFamily, readonly Section[]> = {
   [ClipFamily.Shape]: [...VISUAL, Section.Stroke, Section.Shape],
   [ClipFamily.ThreeD]: VISUAL,
   [ClipFamily.Custom]: ALL,
-  [ClipFamily.Null]: [Section.Layout, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent],
-  [ClipFamily.Camera]: [Section.Content, Section.Layout, Section.Timing, Section.Animate, Section.ThreeD],
+  [ClipFamily.Null]: [...PLACED, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent],
+  [ClipFamily.Camera]: [Section.Content, Section.Layout, Section.Transform, Section.Timing, Section.Animate, Section.ThreeD],
   [ClipFamily.Mask]: VISUAL,
   [ClipFamily.Precomp]: VISUAL,
   [ClipFamily.Adjustment]: VISUAL
 };
 
-const PART_SECTIONS: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Layer, Section.Fill, Section.Stroke, Section.Text]);
+const PART_SECTIONS: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Transform, Section.Layer, Section.Fill, Section.Stroke, Section.Text]);
 
 const MODE_HIDES: Record<EditMode, ReadonlySet<Section>> = {
   [EditMode.Motion]: new Set(),

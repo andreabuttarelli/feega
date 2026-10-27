@@ -109,6 +109,10 @@ export function followed(peers: CanvasPeer[], userId: string): View | null {
   return latest?.view ?? null;
 }
 
+export function presentControlsShown({ others, presenting }: { others: number; presenting: boolean }): boolean {
+  return others > 0 || presenting;
+}
+
 export function presenterOf(peers: CanvasPeer[]): CanvasPeer | null {
   return peers.find((p) => p.presenting) ?? null;
 }

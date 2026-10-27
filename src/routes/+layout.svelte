@@ -177,7 +177,7 @@
 {@render children()}
 {#if perfHud}{@const PerfHud = perfHud}<PerfHud />{/if}
 {#if !isBlog && !localOff(LocalOff.CookieBanner, publicEnv)}<CookieBanner />{/if}
-{#if !isBlog && data?.session}<TermsUpdateNotice version={data.termsNoticeVersion ?? null} />{/if}
+{#if !isBlog && data?.session && !localOff(LocalOff.TermsNotice, publicEnv)}<TermsUpdateNotice version={data.termsNoticeVersion ?? null} />{/if}
 {#if data?.session && tourShowsOn($page.url.pathname)}<HowFeegaWorks tour={data.tour ?? TourState.Seen} />{/if}
 
 <style>

@@ -101,31 +101,33 @@ fn moved_lens(lens: &Lens, m: Affine, frame: Rect, scale: f64) -> Lens {
     }
 }
 
+fn placed_look(look: &Look, m: Affine, frame: Rect, scale: f64) -> Look {
+    let own = look.scissor.map(|[x0, y0, x1, y1]| screen_rect(m, Rect::new(x0, y0, x1, y1)));
+    let clip = own.map_or(frame, |o| o.intersect(frame));
+    let masks = look.masks.clone().map(|layers| {
+        layers
+            .into_iter()
+            .map(|mut l| {
+                l.feather *= scale;
+                l.cover = l.cover.moved(m);
+                l
+            })
+            .collect()
+    });
+    let matte = look.matte.clone().map(|mut matte| {
+        matte.items = matte.items.iter().map(|i| placed(i, m, frame, scale)).collect();
+        matte
+    });
+    let space = look.space.map(|[a, b, c, d]| {
+        let s = times(m, [a, b, c, d, 0.0, 0.0]);
+        [s[0], s[1], s[2], s[3]]
+    });
+    let origin = look.origin.map(|[x, y]| [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
+    Look { matrix: times(m, look.matrix), blur: look.blur * scale, scissor: Some(scissor_of(clip)), masks, matte, space, origin, ..look.clone() }
+}
+
 fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
-    let look = |look: &Look| {
-        let own = look.scissor.map(|[x0, y0, x1, y1]| screen_rect(m, Rect::new(x0, y0, x1, y1)));
-        let clip = own.map_or(frame, |o| o.intersect(frame));
-        let masks = look.masks.clone().map(|layers| {
-            layers
-                .into_iter()
-                .map(|mut l| {
-                    l.feather *= scale;
-                    l.cover = l.cover.moved(m);
-                    l
-                })
-                .collect()
-        });
-        let matte = look.matte.clone().map(|mut matte| {
-            matte.items = matte.items.iter().map(|i| placed(i, m, frame, scale)).collect();
-            matte
-        });
-        let space = look.space.map(|[a, b, c, d]| {
-            let s = times(m, [a, b, c, d, 0.0, 0.0]);
-            [s[0], s[1], s[2], s[3]]
-        });
-        let origin = look.origin.map(|[x, y]| [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
-        Look { matrix: times(m, look.matrix), blur: look.blur * scale, scissor: Some(scissor_of(clip)), masks, matte, space, origin, ..look.clone() }
-    };
+    let look = |look: &Look| placed_look(look, m, frame, scale);
     match item {
         Item::Path(p) => Item::Path(PathItem { look: look(&p.look), ..p.clone() }),
         Item::Image(i) => Item::Image(ImageItem { look: look(&i.look), ..i.clone() }),
@@ -156,11 +158,38 @@ fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect, contou
 }
 
 fn used(u: &UseItem, group: &DisplayList, start: usize) -> Vec<Item> {
+    used_where(u, group, start, |_| true)
+}
+
+fn used_within(u: &UseItem, group: &DisplayList, start: usize, view: Rect) -> Vec<Item> {
+    if group.items.iter().any(|i| matches!(i, Item::Lens(_))) {
+        return used(u, group, start);
+    }
+    let scale = scale_of(u.matrix);
+    used_where(u, group, start, |i| reaches(i, u.matrix, scale, view))
+}
+
+fn reaches(item: &Item, m: Affine, scale: f64, view: Rect) -> bool {
+    reaches_bounds(item, bounds::<Scene>(item, &Pictures::new()), m, scale, view)
+}
+
+fn reaches_bounds(item: &Item, own: Option<Rect>, m: Affine, scale: f64, view: Rect) -> bool {
+    let Some(look) = item.look() else { return true };
+    if look.filters.is_some() || look.backdrop.is_some() {
+        return true;
+    }
+    let Some(own) = own else { return true };
+    let feather = look.masks.iter().flatten().map(|l| l.feather).fold(0.0, f64::max);
+    let margin = (look.blur + feather) * scale * BLUR_REACH + CULL_SLACK_PX;
+    screen_rect(m, own).inflate(margin, margin).overlaps(view)
+}
+
+fn used_where(u: &UseItem, group: &DisplayList, start: usize, keep: impl Fn(&Item) -> bool) -> Vec<Item> {
     let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
     let scale = scale_of(u.matrix);
     let back = group.background.map(|c| background(&u.clip, c, frame, turned_corners(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64))));
     let first = start + back.iter().count();
-    let items = group.items.iter().map(|i| match placed(i, u.matrix, frame, scale) {
+    let items = group.items.iter().filter(|i| keep(i)).map(|i| match placed(i, u.matrix, frame, scale) {
         Item::Lens(mut l) => {
             l.under += first;
             Item::Lens(l)
@@ -176,6 +205,7 @@ pub fn report(skipped: &[Skipped]) -> String {
 
 const CACHE_PREFIX: &str = "cache:";
 const RGBA_BYTES: u64 = 4;
+const CULL_SLACK_PX: f64 = 2.0;
 const SHARPEST: f64 = 1.02;
 const SOFTEST: f64 = 0.8;
 const IDENTITY: Affine = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
@@ -300,11 +330,14 @@ fn standalone(item: &Item) -> bool {
 }
 
 fn visible(item: &Item, view: Rect) -> bool {
+    visible_bounds(item, bounds::<Scene>(item, &Pictures::new()), item.look().map_or(0.0, |l| l.blur), view)
+}
+
+fn visible_bounds(item: &Item, own: Option<Rect>, blur: f64, view: Rect) -> bool {
     if !standalone(item) {
         return true;
     }
-    let Some(own) = bounds::<Scene>(item, &Pictures::new()) else { return true };
-    let blur = item.look().map_or(0.0, |l| l.blur);
+    let Some(own) = own else { return true };
     let reach = own.inflate(blur * BLUR_REACH, blur * BLUR_REACH);
     reach.overlaps(view) && detail(reach.width().max(reach.height()), false) != Detail::Skip
 }
@@ -323,25 +356,179 @@ struct Seed {
     stable: usize,
 }
 
-fn encode(group: &DisplayList, seed: Option<Seed>) -> Option<Arc<Encoded>> {
-    if !group.items.iter().all(vector_only) {
-        return None;
+struct Span {
+    key: String,
+    encoded: Arc<Encoded>,
+    bounds: Rect,
+}
+
+enum Piece {
+    Span(Span),
+    Loose(usize, Option<Rect>),
+    Nested(usize, Option<Rect>, Vec<Piece>),
+}
+
+pub struct Cast {
+    pieces: Vec<Piece>,
+}
+
+impl Cast {
+    fn whole(&self) -> Option<&Span> {
+        match self.pieces.as_slice() {
+            [Piece::Span(span)] => Some(span),
+            _ => None,
+        }
     }
-    let local = UseItem { clip: String::new(), group: String::new(), matrix: IDENTITY, cache: false, hold: false };
-    let frame = Rect::new(0.0, 0.0, group.width as f64, group.height as f64);
+}
+
+fn has_span(pieces: &[Piece]) -> bool {
+    pieces.iter().any(|p| match p {
+        Piece::Span(_) => true,
+        Piece::Loose(..) => false,
+        Piece::Nested(_, _, inside) => has_span(inside),
+    })
+}
+
+struct Row<'a> {
+    lead: Option<Item>,
+    items: &'a [Item],
+}
+
+impl<'a> Row<'a> {
+    fn plain(items: &'a [Item]) -> Self {
+        Row { lead: None, items }
+    }
+
+    fn shift(&self) -> usize {
+        self.lead.iter().count()
+    }
+
+    fn len(&self) -> usize {
+        self.items.len() + self.shift()
+    }
+
+    fn at(&self, i: usize) -> &Item {
+        match &self.lead {
+            Some(lead) if i == 0 => lead,
+            _ => &self.items[i - self.shift()],
+        }
+    }
+}
+
+fn span_of(row: &Row, range: std::ops::Range<usize>, key: String, frame: Rect, seed: Option<&Seed>) -> Span {
+    let local: Vec<Item> = range.map(|i| placed(row.at(i), IDENTITY, frame, 1.0)).collect();
     let paint = |items: &[Item]| {
         let mut scene = Scene::new();
         build_items(&mut scene, items, frame, &Pictures::new(), &Layers::new());
         scene
     };
-    let kept = seed.as_ref().map(|s| Kept { before: &s.before, stable: s.stable });
-    Some(Arc::new(Encoded::reusing(kept, &used(&local, group, 0), frame, |i| bounds::<Scene>(i, &Pictures::new()), paint)))
+    let kept = seed.map(|s| Kept { before: &s.before, stable: s.stable });
+    let encoded = Arc::new(Encoded::reusing(kept, &local, frame, |i| bounds::<Scene>(i, &Pictures::new()), paint));
+    let bounds = encoded.runs.iter().map(|r| r.bounds).reduce(|a, b| a.union(b)).unwrap_or(frame);
+    Span { key, encoded, bounds }
+}
+
+fn pieces_of(row: &Row, path: &str, frame: Rect, seed: Option<&Seed>) -> Vec<Piece> {
+    let shift = row.shift();
+    if row.items.iter().any(|i| matches!(i, Item::Lens(_))) {
+        return (0..row.items.len()).map(|i| Piece::Loose(i, None)).collect();
+    }
+    let mut out = Vec::new();
+    let mut at = 0;
+    while at < row.len() {
+        let here = format!("{path}.{at}");
+        let item = row.at(at);
+        if vector_only(item) {
+            let end = (at..row.len()).find(|&i| !vector_only(row.at(i))).unwrap_or(row.len());
+            let whole = at == 0 && end == row.len();
+            out.push(Piece::Span(span_of(row, at..end, here, frame, seed.filter(|_| whole))));
+            at = end;
+            continue;
+        }
+        let own = bounds::<Scene>(item, &Pictures::new());
+        match item {
+            Item::Group(g) if g.look.backdrop.is_none() => {
+                let inside = pieces_of(&Row::plain(&g.items), &here, frame, None);
+                out.push(if has_span(&inside) { Piece::Nested(at - shift, own, inside) } else { Piece::Loose(at - shift, own) });
+            }
+            _ => out.push(Piece::Loose(at - shift, own)),
+        }
+        at += 1;
+    }
+    out
+}
+
+fn cast_of(group: &DisplayList, key: &str, seed: Option<Seed>) -> Option<Arc<Cast>> {
+    let size = Rect::new(0.0, 0.0, group.width as f64, group.height as f64);
+    let lead = group.background.map(|c| background("", c, size, turned_corners(IDENTITY, size)));
+    let mut pieces = pieces_of(&Row { lead, items: &group.items }, key, size, seed.as_ref());
+    if !has_span(&pieces) {
+        return None;
+    }
+    if let [Piece::Span(span)] = pieces.as_mut_slice() {
+        span.key = key.to_string();
+    }
+    Some(Arc::new(Cast { pieces }))
+}
+
+struct Laying<'a> {
+    u: &'a UseItem,
+    frame: Rect,
+    scale: f64,
+    view: Rect,
+    encoded: &'a mut HashMap<String, Arc<Encoded>>,
+}
+
+impl Laying<'_> {
+    fn keeps(&self, item: &Item, own: Option<Rect>) -> bool {
+        let blur = item.look().map_or(0.0, |l| l.blur * self.scale);
+        let on_screen = own.map(|o| screen_rect(self.u.matrix, o));
+        reaches_bounds(item, own, self.u.matrix, self.scale, self.view) && visible_bounds(item, on_screen, blur, self.view)
+    }
+
+    fn lay(&mut self, pieces: &[Piece], items: &[Item]) -> Vec<Item> {
+        let mut out = Vec::new();
+        for piece in pieces {
+            match piece {
+                Piece::Span(span) => {
+                    if !screen_rect(self.u.matrix, span.bounds).overlaps(self.view) {
+                        continue;
+                    }
+                    self.encoded.insert(span.key.clone(), span.encoded.clone());
+                    let reach = Some([span.bounds.x0, span.bounds.y0, span.bounds.x1, span.bounds.y1]);
+                    out.push(Item::Use(UseItem { clip: self.u.clip.clone(), group: span.key.clone(), matrix: self.u.matrix, cache: false, hold: false, reach }));
+                }
+                Piece::Loose(at, own) => {
+                    if self.keeps(&items[*at], *own) {
+                        out.push(softened(placed(&items[*at], self.u.matrix, self.frame, self.scale)));
+                    }
+                }
+                Piece::Nested(at, own, inside) => {
+                    let Item::Group(g) = &items[*at] else { continue };
+                    if !self.keeps(&items[*at], *own) {
+                        continue;
+                    }
+                    let kids = self.lay(inside, &g.items);
+                    let look = placed_look(&g.look, self.u.matrix, self.frame, self.scale);
+                    out.push(softened(Item::Group(Box::new(GroupItem { clip: g.clip.clone(), items: kids, look }))));
+                }
+            }
+        }
+        out
+    }
+}
+
+fn laid(u: &UseItem, group: &DisplayList, cast: &Cast, view: Rect) -> (Vec<Item>, HashMap<String, Arc<Encoded>>) {
+    let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
+    let mut encoded = HashMap::new();
+    let items = Laying { u, frame, scale: scale_of(u.matrix), view, encoded: &mut encoded }.lay(&cast.pieces, &group.items);
+    (items, encoded)
 }
 
 #[derive(Default)]
 pub struct Library {
     groups: Groups,
-    encodings: HashMap<String, Option<Arc<Encoded>>>,
+    encodings: HashMap<String, Option<Arc<Cast>>>,
     seeds: HashMap<String, Seed>,
     composes: bool,
     held: HashMap<String, Held>,
@@ -396,6 +583,16 @@ impl Library {
         (list.clone(), vec![])
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn drawable_owned(&self, list: DisplayList) -> (DisplayList, Vec<Skipped>) {
+        (list, vec![])
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn drawable_owned(&self, list: DisplayList) -> (DisplayList, Vec<Skipped>) {
+        self.drawable(&list)
+    }
+
     pub fn put_group(&mut self, key: &str, list: &DisplayList) {
         let (drawn, _) = self.drawable(list);
         self.groups.put(key, drawn);
@@ -421,7 +618,7 @@ impl Library {
             return false;
         }
         let (drawn, _) = self.drawable(&DisplayList { items: splice.items.clone(), ..base.clone_empty() });
-        let before = self.encodings.get(from).cloned().flatten();
+        let before = self.encodings.get(from).cloned().flatten().and_then(|cast| cast.whole().map(|span| span.encoded.clone()));
         let stable = splice.head + usize::from(base.background.is_some());
         self.groups.splice(from, to, splice.head, splice.tail, drawn.items);
         self.forget(to);
@@ -439,13 +636,20 @@ impl Library {
         self.composes = true;
     }
 
-    fn encoding(&mut self, group: &str) -> Option<Arc<Encoded>> {
+    fn encoding(&mut self, group: &str) -> Option<Arc<Cast>> {
         if !self.composes {
             return None;
         }
         let list = self.groups.get(group)?;
         let seed = self.seeds.remove(group);
-        self.encodings.entry(group.to_string()).or_insert_with(|| encode(list, seed)).clone()
+        self.encodings.entry(group.to_string()).or_insert_with(|| cast_of(list, group, seed)).clone()
+    }
+
+    fn expanded(&self, u: &UseItem, group: &DisplayList, start: usize, view: Rect) -> Vec<Item> {
+        if self.composes {
+            return used_within(u, group, start, view);
+        }
+        used(u, group, start)
     }
 
     fn cheapened(&self, items: Vec<Item>, view: Rect) -> Vec<Item> {
@@ -498,14 +702,16 @@ impl Library {
                 continue;
             };
             let on_screen = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64)).overlaps(Rect::new(0.0, 0.0, list.width as f64, list.height as f64));
-            if let Some(scene) = self.encoding(&u.group) {
+            let cast = self.encoding(&u.group);
+            let Some(group) = self.groups.get(&u.group) else { continue };
+            if let Some(whole) = cast.as_deref().filter(|c| c.whole().is_some()) {
                 if on_screen {
-                    encoded.insert(u.group.clone(), scene);
-                    items.push(item.clone());
+                    let (laid, spans) = laid(u, group, whole, view);
+                    items.extend(laid);
+                    encoded.extend(spans);
                 }
                 continue;
             }
-            let Some(group) = self.groups.get(&u.group) else { continue };
             let want = held_within(u, group, scale_of(u.matrix), limits.side);
             let (w, h) = texels(group, want);
             if let (true, Some(kept)) = (u.cache && u.hold, self.held.get(&u.group).copied()) {
@@ -518,7 +724,14 @@ impl Library {
             if !u.cache || want <= 0.0 || w.max(h) > limits.side {
                 if on_screen {
                     let start = items.len();
-                    items.extend(self.cheapened(used(u, group, start), view));
+                    match &cast {
+                        Some(cast) => {
+                            let (laid, spans) = laid(u, group, cast, view);
+                            items.extend(laid);
+                            encoded.extend(spans);
+                        }
+                        None => items.extend(self.cheapened(self.expanded(u, group, start, view), view)),
+                    }
                 }
                 continue;
             }
@@ -573,8 +786,8 @@ impl Library {
         let mut evicted = std::mem::replace(&mut self.stale, std::mem::take(&mut self.retiring));
         evicted.extend(gone.iter().map(|k| cache_clip(k)));
         evicted.extend(abandoned.iter().map(|k| building_clip(k)));
-        let rasters = rasters.into_iter().map(|r| Raster { list: self.drawable(&r.list).0, ..r }).collect();
-        let (mut screen, unset) = self.drawable(&DisplayList { items, ..list.clone_empty() });
+        let rasters = rasters.into_iter().map(|r| Raster { list: self.drawable_owned(r.list).0, clip: r.clip }).collect();
+        let (mut screen, unset) = self.drawable_owned(DisplayList { items, ..list.clone_empty() });
         screen.fragments = Fragments::new(encoded);
         Plan { screen, rasters, evicted, pending, skipped: named(missing, "group").chain(unset).collect(), finished, waiting }
     }

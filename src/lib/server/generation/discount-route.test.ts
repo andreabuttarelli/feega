@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { kieModelRows } from '../kie-catalogue';
+import { KIE_FIXTURE_PRICES } from '../kie-pricing.fixtures';
 import { discountCandidateOf, discountRouteFor, RouteHealth, routeHealthOf, type CallSample } from './discount-route';
 
 const SYNCED = '2026-10-15T00:00:00.000Z';
-const banana = discountCandidateOf(kieModelRows(SYNCED).find((row) => row.id === 'kie/nano-banana-2')!)!;
+const banana = discountCandidateOf(kieModelRows(KIE_FIXTURE_PRICES, [], SYNCED).find((row) => row.id === 'kie/nano-banana-2')!)!;
 
 describe('discountRouteFor — when the cheaper kie route is tried first', () => {
   it('takes kie for a resolution kie prices, below the primary price', () => {
@@ -19,7 +20,7 @@ describe('discountRouteFor — when the cheaper kie route is tried first', () =>
   });
 
   it('keeps the primary for a resolution kie does not price', () => {
-    expect(discountRouteFor({ candidate: banana, health: RouteHealth.Healthy, params: { resolution: '4K' }, primaryUsd: 0.15 })).toBeNull();
+    expect(discountRouteFor({ candidate: banana, health: RouteHealth.Healthy, params: { resolution: '512' }, primaryUsd: 0.15 })).toBeNull();
   });
 
   it('keeps the primary when kie is not cheaper', () => {

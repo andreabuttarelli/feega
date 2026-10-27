@@ -33,6 +33,10 @@ const UNIQUE_KEYS: Record<string, string[][]> = {
   motion_revisions: [['node_id', 'version']]
 };
 
+const PRIMARY_KEYS: Record<string, string[][]> = {
+  ai_models: [['id', 'catalogue']]
+};
+
 const FOREIGN_KEYS: Record<string, string> = {
   'orgs_members.profiles': 'user_id'
 };
@@ -260,7 +264,7 @@ export function createMemoryDb(options: MemoryDbOptions) {
     }
 
     function write(): { rows: Row[]; error: DbError | null } {
-      const keys = [['id'], ...(UNIQUE_KEYS[table] ?? [])];
+      const keys = [...(PRIMARY_KEYS[table] ?? [['id']]), ...(UNIQUE_KEYS[table] ?? [])];
       if (action === 'insert' || action === 'upsert') {
         const written: Row[] = [];
         for (const raw of payload) {

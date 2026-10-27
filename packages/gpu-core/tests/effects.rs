@@ -74,6 +74,19 @@ mod gpu {
     }
 
     #[test]
+    fn a_discrete_transfer_steps_the_colour() {
+        let pixels = render(&square(
+            r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [
+          { "tag": "feComponentTransfer", "attrs": {}, "children": [
+            { "tag": "feFuncR", "attrs": { "type": "discrete", "tableValues": "0 1" } },
+            { "tag": "feFuncG", "attrs": { "type": "discrete", "tableValues": "0.2 0.4 0.6" } } ] } ] }] }"#,
+        ));
+
+        assert_eq!(px(&pixels, 32, 32)[0], 255);
+        assert!((152..=154).contains(&px(&pixels, 32, 32)[1]));
+    }
+
+    #[test]
     fn an_offset_moves_the_item() {
         let pixels = render(&square(r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [{ "tag": "feOffset", "attrs": { "dx": 8, "dy": 0 } }] }] }"#));
 
@@ -143,5 +156,39 @@ mod gpu {
 
         assert!(near(px(&pixels, 0, 0), [132, 122, 103, 126]), "{:?}", px(&pixels, 0, 0));
         assert!(near(px(&pixels, 20, 10), [120, 132, 138, 99]), "{:?}", px(&pixels, 20, 10));
+    }
+    fn warped(attrs: &str) -> Vec<u8> {
+        render(&square(&format!(r#"{{ "kind": "svg", "nodes": [{{ "tag": "filter", "attrs": {{}}, "children": [{{ "tag": "feWarp", "attrs": {{ "cx": 0.5, "cy": 0.5, {attrs} }} }}] }}] }}"#)))
+    }
+
+    #[test]
+    fn a_bulge_pulls_the_square_edge_outward() {
+        let pixels = warped(r#""mode": "bulge", "radius": 32, "amount": 0.9"#);
+
+        assert_eq!(px(&pixels, 14, 32)[0], 255);
+        assert_eq!(px(&pixels, 2, 32)[0], 0);
+    }
+
+    #[test]
+    fn a_twirl_turns_the_corner_away() {
+        let pixels = warped(r#""mode": "twirl", "radius": 32, "amount": 90"#);
+
+        assert_eq!(px(&pixels, 17, 17)[0], 0);
+        assert_eq!(px(&pixels, 32, 32)[0], 255);
+    }
+
+    #[test]
+    fn a_zoom_blur_smears_the_square_outward() {
+        let pixels = warped(r#""mode": "radial", "radius": 1, "amount": 0.5, "spin": 0"#);
+
+        assert!((10..245).contains(&px(&pixels, 12, 32)[0]));
+        assert_eq!(px(&pixels, 32, 32)[0], 255);
+    }
+
+    #[test]
+    fn a_lens_blur_softens_the_edge() {
+        let pixels = warped(r#""mode": "lens", "radius": 1, "amount": 6, "boost": 1"#);
+
+        assert!((10..245).contains(&px(&pixels, 15, 32)[0]));
     }
 }

@@ -103,3 +103,23 @@ describe('a pane portalled into the bar', () => {
     expect(pane.removed).toBe(true);
   });
 });
+
+describe('in local mode the bar has no chat', () => {
+  it('lists no Chat tab and starts on the guide', () => {
+    const host = new RightBarHost([BarTab.Chat]);
+
+    expect(host.tabs).toEqual([BarTab.Guide]);
+    expect(host.tab).toBe(BarTab.Guide);
+  });
+
+  it('a stored or deep-linked Chat selection lands on the guide', () => {
+    const host = new RightBarHost([BarTab.Chat]);
+    host.select(BarTab.Chat);
+
+    expect(host.tab).toBe(BarTab.Guide);
+  });
+
+  it('keeps Chat in the cloud', () => {
+    expect(new RightBarHost().tabs).toContain(BarTab.Chat);
+  });
+});

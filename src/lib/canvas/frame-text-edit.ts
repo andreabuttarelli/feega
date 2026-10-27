@@ -89,6 +89,8 @@ export function editLayout(caret: TextCaret, screen: Affine): EditLayout {
   return { transform: `matrix(${m.join(',')})`, width: caret.width, height: caret.height, fontPx: caret.size, wraps: caret.flow.wraps, vertical: caret.vertical };
 }
 
+export const anchorShift = (layout: EditLayout, content: number): number => (layout.height - content) * layout.vertical;
+
 const FLOW_CSS: Record<'wraps' | 'line', (layout: EditLayout) => string> = {
   wraps: (layout) => `white-space:pre-wrap;width:${layout.width}px;`,
   line: () => 'white-space:pre;'

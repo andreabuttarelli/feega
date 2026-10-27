@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsWhole, framesOnCanvas, onStage, stillFrame } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, stillFrame } from './frame-source';
 import instance from '../../../../tests/e2e/fixtures/motion-doc-template-instance.json';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TransitionKind } from '@feega/motion-core/motion/design';
@@ -32,13 +32,24 @@ describe('frames on canvas', () => {
 describe('handing a frame to the core', () => {
   const list = (gaps: number, items: unknown[] = [{ kind: 'path', clip: 'p' }]) => ({ width: 1, height: 1, background: null, items, unsupported: Array.from({ length: gaps }, () => ({ clip: 'c', component: 'Custom', reason: 'custom' })) }) as never;
 
-  it('only a frame the core draws completely leaves its poster', () => {
-    expect(drawsWhole(list(0))).toBe(true);
-    expect(drawsWhole(list(2))).toBe(false);
+  it('a frame the core draws even in part leaves its poster, rather than stay black', () => {
+    expect(drawsAny(list(0))).toBe(true);
+    expect(drawsAny(list(2))).toBe(true);
+  });
+
+  it('names every element the core left out of a frame it drew', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    logGaps('f1', list(0));
+    logGaps('f1', { ...list(0), unsupported: [{ clip: 'c', component: 'Custom', reason: 'dom', detail: 'mask div.x ×2' }] } as never);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0].join(' ')).toContain('c (Custom): mask div.x ×2');
+    warn.mockRestore();
   });
 
   it('leaves the poster to a frame whose still draws nothing, rather than paint its bare background over it', () => {
-    expect(drawsWhole(list(0, []))).toBe(false);
+    expect(drawsAny(list(0, []))).toBe(false);
   });
 });
 
@@ -51,8 +62,8 @@ describe('still frame', () => {
     expect(stillFrame({ ...newMotionDoc(MotionFormat.Landscape), still: { frame: 7 } })).toBe(7);
   });
 
-  it('a doc longer than its content still rests at time 0', () => {
-    expect(stillFrame(instance as unknown as MotionDoc)).toBe(0);
+  it('a doc longer than its content rests once its text has faded in', () => {
+    expect(stillFrame(instance as unknown as MotionDoc)).toBe(12);
   });
 
   it('a clip from 0 to 1s in a 5s frame is drawn on the canvas', () => {
@@ -85,7 +96,8 @@ describe('the frame a video rests on', () => {
   });
 
   it('a frame with nothing fading in still rests at time 0', () => {
-    expect(stillFrame(video(words('title', 150, 0)))).toBe(0);
+    const shape = { id: 'card', component: 'Shape', from: 0, durationInFrames: 150, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.1, height: 0.1, fill: '#ff0000' } };
+    expect(stillFrame(video(shape))).toBe(0);
   });
 });
 

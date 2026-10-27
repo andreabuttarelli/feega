@@ -3,7 +3,7 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/m
 import { Side, addClip, removeClips, setTransition } from '@feega/motion-core/motion/timeline';
 import { precompose } from '@feega/motion-core/motion/precomp';
 import { writeComponent } from './custom/ops';
-import { Quality, SEVERITY, Severity, blocking, blockingFor, docProblems, frameProblems, type QualityProblem } from './direction';
+import { Quality, SEVERITY, Severity, blocking, blockingFor, docProblems, frameProblems, vanishes, type QualityProblem } from './direction';
 import { Forbidden, STYLES, Script } from './style';
 import supasitoV1 from './fixtures/supasito-v1.json';
 import { Ease, TransitionKind } from '@feega/motion-core/motion/design';
@@ -557,5 +557,24 @@ describe('what blocks scales with the length of the video', () => {
 
   it('a film of 15 s or more is held to the whole list', () => {
     expect(blockingFor(story, 20)).toHaveLength(3);
+  });
+});
+
+describe('content that vanishes at a cut and comes back', () => {
+  const at = (time: number, lumaStd: number) => ({ time, luma: 20, lumaStd, whiteShare: 0 });
+
+  it('the canvas that goes empty right after a cut and returns within a second is blocking', () => {
+    const problems = vanishes([at(7.967, 17), at(8, 4.5), at(8.25, 4.5), at(8.5, 4.6), at(9.1, 21.6)]);
+
+    expect(problems.map((p) => [p.kind, p.at])).toEqual([[Quality.VanishingCut, 8]]);
+    expect(blocking(problems)).toHaveLength(1);
+  });
+
+  it('a cut to a title card that stays is not a flash', () => {
+    expect(vanishes([at(17.967, 30), at(18, 8), at(18.5, 8), at(19.2, 8.2)])).toEqual([]);
+  });
+
+  it('frames far apart are never read as a cut', () => {
+    expect(vanishes([at(1, 30), at(3, 4), at(3.5, 30)])).toEqual([]);
   });
 });

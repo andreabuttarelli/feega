@@ -8,8 +8,8 @@ const UNIT: Size = { w: 1, h: 1 };
 const CURVE_SAMPLES = 16;
 const KAPPA = 0.5522847498;
 const DIGITS = 10000;
-const PATH_CHARS = /^[\sMmLlHhVvCcSsQqTtZz0-9eE.,+-]*$/;
-const TOKEN = /[MmLlHhVvCcSsQqTtZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
+const PATH_CHARS = /^[\sMmLlHhVvCcSsQqTtAaZz0-9eE.,+-]*$/;
+const TOKEN = /[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
 
 export const corner = (p: Pt): Vertex => ({ p, in: p, out: p });
 const add = (a: Pt, b: Pt): Pt => [a[0] + b[0], a[1] + b[1]];
@@ -288,11 +288,56 @@ export function pathData(outline: Outline): string {
 
 type Cursor = { tokens: string[]; i: number };
 
+const angleBetween = (u: Pt, v: Pt) => Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]);
+
+enum ArcSize {
+  Small = 'small',
+  Large = 'large'
+}
+
+enum ArcSweep {
+  Backward = 'backward',
+  Forward = 'forward'
+}
+
+function arcCurves(from: Pt, [rx0, ry0]: Pt, turn: number, size: ArcSize, direction: ArcSweep, to: Pt): [Pt, Pt, Pt][] {
+  const large = size === ArcSize.Large;
+  const sweep = direction === ArcSweep.Forward;
+  if (same(from, to)) {
+    return [];
+  }
+  if (!rx0 || !ry0) {
+    return [[from, to, to]];
+  }
+  const [cos, sin] = [Math.cos(turn * DEGREES), Math.sin(turn * DEGREES)];
+  const [hx, hy] = [(from[0] - to[0]) / 2, (from[1] - to[1]) / 2];
+  const [x1, y1] = [cos * hx + sin * hy, -sin * hx + cos * hy];
+  const grow = Math.sqrt(Math.max(1, (x1 * x1) / (rx0 * rx0) + (y1 * y1) / (ry0 * ry0)));
+  const [rx, ry] = [Math.abs(rx0) * grow, Math.abs(ry0) * grow];
+  const room = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1;
+  const reach = (large === sweep ? -1 : 1) * Math.sqrt(Math.max(0, room) / (rx * rx * y1 * y1 + ry * ry * x1 * x1));
+  const [cx1, cy1] = [(reach * rx * y1) / ry, (-reach * ry * x1) / rx];
+  const centre: Pt = [cos * cx1 - sin * cy1 + (from[0] + to[0]) / 2, sin * cx1 + cos * cy1 + (from[1] + to[1]) / 2];
+  const start = angleBetween([1, 0], [(x1 - cx1) / rx, (y1 - cy1) / ry]);
+  const raw = angleBetween([(x1 - cx1) / rx, (y1 - cy1) / ry], [(-x1 - cx1) / rx, (-y1 - cy1) / ry]);
+  const span = sweep && raw < 0 ? raw + Math.PI * 2 : !sweep && raw > 0 ? raw - Math.PI * 2 : raw;
+  const count = Math.max(1, Math.ceil(Math.abs(span) / QUARTER_TURN - 1e-9));
+  const step = span / count;
+  const handle = (4 / 3) * Math.tan(step / 4);
+  const place = ([x, y]: Pt): Pt => [centre[0] + cos * rx * x - sin * ry * y, centre[1] + sin * rx * x + cos * ry * y];
+  return Array.from({ length: count }, (_, i): [Pt, Pt, Pt] => {
+    const [a, b] = [start + i * step, start + (i + 1) * step];
+    const c1 = place([Math.cos(a) - handle * Math.sin(a), Math.sin(a) + handle * Math.cos(a)]);
+    const c2 = place([Math.cos(b) + handle * Math.sin(b), Math.sin(b) - handle * Math.cos(b)]);
+    return [c1, c2, i === count - 1 ? to : place([Math.cos(b), Math.sin(b)])];
+  });
+}
+
 const isCommand = (t: string | undefined) => t !== undefined && /^[A-Za-z]$/.test(t);
 
 export function parsePath(d: string): Outline | string {
   if (!PATH_CHARS.test(d)) {
-    return 'path data takes only M L H V C S Q T Z and numbers';
+    return 'path data takes only M L H V C S Q T A Z and numbers';
   }
   const cur: Cursor = { tokens: d.match(TOKEN) ?? [], i: 0 };
   if (!cur.tokens.length || !/^[Mm]$/.test(cur.tokens[0])) {
@@ -314,6 +359,14 @@ export function parsePath(d: string): Outline | string {
       throw new Error(`path data: ${command} is missing a number`);
     }
     return n;
+  };
+  const flag = (): boolean => {
+    const t = cur.tokens[cur.i] ?? '';
+    if (t.length > 1 && /^[01]/.test(t)) {
+      cur.tokens[cur.i] = t.slice(1);
+      return t[0] === '1';
+    }
+    return read() !== 0;
   };
   const point = (relative: boolean): Pt => {
     const p: Pt = [read(), read()];
@@ -381,6 +434,14 @@ export function parsePath(d: string): Outline | string {
     t: (rel) => {
       const q = lastQuad ? sub(times(pen, 2), lastQuad) : pen;
       quadTo(q, point(rel));
+    },
+    a: (rel) => {
+      const radii: Pt = [read(), read()];
+      const turn = read();
+      const size = flag() ? ArcSize.Large : ArcSize.Small;
+      const direction = flag() ? ArcSweep.Forward : ArcSweep.Backward;
+      const p = point(rel);
+      arcCurves(pen, radii, turn, size, direction, p).forEach(([c1, c2, end]) => curveTo(c1, c2, end));
     },
     z: () => close()
   };

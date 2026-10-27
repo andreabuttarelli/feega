@@ -55,6 +55,13 @@ describe('drawFrame on a custom component', () => {
     ]);
   });
 
+  it('draws a component with an easing prop of its own that no clip move knows', () => {
+    const eased = structuredClone(doc);
+    eased.tracks.flatMap((t) => t.clips)[0].props.easing = 'expo';
+
+    expect(drawFrame(prepare(eased, FEEGA_TOKENS), 10, new Map([['poster', read]])).items).toHaveLength(2);
+  });
+
   it('draws a component whose position, scale and mask are keyframed', () => {
     const moving = structuredClone(doc);
     const clip = moving.tracks.flatMap((t) => t.clips)[0];

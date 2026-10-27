@@ -1,3 +1,5 @@
+import { env as publicEnv } from '$env/dynamic/public';
+import { LocalOff, localOff } from '$lib/local-user';
 import { CHAT_PANEL, readChatPanelPx, writeChatPanelPx } from '$lib/shell-prefs';
 import type { ChatPrefill } from './chat-prefill';
 import type { StreamData } from './chat-session.svelte';
@@ -27,14 +29,22 @@ export enum BarSeat {
 
 const SHARED_TABS = [BarTab.Chat, BarTab.Guide] as const;
 
+type PickableTab = BarTab.Chat | BarTab.Guide;
+
 export class RightBarHost {
   #claims = $state.raw<BarClaim[]>([]);
-  #picked = $state<BarTab.Chat | BarTab.Guide>(BarTab.Chat);
+  #picked = $state<PickableTab>(BarTab.Chat);
+  #off: readonly BarTab[];
   #asked = new WeakSet<ChatPrefill>();
   prefill = $state.raw<ChatPrefill | null>(null);
   reload = $state(0);
   propertiesPane = $state.raw<HTMLElement | null>(null);
   width = $state(readChatPanelPx());
+
+  constructor(off: readonly BarTab[] = []) {
+    this.#off = off;
+    this.#picked = SHARED_TABS.find((t) => !off.includes(t)) ?? BarTab.Guide;
+  }
 
   get active(): BarClaim | null {
     return this.#claims.at(-1) ?? null;
@@ -45,7 +55,8 @@ export class RightBarHost {
   }
 
   get tabs(): BarTab[] {
-    return this.active?.binding.properties ? [BarTab.Properties, ...SHARED_TABS] : [...SHARED_TABS];
+    const shared = SHARED_TABS.filter((t) => !this.#off.includes(t));
+    return this.active?.binding.properties ? [BarTab.Properties, ...shared] : shared;
   }
 
   get tab(): BarTab {
@@ -66,6 +77,9 @@ export class RightBarHost {
     const properties = this.active?.binding.properties;
     if (tab === BarTab.Properties) {
       properties?.onshow(true);
+      return;
+    }
+    if (this.#off.includes(tab)) {
       return;
     }
     this.#picked = tab;
@@ -93,7 +107,7 @@ export class RightBarHost {
   }
 }
 
-export const rightBar = new RightBarHost();
+export const rightBar = new RightBarHost(localOff(LocalOff.Chat, publicEnv) ? [BarTab.Chat] : []);
 
 export function portalInto(node: HTMLElement, target: HTMLElement) {
   target.appendChild(node);

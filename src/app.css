@@ -1,4 +1,5 @@
 @import './lib/styles/safe-area.css';
+@import './lib/styles/desktop-window.css';
 /* ============================================================
    feega — shared app shell + components.
    This is the design system for the product surface. When this
@@ -352,8 +353,8 @@
   --ui-panel: var(--grey-3);
   --ui-panel-sunken: var(--grey-2);
   --ui-panel-raised: var(--grey-4);
-  --ui-input: var(--grey-4);
-  --ui-input-hover: var(--grey-5);
+  --ui-input: var(--grey-2);
+  --ui-input-hover: var(--grey-3);
   --ui-wash: var(--grey-4);
   --ui-pressed: var(--grey-6);
   --ui-divider: var(--grey-5);
@@ -1101,4 +1102,8 @@ html[data-hydrating] :is(button, [role='button'], input, select, textarea, label
 
 @keyframes awaiting-hydration {
   to { opacity: 0.55; }
+}
+
+.ui-section {
+  border-bottom: 1px solid var(--ui-divider);
 }

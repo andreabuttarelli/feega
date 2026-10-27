@@ -24,6 +24,7 @@ import { textPaint } from '../fill/render';
 import { elementStrokes } from '../stroke/elements';
 import { textStroke } from '../stroke/render';
 import { textBody } from './text-body';
+import { CUSTOM_ROOT_PREFIX } from '../gpu-full/dom/tree';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
 
@@ -118,8 +119,10 @@ export function placed(ctx: { id: string; width: number; height: number }, p: Pl
 
 const frames = (ctx: { fps: number }, n: number) => n / ctx.fps;
 
-const missing = (label: string) =>
-  `<div style="${css({ width: '100%', height: '100%', background: INK.paper2, color: INK.inkSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: '24px' })}">${esc(label)}</div>`;
+const readRoot = (id: string) => `id="${CUSTOM_ROOT_PREFIX}${esc(id)}"`;
+
+const missing = (label: string, id: string) =>
+  `<div ${readRoot(id)} style="${css({ width: '100%', height: '100%', background: INK.paper2, color: INK.inkSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: '24px' })}">${esc(label)}</div>`;
 
 type Framing = { fit: string; focusX: number; focusY: number };
 
@@ -223,7 +226,7 @@ const Image: Template<'Image'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
     const url = ctx.asset(ctx.p.assetId);
-    return placed(ctx, ctx.p, url ? zoomed(url, ctx.p) : missing('Pick an image'), true);
+    return placed(ctx, ctx.p, url ? zoomed(url, ctx.p) : missing('Pick an image', ctx.id), true);
   }
 };
 
@@ -241,7 +244,7 @@ const Video: Template<'Video'> = {
   html: (ctx) => {
     const url = ctx.asset(ctx.p.assetId);
     if (!url) {
-      return placed(ctx, ctx.p, missing('Pick a video'), true);
+      return placed(ctx, ctx.p, missing('Pick a video', ctx.id), true);
     }
     const segments = ctx.remap();
     if (segments) {
@@ -273,7 +276,7 @@ const Logo: Template<'Logo'> = {
     const url = ctx.asset(ctx.p.assetId) ?? ctx.logoUrl;
     const inner = url
       ? `<img src="${esc(url)}" alt="" style="${css({ width: '100%', height: '100%', objectFit: 'contain' })}" />`
-      : `<div style="${css({ fontFamily: SANS, fontWeight: 600, fontSize: px(ctx.p.height * ctx.height * 0.5), color: ctx.color('brand.text'), letterSpacing: '-0.04em' })}">${esc(ctx.brandName)}</div>`;
+      : `<div ${readRoot(ctx.id)} style="${css({ height: px(boxOf(ctx.p, ctx).height), display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: JUSTIFY[ctx.p.align] })}"><div style="${css({ fontFamily: SANS, fontWeight: 600, fontSize: px(ctx.p.height * ctx.height * 0.5), color: ctx.color('brand.text'), letterSpacing: '-0.04em' })}">${esc(ctx.brandName)}</div></div>`;
     return placed(ctx, ctx.p, inner);
   }
 };
@@ -296,6 +299,11 @@ const Precomp: Template<'Precomp'> = {
 };
 
 const Adjustment: Template<'Adjustment'> = {
+  timing: Timing.Media,
+  html: () => ''
+};
+
+const Light: Template<'Light'> = {
   timing: Timing.Media,
   html: () => ''
 };
@@ -397,7 +405,7 @@ const Model3D: Template<'Model3D'> = {
   html: (ctx) => {
     const backdrop = BACKDROP[ctx.p.backdrop];
     const stage = threeStage(ctx, ctx.p, backdrop ? ctx.color(backdrop) : null);
-    return ctx.asset(ctx.p.assetId) ? stage : missing('Pick a 3D model');
+    return ctx.asset(ctx.p.assetId) ? stage : missing('Pick a 3D model', ctx.id);
   }
 };
 
@@ -422,7 +430,7 @@ const Logo3D: Template<'Logo3D'> = {
   html: (ctx) => {
     const backdrop = BACKDROP[ctx.p.backdrop];
     const stage = threeStage(ctx, ctx.p, backdrop ? ctx.color(backdrop) : null);
-    return (ctx.asset(ctx.p.assetId) ?? ctx.logoUrl) ? stage : missing('Pick an SVG logo');
+    return (ctx.asset(ctx.p.assetId) ?? ctx.logoUrl) ? stage : missing('Pick an SVG logo', ctx.id);
   }
 };
 
@@ -443,13 +451,13 @@ const Composition: Template<'Composition'> = {
   html: (ctx) => {
     const media = resolvedMedia(ctx.p, ctx.asset);
     if (!media.length) {
-      return missing('Add images or videos');
+      return missing('Add images or videos', ctx.id);
     }
     const fill = css({ position: 'absolute', inset: '0', width: '100%', height: '100%' });
     const videos = media
       .map((m, i) => (m.kind === 'video' ? `<video id="${compositionVideoId(ctx.id, i)}" src="${esc(m.url)}" crossorigin="anonymous" preload="auto" muted playsinline data-start="${ctx.start}" data-duration="${ctx.length}" data-media-start="0" style="${css({ position: 'absolute', inset: '0', width: '100%', height: '100%', objectFit: 'cover' })}"></video>` : ''))
       .join('');
-    return `${videos}<div style="${css({ position: 'absolute', inset: '0', background: ctx.color(ctx.p.background) })}"></div><canvas id="comp-${ctx.id}" width="${ctx.width}" height="${ctx.height}" style="${fill}"></canvas>`;
+    return `<div ${readRoot(ctx.id)} style="${fill}">${videos}<div style="${css({ position: 'absolute', inset: '0', background: ctx.color(ctx.p.background) })}"></div><canvas id="comp-${ctx.id}" width="${ctx.width}" height="${ctx.height}" style="${fill}"></canvas></div>`;
   }
 };
 
@@ -460,9 +468,9 @@ const Custom: Template<'Custom'> = {
   html: (ctx) => {
     const component = ctx.components[ctx.p.name];
     if (!component) {
-      return missing(`No component ${ctx.p.name}`);
+      return missing(`No component ${ctx.p.name}`, ctx.id);
     }
-    return `<div class="cc" id="cc-${ctx.id}" data-component="${esc(ctx.p.name)}">${scopedCss(ctx.id, component.source.css)}${component.source.html}</div>`;
+    return `<div class="cc" ${readRoot(ctx.id)} data-component="${esc(ctx.p.name)}">${scopedCss(ctx.id, component.source.css)}${component.source.html}</div>`;
   }
 };
 
@@ -503,5 +511,6 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   ShaderEffect,
   Precomp,
   Adjustment,
+  Light,
   Custom
 };

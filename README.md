@@ -11,7 +11,7 @@
   <a href="https://feega.app"><img src="https://img.shields.io/badge/Get_started-feega.app-c485fe?style=flat&labelColor=131313" alt="Get started on feega.app" /></a>
 </p>
 
-![feega](./docs/readme-hero.png)
+![feega: design, motion and AI on one canvas](./docs/readme-hero.gif)
 
 **feega is an open-source infinite canvas where people and AI agents design, animate and generate
 together.** You draw frames, animate them on a timeline and export them; the chat agent, the
@@ -31,13 +31,17 @@ together.** You draw frames, animate them on a timeline and export them; the cha
 One canvas saved in one file: no account, no database, no Docker. You need Node 22.
 
 ```sh
-git clone https://github.com/andreabuttarelli/feega && cd feega && npm install
-npm run local -- my-canvas.feega        # http://localhost:5173
+npx feega my-canvas.feega               # http://localhost:5173
 ```
 
-The first run builds the app (a few minutes). The file is created if it does not exist and saved
+The first run downloads the app into `~/.feega/app/`; later starts update it when a newer one exists. From a clone,
+`npm run local -- my-canvas.feega` does the same and builds the app instead (a few minutes). The file is created if it does not exist and saved
 as you work. To continue in the cloud, import it at [feega.app](https://feega.app) with
-**Import .feega**. Sharing, comments, saved versions and AI generation need the cloud and say so.
+**Import .feega**. Sharing, comments and saved versions need the cloud and say so.
+
+To generate with your own provider keys, set `KIE_API_KEY` and/or `LLM_API_KEY` (OpenRouter) in the
+environment or in `.env`: the text, image and video nodes appear, no plan or credits. Keys never
+enter the `.feega` file.
 
 ## Run it locally as an agent
 
@@ -46,7 +50,7 @@ the server on port 5173 and it answers as the local user. Every edit appears liv
 browser tab.
 
 ```sh
-npm run local -- work.feega &                      # 1. server on http://localhost:5173
+npx feega work.feega --no-open &                   # 1. server on http://localhost:5173
 curl -s localhost:5173/api/v1/version              # 2. {"localMode":true,…}
 feega projects && feega canvases <projectId>       # 3. the one project and its one canvas
 ```
@@ -119,7 +123,8 @@ Nothing is credit-gated (`BILLING_PROVIDER=open`). Full guide, limits and timing
 ## Stack
 
 TypeScript, SvelteKit, Supabase (Postgres, Auth, Storage, Realtime), Node.js 22, a WebGPU canvas
-with a WebGL fallback.
+with a WebGL fallback. The marketing site (feega.app) is a separate SvelteKit project in
+`landing/`: `npm --prefix landing ci && npm --prefix landing run dev`.
 
 ## Contributing
 

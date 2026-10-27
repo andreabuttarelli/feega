@@ -23,7 +23,7 @@ describe.each(Object.entries(sources))('lo switcher %s', (_name, source) => {
   });
 
   it('mostra il brand del progetto quando c\'è', () => {
-    expect(source).toMatch(/{#if brandName}/);
+    expect(source).toMatch(/{#if brandName/);
   });
 
   it('il nome lungo si tronca e resta leggibile nel tooltip', () => {
