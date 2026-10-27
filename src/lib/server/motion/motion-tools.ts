@@ -189,8 +189,9 @@ import type { PropertyDef } from '@feega/motion-core/motion/property-resolve';
 import { placeInstance } from '$lib/motion/canvas-components';
 import { runEditSchema, type RunEdit } from '@feega/motion-core/motion/text-runs';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
-import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '@feega/motion-core/motion/fonts/model';
+import { BuiltinFont, FONT_WEIGHTS, FontSource, fontRefProblem, searchFonts } from '@feega/motion-core/motion/fonts/model';
 import { registerFont, removeFont, replaceFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+import { FontOrigin, withPicked } from '$lib/motion/fonts/local';
 import type { FontFamily } from '$lib/motion/fonts/library';
 import { EFFECTS, EFFECT_KINDS } from '@feega/motion-core/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
@@ -2208,9 +2209,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_fonts: tool({
-      description: `Search the fonts: uploaded (the org's own font files, usable by family name in set_font, register_font and font params) and the Google Fonts catalogue (${GOOGLE_FONTS.length} families, most popular first): family, category, weights, italic. Built-ins: ${Object.values(BuiltinFont).join(', ')}. Fonts this video already has are in get_motion_doc fonts.`,
+      description: `Search the fonts: uploaded (the org's own font files, usable by family name in set_font, register_font and font params) and the Google Fonts catalogue (${GOOGLE_FONTS.length} families, most popular first): family, category, weights, italic. Built-ins: ${Object.values(BuiltinFont).join(', ')}. Fonts this video already has are in inVideo, each with source and local: true for a font installed on one computer only (it shows a fallback font on other computers and in server renders).`,
       inputSchema: z.object({ query: z.string().max(60).default(''), limit: z.number().int().min(1).max(MAX_FONT_RESULTS).default(DEFAULT_FONT_RESULTS) }),
       execute: async (input) => ({
+        inVideo: session.doc.fonts.map((f) => ({ family: f.family, source: f.source, local: f.source === FontSource.Local })),
         uploaded: (await uploadedFonts()).filter((f) => f.family.toLowerCase().includes(input.query.trim().toLowerCase())).map((f) => ({ family: f.family, weights: [...new Set(f.variants.map((v) => v.weight))], italic: f.variants.some((v) => v.italic) })),
         fonts: searchFonts(GOOGLE_FONTS, input.query, [], input.limit).map((f) => ({ family: f.f, category: f.c, weights: f.w, italic: f.i === 1 }))
       })
@@ -2248,10 +2250,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     register_font: tool({
-      description: 'Add a Google Fonts family or an uploaded font (list_fonts uploaded) to the video. Call it before add_clip names the family in props.font, and for a custom component font param (then set_props with that family).',
-      inputSchema: z.object({ family: z.string().max(64) }),
+      description: `Add a Google Fonts family or an uploaded font (list_fonts uploaded) to the video. Call it before add_clip names the family in props.font, and for a custom component font param (then set_props with that family). origin ${FontOrigin.Local} adds a font installed on the user's computer by exact family name: it is flagged local in the video and shows a fallback font on other computers and in server renders.`,
+      inputSchema: z.object({ family: z.string().max(64), origin: z.enum(FontOrigin).optional() }),
       execute: async (input) => {
-        const picked = withUploaded(session.doc, input.family, await uploadedFonts());
+        const picked = withPicked(session.doc, input.family, input.origin ?? FontOrigin.Catalogue, await uploadedFonts());
         return apply(registerFont(picked.doc, picked.family, GOOGLE_FONTS), `registered font ${picked.family}`);
       }
     }),
