@@ -445,7 +445,7 @@
   }
 
   .top-box.right > :global(.connection-dot) {
-    margin-inline-start: 6px;
+    margin-inline-start: calc((var(--ui-control-h) - 8px) / 2);
   }
 
   .top-box {
