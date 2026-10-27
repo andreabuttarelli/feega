@@ -23,6 +23,8 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
     'List the canvases of THIS project. One project only — never other projects, never a brand.',
   list_nodes:
     'List live nodes on one canvas of THIS project (id, type, position, data, version). Read this before update_node or run_node: the version is required and the data is what you must resend.',
+  get_selection:
+    'The nodes the user has selected on a canvas of THIS project right now, and the visible view, per open session (sessions[].selection ids, view {cx,cy,zoom}). Waits up to 3.5 s; answers reason no_open_session when the canvas is not open. Use it for "this", "these", "the selected".',
   create_node:
     [
       'Create a node on a canvas of THIS project. data must match the type exactly (describe_node_types): unknown fields and missing required fields are refused.',
@@ -33,6 +35,16 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
     'Change some fields of a node\'s data on THIS project. Send only the fields to change: the rest is kept, and a field set to null is removed. `params` and `filters` merge one level down; arrays replace whole. Returns { outcome: "invalid" } when the merged data breaks the node schema.',
   move_node:
     'Move a node on its canvas. Position only: last-write-wins, does not touch node data or version.',
+  align_nodes:
+    'Align the picked nodes of a canvas of THIS project to an edge or centre line of their shared bounds (left, center, right, top, middle, bottom). Same as the align buttons in the app.',
+  distribute_nodes:
+    'Spread 3 or more nodes of a canvas of THIS project with equal gaps along x or y. The outer two stay in place.',
+  tidy_nodes:
+    'Untangle overlapping nodes of a canvas of THIS project with the smallest moves, as Tidy up in the app.',
+  stack_nodes:
+    'Line the picked nodes up in a row or column (the longer spread decides) with a gap, as Stack in the app.',
+  undo_last:
+    'Revert your last write on a canvas of THIS project: create, update, delete or a line, together with the writes made in the same instant. Refused when someone changed the node since. Moves are not recorded: put a node back with move_node. Calling it twice undoes the undo.',
   connect_nodes:
     'Connect two nodes on one canvas of THIS project. The edge is directed: source feeds target. Refused when the target node uses an uncensored model — those take no inputs of any kind, ever: switch the model first. Also refused when the source medium does not feed the target — an audio node only takes what its current operation needs (describe_node_types type "audio" lists them).',
   move_frame_element:

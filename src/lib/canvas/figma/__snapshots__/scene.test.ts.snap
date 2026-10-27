@@ -106,6 +106,7 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
           },
         ],
         "clip": "none",
+        "component": null,
         "effects": [],
         "fills": [],
         "item": {
@@ -165,6 +166,7 @@ nulla",
       },
     ],
     "clip": "clip",
+    "component": null,
     "effects": [],
     "fills": [
       {
@@ -302,6 +304,7 @@ nulla",
               },
             ],
             "clip": "none",
+            "component": null,
             "effects": [],
             "fills": [],
             "item": {
@@ -361,6 +364,7 @@ nulla",
           },
         ],
         "clip": "clip",
+        "component": null,
         "effects": [],
         "fills": [
           {

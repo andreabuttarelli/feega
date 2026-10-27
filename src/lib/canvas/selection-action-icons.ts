@@ -75,6 +75,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'run-workflow': Play,
   'save-technique': BookmarkPlus,
   'run-technique': Play,
+  'run-technique-rows': ListEnd,
   'edit-technique': Pencil,
   'detach-technique': Unlink,
   'run-downstream': ListEnd,

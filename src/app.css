@@ -353,8 +353,8 @@
   --ui-panel: var(--grey-3);
   --ui-panel-sunken: var(--grey-2);
   --ui-panel-raised: var(--grey-4);
-  --ui-input: var(--grey-4);
-  --ui-input-hover: var(--grey-5);
+  --ui-input: var(--grey-2);
+  --ui-input-hover: var(--grey-3);
   --ui-wash: var(--grey-4);
   --ui-pressed: var(--grey-6);
   --ui-divider: var(--grey-5);
