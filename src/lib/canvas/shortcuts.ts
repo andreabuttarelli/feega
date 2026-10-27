@@ -183,10 +183,26 @@ function altCommand(e: KeyboardEvent): CanvasCommand | null {
   return edge ? { id: 'align', edge } : null;
 }
 
+const ACTIVATION_KEYS = new Set(['Enter', ' ']);
+const CONTROL_TAGS = new Set(['button', 'select', 'summary', 'input', 'textarea']);
+const CONTROL_ROLES = new Set(['button', 'link', 'checkbox', 'radio', 'switch', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'tab', 'combobox']);
+
+function isControl(target: EventTarget | null): boolean {
+  const el = target as (Partial<HTMLElement> & { tagName?: string }) | null;
+  if (!el?.tagName) return false;
+  const tag = el.tagName.toLowerCase();
+  const attr = (name: string) => el.getAttribute?.(name) ?? null;
+  if (CONTROL_TAGS.has(tag) || el.isContentEditable === true) return true;
+  if (tag === 'a' && attr('href') !== null) return true;
+  return CONTROL_ROLES.has(attr('role') ?? '');
+}
+
+const ownsKey = (e: KeyboardEvent): boolean => isTypingTarget(e.target) || (ACTIVATION_KEYS.has(e.key) && isControl(e.target));
+
 export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   if (e.altKey) return altCommand(e);
 
-  if (isTypingTarget(e.target)) return null;
+  if (ownsKey(e)) return null;
 
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key;

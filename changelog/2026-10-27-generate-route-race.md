@@ -16,3 +16,9 @@ both client and server, so a run in flight lost its spinner. `shownOutput`
 
 Rejected: making the server re-read the DB row (it already honours the posted params; the
 row was the stale side).
+
+**Enter on a control:** the canvas `enter` shortcut swallowed Enter on a focused Generate
+button, so the keyboard could not run a node. `matchCanvasShortcut` now leaves Enter and
+Space to any focused control (button, link, role=button, checkbox…). Other keys still reach
+the canvas: blocking Delete or arrows whenever a toolbar button kept focus after a click
+would break them.
