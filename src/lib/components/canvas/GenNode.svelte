@@ -7,7 +7,8 @@
   import type { RememberedVariants } from '$lib/canvas/variants';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
   import { filterSkills, insertSkill, slashQueryAt, type PromptSkill, type SlashQuery } from '$lib/canvas/prompt-skills';
-  import CreditAmount from '$lib/components/CreditAmount.svelte';
+  import { formatPrice } from '$lib/components/credit-amount-format';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import { untrack } from 'svelte';
   import OutputDragHandle from './OutputDragHandle.svelte';
   import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
@@ -333,19 +334,24 @@
         </button>
       {:else if onrunloop && loopVisible}
         <button type="button" class="gen-loop" onclick={() => onrunloop?.()} disabled={!canRun}>
-          Loop ×{loopCombinationCount}{#if loopCredits !== null} · <CreditAmount amount={loopCredits} approx />{:else if quote.variable} · variable cost{/if}
+          Loop ×{loopCombinationCount}{#if loopCredits !== null} · {formatPrice(loopCredits)}{:else if quote.variable} · variable{/if}
         </button>
       {/if}
       <span class="gen-run">
-        <button type="button" class="gen-cta" data-testid="gen-run" title={blocked ?? undefined} onclick={() => onrun?.()} disabled={!canRun}>
-          {runLabelOf(quote)}{#if runCredits !== null} · <CreditAmount amount={runCredits} approx />{:else if quote.variable} · variable cost{/if}
+        {#if runCredits !== null}
+          <span class="gen-price" data-testid="gen-price">{formatPrice(runCredits)}</span>
+        {:else if quote.variable}
+          <span class="gen-price">variable</span>
+        {/if}
+        <button type="button" class="gen-cta" data-testid="gen-run" aria-label={runLabelOf(quote)} title={blocked ?? runLabelOf(quote)} onclick={() => onrun?.()} disabled={!canRun}>
+          <ArrowUp size={16} strokeWidth={2.25} />
         </button>
         {#if providerQuotes.length && !variableTextInput}
           <ul class="gen-providers" data-testid="provider-quotes">
             {#each providerQuotes as providerQuote (providerQuote.provider)}
               <li class:is-selected={providerQuote.selected} class:is-cheapest={providerQuote.cheapest}>
                 <span>{providerQuote.label}</span>
-                {#if providerQuote.credits !== null}<CreditAmount amount={providerQuote.credits} approx />{/if}
+                {#if providerQuote.credits !== null}<span>{formatPrice(providerQuote.credits)}</span>{/if}
                 {#if providerQuote.cheapest}<em>cheapest</em>{/if}
               </li>
             {/each}
@@ -755,9 +761,18 @@
     opacity: 0.35;
     cursor: default;
   }
+  .gen-price {
+    align-self: center;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft, #6e6e73);
+    white-space: nowrap;
+  }
   .gen-cta {
-    gap: 4px;
-    font-weight: 500;
+    justify-content: center;
+    width: 30px;
+    padding: 0;
+    border-radius: var(--ui-radius-full, 9999px);
     background: var(--ui-accent, #0099ff);
     color: #fff;
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 1px 2px rgb(0 0 0 / 0.12);
@@ -777,6 +792,8 @@
   .gen-run {
     position: relative;
     display: inline-flex;
+    align-items: center;
+    gap: 8px;
   }
   .gen-providers {
     display: none;
@@ -914,7 +931,16 @@
     text-overflow: ellipsis;
     transition: height var(--ui-dur, 200ms) var(--ui-ease, ease);
   }
+  .is-compact .gen-actions:has(.gen-prompt:focus) {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .is-compact .gen-actions:has(.gen-prompt:focus) .gen-run {
+    margin-left: auto;
+  }
   .is-compact .gen-actions .gen-prompt:focus {
+    order: -1;
+    flex: 1 1 100%;
     height: 96px;
     white-space: pre-wrap;
     overflow: auto;
@@ -953,6 +979,9 @@
   .is-compact .gen-actions button,
   .is-compact .gen-actions :global(button) {
     height: 28px;
+  }
+  .is-compact .gen-cta {
+    width: 28px;
   }
   .is-compact .gen-skill-save {
     width: 28px;

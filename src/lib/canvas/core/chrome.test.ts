@@ -204,3 +204,13 @@ describe('a rounded node gets a rounded selection ring', () => {
     expect(round.contours.flat().length).toBeGreaterThan(square.contours.flat().length);
   });
 });
+
+describe('connector ports are round', () => {
+  it('draws a disc, not a square, for every input and output', () => {
+    const items = tileChrome(tile({ inputs: marks('text'), outputs: marks('images') }), glyphs).concat(stateChrome(tile({ inputs: marks('text'), outputs: marks('images') }), glyphs));
+    const ports = items.filter((i) => i.clip === `n1:${ChromePart.PortIn}` || i.clip === `n1:${ChromePart.PortOut}`);
+
+    expect(ports.length).toBeGreaterThan(0);
+    expect(ports.every((p) => p.contours.flat().length > 8)).toBe(true);
+  });
+});

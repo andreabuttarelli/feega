@@ -68,11 +68,9 @@ const REFS = { band: 44, pad: 6, height: 32, padX: 10, gap: 6, icon: 14, size: 1
 const PAST = { band: 30, padX: INSET, padY: 5, size: 10.5, leading: 1.5, padCell: 7, min: 22, gap: 4 };
 const TOGGLE = { height: 24.8, size: 10.5, leading: 1.5 };
 const OUTPUT = { pad: 12, size: 12, leading: 1.5 };
-const MARK = { inset: 7, below: 5, height: 16, padX: 6, size: 10, radius: 4, fill: '#000000', fillAlpha: 0.6, ink: '#ffffff' };
 const FORM = { padX: 9, padY: 7, gapX: 8, gapY: 6, size: 11, leading: 1.5, label: 2, select: { padX: 4, padY: 3 }, play: 24, playGap: 4, track: 4, thumb: 16, slider: 16, disabled: 0.35, trackRest: 0.85, chevron: 12 };
 const MORE_VOICES_FALLBACK = 'More voices';
 const PLACEHOLDER_ALPHA = 0.55;
-const MARK_TEXT = 'AI-generated';
 const ADD_REFERENCES = 'Add references';
 const UNLOCK = 'Sblocca';
 const RETRY = 'Try again';
@@ -97,35 +95,50 @@ function write(x: Ctx, part: GenPart, s: string, size: number, colour: string, l
 
 const centred = (x: Ctx, s: string, size: number, set: TextSet, font: Glyphs = x.glyphs) => words(x, s, size, set, font).width;
 
-function buttonWidth(x: Ctx, b: GenButton): number {
-  const label = words(x, `${b.label}${b.credits ? ' · ' : ''}`, BUTTON.size, { leading: BUTTON.leading }).width;
-  const credits = b.credits ? CREDIT.icon + CREDIT.gap + words(x, b.credits, BUTTON.size, { leading: BUTTON.leading }).width : 0;
-  return BUTTON.padX * 2 + label + credits;
+const PRICE = { size: 11.5, leading: 1.5, gap: 8 };
+const ARROW = { stroke: 2, half: 4.5, head: 4 };
+
+function labelOf(b: GenButton): string {
+  return b.credits ? `${b.label} · ${b.credits}` : b.label;
+}
+
+function sendIcon(x: Ctx, part: GenPart, cx: number, cy: number, ink: string): PathItem {
+  const shaft = line([cx, cy + ARROW.half, cx, cy - ARROW.half], ARROW.stroke);
+  const head = line([cx - ARROW.head, cy - ARROW.half + ARROW.head, cx, cy - ARROW.half, cx + ARROW.head, cy - ARROW.half + ARROW.head], ARROW.stroke);
+  return { ...solid(x.clip(part, 2), at(x, [...shaft, ...head]), ink), rule: FillRule.Union };
+}
+
+function sendButton(x: Ctx, part: GenPart, b: GenButton, right: number, mid: number): { items: PathItem[]; left: number } {
+  const { theme } = x;
+  const tone = (colour: string) => (b.enabled ? colour : mix(colour, theme.paper, DISABLED));
+  const d = BUTTON.height;
+  const cx = right - d / 2;
+  const price = b.credits ? words(x, b.credits, PRICE.size, { leading: PRICE.leading }) : null;
+  const priceLeft = price ? right - d - PRICE.gap - price.width : right - d;
+  return {
+    left: priceLeft,
+    items: [
+      solid(x.clip(part), at(x, circle(cx, mid, d / 2)), tone(theme.accent)),
+      sendIcon(x, part, cx, mid, tone(ON_ACCENT)),
+      ...(b.credits ? write(x, part, b.credits, PRICE.size, theme.inkSoft, priceLeft, mid - (PRICE.size * PRICE.leading) / 2, { leading: PRICE.leading }).map((i) => ({ ...i, clip: x.clip(part, 3) })) : [])
+    ]
+  };
 }
 
 function button(x: Ctx, part: GenPart, b: GenButton, right: number, mid: number, primary: boolean): { items: PathItem[]; left: number } {
+  if (primary) {
+    return sendButton(x, part, b, right, mid);
+  }
   const { theme } = x;
-  const w = buttonWidth(x, b);
-  const textH = BUTTON.size * BUTTON.leading;
+  const label = labelOf(b);
+  const w = BUTTON.padX * 2 + words(x, label, BUTTON.size, { leading: BUTTON.leading }).width;
   const h = BUTTON.height;
   const left = right - w;
   const top = mid - h / 2;
   const tone = (colour: string) => (b.enabled ? colour : mix(colour, theme.paper, DISABLED));
-  const ink = tone(primary ? ON_ACCENT : theme.ink);
-  const fill = tone(primary ? theme.accent : theme.paper2);
-  const label = `${b.label}${b.credits ? ' · ' : ''}`;
-  const labelW = words(x, label, BUTTON.size, { leading: BUTTON.leading }).width;
-  const textTop = mid - textH / 2;
-  const iconLeft = left + BUTTON.padX + labelW;
-  const credit = b.credits
-    ? [
-        { ...solid(x.clip(part, 3), at(x, x.icons.credit.map((k) => k.map((v, i) => (i % 2 === 0 ? v + iconLeft : v + mid - CREDIT.icon / 2)))), ink, CREDIT_ALPHA), rule: FillRule.Union },
-        ...write(x, part, b.credits, BUTTON.size, ink, iconLeft + CREDIT.icon + CREDIT.gap, textTop, { leading: BUTTON.leading }).map((i) => ({ ...i, clip: x.clip(part, 4) }))
-      ]
-    : [];
   return {
     left,
-    items: [solid(x.clip(part), at(x, roundRect(left, top, w, h, BUTTON.radius)), fill), ...write(x, part, label, BUTTON.size, ink, left + BUTTON.padX, textTop, { leading: BUTTON.leading }).map((i) => ({ ...i, clip: x.clip(part, 2) })), ...credit]
+    items: [solid(x.clip(part), at(x, roundRect(left, top, w, h, BUTTON.radius)), tone(theme.paper2)), ...write(x, part, label, BUTTON.size, tone(theme.ink), left + BUTTON.padX, mid - (BUTTON.size * BUTTON.leading) / 2, { leading: BUTTON.leading }).map((i) => ({ ...i, clip: x.clip(part, 2) }))]
   };
 }
 
@@ -182,15 +195,6 @@ function output(x: Ctx, text: string, b: Box): PathItem[] {
   const top = b.y + TOGGLE.height + OUTPUT.pad;
   const body = write(x, GenPart.Output, text, OUTPUT.size, theme.ink, b.x + OUTPUT.pad, top, { leading: OUTPUT.leading, width: b.w - 2 * OUTPUT.pad, height: b.y + b.h - top });
   return [...toggle, ...body];
-}
-
-function mark(x: Ctx, b: Box): PathItem[] {
-  const markW = centred(x, MARK_TEXT, MARK.size, { leading: MARK.height / MARK.size }) + 2 * MARK.padX;
-  const markTop = b.y + b.h - MARK.below - MARK.height;
-  return [
-    solid(x.clip(GenPart.Mark), at(x, roundRect(b.x + MARK.inset - BORDER, markTop, markW, MARK.height, MARK.radius)), MARK.fill, MARK.fillAlpha),
-    ...write(x, GenPart.Mark, MARK_TEXT, MARK.size, MARK.ink, b.x + MARK.inset - BORDER + MARK.padX, markTop, { leading: MARK.height / MARK.size }).map((i) => ({ ...i, clip: x.clip(GenPart.Mark, 1) }))
-  ];
 }
 
 const BODIES: Record<GenTileView['state'], (x: Ctx, v: GenTileView, b: Box) => PathItem[]> = {
@@ -423,14 +427,6 @@ export function genMatte(c: At, v: GenTileView): PathItem {
   const b = genBody(c, v);
   const radius = isCompact(v) ? CARD_RADIUS - BORDER : WELL_RADIUS;
   return solid(`${c.id}:${GenPart.Body}:matte`, roundRect(c.x + b.x, c.y + b.y, b.w, b.h, radius), MATTE_INK);
-}
-
-export function genMark(c: At, v: GenTileView, kit: GenKit): PathItem[] {
-  if (v.state !== 'done') {
-    return [];
-  }
-  const x: Ctx = { ...kit, c, clip: (p, n) => (n ? `${c.id}:${p}:${n}` : `${c.id}:${p}`) };
-  return mark(x, genBody(c, v));
 }
 
 export function genItems(c: At, v: GenTileView, kit: GenKit): PathItem[] {

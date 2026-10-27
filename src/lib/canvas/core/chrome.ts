@@ -116,12 +116,13 @@ const RINGS: Record<NodeChrome, (t: StateTile) => PathItem[]> = {
 const spaced = (t: ChromeTile, i: number, n: number) => t.y + ((i + 1) / (n + 1)) * t.height;
 
 function port(t: ChromeTile, part: ChromePart, left: number, centre: number, m: PortMark): PathItem[] {
-  const top = centre - PORT_SIZE / 2;
   const colour = CONNECTOR_STYLE[m.type].color;
   const look = PORT_LOOK[m.state];
   const inset = PORT_RING + PORT_RING / 2;
-  const ring = look.ring ? [item(t, ChromePart.PortRing, line(rect(left - inset, top - inset, PORT_SIZE + 2 * inset, PORT_SIZE + 2 * inset), PORT_RING, true), colour)] : [];
-  return [item(t, part, [rect(left, top, PORT_SIZE, PORT_SIZE)], colour, look.opacity), ...ring];
+  const cx = left + PORT_SIZE / 2;
+  const outer = PORT_SIZE / 2 + inset + PORT_RING / 2;
+  const ring = look.ring ? [item(t, ChromePart.PortRing, [...circle(cx, centre, outer), ...circle(cx, centre, outer - PORT_RING).map(reverse)], colour)] : [];
+  return [item(t, part, circle(cx, centre, PORT_SIZE / 2), colour, look.opacity), ...ring];
 }
 
 function ports(t: ChromeTile): PathItem[] {

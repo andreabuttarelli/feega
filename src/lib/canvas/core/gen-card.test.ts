@@ -5,7 +5,7 @@ import { mix } from '$lib/canvas/gpu/theme';
 import type { GenTileView } from '$lib/canvas/gen-tile-view';
 import type { Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
-import { GenPart, genItems, genMark, type GenIcons } from './gen-card';
+import { GenPart, genItems, type GenIcons } from './gen-card';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', paper2: '#f9f9f9', line: '#ededef', line2: '#d2d2d7', ink: '#1d1d1f', inkSoft: '#6e6e73', chip: '#f2f2f2', chipInk: '#141414', accent: '#0099ff', wire: '#b3b3b6', iterate: '#d97706' };
 const glyphs: Glyphs = (text, size) => ({ contours: text ? [[0, 0, text.length * size * 0.5, 0, text.length * size * 0.5, size, 0, size]] : [], width: text.length * size * 0.5, height: size });
@@ -89,11 +89,6 @@ describe('genItems', () => {
     const items = draw(view({ loop: { label: 'Loop ×2', credits: '~0.08', variable: false, enabled: false, cancel: false } }));
 
     expect(parts(items, GenPart.Loop).length).toBeGreaterThan(0);
-  });
-
-  it('marks a finished output as AI-generated, and nothing before', () => {
-    expect(genMark(card, view({ state: 'done' }), { theme, glyphs, bold: glyphs, icons })).toHaveLength(2);
-    expect(genMark(card, view(), { theme, glyphs, bold: glyphs, icons })).toHaveLength(0);
   });
 
   it('draws the markdown toggle over a finished text output', () => {

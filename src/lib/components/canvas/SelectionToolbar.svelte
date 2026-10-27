@@ -1,6 +1,6 @@
 <script lang="ts">
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
-  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import Maximize2 from '@lucide/svelte/icons/maximize-2';
   import Columns2 from '@lucide/svelte/icons/columns-2';
   import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
@@ -19,7 +19,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-  import CreditAmount from '$lib/components/CreditAmount.svelte';
+  import { formatPrice } from '$lib/components/credit-amount-format';
   import { cn } from '$lib/utils.js';
   import ModelMenu from './ModelMenu.svelte';
   import VariantsMenu from './VariantsMenu.svelte';
@@ -217,21 +217,20 @@
             <VariantsMenu quote={runQuote.variants} onchange={(patch) => onpropertychange?.(patch)} />
           {/if}
           {#if runQuote}
+            {#if runQuote.credits !== null}
+              <span class="run-price" data-testid="run-price">{formatPrice(runQuote.credits)}</span>
+            {:else if runQuote.variable}
+              <span class="run-price">variable</span>
+            {/if}
             <Tooltip.Root>
               <Tooltip.Trigger>
                 {#snippet child({ props })}
-                  <Button {...props} size="sm" class="h-11 md:h-8" data-control="run" disabled={!runQuote.enabled} onclick={() => onrun?.()}>
-                    <Sparkles strokeWidth={1.8} />
-                    {runLabelOf(runQuote)}
-                    {#if runQuote.credits !== null}
-                      <span class="opacity-70">· <CreditAmount amount={runQuote.credits} approx /></span>
-                    {:else if runQuote.variable}
-                      <span class="opacity-70">· variable cost</span>
-                    {/if}
+                  <Button {...props} size="icon-sm" class="size-11 rounded-full md:size-8" data-control="run" aria-label={runLabelOf(runQuote)} disabled={!runQuote.enabled} onclick={() => onrun?.()}>
+                    <ArrowUp strokeWidth={2.25} />
                   </Button>
                 {/snippet}
               </Tooltip.Trigger>
-              <Tooltip.Content side="top">{runQuote.reason ?? 'Run this node'}</Tooltip.Content>
+              <Tooltip.Content side="top">{runQuote.reason ?? runLabelOf(runQuote)}</Tooltip.Content>
             </Tooltip.Root>
             {#if variantsInFlight > 0}
               <Button size="sm" variant="secondary" class="h-11 md:h-8" data-control="cancel-variants" onclick={() => oncancelvariants?.()}>
@@ -354,6 +353,20 @@
     box-shadow: var(--ui-shadow-float);
   }
 
+  .toolbar {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    max-width: min(560px, calc(100vw - 16px));
+  }
+
+  .group[aria-label='Actions'] {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding: 4px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--ui-divider);
+  }
+
   .toolbar :global(button),
   .toolbar :global([data-control]) {
     border-radius: var(--ui-radius-md);
@@ -406,6 +419,14 @@
     .group[aria-label='Actions'] {
       justify-content: space-between;
     }
+  }
+
+  .run-price {
+    padding: 0 2px 0 4px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ui-text-secondary);
+    white-space: nowrap;
   }
 
   .tag-row {

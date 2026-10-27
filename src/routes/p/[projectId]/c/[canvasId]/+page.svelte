@@ -4168,7 +4168,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
               {#if row.data.outputUncensored === true}
                 <span class="uncensored-output" data-testid="uncensored-output">Uncensored</span>
               {/if}
-              <span class="ai-generated-mark" data-testid="ai-generated-mark">AI-generated</span>
               {#if gen.medium === 'text'}
                 <div class="gen-text-wrap">
                   <div class="gen-text-toggle" role="group" aria-label="Vista del testo">
@@ -4622,18 +4621,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     border: none;
     text-decoration: underline;
     cursor: pointer;
-  }
-  .ai-generated-mark {
-    position: absolute;
-    bottom: 6px;
-    left: 6px;
-    z-index: 2;
-    padding: 0 4px;
-    font-size: 0.625rem;
-    line-height: 1rem;
-    color: var(--paper, #fff);
-    background: rgb(0 0 0 / 0.6);
-    pointer-events: none;
   }
   .uncensored-output {
     position: absolute;
