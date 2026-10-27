@@ -61,6 +61,8 @@ import { detachInstance, openDefinition, placeInstance, runInstance } from '$lib
 import { deleteTechnique, listTechniques, TechniqueOutcome } from '$lib/server/repos/techniques';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
+import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import';
+import { MAX_FRAMES } from '$lib/server/figma/import-file';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
 import { listMemberships } from '$lib/server/repos/orgs';
@@ -217,6 +219,17 @@ const drawElementInput = z
   .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse|polygon|star, box:{left,top,width,height}}, {tool:line|arrow, from:{x,y}, to:{x,y}, stroke?:#hex}, or {tool:pen, path:SVG d}, in canvas units') })
   .strict();
 
+const figmaFramesInput = z.object({ url: z.string().describe('a figma.com design link') }).strict();
+const importFigmaInput = z
+  .object({
+    canvasId: z.string(),
+    url: z.string().describe('a figma.com design link; its node-id picks the frame when frameIds is left out'),
+    frameIds: z.array(z.string()).min(1).max(MAX_FRAMES).optional().describe('frame ids from list_figma_frames'),
+    x: z.number().finite(),
+    y: z.number().finite()
+  })
+  .strict();
+
 const drawFrameInput = z
   .object({
     canvasId: z.string(),
@@ -253,6 +266,8 @@ const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().des
 const scaleGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), width: z.number().positive(), height: z.number().positive() }).strict();
 const moveGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), x: z.number().finite(), y: z.number().finite() }).strict();
 const membersOf = (ctx: CanvasCtx, canvasId: string) => nodeMembers(ctx.db, { orgId: ctx.orgId, canvasId, actor: ctx.actor });
+
+const figmaScope = (ctx: CanvasCtx) => ({ db: ctx.db, orgId: ctx.orgId, userId: ctx.userId, projectId: ctx.projectId, actor: ctx.actor });
 
 const framesOf = (ctx: CanvasCtx) => frameStore(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, projectId: ctx.projectId });
 
@@ -833,6 +848,18 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: drawElementInput,
     run: async (ctx, input) => frameAnswer(await drawElement(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.drawn))
+  }),
+
+  list_figma_frames: op({
+    access: Access.Read,
+    input: figmaFramesInput,
+    run: async (ctx, input) => figmaFramesOf(figmaScope(ctx), input.url)
+  }),
+
+  import_figma: op({
+    access: Access.Write,
+    input: importFigmaInput,
+    run: async (ctx, input) => importFigmaInto(figmaScope(ctx), input.canvasId, { url: input.url, nodeIds: input.frameIds ?? null, at: { x: input.x, y: input.y } })
   }),
 
   draw_frame: op({

@@ -33,6 +33,32 @@ Copy layers in Figma and paste on the canvas.
 
 Add a Figma personal access token in Settings and the grey placeholders fill with the real pictures. Steps and troubleshooting are in [Connect Figma](/integrations/connect-figma/).
 
+## Import from a Figma link
+
+<DemoVideo name="figma-import-link" caption="Open Import from Figma, paste a design link and find its frames. Without a token saved, the dialog asks for one." />
+
+Bring whole frames in without copying anything.
+
+1. In Figma, create a personal access token (Settings, Security, Personal access tokens) with read access to files. In feega, paste it in Settings, Profile.
+2. On the canvas, switch the add bar to the design tools (the left toggle) and choose **Import from Figma**.
+3. Paste a figma.com design link and choose **Find frames**. If the link has a `node-id`, that frame is already ticked.
+4. Tick the frames you want (up to 20) and choose **Import**.
+
+Each frame lands as a frame on the canvas, in the same arrangement it has in Figma, at the middle of your view. Layers, text, vectors, gradients, shadows, auto layout and images come across, the same as a paste. Anything that cannot be carried over is listed. If the images cannot be fetched, the frame still lands with grey placeholders.
+
+The token is stored encrypted, per person, and is never sent back to the browser. It needs access to the file: a file you cannot open in Figma cannot be imported.
+
+From the CLI:
+
+```bash
+feega canvas $PROJECT list_figma_frames --input '{"url":"https://www.figma.com/design/<file key>/<name>?node-id=12-48"}'
+feega canvas $PROJECT import_figma --input '{"canvasId":"<canvas>","url":"https://www.figma.com/design/<file key>/<name>","frameIds":["12:48"],"x":0,"y":0}'
+```
+
+Agents do the same with two canvas ops over MCP or the API: `list_figma_frames` with `{url}` returns the frames of the file, and `import_figma` with `{canvasId, url, frameIds, x, y}` draws them. The REST endpoints behind the dialog are `POST /api/v1/projects/{projectId}/figma/frames` and `POST /api/v1/projects/{projectId}/figma/import`.
+
+Not yet: signing in with a Figma account (OAuth). It needs a Figma app registered for feega, so for now the token is the only way to connect.
+
 ## SVG import
 
 Drop or upload an SVG file to get editable vector layers, not a flat image. Gradients, rounded corners, clipping, text and cut-outs (holes) are kept. A pasted SVG keeps its holes too.

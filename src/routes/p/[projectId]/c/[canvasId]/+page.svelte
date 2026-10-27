@@ -223,6 +223,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
+  import FigmaImportDialog from '$lib/components/canvas/FigmaImportDialog.svelte';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
   import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
   import type { Extend } from '$lib/outpaint';
@@ -3550,6 +3551,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
+  let figmaImportAt = $state<{ x: number; y: number } | null>(null);
+
+  function figmaImported(landed: { nodes: unknown[]; undo: unknown[]; skipped: string[] }) {
+    const landedNodes = landed.nodes as CanvasNodeRecord[];
+    nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
+    pushGesture({ items: landed.undo as UndoItem[] });
+    focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
+    if (landed.skipped.length) {
+      failed = `${FIGMA_SKIPPED} ${landed.skipped.join('; ')}`;
+    }
+  }
+
   let figmaJobs = $state<FigmaJob[]>([]);
   let figmaTokenMissing = $state(false);
 
@@ -3971,6 +3984,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(String(nodes.find((n) => n.id === inpaintFor)?.data?.refId ?? '')) ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
   {/if}
+  {#if figmaImportAt}
+    <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/p/{data.projectId}/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />
+  {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
   {/if}
@@ -4056,6 +4072,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onEditTechnique={editTechnique}
     onDetachTechnique={detachTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
+    onFigmaImport={(at) => (figmaImportAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
     onRedo={() => inTurn(redo)}
