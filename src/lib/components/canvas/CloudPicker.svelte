@@ -2,6 +2,8 @@
   import { untrack } from 'svelte';
   import { CLOUD_PROVIDERS, CloudMode, PROVIDER_LABEL, type CloudProviderId } from '$lib/canvas/cloud-picker';
 
+  import { connectionMessage } from '$lib/canvas/connection-messages';
+
   type Entry = { id: string; name: string; folder: boolean; mime: string | null; importable: boolean };
 
   let {
@@ -127,7 +129,7 @@
   {:else if problem === 'not_configured'}
     <p class="note" data-testid="cloud-unconfigured">{PROVIDER_LABEL[provider]} is not set up on this server.</p>
   {:else if problem}
-    <p class="note">Could not load files.</p>
+    <p class="note" data-testid="cloud-problem">{connectionMessage(problem)}</p>
   {:else}
     <ul>
       {#each shown as entry (entry.id)}
