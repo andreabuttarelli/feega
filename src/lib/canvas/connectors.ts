@@ -107,7 +107,7 @@ export function modalityBadges(inputModalities: string[]): ModalityBadge[] {
 /** Il minimo che `ai-models-sync.ts::ModelModalities` porta — nessun import di codice server qui. */
 export type Modalities = { input: string[]; uncensored?: boolean };
 
-const CONNECTOR_MODALITY: Record<Exclude<ConnectorType, 'first_frame' | 'last_frame' | 'motions'>, string> = {
+const CONNECTOR_MODALITY: Record<Exclude<ConnectorType, 'first_frame' | 'last_frame' | 'motions' | 'section'>, string> = {
   text: 'text',
   images: 'image',
   videos: 'video',
