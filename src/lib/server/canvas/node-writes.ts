@@ -1,3 +1,4 @@
+import { shownOutput } from '$lib/canvas/gen-history';
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { deleteConnection, deleteNode, findNode, listConnections, listNodes, renameNode, resizeNode, writeNodeData, type CanvasNodeRecord } from '$lib/server/repos/canvas';
@@ -105,7 +106,7 @@ export async function showRun(db: Db, input: { orgId: string; nodeId: string; ru
     orgId: input.orgId,
     nodeId: input.nodeId,
     expectedVersion: node.version,
-    data: { ...node.data, refId: run.outputAssetId, runId: run.id, running: false, error: null },
+    data: shownOutput(node.data, { id: run.id, mediaId: run.outputAssetId }),
     actor: input.actor
   });
   return shown.outcome === 'conflict' ? { outcome: ShowRun.Conflict } : { outcome: ShowRun.Shown, node: shown.node };

@@ -46,3 +46,11 @@ export function placeNear(centre: { x: number; y: number }, size: { w: number; h
 export function offCentre(centre: { x: number; y: number }, spot: { x: number; y: number }, size: { w: number; h: number }): boolean {
   return spot.x !== centre.x - size.w / 2 || spot.y !== centre.y - size.h / 2;
 }
+
+export function placeInRow(source: Rect, occupied: Rect[]): { x: number; y: number } {
+  const spot: Rect = { ...source, x: source.x + source.w + PLACEMENT_GAP };
+  while (occupied.some((o) => overlaps(spot, o))) {
+    spot.x += source.w + PLACEMENT_GAP;
+  }
+  return { x: spot.x, y: spot.y };
+}

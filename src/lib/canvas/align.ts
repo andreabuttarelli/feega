@@ -1,4 +1,4 @@
-import { Edge } from '$lib/motion/space';
+import { Axis, Edge } from '$lib/motion/space';
 import { tidyMoves } from '$lib/motion/tidy';
 
 export type TileBox = { id: string; x: number; y: number; width: number; height: number };
@@ -51,4 +51,31 @@ export function stackTiles(tiles: readonly TileBox[], gap: number): TileMove[] {
     at += (across ? t.width : t.height) + gap;
     return move;
   });
+}
+
+const MIN_DISTRIBUTED = 3;
+
+export function distributeTiles(tiles: readonly TileBox[], axis: Axis): TileMove[] {
+  if (tiles.length < MIN_DISTRIBUTED) {
+    return [];
+  }
+  const across = axis === Axis.X;
+  const start = (t: TileBox) => (across ? t.x : t.y);
+  const size = (t: TileBox) => (across ? t.width : t.height);
+  const ordered = [...tiles].sort((a, b) => start(a) - start(b));
+  const last = ordered[ordered.length - 1];
+  const free = start(last) + size(last) - start(ordered[0]) - ordered.reduce((sum, t) => sum + size(t), 0);
+  const gap = free / (ordered.length - 1);
+  let at = start(ordered[0]);
+
+  return ordered
+    .map((t) => {
+      const move = across ? { id: t.id, x: at, y: t.y } : { id: t.id, x: t.x, y: at };
+      at += size(t) + gap;
+      return move;
+    })
+    .filter((m) => {
+      const from = ordered.find((t) => t.id === m.id)!;
+      return m.x !== from.x || m.y !== from.y;
+    });
 }

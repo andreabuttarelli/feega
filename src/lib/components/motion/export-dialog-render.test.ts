@@ -10,6 +10,7 @@ import { Reaction } from '$lib/motion/interactive/summary';
 import { DEFAULT_INTERACTIVE, PlayMode } from '@feega/motion-core/motion/interactive/settings';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
+import { registerLocal } from '$lib/motion/fonts/local';
 import { ComponentMode } from '@feega/motion-core/motion/custom/component';
 
 const doc = newMotionDoc(MotionFormat.Landscape);
@@ -52,6 +53,15 @@ function embed(over: Partial<Parameters<typeof EmbedView>[1]> = {}) {
     }
   }).body;
 }
+
+describe('export names the fonts that live on one computer', () => {
+  it('warns about a local font and says nothing without one', () => {
+    const local = registerLocal(doc, 'Avenir Next');
+
+    expect(local.ok && dialog(ExportMode.Video, local.doc)).toContain('data-testid="export-local-fonts"');
+    expect(dialog(ExportMode.Video)).not.toContain('export-local-fonts');
+  });
+});
 
 describe('the export dialog asks what you want first', () => {
   it('opens on two plain choices, not on settings', () => {

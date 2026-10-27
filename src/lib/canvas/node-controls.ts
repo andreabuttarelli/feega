@@ -1,5 +1,5 @@
 import type { CommonProperties, CommonValue } from './common-properties';
-import type { ModelChoice } from './gen-node';
+import { defaultResolution, type ModelChoice } from './gen-node';
 import type { ModelParam } from './model-params';
 
 export const SEGMENTED_MAX_OPTIONS = 4;
@@ -117,7 +117,7 @@ const FIELD_ROWS: readonly FieldRow[] = [
         return null;
       }
       const kind = enumKindOf(options.length) === 'segmented' ? 'chips' : 'menu';
-      return { kind, valueType: 'string', options: optionsOf(options), ...current(p.resolution, options[0]) };
+      return { kind, valueType: 'string', options: optionsOf(options), ...current(p.resolution, defaultResolution(c)) };
     }
   },
   {
