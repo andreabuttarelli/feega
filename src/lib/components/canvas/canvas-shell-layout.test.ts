@@ -8,29 +8,37 @@ const read = (file: string) => readFileSync(join(dir, file), 'utf8');
 const rule = (source: string, selector: string) => source.match(new RegExp(`${selector.replace(/[.[\]]/g, '\\$&')}\\s*{([^}]*)}`))?.[1] ?? '';
 const shell = readFileSync(join(dir, '../../../routes/p/[projectId]/+layout.svelte'), 'utf8');
 
-describe('the canvas shell: solid bars around the canvas, set apart by surface not lines (DESIGN.md)', () => {
-  it('the top bar is one solid box across the full width, in the flow', () => {
-    const bar = rule(read('CanvasTopBar.svelte'), '.canvas-topbar');
-    expect(bar).not.toMatch(/position:\s*absolute/);
-    expect(bar).toMatch(/background:\s*var\(--ui-surface\)/);
-    expect(bar).not.toMatch(/box-shadow/);
+describe('the canvas shell: a full-bleed canvas under floating rounded groups (DESIGN.md)', () => {
+  it('the top bar overlays the canvas and only its groups catch the pointer', () => {
+    const top = read('CanvasTopBar.svelte');
+    const bar = rule(top, '.canvas-topbar');
+    expect(bar).toMatch(/position:\s*absolute/);
+    expect(bar).toMatch(/pointer-events:\s*none/);
+    expect(bar).not.toMatch(/background:\s*var/);
+    expect(rule(top, '.top-group')).toMatch(/border-radius:\s*var\(--ui-radius-full\)/);
   });
 
-  it('the left bar is attached to the window edge, full height, in the flow', () => {
+  it('the left bar is a floating pill over the canvas', () => {
     const rail = rule(read('FloatingRail.svelte'), '.rail');
-    expect(rail).not.toMatch(/position:\s*absolute/);
-    expect(rail).not.toMatch(/box-shadow/);
-    expect(rail).toMatch(/background:\s*var\(--ui-surface\)/);
-    expect(rail).toMatch(/align-self:\s*stretch/);
+    expect(rail).toMatch(/position:\s*absolute/);
+    expect(rail).toMatch(/box-shadow:\s*var\(--ui-shadow-float\)/);
+    expect(rail).toMatch(/border-radius:\s*var\(--ui-radius-full\)/);
   });
 
-  it('a left panel docks next to the bar and pushes the canvas, it does not float over it', () => {
+  it('a left panel floats over the canvas as a rounded card', () => {
     const panel = rule(read('CanvasLeftPanel.svelte'), '.left-panel');
-    expect(panel).not.toMatch(/position:\s*absolute/);
-    expect(panel).not.toMatch(/box-shadow/);
+    expect(panel).toMatch(/position:\s*absolute/);
+    expect(panel).toMatch(/border-radius:\s*var\(--ui-radius-lg\)/);
   });
 
-  it('the order on screen is top bar, then left bar, left panel, canvas and chat in a row', () => {
+  it('the right bar floats as a rounded card, and opens on its own when a frame is selected', () => {
+    const chat = read('CanvasChatPanel.svelte');
+    expect(chat).toMatch(/border-radius:\s*var\(--ui-radius-lg\)/);
+    expect(shell).toMatch(/readChatOpen\(false\)/);
+    expect(shell).toMatch(/<CanvasChatPanel open=\{chatOpen \|\| framePicked\}/);
+  });
+
+  it('the canvas stage spans the whole row, the chrome sits on top of it', () => {
     const top = shell.indexOf('<CanvasTopBar');
     const row = shell.indexOf('<div class="canvas-row">');
     const rail = shell.indexOf('<FloatingRail');
@@ -41,5 +49,6 @@ describe('the canvas shell: solid bars around the canvas, set apart by surface n
     expect(row).toBeLessThan(rail);
     expect(rail).toBeLessThan(panel);
     expect(panel).toBeLessThan(stage);
+    expect(rule(shell, '.canvas-row')).toMatch(/position:\s*relative/);
   });
 });

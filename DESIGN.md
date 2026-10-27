@@ -11,7 +11,7 @@ the tokens and component rules it names live in `docs/design/app-ui.md` and `src
 
 | Rule | Value |
 |---|---|
-| Shapes | **a radius scale, one role per step** (`--ui-radius-*`): `none` 0 for frames and nodes' content, full-bleed panels and bars; `xs` 2px for kbd, checkboxes, swatches; `sm` 4px for buttons, inputs, rows, segments; `md` 6px for menus, popovers, segmented tracks, cards; `lg` 10px for dialogs, sheets and floating bars; `full` for avatars, dots, pills. Pick the step by role, never a free value. |
+| Shapes | **a radius scale, one role per step** (`--ui-radius-*`): `none` 0 for frames and nodes' content, full-bleed panels and bars; `xs` 2px for kbd, checkboxes, swatches; `sm` 4px for buttons, inputs, rows, segments; `md` 6px for menus, popovers, segmented tracks, cards; `lg` 10px for dialogs, sheets, floating bars and the canvas's floating side panels; `full` for avatars, dots, pills. Pick the step by role, never a free value. |
 | Greyscale | **a 13-step pure-grey ramp** (`--grey-0…12`, light and dark) and **semantic roles on top** (`--ui-app`, `--ui-canvas`, `--ui-panel`, `--ui-panel-sunken`, `--ui-panel-raised`, `--ui-input`, `--ui-wash`, `--ui-pressed`, `--ui-divider`, `--ui-text*`, `--ui-icon-ink`). Components use roles, never a ramp step and never a hex. Every text role reads at WCAG AA on every surface role (`src/lib/greyscale-tokens.test.ts`). |
 | Elevation | the canvas is the lowest plane in both themes; panels sit one clear step above it; menus, popovers and floating bars sit above panels with `--ui-shadow-float`. Light: canvas `#ebebeb`, panels white. Dark: canvas `#121212`, panels `#1f1f1f`, raised `#272727`. |
 | Canvas | `--ui-canvas` with a `--ui-canvas-dot` grid. |
@@ -73,6 +73,11 @@ These rules apply to every panel, including the Properties inspector:
 - **Tree selection:** the selected row is a solid accent row with white text; the rows inside it
   are tinted with the accent wash. Each type has its icon.
 - **Floating toolbar:** round tool buttons (`full` radius) in a pill bar, the zoom at the end.
+- **Canvas shell:** the canvas is full bleed. The chrome floats over it as rounded groups on
+  `--ui-panel-raised` with `--ui-shadow-float`: top-bar zones and the left rail are `full` pills,
+  the left panel (Layers / Assets) and the right bar are `lg` cards inset 12px from the edges.
+  Side panels are closed by default; the right bar opens on its own when an element in a frame is
+  selected (the inspector) and otherwise only from its toggle.
 - **Collaborators:** cursors carry a coloured name pill; avatars sit in the top bar, right.
 - **Type colours:** layer icons use `--ui-type-frame` / `--ui-type-text` / `--ui-type-media`.
 - **Top bar** (canvas and inline frame editor, 48px, one row):

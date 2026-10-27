@@ -11,6 +11,7 @@
   import FloatingRail from '$lib/components/canvas/FloatingRail.svelte';
   import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
+  import { frameProperties } from '$lib/components/canvas/frame-properties.svelte';
   import RightBar from '$lib/components/brand-agent/RightBar.svelte';
   import { can, OrgAction } from '$lib/org-roles';
   import CanvasSheet from '$lib/components/canvas/CanvasSheet.svelte';
@@ -52,7 +53,8 @@
   const activeSheetId = $derived(page.state.sheet ? sheetEntryForPath(page.state.sheet.path)?.id ?? null : null);
 
   let leftPanel = $state<LeftPanelKind | null>(null);
-  let chatOpen = $state(browser ? readChatOpen() : true);
+  const framePicked = $derived(!!frameProperties.session?.selection.length);
+  let chatOpen = $state(browser ? readChatOpen(false) : false);
   let mobileView = $state(INITIAL_MOBILE_VIEW);
 
   let isMobile = $state(browser ? matchMedia(MOBILE_QUERY).matches : false);
@@ -283,7 +285,7 @@
         <CanvasSheet {projectId} />
       </div>
 
-      <CanvasChatPanel open={chatOpen} />
+      <CanvasChatPanel open={chatOpen || framePicked} />
     </div>
   {:else}
     <DesktopPageBar
@@ -306,6 +308,7 @@
   }
 
   .project-shell {
+    position: relative;
     height: 100dvh;
     display: flex;
     flex-direction: column;
@@ -313,6 +316,7 @@
   }
 
   .canvas-row {
+    position: relative;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;

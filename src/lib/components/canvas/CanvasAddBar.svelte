@@ -512,7 +512,7 @@
   .add-bar {
     position: absolute;
     z-index: 61;
-    bottom: var(--lift, 0px);
+    bottom: calc(var(--lift, 0px) + 12px);
     left: 50%;
     transform: translateX(-50%);
     transition: bottom var(--chrome-move) var(--ease-expo), left var(--chrome-move) var(--ease-expo), opacity var(--chrome-move) var(--ease-expo), translate var(--chrome-move) var(--ease-expo);

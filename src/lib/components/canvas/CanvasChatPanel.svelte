@@ -128,14 +128,18 @@
   }
 
   .chat-pane {
-    position: relative;
-    flex: 0 0 auto;
-    width: var(--chat-w);
-    height: 100%;
+    position: absolute;
+    top: 56px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 30;
+    width: min(var(--chat-w), calc(100vw - 92px));
     min-height: 0;
     display: flex;
-    background: var(--ui-wash);
-    border-left: 1px solid var(--ui-divider);
+    overflow: hidden;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .chat-resize-handle {
@@ -165,10 +169,13 @@
 
   @media (max-width: 767px) {
     .chat-pane {
+      position: relative;
+      inset: auto;
       flex: 1 1 auto;
       width: 100%;
       height: auto;
-      border-left: 0;
+      border-radius: 0;
+      box-shadow: none;
       background: var(--ui-panel);
     }
     .chat-resize-handle {

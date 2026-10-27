@@ -45,11 +45,11 @@
 </script>
 
 {#if kind === 'influencers'}
-  <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 84px));`}>
+  <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 92px));`}>
     <InfluencersPanel {projectId} {onclose} />
   </div>
 {:else}
-  <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 84px));`}>
+  <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 92px));`}>
     <div class="left-panel-head">
       {#if tabbed && onkind}
         <SegmentedControl label={$_('app.shell.rail')} value={kind} onchange={(value) => onkind(value as LeftPanelKind)} options={TABS.map((tab) => ({ value: tab.value, label: $_(tab.labelKey) }))} />
@@ -73,12 +73,18 @@
 
 <style>
   .left-panel {
-    flex: 0 0 auto;
-    align-self: stretch;
+    position: absolute;
+    left: 68px;
+    top: 56px;
+    bottom: 12px;
+    z-index: 30;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: var(--ui-panel);
+    overflow: hidden;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .left-panel-head {
@@ -88,7 +94,6 @@
     justify-content: space-between;
     height: var(--ui-header-h);
     padding: 0 6px 0 12px;
-    border-bottom: 1px solid var(--ui-divider);
   }
   .left-panel-head h3 {
     margin: 0;
