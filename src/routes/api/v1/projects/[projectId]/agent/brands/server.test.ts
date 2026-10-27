@@ -19,7 +19,11 @@ const rows = {
     { id: 'b2', org_id: 'org-1', name: 'Nord', slug: 'nord', logo_url: 'https://x/logo.png', short_description: null, content: null }
   ],
   posts: [{ id: 'p', org_id: 'org-1', brand_id: 'b1', status: 'ready', planned_for: FUTURE }],
-  social_accounts: [{ id: 's', org_id: 'org-1', brand_id: 'b2', status: 'expired' }]
+  social_accounts: [{ id: 's', org_id: 'org-1', brand_id: 'b2', status: 'expired' }],
+  brand_pins: [
+    { org_id: 'org-1', user_id: 'u1', brand_id: 'b1' },
+    { org_id: 'org-1', user_id: 'u2', brand_id: 'b2' }
+  ]
 };
 
 function call(projectId: string, user: object | null = { id: 'u1' }) {
@@ -34,6 +38,7 @@ describe('GET agent/brands', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.projectBrandId).toBe('b2');
+    expect(body.pinned).toEqual(['b1']);
     expect(body.brands.map((b: { id: string; scheduled: number; accounts: number; accountsDown: number }) => [b.id, b.scheduled, b.accounts, b.accountsDown])).toEqual([
       ['b1', 1, 0, 0],
       ['b2', 0, 1, 1]

@@ -5,7 +5,7 @@ import { table, c } from '../lib/display.ts';
 
 type Item = { id: string; title: string; subtitle: string | null; mediaType: string | null; group?: string };
 
-const TABS = ['products', 'posts', 'ads'];
+const TABS = ['kit', 'products', 'posts', 'ads'];
 
 export async function cmdLibrary(slug: string, tab: string) {
   const session = await loadSession();

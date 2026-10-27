@@ -33,7 +33,7 @@ describe('GET /api/v1/brands/[slug]/library', () => {
   });
 
   it('400 for an unknown tab, 404 for a foreign brand, 401 without a token', async () => {
-    expect((await call('acme', 'kit')).status).toBe(400);
+    expect((await call('acme', 'nope')).status).toBe(400);
     expect((await call('other', 'products')).status).toBe(404);
     expect((await call('acme', 'products', false)).status).toBe(401);
   });

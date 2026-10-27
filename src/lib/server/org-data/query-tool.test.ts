@@ -92,6 +92,10 @@ describe('il confine è org_id, imposto dal codice — non un affinamento facolt
     expect(calls).toHaveLength(0);
   });
 
+  it('the brand kit tables are readable: brand_fonts and brand_pins', () => {
+    expect(ORG_TABLES).toEqual(expect.arrayContaining(['brand_fonts', 'brand_pins']));
+  });
+
   it('la lista delle tabelle è esattamente ORG_TABLES, niente di più niente di meno', () => {
     expect([...ORG_QUERY_TABLE_LIST].sort()).toEqual([...ORG_TABLES].sort());
   });

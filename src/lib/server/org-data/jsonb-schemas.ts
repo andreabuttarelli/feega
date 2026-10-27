@@ -25,6 +25,7 @@
  * `ORG_TABLE_CHECKS` accanto.
  */
 import { z } from 'zod';
+import { logosSchema, paletteSchema, voiceSchema } from '$lib/brand-kit';
 
 /**
  * `posts.media`: la stessa `PostMedia` che `repos/posts.ts` e il tool
@@ -93,13 +94,11 @@ export const JSONB_COLUMN_SCHEMAS: Record<string, JsonbEntry> = {
 
   'canvases.viewport': validated(canvasViewportSchema),
 
-  'brands.palette': freeForm(
-    'nessun repository del nuovo schema legge o scrive questa colonna: `products/brand-context.ts` ' +
-      'ha un VisualBrief.palette per un altro scopo (il brief generato per la grafica), non ' +
-      'confermato come la stessa forma. Imporla qui sarebbe un contratto inventato, non letto dal codice.'
-  ),
+  'brands.palette': validated(paletteSchema),
+  'brands.voice': validated(voiceSchema),
+  'brands.logos': validated(logosSchema),
   'brands.target': freeForm(
-    'stesso motivo di brands.palette: separata da `content` "perché si interroghi" ' +
+    'separata da `content` "perché si interroghi" ' +
       '(NEW_DATABASE_STRUCTURE.md), ma nessun repository la consuma ancora con una forma concreta.'
   ),
 
