@@ -371,6 +371,20 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'get_play_link',
+    {
+      title: 'Play a prototype as a link',
+      description:
+        'Create the public play link of a prototype, starting on this frame: a full-screen player that runs the clicks, hovers, drags and delays linked between frames (`add_interaction`). ' +
+        'Publishes every frame the prototype can reach and turns the canvas share link on; returns `url`, the reachable `frames` and the canvas `flows` (starting points, `set_flow`). ' +
+        'Turning the canvas share off kills the link. Videos from an uncensored project are refused (403, `refusal`). Free.',
+      inputSchema: z.object({ org, node_id: z.string() }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true }
+    },
+    async ({ org, node_id }) => withAuth((token) => motionApi.play(token, node_id, org))
+  );
+
+  server.registerTool(
     'get_motion_embed',
     {
       title: 'Read a frame web embed',

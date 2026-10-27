@@ -29,6 +29,7 @@ import { FRAMES_CLOSED_HINT } from './server-frames';
 import { GUIDES, guidesFor, type GuideTopic } from './guides';
 import { lintAdvice } from '$lib/motion/custom/lint';
 import { tool, type Tool, type ToolExecutionOptions } from 'ai';
+import { cssText, devLayer, tailwindClasses } from '$lib/canvas/dev-css';
 import { addShader, removeShader, setShader } from '$lib/motion/shaders/ops';
 import type { EffectStore } from '$lib/server/effects/store';
 import type { LayoutStore } from '$lib/server/layouts/store';
@@ -125,9 +126,14 @@ const ARRANGE: Record<(typeof ARRANGE_OPS)[number], (doc: MotionDoc, ids: string
 import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { COUNTER_FORMATS } from '@feega/motion-core/motion/text-counter';
 import { setTextCounter } from '$lib/motion/text-counter-ops';
+import { actionSchema, transitionSchema, triggerSchema, ACTION_KINDS, TRANSITION_KINDS as LINK_TRANSITIONS, TRIGGER_KINDS } from '@feega/motion-core/motion/prototype/model';
+import { putInteraction, removeInteraction } from '$lib/motion/prototype/ops';
+import { setFlow } from '$lib/motion/prototype/flows';
+import { MAX_FLOW_NAME } from '@feega/motion-core/motion/prototype/flow';
 import { animateTo } from '$lib/motion/animate-to';
 import { DEFAULT_TRACK } from '@feega/motion-core/motion/tracking/point-tracker';
 import { ApplyMode, applyTrack, trackClip, type LumaReader } from '@feega/motion-core/motion/tracking/track-clip';
+import { IN_OUT_PRESETS, InOutPreset, PresetSide, applyInOut } from '$lib/motion/in-out-presets';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '@feega/motion-core/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '@feega/motion-core/motion/keyframes';
 import type { MotionAsset } from './editor';
@@ -448,6 +454,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         autoLayout: c.autoLayout ?? null,
         layoutItem: c.layoutItem ?? null,
         constraints: c.constraints ?? null,
+        interactions: c.interactions ?? [],
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
@@ -481,6 +488,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     styles: stylesOf(doc),
     variables: doc.variables ?? {},
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
+    flow: doc.flow ?? null,
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     pointTracks: Object.fromEntries(Object.entries(doc.pointTracks ?? {}).map(([id, t]) => [id, { clip_id: t.clipId, points: t.points.length, lost: t.lost }])),
     interactive: interactiveOf(doc),
@@ -978,6 +986,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    read_layer_css: tool({
+      description: 'Dev mode for one layer: its CSS, the same as a Tailwind class list, the box in px of the frame, and the names it takes from the design (brand colours as variables, fonts, named styles, bound variables). Read-only: nothing changes. Brand colours stay variables (var(--brand-accent)) because the brand values come with the render, not the video.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => {
+        const layer = devLayer(session.doc, input.clip_id, null);
+        if (!layer) {
+          return { ok: false, error: `${input.clip_id} is not a layer of this video` };
+        }
+        return { ok: true, name: layer.name, component: layer.component, box: layer.box, css: cssText(layer), tailwind: tailwindClasses(layer), tokens: layer.tokens };
+      }
+    }),
+
     list_components: tool({
       description: 'Every component a clip can use: the library (its track and props, ranges in the units of the prompt for this video size) and the custom components written in code for this video.',
       inputSchema: z.object({}).strict(),
@@ -1260,6 +1280,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: `no track ${input.track_id}: run track_point first` };
         }
         return apply(applyTrack(session.doc, track, { targetClipId: input.target_clip_id, mode: input.mode, offset: { x: input.offset_x, y: input.offset_y } }), `${input.mode} track on ${input.target_clip_id}`);
+      }
+    }),
+
+    apply_preset: tool({
+      description: `One-click entrance or exit for a clip, with the house ease (expo in-out, soft settle). side in plays at the clip start, out ends on its last frame; at (s from the clip start) plays it there instead. duration in s (default per preset). Keys in the span are replaced. Presets: ${Object.values(InOutPreset).map((p) => `${p} (${IN_OUT_PRESETS[p].label}, ${IN_OUT_PRESETS[p].sides.join('/')}, ${IN_OUT_PRESETS[p].seconds}s)`).join('; ')}. typewriter goes on text clips only.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        preset: z.nativeEnum(InOutPreset),
+        side: z.nativeEnum(PresetSide),
+        duration: z.number().positive().optional(),
+        at: z.number().min(0).optional()
+      }),
+      execute: async (input) => {
+        const options = { preset: input.preset, side: input.side, duration: input.duration === undefined ? undefined : frames(input.duration), at: input.at === undefined ? undefined : frames(input.at) };
+        return apply(applyInOut(session.doc, input.clip_id, options, deps.newId), `${input.preset} ${input.side} on ${input.clip_id}`);
       }
     }),
 
@@ -2351,6 +2386,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => VARIABLE_ACTIONS[input.action](input)
     }),
 
+    bind_variable: tool({
+      description: 'Bind one prop of a clip to a variable, as the bind chip next to an inspector field does: a colour variable to fill, stroke or color, a number to roundness, opacity, width, height, size or autoLayout.gap, a string to a text prop, a boolean to a toggle. variable is "Collection/name". The prop then follows the active mode of its collection; set_props on it is refused until unbind_variable.',
+      inputSchema: z.object({ clip_id: z.string(), target: z.string(), variable: z.string() }),
+      execute: async (input) => apply(bindVariable(session.doc, input.clip_id, input.target, input.variable), `bound ${input.target} of ${input.clip_id} to ${input.variable}`)
+    }),
+
+    unbind_variable: tool({
+      description: 'Free a prop from its variable, as the unbind button on the bind chip does. The prop keeps the value it has now.',
+      inputSchema: z.object({ clip_id: z.string(), target: z.string() }),
+      execute: async (input) => apply(unbindVariable(session.doc, input.clip_id, input.target), `unbound ${input.target} of ${input.clip_id}`)
+    }),
+
     register_font: tool({
       description: `Add a Google Fonts family or an uploaded font (list_fonts uploaded) to the video. Call it before add_clip names the family in props.font, and for a custom component font param (then set_props with that family). origin ${FontOrigin.Local} adds a font installed on the user's computer by exact family name: it is flagged local in the video and shows a fallback font on other computers and in server renders.`,
       inputSchema: z.object({ family: z.string().max(64), origin: z.enum(FontOrigin).optional() }),
@@ -2410,6 +2457,34 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const out = apply(applyTextPreset(session.doc, input.clip_id, input.preset, { start: frames(input.start), duration: frames(input.duration) }, id), `${input.preset} on ${input.clip_id}`);
         return out.ok ? { ...out, animator_id: id } : out;
       }
+    }),
+
+    add_interaction: tool({
+      description: `Link a layer to something that happens when the viewer acts on it in a prototype. trigger kind ${TRIGGER_KINDS.join('|')} (after_delay needs delayMs). action kind ${ACTION_KINDS.join('|')}: navigate and open_overlay take target, the id of another frame on the canvas (see the canvas frames), scroll_to takes the target id, back takes none. transition kind ${LINK_TRANSITIONS.join('|')}; slide and push take direction left|right|up|down, smart_animate matches layers of the two frames by layer name (or id when unnamed) and animates position, size, rotation, opacity, fill and radius, while layers found in only one frame fade; dissolve, slide, push and smart_animate take easing and durationMs (default 300). Default transition is instant. Pass interaction_id of an existing link to replace it. At most 16 per layer.`,
+      inputSchema: z.object({ clip_id: z.string(), interaction_id: z.string().optional(), trigger: triggerSchema, action: actionSchema, transition: transitionSchema.optional() }),
+      execute: async ({ clip_id, interaction_id, ...link }) => {
+        const id = interaction_id ?? deps.newId();
+        const out = apply(putInteraction(session.doc, clip_id, { id, ...link }), `linked ${clip_id} (${link.trigger.kind} to ${link.action.kind})`);
+        return out.ok ? { ...out, interaction_id: id } : out;
+      }
+    }),
+
+    remove_interaction: tool({
+      description: 'Remove one prototype link from a layer. interaction_id comes from list_interactions.',
+      inputSchema: z.object({ clip_id: z.string(), interaction_id: z.string() }),
+      execute: async ({ clip_id, interaction_id }) => apply(removeInteraction(session.doc, clip_id, interaction_id), `unlinked ${interaction_id} from ${clip_id}`)
+    }),
+
+    set_flow: tool({
+      description: 'Make this frame the starting point of a prototype flow, named name (for example Onboarding), or take the mark off with name null. The prototype player and the play link start on the first flow of the canvas; links between frames come from add_interaction. get_motion_doc reads it as flow.',
+      inputSchema: z.object({ name: z.string().max(MAX_FLOW_NAME).nullable() }),
+      execute: async ({ name }) => apply(setFlow(session.doc, name), name === null ? 'removed the flow' : `flow ${name}`)
+    }),
+
+    list_interactions: tool({
+      description: 'List every prototype link of this frame: the layer (clip_id), its trigger, action (with target frame) and transition. Links between frames are drawn as arrows on the canvas.',
+      inputSchema: z.object({}),
+      execute: async () => ({ interactions: clipsOf(session.doc).flatMap((c) => (c.interactions ?? []).map((i) => ({ clip_id: c.id, interaction_id: i.id, trigger: i.trigger, action: i.action, transition: i.transition }))) })
     }),
 
     set_text_counter: tool({

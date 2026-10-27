@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { byId } from '$lib/canvas/by-id';
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
@@ -7,7 +8,7 @@
   import OutputViewer from '$lib/components/canvas/OutputViewer.svelte';
   import { OUTPUT_KIND_OF, viewableRuns, type OutputKind, type ViewerRun } from '$lib/canvas/run-info';
   import CloudPicker from '$lib/components/canvas/CloudPicker.svelte';
-  import { CloudMode, type CloudProviderId } from '$lib/canvas/cloud-picker';
+  import { CloudMode, cloudFailure, type CloudProviderId } from '$lib/canvas/cloud-picker';
   import NodeSearch from '$lib/components/canvas/NodeSearch.svelte';
   import { NODES_PARAM, idsFromLink, selectionLink } from '$lib/canvas/selection-link';
   import type { CommentThread } from '$lib/canvas/comment-threads';
@@ -89,7 +90,6 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { onMount, untrack } from 'svelte';
-  import { Renderer, rendererOf } from '$lib/canvas/gpu/renderer-flag';
   import { feedView, personView, productsView } from '$lib/canvas/source-thumbs';
 import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type NodeView } from '$lib/canvas/node-view';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
@@ -135,7 +135,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import { AssetKind } from '@feega/motion-core/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
-  import FrameHover from '$lib/components/canvas/FrameHover.svelte';
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
   import { TileBody } from '$lib/canvas/motion-node';
   import OutputDragHandle from '$lib/components/canvas/OutputDragHandle.svelte';
@@ -143,7 +142,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
-  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
@@ -274,7 +273,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { BILLING_PATH } from '$lib/billing-path';
   import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
   import type { FigmaJob } from '$lib/canvas/figma/images';
-  import { ImagesOutcome } from '$lib/canvas/figma/fetch-images';
+  import { ImagesOutcome, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
+  import { connectionMessage } from '$lib/canvas/connection-messages';
 
   const LINK_COPIED_MS = 1500;
 
@@ -365,7 +365,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       const res = await fetch(`${base}/import`, { method: 'POST', body: JSON.stringify({ fileId: target, place: { canvasId: data.canvas.id, x: at.x, y: at.y } }) });
       const body = (await res.json().catch(() => ({}))) as { node?: CanvasNodeRecord | null; error?: string };
       if (!res.ok || !body.node) {
-        failed = body.error ?? 'Import failed';
+        failed = cloudFailure(mode, body.error);
         return;
       }
       const created = body.node;
@@ -380,7 +380,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const res = await fetch(`${base}/export`, { method: 'POST', body: JSON.stringify({ assetId, folder: target }) });
     if (!res.ok) {
-      failed = 'Export failed';
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      failed = cloudFailure(mode, body.error);
       return;
     }
     cloud = null;
@@ -740,6 +741,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let nodes = $state<Tile[]>((data.nodes as CanvasNodeRecord[]).map((n) => toTile(n)));
+  const nodeById = $derived(byId(nodes));
 
   /**
    * QUANTO IL CONTENUTO DI UN NODO TESTO CHIEDE, misurato dal DOM — mai scritto in database, mai
@@ -1548,7 +1550,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     cursors.port.update({ selection: ids });
   }
 
-  const core = $derived(rendererOf(page.url) === Renderer.Core);
   const liveHost = LiveHost.Canvas;
 
   $effect(() => {
@@ -3625,8 +3626,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let figmaJobs = $state<FigmaJob[]>([]);
   let figmaTokenMissing = $state(false);
 
-  function figmaImagesAnswered(outcome: ImagesOutcome) {
-    figmaTokenMissing = outcome === ImagesOutcome.NoToken;
+  function figmaImagesAnswered(answer: ImagesAnswer) {
+    figmaTokenMissing = answer.outcome === ImagesOutcome.NoToken;
+    if (answer.outcome === ImagesOutcome.Failed) {
+      failed = connectionMessage(answer.error);
+    }
   }
 
   async function pasteSvg(svg: string, at: { x: number; y: number }) {
@@ -4113,7 +4117,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if viewOnly}<p class="view-only-badge" data-testid="view-only">View only</p>{/if}
   {#if Flow}
   <Flow
-    {core}
     mode={canvasMode}
     postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
@@ -4199,8 +4202,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
     viewOf={sourceView}
-    cardPreviews={data.cardPreviews}
-    previewsAt={`/p/${data.projectId}/c/${data.canvas.id}/card-previews`}
     peers={drawnPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
     onLive={(live) => {
@@ -4235,19 +4236,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {#each livePins(id) as thread (thread.id)}
         <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(picked) => commentsPanel.focus(picked)} />
       {/each}
-      {@const over = liveHost === LiveHost.Canvas ? nodes.find((n) => n.id === id) : null}
+      {@const hoverNode = nodeById.get(id)}
+      {@const over = liveHost === LiveHost.Canvas ? hoverNode : null}
       {@const overMotion = over ? motionOf(over) : null}
-      {@const hoverNode = nodes.find((n) => n.id === id)}
       {@const hoverMotion = hoverNode ? motionOf(hoverNode) : null}
-      {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && !core}
-        <FrameHover nodeId={id} revision={hoverMotion.docHeadRevision} previewUrl={motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} width={FORMATS[hoverMotion.format].width} height={FORMATS[hoverMotion.format].height} />
-      {/if}
       {@const hoverGen = hoverNode ? genOf(hoverNode) : null}
       {#if body === TileBody.Standin && hoverGen?.refId && !hoverGen.running}<OutputDragHandle nodeId={id} />{/if}
       {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
     {/snippet}
     {#snippet tile({ id, selected })}
-      {@const row = nodes.find((n) => n.id === id)}
+      {@const row = nodeById.get(id)}
       {#if row}
         {@const gen = genOf(row)}
         {@const frame = frameOf(row)}

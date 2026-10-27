@@ -198,6 +198,12 @@ CLI: `feega studio run|more|cancel|retry|regenerate|approve|reject <batchId>`.
 (login url, email, session expiry; never the password). `forget_app_account` (`{ project_id }`) deletes it
 and its session. Free.
 
+`cloud` (`{ project_id, action, provider?, ... }`) works the Google Drive and Dropbox files of the signed-in
+person: `status` (connected or not), `files` (`folder`, `cursor` for the next page), `import` (`file_id`,
+optional `canvas_id`, `x`, `y`), `export` (`asset_id`, `folder`, `name?`) and `disconnect`. Connecting is a
+browser sign-in in the app. `figma_token_status` (`{ project_id }`) says whether a Figma token is saved,
+never the token. Free.
+
 ## Edit and view
 
 | MCP | CLI |
@@ -290,6 +296,7 @@ list. Returns how many combinations it actually stopped.
 | `publish_motion_embed` | `feega motion embed <nodeId> [--unpublish]` |
 | `get_motion_embed` | `feega motion embed <nodeId> --status` |
 | `share_motion_frame` | `feega motion share <nodeId>` |
+| `get_play_link` | `feega motion play <nodeId>` |
 | `motion_budget` | `feega motion budget <nodeId> [--raise]` |
 | `view_motion_frames` | `feega motion frames <nodeId> --at 1,2.5,4 [--width 640] [--out dir]` |
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |

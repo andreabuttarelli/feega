@@ -39,6 +39,7 @@ const DOC: Record<string, Access> = {
   userGuides: { write: ['add_guide', 'remove_guide'], read: 'userGuides' },
   styles: { write: ['named_style'], read: 'styles' },
   variables: { write: ['variable'], read: 'variables' },
+  flow: { write: ['set_flow'], read: 'flow' },
   links: { fixed: 'written by the canvas when a generative node is connected to the frame (connect_nodes)' }
 };
 
@@ -76,9 +77,10 @@ const CLIP: Record<string, Access> = {
   autoLayout: { write: ['add_auto_layout', 'set_auto_layout', 'reorder_auto_layout'], read: 'autoLayout' },
   layoutItem: { write: ['add_auto_layout', 'set_layout_item'], read: 'layoutItem' },
   constraints: { write: ['set_layout_item', 'set_constraints'], read: 'constraints' },
+  interactions: { write: ['add_interaction', 'remove_interaction'], read: 'interactions' },
   partStyles: { write: ['set_part_fill'], read: 'partStyles' },
   styleRef: { write: ['named_style'], read: 'styleRef' },
-  bind: { write: ['variable'], read: 'bind' },
+  bind: { write: ['variable', 'bind_variable', 'unbind_variable'], read: 'bind' },
   effectStyleRef: { write: ['named_style'], read: 'effectStyleRef' },
   expressions: { write: ['set_expression', 'expression_to_keys', 'pulse_with_music'], read: 'expressions' },
   effects: { write: ['add_effect', 'set_effect', 'remove_effect', 'set_lut'], read: 'effects' },

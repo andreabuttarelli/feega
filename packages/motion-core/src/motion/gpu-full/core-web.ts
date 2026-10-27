@@ -3,6 +3,7 @@ import type { Picture, Pictures, Raster } from './raster';
 import type { Affine } from '../affine';
 import type { Outcome } from './core-outcome';
 import type { Splice } from '../../canvas/core/group-diff';
+import { inlineCore, unzipBase64 } from './inline-core';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
 
@@ -39,7 +40,17 @@ const moving = (picture: Picture) => (typeof HTMLVideoElement !== 'undefined' &&
 
 let loading: Promise<CoreModule> | null = null;
 
+async function loadInlineCore(inline: NonNullable<ReturnType<typeof inlineCore>>): Promise<CoreModule> {
+  const core = (await import(/* @vite-ignore */ URL.createObjectURL(new Blob([inline.js], { type: 'text/javascript' })))) as CoreModule & { default: (init?: { module_or_path: Uint8Array }) => Promise<unknown> };
+  await core.default({ module_or_path: await unzipBase64(inline.wasm) });
+  return core;
+}
+
 async function loadCore(): Promise<CoreModule> {
+  const inline = inlineCore();
+  if (inline) {
+    return loadInlineCore(inline);
+  }
   const core = (await import(/* @vite-ignore */ new URL(CORE_URL, import.meta.url).href)) as CoreModule;
   await core.default();
   return core;

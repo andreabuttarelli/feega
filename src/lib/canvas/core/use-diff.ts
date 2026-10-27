@@ -4,8 +4,9 @@ import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 const same = (a: Use, b: Use) => a.group === b.group && Boolean(a.cache) === Boolean(b.cache) && Boolean(a.hold) === Boolean(b.hold) && a.matrix.every((v, i) => v === b.matrix[i]);
 
 export class SentOverlay {
-  #sent: string | null = null;
   #items: readonly PathItem[] | null = null;
+  #sent: readonly PathItem[] = [];
+  #json: string[] = [];
 
   waiting(items: readonly PathItem[]): boolean {
     return items !== this.#items;
@@ -16,9 +17,10 @@ export class SentOverlay {
       return false;
     }
     this.#items = items;
-    const json = JSON.stringify(items);
-    const changed = json !== this.#sent;
-    this.#sent = json;
+    const json = items.map((item, i) => (item === this.#sent[i] ? this.#json[i] : JSON.stringify(item)));
+    const changed = json.length !== this.#json.length || json.some((j, i) => j !== this.#json[i]);
+    this.#sent = items;
+    this.#json = json;
     return changed;
   }
 }

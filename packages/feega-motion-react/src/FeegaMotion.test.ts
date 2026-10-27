@@ -213,3 +213,75 @@ describe('<FeegaMotion>', () => {
     expect(seeks).toEqual([1.5, 1.5, 1]);
   });
 });
+
+describe('<FeegaMotion> with an interactive video drawn inline', () => {
+  const VARS = [{ name: 'speed', kind: 'number', default: 1, min: 0, max: 4 }];
+  const doc = { width: 1080, height: 1080, fps: 30, durationInFrames: 90, interactive: { vars: VARS } };
+
+  async function inline(props: Partial<Parameters<typeof FeegaMotion>[0]> & { ref?: unknown } = {}) {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith('/source.json') ? { doc, playback: 'autoplay', loop: false, scrollLength: 0 } : { width: 1080, height: 1080, playback: 'autoplay', scrollLength: 0 }))));
+    const onReady = vi.fn();
+    const result = await mount({ id: ID, origin: ORIGIN, scrollLength: 0, onReady, ...props });
+    const el = result.container.querySelector('feega-gpu-player') as HTMLElement & Record<string, unknown>;
+    const drive = vi.fn();
+    Object.assign(el, { seek: vi.fn(), play: vi.fn(), pause: vi.fn(), drive });
+    return { ...result, el, drive, onReady };
+  }
+
+  it('hands the scroll progress to the video as its scroll input', async () => {
+    const { container, el, drive } = await inline();
+    boxAt(container.firstElementChild!, 0, 500);
+
+    await act(async () => {
+      window.dispatchEvent(new Event('scroll'));
+      el.dispatchEvent(new Event('ready'));
+    });
+
+    expect(drive).toHaveBeenCalledWith({ values: { scroll: expect.any(Number) } });
+  });
+
+  it('hands variables set from React to the video', async () => {
+    const ref = createRef<FeegaMotionHandle>();
+    const { drive } = await inline({ ref });
+
+    ref.current!.setVars({ speed: 3 });
+
+    expect(drive).toHaveBeenCalledWith({ vars: { speed: 3 } });
+  });
+
+  it('tells onReady which variables the video declares and their defaults', async () => {
+    const { el, onReady } = await inline();
+
+    await act(async () => {
+      el.dispatchEvent(new Event('ready'));
+    });
+
+    expect(onReady).toHaveBeenCalledWith(expect.objectContaining({ vars: VARS, values: { speed: 1 } }));
+  });
+
+  it('gives a clicked link to onLinkClick instead of opening it', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const onLinkClick = vi.fn();
+    const { el } = await inline({ onLinkClick });
+    const event = new CustomEvent('link', { detail: { url: 'https://feega.app/pricing' }, cancelable: true });
+
+    await act(async () => {
+      el.dispatchEvent(event);
+    });
+
+    expect(onLinkClick).toHaveBeenCalledWith('https://feega.app/pricing');
+    expect(event.defaultPrevented).toBe(true);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('reports the variables the video kept', async () => {
+    const onVarsChange = vi.fn();
+    const { el } = await inline({ onVarsChange });
+
+    await act(async () => {
+      el.dispatchEvent(new CustomEvent('varschange', { detail: { values: { speed: 3 } } }));
+    });
+
+    expect(onVarsChange).toHaveBeenCalledWith({ speed: 3 });
+  });
+});

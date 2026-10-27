@@ -2,6 +2,7 @@ import { Command, OPACITY_KEYS } from '$lib/motion/shortcuts';
 import { Tool, type ActionId } from '$lib/motion/actions';
 import { LayerAction } from '$lib/canvas/layers';
 import { CanvasAction } from '$lib/canvas/canvas-list';
+import { CloudAction, FigmaTokenAction } from '$lib/canvas/cloud-picker';
 import { ClipOp } from '$lib/motion/clip-ops';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
 import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
@@ -222,6 +223,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleRulers]: VIEW,
   [Command.TogglePivot]: VIEW,
   [Command.ToggleOutlines]: VIEW,
+  [Command.ToggleDevMode]: motion('read_layer_css'),
   [Command.Help]: VIEW,
   [Command.Precompose]: motion('precompose'),
   [Command.Group]: motion('frame_clips'),
@@ -432,6 +434,8 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'font family and weight': motion('set_font'),
   'apply or detach a named style': motion('named_style'),
   'save a clip look as a named style': motion('named_style'),
+  'bind a field to a variable with its chip': motion('bind_variable'),
+  'unbind a field from its variable': motion('unbind_variable'),
   'pen path points and handles': motion('edit_path_points'),
   'align and distribute': motion('arrange_space'),
   'reorder layers': motion('set_track'),
@@ -453,6 +457,22 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'restore a revision': tool('restore_motion_revision'),
   'insert a motion template': motion('add_template'),
   'set template fields': motion('set_template_fields')
+};
+
+export const CLOUD_ACTIONS: Record<CloudAction, Parity> = {
+  [CloudAction.Connect]: uiOnly('the provider sign-in happens in a browser'),
+  [CloudAction.Status]: tool('cloud'),
+  [CloudAction.ListFiles]: tool('cloud'),
+  [CloudAction.Import]: tool('cloud'),
+  [CloudAction.Export]: tool('cloud'),
+  [CloudAction.Disconnect]: tool('cloud')
+};
+
+export const FIGMA_TOKEN: Record<FigmaTokenAction, Parity> = {
+  [FigmaTokenAction.Save]: uiOnly('a secret the person pastes; agents never hold it'),
+  [FigmaTokenAction.Test]: uiOnly('calls Figma with the secret; agents read only whether it is saved'),
+  [FigmaTokenAction.Remove]: uiOnly('the person removes a secret they pasted'),
+  [FigmaTokenAction.Status]: tool('figma_token_status')
 };
 
 export const STUDIO_PAGE_ACTIONS: Record<string, Parity> = {
@@ -482,5 +502,7 @@ export const PARITY_TABLES = {
   LAYER_PANEL,
   CANVAS_LIST,
   CLIP_BUTTONS,
-  FRAME_CONTENT
+  FRAME_CONTENT,
+  CLOUD_ACTIONS,
+  FIGMA_TOKEN
 } as const;

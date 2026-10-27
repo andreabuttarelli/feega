@@ -63,11 +63,14 @@
   import LutPicker from './LutPicker.svelte';
   import TextCounterSection from './TextCounterSection.svelte';
   import AnimateToSection from './AnimateToSection.svelte';
+  import InOutPresetsSection from './InOutPresetsSection.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
+  import BindChip from './BindChip.svelte';
+  import { fillTarget } from '$lib/motion/variables';
   import { registerFont, replaceFont, setFont } from '$lib/motion/fonts/ops';
   import { FontOrigin, withPicked } from '$lib/motion/fonts/local';
   import { isBuiltin } from '@feega/motion-core/motion/fonts/model';
@@ -612,24 +615,37 @@
 {#snippet fieldRow(field: Field)}
   {@const keyed = keyedField(clip.component, field.key, animated.params)}
   {#if field.control === Control.Range}
-    <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
+    <div class="stack bindable" data-prop={field.key}>
+      {#if clip.bind?.[field.key]}<BindChip {doc} {clip} target={field.key} {commit} />{:else}{@render rangeField(field)}<BindChip {doc} {clip} target={field.key} {commit} />{/if}
+    </div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
-    <div class="stack" data-prop={field.key}><FillStack {gesture} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} /></div>
+    {@const fillBind = fillTarget(clip)}
+    <div class="stack bindable" data-prop={field.key}>
+      {#if fillBind && clip.bind?.[fillBind]}<BindChip {doc} {clip} target={fillBind} {commit} />{:else}
+        <FillStack {gesture} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
+        {#if fillBind}<BindChip {doc} {clip} target={fillBind} {commit} />{/if}
+      {/if}
+    </div>
   {:else if field.control === Control.Strokes}
     <div class="stack" data-prop={field.key}><StrokeStack {gesture} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
   {:else if field.control === Control.Textarea}
-    <div class="stack">
-      <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} onkeydown={leaveOnEscape} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
+    <div class="stack bindable">
+      {#if clip.bind?.[field.key]}<BindChip {doc} {clip} target={field.key} {commit} />{:else}
+        <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} onkeydown={leaveOnEscape} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
+        <BindChip {doc} {clip} target={field.key} {commit} />
+      {/if}
     </div>
   {:else}
     <div class="line">
       <label for={`f-${field.key}`}>{field.label}</label>
       <div class="control">
-        {#if field.control === Control.Text}
+        {#if clip.bind?.[field.key]}
+          <BindChip {doc} {clip} target={field.key} {commit} />
+        {:else if field.control === Control.Text}
           <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
         {:else if field.control === Control.Select}
           <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
@@ -674,6 +690,7 @@
           <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
         {/if}
       </div>
+      {#if !clip.bind?.[field.key]}<BindChip {doc} {clip} target={field.key} {commit} />{/if}
       {#if keyed}{@render diamond(field.key)}{/if}
     </div>
   {/if}
@@ -684,7 +701,7 @@
   {@const radii = cornerRadii(Number(clip.props.roundness ?? 0), corners)}
   {@const split = corners.length > 0}
   <div class="radius" data-testid="radius">
-    <div class="radius-main">{@render rangeField(round)}</div>
+    <div class="radius-main bindable">{#if clip.bind?.[round.key]}<BindChip {doc} {clip} target={round.key} {commit} />{:else}{@render rangeField(round)}<BindChip {doc} {clip} target={round.key} {commit} />{/if}</div>
     {#if cornersField}
       <button type="button" class="radius-split" class:on={split} data-testid="radius-per-corner" aria-pressed={split} aria-label="Per-corner radius" title="Per-corner radius" onclick={() => setProp(cornersField, split ? [] : radii)}><SquareDashed size={15} /></button>
     {/if}
@@ -851,6 +868,7 @@
 
 {#snippet animateBody()}
   {#if visual && clip.component !== 'Null'}
+    <InOutPresetsSection {doc} {clip} {frame} {commit} />
     <AnimateToSection {doc} {clip} {frame} {commit} />
   {/if}
   {#if TEXT_COMPONENTS.has(clip.component)}
@@ -1170,6 +1188,17 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 6px;
+  }
+
+  .bindable {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .bindable > :global(:first-child) {
+    flex: 1;
+    min-width: 0;
   }
 
   .stackable {

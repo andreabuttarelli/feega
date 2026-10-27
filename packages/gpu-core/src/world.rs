@@ -2,7 +2,10 @@ use serde::Deserialize;
 use vello::kurbo::{Affine as Matrix, Point, Rect};
 
 use crate::display_list::{Affine, DisplayList, Item, Look, PathItem, UseItem};
+use crate::lod::BLUR_REACH;
 use crate::retained::Damage;
+
+const OVERLAY_SLACK_PX: f64 = 2.0;
 
 #[derive(Debug, Deserialize)]
 pub struct Patch {
@@ -22,15 +25,18 @@ pub fn parse_overlay(json: &str) -> Result<Vec<Item>, serde_json::Error> {
 
 pub type Sizes<'a> = &'a dyn Fn(&str) -> Option<(f64, f64)>;
 
+pub const OVERLAY_GROUP: &str = "overlay:";
+
 pub struct World {
     uses: Vec<UseItem>,
     overlay: Vec<Item>,
+    overlay_at: Option<UseItem>,
     damage: Damage,
 }
 
 impl Default for World {
     fn default() -> Self {
-        World { uses: Vec::new(), overlay: Vec::new(), damage: Damage::none() }
+        World { uses: Vec::new(), overlay: Vec::new(), overlay_at: None, damage: Damage::none() }
     }
 }
 
@@ -57,7 +63,7 @@ fn extent(item: &Item) -> Option<Rect> {
 
 fn same(a: &Item, b: &Item) -> bool {
     match (a, b) {
-        (Item::Path(a), Item::Path(b)) => a.contours == b.contours && a.look.matrix == b.look.matrix && a.look.opacity == b.look.opacity && format!("{:?}{:?}", a.paint, a.rule) == format!("{:?}{:?}", b.paint, b.rule),
+        (Item::Path(a), Item::Path(b)) => a.contours == b.contours && a.look.matrix == b.look.matrix && a.look.opacity == b.look.opacity && a.paint == b.paint && a.rule == b.rule,
         _ => false,
     }
 }
@@ -154,13 +160,32 @@ impl World {
         bounds.into_iter().for_each(|b| self.mark(b));
     }
 
+    pub fn overlay_group(&self) -> Option<(DisplayList, UseItem)> {
+        let reach = self.overlay.iter().map(extent).collect::<Option<Vec<Rect>>>()?.into_iter().reduce(|a, b| a.union(b))?;
+        let blur = self.overlay.iter().filter_map(|i| i.look()).map(|l| l.blur).fold(0.0, f64::max);
+        let pad = blur * BLUR_REACH + OVERLAY_SLACK_PX;
+        let corner = reach.inflate(pad, pad);
+        let (x, y) = (corner.x0.floor(), corner.y0.floor());
+        let into = [1.0, 0.0, 0.0, 1.0, -x, -y];
+        let items = self.overlay.iter().map(|i| through(i, into)).collect();
+        let list = DisplayList { width: (corner.x1 - x).ceil() as u32, height: (corner.y1 - y).ceil() as u32, background: None, items, faces: Vec::new(), fragments: Default::default() };
+        Some((list, UseItem { clip: OVERLAY_GROUP.into(), group: OVERLAY_GROUP.into(), matrix: [1.0, 0.0, 0.0, 1.0, x, y], cache: false, hold: false, reach: None }))
+    }
+
+    pub fn place_overlay(&mut self, at: Option<UseItem>) {
+        self.overlay_at = at;
+    }
+
     pub fn take_damage(&mut self) -> Damage {
         std::mem::replace(&mut self.damage, Damage::none())
     }
 
     pub fn screen(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
         let uses = self.uses.iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
-        let overlay = self.overlay.iter().map(|i| through(i, camera));
+        let overlay: Vec<Item> = match &self.overlay_at {
+            Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
+            None => self.overlay.iter().map(|i| through(i, camera)).collect(),
+        };
         DisplayList { width, height, background: None, items: uses.chain(overlay).collect(), faces: Vec::new(), fragments: Default::default() }
     }
 }

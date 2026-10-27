@@ -148,6 +148,8 @@ and spends credits only with that `quoteId` (a changed selection or price is a 4
 
 Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
 
+Cloud files: `cloud` lists, imports and exports Google Drive and Dropbox files and disconnects a provider; `figma_token_status` says whether a Figma token is saved. CLI: `feega cloud status|files|import|export|disconnect`, `feega figma-token`.
+
 ## Edit and see a canvas: `edit` and `view`
 
 `edit` is the one way to change a canvas, its nodes, free elements, frames and what is inside a frame.
@@ -218,7 +220,7 @@ the video's scroll length. Live components (games, generative pieces) run live t
 shows a still of them. Publishing again updates it in place, `action: "unpublish"` takes it
 down. Uncensored projects are refused. It also returns `react` and `flutter` snippets: the
 same player inside a React (`@feega/motion-react`) or Flutter (`feega_motion`) app.
-To send someone one frame, `share_motion_frame` returns a viewer link (loops, tap to play, swipe between shared frames on a phone) and turns the canvas share on; free. `motion_budget` reads what a video spent across its turns; `action: "raise"` lets it spend more, only when the user asks to continue. `get_motion_embed` reads the state. The self-contained HTML (no hosting):
+To send someone one frame, `share_motion_frame` returns a viewer link (loops, tap to play, swipe between shared frames on a phone) and turns the canvas share on; free. `get_play_link` does the same for a prototype: a full-screen player that runs the links between frames (`add_interaction`), starting on the frame given or on the canvas's first flow (`set_flow`), and lists the flows. `motion_budget` reads what a video spent across its turns; `action: "raise"` lets it spend more, only when the user asks to continue. `get_motion_embed` reads the state. The self-contained HTML (no hosting):
 `feega motion embed <nodeId> --download page.html`.
 
 See a video with `view_motion_frames` (up to 6 times in seconds): the frames come back as
@@ -276,7 +278,8 @@ modes? }` creates or edits one (every mode needs a value); `"add_mode"` adds a m
 switches the video to a mode and every bound clip takes that mode's value; `"bind"` `{ collection,
 name, clip_id, target }` links a prop (a colour to fill/stroke/color, a number to roundness, opacity,
 width, `autoLayout.gap`, `autoLayout.padding`...); `"unbind"`, `"remove"`, `"list"`. `set_props` on
-a bound prop is refused. Through `motion_tool`. Across the frames of a canvas: edit op `variables`
+a bound prop is refused. The bind chip next to an inspector field is `bind_variable` `{ clip_id, target,
+variable: "Collection/name" }` and `unbind_variable` `{ clip_id, target }`. Through `motion_tool`. Across the frames of a canvas: edit op `variables`
 (list; define a value, synced to every frame that has the collection; switch a mode per frame with
 `frames`; bind `ids` as `frameId:elementId`).
 

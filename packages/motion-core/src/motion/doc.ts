@@ -34,6 +34,8 @@ import { stillSchema } from './still-model';
 import { partStylesSchema } from './part-style-model';
 import { autoLayoutSchema, layoutItemSchema } from './layout/model';
 import { constraintsSchema } from './constraints/model';
+import { flowSchema } from './prototype/flow';
+import { interactionsSchema } from './prototype/model';
 import { layoutGuidesSchema } from './layout-guides/model';
 import { userGuidesSchema } from './user-guides/model';
 
@@ -123,6 +125,7 @@ const clipSchema = z.object({
   autoLayout: autoLayoutSchema.nullable().optional(),
   layoutItem: layoutItemSchema.optional(),
   constraints: constraintsSchema.optional(),
+  interactions: interactionsSchema.optional(),
   lockRatio: z.boolean().optional(),
   acceptsLights: z.boolean().optional(),
   partStyles: partStylesSchema.optional(),
@@ -231,6 +234,7 @@ export const motionDocSchema = z
     layoutGuides: layoutGuidesSchema,
     userGuides: userGuidesSchema,
     links: z.record(z.string().min(1), z.string().min(1)).optional(),
+    flow: flowSchema.optional(),
     styles: stylesSchema,
     variables: variablesSchema,
     pointTracks: z.record(z.string(), pointTrackSchema).refine((t) => Object.keys(t).length <= MAX_POINT_TRACKS, `at most ${MAX_POINT_TRACKS} saved tracks`).optional()
