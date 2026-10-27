@@ -7,11 +7,15 @@ import { shortcutHelp } from '$lib/motion/shortcuts';
 import { FORMAT } from '$lib/motion/export-formats';
 import { listAllTools } from '../../cli/mcp/server';
 import { CORE_TOOLS, TOOL_FAMILY } from '../../cli/mcp/surface';
+import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
+import { entriesFromKie, entriesFromRows, renderPriceTable, type KieRecord, type SnapshotRow } from '$lib/docs/model-prices';
+import { audioEntries, higgsfieldEntries, kieTextEntries } from '$lib/docs/model-prices-code';
 
 const OUT = fileURLToPath(new URL('../src/content/docs/reference/generated/', import.meta.url));
 const CHANGELOG_DIR = fileURLToPath(new URL('../../src/lib/content/changelog/', import.meta.url));
 const DOCS_ROOT = fileURLToPath(new URL('../src/content/docs/', import.meta.url));
 const REPO_DOCS = fileURLToPath(new URL('../../docs/', import.meta.url));
+const PRICE_SNAPSHOT = fileURLToPath(new URL('../data/model-prices.snapshot.json', import.meta.url));
 const GITHUB_BLOB = 'https://github.com/andreabuttarelli/feega/blob/main';
 
 type JsonSchema = { properties?: Record<string, JsonProp>; required?: string[] };
@@ -138,7 +142,16 @@ function adrs() {
   writeDoc('architecture/adr/index.md', 'Decision records', 'Why the system is built the way it is.', intro + rows.join('\n') + '\n', banner);
 }
 
+function modelPrices() {
+  const snapshot = JSON.parse(readFileSync(PRICE_SNAPSHOT, 'utf8')) as { takenAt: string; rows: SnapshotRow[]; kie: KieRecord[] };
+  const entries = [...entriesFromRows(snapshot.rows), ...entriesFromKie(snapshot.kie), ...kieTextEntries(), ...higgsfieldEntries(), ...audioEntries()];
+  const intro = `Price of every model feega can run, in credits, as you are charged. Snapshot of ${snapshot.takenAt}: ${entries.length} rows.\n\n- **How credits are charged.** Every call costs the provider's price in dollars times 1.2, at ${CREDITS_PER_USD_SUBSCRIPTION_LIST} credits per provider dollar (\`src/lib/credit-ladder.ts\`). One credit is not one dollar: 1 credit is about $0.0083 of provider cost. A range means the price depends on resolution, duration, quality or tier; the Notes column lists the variants.\n- **Rounding.** Each call is rounded to whole credits when it is billed.\n- **Not published.** The provider meters the run and exposes no static price (Wiro \`cp-readoutput\` models), or quotes it per request (Higgsfield).\n- **Where the numbers come from.** Chat, image, video and 3D models: the \`ai_models\` catalogue (OpenRouter, Wiro, Kie) read from production. Kie: its public price list. Audio: \`src/lib/canvas/audio-operations.ts\`. Higgsfield: \`src/lib/server/higgsfield-catalogue.ts\`. Refresh the snapshot with \`node web-docs/scripts/refresh-model-prices.mjs\`.\n\n`;
+  const body = `import PriceTable from '../../../../components/PriceTable.astro';\n\n${intro}<PriceTable>\n\n${renderPriceTable(entries)}\n</PriceTable>\n`;
+  write('model-prices.mdx', `---\ntitle: Model prices\ndescription: The price of every model in credits, generated from the model catalogues.\n---\n\n:::note\nGenerated from the code by \`npm --prefix web-docs run gen\`. Do not edit by hand.\n:::\n\n${body}`);
+}
+
 test('generate the reference pages', async () => {
+  modelPrices();
   await editOps();
   await mcpTools();
   shortcuts();

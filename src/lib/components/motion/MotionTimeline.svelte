@@ -2,6 +2,7 @@
   import { pressMenu, type Point } from '$lib/motion/press-menu';
   import { haptic } from '$lib/native-actions';
   import { PickMode } from '$lib/motion/clip-bar';
+  import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
@@ -57,6 +58,7 @@
     snap,
     waveforms = {},
     beats = [],
+    cached = [],
     assetUrls = {},
     reveal = Reveal.Animated,
     pick = PickMode.One,
@@ -73,6 +75,7 @@
     snap: Snap;
     waveforms?: Record<string, number[]>;
     beats?: number[];
+    cached?: FrameRange[];
     assetUrls?: Record<string, string>;
     reveal?: Reveal;
     pick?: PickMode;
@@ -809,6 +812,9 @@
       {#if shown.workArea}
         <span class="work-area" data-testid="work-area" style={`left: ${headPx + shown.workArea.from * ppf}px; width: ${(shown.workArea.to - shown.workArea.from) * ppf}px;`}></span>
       {/if}
+      {#each cached as run (run.from)}
+        <span class="ram-cache" data-testid="ram-cache" style={`left: ${headPx + run.from * ppf}px; width: ${(run.to - run.from) * ppf}px;`}></span>
+      {/each}
       {#each markers as m (`${m.clipId}:${m.label}`)}
         <span class="marker" class:clip-marker={m.clipId} data-marker={m.label} title={m.label} style={`left: ${headPx + m.frame * ppf}px;`}></span>
       {/each}
@@ -1100,6 +1106,14 @@
     font-variant-numeric: tabular-nums;
     color: var(--ui-ink-3);
     white-space: nowrap;
+  }
+
+  .ram-cache {
+    position: absolute;
+    bottom: 0;
+    height: 3px;
+    background: var(--ui-ok, #2ea043);
+    pointer-events: none;
   }
 
   .work-area {

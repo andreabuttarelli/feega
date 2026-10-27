@@ -179,7 +179,7 @@ raggi con un ruolo per gradino** (`--ui-radius-*` in `src/app.css`, esposta da T
 `rounded-xs/sm/md/lg`; `--radius` in `src/lib/styles/tailwind.css` vale `md`): `none` 0 per
 tele, contenuto dei nodi, pannelli e barre a tutta altezza; `xs` 2px per kbd, checkbox, swatch;
 `sm` 4px per bottoni, input, righe, segmenti; `md` 6px per menu, popover, card; `lg` 10px per
-dialog, sheet e barre flottanti; `full` per avatar, pallini, pill. Si sceglie il gradino per
+dialog, sheet, barre e pannelli flottanti della tela; `full` per avatar, pallini, pill. Si sceglie il gradino per
 ruolo, mai un valore libero (`border-radius: 7px` no). Il dettaglio sta in `DESIGN.md`. Il
 contenuto dei video e dei template segue le sue regole, non questa.
 

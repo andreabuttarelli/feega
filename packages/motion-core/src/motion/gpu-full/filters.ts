@@ -13,7 +13,7 @@ export type Linear = [number, number, number, number];
 
 export const IDENTITY_MATRIX = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
 
-export const PRIMITIVES = new Set(['feColorMatrix', 'feComponentTransfer', 'feFuncR', 'feFuncG', 'feFuncB', 'feFuncA', 'feGaussianBlur', 'feOffset', 'feComposite', 'feFlood', 'feMerge', 'feMergeNode', 'feMorphology', 'feDropShadow', 'feBlend', 'feDiffuseLighting', 'fePointLight', 'feTurbulence', 'feTile', 'feDisplacementMap']);
+export const PRIMITIVES = new Set(['feColorMatrix', 'feComponentTransfer', 'feFuncR', 'feFuncG', 'feFuncB', 'feFuncA', 'feGaussianBlur', 'feOffset', 'feComposite', 'feFlood', 'feMerge', 'feMergeNode', 'feMorphology', 'feDropShadow', 'feBlend', 'feDiffuseLighting', 'fePointLight', 'feTurbulence', 'feTile', 'feDisplacementMap', 'feWarp']);
 
 const FUNCTION = /([a-z-]+)\(((?:[^()]|\([^()]*\))*)\)/g;
 const ARGS = /\s+(?![^(]*\))/;

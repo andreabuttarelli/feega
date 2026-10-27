@@ -21,6 +21,6 @@ export const GET: RequestHandler = async (event) => {
   if (!access.ok) {
     return json({ error: access.reason, provider: event.params.provider, label: labelOf(event.params.provider) }, { status: access.reason === 'not_configured' ? HTTP_NOT_CONFIGURED : HTTP_CONFLICT });
   }
-  const entries = await listFiles(event.params.provider, access.token, event.url.searchParams.get('folder'));
-  return json({ entries });
+  const page = await listFiles(event.params.provider, access.token, event.url.searchParams.get('folder'), event.url.searchParams.get('cursor'));
+  return json(page);
 };

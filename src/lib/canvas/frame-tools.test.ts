@@ -9,8 +9,12 @@ const doc = { layoutGuides: [{ id: 'g' }] } as unknown as MotionDoc;
 const plain = { doc: { layoutGuides: [] } as unknown as MotionDoc, clip: null, picks: 0, tool: DrawTool.Select, pointEdit: null, active: false, views: FRAME_VIEW_DEFAULT };
 
 describe('shownOverlays', () => {
-  it('shows nothing for an empty selection with the select tool', () => {
-    expect([...shownOverlays(plain)]).toEqual([]);
+  it('shows only the rulers for an empty selection with the select tool', () => {
+    expect([...shownOverlays(plain)]).toEqual([FrameOverlay.Rulers]);
+  });
+
+  it('hides the rulers once they are turned off', () => {
+    expect(shownOverlays({ ...plain, views: flipView(FRAME_VIEW_DEFAULT, FrameView.Rulers) }).has(FrameOverlay.Rulers)).toBe(false);
   });
 
   it('shows the draw overlay whenever a draw tool is on', () => {
@@ -56,8 +60,8 @@ describe('shownOverlays', () => {
   it('shows pen points for a path being edited and vector points for a vector', () => {
     const path = clip({ props: { shape: 'path' } });
     const vector = clip({ props: { shape: 'vector' } });
-    expect([...shownOverlays({ ...plain, clip: path, picks: 1, pointEdit: 'c', active: true })]).toEqual([FrameOverlay.Pen]);
-    expect([...shownOverlays({ ...plain, clip: vector, picks: 1, pointEdit: 'c', active: true })]).toEqual([FrameOverlay.Vector]);
+    expect([...shownOverlays({ ...plain, clip: path, picks: 1, pointEdit: 'c', active: true })]).toEqual([FrameOverlay.Rulers, FrameOverlay.Pen]);
+    expect([...shownOverlays({ ...plain, clip: vector, picks: 1, pointEdit: 'c', active: true })]).toEqual([FrameOverlay.Rulers, FrameOverlay.Vector]);
   });
 
   it('hides point editing once the clip is not the one being edited', () => {

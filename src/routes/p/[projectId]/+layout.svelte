@@ -11,6 +11,10 @@
   import FloatingRail from '$lib/components/canvas/FloatingRail.svelte';
   import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
+  import { frameProperties } from '$lib/components/canvas/frame-properties.svelte';
+  import { rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
+  import { frameBar } from '$lib/canvas/frame-bar.svelte';
+  import { followDocks } from '$lib/canvas/dock-lift';
   import RightBar from '$lib/components/brand-agent/RightBar.svelte';
   import { can, OrgAction } from '$lib/org-roles';
   import CanvasSheet from '$lib/components/canvas/CanvasSheet.svelte';
@@ -22,7 +26,7 @@
   import MobileViewSwitch from '$lib/components/canvas/MobileViewSwitch.svelte';
   import { watchKeyboard } from '$lib/canvas/keyboard-inset';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
-  import { NAV_ENTRIES, sheetEntryForPath, directLoadMode, navHref, type NavEntry } from '$lib/shell-nav';
+  import { NAV_ENTRIES, PANEL_WIDTHS, sheetEntryForPath, directLoadMode, navHref, panelForShortcut, type NavEntry } from '$lib/shell-nav';
   import { goto } from '$app/navigation';
   import { INITIAL_MOBILE_VIEW, chatBadge, showView, turnEnded, type MobileView, type ChatTurn } from '$lib/canvas/mobile-view';
   import { anyChatRunning } from '$lib/components/brand-agent/chat-session.svelte';
@@ -52,7 +56,25 @@
   const activeSheetId = $derived(page.state.sheet ? sheetEntryForPath(page.state.sheet.path)?.id ?? null : null);
 
   let leftPanel = $state<LeftPanelKind | null>(null);
-  let chatOpen = $state(browser ? readChatOpen() : true);
+  let chatOpen = $state(browser ? readChatOpen(false) : false);
+
+  let canvasRow = $state<HTMLElement | null>(null);
+  let dockLift = $state(0);
+
+  $effect(() => {
+    const timeline = frameBar.timeline;
+    if (!canvasRow) {
+      return;
+    }
+    return followDocks(canvasRow, () => (timeline ? [timeline] : []), (px) => (dockLift = px));
+  });
+
+  const framePicked = $derived(!!frameProperties.session?.selection.length);
+  const RAIL_EDGE = '68px';
+  const EDGE = '12px';
+  const fitted = (px: number) => `min(${px}px, 100vw - 92px)`;
+  const shellLeft = $derived(leftPanel ? `calc(${RAIL_EDGE} + ${fitted(PANEL_WIDTHS[leftPanel] ?? PANEL_WIDTHS.assets)} + ${EDGE})` : RAIL_EDGE);
+  const shellRight = $derived(chatOpen || framePicked ? `calc(${fitted(rightBar.width)} + 2 * ${EDGE})` : EDGE);
   let mobileView = $state(INITIAL_MOBILE_VIEW);
 
   let isMobile = $state(browser ? matchMedia(MOBILE_QUERY).matches : false);
@@ -105,6 +127,16 @@
 
   function onRailPanel(entry: NavEntry) {
     leftPanel = leftPanel === entry.id ? null : (entry.id as LeftPanelKind);
+  }
+
+  function onPanelKey(e: KeyboardEvent) {
+    const entry = panelForShortcut(e);
+    if (!entry) {
+      return;
+    }
+
+    e.preventDefault();
+    onRailPanel(entry);
   }
 
   function onRailSheet(entry: NavEntry) {
@@ -189,6 +221,8 @@
   const canEdit = $derived(can(data.org.role, OrgAction.Edit));
 </script>
 
+<svelte:window onkeydown={onPanelKey} />
+
 <ChatLeaveGuard {projectId} />
 {#if browser}<RightBar {projectId} viewOnly={!canEdit} />{/if}
 
@@ -258,7 +292,7 @@
       profile={data.profile}
       org={data.org}
     />
-    <div class="canvas-row">
+    <div class="canvas-row" bind:this={canvasRow} style:--shell-left={shellLeft} style:--shell-right={shellRight} style:--dock-lift={`${dockLift}px`}>
       <FloatingRail
         activePanel={leftPanel}
         activeSheet={activeSheetId}
@@ -274,7 +308,6 @@
             kind={leftPanel}
             labelKey={NAV_ENTRIES.find((entry) => entry.id === leftPanel)?.labelKey ?? ''}
             onclose={() => (leftPanel = null)}
-            onkind={(kind) => (leftPanel = kind)}
           />
         {/await}
       {/if}
@@ -283,7 +316,7 @@
         <CanvasSheet {projectId} />
       </div>
 
-      <CanvasChatPanel open={chatOpen} />
+      <CanvasChatPanel open={chatOpen || framePicked} />
     </div>
   {:else}
     <DesktopPageBar
@@ -306,6 +339,7 @@
   }
 
   .project-shell {
+    position: relative;
     height: 100dvh;
     display: flex;
     flex-direction: column;
@@ -313,12 +347,14 @@
   }
 
   .canvas-row {
+    position: relative;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
   }
 
   .canvas-stage {
+    --chrome-top: 56px;
     position: relative;
     flex: 1 1 auto;
     min-width: 0;

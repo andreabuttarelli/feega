@@ -9,13 +9,24 @@ Local mode runs feega on your computer for one canvas. Everything you draw is sa
 `.feega` file, the same file feega.app imports.
 
 ```sh
+npx feega my-canvas.feega
+```
+
+You need Node 22 or later. The browser opens on http://localhost:5173 and the terminal prints
+where the file is saved, relative to the folder you ran the command in. Each start checks for a newer
+version and downloads it once into `~/.feega/app/<version>/`; offline it starts the newest one
+already downloaded. Options:
+`--port 8080`, `--no-open`. If the file does not exist it is created; every change is written back to it within a second, and again when
+you stop the server with Ctrl-C.
+
+## From a clone
+
+```sh
 git clone https://github.com/andreabuttarelli/feega && cd feega && npm install
 npm run local -- my-canvas.feega
 ```
 
-Open http://localhost:5173. The first run builds the app, which takes a few minutes. If the file
-does not exist it is created; every change is written back to it within a second, and again when
-you stop the server with Ctrl-C.
+The first run builds the app, which takes a few minutes.
 
 ## With an agent
 
@@ -25,7 +36,7 @@ port 5173 and need no `feega login`. What an agent adds or changes appears live 
 
 ## AI generation with your own keys
 
-Put a provider key in the process environment or in the `.env` file in the repo folder, then start
+Put a provider key in the process environment (`KIE_API_KEY=… npx feega`), or in the `.env` file when running from a clone, then start
 local mode:
 
 | Variable | Provider |

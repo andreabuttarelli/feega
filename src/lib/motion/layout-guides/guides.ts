@@ -69,11 +69,12 @@ export function guideLines(guide: LayoutGuide, frame: Size): GuideLine[] {
 const lineBounds = (line: GuideLine, frame: Size): Bounds =>
   line.axis === 'x' ? { left: line.at, top: 0, right: line.at, bottom: frame.height } : { left: 0, top: line.at, right: frame.width, bottom: line.at };
 
-export function guideSnapBounds(doc: Pick<MotionDoc, 'layoutGuides' | 'width' | 'height'>): Bounds[] {
+export function guideSnapBounds(doc: Pick<MotionDoc, 'layoutGuides' | 'userGuides' | 'width' | 'height'>): Bounds[] {
   const guides = doc.layoutGuides ?? [];
   const bands = guides.flatMap((g) => guideBands(g, doc)).map((b) => ({ left: b.left, top: b.top, right: b.left + b.width, bottom: b.top + b.height }));
   const lines = guides.flatMap((g) => guideLines(g, doc)).map((l) => lineBounds(l, doc));
-  return [...bands, ...lines];
+  const pulled = (doc.userGuides ?? []).map((g) => lineBounds(g, doc));
+  return [...bands, ...lines, ...pulled];
 }
 
 export function setLayoutGuides(doc: MotionDoc, guides: readonly LayoutGuide[]): OpResult {

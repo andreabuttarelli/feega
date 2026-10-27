@@ -3,9 +3,8 @@
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { bindVariable, bindableTargets, typeOfVariable, unbindVariable, variableEntries } from '$lib/motion/variables';
-  import { adoptCollection } from '$lib/motion/variable-library';
-  import { splitKey } from '@feega/motion-core/motion/variables-model';
+  import { bindableTargets, typeOfVariable, unbindVariable, variableEntries } from '$lib/motion/variables';
+  import { bindFromLibrary } from '$lib/motion/variable-library';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
@@ -30,9 +29,7 @@
     if (key === NONE || target === NONE) {
       return;
     }
-    const collection = splitKey(key)?.[0] ?? '';
-    const adopted = offered[collection] ? adoptCollection(doc, collection, offered[collection]) : { ok: false as const, error: `no collection ${collection}` };
-    commit(adopted.ok ? bindVariable(adopted.doc, clip.id, target, key) : adopted, `Bound ${target} to ${key}`);
+    commit(bindFromLibrary(doc, offered, clip.id, target, key), `Bound ${target} to ${key}`);
     target = NONE;
   }
 </script>

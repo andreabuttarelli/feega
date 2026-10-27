@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 import { startImageTool, type ImageToolDeps } from './image-tool';
-import { IMAGE_TOOL_MODEL, ImageTool } from '$lib/image-tools';
+import { IMAGE_TOOL_MODEL, ImageTool, REFRAME_PROMPT } from '$lib/image-tools';
 
 const db = {} as never;
 const SCOPE = { orgId: 'org', projectId: 'p1', userId: 'u1' };
@@ -133,6 +133,31 @@ describe('startImageTool puts a tool node beside an image and runs it', () => {
         const d = deps(over as never);
 
         expect(await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Outpaint, ...ask })).toEqual({ ok: false, error });
+        expect(d.createNode).not.toHaveBeenCalled();
+      }
+    });
+  });
+
+  describe('reframe', () => {
+    it('pads the picture to the asked aspect and fills the new area with the default prompt', async () => {
+      const d = deps();
+
+      const out = await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Reframe, aspect: '1:1' });
+
+      expect(out).toMatchObject({ ok: true, nodeId: 'n-out' });
+      expect(d.paddedPng).toHaveBeenCalledWith(db, { orgId: 'org', assetId: 'asset-1' }, { width: 80, height: 40 }, expect.objectContaining({ padded: { width: 80, height: 80 } }));
+      expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ displayName: 'Reframe 1:1', data: expect.objectContaining({ prompt: REFRAME_PROMPT, model: IMAGE_TOOL_MODEL[ImageTool.Reframe], editImageRefId: 'padded-asset' }) }));
+    });
+
+    it('refuses without an aspect, when the picture already has it, or when the size is unknown', async () => {
+      for (const [ask, over, error] of [
+        [{}, {}, 'aspect_required'],
+        [{ aspect: '2:1' }, {}, 'already_this_aspect'],
+        [{ aspect: '1:1' }, { pixelSizeOf: vi.fn(async () => null) }, 'source_size_unknown']
+      ] as const) {
+        const d = deps(over as never);
+
+        expect(await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Reframe, ...ask })).toEqual({ ok: false, error });
         expect(d.createNode).not.toHaveBeenCalled();
       }
     });
