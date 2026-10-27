@@ -48,19 +48,41 @@ const FIXED_KEYS = ['curves', 'chrome', 'selected', 'selectedEdge', 'theme', 'gl
 
 let fixedFor: Fixed | null = null;
 let fixedItems: PathItem[] = [];
+let built = new Map<string, PathItem[]>();
 
 function zoomFree(o: Fixed): PathItem[] {
   if (fixedFor && FIXED_KEYS.every((k) => fixedFor![k] === o[k])) {
     return fixedItems;
   }
+  const kept = fixedFor?.theme === o.theme && fixedFor.glyphs === o.glyphs ? built : new Map<string, PathItem[]>();
+  const next = new Map<string, PathItem[]>();
+  const once = (key: string, make: () => PathItem[]) => {
+    const items = kept.get(key) ?? next.get(key) ?? make();
+    next.set(key, items);
+    return items;
+  };
   fixedFor = o;
-  fixedItems = [...o.curves.flatMap((c) => edgeItems(c.edge.id, c.curve, edgeLook(c.edge, o.selected, o.selectedEdge), o.theme)), ...o.chrome.flatMap((t) => turnedBy(chromeOf(t, o.glyphs), t.turn))];
+  fixedItems = [
+    ...o.curves.flatMap((c) => {
+      const look = edgeLook(c.edge, o.selected, o.selectedEdge);
+      return once(JSON.stringify([c.edge.id, look, c.curve]), () => edgeItems(c.edge.id, c.curve, look, o.theme));
+    }),
+    ...o.chrome.flatMap((t) => once(JSON.stringify(t), () => turnedBy(chromeOf(t, o.glyphs), t.turn)))
+  ];
+  built = next;
   return fixedItems;
 }
 
-export function overlayOf(o: WorldOverlay): PathItem[] {
+export type CoreOverlay = { fixed: readonly PathItem[]; live: readonly PathItem[] };
+
+export const NO_OVERLAY: CoreOverlay = { fixed: [], live: [] };
+
+export function overlayOf(o: WorldOverlay): CoreOverlay {
+  return { fixed: zoomFree(o), live: liveItems(o) };
+}
+
+function liveItems(o: WorldOverlay): PathItem[] {
   return [
-    ...zoomFree(o),
     ...o.running.flatMap((b) => runningItems(b, o.zoom, o.theme)),
     ...(o.hovered ? hoverItems(o.hovered, o.zoom, o.theme) : []),
     ...(o.marquee ? marqueeItems(o.marquee, o.zoom, o.theme) : []),

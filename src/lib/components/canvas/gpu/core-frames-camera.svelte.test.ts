@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, frames: 0, puts: [] as string[], attached: 0, lose: false, splices: [] as { from: string; to: string; items: number }[] }));
+const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, parts: [] as string[], frames: 0, puts: [] as string[], attached: 0, lose: false, splices: [] as { from: string; to: string; items: number }[] }));
 
 vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
   createCore: () => {
@@ -22,7 +22,7 @@ vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
       dispose: () => undefined,
       setCamera: (x: number, y: number, zoom: number) => calls.cameras.push([x, y, zoom]),
       patchUses: (patch: unknown) => calls.patches.push(patch),
-      setOverlay: () => calls.overlays++,
+      setOverlay: (part: string) => (calls.overlays++, calls.parts.push(part)),
       frame: () => {
         calls.frames++;
         return { outcome: 'reused', pending: false };
@@ -64,6 +64,21 @@ describe('CoreFrames camera', () => {
     await vi.waitFor(() => expect(calls.cameras.at(-1)).toEqual([40, 0, 1]));
     expect(calls.patches.length).toBe(sent);
     expect(calls.overlays).toBe(overlays);
+  });
+
+  it('a hover change sends the core only the live overlay', async () => {
+    const wire = { kind: 'path', clip: 'e:wire', contours: [[0, 0, 10, 0]], rule: 'nonzero', paint: { kind: 'solid', color: [0, 0, 0, 1] }, opacity: 1, matrix: [1, 0, 0, 1, 0, 0] };
+    const fixed = [wire];
+    const props = $state({ frames: [], cards: [card], overlay: { fixed, live: [] as unknown[] }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props: props as never });
+    flushSync();
+    await vi.waitFor(() => expect(calls.parts).toContain('fixed'));
+    calls.parts.length = 0;
+
+    props.overlay = { fixed, live: [{ ...wire, clip: 'n:hover' }] };
+    flushSync();
+
+    await vi.waitFor(() => expect(calls.parts).toEqual(['live']));
   });
 
   it('draws nodes in the canvas stacking order, not cards before frames', async () => {

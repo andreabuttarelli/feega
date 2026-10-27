@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { wireCurve } from '$lib/canvas/gpu/geometry';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { EdgeLook, type CoreTheme } from './overlay';
-import { ChromeLayers, edgeLook, overlayOf } from './world-overlay';
+import { ChromeLayers, edgeLook, overlayOf as parts, type WorldOverlay } from './world-overlay';
 import { PortState } from './chrome';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', paper2: '#f9f9f9', line: '#e5e5e5', line2: '#d2d2d7', chip: '#f2f2f2', chipInk: '#141414', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
 const edge = (over: Partial<{ id: string; source: string; target: string; mode: string }> = {}) => ({ id: 'e', source: 'a', target: 'b', ...over });
 const glyphs = ((text: string, size: number) => ({ contours: [[0, 0, size, 0, size, size]], width: text.length * size, height: size })) as never;
 const none = { peers: [], outlines: [], ghost: null, hovered: null, running: [], chrome: [], glyphs };
+const overlayOf = (o: WorldOverlay) => {
+  const { fixed, live } = parts(o);
+  return [...fixed, ...live];
+};
 const curve = wireCurve({ x: 0, y: 0 }, { x: 100, y: 50 });
 
 describe('edge look', () => {
@@ -90,5 +94,28 @@ describe('world overlay across zoom', () => {
 
     expect(far[0]).toBe(near[0]);
     expect(far.at(-1)).not.toBe(near.at(-1));
+  });
+
+  it('hands back the same fixed part and a new live part when only the zoom changes', () => {
+    const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], theme, ...none, hovered: { x: 0, y: 0, w: 10, h: 10 } };
+    const near = parts({ ...base, zoom: 1 });
+    const far = parts({ ...base, zoom: 0.5 });
+
+    expect(far.fixed).toBe(near.fixed);
+    expect(far.fixed.map((i) => i.clip.split(':')[1])).toEqual(['wire']);
+    expect(far.live.map((i) => i.clip.split(':').at(-1))).toEqual(['hover']);
+  });
+});
+
+describe('world overlay, node by node', () => {
+  const tile = (id: string, x: number) => ({ id, x, y: 0, width: 100, height: 50, inputs: [], outputs: [], label: null, icon: null, ring: NodeChrome.Selected, handles: true, hovered: false, ringColor: '#7c5cff', names: false });
+
+  it('keeps the chrome items of a node that did not change when another one does', () => {
+    const base = { curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+    const before = parts({ ...base, chrome: [tile('a', 0), tile('b', 200)] });
+    const after = parts({ ...base, chrome: [tile('a', 0), tile('b', 300)] });
+
+    expect(after.fixed[0]).toBe(before.fixed[0]);
+    expect(after.fixed.at(-1)).not.toBe(before.fixed.at(-1));
   });
 });
