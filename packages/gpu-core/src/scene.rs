@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use vello::kurbo::{Affine, BezPath, Point, Rect, Shape};
 use vello::peniko::{Fill, ImageData};
@@ -6,7 +6,7 @@ use vello::Scene;
 
 use crate::canvas::{mix, Canvas};
 use crate::fragments::{compose, Fragments};
-use crate::display_list::{Cover, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Look, Paint, PathItem, Ramp, Rgba, Size, Stop};
+use crate::display_list::{Cover, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Look, MaskLayer, MaskMode, Paint, PathItem, Ramp, Rgba, Size, Stop};
 use crate::pictures::{crop_rect, image_rect, tile_cells, Pictures, Placed as Window};
 use crate::Skipped;
 
@@ -126,8 +126,31 @@ fn skip(skipped: &mut Vec<Skipped>, clip: &str, what: &str) {
     skipped.push(Skipped { clip: clip.into(), what: what.into() });
 }
 
+fn clip_covers(look: &Look) -> Option<Vec<&Cover>> {
+    if look.backdrop.is_some() {
+        return None;
+    }
+    let masks = look.masks.as_ref()?;
+    let hard = |(i, m): (usize, &MaskLayer)| {
+        let first_or_intersect = m.mode == MaskMode::Intersect || (i == 0 && m.mode == MaskMode::Add);
+        matches!(m.cover, Cover::Path { .. }) && !m.invert && m.level == 1.0 && m.feather == 0.0 && first_or_intersect
+    };
+    masks.iter().enumerate().all(hard).then(|| masks.iter().map(|m| &m.cover).collect())
+}
+
 pub fn needs_layer(look: &Look) -> bool {
-    look.blur > 0.0 || look.masks.is_some() || look.matte.is_some() || look.filters.is_some()
+    look.blur > 0.0 || (look.masks.is_some() && clip_covers(look).is_none()) || look.matte.is_some() || look.filters.is_some()
+}
+
+fn clipped<C: Canvas>(scene: &mut C, look: &Look, paint: impl FnOnce(&mut C)) {
+    let covers = clip_covers(look).unwrap_or_default();
+    for cover in &covers {
+        if let Cover::Path { contours, matrix } = cover {
+            scene.push_clip(Fill::NonZero, Affine::new(*matrix), &joined(contours));
+        }
+    }
+    paint(scene);
+    covers.iter().for_each(|_| scene.pop());
 }
 
 pub fn layer_worthy(item: &Item) -> bool {
@@ -189,9 +212,14 @@ pub fn unblended<C: Canvas>(scene: &mut C, items: &[Item], at: usize, frame: Rec
     match (layers.bodies.get(&at), item, layers.groups.get(&at)) {
         (Some(body), _, _) => placed(scene, body),
         (None, Item::Group(group), Some(inner)) => {
-            build_items(scene, &group.items, frame, pictures, inner);
+            clipped(scene, &group.look, |s| {
+                build_items(s, &group.items, frame, pictures, inner);
+            });
         }
-        _ => content(scene, item, pictures, frame),
+        _ => match item.look() {
+            Some(look) => clipped(scene, look, |s| content(s, item, pictures, frame)),
+            None => content(scene, item, pictures, frame),
+        },
     }
 }
 
@@ -230,12 +258,13 @@ pub struct Layers<P = ImageData> {
     pub behind: HashMap<usize, Placed<P>>,
     pub groups: HashMap<usize, Layers<P>>,
     pub blended: HashMap<usize, Placed<P>>,
+    pub culled: HashSet<usize>,
     pub fragments: Fragments,
 }
 
 impl<P> Default for Layers<P> {
     fn default() -> Self {
-        Self { bodies: HashMap::new(), behind: HashMap::new(), groups: HashMap::new(), blended: HashMap::new(), fragments: Fragments::default() }
+        Self { bodies: HashMap::new(), behind: HashMap::new(), groups: HashMap::new(), blended: HashMap::new(), culled: HashSet::new(), fragments: Fragments::default() }
     }
 }
 
@@ -370,6 +399,7 @@ pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictur
         if needs_layer(look) {
             match layers.bodies.get(&i) {
                 Some(layer) => scissored(scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| placed(s, layer))),
+                None if layers.culled.contains(&i) => {}
                 None => skip(&mut skipped, item.clip(), "layer"),
             }
             continue;
@@ -377,7 +407,7 @@ pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictur
         if let Item::Group(group) = item {
             let empty = Layers::new();
             let inner = layers.groups.get(&i).unwrap_or(&empty);
-            scissored(scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| skipped.extend(build_items(s, &group.items, frame, pictures, inner))));
+            scissored(scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| clipped(s, look, |s| skipped.extend(build_items(s, &group.items, frame, pictures, inner)))));
             continue;
         }
         if missing_picture(item, pictures) {
@@ -385,7 +415,7 @@ pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictur
             continue;
         }
         shared.enter(scene, look.scissor);
-        layered(scene, &look.blend, look.opacity, frame, |s| content(s, item, pictures, frame));
+        layered(scene, &look.blend, look.opacity, frame, |s| clipped(s, look, |s| content(s, item, pictures, frame)));
     }
     shared.close(scene);
     skipped
