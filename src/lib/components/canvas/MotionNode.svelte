@@ -285,7 +285,7 @@
       <img class="poster" class:under={playerUp} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" onload={(e) => void posterPainted(e.currentTarget as HTMLImageElement)} />
     {/if}
     {#if mounted && preview}
-      <div class="own" class:veiled={!ownDrawn} data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing muted={true} loop={false} /></div>
+      <div class="own" class:veiled={!ownDrawn} data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} fullDoc={preview.scene ?? null} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing muted={true} loop={false} /></div>
     {:else if !shownPoster && !chrome.bar}
       <div class="placeholder" data-testid="element-placeholder"></div>
     {/if}

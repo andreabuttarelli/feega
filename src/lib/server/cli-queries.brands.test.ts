@@ -66,7 +66,7 @@ describe('getBrandsList sullo schema nuovo', () => {
 
     const brands = await getBrandsList(client as unknown as SupabaseLike);
 
-    expect(brands).toEqual([{ id: 'b1', name: 'Acme', slug: 'acme', pendingCount: 2 }]);
+    expect(brands).toEqual([{ id: 'b1', name: 'Acme', slug: 'acme', pendingCount: 2, scheduled: 0, accounts: 0, accountsDown: 0 }]);
   });
 });
 
@@ -86,5 +86,21 @@ describe('getBrandDetail sullo schema nuovo', () => {
     expect(detail.pendingCount).toBe(1);
     expect(detail.productCount).toBe(1);
     expect(detail.accountCount).toBe(2);
+  });
+});
+
+describe('getBrandsList carries the status the canvas Brands panel shows', () => {
+  it('counts upcoming ready posts and accounts to reconnect per brand', async () => {
+    const client = fakeSupabase({
+      brands: [{ id: 'b1', name: 'Acme', slug: 'acme' }],
+      posts: [{ brand_id: 'b1', status: 'ready', planned_for: new Date(Date.now() + 86_400_000).toISOString() }],
+      social_accounts: [
+        { brand_id: 'b1', status: 'connected' },
+        { brand_id: 'b1', status: 'expired' }
+      ]
+    });
+
+    const [acme] = await getBrandsList(client as unknown as SupabaseLike);
+    expect(acme).toMatchObject({ scheduled: 1, accounts: 2, accountsDown: 1 });
   });
 });

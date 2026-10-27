@@ -66,6 +66,12 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
     expect(canConnect(frame, { id: 'c', kind: 'composition', model: null, uncensored: false })).toEqual({ ok: true });
   });
 
+  it('a free element exposes an image output only while it holds one image', () => {
+    expect(portsOf('element', { ...ctx, holdsImage: () => true })).toEqual({ inputs: [], output: 'images' });
+    expect(portsOf('element', { ...ctx, holdsImage: () => false })).toEqual({ inputs: [], output: null });
+    expect(portsOf('element', ctx)).toEqual({ inputs: [], output: null });
+  });
+
   it('a 3D model takes an image or a text, whatever its model reads, and feeds nothing downstream', () => {
     expect(portsOf('model3d', { ...ctx, modelPorts: () => ['images'] })).toEqual({ inputs: ['images', 'text'], output: null });
   });

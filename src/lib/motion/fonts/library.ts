@@ -62,6 +62,7 @@ export const MAX_FONT_MB = 10;
 
 export type FontLibrary = {
   families: FontFamily[];
+  faceCss: string;
   missing: string[];
   upload: (file: File) => Promise<FontUploaded>;
   rename: (family: string, to: string) => Promise<string | null>;

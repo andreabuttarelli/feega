@@ -61,6 +61,7 @@ export const NODE_KINDS = [
   'model3d',
   'calendar',
   'motion',
+  'element',
   'studio_batch'
 ] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
@@ -149,6 +150,7 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   model3d: { medium: 'model3d', generated: true, accepts: ['image', 'text'], requires: [], requiresOneOf: ['image', 'text'] },
   calendar: { medium: null, generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] },
   motion: { medium: 'motion', generated: true, accepts: [], requires: [], sources: [], sourcesWhy: FRAME_NO_INPUTS },
+  element: { medium: 'image', generated: false, accepts: [], requires: [] },
   studio_batch: { medium: 'image', generated: false, accepts: [], requires: [] }
 };
 

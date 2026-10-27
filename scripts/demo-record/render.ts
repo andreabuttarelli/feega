@@ -19,7 +19,8 @@ const OUT: Record<Aspect, { width: number; height: number }> = {
 const TITLE_S = 1.8;
 const END_S = 1.6;
 const FADE_S = 0.4;
-const OUT_DIR = join(homedir(), 'Documents', 'feega-videos', 'demos');
+export const videosRoot = (): string => process.env.FEEGA_VIDEOS_DIR ?? join(homedir(), 'Documents', 'feega-videos');
+const OUT_DIR = join(videosRoot(), 'demos');
 const FONT = new URL('../../static/fonts/bdo-grotesk-DemiBold.woff2', import.meta.url);
 
 export type DemoCut = { slug: string; title: string; date?: string };

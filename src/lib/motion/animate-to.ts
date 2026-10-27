@@ -11,7 +11,7 @@ export type AnimateSpan = { start: number; duration: number; ease?: EaseSpec };
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
-function spliced(track: readonly Keyframe[], from: Keyframe, to: Keyframe): Keyframe[] {
+export function spliced(track: readonly Keyframe[], from: Keyframe, to: Keyframe): Keyframe[] {
   const outside = track.filter((k) => k.frame < from.frame || k.frame > to.frame);
   return [...outside, from, to].sort((a, b) => a.frame - b.frame);
 }

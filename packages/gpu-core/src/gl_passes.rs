@@ -435,7 +435,50 @@ vec4 run(ivec2 xy) {
   return (vec4(glass, 1.0) * cover + below * (1.0 - cover)) * presence;
 }";
 
-const SOURCES: [(Op, &str); 14] = [
+const WARP: &str = "
+const int TAPS = 32;
+const int DISC_TAPS = 48;
+const float GOLDEN_ANGLE = 2.3999632;
+const float MAX_BULGE = 0.95;
+vec2 rotated(vec2 d, float t) {
+  float c = cos(t); float s = sin(t);
+  return vec2(d.x * c - d.y * s, d.x * s + d.y * c);
+}
+vec4 seen(vec2 q) { return inside(q) ? bilinear(a, q) : vec4(0.0); }
+vec4 run(ivec2 xy) {
+  vec2 at = centre(xy);
+  int mode = int(p(0));
+  vec2 middle = vec2(p(1), p(2)) * vec2(outSize);
+  float radius = max(p(3), 1.0);
+  float amount = p(4);
+  float extra = p(5);
+  vec2 d = at - middle;
+  float t = clamp(1.0 - length(d) / radius, 0.0, 1.0);
+  if (mode == 0) { return seen(middle + d * (1.0 - min(amount, MAX_BULGE) * t * t)); }
+  if (mode == 1) { return seen(middle + rotated(d, amount * t * t)); }
+  vec4 sum = vec4(0.0);
+  float total = 0.0;
+  if (mode == 2) {
+    for (int i = 0; i < TAPS; i++) {
+      float f = float(i) / float(TAPS - 1);
+      sum += seen(middle + rotated(d, extra * (f - 0.5)) * (1.0 - amount * f));
+      total += 1.0;
+    }
+    return sum / total;
+  }
+  for (int i = 0; i < DISC_TAPS; i++) {
+    float reach = sqrt((float(i) + 0.5) / float(DISC_TAPS)) * amount;
+    float angle = float(i) * GOLDEN_ANGLE;
+    vec4 s = seen(at + vec2(cos(angle), sin(angle)) * reach);
+    float bright = dot(s.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float w = 1.0 + extra * bright * bright;
+    sum += s * w;
+    total += w;
+  }
+  return sum / total;
+}";
+
+const SOURCES: [(Op, &str); 15] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -450,6 +493,7 @@ const SOURCES: [(Op, &str); 14] = [
     (Op::Blend, BLEND),
     (Op::Fold, FOLD),
     (Op::Lens, LENS),
+    (Op::Warp, WARP),
 ];
 
 pub struct GlTex {

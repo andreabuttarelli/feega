@@ -1,4 +1,4 @@
-# feega desktop
+# Feega desktop
 
 Electron shell for macOS, Windows and Linux (ADR 0021). It loads the hosted app; no UI of its own.
 
@@ -7,7 +7,7 @@ cd apps/desktop
 npm install
 npm test                                   # routing (node:test)
 FEEGA_URL=http://localhost:5173 npm start
-npm run build:mac                          # dist/mac-arm64/feega.app, unsigned
+npm run build:mac                          # dist/mac-arm64/Feega.app, unsigned
 npm run build                              # this OS's installers, unsigned
 ```
 

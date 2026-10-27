@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+
+use vello::peniko::ImageData;
 use vello::wgpu;
 
 use crate::display_list::DisplayList;
@@ -17,6 +20,13 @@ pub struct Renderer {
     library: Library,
     cached: Pictures,
     limits: Limits,
+    textures: HashMap<String, (wgpu::Texture, ImageData)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Change {
+    Announced,
+    Unannounced,
 }
 
 pub struct Rendered {
@@ -41,12 +51,16 @@ impl Renderer {
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).map_err(failed)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).map_err(failed)?;
         let engine = Engine::new(&device).map_err(failed)?;
-        Ok(Self { device, queue, engine, library: Library::new(), cached: Pictures::new(), limits })
+        Ok(Self { device, queue, engine, library: Library::new(), cached: Pictures::new(), limits, textures: HashMap::new() })
     }
 
     pub fn blending(mut self, blending: crate::layers::Blending) -> Self {
         self.engine.blending = blending;
         self
+    }
+
+    pub fn cached_layers(&self) -> usize {
+        self.engine.cached_layers()
     }
 
     pub fn compose_encodings(&mut self) {
@@ -63,6 +77,27 @@ impl Renderer {
 
     pub fn has_font(&self, key: &str) -> bool {
         self.library.has_font(key)
+    }
+
+    pub fn picture(&mut self, clip: &str, width: u32, height: u32, rgba: &[u8], change: Change) -> ImageData {
+        let fits = self.textures.get(clip).is_some_and(|(t, _)| t.width() == width && t.height() == height);
+        if !fits {
+            let size = wgpu::Extent3d { width, height, depth_or_array_layers: 1 };
+            let texture = self.device.create_texture(&wgpu::TextureDescriptor { label: None, size, mip_level_count: 1, sample_count: 1, dimension: wgpu::TextureDimension::D2, format: wgpu::TextureFormat::Rgba8Unorm, usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING, view_formats: &[] });
+            let image = self.engine.vello.register_texture(texture.clone());
+            self.textures.insert(clip.into(), (texture, image));
+        }
+        let (texture, image) = &self.textures[clip];
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            rgba,
+            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(width * BYTES), rows_per_image: Some(height) },
+            wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        );
+        if change == Change::Announced {
+            self.engine.vello.mark_override_image_dirty(image);
+        }
+        image.clone()
     }
 
     pub fn render(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<Rendered, RenderError> {

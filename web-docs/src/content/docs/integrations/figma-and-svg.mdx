@@ -16,9 +16,10 @@ Copy layers in Figma and paste on the canvas.
 - Shapes, text and groups land as free elements. Frames and sections land as frames. Pasting over a frame puts everything inside it.
 - Rotation, stacked fills and strokes, gradients (including angular and diamond), and auto layout (direction, spacing, padding, alignment, sizing) come across.
 - Small text keeps its real size, even in a very large frame.
-- Component instances stay instances of one main component when the main is in the paste. Otherwise they become a group named after the component. Overrides are not carried over.
+- Component instances stay instances of one main component when the main is in the paste and the instance is untouched. An instance with overrides lands as a plain group that shows its own text, fills, hidden layers and swapped icons.
+- Every text is kept, however small its size or long its paragraph.
 - Layers keep their Figma names in the Layers panel.
-- Anything that cannot be carried over is listed.
+- A short notice says how many things were approximated. **Details** lists them grouped by kind, and the notice closes by itself.
 
 ### Small text and component instances
 
@@ -27,11 +28,11 @@ Copy layers in Figma and paste on the canvas.
 - **Small text stays.** Text that is small next to its frame, such as a 12 px legal line in a 2880 px design, is kept at its size instead of being dropped.
 - **Instances are linked.** When the main component is part of what you copied, its instances land as instances of one component. Select one: the inspector shows the component name, its text and fill fields, and **Swap**, **Reset overrides**, **Push to main** and **Detach**. Editing the main updates every instance.
 - If the main component was not copied, an instance lands as a plain group named after the component.
-- Overrides made on an instance in Figma are not carried over.
+- Overrides made on an instance in Figma (text, fills, hidden layers, swapped icons) are applied. That instance becomes a plain group, no longer linked to the main.
 
 ## Figma images
 
-Add a Figma personal access token in Settings and the grey placeholders fill with the real pictures. Steps and troubleshooting are in [Connect Figma](/integrations/connect-figma/).
+Figma puts only an image id on the clipboard, never the picture, so without a token images land as grey placeholders and the notice says so once. Add a Figma personal access token in Settings and the placeholders fill with the real pictures. Steps and troubleshooting are in [Connect Figma](/integrations/connect-figma/).
 
 ## Import from a Figma link
 
@@ -62,3 +63,22 @@ Not yet: signing in with a Figma account (OAuth). It needs a Figma app registere
 ## SVG import
 
 Drop or upload an SVG file to get editable vector layers, not a flat image. Gradients, rounded corners, clipping, text and cut-outs (holes) are kept. A pasted SVG keeps its holes too.
+
+## Lottie import
+
+<DemoVideo name="lottie-import" caption="Upload a Lottie file: it lands as an editable animated frame, and what could not be carried over is listed." />
+
+1. Drag a `.json` or `.lottie` file onto the canvas, or choose it with the canvas upload.
+2. A frame appears where you dropped it, with the size and frame rate of the animation. Press play on the timeline to watch it.
+3. A notice lists what could not be carried over, for example *trim path*.
+4. Every shape, mask and keyframe is now a layer you can edit, retime or restyle.
+
+Drop or upload a Lottie file (.json or .lottie) to get an editable animated frame with the size and frame rate of the animation. Shapes, gradients, strokes, solids, text, nested compositions, masks and mattes come across as layers with their keyframes and easing. Images land as grey placeholders. Anything that cannot be carried over (trim paths, repeaters, animated paths, effects, time remap) is listed.
+
+Agents do the same with the `import_lottie` canvas op, from the JSON or from an https URL:
+
+```bash
+feega canvas $PROJECT import_lottie --input '{"canvasId":"<canvas>","x":0,"y":0,"url":"https://example.com/payment-success.json"}'
+```
+
+`x` and `y` are the canvas position of the frame centre. The answer lists the new frame and `skipped`, what the file used that was not carried over. Over MCP: `canvas_tool({ project_id, op: "import_lottie", input })`.

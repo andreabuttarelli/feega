@@ -3,8 +3,6 @@ import { FrameFormat, Layering, Settle } from '@feega/motion-core/motion/hyperfr
 import { shootInLanes } from '$lib/motion/export/lanes';
 import { encodeMp4 } from '$lib/motion/export/encode';
 import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
-import { Freshness, GpuIneligible, gpuEngine } from '$lib/motion/gpu/engine';
-import type { Backend } from '$lib/canvas/gpu/backend';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -15,7 +13,7 @@ import { mountCustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom'
 import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { BACKENDS, FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
 import { renderOnCore } from '$lib/motion/gpu-full/core-export';
-import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
+import { type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
 
 const composer = (spec: Spec) => (only?: ReadonlySet<string>) => composeHtml({ doc: spec.doc as MotionDoc, tokens: FEEGA_TOKENS, assets: spec.assets, origin: spec.origin, only });
 
@@ -48,20 +46,6 @@ async function htmlShots(input: ShotsInput): Promise<ShotsResult> {
   }
   player.dispose();
   return { pngs, ms: performance.now() - start, backend: 'html', runs: 0, stats: [] };
-}
-
-async function gpuShots(input: ShotsInput): Promise<ShotsResult> {
-  const engine = await gpuEngine(composer(input.spec), host(), input.preference as Backend, input.displayWidth ?? null);
-  const pngs: string[] = [];
-  const stats = [];
-  const start = performance.now();
-  for (const t of input.times) {
-    stats.push(await engine.renderAt(t, Freshness.Exact));
-    pngs.push(await png(engine.canvas, input.width, input.height));
-  }
-  const out = { pngs, ms: performance.now() - start, backend: engine.backend, runs: engine.runs.length, stats };
-  engine.dispose();
-  return out;
 }
 
 async function fullShots(input: ShotsInput, backend: FullBackend): Promise<ShotsResult> {
@@ -123,14 +107,17 @@ async function htmlExport(input: ExportInput): Promise<ExportResult> {
   return out;
 }
 
-async function gpuExport(input: ExportInput): Promise<ExportResult> {
-  const engine = await gpuEngine(composer(input.spec), host(), input.preference as Backend).catch((e) => (e instanceof GpuIneligible ? null : Promise.reject(e)));
-  if (!engine) {
-    return { ...(await htmlExport(input)), fallback: true };
-  }
-  const out = await encode(input, (onFrame) => engine.renderFrames(input.times, onFrame, input.lanes, new AbortController().signal));
-  engine.dispose();
-  return out;
+async function coreExport(input: ExportInput): Promise<ExportResult> {
+  const doc = input.spec.doc as MotionDoc;
+  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets, { fonts: await loadFontsWith(faceEngineOf(input.spec.faces))(doc, input.spec.assets, FEEGA_TOKENS), smoothing: smoothingOf(navigator.userAgent) });
+  const custom = await mountCustomReads(host(), composer(input.spec), prepared);
+  const signal = new AbortController().signal;
+  let drawn = true;
+  const out = await encode(input, async (onFrame) => {
+    drawn = await renderOnCore(prepared, FullBackend.Core, input.times, onFrame, signal, custom);
+  });
+  custom.dispose();
+  return drawn ? out : { ...(await htmlExport(input)), fallback: true };
 }
 
 function percentile(values: number[], p: number): number {
@@ -141,62 +128,6 @@ function percentile(values: number[], p: number): number {
 function summary(deltas: number[], work: number[]): PreviewResult {
   const BUDGET_MS = 1000 / 60 + 2;
   return { frames: deltas.length, p50: percentile(deltas, 0.5), p95: percentile(deltas, 0.95), dropped: deltas.filter((d) => d > BUDGET_MS).length, worst: Math.max(...deltas), workP50: percentile(work, 0.5), workP95: percentile(work, 0.95) };
-}
-
-async function htmlPreview(input: PreviewInput): Promise<PreviewResult> {
-  await import('@hyperframes/player');
-  const el = document.createElement('hyperframes-player') as HTMLElement & { play: () => void; pause: () => void; iframeElement: HTMLIFrameElement };
-  el.setAttribute('sandbox-origin', 'opaque');
-  el.setAttribute('disable-click-to-play', '');
-  el.loop = true;
-  el.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
-  const ready = new Promise((r) => el.addEventListener('ready', r, { once: true }));
-  host().appendChild(el);
-  el.setAttribute('srcdoc', input.html.replace(/<head[^>]*>/, (head) => `${head}<script>${PREVIEW_PROBE}</script>`));
-  await ready;
-  await new Promise((r) => setTimeout(r, input.warmMs));
-  const ask = () =>
-    new Promise<{ deltas: number[] }>((resolve) => {
-      const onMessage = (e: MessageEvent) => {
-        if (e.data?.type === PROBE_REPLY) {
-          removeEventListener('message', onMessage);
-          resolve(e.data);
-        }
-      };
-      addEventListener('message', onMessage);
-      el.iframeElement.contentWindow?.postMessage({ type: PROBE_REQUEST }, '*');
-    });
-  await ask();
-  el.play();
-  await new Promise((r) => setTimeout(r, input.seconds * 1000));
-  const reply = await ask();
-  el.pause();
-  el.remove();
-  return summary(reply.deltas.slice(1), []);
-}
-
-async function gpuPreview(input: PreviewInput): Promise<PreviewResult> {
-  const engine = await gpuEngine(composer(input.spec), host(), input.preference as Backend);
-  engine.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
-  host().appendChild(engine.canvas);
-  await engine.renderAt(0, Freshness.Exact);
-  await new Promise((r) => setTimeout(r, input.warmMs));
-  const deltas: number[] = [];
-  const work: number[] = [];
-  const start = performance.now();
-  let last = start;
-  while (performance.now() - start < input.seconds * 1000) {
-    await new Promise((r) => requestAnimationFrame(r));
-    const now = performance.now();
-    deltas.push(now - last);
-    last = now;
-    const t = (((now - start) / 1000) % engine.scene.duration) || 0;
-    const w0 = performance.now();
-    await engine.renderAt(t, Freshness.Latest);
-    work.push(performance.now() - w0);
-  }
-  engine.dispose();
-  return summary(deltas.slice(1), work);
 }
 
 const SCRUB_PERIOD_S = 2;
@@ -313,4 +244,4 @@ async function liveSeek(t: number) {
   await new Promise((r) => setTimeout(r, 400));
 }
 
-Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, gpuCoreShots, gpuCoreGlShots, coreExportShots: (i: ShotsInput) => coreExportShots(i, FullBackend.Core), coreExportGlShots: (i: ShotsInput) => coreExportShots(i, FullBackend.CoreGl), htmlExport, gpuExport, htmlPreview, gpuPreview, htmlScrub, coreScrub });
+Object.assign(window, { liveMount, liveSeek, htmlShots, gpuFullShots, gpuCoreShots, gpuCoreGlShots, coreExportShots: (i: ShotsInput) => coreExportShots(i, FullBackend.Core), coreExportGlShots: (i: ShotsInput) => coreExportShots(i, FullBackend.CoreGl), htmlExport, coreExport, htmlScrub, coreScrub });

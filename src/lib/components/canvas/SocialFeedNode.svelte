@@ -6,13 +6,14 @@
   import type { SocialFeedNode } from '$lib/canvas/social-feed-node';
   import type { SocialPost } from '$lib/server/repos/social-posts';
 
-  let { node, posts = [], total = 0 }: { node: SocialFeedNode; posts?: SocialPost[]; total?: number } = $props();
+  let { node, nodeId = null, posts = [], total = 0 }: { node: SocialFeedNode; nodeId?: string | null; posts?: SocialPost[]; total?: number } = $props();
 
   const BADGE_OF = { carousel: 'carousel', video: 'video', image: null } as const;
 
   const tiles = $derived<PreviewTile[]>(
     posts.map((post) => ({
       key: post.id,
+      itemId: post.id,
       thumb: postThumb(post),
       label: post.caption ?? '',
       caption: null,
@@ -25,6 +26,7 @@
   icon={Rss}
   title={node.handle.trim() ? `@${node.handle} · ${node.platform}` : 'Feed social'}
   {tiles}
+  {nodeId}
   {total}
   syncStatus={node.syncStatus}
   syncError={node.syncError}

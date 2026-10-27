@@ -14,6 +14,7 @@ A code frame runs real component code on the canvas: a landing page, a pricing t
 - **Pages.** Use `MemoryRouter` from `react-router-dom` in React. `HashRouter` and `BrowserRouter` need a real page address, which a frame does not have. In Svelte, links like `<a href="#/pricing">` with a `hashchange` listener work.
 - **Animations.** Entrance and scroll animations run inside the frame, which scrolls on its own: `framer-motion` (`whileInView`), GSAP `ScrollTrigger`, Svelte transitions and `IntersectionObserver`.
 - **Size.** The page is laid out at the frame's width: resize the frame to see the narrow layout.
+- **Fonts.** Fonts uploaded to the organization are already declared inside the frame: `font-family: "Family"` uses them. See [Uploaded fonts](/canvas/fonts/).
 - **Safety.** The code runs in a sandboxed iframe with no access to your session or the app.
 
 ## Several pages side by side

@@ -1,3 +1,4 @@
+import { withOrgContext } from '$lib/server/ai-log';
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { DataCheck, findNode, patchNodeData, writeNodeData, type PatchWrite } from '$lib/server/repos/canvas';
@@ -98,7 +99,7 @@ export async function syncNode(db: Db, input: { orgId: string; projectId: string
     return { outcome: 'conflict', keys: [] };
   }
 
-  const outcome = await sync(db, input.orgId, input.projectId, node);
+  const outcome = await withOrgContext(input.orgId, () => sync(db, input.orgId, input.projectId, node));
   const patch = outcome.ok
     ? { sync_status: 'done', sync_error: null, synced_count: outcome.synced, synced_at: new Date().toISOString(), ...outcome.extra }
     : { sync_status: 'failed', sync_error: outcome.error };

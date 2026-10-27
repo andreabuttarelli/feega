@@ -56,7 +56,7 @@
       {:else if kind === OutputKind.Audio}
         <audio src={url} controls></audio>
       {:else}
-        <img src={url} alt={info.prompt} />
+        <img draggable="false" src={url} alt={info.prompt} />
       {/if}
     </div>
     <aside class="info" data-testid="output-info">

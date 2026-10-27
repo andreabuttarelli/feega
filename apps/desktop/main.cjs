@@ -3,7 +3,7 @@ const path = require('node:path');
 const { autoUpdater } = require('electron-updater');
 const { watchUpdates } = require('./updates.cjs');
 const { frameless, overlay } = require('./chrome.cjs');
-const { start, authReturn, staysInside, DEEP_LINK_SCHEME } = require('./routing.cjs');
+const { start, authReturn, staysInside, keepInside, DEEP_LINK_SCHEME } = require('./routing.cjs');
 const nativeCanvas = require('./native-canvas.cjs');
 
 const START_URL_ENV = 'FEEGA_URL';
@@ -34,7 +34,7 @@ function deepLinkIn(argv) {
 }
 
 function windowOptions() {
-  const base = { width: 1440, height: 900, minWidth: 800, minHeight: 600, title: 'feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) };
+  const base = { width: 1440, height: 900, minWidth: 800, minHeight: 600, title: 'Feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) };
   if (!NativeCanvas) {
     return base;
   }
@@ -68,13 +68,7 @@ function open() {
     return { action: 'deny' };
   });
 
-  window.webContents.on('will-navigate', (event, url) => {
-    if (staysInside(url, home.href)) {
-      return;
-    }
-    event.preventDefault();
-    shell.openExternal(url);
-  });
+  keepInside(window.webContents, home.href, (url) => shell.openExternal(url));
 
   window.loadURL(home.href);
 }

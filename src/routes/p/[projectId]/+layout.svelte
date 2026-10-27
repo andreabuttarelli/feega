@@ -26,7 +26,8 @@
   import MobileViewSwitch from '$lib/components/canvas/MobileViewSwitch.svelte';
   import { watchKeyboard } from '$lib/canvas/keyboard-inset';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
-  import { NAV_ENTRIES, PANEL_WIDTHS, sheetEntryForPath, directLoadMode, navHref, panelForShortcut, type NavEntry } from '$lib/shell-nav';
+  import { EDGE, fitted, shellLeftOf } from '$lib/shell-insets';
+  import { NAV_ENTRIES, sheetEntryForPath, directLoadMode, navHref, panelForShortcut, type NavEntry } from '$lib/shell-nav';
   import { goto } from '$app/navigation';
   import { INITIAL_MOBILE_VIEW, chatBadge, showView, turnEnded, type MobileView, type ChatTurn } from '$lib/canvas/mobile-view';
   import { anyChatRunning } from '$lib/components/brand-agent/chat-session.svelte';
@@ -70,10 +71,7 @@
   });
 
   const framePicked = $derived(!!frameProperties.session?.selection.length);
-  const RAIL_EDGE = '68px';
-  const EDGE = '12px';
-  const fitted = (px: number) => `min(${px}px, 100vw - 92px)`;
-  const shellLeft = $derived(leftPanel ? `calc(${RAIL_EDGE} + ${fitted(PANEL_WIDTHS[leftPanel] ?? PANEL_WIDTHS.assets)} + ${EDGE})` : RAIL_EDGE);
+  const shellLeft = $derived(shellLeftOf(leftPanel));
   const shellRight = $derived(chatOpen || framePicked ? `calc(${fitted(rightBar.width)} + 2 * ${EDGE})` : EDGE);
   let mobileView = $state(INITIAL_MOBILE_VIEW);
 

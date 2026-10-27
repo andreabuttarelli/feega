@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { byId } from '$lib/canvas/by-id';
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
@@ -7,7 +8,7 @@
   import OutputViewer from '$lib/components/canvas/OutputViewer.svelte';
   import { OUTPUT_KIND_OF, viewableRuns, type OutputKind, type ViewerRun } from '$lib/canvas/run-info';
   import CloudPicker from '$lib/components/canvas/CloudPicker.svelte';
-  import { CloudMode, type CloudProviderId } from '$lib/canvas/cloud-picker';
+  import { CloudMode, cloudFailure, type CloudProviderId } from '$lib/canvas/cloud-picker';
   import NodeSearch from '$lib/components/canvas/NodeSearch.svelte';
   import { NODES_PARAM, idsFromLink, selectionLink } from '$lib/canvas/selection-link';
   import type { CommentThread } from '$lib/canvas/comment-threads';
@@ -18,6 +19,7 @@
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
   import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
+  import TechniqueRowsDialog from '$lib/components/canvas/TechniqueRowsDialog.svelte';
   import CanvasVersionsDialog from '$lib/components/canvas/CanvasVersionsDialog.svelte';
   import type { CanvasVersion } from '$lib/server/canvas/canvas-versions';
   import { localStore } from '$lib/browser-storage';
@@ -88,7 +90,6 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { onMount, untrack } from 'svelte';
-  import { Renderer, rendererOf } from '$lib/canvas/gpu/renderer-flag';
   import { feedView, personView, productsView } from '$lib/canvas/source-thumbs';
 import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type NodeView } from '$lib/canvas/node-view';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
@@ -126,7 +127,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
   import { frameHolding, type FrameHold } from '$lib/canvas/frame-holding';
-  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
+  import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
@@ -134,7 +137,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import { AssetKind } from '@feega/motion-core/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
-  import FrameHover from '$lib/components/canvas/FrameHover.svelte';
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
   import { TileBody } from '$lib/canvas/motion-node';
   import OutputDragHandle from '$lib/components/canvas/OutputDragHandle.svelte';
@@ -142,7 +144,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
-  import { FrameKind, HoverHost, hoverHostOf, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
@@ -185,6 +187,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   } from '$lib/canvas/list-node';
   import { verdictForUpload, canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { isFeegaFile } from '$lib/canvas/feega-file';
+  import { isLottieFile } from '$lib/canvas/lottie-file';
+  import { lottieSource } from '$lib/motion/import-lottie';
   import { importFeega } from '$lib/canvas/feega-transfer';
   import { FONT_FILE } from '$lib/motion/fonts/library';
   import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
@@ -209,6 +213,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { loadTextViewMode, storeTextViewMode, type TextViewMode } from '$lib/canvas/text-view-mode';
   import { renderDocHtml } from '$lib/canvas/doc-render';
   import '$lib/styles/doc-prose.css';
+  import { diffRuns, type RunDifference } from '$lib/canvas/run-diff';
   import { historyItemsOf, producedRuns, shownOutput } from '$lib/canvas/gen-history';
   import { genTileView, type GenTileView } from '$lib/canvas/gen-tile-view';
   import { runQuoteOf, type RunQuote } from '$lib/canvas/run-quote';
@@ -220,12 +225,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { connectorsFor, orphanedByModelChange, type ConnectorType, type GenerativeNodeKind, connectorsForNode } from '$lib/canvas/connectors';
   import { portsOf } from '$lib/canvas/node-ports';
   import { TECHNIQUE_NODE, TECHNIQUE_EDIT_PREFIX, instancePorts } from '$lib/canvas/technique-instance';
+  import type { ColumnMapping } from '$lib/canvas/technique-batch';
+  import type { TechniqueSlot } from '$lib/canvas/technique';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
   import FigmaImportDialog from '$lib/components/canvas/FigmaImportDialog.svelte';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
   import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
+  import ReframeDialog from '$lib/components/canvas/ReframeDialog.svelte';
+  import type { Focus } from '$lib/reframe';
   import type { Extend } from '$lib/outpaint';
   import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
@@ -266,7 +275,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { BILLING_PATH } from '$lib/billing-path';
   import type { FigmaImage } from '$lib/canvas/figma/figma-doc';
   import type { FigmaJob } from '$lib/canvas/figma/images';
-  import { ImagesOutcome } from '$lib/canvas/figma/fetch-images';
+  import { ImagesOutcome, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
+  import { figmaNotice } from '$lib/canvas/figma/notice';
+  import FigmaNotice from '$lib/components/canvas/FigmaNotice.svelte';
+  import { connectionMessage } from '$lib/canvas/connection-messages';
 
   const LINK_COPIED_MS = 1500;
 
@@ -304,7 +316,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let viewing = $state<{ runs: ViewerRun[]; start: number; kind: OutputKind } | null>(null);
 
-  let pairing = $state<{ left: string; right: string; leftLabel: string; rightLabel: string } | null>(null);
+  let pairing = $state<{ left: string; right: string; leftLabel: string; rightLabel: string; diff?: RunDifference[] } | null>(null);
 
   function compareOutputs(ids: string[]) {
     const [a, b] = ids.map((id) => nodes.find((n) => n.id === id));
@@ -314,6 +326,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const urlOf = (assetId: string) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full);
     const nameOf = (n: typeof a) => n.displayName ?? (typeof n.data.prompt === 'string' ? n.data.prompt.slice(0, 24) : 'Image');
     pairing = { left: urlOf(a.data.refId), right: urlOf(b.data.refId), leftLabel: nameOf(a), rightLabel: nameOf(b) };
+  }
+
+  function compareRuns(nodeId: string, runA: string, runB: string) {
+    const all = runsByNode[nodeId] ?? [];
+    const a = all.find((r) => r.id === runA);
+    const b = all.find((r) => r.id === runB);
+    if (!a?.mediaId || !b?.mediaId) {
+      return;
+    }
+    const urlOf = (assetId: string) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full);
+    pairing = { left: urlOf(a.mediaId), right: urlOf(b.mediaId), leftLabel: 'A', rightLabel: 'B', diff: diffRuns(a, b) };
   }
 
   function viewOutput(id: string) {
@@ -346,7 +369,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       const res = await fetch(`${base}/import`, { method: 'POST', body: JSON.stringify({ fileId: target, place: { canvasId: data.canvas.id, x: at.x, y: at.y } }) });
       const body = (await res.json().catch(() => ({}))) as { node?: CanvasNodeRecord | null; error?: string };
       if (!res.ok || !body.node) {
-        failed = body.error ?? 'Import failed';
+        failed = cloudFailure(mode, body.error);
         return;
       }
       const created = body.node;
@@ -361,7 +384,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const res = await fetch(`${base}/export`, { method: 'POST', body: JSON.stringify({ assetId, folder: target }) });
     if (!res.ok) {
-      failed = 'Export failed';
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      failed = cloudFailure(mode, body.error);
       return;
     }
     cloud = null;
@@ -677,6 +701,37 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
   }
 
+  function feedImageOver(client: PointerPoint | null) {
+    markFrame(client, null);
+    feedImageHover.over = client && !frameUnderPointer(client, null) ? (toFlow?.(client) ?? null) : null;
+  }
+
+  async function dropFeedImage(drag: FeedImageDrag, client: PointerPoint) {
+    feedImageOver(null);
+    feedImageHover.size = null;
+    const drop = dropAt(client, null);
+    if (!drop) {
+      return;
+    }
+
+    const ask = { source: drag.nodeId, item_id: drag.itemId, image_index: drag.imageIndex, drop: JSON.stringify(drop) };
+    if (drop.on !== DropOn.Canvas) {
+      landed(await post('importFeedImage', ask));
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    catalogPosters.set(id, drag.thumb);
+    nodes = [...nodes, toTile(pendingPicture(id, drop, feedImageSize(drag)))];
+    const res = await post('importFeedImage', { ...ask, node_id: id });
+    const created = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    catalogPosters.delete(id);
+    nodes = settle(nodes, id, created ? toTile(created, { select: true }) : null);
+    if (created) {
+      pushGesture(createGesture(created));
+    }
+  }
+
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
   type Tile = {
     id: string;
@@ -721,6 +776,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let nodes = $state<Tile[]>((data.nodes as CanvasNodeRecord[]).map((n) => toTile(n)));
+  const nodeById = $derived(byId(nodes));
 
   /**
    * QUANTO IL CONTENUTO DI UN NODO TESTO CHIEDE, misurato dal DOM — mai scritto in database, mai
@@ -878,6 +934,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     model: string | null;
     startedAt: string;
     text?: string | null;
+    params?: Record<string, unknown> | null;
   }) {
     return {
       id: run.id,
@@ -885,7 +942,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       prompt: run.prompt ?? '',
       model: run.model,
       createdAt: run.startedAt,
-      text: run.text ?? null
+      text: run.text ?? null,
+      params: run.params ?? null
     };
   }
 
@@ -1527,7 +1585,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     cursors.port.update({ selection: ids });
   }
 
-  const core = $derived(rendererOf(page.url) === Renderer.Core);
   const liveHost = LiveHost.Canvas;
 
   $effect(() => {
@@ -1943,6 +2000,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       await pasteSvg(await file.text(), at);
       return;
     }
+    if (isLottieFile(file)) {
+      await importLottie(new Uint8Array(await file.arrayBuffer()), at);
+      return;
+    }
     const verdict = verdictForUpload(file.type, file.name, file.size);
     if (!verdict.ok) {
       failed = verdict.why;
@@ -2316,7 +2377,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const row = nodes.find((n) => n.id === id);
     const gen = row ? genOf(row) : null;
     const items = gen ? historyItemsOf({ ...gen, runs: runsByNode[id] ?? [] }) : [];
-    return gen && items.length ? { items, urlOf: assetUrl, onshow: (runId: string) => void restore(id, gen, runId) } : null;
+    return gen && items.length ? { items, urlOf: assetUrl, onshow: (runId: string) => void restore(id, gen, runId), oncompare: (a: string, b: string) => compareRuns(id, a, b) } : null;
   }
 
   function variantsInFlightFor(id: string): number {
@@ -3429,6 +3490,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let formatsFor = $state<string | null>(null);
   let inpaintFor = $state<string | null>(null);
   let outpaintFor = $state<string | null>(null);
+  let reframeFor = $state<string | null>(null);
   let exportFor = $state<string[] | null>(null);
   let exportElements = $state<{ frameId: string; elementIds: string[] } | null>(null);
 
@@ -3466,6 +3528,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function outpaint(nodeId: string, prompt: string, extend: Extend) {
     landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
+    void invalidate('app:credits');
+  }
+
+  async function reframe(nodeId: string, aspect: string, focus: Focus) {
+    const isVideo = nodes.find((n) => n.id === nodeId)?.type === 'video';
+    if (isVideo) {
+      landed(await post('videoReframe', { node_id: nodeId, aspect, focus: JSON.stringify(focus) }));
+      return;
+    }
+    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Reframe, aspect }));
     void invalidate('app:credits');
   }
 
@@ -3528,7 +3600,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   const FIGMA_PASTE = 'These Figma layers could not be read. In Figma use Copy as → Copy as SVG, then paste here.';
-  const FIGMA_SKIPPED = 'Pasted from Figma. Approximated or skipped:';
 
   async function pasteFigma(html: string, at: { x: number; y: number }) {
     const res = await post('pasteFigma', { html, at: JSON.stringify(at) });
@@ -3540,14 +3611,34 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
     pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
     focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
-    const skipped = (res?.skipped ?? []) as string[];
-    if (skipped.length) {
-      failed = `${FIGMA_SKIPPED} ${skipped.join('; ')}`;
-    }
     const fileKey = (res?.fileKey ?? null) as string | null;
     const fills = (res?.fills ?? []) as { nodeId: string; images: FigmaImage[] }[];
+    figmaPasted({ skipped: (res?.skipped ?? []) as string[], images: fills.reduce((n, f) => n + f.images.length, 0), loading: Boolean(fileKey && fills.length) });
     if (fileKey && fills.length) {
       figmaJobs = [...figmaJobs, ...fills.map((f) => ({ ...f, fileKey }))];
+    }
+  }
+
+  const LOTTIE_SKIPPED = 'Imported from Lottie. Not carried over:';
+
+  async function importLottie(bytes: Uint8Array, at: { x: number; y: number }) {
+    const source = lottieSource(bytes);
+    if (typeof source === 'string') {
+      failed = source;
+      return;
+    }
+    const res = await post('importLottie', { lottie: JSON.stringify(source), at: JSON.stringify(at) });
+    const landedNodes = res?.outcome === 'done' ? ((res.nodes ?? []) as CanvasNodeRecord[]) : [];
+    if (!landedNodes.length) {
+      failed = 'This file is not a Lottie animation this canvas can read.';
+      return;
+    }
+    nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
+    const skipped = (res?.skipped ?? []) as string[];
+    if (skipped.length) {
+      failed = `${LOTTIE_SKIPPED} ${skipped.join('; ')}`;
     }
   }
 
@@ -3558,16 +3649,24 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
     pushGesture({ items: landed.undo as UndoItem[] });
     focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
-    if (landed.skipped.length) {
-      failed = `${FIGMA_SKIPPED} ${landed.skipped.join('; ')}`;
-    }
+    figmaPasted({ skipped: landed.skipped, images: 0, loading: false });
   }
 
   let figmaJobs = $state<FigmaJob[]>([]);
-  let figmaTokenMissing = $state(false);
+  let figmaPaste = $state<{ skipped: string[]; images: number } | null>(null);
+  let figmaOutcome = $state<ImagesOutcome | null>(null);
+  const figmaShown = $derived(figmaPaste ? figmaNotice({ ...figmaPaste, outcome: figmaOutcome }) : null);
 
-  function figmaImagesAnswered(outcome: ImagesOutcome) {
-    figmaTokenMissing = outcome === ImagesOutcome.NoToken;
+  function figmaPasted(paste: { skipped: string[]; images: number; loading: boolean }) {
+    figmaPaste = { skipped: paste.skipped, images: paste.images };
+    figmaOutcome = paste.loading || !paste.images ? null : ImagesOutcome.Failed;
+  }
+
+  function figmaImagesAnswered(answer: ImagesAnswer) {
+    figmaOutcome = answer.outcome;
+    if (answer.outcome === ImagesOutcome.Failed) {
+      failed = connectionMessage(answer.error);
+    }
   }
 
   async function pasteSvg(svg: string, at: { x: number; y: number }) {
@@ -3707,6 +3806,35 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       techniqueNotice = 'Running. Results land on the Technique runs canvas.';
       void refresh();
     }
+  }
+
+  let rowsTechnique = $state<{ id: string; name: string; inputs: TechniqueSlot[] } | null>(null);
+
+  function openTechniqueRows(ids: string[]) {
+    const node = techniqueNodeIn(ids);
+    const technique = node ? techniqueOfTile(node) : null;
+    rowsTechnique = technique ? { id: technique.id, name: technique.name, inputs: technique.inputs } : null;
+  }
+
+  const rowsFields = (rows: string[][], mapping: ColumnMapping) => ({ technique_id: rowsTechnique?.id ?? '', rows: JSON.stringify(rows), mapping: JSON.stringify(mapping) });
+
+  async function previewTechniqueRows(rows: string[][], mapping: ColumnMapping) {
+    const out = await post('preview_technique_rows', rowsFields(rows, mapping));
+    return out ? { rows: Number(out.rows), creditsPerRow: Number(out.creditsPerRow), credits: Number(out.credits) } : null;
+  }
+
+  async function startTechniqueRows(rows: string[][], mapping: ColumnMapping) {
+    const out = await post('run_technique_rows', rowsFields(rows, mapping));
+    return out ? { workflowIds: out.workflowIds as string[], runIds: out.runIds as string[] } : null;
+  }
+
+  async function techniqueRowsProgress(runIds: string[]) {
+    const out = await post('technique_rows_progress', { run_ids: JSON.stringify(runIds) });
+    return out ? { total: Number(out.total), done: Number(out.done), failed: Number(out.failed), running: Number(out.running) } : null;
+  }
+
+  async function cancelTechniqueRows(workflowIds: string[]) {
+    await post('cancel_technique_rows', { workflow_ids: JSON.stringify(workflowIds) });
   }
 
   async function editTechnique(ids: string[]) {
@@ -3938,11 +4066,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {/if}
     </p>
   {/if}
-  {#if figmaTokenMissing}
-    <p class="warning" role="status" data-testid="figma-token-hint">
-      Add a Figma token in Settings to import images
-      <a href="/p/{data.projectId}/settings/profile">Open settings</a>
-    </p>
+  {#if figmaShown}
+    <FigmaNotice notice={figmaShown} settingsHref="/p/{data.projectId}/settings/profile" onclose={() => (figmaPaste = null)} />
   {/if}
   {#if techniqueNotice}
     <p class="warning" role="status" data-testid="technique-notice">{techniqueNotice}</p>
@@ -3975,11 +4100,25 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if exportElements}
     <ExportDialog count={exportElements.elementIds.length} onexport={(rows) => exportPicked(exportElements!, rows)} onclose={() => (exportElements = null)} />
   {/if}
+  {#if rowsTechnique}
+    <TechniqueRowsDialog
+      name={rowsTechnique.name}
+      inputs={rowsTechnique.inputs}
+      onpreview={previewTechniqueRows}
+      onstart={startTechniqueRows}
+      onprogress={techniqueRowsProgress}
+      oncancel={cancelTechniqueRows}
+      onclose={() => (rowsTechnique = null)}
+    />
+  {/if}
   {#if versionsPanel.open}
     <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
   {/if}
   {#if outpaintFor}
     <OutpaintDialog onapply={(prompt, extend) => outpaint(outpaintFor!, prompt, extend)} onclose={() => (outpaintFor = null)} />
+  {/if}
+  {#if reframeFor}
+    <ReframeDialog medium={nodes.find((n) => n.id === reframeFor)?.type === 'video' ? 'video' : 'image'} onapply={(aspect, focus) => reframe(reframeFor!, aspect, focus)} onclose={() => (reframeFor = null)} />
   {/if}
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(String(nodes.find((n) => n.id === inpaintFor)?.data?.refId ?? '')) ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
@@ -4011,7 +4150,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if viewOnly}<p class="view-only-badge" data-testid="view-only">View only</p>{/if}
   {#if Flow}
   <Flow
-    {core}
     mode={canvasMode}
     postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
@@ -4030,6 +4168,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onImageTool={imageTool}
     onLayersToFrame={layersToFrame}
     onInpaint={(id) => (inpaintFor = id)}
+    onReframe={(id) => (reframeFor = id)}
     onOutpaint={(id) => (outpaintFor = id)}
     onExport={(ids) => (exportFor = ids)}
     onExportRows={exportFrames}
@@ -4038,6 +4177,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCreate={create}
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
+    onDropFeedImage={dropFeedImage}
+    onFeedImageOver={feedImageOver}
     onDraw={drawElement}
     onDrawFrame={drawFrame}
     onRotate={rotateGroupBy}
@@ -4063,12 +4204,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onPasteData={pasteData}
     {figmaJobs}
     onFigmaImages={figmaImagesAnswered}
+    onFigmaPaste={figmaPasted}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
     onTemplate={insertTemplate}
     techniques={techniqueShelf.list}
     onTechnique={insertTechnique}
     onSaveTechnique={saveTechnique}
     onRunTechnique={runTechniqueNode}
+    onRunTechniqueRows={openTechniqueRows}
     onEditTechnique={editTechnique}
     onDetachTechnique={detachTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
@@ -4095,8 +4238,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
     viewOf={sourceView}
-    cardPreviews={data.cardPreviews}
-    previewsAt={`/p/${data.projectId}/c/${data.canvas.id}/card-previews`}
     peers={drawnPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
     onLive={(live) => {
@@ -4117,6 +4258,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     follow={followView}
   >
     {#snippet canvasOver()}
+      {#if feedImageHover.over && feedImageHover.size}
+        <div class="feed-drop" data-testid="feed-drop" style={`transform: translate(${feedImageHover.over.x - feedImageHover.size.w / 2}px, ${feedImageHover.over.y - feedImageHover.size.h / 2}px);width:${feedImageHover.size.w}px;height:${feedImageHover.size.h}px`}></div>
+      {/if}
       {#if commentsPanel.pending && !commentsPanel.pending.nodeId}
         <CommentPin ghost at={commentsPanel.pending} />
       {/if}
@@ -4131,19 +4275,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       {#each livePins(id) as thread (thread.id)}
         <CommentPin {thread} active={commentsPanel.active === thread.id} onpick={(picked) => commentsPanel.focus(picked)} />
       {/each}
-      {@const over = liveHost === LiveHost.Canvas ? nodes.find((n) => n.id === id) : null}
+      {@const hoverNode = nodeById.get(id)}
+      {@const over = liveHost === LiveHost.Canvas ? hoverNode : null}
       {@const overMotion = over ? motionOf(over) : null}
-      {@const hoverNode = nodes.find((n) => n.id === id)}
       {@const hoverMotion = hoverNode ? motionOf(hoverNode) : null}
-      {#if hoverMotion?.docHeadRevision && hoverHostOf(body) === HoverHost.Overlay && !core}
-        <FrameHover nodeId={id} revision={hoverMotion.docHeadRevision} previewUrl={motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} width={FORMATS[hoverMotion.format].width} height={FORMATS[hoverMotion.format].height} />
-      {/if}
       {@const hoverGen = hoverNode ? genOf(hoverNode) : null}
       {#if body === TileBody.Standin && hoverGen?.refId && !hoverGen.running}<OutputDragHandle nodeId={id} />{/if}
       {#if overMotion}<FrameLiveControls nodeId={id} interactive={!!overMotion.interactive} src={motionLivePath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id })} />{/if}
     {/snippet}
     {#snippet tile({ id, selected })}
-      {@const row = nodes.find((n) => n.id === id)}
+      {@const row = nodeById.get(id)}
       {#if row}
         {@const gen = genOf(row)}
         {@const frame = frameOf(row)}
@@ -4304,7 +4445,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onfield={(patch) => write(id, patch)}
             onsync={() => sync(id)}
           >
-            <ProductsNode node={catalog} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
+            <ProductsNode node={catalog} nodeId={id} products={shownProducts[id] ?? []} total={products[id]?.length ?? 0} />
           </SourceSettingsFrame>
         {:else if feed}
           <SourceSettingsFrame
@@ -4314,7 +4455,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             onfield={(patch) => write(id, patch)}
             onsync={() => sync(id)}
           >
-            <SocialFeedNode node={feed} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
+            <SocialFeedNode node={feed} nodeId={id} posts={shownPosts[id] ?? []} total={socialPosts[id]?.length ?? 0} />
           </SourceSettingsFrame>
         {:else if influencer}
           <InfluencerNode
@@ -4473,6 +4614,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     height: 100%;
     background: var(--muted);
     animation: pending-pulse 1.2s ease-in-out infinite alternate;
+  }
+
+  .feed-drop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    border: 1.5px dashed var(--ink, #1d1d1f);
+    background: rgb(0 0 0 / 0.05);
   }
 
   .pending-frame.shown {

@@ -12,6 +12,12 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** a fresh database applies every file and the app still answers `PGRST205` for `orgs`. **Move:** the new schema was never a migration; `supabase/baseline` is generated from production catalogs and `db:migrate` applies it, then only files dated after its cutoff. Never delete or rename the legacy files.
 
+## Canvas performance
+
+### Panning zoomed in stalls on `submit` and the wasm encoder: count layers per frame
+
+**Signal:** pan at 70%+ zoom falls under 20 fps with frames of 500 ms to 2 s, a CPU profile led by `GPUQueue.submit`, `createBindGroup` and `PathEncoder` inside `gpu_core_bg.wasm`, nothing in JS; zoomed out it holds 60. **Move:** read the inclusive time of `layers::body` and `layers::mask`, not the self time: every item with a mask, blur or filter is its own texture, vello render and queue submit, and one imported SVG carries about 600 masked paths. Hard path masks that only intersect are clips now (`clip_covers` in `scene.rs`); anything softer still costs a layer, so keep layers out of the frame being painted (`Layers::culled`). Run the harness at least three times: a run where the heavy frames are still caching while the pan starts looks fine or terrible at random.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
@@ -23,6 +29,18 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A PR that adds or changes a tool fails the tool surface pins
 
 **Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. The src pin stores one fingerprint per tool/op, one entry each: PRs touching different tools do not conflict; a real conflict means the same tool changed twice. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
+
+### A Playwright spec cannot import motion-core: build the page with vite-node first
+
+**Signal:** `Module ".../part-usage.json" needs an import attribute of "type: json"` the moment a spec or demo imports `bundle.ts` or the doc ops. **Move:** Playwright loads TypeScript through Node, not Vite. Build the fixture in a separate `npx vite-node tests/e2e/fixtures/build-lumen.ts <dir> <origin>` step and let the spec read the files (`tests/e2e/fixtures/interactive-routes.ts`).
+
+### The legacy HTML player stays blank on localhost in new Chromium
+
+**Signal:** an old interactive embed drawn once, never reacts, console says `Permission was denied for this request to access the loopback address space` for `/motion-runtime/*.js`. **Move:** the player iframe has an opaque origin, so Local Network Access blocks its scripts from localhost. Launch the before-run with `--disable-features=LocalNetworkAccessChecks,PrivateNetworkAccessRespectPreflightResults,BlockInsecurePrivateNetworkRequests`. Production is not affected.
+
+### A scroll-scrubbed hero starts empty: Title and Text fade up from their own first frame
+
+**Signal:** playback `scrub` at progress 0 shows shapes and Kickers but no headline or body copy. **Move:** `Title` and `Text` fade up over their first frames, `Kicker` and `Caption` do not. Play the entrance (`autoplay`) and let `input.scroll` drive the rest, or start the story with the copy already faded in.
 
 ### An effect that publishes into a `$state` map loops once it runs per edit
 
@@ -3360,17 +3378,36 @@ in console.
 Signal: a poster is a white card on gpu-core; the console shows `UNSUPPORTED ... "unread"` and `core DOM read failed ... DataCloneError: Non-origin-clean ImageBitmap`. Cause: an element the DOM read cannot draw (SVG `<image>`) makes the whole frame undrawable, and a remote image drawn to a canvas without CORS taints the bitmap so it cannot leave the reader iframe. Move: log `list.unsupported` in `drawsWhole` to see which gap; load probe images with `crossOrigin = "anonymous"`; a data URL hides the taint, so test with a real storage URL.
 
 
+### A heavy-looking frame is not always the heavy thing in the profile
+**Signal:** the core renderer is slow zoomed in, the profile is wasm path encoding (`PathEncoder`, `polygon`, `Vec<Vec<f64>>::clone`), and the two path-heavy SVG frames get the blame. **Move:** dump what the wasm module is fed (wrap `put_group` and `set_overlay` through `page.route` on `gpu_core.js`) and count points per caller before building a cache. Here the overlay (57k points, cloned twice per region) outweighed the frames, and a native `encode_cost` timing showed encoding the 1.5 MB groups costs 2.5 ms, so the "250 ms first appearance" was never the encode. Also check any cache key built with `format!("{:?}", item)`: on a large group it is the hitch.
+
 ## A Playwright click inside a canvas iframe hits the wrong element
 Signal: `frameLocator(...).click()` on a link in a code frame passes, but nothing happens; a capture listener in the frame logs the click on a parent (`NAV`). Cause: the tile is CSS-scaled with the canvas zoom and Playwright places in-iframe points without that scale. Move: compute the point yourself: `frame.boundingBox().x + rect.x * (frame.width / innerWidth)`, then `page.mouse.click`. Real clicks are fine.
 
 ## A link `#/page` in a srcdoc iframe blanks the frame
 Signal: clicking `<a href="#/pricing">` in a code frame leaves an empty page at `about:blank#/pricing`. Cause: srcdoc documents resolve relative URLs against the parent's base, so the hash link is a cross-document navigation. Move: `<base href="about:srcdoc">` in the srcdoc head. `new URL('/x', location.href)` still throws there, so react-router's HashRouter/BrowserRouter cannot work: use MemoryRouter.
 
+## A video exports on HTML although gpu-core is wired
+**Signal:** the export finishes, `data-export-engine="html"` on `[data-testid=motion-preview]`, no error. **Move:** `MotionPreview.render` takes the core path only when it is handed a scene (`fullDoc`, or the 8th argument) and `prefer` is a core engine; a caller that passes a bare `render` gets HTML silently. Read the attribute after one real export before reporting a surface as moved. Videos with line/vector shapes, motion blur or 3D devices fall back by design (`coreExportable`).
+
 ## Landing
 
 ### A below-the-fold image collage costs Lighthouse mobile points even with `loading="lazy"`
 
 **Signal:** home mobile score drops from 90 to 87 and LCP from 3.2 s to 3.7 s after adding a section of images a viewport below the hero; the LCP element is still the hero poster. **Move:** native lazy loading fetches within about a viewport and a half, and those requests compete with the poster and the hero video. Mount the tiles from an `IntersectionObserver` (`Collage.svelte`) and reserve the height with `aspect-ratio` so CLS stays 0. Measure against a build of `origin/dev`, not against the target alone.
+
+### A perf harness run through tsx reports 0 frames
+**Signal:** every sweep in `scripts/perf` prints `fps null`/`frames 0`, yet the page's own HUD shows 59 fps. **Move:** tsx (esbuild `keepNames`) wraps named functions in `__name(...)`, which the page does not define, so an `addInitScript` callback throws on its first line. Add `page.addInitScript({ content: 'window.__name = (f) => f;' })` before the others.
+
+### Core canvas frames are slow but the main thread is idle
+**Signal:** long frames on the core renderer with a flat JS profile; a Chrome trace shows `CrRendererMain` idle and `CrGpuMain` in `Queue::Submit` for 25+ ms. CPU throttling does not touch the GPU process. **Move:** record a Metal System Trace (`xcrun xctrace record --template 'Metal System Trace' --all-processes`) and look at Chrome's encoders: blits at the start of a command buffer are vello atlas copies. Never mark pictures dirty per render; vello 0.11 only loses the atlas after a patch-free scene (0x0 atlas), which `Engine` prevents with an off-target gradient.
+
+### A rebuilt wasm measured under `vite preview` is not the wasm you built
+**Signal:** after copying a new `gpu_core_bg.wasm` into `.svelte-kit/output/client`, the console shows `[canvas] core off: WebAssembly compilation aborted` and `ERR_CONTENT_LENGTH_MISMATCH`; the page silently runs the fallback renderer and the numbers look great. **Move:** sirv stats files at startup: restart `vite preview` after every swap. `scripts/perf/big-canvas.ts` now throws on `core off`.
+
+## Unit tests fail in a worktree only after a demo or e2e run copied `.env` into it
+
+**Signal:** `robots.txt`, `sitemap.xml`, `credits` and `/api/v1/motion/[nodeId]/embed` server tests go red in a worktree that was green, with no code change near them. **Move:** a worktree has no `.env`; copying the main one in to run a demo or the dev server makes `$env` values real and those tests read them. Move `.env` aside (`mv .env .env.bak`) for the unit run, put it back for the demo, and delete it with the worktree.
 
 ## Worktree tests resolve @feega/* from the main checkout
 

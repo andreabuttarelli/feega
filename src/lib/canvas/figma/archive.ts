@@ -71,8 +71,11 @@ export type FigmaRawNode = {
   textAlignHorizontal?: string;
   textData?: { characters: string; styleOverrideTable?: FigmaRawNode[]; characterStyleIDs?: number[] };
   styleID?: number;
-  symbolData?: { symbolID?: Guid };
+  symbolData?: { symbolID?: Guid; symbolOverrides?: NodePatch[] };
+  derivedSymbolData?: NodePatch[];
 };
+
+export type NodePatch = Partial<FigmaRawNode> & { guidPath?: { guids: Guid[] }; overriddenSymbolID?: Guid };
 
 export type FigmaMeta = { fileKey?: string; pasteID?: number; dataType?: string };
 

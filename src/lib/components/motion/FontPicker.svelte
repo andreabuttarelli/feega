@@ -1,5 +1,6 @@
 <script lang="ts">
   import { BuiltinFont, fontStack, nearestWeight, searchFonts, type CatalogueFont, type FontFace } from '@feega/motion-core/motion/fonts/model';
+  import { FIELD_INPUT } from '$lib/components/ui/shell';
   import { MAX_FONT_MB, type FontLibrary } from '$lib/motion/fonts/library';
   import { FontOrigin, LocalFonts, readLocalFonts, type LocalFontsRead } from '$lib/motion/fonts/local';
 
@@ -17,8 +18,16 @@
     library?: FontLibrary | null;
   } = $props();
 
+  const TRIGGER = 'h-(--ui-row) w-full min-w-0 cursor-pointer truncate px-2.5 text-left text-ui-label transition-colors duration-(--ui-dur-fast)';
+  const GROUP = 'm-0 mt-1 text-[10px] uppercase text-ui-text-3';
+  const MUTED = 'm-0 text-[11px] text-ui-text-3';
+  const TAG = 'ml-1.5 font-mono text-[10px] text-ui-text-3';
+  const ROW = 'w-full cursor-pointer truncate rounded-sm px-2 py-1 text-left text-base text-ui-text hover:bg-ui-wash';
+  const rowClass = (selected: boolean) => (selected ? `${ROW} bg-ui-selected` : ROW);
+
   const RESULTS = 40;
   const PREVIEW_LINK = 'motion-font-previews';
+  const UPLOADED_STYLE = 'motion-font-uploads';
   const REGULAR = 400;
   const ACCEPT = '.ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2';
 
@@ -70,6 +79,16 @@
     const link = (document.getElementById(PREVIEW_LINK) as HTMLLinkElement | null) ?? Object.assign(document.createElement('link'), { id: PREVIEW_LINK, rel: 'stylesheet' });
     link.href = href;
     document.head.appendChild(link);
+  });
+
+  $effect(() => {
+    const css = library?.faceCss ?? '';
+    if (!open || !css || typeof document === 'undefined') {
+      return;
+    }
+    const style = document.getElementById(UPLOADED_STYLE) ?? Object.assign(document.createElement('style'), { id: UPLOADED_STYLE });
+    style.textContent = css;
+    document.head.appendChild(style);
   });
 
   async function pickInstalled(family: string) {
@@ -124,178 +143,69 @@
   }
 </script>
 
-<div class="font-picker" data-testid="font-picker">
-  <button type="button" class="current" style={`font-family: ${fontStack(value, fonts)}`} aria-expanded={open} aria-label={`Font ${value}`} onclick={toggle}>{value}</button>
-  {#if missing}<p class="warn" role="status" data-testid="font-missing">The file of {value} is gone: a fallback font is showing.</p>{/if}
+<div class="font-picker relative w-full" data-testid="font-picker">
+  <button type="button" class={`${TRIGGER} rounded-sm bg-ui-input text-ui-text hover:bg-ui-input-hover`} style={`font-family: ${fontStack(value, fonts)}`} aria-expanded={open} aria-label={`Font ${value}`} onclick={toggle}>{value}</button>
+  {#if missing}<p class="m-0 mt-0.5 text-[11px] text-amber-700 dark:text-amber-400" role="status" data-testid="font-missing">The file of {value} is gone: a fallback font is showing.</p>{/if}
   {#if open}
-    <div class="panel" role="dialog" aria-label="Choose a font">
-      <input type="search" placeholder="Search Google Fonts…" aria-label="Search fonts" bind:value={query} />
-      <p class="group">In this video</p>
-      <ul>
+    <div class="absolute inset-x-0 top-[calc(100%+2px)] z-20 grid max-h-[420px] gap-1 overflow-auto rounded-md bg-ui-raised p-1.5 text-ui-text shadow-ui-float" role="dialog" aria-label="Choose a font">
+      <input type="search" class={`${FIELD_INPUT} w-full`} placeholder="Search Google Fonts…" aria-label="Search fonts" bind:value={query} />
+      <p class={GROUP}>In this video</p>
+      <ul class="m-0 list-none p-0">
         {#each inVideo as family (family)}
-          <li><button type="button" class:on={family === value} style={`font-family: ${fontStack(family, fonts)}`} onclick={() => pick(family)}>{family}</button></li>
+          <li><button type="button" class={rowClass(family === value)} aria-current={family === value} style={`font-family: ${fontStack(family, fonts)}`} onclick={() => pick(family)}>{family}</button></li>
         {/each}
       </ul>
       {#if library}
-        <p class="group">Uploaded</p>
-        <ul data-testid="font-uploaded">
+        <p class={GROUP}>Uploaded</p>
+        <ul class="m-0 list-none p-0" data-testid="font-uploaded">
           {#each uploaded as font (font.family)}
-            <li class="row">
+            <li class="flex gap-0.5">
               {#if renaming === font.family}
-                <input class="rename" value={font.family} aria-label={`Rename ${font.family}`} {@attach (el) => el.focus()} onkeydown={(e) => (e.key === 'Enter' ? rename(font.family, e.currentTarget.value) : e.key === 'Escape' ? (renaming = null) : null)} onblur={(e) => rename(font.family, e.currentTarget.value)} />
+                <input class={`${FIELD_INPUT} w-full`} value={font.family} aria-label={`Rename ${font.family}`} {@attach (el) => el.focus()} onkeydown={(e) => (e.key === 'Enter' ? rename(font.family, e.currentTarget.value) : e.key === 'Escape' ? (renaming = null) : null)} onblur={(e) => rename(font.family, e.currentTarget.value)} />
               {:else}
-                <button type="button" class:on={font.family === value} style={`font-family: '${font.family}', system-ui`} onclick={() => pick(font.family)}>{font.family}<span class="tag">{font.variants.length > 1 ? `${font.variants.length} styles` : 'uploaded'}</span></button>
-                <button type="button" class="act" aria-label={`Rename ${font.family}`} onclick={() => (renaming = font.family)}>Rename</button>
-                <button type="button" class="act" aria-label={`Delete ${font.family}`} onclick={() => remove(font.family)}>Delete</button>
+                <button type="button" class={`${rowClass(font.family === value)} flex-1`} aria-current={font.family === value} style={`font-family: '${font.family}', system-ui`} onclick={() => pick(font.family)}>{font.family}<span class={TAG}>{font.variants.length > 1 ? `${font.variants.length} styles` : 'uploaded'}</span></button>
+                <button type="button" class="rounded-sm px-1 text-[10px] text-ui-text-3 hover:bg-ui-wash" aria-label={`Rename ${font.family}`} onclick={() => (renaming = font.family)}>Rename</button>
+                <button type="button" class="rounded-sm px-1 text-[10px] text-ui-text-3 hover:bg-ui-wash" aria-label={`Delete ${font.family}`} onclick={() => remove(font.family)}>Delete</button>
               {/if}
             </li>
           {:else}
-            <li class="muted">{library.families.length ? 'No uploaded font matches.' : 'No uploaded fonts yet.'}</li>
+            <li class={MUTED}>{library.families.length ? 'No uploaded font matches.' : 'No uploaded fonts yet.'}</li>
           {/each}
         </ul>
       {/if}
-      <p class="group">Installed on this computer</p>
+      <p class={GROUP}>Installed on this computer</p>
       {#if installed?.state === LocalFonts.Ready}
-        <ul data-testid="font-installed">
+        <ul class="m-0 list-none p-0" data-testid="font-installed">
           {#each installedMatches as family (family)}
-            <li><button type="button" class:on={family === value} style={`font-family: '${family}', system-ui`} onclick={() => pickInstalled(family)}>{family}<span class="tag">local</span></button></li>
+            <li><button type="button" class={rowClass(family === value)} aria-current={family === value} style={`font-family: '${family}', system-ui`} onclick={() => pickInstalled(family)}>{family}<span class={TAG}>local</span></button></li>
           {:else}
-            <li class="muted">No installed font matches.</li>
+            <li class={MUTED}>No installed font matches.</li>
           {/each}
         </ul>
       {:else if !installed}
-        <button type="button" class="act" data-testid="font-installed-show" disabled={reading} onclick={showInstalled}>{reading ? 'Reading installed fonts…' : 'Show installed fonts…'}</button>
+        <button type="button" class="rounded-sm px-1 text-left text-[10px] text-ui-text-3 hover:bg-ui-wash" data-testid="font-installed-show" disabled={reading} onclick={showInstalled}>{reading ? 'Reading installed fonts…' : 'Show installed fonts…'}</button>
       {/if}
-      {#if installed}<p class="muted" data-testid="font-installed-note">{LOCAL_NOTE[installed.state]}</p>{/if}
-      <p class="group">Google Fonts{brand.length ? ' · brand first' : ''}</p>
-      <ul class="results" data-testid="font-results">
+      {#if installed}<p class={MUTED} data-testid="font-installed-note">{LOCAL_NOTE[installed.state]}</p>{/if}
+      <p class={GROUP}>Google Fonts{brand.length ? ' · brand first' : ''}</p>
+      <ul class="m-0 list-none p-0" data-testid="font-results">
         {#each results as font (font.f)}
           <li>
-            <button type="button" class:on={font.f === value} style={`font-family: '${font.f}', system-ui`} onclick={() => pick(font.f)}>
-              {font.f}{#if brandSet.has(font.f)}<span class="tag">brand</span>{/if}
+            <button type="button" class={rowClass(font.f === value)} aria-current={font.f === value} style={`font-family: '${font.f}', system-ui`} onclick={() => pick(font.f)}>
+              {font.f}{#if brandSet.has(font.f)}<span class={TAG}>brand</span>{/if}
             </button>
           </li>
         {:else}
-          <li class="muted">{catalogue.length ? 'No font matches.' : 'Loading the catalogue…'}</li>
+          <li class={MUTED}>{catalogue.length ? 'No font matches.' : 'Loading the catalogue…'}</li>
         {/each}
       </ul>
       {#if library}
-        <label class="upload">
+        <label class="grid gap-1 text-xs">
           <input type="file" accept={ACCEPT} aria-label="Upload a font file" disabled={uploading} onchange={(e) => upload(e.currentTarget)} />
           {uploading ? 'Uploading…' : 'Upload font…'}
         </label>
-        <p class="muted">TTF, OTF, WOFF or WOFF2, up to {MAX_FONT_MB}MB. Everyone in the workspace can use it; upload only fonts your licence allows.</p>
-        {#if uploadError}<p class="error" role="alert">{uploadError}</p>{/if}
+        <p class={MUTED}>TTF, OTF, WOFF or WOFF2, up to {MAX_FONT_MB}MB. Everyone in the workspace can use it; upload only fonts your licence allows.</p>
+        {#if uploadError}<p class="m-0 text-[11px] text-red-600 dark:text-red-400" role="alert">{uploadError}</p>{/if}
       {/if}
     </div>
   {/if}
 </div>
-
-<style>
-  .font-picker {
-    position: relative;
-    width: 100%;
-  }
-
-  .current {
-    width: 100%;
-    text-align: left;
-    padding: 4px 6px;
-    border: 1px solid var(--border, #ddd);
-    background: var(--ui-field);
-    font-size: 14px;
-  }
-
-  .panel {
-    position: absolute;
-    z-index: 20;
-    left: 0;
-    right: 0;
-    top: calc(100% + 2px);
-    background: var(--background, #fff);
-    border: 1px solid var(--border, #ddd);
-    padding: 6px;
-    display: grid;
-    gap: 4px;
-    max-height: 420px;
-    overflow: auto;
-  }
-
-  ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  li button {
-    width: 100%;
-    text-align: left;
-    padding: 3px 4px;
-    font-size: 16px;
-  }
-
-  li button.on {
-    background: #a855f7;
-    color: #fff;
-  }
-
-  .group {
-    margin: 4px 0 0;
-    font-size: 10px;
-    text-transform: uppercase;
-    color: var(--muted-foreground, #888);
-  }
-
-  .tag {
-    margin-left: 6px;
-    font-size: 10px;
-    color: #a855f7;
-    font-family: 'Fragment Mono', monospace;
-  }
-
-  .muted {
-    font-size: 11px;
-    color: var(--muted-foreground, #888);
-    margin: 0;
-  }
-
-  .upload {
-    font-size: 12px;
-    display: grid;
-    gap: 4px;
-  }
-
-  .row {
-    display: flex;
-    gap: 2px;
-  }
-
-  .row > button:first-child {
-    flex: 1;
-  }
-
-  .act {
-    font-size: 10px;
-    padding: 0 4px;
-    color: var(--muted-foreground, #888);
-    border-radius: var(--ui-radius-sm);
-  }
-
-  .rename {
-    width: 100%;
-    font-size: 14px;
-    border-radius: var(--ui-radius-sm);
-  }
-
-  .warn {
-    color: #b45309;
-    font-size: 11px;
-    margin: 2px 0 0;
-  }
-
-  .error {
-    color: #e11d48;
-    font-size: 11px;
-    margin: 0;
-  }
-</style>

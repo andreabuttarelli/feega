@@ -1,17 +1,24 @@
 import { BACKENDS, type FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
 import { drawFrame, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
-import { sharedFrames } from '$lib/motion/gpu/webcodecs-decoder';
+import { originalFrames } from '$lib/motion/gpu/shared-frames';
 import { createMedia } from '@feega/motion-core/motion/gpu-full/media';
 import { readClips, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
 
 export type FrameSink = (bitmap: ImageBitmap, index: number) => Promise<void>;
 
 const frameAt = (prepared: Prepared, time: number) => Math.round(time * prepared.doc.fps);
 
+export const snapToFrame = (doc: Pick<MotionDoc, 'fps'>, time: number): number => Math.round(time * doc.fps) / doc.fps;
+
 const NO_READS: ReadonlySet<string> = new Set();
 
-export const coreExportable = (prepared: Prepared, times: number[], read = NO_READS): boolean => times.every((t) => drawFrame(prepared, frameAt(prepared, t)).unsupported.every((gap) => read.has(gap.clip)));
+const WHOLE_FRAME_TOLERANCE = 1e-6;
+
+const onWholeFrame = (prepared: Prepared, time: number): boolean => Math.abs(time * prepared.doc.fps - frameAt(prepared, time)) < WHOLE_FRAME_TOLERANCE;
+
+export const coreExportable = (prepared: Prepared, times: number[], read = NO_READS): boolean => times.every((t) => onWholeFrame(prepared, t) && drawFrame(prepared, frameAt(prepared, t)).unsupported.every((gap) => read.has(gap.clip)));
 
 export async function renderOnCore(prepared: Prepared, backend: FullBackend, times: number[], onFrame: FrameSink, signal: AbortSignal, custom: CustomReads): Promise<boolean> {
   if (!coreExportable(prepared, times, new Set(readClips(prepared.doc, prepared.tokens.logoUrl).read))) {
@@ -23,7 +30,7 @@ export async function renderOnCore(prepared: Prepared, backend: FullBackend, tim
   if (!raster) {
     return false;
   }
-  const media = createMedia({ frames: sharedFrames() });
+  const media = createMedia({ frames: originalFrames() });
   try {
     for (const [index, time] of times.entries()) {
       signal.throwIfAborted();
