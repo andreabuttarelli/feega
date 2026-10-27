@@ -251,6 +251,30 @@ export async function actAtVersion(action: VersionedAction): Promise<ActionAnswe
   return action.send(action.version());
 }
 
+export function inFlightWrites() {
+  const pending = new Map<string, Promise<void>>();
+
+  return {
+    track<T>(ids: string[], write: Promise<T>): Promise<T> {
+      const landed = write.then(() => {}, () => {});
+      for (const id of ids) {
+        pending.set(id, landed);
+      }
+      void landed.then(() => {
+        for (const id of ids) {
+          if (pending.get(id) === landed) {
+            pending.delete(id);
+          }
+        }
+      });
+      return write;
+    },
+    settled: async (id?: string): Promise<void> => {
+      await (id === undefined ? Promise.all(pending.values()) : pending.get(id));
+    }
+  };
+}
+
 export async function writeWithRetry(attempt: WriteAttempt): Promise<WriteOutcome> {
   const tried = await attempt.send(attempt.patch, attempt.base);
   const first = failureOf(tried) === SaveFailure.Busy ? await attempt.send(attempt.patch, attempt.base) : tried;

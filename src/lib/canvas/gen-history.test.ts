@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { withRun, showRun, shownIndex, canStartRun, blockedReason, historyItemsOf, RUNNABLE_MEDIUMS } from './gen-history';
+import { withRun, showRun, shownIndex, canStartRun, blockedReason, historyItemsOf, RUNNABLE_MEDIUMS, shownOutput } from './gen-history';
 import type { GenNode, GenRun } from './gen-node';
 
 const choices = [{ id: 'm1' }];
@@ -204,5 +204,19 @@ describe('la griglia della storia', () => {
     const items = historyItemsOf(node({ runs: [...four.slice(0, 2), run({ id: 'r3', mediaId: null })], refId: 'media-1' }));
 
     expect(items.map((i) => i.runId)).toEqual(['r1', 'r2']);
+  });
+});
+
+describe('shownOutput: picking a past output never touches the run in flight', () => {
+  const past = { id: 'run-1', mediaId: 'asset-1' };
+
+  it('a running node keeps running, its run id and its error', () => {
+    const data = { running: true, runId: 'run-2', error: null, refId: 'asset-0' };
+    expect(shownOutput(data, past)).toEqual({ running: true, runId: 'run-2', error: null, refId: 'asset-1' });
+  });
+
+  it('an idle node points at the picked run and drops a stale error', () => {
+    const data = { running: false, runId: 'run-2', error: 'boom', refId: 'asset-0' };
+    expect(shownOutput(data, past)).toEqual({ running: false, runId: 'run-1', error: null, refId: 'asset-1' });
   });
 });
