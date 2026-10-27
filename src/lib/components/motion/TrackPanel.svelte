@@ -156,7 +156,7 @@
   .stage {
     position: relative;
     width: 100%;
-    max-width: 360px;
+    max-width: 240px;
     background: var(--ui-bg);
     border: 1px solid var(--ui-line-strong);
     cursor: crosshair;

@@ -15,3 +15,7 @@ Decisions:
 - Tests use a synthetic moving square: drawn in-memory for the tracker, encoded by ffmpeg for the server reader.
 
 Discarded: a WGSL tracker (the CPU one costs about 100k multiply-adds per frame at 480 px), two-point and corner-pin tracking, a mask-following option. Next slices.
+
+## Tracks survive between calls
+
+`track_point` used to keep its result in per-call session state, so `apply_track` from a separate `feega motion tool` call found no track. The result is now saved on the doc (`pointTracks`, last 20) and `track_point` is a write tool.

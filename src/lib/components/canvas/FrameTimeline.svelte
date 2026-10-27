@@ -122,8 +122,12 @@
       {/each}
     </div>
   {/if}
-  {#if remapped}<TimeRemap {doc} clip={remapped} {frame} {onchange} />{/if}
-  {#if remapped && assetUrl}<TrackPanel {doc} clip={remapped} {frame} {assetUrl} {onchange} />{/if}
+  {#if remapped}
+    <div class="tools" data-testid="frame-timeline-tools">
+      <TimeRemap {doc} clip={remapped} {frame} {onchange} />
+      {#if assetUrl}<TrackPanel {doc} clip={remapped} {frame} {assetUrl} {onchange} />{/if}
+    </div>
+  {/if}
   <div class="body">
     {#if graphOpen}
       <GraphEditor {doc} {frame} {selection} bind:keySelection {camera} {onchange} />
@@ -173,6 +177,13 @@
     color: inherit;
     border: 1px solid var(--ui-line, #e5e5e5);
     border-radius: var(--ui-radius-sm, 4px);
+  }
+
+  .tools {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 70%;
+    overflow-y: auto;
   }
 
   .marks {

@@ -188,6 +188,15 @@ export function fitsResolution(d: { width: number; height: number; still?: unkno
   return Boolean(d.still) || Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE);
 }
 
+const MAX_POINT_TRACKS = 20;
+
+const pointTrackSchema = z.object({
+  clipId: z.string(),
+  anchor: z.number(),
+  lost: z.boolean(),
+  points: z.array(z.object({ x: z.number(), y: z.number(), frame: z.number(), score: z.number() }))
+});
+
 export const motionDocSchema = z
   .object({
     version: z.literal(DOC_VERSION),
@@ -220,7 +229,8 @@ export const motionDocSchema = z
     layoutGuides: layoutGuidesSchema,
     links: z.record(z.string().min(1), z.string().min(1)).optional(),
     styles: stylesSchema,
-    variables: variablesSchema
+    variables: variablesSchema,
+    pointTracks: z.record(z.string(), pointTrackSchema).refine((t) => Object.keys(t).length <= MAX_POINT_TRACKS, `at most ${MAX_POINT_TRACKS} saved tracks`).optional()
   })
   .refine(fitsResolution, RESOLUTION_PROBLEM)
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] })

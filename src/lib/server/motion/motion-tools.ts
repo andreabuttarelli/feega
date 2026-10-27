@@ -125,7 +125,7 @@ import { COUNTER_FORMATS } from '@feega/motion-core/motion/text-counter';
 import { setTextCounter } from '$lib/motion/text-counter-ops';
 import { animateTo } from '$lib/motion/animate-to';
 import { DEFAULT_TRACK } from '@feega/motion-core/motion/tracking/point-tracker';
-import { ApplyMode, applyTrack, trackClip, type ClipTrack, type LumaReader } from '@feega/motion-core/motion/tracking/track-clip';
+import { ApplyMode, applyTrack, trackClip, type LumaReader } from '@feega/motion-core/motion/tracking/track-clip';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '@feega/motion-core/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '@feega/motion-core/motion/keyframes';
 import type { MotionAsset } from './editor';
@@ -257,7 +257,9 @@ const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']
 
 const copyTexts = (slots: Record<string, unknown>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
 
-export type MotionSession = { tracks?: Record<string, ClipTrack>; doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing; looks?: Looks };
+const MAX_SAVED_TRACKS = 20;
+
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing; looks?: Looks };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -1232,7 +1234,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const { points } = out.track;
         const px = (p: { x: number; y: number }) => ({ x: Math.round(p.x * width), y: Math.round(p.y * height) });
-        session.tracks = { ...session.tracks, [id]: out.track };
+        const kept = Object.entries(session.doc.pointTracks ?? {}).slice(1 - MAX_SAVED_TRACKS);
+        session.doc = { ...session.doc, pointTracks: { ...Object.fromEntries(kept), [id]: out.track } };
         return { ok: true, track_id: id, frames: points.length, lost: out.track.lost, from: points[0].frame / session.doc.fps, to: points[points.length - 1].frame / session.doc.fps, first: px(points[0]), last: px(points[points.length - 1]), weakest: Math.round(Math.min(...points.map((p) => p.score)) * 100) / 100 };
       }
     }),
@@ -1241,7 +1244,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Attach a track from track_point to a layer as x/y keyframes. follow: the target sits on the tracked point (plus offset_x/offset_y px), like After Effects Track Motion with an Edit Target. stabilise: use the video clip itself as target and it moves against the point so the point holds still.',
       inputSchema: z.object({ track_id: z.string(), target_clip_id: z.string(), mode: z.enum(ApplyMode).default(ApplyMode.Follow), offset_x: z.number().default(0), offset_y: z.number().default(0) }),
       execute: async (input) => {
-        const track = session.tracks?.[input.track_id];
+        const track = session.doc.pointTracks?.[input.track_id];
         if (!track) {
           return { ok: false, error: `no track ${input.track_id}: run track_point first` };
         }

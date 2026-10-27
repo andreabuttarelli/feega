@@ -31,4 +31,11 @@ The video is assumed to fill the frame. Tracked positions are measured from the 
 - `track_point` takes `clip_id`, `time` (seconds from the clip start), `x` and `y` (px of the frame), and optionally `from`, `to`, `feature` and `search` (px). It decodes the frames on the server with ffmpeg, runs the same tracker and returns a `track_id`.
 - `apply_track` takes the `track_id`, a `target_clip_id`, `mode` (`follow` or `stabilise`) and `offset_x` / `offset_y`.
 
+The track is saved with the video, so `apply_track` works in a later call, including from the CLI. The last 20 tracks are kept.
+
+```bash
+feega motion tool <nodeId> track_point --input '{"clip_id":"abc","time":0,"x":960,"y":540}'
+feega motion tool <nodeId> apply_track --input '{"track_id":"<track_id from the first call>","target_clip_id":"def","mode":"follow"}'
+```
+
 The server reads frames at the clip's own pace. A clip with reverse, or with time remap keyframes, cannot be tracked there: clear the remap first. The browser tracks those clips as they play.
