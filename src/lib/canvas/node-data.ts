@@ -20,6 +20,7 @@
  * primo campo aggiunto.
  */
 import { z } from 'zod';
+import { CODE_ENTRY, Framework } from './code-frame';
 import { mergeNodeData, type NodeData } from './node-patch';
 import { SOCIAL_PLATFORMS } from './social-platforms';
 import { FEED_MEDIA, FEED_SORTS, PRODUCT_SORTS } from './source-filters';
@@ -158,11 +159,20 @@ function isEmbeddableUrl(raw: string): boolean {
 
 const iframeSchema = z
   .object({
-    url: z.string().refine(isEmbeddableUrl, { message: 'solo indirizzi http e https' }).optional(),
-    content: z.string().optional()
+    url: z.string().refine((u) => u === '' || isEmbeddableUrl(u), { message: 'solo indirizzi http e https' }).optional(),
+    content: z.string().optional(),
+    html: z.string().optional(),
+    framework: z.enum(Framework).optional(),
+    files: z.record(z.string(), z.string()).optional(),
+    vars: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+    sourceNodeId: z.string().optional(),
+    route: z.string().optional()
   })
-  .refine((v) => Boolean(v.url) || Boolean(v.content), {
-    message: 'needs a url or content: an embed with neither shows nothing'
+  .refine((v) => Boolean(v.url) || Boolean(v.content) || Boolean(v.html) || Boolean(v.files) || Boolean(v.sourceNodeId), {
+    message: 'needs a url, html or files: an embed with none shows nothing'
+  })
+  .refine((v) => !v.files || (v.framework !== undefined && CODE_ENTRY[v.framework] in v.files), {
+    message: 'a code frame needs framework (react|svelte) and its entry file: App.tsx for react, App.svelte for svelte'
   });
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional();

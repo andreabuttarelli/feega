@@ -1,0 +1,78 @@
+---
+title: Connect Drive and Dropbox
+description: Import files from Google Drive or Dropbox onto the canvas, and export images and videos back.
+sidebar:
+  order: 5
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="connect-cloud" caption="Design bar, Drive / Dropbox: the picker offers Google Drive and Dropbox, each with a Connect link." />
+
+Google Drive and Dropbox are the two cloud providers. Each person connects their own account, and files never move without a click.
+
+## Connect
+
+You connect from the picker. Settings, Profile lists both providers and disconnects them.
+
+1. On the canvas, switch the bottom bar to **Design** (the pen icon on the left of the bar).
+2. Choose the cloud icon, **Drive / Dropbox**.
+3. Pick the **Google Drive** or **Dropbox** tab and choose **Connect**.
+4. Sign in with the provider and approve access. You land back on the canvas with the picker ready.
+
+feega asks for:
+
+| Provider | Access |
+| --- | --- |
+| Google Drive | Read your files, and create files it exports |
+| Dropbox | Read file metadata and content, write files |
+
+Access is offline, so the connection stays until you revoke it. Tokens are stored encrypted, per person, and refreshed when they expire.
+
+## Import
+
+1. Open the picker as above and choose the provider tab.
+2. Open folders with a click. The path at the top goes back up.
+3. Choose a file. It lands on the canvas at the middle of your view, as an image, video or document node, and is selected.
+
+Folders list 200 entries at a time; choose **Load more** for the next page. Google Docs, Sheets and Slides import as PDF, and Drawings as PNG. Other Google formats, such as Forms, show as not importable.
+
+## Export
+
+1. Select one image or video node.
+2. In the selection bar, open the cloud menu and choose **Export to Google Drive** or **Export to Dropbox**.
+3. Open the destination folder and choose **Export here**. In Google Drive, leaving the picker at the top exports to My Drive.
+
+The file keeps the name it was uploaded with. Dropbox renames on a clash, so nothing is overwritten.
+
+## Disconnect
+
+Choose **Disconnect** in the picker, or in Settings, Profile. feega forgets the connection and revokes it at Google or Dropbox. The next import or export asks you to connect again. If the provider does not confirm the revoke, remove feega there too: Google account, Security, third-party access; or Dropbox, Settings, Connected apps.
+
+## Troubleshooting
+
+| What you see | Why | Fix |
+| --- | --- | --- |
+| "Connect Google Drive to continue." | No connection, or the connection expired or was revoked | Choose **Connect** |
+| "Google Drive is not set up on this server." | Self-hosted without the provider's app credentials | Set `GOOGLE_DRIVE_CLIENT_ID` and `GOOGLE_DRIVE_CLIENT_SECRET` (or `DROPBOX_CLIENT_ID` and `DROPBOX_CLIENT_SECRET`), with `/api/v1/cloud/callback` as the redirect URL |
+| "Could not load files." | The provider refused the listing | Reconnect, then retry |
+| "The provider would not let feega download that file…" | The provider refused the download | Check you can open the file in the provider |
+| "The provider refused the upload…" | The provider refused the upload | Pick a different folder |
+| "feega could not read the file to export" | The asset could not be read | Try again |
+| The cloud icon is missing | Local mode hides cloud controls | Use the hosted app |
+
+## CLI, MCP and API
+
+The CLI has `feega cloud status|files|import|export|disconnect <projectId> ...`, and MCP has the `cloud` tool with the same actions. Connecting is always the browser flow at `/api/v1/cloud/{provider}/connect`.
+
+The REST endpoints, all under `/api/v1/projects/{projectId}/cloud` with `provider` set to `google_drive` or `dropbox`:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | Which providers are connected and set up |
+| `GET` | `/{provider}/files?folder=&cursor=` | List a folder: `{ entries, next }` |
+| `POST` | `/{provider}/import` | `{ fileId, place: { canvasId, x, y } }` |
+| `POST` | `/{provider}/export` | `{ assetId, folder, name? }` |
+| `DELETE` | `/{provider}` | Disconnect and revoke |
+
+They answer `409` with `not_connected` or `reconnect`, and `501` with `not_configured`.

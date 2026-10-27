@@ -20,6 +20,17 @@ describe('Figma token check', () => {
     expect(await figmaMe(async () => answer(403, {}), TOKEN)).toEqual({ ok: false });
   });
 
+  it('accepts a token that only lacks the Current user scope, without a handle', async () => {
+    const err = 'Invalid scope(s): file_content:read. This endpoint requires the current_user:read scope';
+
+    expect(await figmaMe(async () => answer(403, { status: 403, err }), TOKEN)).toEqual({ ok: true, handle: null });
+  });
+
+  it('still refuses an invalid or expired token', async () => {
+    expect(await figmaMe(async () => answer(403, { status: 403, err: 'Invalid token' }), TOKEN)).toEqual({ ok: false });
+    expect(await figmaMe(async () => answer(403, { status: 403, err: 'Token expired' }), TOKEN)).toEqual({ ok: false });
+  });
+
   it('treats an unreachable Figma as a refusal', async () => {
     expect(await figmaMe(async () => Promise.reject(new Error('down')), TOKEN)).toEqual({ ok: false });
   });

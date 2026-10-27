@@ -93,7 +93,7 @@ function linePrice(lines: Line[]): RoutePrice {
 }
 
 function primaryPrice(choice: ModelChoice): RoutePrice {
-  return { unitCredits: choice.unitCredits, pricedInputs: choice.pricedInputs, creditOverrides: choice.creditOverrides, variableCredits: choice.variableCredits };
+  return { unitCredits: choice.unitCredits, pricedInputs: choice.pricedInputs, creditOverrides: choice.creditOverrides, variableCredits: choice.variableCredits, perSecondCredits: choice.perSecondCredits };
 }
 
 export function withDiscountPrices(book: DiscountBook | null, choice: ModelChoice, medium: TaskMedium): ModelChoice {

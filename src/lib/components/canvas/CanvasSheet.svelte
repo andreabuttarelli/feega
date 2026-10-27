@@ -92,10 +92,11 @@
   @layer utilities {
     :global([data-slot='sheet-content'][data-side].canvas-sheet) {
       position: absolute !important;
-      top: 60px !important;
-      left: 60px !important;
-      right: 0 !important;
-      bottom: 8px !important;
+      z-index: 70 !important;
+      top: 56px !important;
+      left: 68px !important;
+      right: 12px !important;
+      bottom: 12px !important;
       height: auto !important;
       width: auto !important;
       max-width: none !important;

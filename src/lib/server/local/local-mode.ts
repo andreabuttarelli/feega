@@ -104,6 +104,7 @@ export function localStore(env: Env = process.env): FeegaStore | null {
   store = opened;
   if (hasAiKey(env)) {
     void syncModels(opened, env);
+    void import('./local-ticker').then(({ startLocalTicker }) => startLocalTicker(opened.db));
   }
   return store;
 }
