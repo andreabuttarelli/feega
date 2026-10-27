@@ -3412,3 +3412,7 @@ Signal: clicking `<a href="#/pricing">` in a code frame leaves an empty page at 
 ## Worktree tests resolve @feega/* from the main checkout
 
 Signal: a test of code under `packages/` hangs or ignores your edit in a worktree whose `node_modules` is a symlink; `svelte-check` says the new module does not exist. Cause: `node_modules/@feega/*` are relative symlinks, resolved from the real path, so they point at the main checkout. Move: a scratch vitest config that merges `vite.config.ts` and aliases `@feega/motion-core/(.*)` to `packages/motion-core/src/$1` (and a scratch tsconfig with the same `paths` plus `$lib`); do not commit them.
+
+## A mask's polarity belongs to the model, and green tests don't know it
+
+Signal: inpaint keeps the painted area and regenerates the rest; reframe returns the grey padding untouched. Cause: `kie/ideogram/v3-edit` repaints BLACK and keeps white, while the mask builder painted the area to change white; a fake model accepts either. Move: the convention lives in one table next to the model (`MASK_PAINT` in `src/lib/image-tools.ts`), and a new model with a mask is verified with one real generation before the row is trusted. A provider that answers `internal error` with a request body that matches its docs is down, not misused: capture the body first, then swap the model in one row.

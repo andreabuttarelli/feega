@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sourceAssetIdOf } from '$lib/canvas/image-source';
   import { byId } from '$lib/canvas/by-id';
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
@@ -4121,7 +4122,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <ReframeDialog medium={nodes.find((n) => n.id === reframeFor)?.type === 'video' ? 'video' : 'image'} onapply={(aspect, focus) => reframe(reframeFor!, aspect, focus)} onclose={() => (reframeFor = null)} />
   {/if}
   {#if inpaintFor}
-    <InpaintDialog src={assetUrl(String(nodes.find((n) => n.id === inpaintFor)?.data?.refId ?? '')) ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
+    <InpaintDialog src={assetUrl(sourceAssetIdOf(nodes.find((n) => n.id === inpaintFor)?.data ?? {}) ?? '') ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
   {/if}
   {#if figmaImportAt}
     <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/p/{data.projectId}/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />

@@ -80,7 +80,23 @@ describe('paddedPng', () => {
     expect({ width: info.width, height: info.height }).toEqual({ width: 30, height: 10 });
     const pixel = (x: number) => [data[x * 3], data[x * 3 + 1], data[x * 3 + 2]];
     expect(pixel(15)).toEqual([255, 0, 0]);
-    expect(pixel(2)).not.toEqual([255, 0, 0]);
+    vi.unstubAllGlobals();
+  });
+
+  it('fills the new area with the edge colours of the picture, blurred, not a flat grey', async () => {
+    const left = await sharp({ create: { width: 10, height: 10, channels: 3, background: '#00f' } }).png().toBuffer();
+    const right = await sharp({ create: { width: 10, height: 10, channels: 3, background: '#f00' } }).png().toBuffer();
+    const png = await sharp({ create: { width: 20, height: 10, channels: 3, background: '#000' } }).composite([{ input: left, left: 0, top: 0 }, { input: right, left: 10, top: 0 }]).png().toBuffer();
+    findAsset.mockResolvedValue({ id: 'a1', type: 'image', url: 'u1/pic.png', width: 20, height: 10 });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(png))));
+    const plan = outpaintPlan({ width: 20, height: 10 }, { left: 0.5, right: 0, top: 0, bottom: 0 });
+
+    const padded = await paddedPng(db, { orgId: 'org', assetId: 'a1' }, { width: 20, height: 10 }, plan);
+
+    const { data } = await sharp(padded).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const pixel = (x: number) => [data[x * 3], data[x * 3 + 1], data[x * 3 + 2]];
+    expect(pixel(2)[2]).toBeGreaterThan(pixel(2)[0]);
+    expect(pixel(12)).toEqual([0, 0, 255]);
     vi.unstubAllGlobals();
   });
 });

@@ -17,7 +17,7 @@ A generation node holds a prompt, a model and its result. Its `type` is one of `
 - **Cost preview.** The Generate button shows the credits the run will cost with the chosen model, provider, duration, resolution and variants, and updates as you change them. Each provider is priced at its own rate for that resolution; Auto shows the price of the provider it will actually use.
 - **Stop.** While a node runs, its Generate button in the selection bar becomes Stop, with a progress ring. A disabled Generate button says why when you hover it.
 - **Loops.** `run_node_loop` queues every combination of a node's inputs; `preview_node_loop` is free; more than 50 needs confirmation and more than 1000 is refused.
-- **Images.** Remove background and 2×/4× upscale from the image toolbar.
+- **Images.** Remove background and 2× upscale from the image toolbar.
 - **Uncensored models** run only in an uncensored project that the org owner turned on in Settings.
 
 Node data shapes per type: MCP `describe_node_types`. Tool details: [MCP tools](/reference/generated/mcp-tools/).
