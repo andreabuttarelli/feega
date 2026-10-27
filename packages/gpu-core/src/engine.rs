@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use vello::kurbo::{Affine, Point, Rect};
-use vello::peniko::{color::AlphaColor, Color, ImageData};
+use vello::peniko::{color::AlphaColor, Color, Fill, Gradient, ImageData};
 use vello::wgpu;
 use vello::{AaConfig, AaSupport, RenderParams, RendererOptions, Scene};
 
@@ -16,6 +16,7 @@ use crate::Skipped;
 const KEPT_LAYERS: usize = 32;
 const KEPT_FRAMES: u64 = 240;
 const KEYED_POINTS_MAX: usize = 1000;
+const OFF_TARGET: Rect = Rect::new(-2.0, -2.0, -1.0, -1.0);
 
 struct Cached {
     image: ImageData,
@@ -96,10 +97,17 @@ struct Gpu<'a> {
     runner: WgpuRunner<'a>,
     width: u32,
     height: u32,
-    drawn: Vec<ImageData>,
     kept: Vec<Pooled>,
     last: Option<Pooled>,
     cache: &'a mut LayerCache,
+}
+
+fn empties_the_atlas(scene: &Scene) -> bool {
+    scene.encoding().resources.patches.is_empty()
+}
+
+fn atlas_anchor() -> Gradient {
+    Gradient::new_linear((0.0, 0.0), (1.0, 0.0)).with_stops([Color::TRANSPARENT, Color::TRANSPARENT])
 }
 
 fn clips(items: &[Item]) -> Vec<&str> {
@@ -121,21 +129,20 @@ fn clips(items: &[Item]) -> Vec<&str> {
         .collect()
 }
 
-fn drawn(list: &DisplayList, pictures: &Pictures) -> Vec<ImageData> {
-    clips(&list.items).into_iter().filter_map(|c| pictures.get(c).cloned()).collect()
-}
-
 fn base(colour: Option<Rgba>) -> Color {
     colour.map(AlphaColor::new).unwrap_or(Color::TRANSPARENT)
 }
 
 impl Gpu<'_> {
     fn render(&mut self, scene: &Scene, base: Color, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
-        for image in &self.drawn {
-            self.vello.mark_override_image_dirty(image);
-        }
         let params = RenderParams { base_color: base, width, height, antialiasing_method: AaConfig::Area };
-        self.vello.render_to_texture(self.runner.device, self.runner.queue, scene, target, &params)
+        if !empties_the_atlas(scene) {
+            return self.vello.render_to_texture(self.runner.device, self.runner.queue, scene, target, &params);
+        }
+        let mut anchored = Scene::new();
+        anchored.append(scene, None);
+        anchored.fill(Fill::NonZero, Affine::IDENTITY, &atlas_anchor(), None, &OFF_TARGET);
+        self.vello.render_to_texture(self.runner.device, self.runner.queue, &anchored, target, &params)
     }
 }
 
@@ -210,7 +217,7 @@ impl Engine {
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
-        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, drawn: drawn(list, pictures), kept: Vec::new(), last: None, cache: &mut self.cache };
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache };
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let (scene, skipped) = build(list, pictures, &layers);
         let drawn = gpu.render(&scene, base(list.background), target, (list.width, list.height));

@@ -81,3 +81,14 @@ describe('node chrome in the overlay', () => {
     expect(ring.matrix.map((v) => Math.round(v))).toEqual([0, 1, -1, 0, 75, -25]);
   });
 });
+
+describe('world overlay across zoom', () => {
+  it('keeps the wire and chrome items when only the zoom changes', () => {
+    const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], theme, ...none, hovered: { x: 0, y: 0, w: 10, h: 10 } };
+    const near = overlayOf({ ...base, zoom: 1 });
+    const far = overlayOf({ ...base, zoom: 0.5 });
+
+    expect(far[0]).toBe(near[0]);
+    expect(far.at(-1)).not.toBe(near.at(-1));
+  });
+});

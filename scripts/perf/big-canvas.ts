@@ -22,6 +22,10 @@ const ZOOM_STEP_LIMIT = 40;
 const THROTTLE_PHONE = 4;
 const PROFILE_TOP = 15;
 const CLOSE_TIMEOUT_MS = 10_000;
+const CORE_OFF = '[canvas] core off';
+const TSX_NAME_SHIM = 'window.__name = (f) => f;';
+const TRACE = process.env.PERF_TRACE === '1';
+const TRACE_CATEGORIES = ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame', 'v8', 'v8.execute', 'disabled-by-default-v8.cpu_profiler', 'disabled-by-default-v8.gc', 'blink.user_timing', 'gpu', 'viz', 'webgpu', 'disabled-by-default-webgpu', 'gpu.dawn', 'disabled-by-default-gpu.dawn'];
 
 type Config = { renderer: string; query: string; throttle: number };
 type Run = {
@@ -160,8 +164,14 @@ async function oneRun(browser: Browser, state: string, config: Config, index: nu
   const tag = `${config.renderer}-x${config.throttle}-${index}`;
   const context = await browser.newContext({ viewport: VIEWPORT, storageState: state });
   const page = await context.newPage();
+  await page.addInitScript({ content: TSX_NAME_SHIM });
   await page.addInitScript(instrument);
   await page.addInitScript(installProbes);
+  page.on('console', (m) => {
+    if (m.text().includes(CORE_OFF)) {
+      throw new Error(`core renderer fell back: ${m.text()}`);
+    }
+  });
   const cdp = await context.newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: config.throttle });
 
@@ -227,13 +237,25 @@ async function oneRun(browser: Browser, state: string, config: Config, index: nu
     await cdp.send('Profiler.start');
   }
   const panFit = await measure(page, SWEEP_MS, (until) => wheelPan(page, until));
+  if (profile && TRACE) {
+    await browser.startTracing(page, { path: `${OUT}/${tag}-zoom.trace.json`, categories: TRACE_CATEGORIES });
+  }
   const zoom = await measure(page, SWEEP_MS, (until) => wheelZoom(page, until));
+  if (profile && TRACE) {
+    await browser.stopTracing();
+  }
   await page.screenshot({ path: `${OUT}/${tag}-after-zoom-sweep.png` });
   await page.keyboard.press('Shift+Digit1');
   await page.waitForTimeout(1500);
   await zoomTo(page, await anchorOf(page), TARGET_ZOOM);
   await page.screenshot({ path: `${OUT}/${tag}-zoomed.png` });
+  if (profile && TRACE) {
+    await browser.startTracing(page, { path: `${OUT}/${tag}-panZoomed.trace.json`, categories: TRACE_CATEGORIES });
+  }
   const panZoomed = await measure(page, SWEEP_MS, (until) => wheelPan(page, until));
+  if (profile && TRACE) {
+    await browser.stopTracing();
+  }
   if (profile) {
     const { profile: prof } = (await cdp.send('Profiler.stop')) as { profile: unknown };
     writeFileSync(`${OUT}/${tag}.cpuprofile`, JSON.stringify(prof));

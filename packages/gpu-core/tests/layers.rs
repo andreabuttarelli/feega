@@ -143,12 +143,14 @@ fn a_picture_mask_survives_frames_that_grow_the_image_atlas() {
         }
         list.replacen("\n  ]", &format!(",\n{}\n  ]", extra.join(",\n")), 1)
     };
-    let pictures = Pictures::from([("p".to_string(), picture(1, 1, vec![255, 255, 255, 255]))]);
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
+    let gpu = renderer.picture("p", 1, 1, &[255, 255, 255, 255], gpu_core::render::Change::Announced);
 
-    for n in [0, 12, 0, 24, 1] {
-        let pixels = renderer.render(&parse(&crowded(n)).unwrap(), &pictures).unwrap().pixels;
-        assert_eq!(grey(&pixels, 24, 32), 255, "with {n} extra layers");
+    for (kind, pictures) in [("memory", Pictures::from([("p".to_string(), picture(1, 1, vec![255, 255, 255, 255]))])), ("gpu", Pictures::from([("p".to_string(), gpu)]))] {
+        for n in [0, 12, 0, 24, 1] {
+            let pixels = renderer.render(&parse(&crowded(n)).unwrap(), &pictures).unwrap().pixels;
+            assert_eq!(grey(&pixels, 24, 32), 255, "{kind} picture with {n} extra layers");
+        }
     }
 }
 
