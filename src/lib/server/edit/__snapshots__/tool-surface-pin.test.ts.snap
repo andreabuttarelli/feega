@@ -26,7 +26,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool draw_element 1`] = `"309ac18bee771d65d62ff5dba6d12d395ad9c65002e81753bdd20a773c502451"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool frame_tool 1`] = `"23b1bba3a837c6ec17e914a8ff2db46dc849a6305919eec4f4c0d58ffe3ccdcf"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool frame_tool 1`] = `"2bc00f135d1873a7898c9581dc84277bf09f4ef742a4262eddf887d59740cf57"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool get_motion_embed 1`] = `"740c3cd4c2636b163beb4d3251aaa976ceed02e94b8a0e1f7f27368c0e9dacff"`;
 
@@ -175,6 +175,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op apply_particle_preset 1`] = `"4ce7357e9714e997f8a58c341c7c1c4cf0b61f98907747e820b118510dc6ec5a"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op apply_physics_preset 1`] = `"4241b75f711ac50c567f669ede4ce29cf91de983a42400dcf578757e1803d03f"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op apply_preset 1`] = `"f8e0c4fa9420684cd735e47569ab89664ebf07d43906243d639a97358843b7fe"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op apply_shape_preset 1`] = `"801779184aa46f3098aefa8716779c8fca0f1537773a628509ddf8385a6aff14"`;
 
@@ -657,6 +659,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema apply_particle_preset 1`] = `"fda83659158189df9fbeeb4abad2a2120fb010c0a3ed36bf7a849547a6b9cff5"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema apply_physics_preset 1`] = `"8b5885c46836d79f1a872db3a1d2d5d017278e95beaef065e3cb90b9fe1f741e"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema apply_preset 1`] = `"bf9fbd72efd5c85caee135014ef9de2cec736496047fe7a814f2f9bac3be659e"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema apply_shape_preset 1`] = `"72eba1141b7f4c55a41af114c4c971f23ccb82cd57ee54dea355bb90b9abd770"`;
 
