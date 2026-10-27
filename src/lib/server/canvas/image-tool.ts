@@ -3,12 +3,13 @@ import { createConnection, createNode, findNode, type CanvasNodeRecord } from '$
 import type { Actor } from '$lib/server/repos/actor';
 import { runGenNode, type RunOutcome } from '$lib/server/canvas/generate';
 import { detectLayers } from '$lib/server/canvas/layer-detect';
-import { IMAGE_TOOL_MODEL, ImageTool, imageToolParams, REFRAME_PROMPT } from '$lib/image-tools';
+import { IMAGE_TOOL_MODEL, ImageTool, imageToolParams, maskPaintOf, REFRAME_PROMPT, UPSCALE_RESULT_FACTOR } from '$lib/image-tools';
 import { layerPrompt } from '$lib/layer-boxes';
 import { paddedPng, pixelSizeOf, storePng } from '$lib/server/canvas/edit-assets';
 import { maskPng, type PixelSize } from '$lib/server/image-mask';
 import type { Mask } from '$lib/image-mask';
 import { outpaintPlan, type Extend } from '$lib/outpaint';
+import { sourceAssetIdOf } from '$lib/canvas/image-source';
 import { ratioOf, reframeExtend } from '$lib/reframe';
 
 const COLUMN_GAP = 80;
@@ -52,7 +53,7 @@ type PlanContext = { db: Db; deps: ImageToolDeps; input: ImageToolInput; source:
 const planOf = (name: string, params: Record<string, string>): Plan => ({ ok: true, name, prompt: '', params, extra: {} });
 
 async function paddedPlan({ db, deps, input, source }: PlanContext, name: string, prompt: string, extendFor: (size: PixelSize) => Extend | null): Promise<Plan> {
-  const scope = { orgId: input.orgId, assetId: String(source.data.refId) };
+  const scope = { orgId: input.orgId, assetId: sourceAssetIdOf(source.data)! };
   const size = await deps.pixelSizeOf(db, scope);
   if (!size) {
     return { ok: false, error: 'source_size_unknown' };
@@ -62,24 +63,23 @@ async function paddedPlan({ db, deps, input, source }: PlanContext, name: string
     return { ok: false, error: 'already_this_aspect' };
   }
   const plan = outpaintPlan(size, extend);
-  const [padded, mask] = await Promise.all([deps.paddedPng(db, scope, size, plan), maskPng(plan.padded, { regions: plan.regions })]);
+  const [padded, mask] = await Promise.all([deps.paddedPng(db, scope, size, plan), maskPng(plan.padded, { regions: plan.regions }, maskPaintOf(input.tool))]);
   const owner = { orgId: input.orgId, projectId: input.projectId, userId: input.userId, nodeId: source.id, ...plan.padded };
   const [paddedAsset, maskAsset] = await Promise.all([deps.storePng(db, { ...owner, png: padded }), deps.storePng(db, { ...owner, png: mask })]);
-  return { ok: true, name, prompt, params: imageToolParams(input.tool, input.factor), extra: { editImageRefId: paddedAsset.id, maskRefId: maskAsset.id } };
+  return { ok: true, name, prompt, params: imageToolParams(input.tool), extra: { editImageRefId: paddedAsset.id, maskRefId: maskAsset.id } };
 }
 
 const PLAN: Record<ImageTool, (context: PlanContext) => Promise<Plan>> = {
-  [ImageTool.RemoveBackground]: async ({ input }) => planOf('Remove background', imageToolParams(input.tool, input.factor)),
+  [ImageTool.RemoveBackground]: async ({ input }) => planOf('Remove background', imageToolParams(input.tool)),
   [ImageTool.Upscale]: async ({ input }) => {
-    const params = imageToolParams(input.tool, input.factor);
-    return planOf(`Upscale ${params.upscale_factor}×`, params);
+    return planOf(`Upscale ${UPSCALE_RESULT_FACTOR}×`, imageToolParams(input.tool));
   },
   [ImageTool.SplitLayers]: async ({ db, deps, input, source }) => {
-    const layers = await deps.detectLayers(db, { orgId: input.orgId, assetId: String(source.data.refId) });
+    const layers = await deps.detectLayers(db, { orgId: input.orgId, assetId: sourceAssetIdOf(source.data)! });
     if (!layers.length) {
       return { ok: false, error: 'no_layers_found' };
     }
-    return { ok: true, name: 'Layers', prompt: layerPrompt(layers), params: imageToolParams(input.tool, input.factor), extra: { layerBoxes: layers } };
+    return { ok: true, name: 'Layers', prompt: layerPrompt(layers), params: imageToolParams(input.tool), extra: { layerBoxes: layers } };
   },
   [ImageTool.Inpaint]: async ({ db, deps, input, source }) => {
     if (!input.prompt) {
@@ -88,13 +88,13 @@ const PLAN: Record<ImageTool, (context: PlanContext) => Promise<Plan>> = {
     if (!input.mask) {
       return { ok: false, error: 'mask_required' };
     }
-    const size = await deps.pixelSizeOf(db, { orgId: input.orgId, assetId: String(source.data.refId) });
+    const size = await deps.pixelSizeOf(db, { orgId: input.orgId, assetId: sourceAssetIdOf(source.data)! });
     if (!size) {
       return { ok: false, error: 'source_size_unknown' };
     }
-    const png = await maskPng(size, input.mask);
+    const png = await maskPng(size, input.mask, maskPaintOf(input.tool));
     const stored = await deps.storePng(db, { orgId: input.orgId, projectId: input.projectId, userId: input.userId, nodeId: source.id, png, ...size });
-    return { ok: true, name: 'Inpaint', prompt: input.prompt, params: imageToolParams(input.tool, input.factor), extra: { maskRefId: stored.id } };
+    return { ok: true, name: 'Inpaint', prompt: input.prompt, params: imageToolParams(input.tool), extra: { maskRefId: stored.id } };
   },
   [ImageTool.Outpaint]: async (context) => {
     if (!context.input.prompt) {
@@ -121,7 +121,7 @@ function refusalOf(source: CanvasNodeRecord | null): string | null {
   if (source.type !== 'image') {
     return 'source_not_image';
   }
-  return source.data.refId ? null : 'source_empty';
+  return sourceAssetIdOf(source.data) ? null : 'source_empty';
 }
 
 export async function startImageTool(db: Db, deps: ImageToolDeps, input: ImageToolInput): Promise<ImageToolStart> {

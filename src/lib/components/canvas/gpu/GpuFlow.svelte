@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ownsPress } from '$lib/canvas/press-owner';
   import { cardRadiusOf } from '$lib/canvas/core/gen-card';
   import { LocalOff, isOff } from '$lib/local-user';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
@@ -763,7 +764,7 @@
   function onClickInside(e: MouseEvent) {
     const target = e.target as HTMLElement;
     const id = target.closest<HTMLElement>('.gpu-dom-node')?.dataset.id;
-    if (!id || !target.closest(INTERACTIVE) || !spec.flow.elementsSelectable || selected.includes(id)) {
+    if (!id || !ownsPress(target, e.clientY) || !spec.flow.elementsSelectable || selected.includes(id)) {
       return;
     }
     clickNode(id, e.shiftKey || e.metaKey || e.ctrlKey);
@@ -1857,7 +1858,7 @@
       goInside(hit.nodeId, Gesture.Click, null);
     }
     const inDom = target.closest('.gpu-dom-node');
-    if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && hit.kind !== HitKind.Rotate && target.closest(INTERACTIVE)) {
+    if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && hit.kind !== HitKind.Rotate && ownsPress(target, e.clientY)) {
       return;
     }
     if (e.button === 2 && hit.kind !== HitKind.Empty) {
