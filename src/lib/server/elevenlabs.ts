@@ -11,6 +11,12 @@ const DEFAULT_AUDIO_MIME = 'audio/mpeg';
 const HISTORY_ITEM_HEADER = 'history-item-id';
 const HTTP_NOT_FOUND = 404;
 const PREMADE = 'premade';
+const HTTP_PAYMENT_REQUIRED = 402;
+
+const MESSAGE_BY_STATUS: Record<number, string> = {
+  [HTTP_PAYMENT_REQUIRED]:
+    "provider_plan: this ElevenLabs feature is not available on feega's current provider plan. Nothing was generated; try again later or write to support@feega.app."
+};
 
 type Config = { apiKey: string; baseUrl?: string; fetchFn?: typeof fetch };
 
@@ -37,6 +43,11 @@ function mediaForm(field: string, media: AudioFile, extra: Record<string, string
 }
 
 export async function readableError(res: Response): Promise<Error> {
+  const known = MESSAGE_BY_STATUS[res.status];
+  if (known) {
+    return new Error(known);
+  }
+
   const body = (await res.json().catch(() => null)) as { detail?: { message?: string } | string } | null;
   const detail = body?.detail;
   const message = typeof detail === 'string' ? detail : detail?.message ?? res.statusText;
