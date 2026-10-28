@@ -16,7 +16,7 @@ import { literal, NodeKind, type Attr, type Bound, type CodeNode, type Component
 import { absoluteRules, containerRules, flowItemRules, isFlowChild, px, Shape } from './place';
 import { backgroundRules, borderRules, effectRules, radiusRules, typeRules, type Painter } from './paint';
 import { ColourRole, TokenBook } from './tokens';
-import { planComponents, PropKey, READINGS, type Binding, type ComponentPlan } from './instances';
+import { planComponents, PropKey, READINGS, specsOf, type Binding, type ComponentPlan } from './instances';
 
 export type BuildInput = { doc: MotionDoc; name: string; assets: Record<string, string>; brand: BrandTokens | null };
 
@@ -308,14 +308,17 @@ function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
   }
   ensureComponent(plan, scope.shared);
   scope.uses.add(plan.name);
-  const values = plan.values.get(clip.id) ?? new Map();
+  const forwards = scope.plan?.forwards.get(clip.id) ?? [];
+  const forwarded = new Set(forwards.map((f) => f.name));
+  const values = [...(plan.values.get(clip.id) ?? new Map<string, string | boolean>()).entries()].filter(([name]) => !forwarded.has(name));
   const shownBy = bound(clip, PropKey.Hidden, scope);
   return {
     kind: NodeKind.Use,
     component: plan.name,
     className: scope.names.unique(kebab(layerName(clip))),
     rules: placement(clip, parent, scope),
-    props: [...values.entries()].map(([name, value]) => ({ name, value })),
+    props: values.map(([name, value]) => ({ name, value })),
+    forwards,
     ...(shownBy ? { shownBy } : {})
   };
 }
@@ -402,7 +405,7 @@ function ensureComponent(plan: ComponentPlan, shared: Shared) {
   if (instanceTag) {
     root.tag = tag;
   }
-  const props = [...plan.bindings.values()].flat().map((b) => b.spec);
+  const props = specsOf(plan);
   shared.built.set(plan.compId, { name: plan.name, props, root, uses: [...scope.uses].sort() });
 }
 

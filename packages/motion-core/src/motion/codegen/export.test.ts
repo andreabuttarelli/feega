@@ -143,3 +143,26 @@ describe('the landing page fixture', () => {
     expect(page).toContain('grid-cols-12');
   });
 });
+
+describe('an override on an instance nested inside another component', () => {
+  const growth = (html: string) => html.slice(html.indexOf('Growth'), html.indexOf('Start with Growth'));
+
+  it('reaches the nested instance in static HTML', () => {
+    const index = file(exportCode(landingDoc(), { name: 'Landing', target: CodeTarget.Html }), 'index.html');
+    expect(growth(index).match(/style="color: #c4cad6"[^>]*>✓/g)).toHaveLength(4);
+  });
+
+  it('is exposed on the outer component and forwarded to the inner one', () => {
+    const react = exportCode(landingDoc(), { name: 'Landing' });
+    const tier = file(react, 'src/components/PricingTier.tsx');
+    expect(tier).toContain('feature1LabelColor?: string;');
+    expect(tier).toContain('labelColor={feature1LabelColor}');
+    expect(tier).toContain("import { CheckItem } from './CheckItem';");
+    expect(file(react, 'src/pages/Landing.tsx')).toContain('feature4LabelColor="#c4cad6"');
+  });
+
+  it('forwards in Svelte too', () => {
+    const tier = file(exportCode(landingDoc(), { name: 'Landing', target: CodeTarget.Svelte }), 'src/lib/components/PricingTier.svelte');
+    expect(tier).toContain('labelColor={feature1LabelColor}');
+  });
+});

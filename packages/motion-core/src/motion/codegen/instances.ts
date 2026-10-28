@@ -1,5 +1,5 @@
 import { compOf, type MotionClip, type MotionComp, type MotionDoc } from '../doc';
-import { overridden } from '../precomp';
+import { MAX_COMP_DEPTH, overridden } from '../precomp';
 import { FillType, fillsOf } from '../fill/model';
 import type { PropertyDef } from '../property-resolve';
 import { camel, kebab, NameBook, pascal } from './naming';
@@ -34,6 +34,8 @@ const PROP_KEYS = Object.values(PropKey);
 
 export type Binding = { key: PropKey; spec: PropSpec };
 
+export type Forward = { name: string; prop: string };
+
 export type ComponentPlan = {
   compId: string;
   name: string;
@@ -41,7 +43,12 @@ export type ComponentPlan = {
   comp: MotionComp;
   bindings: Map<string, Binding[]>;
   values: Map<string, Map<string, string | boolean>>;
+  exposed: PropSpec[];
+  forwards: Map<string, Forward[]>;
+  propNames: NameBook;
 };
+
+const NESTED = '/';
 
 const layerName = (clip: MotionClip) => clip.name || clip.component;
 
@@ -87,7 +94,49 @@ function planOne(compId: string, comp: MotionComp, hosts: MotionClip[], names: N
       }
     }
   }
-  return { compId, name, block: kebab(name), comp, bindings, values };
+  return { compId, name, block: kebab(name), comp, bindings, values, exposed: [], forwards: new Map(), propNames };
+}
+
+export const specsOf = (plan: ComponentPlan): PropSpec[] => [...[...plan.bindings.values()].flat().map((b) => b.spec), ...plan.exposed];
+
+const isHost = (doc: MotionDoc, clip: MotionClip) => compOf(clip) !== null && Boolean(doc.comps[compOf(clip)!]);
+
+function nestedHosts(doc: MotionDoc, hosts: MotionClip[]): MotionClip[] {
+  const out: MotionClip[] = [];
+  let frontier = hosts;
+  for (let depth = 0; frontier.length && depth < MAX_COMP_DEPTH; depth += 1) {
+    frontier = frontier.flatMap((h) => [...effectiveClips(doc.comps[compOf(h)!], h).values()].filter((c) => isHost(doc, c)).map((c) => ({ ...c, id: `${h.id}${NESTED}${c.id}` })));
+    out.push(...frontier);
+  }
+  return out;
+}
+
+function expose(outer: ComponentPlan, plans: Map<string, ComponentPlan>, done: Set<string>) {
+  if (done.has(outer.compId)) {
+    return;
+  }
+  done.add(outer.compId);
+  const nested = outer.comp.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => plans.has(compOf(c) ?? ''));
+  for (const master of nested) {
+    const inner = plans.get(compOf(master)!)!;
+    expose(inner, plans, done);
+    for (const spec of specsOf(inner)) {
+      const own = inner.values.get(master.id)?.get(spec.name);
+      const seen = [...outer.values.keys()].map((id) => [id, inner.values.get(`${id}${NESTED}${master.id}`)?.get(spec.name)] as const);
+      if (!seen.some(([, v]) => v !== undefined && !same(v, own))) {
+        continue;
+      }
+      const name = outer.propNames.unique(`${camel(layerName(master))}${pascal(spec.name)}`);
+      const fallback = own ?? spec.fallback;
+      outer.exposed.push({ name, type: spec.type, fallback });
+      outer.forwards.set(master.id, [...(outer.forwards.get(master.id) ?? []), { name: spec.name, prop: name }]);
+      for (const [id, value] of seen) {
+        if (value !== undefined && !same(value, fallback)) {
+          outer.values.get(id)!.set(name, value);
+        }
+      }
+    }
+  }
 }
 
 export function hostsOf(doc: MotionDoc): MotionClip[] {
@@ -96,8 +145,12 @@ export function hostsOf(doc: MotionDoc): MotionClip[] {
 }
 
 export function planComponents(doc: MotionDoc, resolve: (key: PropKey, value: string | boolean) => string | boolean): Map<string, ComponentPlan> {
-  const hosts = hostsOf(doc);
+  const real = hostsOf(doc);
+  const hosts = [...real, ...nestedHosts(doc, real)];
   const names = new NameBook('');
   const ids = [...new Set(hosts.map((h) => compOf(h)!))].sort((a, b) => doc.comps[a].name.localeCompare(doc.comps[b].name) || a.localeCompare(b));
-  return new Map(ids.map((id) => [id, planOne(id, doc.comps[id], hosts.filter((h) => compOf(h) === id), names, resolve)]));
+  const plans = new Map(ids.map((id) => [id, planOne(id, doc.comps[id], hosts.filter((h) => compOf(h) === id), names, resolve)]));
+  const done = new Set<string>();
+  plans.forEach((plan) => expose(plan, plans, done));
+  return plans;
 }

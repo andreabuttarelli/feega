@@ -43,7 +43,8 @@ function styleAttr(node: ElementNode): string {
 function useLines(node: UseNode, depth: number, ctx: Ctx): string[] {
   const classes = tailwindOf(node.rules, ctx.tokens);
   const props = node.props.map((p) => (typeof p.value === 'boolean' ? ` ${p.name}={${p.value}}` : ` ${p.name}=${attrValue({ literal: p.value })}`)).join('');
-  return [`${pad(depth)}<${node.component}${classes ? ` className="${classes}"` : ''}${props} />`];
+  const forwards = node.forwards.map((f) => ` ${f.name}={${f.prop}}`).join('');
+  return [`${pad(depth)}<${node.component}${classes ? ` className="${classes}"` : ''}${props}${forwards} />`];
 }
 
 function svgOf(node: SvgNode, ctx: Ctx): string {

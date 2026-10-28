@@ -26,6 +26,8 @@ const C = {
 const SANS = 'Inter';
 const MONO = 'JetBrains Mono';
 
+const TIER_LINES = ['✓  Close checklist and task owners', '✓  Bank and card reconciliation', '✓  Flux analysis on every account', '✓  Audit trail export'];
+
 const fill = { width: Sizing.Fill, height: Sizing.Hug };
 const hug = { width: Sizing.Hug, height: Sizing.Hug };
 
@@ -65,6 +67,10 @@ function components(kit: DocKit) {
     f.text('body', 'Bank feeds land at 6 a.m. and 92% of lines match their ledger entry before anyone logs in.', { parent: 'root', name: 'Body', size: 16, color: C.body, leading: 1.55, font: SANS, item: fill });
   });
 
+  kit.component('c-check', 'Check item', (c) => {
+    c.text('label', TIER_LINES[0], { name: 'Label', size: 15, color: C.body, font: SANS });
+  });
+
   kit.component('c-tier', 'Pricing tier', (p) => {
     p.frame('root', { name: 'Pricing tier', box: box(0, 0, 410, 520), fill: C.paper, radius: 20, stroke: { color: C.line, width: 1 }, layout: { direction: Direction.Vertical, gap: 20, padding: { top: 36, right: 36, bottom: 36, left: 36 } }, item: { width: Sizing.Fill, height: Sizing.Hug } });
     p.text('name', 'Team', { parent: 'root', name: 'Plan', size: 16, weight: 600, color: C.ink, font: SANS });
@@ -73,7 +79,7 @@ function components(kit: DocKit) {
     p.text('period', '/ month', { parent: 'price-row', name: 'Period', size: 15, color: C.muted, font: SANS });
     p.text('pitch', 'For finance teams closing one entity on one ledger.', { parent: 'root', name: 'Pitch', size: 15, color: C.body, leading: 1.5, font: SANS, item: fill });
     p.frame('list', { name: 'Feature list', parent: 'root', box: box(0, 0, 338, 140), layout: { direction: Direction.Vertical, gap: 12 }, item: fill });
-    ['Close checklist and task owners', 'Bank and card reconciliation', 'Flux analysis on every account', 'Audit trail export'].forEach((line, i) => p.text(`line-${i + 1}`, `✓  ${line}`, { parent: 'list', name: `Feature ${i + 1}`, size: 15, color: C.body, font: SANS }));
+    TIER_LINES.forEach((line, i) => p.instance(`line-${i + 1}`, 'c-check', { parent: 'list', name: `Feature ${i + 1}`, box: box(0, 0, 338, 22), overrides: i ? { label: { text: line } } : undefined }));
     p.frame('cta', { name: 'Choose button', parent: 'root', box: box(0, 0, 338, 48), fill: C.brand, radius: 10, layout: { direction: Direction.Horizontal, justify: Justify.Center, align: Align.Center, padding: { top: 14, right: 22, bottom: 14, left: 22 } }, item: fill });
     p.text('cta-label', 'Start with Team', { parent: 'cta', name: 'Choose label', size: 15, weight: 600, color: C.paper, leading: 1.2, font: SANS });
   });
@@ -191,7 +197,7 @@ function pricing(kit: DocKit) {
           name: { text: t.name, ...(t.ink ? { color: t.ink } : {}) },
           price: { text: t.price, ...(t.ink ? { color: t.ink } : {}) },
           pitch: { text: t.pitch, ...(t.body ? { color: t.body } : {}) },
-          ...(t.body ? Object.fromEntries([1, 2, 3, 4].map((n) => [`line-${n}`, { color: t.body }])) : {}),
+          ...(t.body ? Object.fromEntries(TIER_LINES.map((line, n) => [`line-${n + 1}`, { overrides: { label: { text: line, color: t.body } } }])) : {}),
           ...(t.fill ? { root: { fills: [{ type: 'solid', color: t.fill, opacity: 1, visible: true, blend: 'normal' }] } } : {}),
           'cta-label': { text: t.cta }
         }

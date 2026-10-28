@@ -32,7 +32,8 @@ const styles = (node: ElementNode) => node.styleBinds.map((b) => ` style:${b.pro
 function useLines(node: UseNode, depth: number, ctx: Ctx): string[] {
   const cls = node.rules.length ? ` class="${instanceClass(ctx.file, node.className)}"` : '';
   const props = node.props.map((p) => (typeof p.value === 'boolean' ? ` ${p.name}={${p.value}}` : ` ${p.name}=${attrValue({ literal: p.value })}`)).join('');
-  return [`${pad(depth)}<${node.component}${cls}${props} />`];
+  const forwards = node.forwards.map((f) => ` ${f.name}={${f.prop}}`).join('');
+  return [`${pad(depth)}<${node.component}${cls}${props}${forwards} />`];
 }
 
 const svgOf = (node: SvgNode) => `<svg class="${node.className}" width="${node.width}" height="${node.height}" viewBox="0 0 ${node.width} ${node.height}" fill="none" aria-hidden="true">${node.markup}</svg>`;
