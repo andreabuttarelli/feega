@@ -187,17 +187,96 @@ function applyOverride(clip: MotionClip, key: OverrideKey, value: unknown): Moti
   return { ...clip, [section]: { ...current, [field]: value } };
 }
 
-export function resolveAt(doc: MotionDoc, breakpointId: string): MotionDoc {
+function readField(clip: MotionClip, key: OverrideKey): unknown {
+  const { section, field } = OVERRIDES[key];
+  const holder = (section ? clip[section] : clip) as Record<string, unknown> | undefined;
+  return holder?.[field];
+}
+
+const PRECISION = 1e9;
+const rounded = (_key: string, v: unknown) => (typeof v === 'number' ? Math.round(v * PRECISION) / PRECISION : v);
+const same = (a: unknown, b: unknown) => JSON.stringify(a, rounded) === JSON.stringify(b, rounded);
+
+const unitOf = (size: { width: number; height: number }) => Math.min(size.width, size.height);
+
+type Stroke = { width?: number; sides?: number[] };
+
+enum Anchor {
+  Frame = 'frame',
+  Pixels = 'pixels'
+}
+
+function rescaleClip(clip: MotionClip, unit: number, across: number, anchor: Anchor = Anchor.Frame): MotionClip {
+  const props = { ...clip.props };
+  if (typeof props.size === 'number') {
+    props.size = props.size * unit;
+  }
+  if (Array.isArray(props.strokes)) {
+    props.strokes = (props.strokes as Stroke[]).map((s) => ({ ...s, ...(typeof s.width === 'number' ? { width: s.width * unit } : {}), ...(s.sides ? { sides: s.sides.map((w) => w * unit) } : {}) }));
+  }
+  if ((clip.parent || anchor === Anchor.Pixels) && typeof props.width === 'number') {
+    props.width = props.width * across;
+  }
+  if (anchor === Anchor.Pixels && typeof props.x === 'number') {
+    props.x = props.x * across;
+  }
+  return { ...clip, props };
+}
+
+function rescale(doc: MotionDoc, width: number): MotionDoc {
+  const unit = unitOf(doc) / unitOf({ width, height: doc.height });
+  const across = doc.width / width;
+  const comps = Object.fromEntries(
+    Object.entries(doc.comps ?? {}).map(([id, comp]) => [id, comp.frame ? comp : { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => rescaleClip(c as MotionClip, unit, across, Anchor.Pixels)) })) }])
+  ) as MotionDoc['comps'];
+  return { ...mapClips(doc, (c) => rescaleClip(c, unit, across)), comps, width };
+}
+
+function cascaded(doc: MotionDoc, breakpointId: string): { doc: MotionDoc; width: number } {
   const views = viewsOf(doc);
   const target = views.find((v) => v.id === breakpointId) ?? views[0];
   const cascade = views.filter((v) => v.width >= target.width).map((v) => v.id);
 
-  const resolved = mapClips(doc, (clip) => {
-    const applied = cascade.reduce((c, id) => Object.entries(clip.overrides?.[id] ?? {}).reduce((acc, [key, value]) => applyOverride(acc, key as OverrideKey, value), c), clip);
-    return withOverrides(applied, undefined);
+  const applied = mapClips(doc, (clip) => cascade.reduce((c, id) => Object.entries(clip.overrides?.[id] ?? {}).reduce((acc, [key, value]) => applyOverride(acc, key as OverrideKey, value), c), clip));
+  return { doc: applied, width: target.width };
+}
+
+function liftClip(edited: MotionClip, source: MotionClip, before: MotionClip, breakpointId: string): MotionClip {
+  const changed = OVERRIDE_KEYS.filter((key) => !same(readField(edited, key), readField(before, key)));
+  if (!changed.length) {
+    return withOverrides(edited, source.overrides);
+  }
+
+  const base = changed.reduce((c, key) => applyOverride(c, key, readField(source, key)), edited);
+  const at = { ...source.overrides?.[breakpointId], ...Object.fromEntries(changed.map((key) => [key, readField(edited, key)])) };
+  return withOverrides(base, { ...source.overrides, [breakpointId]: at });
+}
+
+export function liftEdit(source: MotionDoc, breakpointId: string, edited: MotionDoc): MotionDoc {
+  if (breakpointId === BASE_BREAKPOINT) {
+    return edited;
+  }
+
+  const sources = new Map(clipsOf(source).map((c) => [c.id, c]));
+  const befores = new Map(clipsOf(cascaded(source, breakpointId).doc).map((c) => [c.id, c]));
+  const lifted = mapClips(rescale(edited, source.width), (clip) => {
+    const from = sources.get(clip.id);
+    return from ? liftClip(clip, from, befores.get(clip.id)!, breakpointId) : clip;
   });
-  const { breakpoints: _bps, ...rest } = resolved;
-  return { ...rest, width: target.width } as MotionDoc;
+  return { ...lifted, width: source.width, breakpoints: source.breakpoints };
+}
+
+export function resolveAt(doc: MotionDoc, breakpointId: string): MotionDoc {
+  const { doc: applied, width } = cascaded(doc, breakpointId);
+  const { breakpoints: _bps, ...rest } = rescale(mapClips(applied, (c) => withOverrides(c, undefined)), width);
+  return rest as MotionDoc;
+}
+
+export const inView = (doc: MotionDoc, breakpointId: string): MotionDoc => (breakpointId === BASE_BREAKPOINT ? doc : resolveAt(doc, breakpointId));
+
+export function overridesAt(doc: MotionDoc, clipId: string, breakpointId: string): OverrideKey[] {
+  const clip = clipsOf(doc).find((c) => c.id === clipId);
+  return Object.keys(clip?.overrides?.[breakpointId] ?? {}) as OverrideKey[];
 }
 
 export type MediaQuery = { breakpointId: string; maxWidth: number; clips: Record<string, ClipOverrides> };
