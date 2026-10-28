@@ -52,7 +52,7 @@ describe('GET motion live', () => {
     expect(status).toBe(200);
     expect(type).toContain('text/html');
     expect(body).toContain('Launch day');
-    expect(body).toContain('<hyperframes-player id="player"');
+    expect(body).toContain('<feega-gpu-player id="player" source="feega-source">');
     expect(body).toContain(LIVE_MESSAGE);
   });
 });

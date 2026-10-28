@@ -29,7 +29,3 @@ async function openDecoder(src: string, width: number): Promise<Decoder> {
 }
 
 export const createWebCodecsFrames = (budget = FRAME_BUDGET_BYTES): VideoFrames => createVideoFrames({ open: openDecoder, supported: webCodecsReady(), budget, pool: DECODER_POOL });
-
-let shared: VideoFrames | null = null;
-
-export const sharedFrames = (): VideoFrames => (shared ??= createWebCodecsFrames());

@@ -452,6 +452,51 @@ fn run(xy: vec2<i32>) -> vec4<f32> {
 }
 "#;
 
+const WARP: &str = r#"
+const TAPS = 32;
+const DISC_TAPS = 48;
+const GOLDEN_ANGLE = 2.3999632;
+const MAX_BULGE = 0.95;
+fn rotated(d: vec2<f32>, t: f32) -> vec2<f32> {
+  let c = cos(t);
+  let s = sin(t);
+  return vec2<f32>(d.x * c - d.y * s, d.x * s + d.y * c);
+}
+fn seen(q: vec2<f32>) -> vec4<f32> { return select(vec4<f32>(0.0), bilinear(a, q), inside(q)); }
+fn run(xy: vec2<i32>) -> vec4<f32> {
+  let at = centre(xy);
+  let mode = u32(p[0]);
+  let middle = vec2<f32>(p[1], p[2]) * vec2<f32>(size());
+  let radius = max(p[3], 1.0);
+  let amount = p[4];
+  let extra = p[5];
+  let d = at - middle;
+  let t = clamp(1.0 - length(d) / radius, 0.0, 1.0);
+  if (mode == 0u) { return seen(middle + d * (1.0 - min(amount, MAX_BULGE) * t * t)); }
+  if (mode == 1u) { return seen(middle + rotated(d, amount * t * t)); }
+  var sum = vec4<f32>(0.0);
+  var total = 0.0;
+  if (mode == 2u) {
+    for (var i = 0; i < TAPS; i++) {
+      let f = f32(i) / f32(TAPS - 1);
+      sum += seen(middle + rotated(d, extra * (f - 0.5)) * (1.0 - amount * f));
+      total += 1.0;
+    }
+    return sum / total;
+  }
+  for (var i = 0; i < DISC_TAPS; i++) {
+    let reach = sqrt((f32(i) + 0.5) / f32(DISC_TAPS)) * amount;
+    let angle = f32(i) * GOLDEN_ANGLE;
+    let s = seen(at + vec2<f32>(cos(angle), sin(angle)) * reach);
+    let bright = dot(s.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let w = 1.0 + extra * bright * bright;
+    sum += s * w;
+    total += w;
+  }
+  return sum / total;
+}
+"#;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Op {
     Matrix,
@@ -468,9 +513,10 @@ pub enum Op {
     Blend,
     Fold,
     Lens,
+    Warp,
 }
 
-const SOURCES: [(Op, &str); 14] = [
+const SOURCES: [(Op, &str); 15] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -485,6 +531,7 @@ const SOURCES: [(Op, &str); 14] = [
     (Op::Blend, BLEND),
     (Op::Fold, FOLD),
     (Op::Lens, LENS),
+    (Op::Warp, WARP),
 ];
 
 const POOL_PER_SIZE: usize = 6;
@@ -502,12 +549,15 @@ impl Drop for Slot {
         let mut shelves = self.shelves.borrow_mut();
         let size = (self.texture.width(), self.texture.height());
         if shelves.len() >= POOL_SIZES && !shelves.contains_key(&size) {
+            self.texture.destroy();
             return;
         }
         let shelf = shelves.entry(size).or_default();
-        if shelf.len() < POOL_PER_SIZE {
-            shelf.push(self.texture.clone());
+        if shelf.len() >= POOL_PER_SIZE {
+            self.texture.destroy();
+            return;
         }
+        shelf.push(self.texture.clone());
     }
 }
 
@@ -620,6 +670,7 @@ impl FilterPasses {
             pass.dispatch_workgroups(out.width().div_ceil(GROUP), out.height().div_ceil(GROUP), 1);
         }
         queue.submit([encoder.finish()]);
+        buffer.destroy();
         out
     }
 }

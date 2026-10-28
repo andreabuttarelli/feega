@@ -3,6 +3,7 @@ import type { SettingsActions, SettingsEvent } from '../event';
 import { readUploadImage } from '$lib/server/raster-image';
 import { setProjectBrand } from '$lib/server/repos/projects';
 import { brandIdOf } from '$lib/server/tenancy/brand-slug';
+import { kitActions, loadKit, writeLogos } from './brand-kit';
 
 const BRAND_COLUMNS = 'id, name, slug, logo_url, website, short_description, content';
 
@@ -78,6 +79,7 @@ export const load = async ({ parent, locals: { supabase } }: SettingsEvent) => {
 
   return {
     brand: toBrandSettings(data),
+    kit: await loadKit(supabase, { projectId: project.id, orgId: org.id, brandId: data.id }),
     orgBrands: (orgBrands.data ?? []).map(toBrandSettings)
   };
 };
@@ -92,6 +94,7 @@ async function orgIdOfProject(
 }
 
 export const actions: SettingsActions = {
+  ...kitActions,
   update: async ({ request, params, locals: { supabase } }) => {
     const brandId = await brandIdOf(supabase, params.projectId!);
     if (!brandId) return fail(400, { error: 'No brand selected for this project' });
@@ -138,10 +141,7 @@ export const actions: SettingsActions = {
     if (up.error) return fail(400, { error: up.error.message });
     const url = supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
 
-    const { error: updateError } = await supabase
-      .from('brands')
-      .update({ logo_url: url, updated_at: new Date().toISOString() })
-      .eq('id', brandId);
+    const { error: updateError } = await writeLogos(supabase, brandId, 'primary', url);
     if (updateError) return fail(400, { error: updateError.message });
     return { saved: true };
   },
@@ -150,10 +150,7 @@ export const actions: SettingsActions = {
     const brandId = await brandIdOf(supabase, params.projectId!);
     if (!brandId) return fail(400, { error: 'No brand selected for this project' });
 
-    const { error: updateError } = await supabase
-      .from('brands')
-      .update({ logo_url: null, updated_at: new Date().toISOString() })
-      .eq('id', brandId);
+    const { error: updateError } = await writeLogos(supabase, brandId, 'primary', null);
     if (updateError) return fail(400, { error: updateError.message });
     return { saved: true };
   },

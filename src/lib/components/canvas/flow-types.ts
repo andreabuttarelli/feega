@@ -12,6 +12,7 @@ import type { NameTag } from '$lib/canvas/node-label';
 import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
 import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
 import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
+import type { FeedImageDrag } from '$lib/canvas/feed-image';
 import type { SelectOutput } from '$lib/canvas/select-outputs';
 import type { CanvasEdgeKind, FlowEdge, WireMode } from '$lib/canvas-edges';
 import type { Addable } from '$lib/canvas/addable';
@@ -81,12 +82,15 @@ export type FlowProps = {
   onLayersToFrame?: (nodeId: string) => void;
   onInpaint?: (nodeId: string) => void;
   onOutpaint?: (nodeId: string) => void;
+  onReframe?: (nodeId: string) => void;
   onExport?: (frameIds: string[]) => void;
   onEdgeDelete?: (edgeId: string) => void;
   onEdgeRetype?: (edgeId: string, kind: CanvasEdgeKind) => void;
   onEdgeModeChange?: (edgeId: string, mode: WireMode) => void;
   onCreate?: (what: Addable, at: { x: number; y: number }) => void;
   onCreateFilled?: (drag: FilledNodeDrag, at: { x: number; y: number }) => void;
+  onDropFeedImage?: (drag: FeedImageDrag, client: PointerPoint) => void;
+  onFeedImageOver?: (client: PointerPoint | null) => void;
   onDropOutput?: (
     nodeId: string,
     client: PointerPoint,

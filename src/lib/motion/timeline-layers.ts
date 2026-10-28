@@ -112,19 +112,25 @@ export function propValue(keys: readonly Keyframe[], localFrame: number): string
 
 export enum KeyGlyph {
   Diamond = 'diamond',
-  Square = 'square',
-  Circle = 'circle'
+  Hourglass = 'hourglass',
+  Circle = 'circle',
+  Square = 'square'
 }
 
 const INTERP_SHAPE: Record<Interp, KeyGlyph> = {
-  [Interp.Bezier]: KeyGlyph.Diamond,
-  [Interp.Auto]: KeyGlyph.Diamond,
-  [Interp.Continuous]: KeyGlyph.Diamond,
-  [Interp.Hold]: KeyGlyph.Square,
-  [Interp.Linear]: KeyGlyph.Circle
+  [Interp.Linear]: KeyGlyph.Diamond,
+  [Interp.Bezier]: KeyGlyph.Hourglass,
+  [Interp.Auto]: KeyGlyph.Circle,
+  [Interp.Continuous]: KeyGlyph.Circle,
+  [Interp.Hold]: KeyGlyph.Square
 };
 
-export const keyGlyph = (key: Keyframe): KeyGlyph => INTERP_SHAPE[key.out ?? Interp.Bezier];
+export type KeyGlyphs = { left: KeyGlyph; right: KeyGlyph };
+
+export const keyGlyph = (key: Keyframe): KeyGlyphs => ({
+  left: INTERP_SHAPE[key.in ?? Interp.Bezier],
+  right: INTERP_SHAPE[key.out ?? Interp.Bezier]
+});
 
 export type RulerMark = { frame: number; label: string | null };
 

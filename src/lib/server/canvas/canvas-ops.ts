@@ -29,6 +29,8 @@ import { parseVariantsAsk } from '$lib/canvas/variants';
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
 import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-frame';
 import { imageToolAskSchema } from '$lib/image-tools';
+import { videoReframeAskSchema } from '$lib/reframe';
+import { VIDEO_REFRAME_DEPS, startVideoReframe } from '$lib/server/canvas/video-reframe';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
@@ -38,7 +40,10 @@ import { enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
 import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles';
 import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-variables';
-import { drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
+import { importLottieAt } from '$lib/server/motion/lottie-at';
+import { lottieSource } from '$lib/motion/import-lottie';
+import { SafeFetchError, safeFetchBytes } from '$lib/server/tool-guard';
+import { MoveOutcome, drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { NODE_NAME_MAX } from '$lib/canvas/node-name';
@@ -67,12 +72,15 @@ import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import'
 import { MAX_FRAMES } from '$lib/server/figma/import-file';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
+import { readSelection, SELECTION_WAIT_MS } from '$lib/server/canvas/selection-read';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { undoGesture } from '$lib/server/canvas/undo';
 import { arrangeNodes } from '$lib/server/canvas/arrange';
 import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileBox, type TileMove } from '$lib/canvas/align';
 import { Axis, Edge } from '$lib/motion/space';
 import { listCanvasEvents } from '$lib/server/repos/canvas-events';
+import { listAgentChanges, rejectChange } from '$lib/server/canvas/reject';
+import { Keep } from '$lib/canvas/reject-plan';
 import { lastGesture } from '$lib/canvas/undo-last';
 import { parseUndoItem, type UndoItem } from '$lib/canvas/undo-plan';
 import { endOnboarding, runDemo } from '$lib/server/onboarding/first-run';
@@ -90,6 +98,8 @@ import { cancelRender } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
 import { importCanvasLink, registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
+import { importFeedImage } from '$lib/server/canvas/feed-image';
+import { DropOn } from '$lib/motion/move-element';
 import { canvasUploadPrefix, verdictForUpload } from '$lib/canvas/upload-kind';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { findProjectById } from '$lib/server/repos/projects';
@@ -249,6 +259,32 @@ function frameBox(input: z.infer<typeof drawFrameInput>) {
   const preset = input.format && input.format !== MotionFormat.Custom ? FORMATS[input.format] : null;
   const height = preset ? (input.w * preset.height) / preset.width : (input.h as number);
   return { left: input.x, top: input.y, width: input.w, height };
+}
+
+const LOTTIE_MAX_BYTES = 8_000_000;
+const LOTTIE_FETCH_TIMEOUT_MS = 15_000;
+
+const importLottieInput = z
+  .object({
+    canvasId: z.string(),
+    x: z.number().finite().describe('canvas position of the frame centre'),
+    y: z.number().finite(),
+    lottie: z.record(z.string(), z.unknown()).optional().describe('the Lottie JSON itself'),
+    url: z.string().url().startsWith('https://').optional().describe('an https URL of a .json or .lottie file')
+  })
+  .strict()
+  .refine((a) => Boolean(a.lottie) !== Boolean(a.url), 'give lottie or url, not both');
+
+async function lottieOf(input: z.infer<typeof importLottieInput>): Promise<unknown> {
+  if (input.lottie) {
+    return input.lottie;
+  }
+  try {
+    const fetched = await safeFetchBytes(input.url as string, { maxBytes: LOTTIE_MAX_BYTES, timeoutMs: LOTTIE_FETCH_TIMEOUT_MS, scheme: 'https-only' });
+    return fetched.ok ? lottieSource(fetched.bytes) : 'The file could not be downloaded.';
+  } catch (e) {
+    return e instanceof SafeFetchError ? e.message : 'The file could not be downloaded.';
+  }
 }
 
 const MOTION_TYPE = 'motion';
@@ -412,6 +448,14 @@ const distributeNodesInput = arrangeInput.extend({ axis: z.enum(Object.values(Ax
 const stackNodesInput = arrangeInput.extend({ gap: z.number().min(0).default(STACK_GAP).describe('space between nodes in canvas units') }).strict();
 const undoLastInput = z.object({ canvasId: z.string() }).strict();
 const UNDO_LOOKBACK = 50;
+const rejectChangeInput = z
+  .object({
+    canvasId: z.string(),
+    eventIds: z.array(z.number().int()).min(1).describe('canvas_events ids of one change, from agent_changes or view activity'),
+    choices: z.array(z.object({ eventId: z.number().int(), path: z.string(), keep: z.enum(Keep) })).optional().describe('one per conflict: keep mine, or take the reject'),
+    confirm: z.boolean().optional().describe('delete a created node even though someone else connected or edited it')
+  })
+  .strict();
 const NOTHING_TO_UNDO = { outcome: 'nothing_to_undo' };
 const endOnboardingInput = z.object({ status: z.enum([OnboardingStatus.Dismissed, OnboardingStatus.Completed]) }).strict();
 const textCostInput = z
@@ -428,6 +472,20 @@ const MAX_CLONE_SAMPLE_BYTES = 3 * 1024 * 1024;
 
 const requestUploadInput = z.object({ fileName: z.string().min(1), mimeType: z.string().min(1), bytes: z.number().int().positive() }).strict();
 const importLinkInput = z.object({ url: z.string().url().describe('https link to a picture or video') }).strict();
+
+const importFeedImageInput = z
+  .object({
+    canvasId: z.string(),
+    nodeId: z.string().describe('the Social feed or Products node'),
+    itemId: z.string().describe('id of a post (socialPosts) or product (products) in canvas_snapshot'),
+    imageIndex: z.number().int().min(0).default(0).describe('which picture of a carousel post or product'),
+    x: z.number().default(0).describe('canvas position of the new image node, its centre'),
+    y: z.number().default(0),
+    toFrameId: z.string().optional().describe('put the picture inside this Frame instead of making a node'),
+    frameX: z.number().min(0).max(1).default(0.5),
+    frameY: z.number().min(0).max(1).default(0.5)
+  })
+  .strict();
 
 const registerUploadInput = z
   .object({
@@ -545,6 +603,18 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => {
       const memberships = (await listMemberships(ctx.db, ctx.userId)).filter((m) => m.org.id === ctx.orgId);
       return canvasRevision(ctx.db, { canvasId: input.canvasId, projectId: ctx.projectId, memberships });
+    }
+  }),
+
+  get_selection: op({
+    access: Access.Read,
+    input: canvasIdInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const { channelFeed } = await import('$lib/server/canvas/selection-feed');
+      return readSelection(channelFeed, { canvasId: input.canvasId, userId: ctx.userId, waitMs: SELECTION_WAIT_MS });
     }
   }),
 
@@ -735,6 +805,28 @@ export const CANVAS_OPS = {
     }
   }),
 
+  agent_changes: op({
+    access: Access.Read,
+    input: canvasIdInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return { changes: await listAgentChanges(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) };
+    }
+  }),
+
+  reject_change: op({
+    access: Access.Write,
+    input: rejectChangeInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return rejectChange(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor });
+    }
+  }),
+
   run_demo: op({
     access: Access.Write,
     input: canvasIdInput,
@@ -880,6 +972,22 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => frameAnswer(await drawFrameAt(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, frameBox(input), input.format, input.still))
   }),
 
+  import_lottie: op({
+    access: Access.Write,
+    input: importLottieInput,
+    run: async (ctx, input) => {
+      const json = await lottieOf(input);
+      if (typeof json === 'string') {
+        return { outcome: MoveOutcome.Invalid, message: json };
+      }
+      const placed = await importLottieAt(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, json, { x: input.x, y: input.y }, () => crypto.randomUUID().slice(0, 8));
+      if ('error' in placed) {
+        return { outcome: MoveOutcome.Invalid, message: placed.error };
+      }
+      return { outcome: placed.outcome, frame_id: placed.frameId, skipped: placed.skipped };
+    }
+  }),
+
   group_elements: op({
     access: Access.Write,
     input: groupElementsInput,
@@ -983,12 +1091,21 @@ export const CANVAS_OPS = {
     input: imageToolAskSchema,
     run: async (ctx, input) => {
       const started = await ctx.billed(() =>
-        startImageTool(ctx.db, IMAGE_TOOL_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, tool: input.tool, factor: input.factor, prompt: input.prompt, mask: input.mask, extend: input.extend, actor: ctx.actor })
+        startImageTool(ctx.db, IMAGE_TOOL_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, tool: input.tool, factor: input.factor, prompt: input.prompt, mask: input.mask, extend: input.extend, aspect: input.aspect, actor: ctx.actor })
       );
       if (!started.ok) {
         return { error: started.error };
       }
       return { nodeId: started.nodeId, ...outcomeOf(started.outcome) };
+    }
+  }),
+
+  video_reframe: op({
+    access: Access.Write,
+    input: videoReframeAskSchema,
+    run: async (ctx, input) => {
+      const started = await startVideoReframe(ctx.db, VIDEO_REFRAME_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, aspect: input.aspect, focus: input.focus, actor: ctx.actor });
+      return started.ok ? { outcome: 'done', nodeId: started.nodeId } : { error: started.error };
     }
   }),
 
@@ -1556,6 +1673,21 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: importLinkInput,
     run: async (ctx, input) => uploadAnswer(async () => ({ asset: (await importCanvasLink(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, url: input.url })).asset }))
+  }),
+
+  import_feed_image: op({
+    access: Access.Write,
+    input: importFeedImageInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const drop = input.toFrameId ? { on: DropOn.Frame, nodeId: input.toFrameId, at: { x: input.frameX, y: input.frameY } } as const : { on: DropOn.Canvas, x: input.x, y: input.y } as const;
+      return uploadAnswer(async () => {
+        const landed = await importFeedImage({ db: ctx.db, frames: framesOf(ctx), actor: ctx.actor }, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, nodeId: input.nodeId, itemId: input.itemId, imageIndex: input.imageIndex, drop });
+        return landed.placed === 'frame' ? frameAnswer(landed.moved) : { node: landed.node, asset: landed.asset };
+      });
+    }
   }),
 
   list_voices: op({

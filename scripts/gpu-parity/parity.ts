@@ -20,7 +20,6 @@ import type { ExportInput, ExportResult, PreviewInput, PreviewResult, ShotsInput
 enum Mode {
   Parity = 'parity',
   Export = 'export',
-  Preview = 'preview',
   Scrub = 'scrub'
 }
 
@@ -44,9 +43,9 @@ const seconds = Number(flags.get('seconds') ?? 6);
 const displayWidth = flags.has('display') ? Number(flags.get('display')) : null;
 const scaleFactor = Number(flags.get('dpr') ?? 1);
 const engineName = flags.get('engine') ?? 'chromium';
-const SHOTS: Record<string, string> = { html: 'htmlShots', gpu: 'gpuShots', 'gpu-full': 'gpuFullShots', 'gpu-core': 'gpuCoreShots', 'gpu-core-gl': 'gpuCoreGlShots', 'core-export': 'coreExportShots', 'core-export-gl': 'coreExportGlShots' };
+const SHOTS: Record<string, string> = { html: 'htmlShots', 'gpu-full': 'gpuFullShots', 'gpu-core': 'gpuCoreShots', 'gpu-core-gl': 'gpuCoreGlShots', 'core-export': 'coreExportShots', 'core-export-gl': 'coreExportGlShots' };
 const PIXEL_TOLERANCE = 8;
-const under = SHOTS[flags.get('under') ?? 'gpu'];
+const under = SHOTS[flags.get('under') ?? 'core-export'];
 const name = flags.get('name') ?? docPath.split('/').pop()?.replace(/\.(doc\.)?json$/, '') ?? 'doc';
 
 async function hostBundle(): Promise<string> {
@@ -141,7 +140,7 @@ const spec = { doc, assets, origin: server.origin, faces: flags.get('faces') };
 const dir = join(OUT, name);
 mkdirSync(dir, { recursive: true });
 
-const browser = engineName === 'webkit' ? await webkit.launch({ headless: mode !== Mode.Preview }) : await chromium.launch({ ...LAUNCH, headless: mode !== Mode.Preview });
+const browser = engineName === 'webkit' ? await webkit.launch({ headless: true }) : await chromium.launch({ ...LAUNCH, headless: true });
 const page = await browser.newPage({ viewport: { width: Math.max(1920, doc.width), height: Math.max(1080, doc.height) }, deviceScaleFactor: scaleFactor });
 page.setDefaultTimeout(TIMEOUT_MS);
 page.on('pageerror', (e) => console.error('pageerror', e.message));
@@ -179,7 +178,7 @@ if (mode === Mode.Parity) {
     const lb = luma(b.pixels);
     rows.push({ t: times[i], ssim: ssim(la, lb, a.width, a.height), psnr: psnr(la, lb), off: differing(a.pixels, b.pixels, PIXEL_TOLERANCE) });
     writeFileSync(join(framesDir, `html-${String(i).padStart(3, '0')}.png`), Buffer.from(before.pngs[i], 'base64'));
-    writeFileSync(join(framesDir, `gpu-${String(i).padStart(3, '0')}.png`), Buffer.from(after.pngs[i], 'base64'));
+    writeFileSync(join(framesDir, `core-${String(i).padStart(3, '0')}.png`), Buffer.from(after.pngs[i], 'base64'));
   }
   const fmt = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : 'inf');
   const worst = rows.reduce((w, r) => (r.ssim < w.ssim ? r : w), rows[0]);
@@ -189,7 +188,7 @@ if (mode === Mode.Parity) {
   console.log(report);
   const ff = (args: string[]) => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...args]);
   const scale = 'scale=960:-2';
-  ff(['-framerate', '2', '-i', join(framesDir, 'html-%03d.png'), '-framerate', '2', '-i', join(framesDir, 'gpu-%03d.png'), '-filter_complex', `[0]${scale}[a];[1]${scale}[b];[a][b]hstack`, '-pix_fmt', 'yuv420p', '-c:v', 'libx264', join(dir, 'side-by-side.mp4')]);
+  ff(['-framerate', '2', '-i', join(framesDir, 'html-%03d.png'), '-framerate', '2', '-i', join(framesDir, 'core-%03d.png'), '-filter_complex', `[0]${scale}[a];[1]${scale}[b];[a][b]hstack`, '-pix_fmt', 'yuv420p', '-c:v', 'libx264', join(dir, 'side-by-side.mp4')]);
   ff(['-i', join(dir, 'side-by-side.mp4'), '-vf', `fps=2,scale=960:-2,tile=1x${Math.min(times.length, 6)}`, '-frames:v', '1', join(dir, 'sheet.png')]);
 }
 
@@ -197,25 +196,15 @@ if (mode === Mode.Export) {
   const times = Array.from({ length: Math.min(frames, doc.durationInFrames) }, (_, i) => i / doc.fps);
   const input: ExportInput = { html, spec, times, ...size, fps: doc.fps, lanes: lanesWithin(APP_LANES, webglPerLane(html)), preference, keep: true };
   const today = await call<ExportInput, ExportResult>('htmlExport', input);
-  const gpu = await call<ExportInput, ExportResult>('gpuExport', input);
-  for (const [label, r] of [['html', today], ['gpu', gpu]] as const) {
+  const gpu = await call<ExportInput, ExportResult>('coreExport', input);
+  for (const [label, r] of [['html', today], ['core', gpu]] as const) {
     if (r.mp4) {
       writeFileSync(join(dir, `export-${label}.mp4`), Buffer.from(r.mp4, 'base64'));
     }
   }
   const line = `| ${name} | ${times.length} | ${input.lanes} | ${(today.wallMs / times.length).toFixed(0)} | ${(gpu.wallMs / times.length).toFixed(0)} | ${(today.wallMs / gpu.wallMs).toFixed(2)}x${gpu.fallback ? ' (HTML fallback)' : ''} |`;
-  writeFileSync(join(dir, 'export.md'), `| doc | frames | html lanes | html ms/frame | gpu ms/frame | speed-up |\n|---|---|---|---|---|---|\n${line}\n`);
+  writeFileSync(join(dir, 'export.md'), `| doc | frames | html lanes | html ms/frame | core ms/frame | speed-up |\n|---|---|---|---|---|---|\n${line}\n`);
   console.log(line);
-}
-
-if (mode === Mode.Preview) {
-  const input: PreviewInput = { html, spec, seconds, warmMs: 2000, preference };
-  const today = await call<PreviewInput, PreviewResult>('htmlPreview', input);
-  const gpu = await call<PreviewInput, PreviewResult>('gpuPreview', input);
-  const row = (label: string, r: PreviewResult) => `| ${name} | ${label} | ${r.frames} | ${r.p50.toFixed(1)} | ${r.p95.toFixed(1)} | ${r.dropped} | ${r.workP50.toFixed(1)} | ${r.workP95.toFixed(1)} |`;
-  const table = `| doc | engine | frames | rAF p50 ms | rAF p95 ms | dropped (>18.7ms) | work p50 ms | work p95 ms |\n|---|---|---|---|---|---|---|---|\n${row('html', today)}\n${row('gpu', gpu)}\n`;
-  writeFileSync(join(dir, 'preview.md'), table);
-  console.log(table);
 }
 
 if (mode === Mode.Scrub) {

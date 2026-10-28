@@ -86,7 +86,6 @@ const TEXT_BOX: Record<TextSizing, (truncate: boolean) => Record<string, string>
   [TextSizing.AutoHeight]: () => ({ height: 'auto' })
 };
 
-const FITS: Record<TextSizing, boolean> = { [TextSizing.Fixed]: true, [TextSizing.AutoWidth]: false, [TextSizing.AutoHeight]: false };
 
 type Placed = Pick<PropsOf<'Title'>, 'x' | 'y' | 'width' | 'height' | 'opacity' | 'scale' | 'rotation'> & { align: TextAlign };
 
@@ -189,8 +188,7 @@ const Text: Template<'Text'> = {
     const paint = glyphPaint(ctx, 'Text');
     const lines = clampLines(ctx, size);
     const style = css({ ...typeStyle(ctx, measured(ctx.p, size), size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], textWrapStyle: ctx.p.textWrap === 'wrap' ? undefined : ctx.p.textWrap, textBox: TEXT_BOX_TRIM[ctx.p.leadingTrim], ...decorationCss(ctx.p, ctx.color), ...clampCss(lines), ...ctx.text.vars });
-    const fit = FITS[ctx.p.sizing] && lines === null ? ` data-fit="${size}"` : ' data-text';
-    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}"${fit} style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${textBody(ctx)}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, { justifyContent: VERTICAL[ctx.p.verticalAlign], ...TEXT_BOX[ctx.p.sizing](ctx.p.truncate) });
+    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}" data-text style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${textBody(ctx)}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, { justifyContent: VERTICAL[ctx.p.verticalAlign], ...TEXT_BOX[ctx.p.sizing](ctx.p.truncate) });
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]
 };
@@ -299,6 +297,11 @@ const Precomp: Template<'Precomp'> = {
 };
 
 const Adjustment: Template<'Adjustment'> = {
+  timing: Timing.Media,
+  html: () => ''
+};
+
+const Light: Template<'Light'> = {
   timing: Timing.Media,
   html: () => ''
 };
@@ -506,5 +509,6 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   ShaderEffect,
   Precomp,
   Adjustment,
+  Light,
   Custom
 };

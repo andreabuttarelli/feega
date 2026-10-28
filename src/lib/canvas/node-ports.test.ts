@@ -32,7 +32,7 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   motion: { inputs: false, output: true },
   element: { inputs: false, output: false },
   studio_batch: { inputs: false, output: true },
-  section: { inputs: false, output: false },
+  section: { inputs: false, output: true },
   technique: { inputs: false, output: false }
 };
 
@@ -64,6 +64,12 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
       expect(canConnect({ id: kind, kind, model: null, uncensored: false }, frame)).toEqual({ ok: false, why: FRAME_NO_INPUTS });
     }
     expect(canConnect(frame, { id: 'c', kind: 'composition', model: null, uncensored: false })).toEqual({ ok: true });
+  });
+
+  it('a free element exposes an image output only while it holds one image', () => {
+    expect(portsOf('element', { ...ctx, holdsImage: () => true })).toEqual({ inputs: [], output: 'images' });
+    expect(portsOf('element', { ...ctx, holdsImage: () => false })).toEqual({ inputs: [], output: null });
+    expect(portsOf('element', ctx)).toEqual({ inputs: [], output: null });
   });
 
   it('a 3D model takes an image or a text, whatever its model reads, and feeds nothing downstream', () => {

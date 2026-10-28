@@ -65,6 +65,12 @@
     grab = { kind: 'point', ref, from: local(e), origin: outline[ref.contour].vertices[ref.index].p };
   }
 
+  function smoothPoint(e: MouseEvent, ref: PointRef) {
+    e.stopPropagation();
+    selected = ref;
+    commit(toggleSmooth(outline, ref), 'Toggled a point between corner and smooth');
+  }
+
   function startHandle(e: PointerEvent, ref: PointRef, handle: Handle) {
     e.stopPropagation();
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
@@ -86,6 +92,12 @@
 
   function keys(e: KeyboardEvent) {
     if (isTyping(e.target as HTMLElement | null)) {
+      return;
+    }
+    if (e.key === 'Enter' && !pen) {
+      e.preventDefault();
+      e.stopPropagation();
+      onexit();
       return;
     }
     if (e.key === 'Escape') {
@@ -205,7 +217,7 @@
   </div>
   {#each outline as contour, ci (ci)}
     {#each contour.vertices as v, vi (vi)}
-      <button type="button" data-drawn-small class="point" class:sel={selected?.contour === ci && selected?.index === vi} aria-label={`Path point ${ci + 1}.${vi + 1}`} data-point={`${ci}.${vi}`} style={pct(v.p)} onpointerdown={(e) => startPoint(e, { contour: ci, index: vi })}></button>
+      <button type="button" data-drawn-small class="point" class:sel={selected?.contour === ci && selected?.index === vi} aria-label={`Path point ${ci + 1}.${vi + 1}`} data-point={`${ci}.${vi}`} style={pct(v.p)} onpointerdown={(e) => startPoint(e, { contour: ci, index: vi })} ondblclick={(e) => smoothPoint(e, { contour: ci, index: vi })}></button>
     {/each}
   {/each}
   {#if selected}

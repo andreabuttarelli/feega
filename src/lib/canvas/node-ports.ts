@@ -13,7 +13,8 @@ export enum OutputRule {
   Item = 'item',
   Media = 'media',
   Audio = 'audio',
-  Technique = 'technique'
+  Technique = 'technique',
+  FreeImage = 'free_image'
 }
 
 type Ports = {
@@ -28,6 +29,7 @@ export type PortContext = {
   mediaKind: () => 'image' | 'video';
   audioOperation?: () => AudioOperationId;
   audioInput?: () => AudioInputKind;
+  holdsImage?: () => boolean;
   techniquePorts?: () => { inputs: ConnectorType[]; output: ConnectorType | null };
 };
 
@@ -52,9 +54,9 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   audio: { inputs: InputRule.Audio, output: OutputRule.Audio },
   model3d: { inputs: ['images', 'text'], output: null },
   motion: { inputs: NONE, output: 'motions' },
-  element: { inputs: NONE, output: null },
+  element: { inputs: NONE, output: OutputRule.FreeImage },
   studio_batch: { inputs: NONE, output: 'images' },
-  section: { inputs: NONE, output: null },
+  section: { inputs: NONE, output: 'section' },
   technique: { inputs: InputRule.Technique, output: OutputRule.Technique }
 };
 
@@ -74,6 +76,7 @@ const INPUTS: Record<InputRule, (ctx: PortContext) => ConnectorType[]> = {
 const OUTPUTS: Record<OutputRule, (ctx: PortContext) => ConnectorType | null> = {
   [OutputRule.Technique]: (ctx) => techniquePortsOf(ctx).output,
   [OutputRule.Item]: (ctx) => ctx.itemPort(),
+  [OutputRule.FreeImage]: (ctx) => ((ctx.holdsImage ?? (() => false))() ? 'images' : null),
   [OutputRule.Media]: (ctx) => (ctx.mediaKind() === 'video' ? 'videos' : 'images'),
   [OutputRule.Audio]: (ctx) =>
     audioOutputPorts((ctx.audioOperation ?? DEFAULT_AUDIO_OPERATION_CTX)(), (ctx.audioInput ?? DEFAULT_AUDIO_INPUT_CTX)())[0]

@@ -6,14 +6,20 @@ import type { OpResult } from '@feega/motion-core/motion/timeline';
 import type { Pt } from '@feega/motion-core/motion/shape/geometry';
 import { setPath, shapePath, type ShapeParams } from './ops';
 import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
+import { pathSpace } from '@feega/motion-core/motion/shape/space';
 
-const EDITABLE: ReadonlySet<string> = new Set([ShapeKind.Path, ShapeKind.Vector, ShapeKind.Polygon, ShapeKind.Star, ShapeKind.Line]);
-const NEEDS_PATH: ReadonlySet<string> = new Set([ShapeKind.Polygon, ShapeKind.Star, ShapeKind.Line]);
+const EDITABLE: ReadonlySet<string> = new Set(Object.values(ShapeKind));
+const NEEDS_PATH: ReadonlySet<string> = new Set([ShapeKind.Rect, ShapeKind.Circle, ShapeKind.Ellipse, ShapeKind.Polygon, ShapeKind.Star, ShapeKind.Line]);
 
 export const canEditPoints = (clip: Pick<MotionClip, 'component' | 'props'> | null | undefined): boolean => clip?.component === 'Shape' && EDITABLE.has(String(clip.props.shape));
 
 export function enterPointEdit(doc: MotionDoc, clip: MotionClip): OpResult {
   return NEEDS_PATH.has(String(clip.props.shape)) ? setPath(doc, clip.id, shapePath(clip.props as unknown as ShapeParams)) : { ok: true, doc };
+}
+
+export function landsOn(doc: MotionDoc, clipId: string, frame: number, at: Pt): boolean {
+  const [u, v] = pathSpace(doc, clipId, frame).toLocal(at);
+  return u >= 0 && u <= 1 && v >= 0 && v <= 1;
 }
 
 export const pointBounds = (p: Pt): Bounds => ({ left: p[0], right: p[0], top: p[1], bottom: p[1] });

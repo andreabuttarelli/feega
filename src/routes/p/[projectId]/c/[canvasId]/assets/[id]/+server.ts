@@ -7,6 +7,7 @@ import { findAsset } from '$lib/server/repos/assets';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import type { ThumbnailPreset } from '$lib/server/media-thumbnails';
 import { AssetSize, sizeOf } from '$lib/canvas/asset-url';
+import { PROXY_PARAM } from '$lib/motion/gpu/video-proxy';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { CANVAS_REDIRECT_MAX_AGE_S } from '$lib/server/repos/asset-storage';
 import { redirectMemo } from '$lib/server/canvas/asset-redirects';
@@ -44,7 +45,8 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
   }
 
   const phases = serverTiming();
-  const memoKey = [user.id, params.canvasId, params.id, sizeOf(url)].join('|');
+  const wantsProxy = url.searchParams.get(PROXY_PARAM) === '1';
+  const memoKey = [user.id, params.canvasId, params.id, sizeOf(url), wantsProxy].join('|');
   const remembered = await phases.time('memo', Promise.resolve(signedRedirects.recall(memoKey)));
   if (remembered) {
     return fileRedirect(remembered, phases.header());
@@ -71,7 +73,7 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
     });
   }
 
-  const path = asset.url ?? '';
+  const path = (wantsProxy ? asset.proxyUrl : null) ?? asset.url ?? '';
   if (!path) {
     throw error(404, 'asset senza file');
   }

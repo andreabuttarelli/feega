@@ -69,6 +69,7 @@ const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
   [Command.ToggleLayoutGuides]: FrameView.Guides,
   [Command.ToggleRulers]: FrameView.Rulers,
   [Command.ToggleOutlines]: FrameView.Outlines,
+  [Command.ToggleDevMode]: FrameView.Dev,
   [Command.TogglePivot]: FrameView.Pivot
 };
 
@@ -138,6 +139,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.ToggleLayoutGuides]: { id: 'view', view: FrameView.Guides },
   [Command.ToggleRulers]: { id: 'view', view: FrameView.Rulers },
   [Command.ToggleOutlines]: { id: 'view', view: FrameView.Outlines },
+  [Command.ToggleDevMode]: { id: 'view', view: FrameView.Dev },
   [Command.TogglePivot]: { id: 'view', view: FrameView.Pivot },
   [Command.MoveLeft]: nudgeBy(-1, 0, NUDGE_STEP),
   [Command.MoveRight]: nudgeBy(1, 0, NUDGE_STEP),
@@ -177,7 +179,8 @@ const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'>
 const ALT_ALIGN: Record<string, Edge> = { KeyA: Edge.Left, KeyH: Edge.Center, KeyD: Edge.Right, KeyW: Edge.Top, KeyV: Edge.Middle, KeyS: Edge.Bottom };
 
 function altCommand(e: KeyboardEvent): CanvasCommand | null {
-  if (isTypingTarget(e.target) || e.shiftKey) return null;
+  if (isTypingTarget(e.target)) return null;
+  if (e.shiftKey) return e.code === 'KeyR' ? { id: 'view', view: FrameView.Rulers } : null;
   const mod = e.metaKey || e.ctrlKey;
   if (mod) return e.code === 'KeyT' ? { id: 'tidy' } : null;
   if (e.code === 'KeyR') return { id: 'view', view: FrameView.Pivot };

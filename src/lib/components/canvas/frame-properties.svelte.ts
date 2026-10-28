@@ -14,12 +14,23 @@ export class FrameProperties {
   tokens = $state.raw<BrandTokens | null>(null);
   extras = $state.raw<FrameExtras | null>(null);
   part = $state<string | null>(null);
+  dev = $state(false);
+  toggleDev: (() => void) | null = null;
+  exportPicks: (() => void) | null = null;
 
   publish(nodeId: string, session: FrameEditSession, tokens: BrandTokens, extras: FrameExtras | null) {
     this.nodeId = nodeId;
     this.session = session;
     this.tokens = tokens;
     this.extras = extras;
+  }
+
+  get routed(): string | null {
+    if (!this.nodeId || !this.session) {
+      return null;
+    }
+    const picked = this.session.selection.join(',');
+    return picked ? `${this.nodeId}:${picked}` : this.nodeId;
   }
 
   openFrame(): OpenFrame | null {
@@ -35,6 +46,8 @@ export class FrameProperties {
     this.tokens = null;
     this.extras = null;
     this.part = null;
+    this.toggleDev = null;
+    this.exportPicks = null;
   }
 }
 

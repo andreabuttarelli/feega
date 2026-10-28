@@ -11,3 +11,11 @@ export function frameHolding(tiles: readonly Holder[], box: CanvasBox): FrameHol
   const frame = tiles.findLast(holds);
   return frame ? { nodeId: frame.id, at: { x: (centre.x - frame.x) / frame.w, y: (centre.y - frame.y) / frame.h } } : null;
 }
+
+export function groupHolding(tiles: readonly Holder[], boxes: readonly CanvasBox[]): FrameHold | null {
+  const left = Math.min(...boxes.map((b) => b.left));
+  const top = Math.min(...boxes.map((b) => b.top));
+  const right = Math.max(...boxes.map((b) => b.left + b.width));
+  const bottom = Math.max(...boxes.map((b) => b.top + b.height));
+  return frameHolding(tiles, { left, top, width: right - left, height: bottom - top });
+}

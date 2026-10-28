@@ -61,6 +61,7 @@ describe('the shell primitives', () => {
   });
 
   it('a section header is a bold title; a foldable one is a button that says whether it is open', () => {
+    expect(render(Section, { props: { title: 'Layout', children: body } }).body).toMatch(/<section[^>]*class="[^"]*\bui-section\b/);
     expect(render(Section, { props: { title: 'Layout', children: body } }).body).toMatch(/<h3[^>]*font-semibold[^>]*>Layout<\/h3>/);
     const closed = render(Section, { props: { title: 'Effects', fold: Fold.Closed, children: body } }).body;
     expect(closed).toContain('aria-expanded="false"');

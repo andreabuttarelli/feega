@@ -58,10 +58,17 @@ function networkOf(blob: Uint8Array): Network | null {
 
 const reversed = (s: Segment): Segment => ({ start: s.end, end: s.start, tangentStart: s.tangentEnd, tangentEnd: s.tangentStart });
 
+const touches = (s: Segment | undefined, vertex: number) => s !== undefined && (s.start === vertex || s.end === vertex);
+
+function entryOf(first: Segment | undefined, second: Segment | undefined): number {
+  const backwards = first !== undefined && touches(second, first.start) && !touches(second, first.end);
+  return backwards ? first.end : -1;
+}
+
 function loopPath(network: Network, loop: number[], scale: Vec): string {
   const pt = (v: Vec) => `${round(v.x * scale.x)} ${round(v.y * scale.y)}`;
   const parts: string[] = [];
-  let last = -1;
+  let last = entryOf(network.segments[loop[0]], network.segments[loop[1]]);
   for (const index of loop) {
     const given = network.segments[index];
     if (!given) {
@@ -69,7 +76,7 @@ function loopPath(network: Network, loop: number[], scale: Vec): string {
     }
     const s = given.start !== last && given.end === last ? reversed(given) : given;
     const [a, b] = [network.vertices[s.start], network.vertices[s.end]];
-    if (s.start !== last) {
+    if (!parts.length || s.start !== last) {
       parts.push(`M${pt(a)}`);
     }
     const straight = !s.tangentStart.x && !s.tangentStart.y && !s.tangentEnd.x && !s.tangentEnd.y;

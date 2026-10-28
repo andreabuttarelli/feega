@@ -1,8 +1,11 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 
 const DEFAULT_FILE = 'canvas.feega';
-const DEFAULT_PORT = 5173;
+const DEFAULT_PORT = 0;
+export const LOOPBACK = '127.0.0.1';
+export const USAGE = `usage: feega [file.feega] [--port <n>] [--no-open] [--help] [--version]`;
 const CACHED_MARKER = '.complete';
 const APP_TAG = 'app-v';
 const RELEASES = 'https://github.com/andreabuttarelli/feega/releases/download';
@@ -25,6 +28,14 @@ export function parseArgs(argv, cwd) {
 
   while (rest.length) {
     const arg = rest.shift();
+    if (arg === '--help' || arg === '-h') {
+      return { command: 'help' };
+    }
+
+    if (arg === '--version') {
+      return { command: 'version' };
+    }
+
     if (arg === '--no-open') {
       browser = 'skip';
       continue;
@@ -40,10 +51,14 @@ export function parseArgs(argv, cwd) {
       continue;
     }
 
+    if (arg.startsWith('-')) {
+      throw new Error(`unknown option: ${arg}\n${USAGE}`);
+    }
+
     files.push(arg);
   }
 
-  return { file: resolve(cwd, files[0] ?? DEFAULT_FILE), port, browser };
+  return { command: 'run', file: resolve(cwd, files[0] ?? DEFAULT_FILE), port, browser };
 }
 
 export const appDir = (home, version) => join(home, '.feega', 'app', version);
@@ -94,3 +109,15 @@ export function pickVersion(latest, cached) {
 
   return { version: cached[0], action: 'cache' };
 }
+
+export const boundUrl = (port) => `http://${LOOPBACK}:${port}`;
+
+export const freePort = (port) =>
+  new Promise((done, fail) => {
+    const probe = createServer();
+    probe.once('error', fail);
+    probe.listen(port, LOOPBACK, () => {
+      const { port: bound } = probe.address();
+      probe.close(() => done(bound));
+    });
+  });

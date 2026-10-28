@@ -239,6 +239,19 @@
     gap: var(--ui-space-2);
   }
 
+  @media (max-width: 640px) {
+    .create {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      justify-content: stretch;
+    }
+
+    .create :global(button),
+    .create form {
+      width: 100%;
+    }
+  }
+
   .column {
     display: flex;
     flex-direction: column;

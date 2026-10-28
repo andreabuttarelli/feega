@@ -119,6 +119,29 @@ export async function saveDesignedVoice(
   return { ok: true, voice };
 }
 
+export async function addLibraryVoice(
+  deps: VoiceDeps,
+  scope: VoiceScope,
+  input: { ownerId: string; voiceId: string; name: string }
+): Promise<Outcome<{ voice: CustomVoice }>> {
+  if (await slotsFull(deps, scope.orgId)) {
+    return { ok: false, error: 'voice_slots_full' };
+  }
+  const providerVoiceId = await deps.provider.addShared(input);
+  const voice = await recorded(deps, {
+    orgId: scope.orgId,
+    providerVoiceId,
+    name: input.name,
+    method: 'library',
+    description: null,
+    consentBasis: null,
+    consentSpeaker: null,
+    consentAttestedAt: null,
+    actor: scope.actor
+  });
+  return { ok: true, voice };
+}
+
 async function purgeSamples(deps: VoiceDeps, voice: CustomVoice): Promise<void> {
   for (const sampleId of await deps.provider.sampleIds(voice.providerVoiceId)) {
     await deps.provider.deleteSample(voice.providerVoiceId, sampleId);
@@ -192,15 +215,18 @@ export async function sweepOrphanVoices(deps: VoiceDeps): Promise<{ removed: num
 
 export async function voiceRefusalFor(
   store: VoiceStore,
-  input: { orgId: string; voiceId: string; mode: ProjectMode }
+  input: { orgId: string; voiceId: string; mode: ProjectMode; premade?: ReadonlySet<string> | null }
 ): Promise<VoiceRefusal | null> {
   if (await store.ownedElsewhere(input.orgId, input.voiceId)) {
+    return 'voice_not_yours';
+  }
+  const own = (await store.list(input.orgId)).find((v) => v.providerVoiceId === input.voiceId);
+  if (!own && input.premade && !input.premade.has(input.voiceId)) {
     return 'voice_not_yours';
   }
   if (input.mode !== ProjectMode.Uncensored) {
     return null;
   }
-  const own = (await store.list(input.orgId)).find((v) => v.providerVoiceId === input.voiceId);
   return own?.method === 'instant_clone' ? 'cloned_voice_not_in_this_project' : null;
 }
 

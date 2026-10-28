@@ -52,6 +52,9 @@
       [`${base}/models`]: {
         title: $_('app.settings.models.title')
       },
+      [`${base}/fonts`]: {
+        title: $_('app.settings.fonts.title')
+      },
       [`${base}/spend`]: {
         title: $_('app.settings.spend.title')
       },

@@ -409,10 +409,14 @@ const effectsSchema = z.object({
 
 export const SECTION_DEFAULT_FILL = '#f3f3f3';
 
-const sectionSchema = z.object({
-  title: z.string().max(80).default('Section'),
-  fill: z.string().regex(HEX_COLOR, 'invalid colour, expected #rrggbb').default(SECTION_DEFAULT_FILL)
-});
+const sectionSchema = z
+  .object({
+    title: z.string().max(80).default('Section'),
+    fill: z.string().regex(HEX_COLOR, 'invalid colour, expected #rrggbb').default(SECTION_DEFAULT_FILL)
+  })
+  .describe(
+    'Connect a section to a text, image or video node (source = the section) and that node receives, at run time, everything whose data.groupId is this section: text and docs into the prompt, images and videos as references. A node inside never receives itself. To skip an item for one target, set data.sectionExcluded: [nodeId] on that target.'
+  );
 
 const techniqueSchema = z.object({
   techniqueId: z.string().uuid(),
@@ -596,8 +600,8 @@ export function validateNodeData(type: string, data: unknown): NodeDataVerdict {
   }
 
   const schema = NODE_DATA_SCHEMAS[type];
-  const { rotation, groupId, colorTag, ...own } = (data ?? {}) as Record<string, unknown>;
-  const layout = nodeLayoutSchema.safeParse({ rotation, groupId, colorTag });
+  const { rotation, groupId, colorTag, sectionExcluded, ...own } = (data ?? {}) as Record<string, unknown>;
+  const layout = nodeLayoutSchema.safeParse({ rotation, groupId, colorTag, sectionExcluded });
   if (!layout.success) {
     return { ok: false, error: `${type}.data.${layout.error.issues[0].path.join('.')}: ${layout.error.issues[0].message}` };
   }

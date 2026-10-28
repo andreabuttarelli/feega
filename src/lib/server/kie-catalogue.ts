@@ -210,7 +210,7 @@ type KieToolModel = {
 
 const KIE_TOOL_MODELS: readonly KieToolModel[] = [
   { tool: ImageTool.RemoveBackground, kieModel: 'recraft/remove-background', label: 'Remove background', imageField: 'image' },
-  { tool: ImageTool.Upscale, kieModel: 'topaz/image-upscale', label: 'Upscale image', imageField: 'image_url', priceBy: { field: 'upscale_factor', token: 'resolution', variants: { '2': '2K', '4': '4K' } } },
+  { tool: ImageTool.Upscale, kieModel: 'recraft/crisp-upscale', label: 'Upscale image', imageField: 'image' },
   { tool: ImageTool.SplitLayers, kieModel: 'seedream/5-flash-layer-decomposition', label: 'Split into layers', imageField: 'image_url', takesPrompt: true, keepsLayers: true },
   { tool: ImageTool.Inpaint, kieModel: 'ideogram/v3-edit', label: 'Inpaint', imageField: 'image_url', maskField: 'mask_url', takesPrompt: true, priceBy: { field: 'rendering_speed', token: 'tier', variants: { TURBO: 'TURBO', BALANCED: 'BALANCED', QUALITY: 'QUALITY' } } }
 ];

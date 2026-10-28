@@ -7,7 +7,8 @@ export const SHELL_PREF_KEYS = {
   sidebarPane: 'feega.sidebarPane',
   chatPanelPx: 'feega.chatPanelPx',
   chatOpen: 'feega.chatOpen',
-  chatTab: 'feega.chatTab'
+  chatTab: 'feega.chatTab',
+  rulers: 'feega.rulers'
 } as const;
 
 const SHELL_PREF_KEYS_LEGACY = {
@@ -16,7 +17,8 @@ const SHELL_PREF_KEYS_LEGACY = {
   sidebarPane: 'dazero.sidebarPane',
   chatPanelPx: 'dazero.chatPanelPx',
   chatOpen: 'dazero.chatOpen',
-  chatTab: 'dazero.chatTab'
+  chatTab: 'dazero.chatTab',
+  rulers: 'dazero.rulers'
 } as const;
 
 export const CHAT_TABS = ['chat', 'guide', 'properties'] as const;
@@ -163,4 +165,12 @@ export function readChatTab(): ChatTab {
 
 export function writeChatTab(tab: ChatTab) {
   writeRaw(SHELL_PREF_KEYS.chatTab, tab);
+}
+
+export function readRulers(): boolean {
+  return readRaw(SHELL_PREF_KEYS.rulers) === 'true';
+}
+
+export function writeRulers(on: boolean) {
+  writeRaw(SHELL_PREF_KEYS.rulers, on ? 'true' : 'false');
 }

@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 import { startImageTool, type ImageToolDeps } from './image-tool';
-import { IMAGE_TOOL_MODEL, ImageTool } from '$lib/image-tools';
+import { IMAGE_TOOL_MODEL, ImageTool, REFRAME_PROMPT } from '$lib/image-tools';
 
 const db = {} as never;
 const SCOPE = { orgId: 'org', projectId: 'p1', userId: 'u1' };
@@ -46,13 +46,13 @@ describe('startImageTool puts a tool node beside an image and runs it', () => {
     );
   });
 
-  it('upscale carries the factor to the node and the run', async () => {
+  it('upscale names the doubling and sends no parameter to the node and the run', async () => {
     const d = deps();
 
     await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Upscale, factor: '4' });
 
-    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ displayName: 'Upscale 4×', data: expect.objectContaining({ params: { upscale_factor: '4' } }) }));
-    expect(d.runGenNode).toHaveBeenCalledWith(db, expect.objectContaining({ params: { upscale_factor: '4' } }));
+    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ displayName: 'Upscale 2×', data: expect.objectContaining({ params: {} }) }));
+    expect(d.runGenNode).toHaveBeenCalledWith(db, expect.objectContaining({ params: {} }));
   });
 
   it('refuses a missing node, a node that is not an image, and an image with no result, before writing', async () => {
@@ -138,6 +138,50 @@ describe('startImageTool puts a tool node beside an image and runs it', () => {
     });
   });
 
+  describe('uploaded source', () => {
+    const uploaded = { ...source, data: { assetId: 'asset-up' } };
+
+    it('works on a node that holds only an uploaded asset', async () => {
+      const d = deps({ findNode: vi.fn(async () => uploaded) as never });
+
+      const out = await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Reframe, aspect: '1:1' });
+
+      expect(out).toMatchObject({ ok: true });
+      expect(d.paddedPng).toHaveBeenCalledWith(db, { orgId: 'org', assetId: 'asset-up' }, expect.anything(), expect.anything());
+    });
+
+    it('refuses a node with no asset at all', async () => {
+      const d = deps({ findNode: vi.fn(async () => ({ ...source, data: {} })) as never });
+
+      expect(await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Upscale })).toEqual({ ok: false, error: 'source_empty' });
+    });
+  });
+
+  describe('reframe', () => {
+    it('pads the picture to the asked aspect and fills the new area with the default prompt', async () => {
+      const d = deps();
+
+      const out = await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Reframe, aspect: '1:1' });
+
+      expect(out).toMatchObject({ ok: true, nodeId: 'n-out' });
+      expect(d.paddedPng).toHaveBeenCalledWith(db, { orgId: 'org', assetId: 'asset-1' }, { width: 80, height: 40 }, expect.objectContaining({ padded: { width: 80, height: 80 } }));
+      expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ displayName: 'Reframe 1:1', data: expect.objectContaining({ prompt: REFRAME_PROMPT, model: IMAGE_TOOL_MODEL[ImageTool.Reframe], editImageRefId: 'padded-asset' }) }));
+    });
+
+    it('refuses without an aspect, when the picture already has it, or when the size is unknown', async () => {
+      for (const [ask, over, error] of [
+        [{}, {}, 'aspect_required'],
+        [{ aspect: '2:1' }, {}, 'already_this_aspect'],
+        [{ aspect: '1:1' }, { pixelSizeOf: vi.fn(async () => null) }, 'source_size_unknown']
+      ] as const) {
+        const d = deps(over as never);
+
+        expect(await startImageTool(db, d, { ...SCOPE, sourceNodeId: 'n-src', tool: ImageTool.Reframe, ...ask })).toEqual({ ok: false, error });
+        expect(d.createNode).not.toHaveBeenCalled();
+      }
+    });
+  });
+
   describe('inpaint', () => {
     const mask = { regions: [{ left: 0.5, top: 0, width: 0.5, height: 1 }] };
 
@@ -150,6 +194,9 @@ describe('startImageTool puts a tool node beside an image and runs it', () => {
       expect(d.pixelSizeOf).toHaveBeenCalledWith(db, { orgId: 'org', assetId: 'asset-1' });
       const stored = (d.storePng as ReturnType<typeof vi.fn>).mock.calls[0][1];
       expect(stored).toMatchObject({ orgId: 'org', projectId: 'p1', userId: 'u1', nodeId: 'n-src', width: 80, height: 40 });
+      const { data: grey, info } = await sharp(stored.png).greyscale().raw().toBuffer({ resolveWithObject: true });
+      expect(grey[10 * info.width + 60]).toBe(0);
+      expect(grey[10 * info.width + 10]).toBe(255);
       const meta = await sharp(stored.png).metadata();
       expect({ width: meta.width, height: meta.height }).toEqual({ width: 80, height: 40 });
       const data = { prompt: 'a red hat', model: IMAGE_TOOL_MODEL[ImageTool.Inpaint], params: { rendering_speed: 'BALANCED' }, maskRefId: 'mask-asset' };

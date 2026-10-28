@@ -8,7 +8,7 @@ import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { unionBounds } from './multi-select';
 import { setConstraints } from './constraints/constraints';
 import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
-import { placeBox, setPropAcross, sharedConstraint, sharedProp } from './selection-props';
+import { placeBox, setPropAcross, sharedConstraint, sharedFields, sharedProp } from './selection-props';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -87,5 +87,40 @@ describe('placing the box of a selection', () => {
     expect(sized.top).toBeCloseTo(before.top, 3);
     expect(sized.right - sized.left).toBeCloseTo(width * 2, 3);
     expect(sized.bottom - sized.top).toBeCloseTo(height * 2, 3);
+  });
+});
+
+describe('fields shared by a selection', () => {
+  const text = (doc: MotionDoc, id: string, size: number) => must(addClip(doc, { component: 'Text', from: 0, durationInFrames: 60, props: { text: id, size, color: '#ffffff' } }, id));
+  const texts = text(text(newMotionDoc(MotionFormat.Landscape), 't1', 0.1), 't2', 0.2);
+  const keysOf = (doc: MotionDoc, ids: string[]) => sharedFields(ids.map((id) => findClip(doc, id)!.clip)).map((s) => s.field.key);
+
+  it('are the style fields every selected kind declares', () => {
+    const keys = keysOf(texts, ['t1', 't2']);
+
+    expect(keys).toEqual(expect.arrayContaining(['color', 'font', 'size', 'weight']));
+    expect(keys).not.toContain('text');
+  });
+
+  it('drop what only one kind has when the kinds differ', () => {
+    const mixed = shape(texts, 's', 0.2, '#ff0000');
+    const keys = keysOf(mixed, ['t1', 's']);
+
+    expect(keys).not.toContain('font');
+    expect(keys).not.toContain('stroke');
+  });
+
+  it('show a shared value, and Mixed where the clips differ', () => {
+    const fields = sharedFields(['t1', 't2'].map((id) => findClip(texts, id)!.clip));
+    const valueOf = (key: string) => fields.find((f) => f.field.key === key)!.value;
+
+    expect(valueOf('color')).toBe('#ffffff');
+    expect(valueOf('size')).toBe(MIXED);
+  });
+
+  it('write a value to every selected clip, even one that kept the default', () => {
+    const edited = must(setPropAcross(texts, ['t1', 't2'], 'weight', 700));
+
+    expect(['t1', 't2'].map((id) => findClip(edited, id)!.clip.props.weight)).toEqual([700, 700]);
   });
 });

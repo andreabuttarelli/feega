@@ -66,3 +66,5 @@ export const readMode = (stored: string | null): EditMode => (Object.values(Edit
 export function startMode(doc: MotionDoc, stored: string | null): EditMode {
   return controlShown(doc, VideoControl.EditMode) && timelineFits(doc) ? readMode(stored) : EditMode.Design;
 }
+
+export const shownMode = (toggled: Partial<Record<string, EditMode>>, nodeId: string, doc: MotionDoc, stored: string | null): EditMode => toggled[nodeId] ?? startMode(doc, stored);

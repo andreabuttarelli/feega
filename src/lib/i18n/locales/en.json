@@ -177,6 +177,8 @@
         "logout": "Sign out",
         "navigate": "Navigate",
         "help": "Help",
+        "view": "View",
+        "rulers": "Rulers",
         "account": "Account"
       }
     },
@@ -209,11 +211,20 @@
         "figmaRemove": "Remove",
         "figmaSaved": "Figma token saved.",
         "figmaTested": "Connected to Figma.",
+        "figmaTestedScope": "Figma accepted the token. It has no Current user scope, so the account name is hidden; images still work.",
         "figmaRemoved": "Figma token removed.",
         "figmaInvalid": "Paste a valid Figma token.",
         "figmaRejected": "Figma did not accept this token.",
         "figmaNone": "Save a token first.",
         "figmaUnavailable": "Figma tokens are not available yet.",
+        "cloudTitle": "Google Drive and Dropbox",
+        "cloudDesc": "Import files onto the canvas and export back. Connect from the file picker on the canvas.",
+        "cloudConnected": "Connected",
+        "cloudNotConnected": "Not connected",
+        "cloudNotConfigured": "Not set up on this server",
+        "cloudDisconnect": "Disconnect",
+        "cloudDisconnected": "Disconnected.",
+        "cloudInvalid": "Unknown provider.",
         "saved": "Profile saved.",
         "avatarSaved": "Profile photo updated.",
         "avatarRemoved": "Profile photo removed.",
@@ -277,6 +288,18 @@
         "saved": "Saved.",
         "adminOnly": "Only owners and admins can change this.",
         "unavailable": "Could not save. Try again later."
+      },
+      "fonts": {
+        "title": "Fonts",
+        "subtitle": "Fonts uploaded here can be used by everyone in the organization, in every frame, code frame and video export.",
+        "upload": "Upload font",
+        "uploading": "Uploading…",
+        "hint": "TTF, OTF, WOFF or WOFF2, up to 10MB. Upload only fonts your licence allows.",
+        "empty": "No uploaded fonts yet.",
+        "delete": "Delete",
+        "confirmDelete": "Delete this font for everyone in the organization? Frames using it fall back to a system font.",
+        "preview": "The quick brown fox jumps over the lazy dog",
+        "styles": "styles"
       },
       "spend": {
         "title": "Billing limits",

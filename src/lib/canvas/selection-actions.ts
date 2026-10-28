@@ -16,6 +16,7 @@
 
 import type { PostCompositionNode } from './post-composition';
 import { FrameKind, docKindOf, holdsDoc } from './motion-node';
+import { sourceAssetIdOf } from './image-source';
 import { Edge } from '$lib/motion/space';
 import { FRAME_DIALOG_ACTIONS, isFrameDialogAction, type FrameDialogActionId } from './frame-dialogs';
 import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-plan';
@@ -36,6 +37,7 @@ export type SelectionActionId =
   | 'upscale-image'
   | 'inpaint'
   | 'outpaint'
+  | 'reframe'
   | 'split-layers'
   | 'layers-to-frame'
   | 'copy-id'
@@ -112,6 +114,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'upscale-image', label: 'Upscale 2×', group: 'secondary', minNodes: 1 },
   { id: 'inpaint', label: 'Inpaint…', group: 'secondary', minNodes: 1 },
   { id: 'outpaint', label: 'Outpaint…', group: 'secondary', minNodes: 1 },
+  { id: 'reframe', label: 'Reframe…', group: 'secondary', minNodes: 1 },
   { id: 'split-layers', label: 'Split into layers', group: 'secondary', minNodes: 1 },
   { id: 'layers-to-frame', label: 'Layers to frame', group: 'secondary', minNodes: 1 },
   { id: 'copy', label: 'Copy', group: 'menu', minNodes: 1, shortcut: 'Mod+C' },
@@ -199,7 +202,9 @@ const isOneFrame = (summaries: readonly Summary[]) => summaries.length === 1 && 
 
 const FRAME_DIALOG_SHOWN = Object.fromEntries((Object.keys(FRAME_DIALOG_ACTIONS) as FrameDialogActionId[]).map((id) => [id, isOneFrame]));
 
-const isOneFinishedImage = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'image' && Boolean(summaries[0].data.refId);
+const isOneFinishedImage = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'image' && Boolean(sourceAssetIdOf(summaries[0].data));
+
+const isOneFinishedMedia = (summaries: readonly Summary[]) => summaries.length === 1 && (summaries[0].type === 'image' || summaries[0].type === 'video') && Boolean(sourceAssetIdOf(summaries[0].data));
 
 const isOneTechnique = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'technique';
 
@@ -213,6 +218,7 @@ const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) =
   'upscale-image': isOneFinishedImage,
   inpaint: isOneFinishedImage,
   outpaint: isOneFinishedImage,
+  reframe: isOneFinishedMedia,
   'split-layers': isOneFinishedImage,
   'layers-to-frame': (summaries) => isOneFinishedImage(summaries) && Array.isArray(summaries[0].data.layerRefIds) && summaries[0].data.layerRefIds.length > 0,
   ungroup: (summaries) => summaries.some(isGroup),

@@ -16,6 +16,12 @@ import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
 
 describe('frame view shortcuts', () => {
+  it('toggles the rulers with alt+shift+R even where alt rewrites the key', () => {
+    const at = { tagName: 'DIV', isContentEditable: false };
+
+    expect(matchCanvasShortcut({ key: 'Â', code: 'KeyR', shiftKey: true, metaKey: false, ctrlKey: false, altKey: true, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Rulers });
+  });
+
   it('toggles the pixel grid, the guides and the outlines', () => {
     const at = { tagName: 'DIV', isContentEditable: false };
 

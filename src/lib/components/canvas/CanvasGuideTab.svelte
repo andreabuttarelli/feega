@@ -1,6 +1,6 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
-  import { DOCS_ORIGIN, GUIDES_INDEX_URL, filterGuides, guideUrl, parseGuides, type Guide } from '$lib/docs-guides';
+  import { DOCS_ORIGIN, fetchGuides, filterGuides, guideUrl, type Guide } from '$lib/docs-guides';
 
   let {
     initialSlug = null,
@@ -19,9 +19,8 @@
   const sections = $derived([...new Set(shown.map((guide) => guide.section))]);
 
   $effect(() => {
-    fetch(GUIDES_INDEX_URL)
-      .then((response) => response.json())
-      .then((json) => (guides = parseGuides(json)))
+    fetchGuides()
+      .then((loaded) => (guides = loaded))
       .catch(() => (offline = true));
   });
 

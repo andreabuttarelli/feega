@@ -40,4 +40,27 @@ describe('frame pacer', () => {
     expect(left).toBe(0);
     expect(c.pending()).toBe(0);
   });
+
+  it('a gpu still busy with earlier frames skips the paint but keeps the loop alive', () => {
+    const c = clock();
+    let painted = 0;
+    let busy = true;
+    const pacer = new FramePacer(
+      () => {
+        painted++;
+        return false;
+      },
+      c.raf,
+      () => busy
+    );
+    pacer.invalidate();
+    c.tick(16);
+    c.tick(32);
+    expect(painted).toBe(0);
+    expect(c.pending()).toBe(1);
+    busy = false;
+    c.tick(48);
+    expect(painted).toBe(1);
+    expect(c.pending()).toBe(0);
+  });
 });

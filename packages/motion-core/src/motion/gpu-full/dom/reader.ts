@@ -18,10 +18,12 @@ export async function mountDomReader(host: HTMLElement, compose: Compose, clips:
   frame.srcdoc = withProbe(compose(composed));
   host.appendChild(frame);
   await loaded;
+  let asked = 0;
+  const waiting = new Set<(reason: Error) => void>();
 
   const readAt = (time: number) =>
     new Promise<DomReadReply>((resolve, reject) => {
-      const id = crypto.randomUUID();
+      const id = String(++asked);
       const timer = setTimeout(() => finish(() => reject(new Error(`custom components did not answer within ${READ_TIMEOUT_MS / 1000}s`))), READ_TIMEOUT_MS);
       const onMessage = (e: MessageEvent) => {
         const m = e.data as DomReadReply;
@@ -32,12 +34,20 @@ export async function mountDomReader(host: HTMLElement, compose: Compose, clips:
       const finish = (then: () => void) => {
         clearTimeout(timer);
         removeEventListener('message', onMessage);
+        waiting.delete(abandon);
         then();
       };
+      const abandon = (reason: Error) => finish(() => reject(reason));
+      waiting.add(abandon);
       addEventListener('message', onMessage);
       const request: DomReadRequest = { type: DOM_READ_REQUEST, id, time, clips };
       frame.contentWindow?.postMessage(request, '*');
     });
 
-  return { readAt, dispose: () => frame.remove() };
+  const dispose = () => {
+    frame.remove();
+    [...waiting].forEach((abandon) => abandon(new Error('reader disposed')));
+  };
+
+  return { readAt, dispose };
 }

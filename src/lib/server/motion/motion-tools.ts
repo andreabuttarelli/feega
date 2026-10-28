@@ -9,7 +9,7 @@ import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '@feega/motion-core/motion/fill/model';
 import { setNetwork, toVector } from '$lib/motion/vector/ops';
 import { PointOp, editPathPoints } from '$lib/motion/shape/point-ops';
-import { Handle } from '$lib/motion/shape/pen';
+import { Handle, Mirror } from '$lib/motion/shape/pen';
 import { networkSchema } from '@feega/motion-core/motion/vector/model';
 import { BooleanOp, combineShapes, flattenShapes } from '@feega/motion-core/motion/shape/boolean';
 import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
@@ -29,6 +29,7 @@ import { FRAMES_CLOSED_HINT } from './server-frames';
 import { GUIDES, guidesFor, type GuideTopic } from './guides';
 import { lintAdvice } from '$lib/motion/custom/lint';
 import { tool, type Tool, type ToolExecutionOptions } from 'ai';
+import { cssText, devLayer, tailwindClasses } from '$lib/canvas/dev-css';
 import { addShader, removeShader, setShader } from '$lib/motion/shaders/ops';
 import type { EffectStore } from '$lib/server/effects/store';
 import type { LayoutStore } from '$lib/server/layouts/store';
@@ -58,7 +59,7 @@ import { unionBounds } from '$lib/motion/multi-select';
 import { AXES, EDGES, alignSpace, distributeSpace, moveBy, tidySpace, propBoxes, type Axis, type Edge } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import type { Pt } from '$lib/motion/scene-select';
-import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, renameClip, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '@feega/motion-core/motion/organize';
+import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, renameClip, setClipFlags, setTrackFlags, setWorkArea, staggerClips, closeLoop } from '@feega/motion-core/motion/organize';
 
 const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) => `distribute_${a}` as const), 'tidy', 'move', 'scale', 'scale_group', 'rotate_group'] as const;
 
@@ -125,7 +126,14 @@ const ARRANGE: Record<(typeof ARRANGE_OPS)[number], (doc: MotionDoc, ids: string
 import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { COUNTER_FORMATS } from '@feega/motion-core/motion/text-counter';
 import { setTextCounter } from '$lib/motion/text-counter-ops';
+import { actionSchema, transitionSchema, triggerSchema, ACTION_KINDS, TRANSITION_KINDS as LINK_TRANSITIONS, TRIGGER_KINDS } from '@feega/motion-core/motion/prototype/model';
+import { putInteraction, removeInteraction } from '$lib/motion/prototype/ops';
+import { setFlow } from '$lib/motion/prototype/flows';
+import { MAX_FLOW_NAME } from '@feega/motion-core/motion/prototype/flow';
 import { animateTo } from '$lib/motion/animate-to';
+import { DEFAULT_TRACK } from '@feega/motion-core/motion/tracking/point-tracker';
+import { ApplyMode, applyTrack, trackClip, type LumaReader } from '@feega/motion-core/motion/tracking/track-clip';
+import { IN_OUT_PRESETS, InOutPreset, PresetSide, applyInOut } from '$lib/motion/in-out-presets';
 import { EASE_PRESETS, EASE_PRESET_IDS, easeHandles, withHandles } from '@feega/motion-core/motion/graph';
 import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, easeSchema, type Keyframe } from '@feega/motion-core/motion/keyframes';
 import type { MotionAsset } from './editor';
@@ -163,6 +171,8 @@ import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type
 import { removeLight, removeLook, setLight, setLightKeyframes, setLook } from '$lib/motion/look-ops';
 import { DEVICE, DEVICES } from '@feega/motion-core/motion/devices';
 import { DEVICE_PRESETS, PRESET as DEVICE_PRESET, addDeviceRow, applyDevicePreset } from '$lib/motion/device-presets';
+import { STAGE_LIGHT, STAGE_LIGHT_ABOUT, STAGE_LIGHT_COLOUR, STAGE_LIGHT_KINDS } from '@feega/motion-core/motion/lights';
+import { addStageLight, setAcceptsLights, setStageLight } from '@feega/motion-core/motion/lights-ops';
 import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCameraKeyframes, setClipDepth } from '@feega/motion-core/motion/camera-ops';
 import { ParentOpacity } from '@feega/motion-core/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
@@ -261,6 +271,8 @@ const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']
 
 const copyTexts = (slots: Record<string, unknown>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
 
+const MAX_SAVED_TRACKS = 20;
+
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing; looks?: Looks };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
@@ -290,6 +302,7 @@ export type MotionToolDeps = {
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   videoBreakdown?: (assetId: string) => Promise<BreakdownAnswer>;
+  trackReader?: (src: string) => LumaReader;
   spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
   renderLink?: (quality: ExportQuality) => Promise<Record<string, unknown>>;
@@ -435,11 +448,13 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         keyframes: inSeconds(shownKeyframes(c.component, c.keyframes, doc)),
         depth: c.depth,
         space: c.space,
+        acceptsLights: c.acceptsLights ?? true,
         parent: c.parent,
         parentOpacity: c.parentOpacity,
         autoLayout: c.autoLayout ?? null,
         layoutItem: c.layoutItem ?? null,
         constraints: c.constraints ?? null,
+        interactions: c.interactions ?? [],
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
@@ -473,7 +488,9 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     styles: stylesOf(doc),
     variables: doc.variables ?? {},
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
+    flow: doc.flow ?? null,
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
+    pointTracks: Object.fromEntries(Object.entries(doc.pointTracks ?? {}).map(([id, t]) => [id, { clip_id: t.clipId, points: t.points.length, lost: t.lost }])),
     interactive: interactiveOf(doc),
     style: styleOf(doc),
     script: doc.script ?? null,
@@ -969,6 +986,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    read_layer_css: tool({
+      description: 'Dev mode for one layer: its CSS, the same as a Tailwind class list, the box in px of the frame, and the names it takes from the design (brand colours as variables, fonts, named styles, bound variables). Read-only: nothing changes. Brand colours stay variables (var(--brand-accent)) because the brand values come with the render, not the video.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => {
+        const layer = devLayer(session.doc, input.clip_id, null);
+        if (!layer) {
+          return { ok: false, error: `${input.clip_id} is not a layer of this video` };
+        }
+        return { ok: true, name: layer.name, component: layer.component, box: layer.box, css: cssText(layer), tailwind: tailwindClasses(layer), tokens: layer.tokens };
+      }
+    }),
+
     list_components: tool({
       description: 'Every component a clip can use: the library (its track and props, ranges in the units of the prompt for this video size) and the custom components written in code for this video.',
       inputSchema: z.object({}).strict(),
@@ -1113,6 +1142,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => apply(setWorkArea(session.doc, input.clear ? null : { from: frames(input.start ?? 0), to: input.end === undefined ? session.doc.durationInFrames : frames(input.end) }), 'set the work area')
     }),
 
+    close_loop: tool({
+      description: 'Make the loop seamless: every prop animated across the loop end (the work area out point, else the video end) gets a closing keyframe there with its first keyframe value, and keys past it are dropped, so the last frame flows into the first.',
+      inputSchema: z.object({}),
+      execute: async () => apply(closeLoop(session.doc), 'closed the loop')
+    }),
+
     set_visibility: tool({
       description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it. clip_content true on a clip crops its children (set_parent) to its box at rest, like a frame in a design tool. lock_ratio true on a clip keeps its width:height ratio when set_props changes one of them, like the aspect lock.',
       inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional(), bleed: z.boolean().optional(), clip_content: z.boolean().optional(), lock_ratio: z.boolean().optional() }),
@@ -1206,6 +1241,66 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const owner = ownerOf(input.clip_id);
         const targets = Object.fromEntries(Object.entries(input.to).map(([prop, value]) => [prop, typeof value === 'number' ? toStored(owner, prop, value, session.doc) : value]));
         return apply(animateTo(session.doc, input.clip_id, targets, { start: frames(input.start), duration: Math.max(1, frames(input.duration)), ease: input.ease }, (c) => c), `animated ${input.clip_id} to ${Object.keys(input.to).join(', ')}`);
+      }
+    }),
+
+    track_point: tool({
+      description: 'Track a point on a Video clip through its frames (normalised cross-correlation on luminance). x and y are px of the video frame as it fills the canvas; time is the second (from the clip start) where the point sits. It follows the point forward to `to` and backward to `from` (default: the whole clip) and returns a track_id for apply_track. feature is the half-size px of the patch matched, search the px it may move between frames.',
+      inputSchema: z.object({ clip_id: z.string(), time: z.number().min(0).default(0), x: z.number(), y: z.number(), from: z.number().min(0).optional(), to: z.number().min(0).optional(), feature: z.number().positive().optional(), search: z.number().positive().optional() }),
+      execute: async (input) => {
+        if (!deps.trackReader) {
+          return UNREADABLE('tracking');
+        }
+        const clip = findClip(session.doc, input.clip_id)?.clip;
+        const src = clip?.component === 'Video' ? deps.assets.find((a) => a.id === clip.props.assetId)?.url : null;
+        if (clip?.component === 'Video' && !src) {
+          return { ok: false, error: `${input.clip_id} has no video asset with a file yet` };
+        }
+        const { width, height } = session.doc;
+        const request = {
+          clipId: input.clip_id,
+          frame: frames(input.time),
+          point: { x: input.x / width, y: input.y / height },
+          range: { from: frames(input.from ?? 0), to: input.to === undefined ? Number.MAX_SAFE_INTEGER : frames(input.to) },
+          options: { feature: input.feature === undefined ? DEFAULT_TRACK.feature : input.feature / width, search: input.search === undefined ? DEFAULT_TRACK.search : input.search / width }
+        };
+        const out = await trackClip(session.doc, request, deps.trackReader(src ?? '')).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }));
+        if (!out.ok) {
+          return out;
+        }
+        const id = deps.newId();
+        const { points } = out.track;
+        const px = (p: { x: number; y: number }) => ({ x: Math.round(p.x * width), y: Math.round(p.y * height) });
+        const kept = Object.entries(session.doc.pointTracks ?? {}).slice(1 - MAX_SAVED_TRACKS);
+        session.doc = { ...session.doc, pointTracks: { ...Object.fromEntries(kept), [id]: out.track } };
+        return { ok: true, track_id: id, frames: points.length, lost: out.track.lost, from: points[0].frame / session.doc.fps, to: points[points.length - 1].frame / session.doc.fps, first: px(points[0]), last: px(points[points.length - 1]), weakest: Math.round(Math.min(...points.map((p) => p.score)) * 100) / 100 };
+      }
+    }),
+
+    apply_track: tool({
+      description: 'Attach a track from track_point to a layer as x/y keyframes. follow: the target sits on the tracked point (plus offset_x/offset_y px), like After Effects Track Motion with an Edit Target. stabilise: use the video clip itself as target and it moves against the point so the point holds still.',
+      inputSchema: z.object({ track_id: z.string(), target_clip_id: z.string(), mode: z.enum(ApplyMode).default(ApplyMode.Follow), offset_x: z.number().default(0), offset_y: z.number().default(0) }),
+      execute: async (input) => {
+        const track = session.doc.pointTracks?.[input.track_id];
+        if (!track) {
+          return { ok: false, error: `no track ${input.track_id}: run track_point first` };
+        }
+        return apply(applyTrack(session.doc, track, { targetClipId: input.target_clip_id, mode: input.mode, offset: { x: input.offset_x, y: input.offset_y } }), `${input.mode} track on ${input.target_clip_id}`);
+      }
+    }),
+
+    apply_preset: tool({
+      description: `One-click entrance or exit for a clip, with the house ease (expo in-out, soft settle). side in plays at the clip start, out ends on its last frame; at (s from the clip start) plays it there instead. duration in s (default per preset). Keys in the span are replaced. Presets: ${Object.values(InOutPreset).map((p) => `${p} (${IN_OUT_PRESETS[p].label}, ${IN_OUT_PRESETS[p].sides.join('/')}, ${IN_OUT_PRESETS[p].seconds}s)`).join('; ')}. typewriter goes on text clips only.`,
+      inputSchema: z.object({
+        clip_id: z.string(),
+        preset: z.nativeEnum(InOutPreset),
+        side: z.nativeEnum(PresetSide),
+        duration: z.number().positive().optional(),
+        at: z.number().min(0).optional()
+      }),
+      execute: async (input) => {
+        const options = { preset: input.preset, side: input.side, duration: input.duration === undefined ? undefined : frames(input.duration), at: input.at === undefined ? undefined : frames(input.at) };
+        return apply(applyInOut(session.doc, input.clip_id, options, deps.newId), `${input.preset} ${input.side} on ${input.clip_id}`);
       }
     }),
 
@@ -1690,8 +1785,56 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     set_clip_depth: tool({
       description: 'Place a clip in the camera world: depth in pixels behind the focus plane 0 (negative comes forward; a far background 1500–4000, a foreground card -200..0). It keeps its size at rest and shows parallax when the camera moves. space "screen" keeps a caption or overlay flat on top, ignoring the camera.',
-      inputSchema: z.object({ clip_id: z.string(), depth: z.number().optional(), space: z.enum(SPACES).optional() }),
-      execute: async (input) => apply(setClipDepth(session.doc, input.clip_id, { depth: input.depth, space: input.space }), `placed ${input.clip_id} in depth`)
+      inputSchema: z.object({ clip_id: z.string(), depth: z.number().optional(), space: z.enum(SPACES).optional(), accepts_lights: z.boolean().optional() }),
+      execute: async (input) => {
+        const placed = setClipDepth(session.doc, input.clip_id, { depth: input.depth, space: input.space });
+        const lit = placed.ok && input.accepts_lights !== undefined ? setAcceptsLights(placed.doc, input.clip_id, input.accepts_lights) : placed;
+        return apply(lit, `placed ${input.clip_id} in depth`);
+      }
+    }),
+
+    set_stage_light: tool({
+      description: `Add a light to the camera world (clip_id omitted, needs a camera) or change one (clip_id of a Light clip). Like an After Effects light it shades the flat layers of the world, per layer: Lambert from the layer's own rotateX/rotateY/rotateZ, so turn a layer to see it catch light. Once any light is on, a layer no light reaches is black, so add an ambient light for a base. kind: ${STAGE_LIGHT_KINDS.map((k) => `${k} (${STAGE_LIGHT_ABOUT[k]})`).join('; ')}. color #rrggbb. intensity ${STAGE_LIGHT.intensity.min}..${STAGE_LIGHT.intensity.max}, falloff radius in px (0 none), cone_angle degrees and cone_feather 0..1 for spot. x/y in px of the frame from the centre, depth in px behind the focus plane (negative is in front of the layers, default -600), aim_x tilts down and aim_y turns right, in degrees (spot, parallel). start/duration in seconds. Animate with set_keyframes on the returned clip_id: color, intensity, falloff, coneAngle, coneFeather, x, y, rotateX, rotateY. set_clip_depth accepts_lights false keeps a layer out of the lighting; 3D clips keep their own.`,
+      inputSchema: z.object({
+        clip_id: z.string().optional(),
+        kind: z.enum(STAGE_LIGHT_KINDS).optional(),
+        color: z.string().regex(STAGE_LIGHT_COLOUR.pattern).optional(),
+        intensity: z.number().optional(),
+        falloff: z.number().optional(),
+        cone_angle: z.number().optional(),
+        cone_feather: z.number().optional(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        depth: z.number().optional(),
+        aim_x: z.number().optional(),
+        aim_y: z.number().optional(),
+        start: z.number().min(0).optional(),
+        duration: z.number().positive().optional(),
+        ...PLACED
+      }),
+      execute: async (input) => {
+        if (!input.clip_id && !session.doc.camera) {
+          return apply({ ok: false, error: 'lights shade the camera world: turn the camera on first (set_camera)' }, 'added a light');
+        }
+        const props = Object.fromEntries(
+          Object.entries({ kind: input.kind, [STAGE_LIGHT_COLOUR.key]: input.color, intensity: input.intensity, falloff: input.falloff, coneAngle: input.cone_angle, coneFeather: input.cone_feather }).filter(([, v]) => v !== undefined)
+        );
+        const transform = Object.fromEntries(
+          Object.entries({
+            x: input.x === undefined ? undefined : toStored('Light', 'x', input.x, session.doc),
+            y: input.y === undefined ? undefined : toStored('Light', 'y', input.y, session.doc),
+            rotateX: input.aim_x,
+            rotateY: input.aim_y
+          }).filter(([, v]) => v !== undefined)
+        );
+        if (input.clip_id) {
+          return apply(setStageLight(session.doc, input.clip_id, { props, transform, depth: input.depth }), `changed light ${input.clip_id}`);
+        }
+        const id = deps.newId();
+        const added = addStageLight(session.doc, { kind: input.kind ?? 'point', from: frames(input.start ?? 0), durationInFrames: input.duration === undefined ? undefined : frames(input.duration), trackId: input.track_id, props, transform }, id);
+        const placed = added.ok && input.depth !== undefined ? setStageLight(added.doc, id, { depth: input.depth }) : added;
+        return created(apply(placed, 'added a light'), id);
+      }
     }),
 
     add_null: tool({
@@ -1927,10 +2070,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     edit_path_points: tool({
-      description: `Edit the points of a path, polygon, star or line Shape clip one by one, in order (indices refer to the path after the previous edits; a parametric shape becomes a free path). Coordinates are in the shape box, 0,0 top-left and 1,1 bottom-right. move: point contour.index goes to "to". delete: remove it. insert: add a point on the segment that starts at contour.index, at t 0..1 along it. smooth: give a corner point curved handles; corner: flatten its handles. handle: put the in or out handle of the point at "to". close: close or open the contour.`,
+      description: `Edit the points of any non-vector Shape clip (path, rect, circle, ellipse, polygon, star, line) one by one, in order (indices refer to the path after the previous edits; a parametric shape becomes a free path). Coordinates are in the shape box, 0,0 top-left and 1,1 bottom-right. move: point contour.index goes to "to". delete: remove it. insert: add a point on the segment that starts at contour.index, at t 0..1 along it. smooth: give a corner point curved handles; corner: flatten its handles. handle: put the in or out handle of the point at "to"; mirror "mirrored" also swings the other handle opposite (a smooth curve), "broken" (default) moves only this one. close: close or open the contour.`,
       inputSchema: z.object({
         clip_id: z.string(),
-        edits: z.array(z.object({ op: z.enum(PointOp), contour: z.number().int().min(0), index: z.number().int().min(0), to: z.tuple([z.number(), z.number()]).optional(), t: z.number().min(0).max(1).optional(), handle: z.enum(Handle).optional() })).min(1).max(200)
+        edits: z.array(z.object({ op: z.enum(PointOp), contour: z.number().int().min(0), index: z.number().int().min(0), to: z.tuple([z.number(), z.number()]).optional(), t: z.number().min(0).max(1).optional(), handle: z.enum(Handle).optional(), mirror: z.enum(Mirror).optional() })).min(1).max(200)
       }),
       execute: async (input) => apply(editPathPoints(session.doc, input.clip_id, input.edits), `edited the points of ${input.clip_id}`)
     }),
@@ -2249,6 +2392,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => VARIABLE_ACTIONS[input.action](input)
     }),
 
+    bind_variable: tool({
+      description: 'Bind one prop of a clip to a variable, as the bind chip next to an inspector field does: a colour variable to fill, stroke or color, a number to roundness, opacity, width, height, size or autoLayout.gap, a string to a text prop, a boolean to a toggle. variable is "Collection/name". The prop then follows the active mode of its collection; set_props on it is refused until unbind_variable.',
+      inputSchema: z.object({ clip_id: z.string(), target: z.string(), variable: z.string() }),
+      execute: async (input) => apply(bindVariable(session.doc, input.clip_id, input.target, input.variable), `bound ${input.target} of ${input.clip_id} to ${input.variable}`)
+    }),
+
+    unbind_variable: tool({
+      description: 'Free a prop from its variable, as the unbind button on the bind chip does. The prop keeps the value it has now.',
+      inputSchema: z.object({ clip_id: z.string(), target: z.string() }),
+      execute: async (input) => apply(unbindVariable(session.doc, input.clip_id, input.target), `unbound ${input.target} of ${input.clip_id}`)
+    }),
+
     register_font: tool({
       description: `Add a Google Fonts family or an uploaded font (list_fonts uploaded) to the video. Call it before add_clip names the family in props.font, and for a custom component font param (then set_props with that family). origin ${FontOrigin.Local} adds a font installed on the user's computer by exact family name: it is flagged local in the video and shows a fallback font on other computers and in server renders.`,
       inputSchema: z.object({ family: z.string().max(64), origin: z.enum(FontOrigin).optional() }),
@@ -2308,6 +2463,34 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const out = apply(applyTextPreset(session.doc, input.clip_id, input.preset, { start: frames(input.start), duration: frames(input.duration) }, id), `${input.preset} on ${input.clip_id}`);
         return out.ok ? { ...out, animator_id: id } : out;
       }
+    }),
+
+    add_interaction: tool({
+      description: `Link a layer to something that happens when the viewer acts on it in a prototype. trigger kind ${TRIGGER_KINDS.join('|')} (after_delay needs delayMs). action kind ${ACTION_KINDS.join('|')}: navigate and open_overlay take target, the id of another frame on the canvas (see the canvas frames), scroll_to takes the target id, back takes none. transition kind ${LINK_TRANSITIONS.join('|')}; slide and push take direction left|right|up|down, smart_animate matches layers of the two frames by layer name (or id when unnamed) and animates position, size, rotation, opacity, fill and radius, while layers found in only one frame fade; dissolve, slide, push and smart_animate take easing and durationMs (default 300). Default transition is instant. Pass interaction_id of an existing link to replace it. At most 16 per layer.`,
+      inputSchema: z.object({ clip_id: z.string(), interaction_id: z.string().optional(), trigger: triggerSchema, action: actionSchema, transition: transitionSchema.optional() }),
+      execute: async ({ clip_id, interaction_id, ...link }) => {
+        const id = interaction_id ?? deps.newId();
+        const out = apply(putInteraction(session.doc, clip_id, { id, ...link }), `linked ${clip_id} (${link.trigger.kind} to ${link.action.kind})`);
+        return out.ok ? { ...out, interaction_id: id } : out;
+      }
+    }),
+
+    remove_interaction: tool({
+      description: 'Remove one prototype link from a layer. interaction_id comes from list_interactions.',
+      inputSchema: z.object({ clip_id: z.string(), interaction_id: z.string() }),
+      execute: async ({ clip_id, interaction_id }) => apply(removeInteraction(session.doc, clip_id, interaction_id), `unlinked ${interaction_id} from ${clip_id}`)
+    }),
+
+    set_flow: tool({
+      description: 'Make this frame the starting point of a prototype flow, named name (for example Onboarding), or take the mark off with name null. The prototype player and the play link start on the first flow of the canvas; links between frames come from add_interaction. get_motion_doc reads it as flow.',
+      inputSchema: z.object({ name: z.string().max(MAX_FLOW_NAME).nullable() }),
+      execute: async ({ name }) => apply(setFlow(session.doc, name), name === null ? 'removed the flow' : `flow ${name}`)
+    }),
+
+    list_interactions: tool({
+      description: 'List every prototype link of this frame: the layer (clip_id), its trigger, action (with target frame) and transition. Links between frames are drawn as arrows on the canvas.',
+      inputSchema: z.object({}),
+      execute: async () => ({ interactions: clipsOf(session.doc).flatMap((c) => (c.interactions ?? []).map((i) => ({ clip_id: c.id, interaction_id: i.id, trigger: i.trigger, action: i.action, transition: i.transition }))) })
     }),
 
     set_text_counter: tool({

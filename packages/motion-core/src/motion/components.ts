@@ -18,6 +18,7 @@ import { GLASS_NUMBERS, GLASS_NUMBER_KEYS, GLASS_TINT, GlassSection } from './gl
 import { BLOB_NUMBERS, BLOB_NUMBER_KEYS, BLOB_TINT, BlobSection } from './blob/model';
 import { SEEKABLE_EFFECTS, SHADER_EFFECT_IDS, ShaderEffectId } from './shader-effects/catalogue';
 import { effectProblem } from './shader-effects/preset';
+import { STAGE_LIGHT, STAGE_LIGHT_ABOUT, STAGE_LIGHT_COLOUR, STAGE_LIGHT_KINDS, StageLightKind } from './lights';
 import { fillsSchema } from './fill/model';
 import { strokesSchema } from './stroke/model';
 import { runsSchema } from './text-runs';
@@ -78,8 +79,10 @@ const range = (min: number, max: number, step: number, fallback: number, label: 
 const choice = <T extends readonly [string, ...string[]]>(values: T, fallback: T[number], label: string, group: Group) =>
   z.enum(values).default(fallback as never).meta({ control: Control.Select, label, group });
 
+export const TEXT_MAX_CHARS = { line: 500, block: 20000 } as const;
+
 const text = (fallback: string, label: string, multiline = false) =>
-  z.string().max(500).default(fallback).meta({ control: multiline ? Control.Textarea : Control.Text, label, group: Group.Content });
+  z.string().max(multiline ? TEXT_MAX_CHARS.block : TEXT_MAX_CHARS.line).default(fallback).meta({ control: multiline ? Control.Textarea : Control.Text, label, group: Group.Content });
 
 const asset = (kind: AssetKind, label: string) =>
   z.string().nullable().default(null).meta({ control: Control.Asset, assetKind: kind, label, group: Group.Content });
@@ -146,8 +149,7 @@ export const AXES = /^('[A-Za-z0-9]{4}' -?\d+(\.\d+)?)(, '[A-Za-z0-9]{4}' -?\d+(
 
 type Look = { weight?: number; tracking: number; leading: number };
 
-const POSTER_TYPE_MAX = 1.2;
-export const TYPE_SIZE = { min: 0.001, max: POSTER_TYPE_MAX } as const;
+export const TYPE_SIZE = { min: 0.001, max: 4 } as const;
 
 const typography = (size: number, fallbackColor: string, look: Look) => ({
   color: color(fallbackColor, 'Colour'),
@@ -626,6 +628,22 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(5),
     schema: z.object({}).strict()
+  },
+  Light: {
+    label: 'Light',
+    description: `Draws nothing: it lights the layers of the camera world (needs a camera) while it is on screen, like an After Effects light. kind: ${STAGE_LIGHT_KINDS.map((k) => `${k} (${STAGE_LIGHT_ABOUT[k]})`).join('; ')}. Position it with transform x/y and depth, aim it with rotateX/rotateY. Layers are shaded Lambert per layer from their own 3D rotation; a layer with acceptsLights off is left alone. Once any light is on, a layer no light reaches is black. 3D clips keep their own lighting. Colour, intensity, falloff, coneAngle, coneFeather take set_keyframes.`,
+    track: TrackKind.Visual,
+    durationInFrames: seconds(5),
+    schema: z
+      .object({
+        kind: choice(STAGE_LIGHT_KINDS, StageLightKind.Point, 'Kind', Group.Content),
+        [STAGE_LIGHT_COLOUR.key]: z.string().regex(STAGE_LIGHT_COLOUR.pattern, 'expected #rrggbb').default(STAGE_LIGHT_COLOUR.fallback).meta({ control: Control.Color, label: STAGE_LIGHT_COLOUR.label, group: Group.Style }),
+        intensity: range(STAGE_LIGHT.intensity.min, STAGE_LIGHT.intensity.max, STAGE_LIGHT.intensity.step, STAGE_LIGHT.intensity.fallback, STAGE_LIGHT.intensity.label, Group.Style),
+        falloff: range(STAGE_LIGHT.falloff.min, STAGE_LIGHT.falloff.max, STAGE_LIGHT.falloff.step, STAGE_LIGHT.falloff.fallback, STAGE_LIGHT.falloff.label, Group.Style),
+        coneAngle: range(STAGE_LIGHT.coneAngle.min, STAGE_LIGHT.coneAngle.max, STAGE_LIGHT.coneAngle.step, STAGE_LIGHT.coneAngle.fallback, STAGE_LIGHT.coneAngle.label, Group.Style),
+        coneFeather: range(STAGE_LIGHT.coneFeather.min, STAGE_LIGHT.coneFeather.max, STAGE_LIGHT.coneFeather.step, STAGE_LIGHT.coneFeather.fallback, STAGE_LIGHT.coneFeather.label, Group.Style)
+      })
+      .strict()
   },
   Custom: {
     label: 'Custom',

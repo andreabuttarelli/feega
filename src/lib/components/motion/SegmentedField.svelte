@@ -10,6 +10,11 @@
   import MoveHorizontal from '@lucide/svelte/icons/move-horizontal';
   import MoveVertical from '@lucide/svelte/icons/move-vertical';
   import Maximize from '@lucide/svelte/icons/maximize';
+  import AsTyped from '@lucide/svelte/icons/type';
+  import CaseUpper from '@lucide/svelte/icons/case-upper';
+  import CaseLower from '@lucide/svelte/icons/case-lower';
+  import CaseTitle from '@lucide/svelte/icons/case-sensitive';
+  import SmallCaps from './SmallCapsIcon.svelte';
   import { SegmentedControl } from '$lib/components/ui/shell';
   import { SegmentIcon, type Segment } from '$lib/motion/segments';
 
@@ -25,7 +30,12 @@
     [SegmentIcon.Bottom]: AlignBottom,
     [SegmentIcon.AutoWidth]: MoveHorizontal,
     [SegmentIcon.AutoHeight]: MoveVertical,
-    [SegmentIcon.FixedSize]: Maximize
+    [SegmentIcon.FixedSize]: Maximize,
+    [SegmentIcon.AsTyped]: AsTyped,
+    [SegmentIcon.Upper]: CaseUpper,
+    [SegmentIcon.Lower]: CaseLower,
+    [SegmentIcon.Title]: CaseTitle,
+    [SegmentIcon.SmallCaps]: SmallCaps
   };
 
   const shown = $derived(options.map((o) => ({ value: o.value, label: o.label, icon: o.icon ? ICONS[o.icon] : undefined })));

@@ -151,7 +151,7 @@ export function elevenLabs(config: Config): AudioProvider {
     },
 
     async voices(): Promise<Voice[]> {
-      const res = await send(`/v2/voices?page_size=${VOICE_PAGE_SIZE}`, { method: 'GET' });
+      const res = await send(`/v2/voices?page_size=${VOICE_PAGE_SIZE}&voice_type=default`, { method: 'GET' });
       const body = (await res.json()) as { voices?: VoiceRow[] };
       return (body.voices ?? []).filter((v) => v.category === PREMADE).map((v) => ({
         id: v.voice_id,

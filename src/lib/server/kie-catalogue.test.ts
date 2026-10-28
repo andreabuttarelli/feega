@@ -142,13 +142,12 @@ describe('the kie catalogue', () => {
     expect(taskUsdFor(tool.pricing, { rendering_speed: 'TURBO' })).toBeLessThan(taskUsdFor(tool.pricing, { rendering_speed: 'QUALITY' })!);
   });
 
-  it('offers the image upscale priced per factor', () => {
+  it('offers the image upscale at one flat price', () => {
     const tool = rows.find((r) => r.id === IMAGE_TOOL_MODEL[ImageTool.Upscale])!;
 
-    expect(tool.wire_spec).toMatchObject({ model: 'topaz/image-upscale', requiresImage: true, menuGroup: IMAGE_TOOLS_GROUP, fields: { images: ['image_url'] } });
-    expect(tool.param_schema).toMatchObject({ upscale_factor: { type: 'enum', values: ['2', '4'] } });
-    expect(taskUsdFor(tool.pricing, { upscale_factor: '2' })).toBeCloseTo(10 * KIE_CREDIT_USD, 6);
-    expect(taskUsdFor(tool.pricing, { upscale_factor: '4' })).toBeCloseTo(20 * KIE_CREDIT_USD, 6);
+    expect(tool.wire_spec).toMatchObject({ model: 'recraft/crisp-upscale', requiresImage: true, menuGroup: IMAGE_TOOLS_GROUP, fields: { images: ['image'] } });
+    expect(tool.param_schema).toEqual({});
+    expect(taskUsdFor(tool.pricing, {})).toBeCloseTo(0.5 * KIE_CREDIT_USD, 6);
   });
 
   it('is never uncensored and always provider kie', () => {

@@ -6,10 +6,12 @@ import { canConnect, NODE_KINDS, type CanvasNode, type NodeKind } from '$lib/can
 import { tileNode } from '$lib/canvas/connect-rules';
 import type { Db } from '$lib/server/db/client';
 import { findNode } from '$lib/server/repos/canvas';
+import { freeImageAssetOf } from './free-image';
 import { isUncensoredModel } from '$lib/server/uncensored-access';
 import { catalogueIn, type ProjectMode } from '$lib/project-mode';
 
 export const UNCENSORED_NO_INPUTS_ERROR = 'uncensored_no_inputs';
+export const EMPTY_ELEMENT_SOURCE = 'Only an element that holds a single image can feed a node';
 
 export async function targetTakesNoInputs(db: Db, input: { orgId: string; targetNodeId: string }): Promise<boolean> {
   const target = await findNode(db, { orgId: input.orgId, nodeId: input.targetNodeId }).catch(() => null);
@@ -61,7 +63,15 @@ export async function connectRefusal(
     findNode(db, { orgId: input.orgId, nodeId: input.sourceNodeId }).catch(() => null),
     findNode(db, { orgId: input.orgId, nodeId: input.targetNodeId }).catch(() => null)
   ]);
-  return connectVerdict(source, target);
+  return connectVerdict(source, target) ?? (await elementSourceRefusal(db, { orgId: input.orgId, source }));
+}
+
+export async function elementSourceRefusal(db: Db, input: { orgId: string; source: { id: string; type: string; data: Record<string, unknown> } | null }): Promise<string | null> {
+  if (input.source?.type !== 'element') {
+    return null;
+  }
+
+  return (await freeImageAssetOf(db, { orgId: input.orgId, node: input.source })) ? null : EMPTY_ELEMENT_SOURCE;
 }
 
 const NOTHING_OFFERED: OfferedModels = { choices: [], recommended: [] };

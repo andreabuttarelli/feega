@@ -73,6 +73,7 @@
   const library = $derived(data.assets.filter((a) => MEDIA_KINDS.has(a.kind)));
   const assetUrls = $derived(Object.fromEntries(data.assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
   const html = $derived(composeHtml({ doc, tokens: data.tokens, assets: assetUrls, target: Target.Screen }));
+  const fullDoc = $derived({ doc, tokens: data.tokens, assets: assetUrls, compose: (only?: ReadonlySet<string>) => composeHtml({ doc, tokens: data.tokens, assets: assetUrls, target: Target.Screen, only }) });
   const picked = $derived(new Map((draft?.media ?? []).map((m, i) => [m.assetId, i])));
   const fixedCamera = $derived(draft ? layoutOf(draft.layout, draft.custom?.spec).camera === 'fixed' : false);
   let layoutPrompt = $state('');
@@ -266,7 +267,7 @@
   <div class="body">
     <section class="stage-col">
       <div class="preview">
-        <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing />
+        <MotionPreview bind:this={preview} {html} {fullDoc} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing />
       </div>
       <div class="transport">
         <button type="button" class="icon" aria-label={playing ? 'Pause' : 'Play'} onclick={() => (playing = !playing)}>

@@ -60,9 +60,9 @@ describe('the Layer section', () => {
 });
 
 describe('booleans in Properties', () => {
-  it('read as Yes / No, never a bare checkbox', () => {
+  it('read as a toggle button, never a bare checkbox', () => {
     const html = inspect('Title');
-    expect(html).toMatch(/data-segmented="Italic"[\s\S]*?>Yes<[\s\S]*?>No</);
+    expect(html).toContain('data-testid="text-italic"');
     expect(html).not.toContain('id="f-italic"');
   });
 });
