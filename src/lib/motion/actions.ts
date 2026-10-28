@@ -42,6 +42,8 @@ import PenTool from '@lucide/svelte/icons/pen-tool';
 import Pencil from '@lucide/svelte/icons/pencil';
 import PencilRuler from '@lucide/svelte/icons/pencil-ruler';
 import Pause from '@lucide/svelte/icons/pause';
+import Repeat from '@lucide/svelte/icons/repeat';
+import InfinityIcon from '@lucide/svelte/icons/infinity';
 import Rewind from '@lucide/svelte/icons/rewind';
 import SkipBack from '@lucide/svelte/icons/skip-back';
 import SkipForward from '@lucide/svelte/icons/skip-forward';
@@ -131,6 +133,8 @@ export enum Tool {
   Snap = 'snap',
   NullFromSelection = 'null-from-selection',
   ClearWorkArea = 'clear-work-area',
+  Loop = 'loop',
+  CloseLoop = 'close-loop',
   CopyEase = 'copy-ease',
   PasteEase = 'paste-ease',
   FitGraph = 'fit-graph',
@@ -308,6 +312,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.WorkIn]: { name: 'Work area starts here', icon: ChevronFirst, group: GuideGroup.Timeline, menu: MenuSection.Time },
   [Command.WorkOut]: { name: 'Work area ends here', icon: ChevronLast, group: GuideGroup.Timeline, menu: MenuSection.Time },
   [Tool.ClearWorkArea]: { name: 'Clear work area', icon: Brackets, group: GuideGroup.Timeline, menu: MenuSection.Time },
+  [Tool.Loop]: { name: 'Loop playback', icon: Repeat, group: GuideGroup.Playback, place: Place.Transport },
+  [Tool.CloseLoop]: { name: 'Make seamless', icon: InfinityIcon, group: GuideGroup.Timeline, menu: MenuSection.Time },
   [Tool.Snap]: { name: 'Snap', icon: Magnet, group: GuideGroup.Timeline, place: Place.Toolbar },
   [Command.ZoomIn]: { name: 'Zoom in', icon: ZoomIn, group: GuideGroup.Timeline, gesture: PINCH, menu: MenuSection.View },
   [Command.ZoomOut]: { name: 'Zoom out', icon: ZoomOut, group: GuideGroup.Timeline, gesture: PINCH, menu: MenuSection.View },

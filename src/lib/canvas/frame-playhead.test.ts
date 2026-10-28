@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { frameOfLive } from '$lib/canvas/core/frame-source';
-import { advance, withPlayhead } from './frame-playhead';
+import { Wrap, advance, withPlayhead } from './frame-playhead';
 
 const doc = newMotionDoc(MotionFormat.Landscape);
 const live = { doc, tokens: FEEGA_TOKENS, assets: {} };
@@ -28,11 +28,38 @@ describe('the playhead of a frame on the canvas', () => {
 });
 
 describe('advancing playback', () => {
+  const whole = { from: 0, to: 300 };
+  const play = (head: number, ms: number, range = whole, wrap = Wrap.Loop) => advance({ head, ms, fps: 30, range, wrap });
+
   it('moves by the frames the elapsed time covers', () => {
-    expect(advance({ frame: 0, ms: 1000, fps: 30, duration: 300 })).toBe(30);
+    expect(play(0, 1000)).toBe(30);
   });
 
-  it('loops back to the start at the end of the doc', () => {
-    expect(advance({ frame: 295, ms: 1000, fps: 30, duration: 300 })).toBe(25);
+  it('plays at the doc rate on a 60 Hz screen, not one frame per paint', () => {
+    let head: number | null = 0;
+    for (let tick = 0; tick < 60; tick++) {
+      head = play(head!, 1000 / 60);
+    }
+    expect(Math.floor(head!)).toBe(30);
+  });
+
+  it('keeps moving on a 120 Hz screen', () => {
+    let head: number | null = 0;
+    for (let tick = 0; tick < 120; tick++) {
+      head = play(head!, 1000 / 120);
+    }
+    expect(Math.floor(head!)).toBe(30);
+  });
+
+  it('loops back to the start at the end of the doc without a held frame', () => {
+    expect(play(295, 1000)).toBe(25);
+  });
+
+  it('loops inside the work area', () => {
+    expect(play(95, 1000, { from: 60, to: 100 })).toBe(85);
+  });
+
+  it('stops at the out point when looping is off', () => {
+    expect(play(295, 1000, whole, Wrap.Stop)).toBeNull();
   });
 });

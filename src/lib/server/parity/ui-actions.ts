@@ -295,6 +295,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Tool.Snap]: VIEW,
   [Tool.NullFromSelection]: motion('add_null'),
   [Tool.ClearWorkArea]: motion('set_work_area'),
+  [Tool.Loop]: motion('set_interactive'),
+  [Tool.CloseLoop]: motion('close_loop'),
   [Tool.CopyEase]: CLIPBOARD,
   [Tool.PasteEase]: motion('set_ease_handles'),
   [Tool.FitGraph]: VIEW,
