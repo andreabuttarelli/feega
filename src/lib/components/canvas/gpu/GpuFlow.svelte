@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { breakpointViews, viewAt } from '$lib/canvas/breakpoint-views';
+  import { BASE_BREAKPOINT, resolveAt } from '@feega/motion-core/motion/breakpoints/model';
   import { ownsPress } from '$lib/canvas/press-owner';
   import { cardRadiusOf } from '$lib/canvas/core/gen-card';
   import { LocalOff, isOff } from '$lib/local-user';
@@ -909,7 +911,23 @@
     })();
   });
 
+  function viewPickAt(w: Point, picked: readonly string[]) {
+    const hit = viewAt(bpViews, w);
+    const live = hit ? viewLives.get(hit.frame.id) : null;
+    if (!hit || !live) {
+      return null;
+    }
+    const picker = pickers.of(hit.frame.id, live, () => liveOf(hit.nodeId)?.playhead);
+    const space = picker.spaceOf(hit.frame.box, 0);
+    const clip = picker.pickHeld(w, space, inside?.nodeId === hit.nodeId ? picked : []);
+    return { nodeId: hit.nodeId, breakpointId: hit.breakpointId, clip, space, picker, frame: hit.frame };
+  }
+
   function framePickAt(w: Point, picked: readonly string[] = []) {
+    const inView = viewPickAt(w, picked);
+    if (inView) {
+      return inView;
+    }
     const id = topNodeAt(w);
     const frame = id && !domIds.has(id) ? coreFrames.find((f) => f.id === id) : null;
     const live = frame ? (liveDocs.map.get(frame.id) ?? fetched.get(frame.id)?.live) : null;
@@ -919,7 +937,7 @@
     const picker = pickers.of(frame.id, live, () => liveOf(frame.id)?.playhead);
     const space = picker.spaceOf(frame.box, byId.get(frame.id)?.rotation ?? 0);
     const clip = picker.pickHeld(w, space, inside?.nodeId === frame.id ? picked : []);
-    return { nodeId: frame.id, clip, space, picker, frame };
+    return { nodeId: frame.id, breakpointId: BASE_BREAKPOINT, clip, space, picker, frame };
   }
 
   function hoverElement(w: Point) {
@@ -965,11 +983,19 @@
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
   const revisionOfFrame = (id: string) => coreFrames.find((f) => f.id === id)?.revision ?? 0;
+  const bpViews = $derived(breakpointViews(coreFrames, (id) => liveOf(id)?.doc));
   const drawnFrames = $derived(coreFrames.map((f) => {
     const doc = liveOf(f.id)?.doc;
     const scenes = doc ? sceneStamp(doc, (id) => sceneRevision(revisionOfFrame(id), liveDocs.edits.get(id))) : '';
     return scenes ? { ...f, scenes } : f;
-  }));
+  }).concat(bpViews.map((v) => v.frame)));
+  const viewLives = $derived(new Map(bpViews.flatMap((v) => {
+    const live = liveOf(v.nodeId);
+    return live ? [[v.frame.id, { ...live, doc: resolveAt(live.doc, v.breakpointId) }] as const] : [];
+  })));
+  const viewOverlays = $derived(bpViews.map((v) => ({ id: v.frame.id, ...v.frame.box, rotation: 0, bar: 0, doc: { width: v.frame.box.w, height: v.frame.box.h } })));
+  const viewLabels = $derived(new Map(bpViews.map((v) => [v.frame.id, `${v.name} ${v.width}`])));
+  const coreLive = $derived(viewLives.size ? new Map([...liveDocs.map, ...viewLives]) : liveDocs.map);
   $effect(() => {
     canvasComponents.set(
       coreFrames.flatMap((f) => {
@@ -1041,7 +1067,7 @@
       return null;
     }
     const clip = chainTarget(doc, hit.picker.chain(w, hit.space), inside?.nodeId === hit.nodeId ? picks : [], reach);
-    return clip ? { nodeId: hit.nodeId, clip } : null;
+    return clip ? { nodeId: hit.nodeId, breakpointId: hit.breakpointId, clip } : null;
   }
 
   function groupOfPick(nodeId: string): string | null {
@@ -1057,6 +1083,10 @@
     }
     select([hit.nodeId]);
     goInside(hit.nodeId, deep ? Gesture.Deep : Gesture.Click, hit.clip);
+    const saver = saverOf(hit.nodeId);
+    if (saver) {
+      saver.breakpoint = hit.breakpointId;
+    }
     return true;
   }
 
@@ -2963,7 +2993,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={resizing} order={stackOrder} live={liveDocs.map} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={resizing} order={stackOrder} live={coreLive} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>
@@ -3009,6 +3039,9 @@
           <div class="frame-marquee" data-testid="frame-marquee" style={`left:${band.left}px;top:${band.top}px;width:${band.width}px;height:${band.height}px`}></div>
         {/if}
       {/snippet}
+    </FrameOverlays>
+    <FrameOverlays {view} frames={viewOverlays}>
+      {#snippet children(frame)}<span class="bp-label" data-testid="breakpoint-view-label">{viewLabels.get(frame.id)}</span>{/snippet}
     </FrameOverlays>
     <PrototypePlayerHost frames={playerFrames} />
     <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} />
@@ -3235,6 +3268,16 @@
 </div>
 
 <style>
+  .bp-label {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    padding-bottom: 4px;
+    color: var(--ui-ink-2);
+    font-size: var(--ui-text-xs);
+    white-space: nowrap;
+  }
+
   .wrap.commenting .surface {
     cursor: crosshair;
   }

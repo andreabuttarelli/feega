@@ -12,6 +12,10 @@ Status: accepted 2026-10-28.
   text align, x/y/width/height, constraints.
 - `resolveAt(doc, id)` applies the overrides of every view at least as wide as the target, widest
   first, then drops `breakpoints` and `overrides`. The result is a plain doc any renderer reads.
+- A view keeps pixels: text size, stroke widths and the width of laid-out children are rescaled
+  from the frame's unit to the view's, so a 15px label is 15px on Phone. Override values are
+  stored in the base frame's units; `liftEdit` converts an edit made on a view back before
+  diffing, so an untouched round trip writes nothing.
 - `mediaQueries(doc)` lists the same overrides as `max-width` steps, widest first, for codegen.
 - Nothing is automatic. A new breakpoint inherits everything; "stack on this breakpoint" is a
   user action that writes explicit `direction` and `width` overrides.

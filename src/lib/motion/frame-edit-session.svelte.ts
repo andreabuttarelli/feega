@@ -8,6 +8,7 @@ import { liveEdits, type LiveEdits } from './live-edit';
 import { settleGroups } from './light-group';
 import { mergeView } from '@feega/motion-core/motion/precomp';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
 
 const SAVE_DEBOUNCE_MS = 250;
 const COALESCE_MS = 800;
@@ -32,6 +33,7 @@ export class FrameEditSession {
   history = $state.raw<History>(startHistory({} as MotionDoc));
   version = $state(0);
   selection = $state<string[]>([]);
+  breakpoint = $state<string>(BASE_BREAKPOINT);
   mode = $state<EditMode>(EditMode.Design);
   saveState = $state<SaveState>(SaveState.Saved);
   notice = $state('');
