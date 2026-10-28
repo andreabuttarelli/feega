@@ -3940,6 +3940,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     await refresh();
     if (result.undo.length) { pushGesture({ items: result.undo }); }
+    if (result.moves.length) { undoStack.push({ source: 'move', gesture: { kind: 'move', items: result.moves } }); }
     return result;
   }
 

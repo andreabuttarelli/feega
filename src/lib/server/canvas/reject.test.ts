@@ -102,6 +102,19 @@ describe('reject one agent change, keep the edits made after it', () => {
     expect((await findNode(db, { orgId: ORG, nodeId: node.id }))!.data).toEqual({ prompt: 'keep me' });
   });
 
+  it('a rejected move reports where the node was, so one undo can put it back', async () => {
+    const db = memory();
+    const node = await make(db, { prompt: 'x' });
+    await moveNode(db, { orgId: ORG, nodeId: node.id, x: 300, y: 40, actor: AGENT });
+
+    const result = await reject(db, [await lastEventId(db)]);
+
+    if (result.outcome !== 'rejected') {
+      throw new Error(result.outcome);
+    }
+    expect(result.moves).toEqual([{ nodeId: node.id, before: { x: 300, y: 40 }, after: { x: 0, y: 0 } }]);
+  });
+
   it('the reject is itself undoable: its undo brings the agent change back', async () => {
     const db = memory();
     const node = await make(db, { prompt: 'mine', model: 'm1' });
