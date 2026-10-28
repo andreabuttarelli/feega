@@ -5,7 +5,7 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { FrameFit, framePicker, type WorldRect } from '$lib/canvas/frame-pick';
+  import { FrameFit, FramePickers, type WorldRect } from '$lib/canvas/frame-pick';
   import { onDestroy, onMount, untrack } from 'svelte';
   import { TILE_PAINTED } from '@feega/motion-core/motion/hyperframes/measure';
   import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
@@ -70,7 +70,7 @@
   import { FRAME_DIALOG_ACTIONS, FrameDialog, isFrameDialogAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Reach, frameLevel, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Reach, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { chainTarget, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
@@ -827,7 +827,7 @@
     }
     const hit = hitAt(world);
     const id = hit.kind === HitKind.Node ? hit.nodeId : null;
-    const deeper = id ? framePickAt(world) : null;
+    const deeper = id ? framePickAt(world, picks) : null;
     const entered = id && deeper && inside?.nodeId === id ? enteredFrom(deeper.picker.chain(world, deeper.space), picks) : null;
     if (id && entered) {
       pickMany(id, [entered]);
@@ -875,7 +875,7 @@
     glider.invalidate();
   }
 
-  const pickers = new Map<string, { live: object; picker: ReturnType<typeof framePicker> }>();
+  const pickers = new FramePickers();
   let fetched = $state.raw(new Map<string, { revision: number; live: LiveDoc }>());
   const asked = new Set<string>();
 
@@ -909,18 +909,16 @@
     })();
   });
 
-  function framePickAt(w: Point) {
+  function framePickAt(w: Point, picked: readonly string[] = []) {
     const id = topNodeAt(w);
     const frame = id && !domIds.has(id) ? coreFrames.find((f) => f.id === id) : null;
     const live = frame ? (liveDocs.map.get(frame.id) ?? fetched.get(frame.id)?.live) : null;
     if (!frame || !live) {
       return null;
     }
-    const held = pickers.get(frame.id);
-    const picker = held?.live === live.doc ? held.picker : framePicker(live, () => liveOf(frame.id)?.playhead);
-    pickers.set(frame.id, { live: live.doc, picker });
+    const picker = pickers.of(frame.id, live, () => liveOf(frame.id)?.playhead);
     const space = picker.spaceOf(frame.box, byId.get(frame.id)?.rotation ?? 0);
-    const clip = picker.pick(w, space);
+    const clip = picker.pickHeld(w, space, inside?.nodeId === frame.id ? picked : []);
     return { nodeId: frame.id, clip, space, picker, frame };
   }
 
@@ -1358,9 +1356,7 @@
     if (!frame || !live) {
       return null;
     }
-    const held = pickers.get(nodeId);
-    const picker = held?.live === live.doc ? held.picker : framePicker(live, () => liveOf(nodeId)?.playhead);
-    pickers.set(nodeId, { live: live.doc, picker });
+    const picker = pickers.of(nodeId, live, () => liveOf(nodeId)?.playhead);
     return { picker, space: picker.spaceOf(frame.box, byId.get(nodeId)?.rotation ?? 0, resizing.has(nodeId) ? FrameFit.Stretch : FrameFit.Contain), frame, live };
   }
 
@@ -1707,6 +1703,12 @@
     if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && pickElement(e, toWorld(view, local(e)))) {
       e.stopPropagation();
       return;
+    }
+    const under = grip === Grip.Move ? elementAt(toWorld(view, local(e)), Reach.Top) : null;
+    const instead = under?.nodeId === nodeId ? grabbedInstead(picks, under.clip) : null;
+    if (instead) {
+      pickMany(nodeId, [instead]);
+      clip = instead;
     }
     const at = pickerOf(nodeId);
     const saver = saverOf(nodeId);
@@ -3000,7 +3002,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} views={{ ...frameViews, [FrameView.Rulers]: rulersPref.on }} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={shownMode(toggledModes, frame.id, tools.doc, recalledMode(modeStore()))} views={{ ...frameViews, [FrameView.Rulers]: rulersPref.on }} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}

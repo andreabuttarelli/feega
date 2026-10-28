@@ -16,6 +16,7 @@
   import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { EditMode } from '$lib/motion/edit-mode';
+  import { drawStart } from '$lib/motion/draw-create';
   import { Axis, Edge, alignSpace, distributeSpace, propBoxes } from '$lib/motion/space';
   import { canEditPoints, enterPointEdit, landsOn } from '$lib/motion/shape/vector-edit';
   import type { Pt } from '@feega/motion-core/motion/shape/geometry';
@@ -33,6 +34,7 @@
   let {
     doc,
     frame,
+    mode = EditMode.Design,
     size,
     picks,
     tool,
@@ -45,6 +47,7 @@
   }: {
     doc: MotionDoc;
     frame: number;
+    mode?: EditMode;
     size: Size;
     picks: string[];
     tool: DrawTool;
@@ -132,7 +135,7 @@
   {#if shown.has(FrameOverlay.ShapeBuilder)}<ShapeBuilderOverlay {doc} {frame} {picks} onchange={apply} onexit={onleave} />{/if}
   {#if shown.has(FrameOverlay.Draw)}
     <div class="draw">
-      <DrawOverlay {doc} {frame} {tool} onchange={apply} oncreated={created} />
+      <DrawOverlay {doc} frame={drawStart(mode, frame)} {tool} onchange={apply} oncreated={created} />
     </div>
   {/if}
 </div>

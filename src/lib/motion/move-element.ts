@@ -1,4 +1,4 @@
-import { COMPONENTS, TrackKind, type ComponentId } from '@feega/motion-core/motion/components';
+import { COMPONENTS, TrackKind, defaultProps, type ComponentId } from '@feega/motion-core/motion/components';
 import { MAX_SHORT_SIDE, MAX_SIDE, MAX_TRACKS, MotionFormat, cloneDoc, compsOf, findClip, newClip, newMotionDoc, type AssetRef, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
 import { FPS, maxFrames } from '@feega/motion-core/motion/design';
 import { fieldsOf } from './inspector';
@@ -375,7 +375,7 @@ export function frameOf(element: Element, mode: DocMode, box: Box | null, newId:
 export function mediaElement(output: Output, fps: number = FPS): Element {
   const media = MEDIA[output.kind];
   const durationInFrames = media.frames(output, fps) ?? Math.round((COMPONENTS[media.component].durationInFrames * fps) / FPS);
-  const clip = newClip({ id: `${media.component.toLowerCase()}-${crypto.randomUUID().slice(0, 8)}`, from: 0, durationInFrames, component: media.component, props: { ...MEDIA_FIT[output.kind], [media.prop]: media.value(output) } });
+  const clip = newClip({ id: `${media.component.toLowerCase()}-${crypto.randomUUID().slice(0, 8)}`, from: 0, durationInFrames, component: media.component, props: { ...defaultProps(media.component), ...MEDIA_FIT[output.kind], [media.prop]: media.value(output) } });
   const asset = media.asset(output);
   return { clip, fps, size: media.size(output), stillAt: 0, fillsFrame: output.kind === OutputKind.Image, carried: { assets: asset ? [asset] : [], fonts: [], components: {}, comps: {} } };
 }

@@ -7,6 +7,7 @@ import { FillKind, ShapeKind, StrokeKind } from '@feega/motion-core/motion/shape
 import type { SvgFillRule, SvgGradient } from './shape/svg-import';
 import { FillType } from '@feega/motion-core/motion/fill/model';
 import { setClipFlags } from '@feega/motion-core/motion/organize';
+import { EditMode } from './edit-mode';
 import { DocMode, docMode, setStill, settledStill } from '@feega/motion-core/motion/still';
 import { TOP_LEFT_START, addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
@@ -37,6 +38,13 @@ const SPAN: Record<DocMode, (doc: MotionDoc, frame: number, component: Component
     return { from, durationInFrames: Math.max(1, doc.durationInFrames - from) };
   }
 };
+
+const DRAW_START: Record<EditMode, (playhead: number) => number> = {
+  [EditMode.Design]: () => 0,
+  [EditMode.Motion]: (playhead) => playhead
+};
+
+export const drawStart = (mode: EditMode, playhead: number): number => DRAW_START[mode](playhead);
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
