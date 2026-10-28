@@ -57,6 +57,16 @@ describe('elevenLabs adapter', () => {
     expect(JSON.parse(String(calls[0].init.body))).toEqual({ prompt: 'lofi', music_length_ms: 30000, model_id: 'music_v1' });
   });
 
+  it('a 402 from music tells the user the provider plan blocks it, not to upgrade their own plan', async () => {
+    const { provider } = recorder(() => new Response(JSON.stringify({
+      detail: { status: 'payment_required', message: 'Music API is not available for free users. Please upgrade to a paid plan to use the API.' }
+    }), { status: 402, headers: { 'content-type': 'application/json' } }));
+
+    await expect(provider.compose({ prompt: 'lofi', seconds: 10, model: 'music_v1' })).rejects.toThrow(
+      'provider_plan: this ElevenLabs feature is not available on feega\'s current provider plan. Nothing was generated; try again later or write to support@feega.app.'
+    );
+  });
+
   it('makes a sound effect with the duration in seconds', async () => {
     const { calls, provider } = recorder(() => audioReply());
     await provider.soundEffect({ prompt: 'door', seconds: 5, model: 'eleven_text_to_sound_v2' });
