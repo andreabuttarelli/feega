@@ -46,6 +46,55 @@ Mockups (social post, canvas) work the same. For an adjustment layer, select it,
 
 `set_keyframes` gives full control over each key and its easing; for an adjustment layer use `prop: "opacity"`. `list_components` says what each component animates.
 
+## Add and remove keys
+
+In the timeline, each animated property row has a small diamond button next to its name. With the playhead on a key it reads **Remove keyframe here**; anywhere else it reads **Add keyframe here**. Adding keys the property at its current value. Camera rows cannot be keyed from the diamond.
+
+In **Design** mode, changing an animated property moves every key of that property by the same amount, and the inspector warns you. In **Animate** mode the change is keyed at the playhead. Properties with no keys are simply set in both modes.
+
+## Key shapes
+
+A key's shape shows how the value **leaves** it (its out interpolation):
+
+| Shape | Interpolation |
+|---|---|
+| Diamond | Bezier (default), Auto-bezier, Continuous |
+| Circle | Linear |
+| Square | Hold |
+| Dashed outline | Roving (combined with the shape above) |
+
+Selected keys fill with the accent colour. There is no hourglass shape: Bezier, Auto-bezier and Continuous share the diamond.
+
+## Interpolation types
+
+Each key has an **in** side (arriving) and an **out** side (leaving):
+
+- **Bezier:** follows the ease curve (the default).
+- **Linear:** constant speed.
+- **Hold:** the value does not change until the next key.
+- **Auto-bezier:** smooth, never overshoots.
+- **Continuous:** smooth, keeps speed through the key.
+- **Roving:** retimes a middle key so the speed is even. Position properties only.
+
+To change a type, click the thin bar between two keys (**Ease**). The ease picker opens with a *Leaving* row for the earlier key and an *Entering next* row for the later one; pick a type in each. Roving is not in the picker; set it with `set_keyframes` (`roving: true`) from an agent, MCP or CLI.
+
 ## Easing
 
-**Unverified:** the list of easing curves and where the picker lives. The design rule in `DESIGN.md` is strong in-out expo-like curves with a tiny settle at the end; the editor's own list is in the motion code.
+The same picker holds the easing for the segment:
+
+- Named curves: Standard, Ease out, Ease in, Linear, Overshoot, Elastic, Bounce.
+- **Intensity** slider for Elastic and Bounce.
+- **cubic-bezier** fields: type the four numbers of a custom curve (x values are clamped to 0-1).
+- **Copy as CSS** copies the curve.
+
+## Graph editor
+
+Open it with the **Graph editor** button at the right of the timeline toolbar, or from the View menu. Select a clip with keyframes (or keys) and pick the property in the dropdown.
+
+- **Value** plots the property over time; **Speed** plots its rate of change.
+- Drag the square handles on a Bezier segment to shape the ease. Handles only appear between two Bezier keys.
+- Click a key to select it, `Shift`+click to add more. Presets, copy and paste apply to the selected keys, or to the whole property if none are selected.
+- **Easy ease** presets: `F9` (both sides), `Shift+F9` (arriving), `Cmd+Shift+F9` / `Ctrl+Shift+F9` (leaving).
+- **Apple curves**: default, ease in, ease out, ease in-out.
+- **Copy ease** and **Paste ease** move a curve from one key to others.
+- **Fit curves to view** re-frames the plot.
