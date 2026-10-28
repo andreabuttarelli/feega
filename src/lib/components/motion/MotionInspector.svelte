@@ -173,7 +173,6 @@
 
   const family = $derived(familyOf(clip.component));
   let sections = $state<SectionState>({});
-  let advancedOpen = $state(false);
 
   onMount(() => {
     sections = readSections(localStore());
@@ -1155,20 +1154,6 @@
 {/snippet}
 
 <style>
-  .advanced {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-    padding: 4px 0;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--ui-ink-2);
-  }
-
-  .advanced :global(.turned) {
-    transform: rotate(90deg);
-  }
-
   .inspector {
     display: flex;
     flex: 1 0 auto;
@@ -1289,18 +1274,6 @@
   .case {
     flex: 1;
     min-width: 0;
-  }
-
-  .advanced {
-    margin-top: 8px;
-  }
-
-  .advanced > summary {
-    cursor: pointer;
-    color: var(--ui-ink-2);
-    min-height: 28px;
-    display: flex;
-    align-items: center;
   }
 
   .adv {

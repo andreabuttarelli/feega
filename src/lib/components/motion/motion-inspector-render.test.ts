@@ -25,13 +25,13 @@ function inspect(component: ComponentId, mode = EditMode.Motion) {
 const sections = (html: string) => [...html.matchAll(/data-section="([^"]+)"/g)].map((m) => m[1]);
 
 describe('Properties for one clip', () => {
-  it('a title: its name and kind on top, then layout, layer, fill, effects, text, animation in that order', () => {
+  it('a title: its name and kind on top, then layout, layer, effects, text, animation in that order', () => {
     const html = inspect('Title');
 
     expect(html).toMatch(/class="name[^"]*"[^>]*value="Better marketing/);
     expect(html).toMatch(/class="kind[^"]*">Title</);
     const order = sections(html).filter((s) => ['layout', 'layer', 'fill', 'effects', 'text', 'animate'].includes(s));
-    expect(order).toEqual(['layout', 'layer', 'fill', 'effects', 'text', 'animate']);
+    expect(order).toEqual(['layout', 'layer', 'effects', 'text', 'animate']);
   });
 
   it('a title shows each value with an English label and its unit, never a glyph or a bare ratio', () => {
@@ -53,12 +53,13 @@ describe('Properties for one clip', () => {
     expect(textSection).toContain('data-segmented="Text align"');
   });
 
-  it('a text keeps the width and slant axes behind a collapsed advanced row', () => {
+  it('a text keeps the width and slant axes behind a closed advanced type popover', () => {
     const html = inspect('Text');
     const text = html.split('data-section="text"')[1] ?? '';
 
-    expect(text).toContain('data-testid="text-advanced"');
-    expect(text).toContain('aria-expanded="false"');
+    expect(text).toContain('data-testid="advanced-type-toggle"');
+    expect(text).toContain('aria-pressed="false"');
+    expect(text).not.toContain('data-testid="side-popover"');
     expect(text).not.toContain('Width axis');
     expect(text).not.toContain('Slant axis');
     expect(text).not.toContain('Other axes');
@@ -66,12 +67,13 @@ describe('Properties for one clip', () => {
     expect(text).toContain('>Spacing</span>');
   });
 
-  it('a text offers the case as five icons, each named', () => {
+  it('a text offers the case as a select with five named options', () => {
     const text = (inspect('Text').split('data-section="text"')[1] ?? '');
 
-    for (const name of ['As typed', 'Uppercase', 'Lowercase', 'Title case', 'Small caps']) {
-      expect(text).toContain(`aria-label="${name}"`);
-    }
+    expect(text).toContain('data-testid="text-case"');
+    const select = text.split('data-testid="text-case"')[1]?.split('</select>')[0] ?? '';
+
+    expect(select.match(/<option/g)).toHaveLength(5);
   });
 
   it('a colour is a swatch, a hex field and a picker, not a row of brand swatches', () => {
