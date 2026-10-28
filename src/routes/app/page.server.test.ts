@@ -75,15 +75,14 @@ function form(fields: Record<string, string>) {
 describe('/app is the dashboard for a returning user', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('loads projects, tools and the latest outputs of the chosen org', async () => {
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as unknown as {
-      dashboard: { projects: { id: string; canvases: unknown[] }[]; batches: { href: string }[] };
+  it('loads tools without re-reading the dashboard bootstrap already returned', async () => {
+    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' }, projects: [{ id: 'p1', name: 'Launch' }] }) } as never)) as unknown as {
+      dashboard?: unknown;
       tools: { id: string }[];
     };
 
-    expect(data.dashboard.projects.map((p) => p.id)).toEqual(['p1']);
-    expect(data.dashboard.projects[0].canvases).toEqual([{ id: 'c1', name: 'Board', href: '/p/p1/c/c1' }]);
-    expect(data.dashboard.batches[0].href).toBe('/app/studio/b1');
+    expect(data.dashboard).toBeUndefined();
+    expect(listProjects).not.toHaveBeenCalled();
     expect(data.tools.map((t) => t.id)).toEqual(['studio', 'compose', 'upscale']);
   });
 

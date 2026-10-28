@@ -14,16 +14,16 @@ if (import.meta.env.VITE_VERCEL_ANALYTICS && (!browser || !bundleApiBase())) {
 
 const ROOT_API = '/api/v1/me/root';
 
-async function grantFor(signedIn: boolean): Promise<void> {
+function grantFor(signedIn: boolean): void {
   const apiBase = bundleApiBase();
   if (apiBase && signedIn) {
-    await keepAssetGrant(apiBase);
+    keepAssetGrant(apiBase).catch((e) => console.error('asset grant', e));
   }
 }
 
 async function inBrowser(): Promise<RootShell> {
   const [session, shell] = await Promise.all([viewerSession(), viewerCall<RootShell>(`${ROOT_API}?host=${encodeURIComponent(location.hostname)}`)]);
-  await grantFor(!!session);
+  grantFor(!!session);
   return { ...shell, session };
 }
 
