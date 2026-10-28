@@ -54,16 +54,17 @@ In **Design** mode, changing an animated property moves every key of that proper
 
 ## Key shapes
 
-A key's shape shows how the value **leaves** it (its out interpolation):
+A key is drawn in two halves, as in After Effects: the left half shows how the value **arrives** (in interpolation), the right half how it **leaves** (out interpolation).
 
 | Shape | Interpolation |
 |---|---|
-| Diamond | Bezier (default), Auto-bezier, Continuous |
-| Circle | Linear |
+| Diamond | Linear |
+| Hourglass | Bezier (default) |
+| Circle | Auto-bezier, Continuous |
 | Square | Hold |
 | Dashed outline | Roving (combined with the shape above) |
 
-Selected keys fill with the accent colour. There is no hourglass shape: Bezier, Auto-bezier and Continuous share the diamond.
+Selected keys fill with the accent colour. A key whose sides differ shows two different half-shapes.
 
 ## Interpolation types
 
