@@ -17,6 +17,7 @@ use crate::pictures::Pictures;
 use crate::reproject::{Draw, Reprojector};
 use crate::retained::{Camera, Lookup, Quality};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
+use crate::texture_budget::split;
 use crate::Skipped;
 
 const CACHE_SIDE: u32 = 4096;
@@ -336,7 +337,9 @@ impl WebCore {
     }
 
     pub fn set_budget(&mut self, bytes: f64) {
-        self.library.set_budget(bytes as u64);
+        let share = split(bytes as u64, self.compositor.size());
+        self.library.set_budget(share.cache);
+        self.engine.set_budget(share.pool, share.layers);
     }
 
     fn frame_limits(&self, now_ms: f64) -> Limits {
@@ -366,6 +369,10 @@ impl WebCore {
 
     pub fn cache_bytes(&self) -> f64 {
         self.library.cache_bytes() as f64
+    }
+
+    pub fn scratch_bytes(&self) -> f64 {
+        self.engine.scratch_bytes() as f64
     }
 
     pub fn draw(&mut self, list_json: &str) -> Result<String, JsValue> {

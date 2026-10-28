@@ -27,8 +27,7 @@ fn usable(device: &wgpu::Device, queue: &wgpu::Queue, texture: &wgpu::Texture) -
 fn a_texture_the_pool_does_not_shelve_is_destroyed_at_once() {
     let (device, queue) = device();
     let passes = FilterPasses::new(&device);
-    let kept: Vec<_> = (1..=48).map(|side| passes.texture(&device, side, side)).collect();
-    drop(kept);
+    passes.set_pool_bytes(100 * 100 * 4 - 1);
     let extra = passes.texture(&device, 100, 100);
     let raw = (*extra).clone();
     drop(extra);

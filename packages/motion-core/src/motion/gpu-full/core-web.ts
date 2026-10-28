@@ -9,7 +9,7 @@ import { inlineCore, unzipBase64 } from './inline-core';
 const CORE_URL = '/gpu-core/gpu_core.js';
 
 type Size = { width: number; height: number };
-export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; free: () => void };
+export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; free: () => void };
 
 export enum CoreMotion {
   Still = 0,
@@ -19,7 +19,7 @@ export enum CoreMotion {
 export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine; cache?: boolean; hold?: boolean };
 export type UsePatch = { put: Use[]; drop: string[]; order?: string[] };
 export type Painted = { outcome: Outcome; pending: boolean; skipped: string[] };
-export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (part: OverlayPart, items: readonly Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; pictureBytes: () => number; lost: () => boolean; busy?: () => boolean; setMotion?: (motion: CoreMotion) => void; setBudget?: (bytes: number) => void; behindPage?: boolean };
+export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (part: OverlayPart, items: readonly Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; pictureBytes: () => number; scratchBytes?: () => number; wasmBytes?: () => number; lost: () => boolean; busy?: () => boolean; setMotion?: (motion: CoreMotion) => void; setBudget?: (bytes: number) => void; behindPage?: boolean };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
 
@@ -50,10 +50,18 @@ export function wantedPictures(items: Item[]): PictureItem[] {
 const moving = (picture: Picture) => (typeof HTMLVideoElement !== 'undefined' && picture.source instanceof HTMLVideoElement) || (typeof HTMLCanvasElement !== 'undefined' && picture.source instanceof HTMLCanvasElement);
 
 let loading: Promise<CoreModule> | null = null;
+let wasmMemory: WebAssembly.Memory | null = null;
+
+const kept = (exports: unknown) => {
+  const memory = (exports as { memory?: unknown } | undefined)?.memory;
+  if (memory instanceof WebAssembly.Memory) {
+    wasmMemory = memory;
+  }
+};
 
 async function loadInlineCore(inline: NonNullable<ReturnType<typeof inlineCore>>): Promise<CoreModule> {
   const core = (await import(/* @vite-ignore */ URL.createObjectURL(new Blob([inline.js], { type: 'text/javascript' })))) as CoreModule & { default: (init?: { module_or_path: Uint8Array }) => Promise<unknown> };
-  await core.default({ module_or_path: await unzipBase64(inline.wasm) });
+  kept(await core.default({ module_or_path: await unzipBase64(inline.wasm) }));
   return core;
 }
 
@@ -63,7 +71,7 @@ async function loadCore(): Promise<CoreModule> {
     return loadInlineCore(inline);
   }
   const core = (await import(/* @vite-ignore */ new URL(CORE_URL, import.meta.url).href)) as CoreModule;
-  await core.default();
+  kept(await core.default());
   return core;
 }
 
@@ -209,6 +217,8 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     },
     cacheBytes: () => attached.cache_bytes(),
     pictureBytes: () => attached.picture_bytes(),
+    scratchBytes: () => attached.scratch_bytes?.() ?? 0,
+    wasmBytes: () => wasmMemory?.buffer.byteLength ?? 0,
     lost: () => attached.lost(),
     busy: () => attached.busy?.() ?? false,
     setMotion: (motion: CoreMotion) => attached.set_motion?.(motion),
