@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  addLibraryVoice,
   cloneVoice,
   deleteVoice,
   designPreviews,
@@ -163,11 +164,36 @@ describe('using a voice', () => {
     expect(await voiceRefusalFor(store, { orgId: 'org-1', voiceId: 'el-1', mode: ProjectMode.Standard })).toBe('voice_not_yours');
   });
 
+  it('refuses a voice that is neither premade nor the org own', async () => {
+    const { store } = fakes([]);
+    const premade = new Set(['rachel']);
+    expect(await voiceRefusalFor(store, { orgId: 'org-1', voiceId: 'stray', mode: ProjectMode.Standard, premade })).toBe('voice_not_yours');
+    expect(await voiceRefusalFor(store, { orgId: 'org-1', voiceId: 'rachel', mode: ProjectMode.Standard, premade })).toBeNull();
+  });
+
   it('refuses an own clone in an uncensored project, allows a designed one', async () => {
     const { store } = fakes([voice({ method: 'instant_clone' }), voice({ id: 'r2', providerVoiceId: 'el-2' })]);
     expect(await voiceRefusalFor(store, { orgId: 'org-1', voiceId: 'el-1', mode: ProjectMode.Uncensored })).toBe('cloned_voice_not_in_this_project');
     expect(await voiceRefusalFor(store, { orgId: 'org-1', voiceId: 'el-2', mode: ProjectMode.Uncensored })).toBeNull();
     expect(await voiceRefusalFor(store, { orgId: 'org-1', voiceId: 'premade', mode: ProjectMode.Standard })).toBeNull();
+  });
+});
+
+describe('a voice added from the library', () => {
+  it('is recorded as the org own, so no other org can use or list it', async () => {
+    const { deps, provider, store } = fakes();
+    vi.mocked(provider.addShared).mockResolvedValue('el-lib');
+
+    const out = await addLibraryVoice(deps, SCOPE, { ownerId: 'o', voiceId: 'v', name: 'Lib' });
+
+    expect(out.ok).toBe(true);
+    expect(store.insert).toHaveBeenCalledWith(expect.objectContaining({ orgId: 'org-1', providerVoiceId: 'el-lib', method: 'library' }));
+  });
+
+  it('refuses when the slots are full, before adding', async () => {
+    const { deps, provider } = fakes([], { used: 30, limit: 30 });
+    expect(await addLibraryVoice(deps, SCOPE, { ownerId: 'o', voiceId: 'v', name: 'Lib' })).toEqual({ ok: false, error: 'voice_slots_full' });
+    expect(provider.addShared).not.toHaveBeenCalled();
   });
 });
 

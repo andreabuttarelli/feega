@@ -1,7 +1,7 @@
 import type { PlanKey } from '$lib/plans';
 import { ProjectMode } from '$lib/project-mode';
 
-export type VoiceMethod = 'design' | 'instant_clone';
+export type VoiceMethod = 'design' | 'instant_clone' | 'library';
 
 export type ConsentBasis = 'own_voice' | 'consented_speaker';
 
@@ -19,7 +19,8 @@ export const VOICE_SLOTS_BY_PLAN: Readonly<Record<PlanKey | 'none', number>> = {
 
 export const VOICE_CREATION_USD: Readonly<Record<VoiceMethod, number>> = {
   design: 0.08,
-  instant_clone: 0.1
+  instant_clone: 0.1,
+  library: 0
 };
 
 export const MIN_VOICE_DESCRIPTION = 20;
