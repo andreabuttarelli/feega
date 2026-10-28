@@ -9,10 +9,7 @@
   const EDGE_EPSILON_PX = 1;
   const ITEM = '[role="menuitem"]';
 
-  enum Dir {
-    Up = -1,
-    Down = 1
-  }
+  const Dir = { Up: -1, Down: 1 } as const;
 
   let { at, children }: { at: { x: number; y: number }; children: Snippet } = $props();
 
@@ -40,7 +37,7 @@
     canDown = scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - EDGE_EPSILON_PX;
   }
 
-  function glide(dir: Dir) {
+  function glide(dir: (typeof Dir)[keyof typeof Dir]) {
     cancelAnimationFrame(raf);
     const step = () => {
       if (!scroller) {
