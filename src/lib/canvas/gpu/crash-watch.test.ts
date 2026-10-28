@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blankSample } from './crash-record';
+import { blankSample, wasInGesture } from './crash-record';
 import { Motion, track, type Tick } from './crash-watch';
 
 const tick = (over: Partial<Tick>): Tick => ({ x: 0, y: 0, zoom: 1, now: 0, motion: Motion.Moving, rastered: false, ...over });
@@ -31,5 +31,12 @@ describe('the live sample', () => {
 
     expect(s.rasterZoom).toBe(1.5);
     expect(s.zoom).toBe(3);
+  });
+});
+
+describe("which crash records are worth sending", () => {
+  it("only those written during a gesture", () => {
+    expect(wasInGesture({ ...blankSample(), gestureFrames: 3 })).toBe(true);
+    expect(wasInGesture({ ...blankSample(), gestureFrames: 0 })).toBe(false);
   });
 });

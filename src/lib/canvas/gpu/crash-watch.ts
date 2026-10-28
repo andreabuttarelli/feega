@@ -1,4 +1,4 @@
-import { CrashRecorder, blankSample, type CrashSample } from './crash-record';
+import { CrashRecorder, blankSample, wasInGesture, type CrashSample } from './crash-record';
 import { pollLag, probeGpu, wasmBytes, type GpuCounters } from './gpu-probe';
 
 export enum Motion {
@@ -66,7 +66,7 @@ export function watchCrashes(sizes: Sizes): CrashWatch {
   const store = shelf();
   const recorder = store ? new CrashRecorder(store) : null;
   const previous = recorder?.begin();
-  if (previous) {
+  if (previous && wasInGesture(previous)) {
     send(previous);
   }
 
