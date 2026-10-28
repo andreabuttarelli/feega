@@ -16,7 +16,15 @@ describe('/motion-runtime/[file]', () => {
     expect(await res.text()).toBe(chunkCode(Chunk.Particles));
   });
 
-  it('a file from another build is a 404, never someone else’s code', async () => {
-    expect(() => open('particles.0000000000000000.js')).toThrow(expect.objectContaining({ status: 404 }));
+  it('a chunk hashed by another build serves this build’s chunk, so stored embeds and browser-composed frames still play', async () => {
+    const res = await open('engine.0000000000000000.js');
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).not.toContain('immutable');
+    expect(await res.text()).toBe(chunkCode(Chunk.Engine));
+  });
+
+  it('an unknown chunk is a 404', async () => {
+    expect(() => open('nope.0000000000000000.js')).toThrow(expect.objectContaining({ status: 404 }));
   });
 });

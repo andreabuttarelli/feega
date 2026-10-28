@@ -70,3 +70,8 @@ export const chunkUrl = (origin: string, chunk: Chunk) => `${origin}${MOTION_RUN
 export function chunkByFile(file: string): string | null {
   return [...chunks().values()].find((c) => c.file === file)?.code ?? null;
 }
+
+export function chunkByName(file: string): string | null {
+  const chunk = Object.values(Chunk).find((c) => file.startsWith(`${c}.`) && file.endsWith('.js'));
+  return chunk ? chunkCode(chunk) : null;
+}
