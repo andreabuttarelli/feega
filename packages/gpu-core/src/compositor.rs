@@ -86,17 +86,18 @@ impl Compositor {
         }
     }
 
-    fn region<P: Painter>(&mut self, painter: &mut P, library: &mut Library, raster: &Raster, rect: Rect) -> Result<Vec<Skipped>, P::Error> {
+    fn region<P: Painter>(&mut self, painter: &mut P, library: &mut Library, raster: &Raster, rect: Rect, limits: Limits) -> Result<(Vec<Skipped>, usize), P::Error> {
         let q = scale_of(raster.quality);
         let o = self.retained.overscan() as f64;
         let to_region = Matrix::scale(q) * Matrix::translate((o - rect.x0, o - rect.y0)) * Matrix::new(raster.camera.matrix());
         let (w, h) = ((rect.width() * q).ceil() as u32, (rect.height() * q).ceil() as u32);
-        let plan = library.plan(&self.world.screen(to_region.as_coeffs(), w, h), painter.limits());
+        let plan = library.plan(&self.world.screen(to_region.as_coeffs(), w, h), limits);
+        let rastered = plan.rasters.len();
         self.pending |= plan.pending || !plan.finished.is_empty();
         for group in plan.finished.iter().chain(&plan.waiting) {
             self.world.touch(group, library.size_of(group));
         }
-        painter.paint(plan, rect, raster.quality)
+        Ok((painter.paint(plan, rect, raster.quality)?, rastered))
     }
 
     pub fn frame<P: Painter>(&mut self, painter: &mut P, library: &mut Library, camera: Camera, now_ms: f64, clock: &mut dyn FnMut() -> f64) -> Result<Frame, P::Error> {
@@ -115,8 +116,11 @@ impl Compositor {
                 let q = scale_of(raster.quality);
                 let (tw, th) = painter.tile();
                 let parts: Vec<Rect> = raster.rects.iter().flat_map(|r| tiles(*r, (tw as f64 / q) as u32, (th as f64 / q) as u32)).collect();
+                let mut limits = painter.limits();
                 for part in parts {
-                    skipped.extend(self.region(painter, library, raster, part)?);
+                    let (missed, rastered) = self.region(painter, library, raster, part, limits)?;
+                    skipped.extend(missed);
+                    limits.rasters = limits.rasters.saturating_sub(rastered);
                 }
                 if raster.outcome == Outcome::Full && raster.quality == Quality::Sharp {
                     self.retained.took(clock() - started);
