@@ -7,7 +7,9 @@ import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { unpackFeega } from '$lib/canvas/feega-file';
 import { snapshotSchema } from '$lib/canvas/canvas-version';
-import { LOCAL_ORG_ID, openFeegaStore, writeAtomically, type FeegaStore } from './feega-store';
+import { LOCAL_ORG_ID, LOCAL_USER, openFeegaStore, writeAtomically, type FeegaStore } from './feega-store';
+import { orgFontFamilies, storeFontFile } from '$lib/server/motion/font-upload';
+import { listOrgFonts } from '$lib/server/repos/org-fonts';
 
 const ORIGIN = 'http://127.0.0.1:5173';
 const actor = { kind: 'user' as const, id: null };
@@ -130,5 +132,21 @@ describe('scrittura atomica', () => {
     await store.flush();
 
     expect(readdirSync(join(path, '..'))).toEqual(['work.feega']);
+  });
+
+  it('un font caricato sta nel file anche se nessun frame lo usa, e torna alla riapertura', async () => {
+    const path = tempFile();
+    const first = openFeegaStore(path, { origin: ORIGIN });
+    const bytes = new Uint8Array(readFileSync('static/fonts/fraunces-latin.woff2'));
+    const saved = await storeFontFile(first.db, { orgId: LOCAL_ORG_ID, userId: LOCAL_USER.id, name: 'Fraunces.woff2', bytes });
+    expect(saved.ok).toBe(true);
+    await first.flush();
+
+    const second = openFeegaStore(path, { origin: ORIGIN });
+    const families = await orgFontFamilies(second.db, LOCAL_ORG_ID);
+
+    expect(families.map((f) => f.family)).toEqual(['Fraunces']);
+    const [font] = await listOrgFonts(second.db, LOCAL_ORG_ID);
+    expect(second.blob('canvas-assets', font.path)?.bytes.length).toBe(bytes.length);
   });
 });

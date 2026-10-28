@@ -1,5 +1,6 @@
 import { preparedDoc } from '../../hyperframes/compose';
 import type { BrandTokens } from '../../brand';
+import { localFaceCss } from '../../fonts/local-files';
 import { googleFontsUrl, uploadFaceCss, usedFaces } from '../../fonts/model';
 import type { MotionDoc } from '../../doc';
 import type { FaceBook } from './face';
@@ -15,7 +16,7 @@ export const fontkitEngine: Engine = async () => fontkitSource;
 
 export type Reader = { text: (url: string) => Promise<string>; bytes: (url: string) => Promise<Uint8Array> };
 
-const web: Reader = {
+export const webReader: Reader = {
   text: (url) => fetch(url).then((r) => (r.ok ? r.text() : '')),
   bytes: (url) => fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`${r.status} ${url}`)))).then((b) => new Uint8Array(b))
 };
@@ -50,7 +51,7 @@ const remembered = <T>(load: (url: string) => Promise<T>) => {
   };
 };
 
-export function fontLoader(read: Reader = web, engine: Engine = fontkitEngine): (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook> {
+export function fontLoader(read: Reader = webReader, engine: Engine = fontkitEngine): (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook> {
   const sheet = remembered((url) => read.text(url).catch(() => ''));
   let made: ReturnType<Engine> | null = null;
   const source = remembered((url) => Promise.all([read.bytes(url), (made ??= engine())]).then(([bytes, make]): [string, Source] => [url, make(bytes)]).catch(() => null));
@@ -60,7 +61,7 @@ export function fontLoader(read: Reader = web, engine: Engine = fontkitEngine): 
     const points = codePointsOf(doc);
     const symbols = symbolsUrl(points);
     const css = await Promise.all([BUILTIN_FONTS_URL, ...(google ? [google] : []), ...(symbols ? [symbols] : [])].map(sheet));
-    const rules = [...css, uploadFaceCss(doc.fonts, assets)].flatMap(faceRules);
+    const rules = [...css, uploadFaceCss(doc.fonts, assets), localFaceCss(doc.fonts)].flatMap(faceRules);
     const urls = [...new Set(rules.filter((r) => needed(r, points)).map((r) => r.url))];
     const loaded = await Promise.all(urls.map(source));
     return faceBook(rules, new Map(loaded.filter((l): l is [string, Source] => l !== null)), doc.fonts);

@@ -55,7 +55,7 @@ export const SECTION_TITLE = 'text-ui-title font-semibold tracking-[var(--ui-tra
 
 export const SECTION_LABEL ='text-ui-section font-semibold uppercase tracking-[var(--ui-tracking-caps)] text-ui-text-3';
 
-export const FIELD_INPUT = `h-(--ui-row) pointer-coarse:h-11 min-w-0 rounded-md bg-ui-input px-2.5 text-ui-label text-ui-text tabular-nums placeholder:text-ui-text-3 transition-colors duration-(--ui-dur-fast) hover:bg-ui-input-hover focus-visible:bg-ui-panel disabled:text-ui-text-off ${FOCUS_RING}`;
+export const FIELD_INPUT = `h-(--ui-row) pointer-coarse:h-11 min-w-0 rounded-sm bg-ui-input px-2.5 text-ui-label text-ui-text tabular-nums placeholder:text-ui-text-3 transition-colors duration-(--ui-dur-fast) hover:bg-ui-input-hover focus-visible:bg-ui-panel disabled:text-ui-text-off ${FOCUS_RING}`;
 
 export const SURFACE: Record<Surface, string> = {
   [Surface.Panel]: 'bg-ui-panel',

@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { cardOverElements, elementsOnly } from '../../../../tests/fixtures/figma/elements';
+import { buttonInstances, smallTextInHugeFrame } from '../../../../tests/fixtures/figma/components';
+import { figmaClipboardHtml } from '../../../../tests/fixtures/figma/clipboard';
+import { HIDDEN_ICON, landingPage, OVERRIDDEN_LABEL } from '../../../../tests/fixtures/figma/landing';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { parseMotionDoc, type MotionClip } from '@feega/motion-core/motion/doc';
 import { stillFrame } from '$lib/canvas/core/frame-source';
@@ -116,5 +119,109 @@ describe('a Figma frame with auto layout', () => {
   it('lets the growing child fill the main axis and hugs the text', () => {
     const text = clips.find((c) => c.component === 'Text')!;
     expect(text.layoutItem).toMatchObject({ width: 'fill', height: 'hug' });
+  });
+});
+
+describe('text in a frame much larger than the text', () => {
+  const [item] = planOf(smallTextInHugeFrame(), newId)!.items;
+  const text = clipsOf(item.doc).filter((c) => c.component === 'Text');
+
+  it('keeps the text and its real font size', () => {
+    const scale = item.doc.width / item.size.width;
+    expect(text).toHaveLength(1);
+    expect((text[0].props.size as number) * Math.min(item.doc.width, item.doc.height)).toBeCloseTo(12 * scale, 0);
+  });
+});
+
+describe('component instances', () => {
+  const innerTextId = (doc: { comps: Record<string, { component?: unknown; tracks: { clips: unknown[] }[] }> }) =>
+    (Object.values(doc.comps).find((c) => c.component)!.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.component === 'Text')!).id;
+
+  const instancesOf = (doc: Parameters<typeof clipsOf>[0]) => clipsOf(doc).filter((c) => c.component === 'Precomp' && c.name === 'Button');
+  const mainsOf = (doc: { comps: Record<string, { component?: { name: string } }> }) => Object.values(doc.comps).filter((c) => c.component);
+  const linkedOf = (doc: Parameters<typeof clipsOf>[0] & Parameters<typeof mainsOf>[0]) => instancesOf(doc).filter((c) => doc.comps[c.props.comp as string]?.component);
+
+  it('stay instances of one main component when the main is in the paste', () => {
+    const [item] = planOf(buttonInstances({ mainCopied: true }), newId)!.items;
+    const instances = linkedOf(item.doc);
+    expect(instances).toHaveLength(2);
+    expect(mainsOf(item.doc).map((m) => m.component!.name)).toEqual(['Button']);
+    expect(new Set(instances.map((c) => c.props.comp)).size).toBe(1);
+  });
+
+  it('put the second instance where it was in Figma', () => {
+    const [item] = planOf(buttonInstances({ mainCopied: true }), newId)!.items;
+    const [first, second] = linkedOf(item.doc);
+    const scale = item.doc.width / item.size.width;
+    expect(((second.transform.x ?? 0) - (first.transform.x ?? 0)) * item.doc.width).toBeCloseTo(300 * scale, 0);
+  });
+
+  it('draw both instances on the canvas', () => {
+    const [item] = planOf(buttonInstances({ mainCopied: true }), newId)!.items;
+    const list = drawFrame(prepare(item.doc, FEEGA_TOKENS, {}, { fonts: boxBook(), smoothing: Smoothing.Plain }), stillFrame(item.doc));
+    const labels = list.items.filter((i) => 'clip' in i && String(i.clip).endsWith(innerTextId(item.doc)));
+    expect(labels).toHaveLength(2);
+    const [first, second] = linkedOf(item.doc).map((host) => list.items.find((i) => 'clip' in i && i.clip === `${host.id}__0__${innerTextId(item.doc)}`) as unknown as { matrix: number[] });
+    const scale = item.doc.width / item.size.width;
+    expect(second.matrix[4] - first.matrix[4]).toBeCloseTo(300 * scale, 0);
+  });
+
+  it('become groups named after the component when the main is not in the paste', () => {
+    const [item] = planOf(buttonInstances({ mainCopied: false }), newId)!.items;
+    expect(instancesOf(item.doc)).toHaveLength(2);
+    expect(mainsOf(item.doc)).toHaveLength(0);
+  });
+});
+
+describe('a whole landing page', () => {
+  const [item] = planOf(landingPage().message, newId)!.items;
+  const texts = clipsOf(item.doc).filter((c) => c.component === 'Text');
+  const textOf = (c: MotionClip) => String(c.props.text);
+
+  it('keeps every text, however small its size or long its paragraph', () => {
+    const kept = texts.map(textOf);
+    for (const expected of landingPage().texts) {
+      expect(kept).toContain(expected);
+    }
+  });
+
+  it('reports no text as skipped', () => {
+    const { skipped } = planOf(landingPage().message, newId)!;
+    expect(skipped.filter((s) => s.startsWith('style of'))).toEqual([]);
+  });
+
+  it('gives a text without a font size a readable one', () => {
+    const copyright = texts.find((c) => textOf(c) === 'Copyright')!;
+    expect(copyright.props.size as number).toBeGreaterThan(0);
+  });
+
+  it('shows the overridden label of an instance, not the main label', () => {
+    const kept = texts.map(textOf);
+    expect(kept).toContain(OVERRIDDEN_LABEL);
+    expect(kept.filter((t) => t === 'Label')).toHaveLength(1);
+  });
+
+  it('paints the overridden label with the overriding fill', () => {
+    const joined = texts.find((c) => textOf(c) === OVERRIDDEN_LABEL)!;
+    expect(joined.props.color).toBe('#1ab34d');
+  });
+
+  it('leaves out the icon an instance hides', () => {
+    const arrows = clipsOf(item.doc).filter((c) => c.name === HIDDEN_ICON);
+    expect(arrows).toHaveLength(1);
+  });
+
+  it('does not report the flattened instance as a loss', () => {
+    const { skipped } = planOf(landingPage().message, newId)!;
+    expect(skipped.filter((s) => s.includes('flattened'))).toEqual([]);
+  });
+});
+
+describe('a landing page through the clipboard encoding', () => {
+  it('keeps the instance overrides after the Figma schema decodes them', () => {
+    const plan = figmaPlan(figmaClipboardHtml(landingPage().message), newId)!;
+    const kept = clipsOf(plan.items[0].doc).filter((c) => c.component === 'Text').map((c) => String(c.props.text));
+    expect(kept).toContain(OVERRIDDEN_LABEL);
+    expect(kept).toContain(landingPage().texts.at(-1));
   });
 });

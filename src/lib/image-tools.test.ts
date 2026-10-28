@@ -1,21 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { IMAGE_TOOL_MODEL, ImageTool, imageToolAskSchema, imageToolParams, isImageToolModel } from './image-tools';
+import { IMAGE_TOOL_MODEL, ImageTool, imageToolAskSchema, imageToolParams, isImageToolModel, MaskPaint, maskPaintOf } from './image-tools';
 import { promptRequired } from '$lib/canvas/gen-node';
 
 describe('image tools', () => {
   it('names the kie model behind every tool', () => {
     expect(IMAGE_TOOL_MODEL[ImageTool.RemoveBackground]).toBe('kie/recraft/remove-background');
-    expect(IMAGE_TOOL_MODEL[ImageTool.Upscale]).toBe('kie/topaz/image-upscale');
+    expect(IMAGE_TOOL_MODEL[ImageTool.Upscale]).toBe('kie/recraft/crisp-upscale');
   });
 
   it('splits layers on kie seedream and carries no params', () => {
     expect(IMAGE_TOOL_MODEL[ImageTool.SplitLayers]).toBe('kie/seedream/5-flash-layer-decomposition');
-    expect(imageToolParams(ImageTool.SplitLayers, undefined)).toEqual({});
+    expect(imageToolParams(ImageTool.SplitLayers)).toEqual({});
   });
 
   it('inpaints on kie ideogram edit, balanced by default, and still wants a prompt', () => {
     expect(IMAGE_TOOL_MODEL[ImageTool.Inpaint]).toBe('kie/ideogram/v3-edit');
-    expect(imageToolParams(ImageTool.Inpaint, undefined)).toEqual({ rendering_speed: 'BALANCED' });
+    expect(imageToolParams(ImageTool.Inpaint)).toEqual({ rendering_speed: 'BALANCED' });
     expect(promptRequired('image', IMAGE_TOOL_MODEL[ImageTool.Inpaint])).toBe(true);
   });
 
@@ -26,6 +26,12 @@ describe('image tools', () => {
     expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Inpaint, mask }).success).toBe(false);
     expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Inpaint, prompt: 'a red hat' }).success).toBe(false);
     expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.RemoveBackground }).success).toBe(true);
+  });
+
+  it('reframe reuses the edit model and needs an aspect, not a prompt', () => {
+    expect(IMAGE_TOOL_MODEL[ImageTool.Reframe]).toBe(IMAGE_TOOL_MODEL[ImageTool.Outpaint]);
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Reframe, aspect: '9:16' }).success).toBe(true);
+    expect(imageToolAskSchema.safeParse({ nodeId: 'n', tool: ImageTool.Reframe }).success).toBe(false);
   });
 
   it('outpaint reuses the edit model, and needs a prompt and an extension', () => {
@@ -46,9 +52,14 @@ describe('image tools', () => {
     expect(promptRequired('image', 'kie/nano-banana-2')).toBe(true);
   });
 
-  it('only the upscale carries a factor, defaulting to 2', () => {
-    expect(imageToolParams(ImageTool.Upscale, undefined)).toEqual({ upscale_factor: '2' });
-    expect(imageToolParams(ImageTool.Upscale, '4')).toEqual({ upscale_factor: '4' });
-    expect(imageToolParams(ImageTool.RemoveBackground, '4')).toEqual({});
+  it('no image tool but the edit ones carries a parameter', () => {
+    expect(imageToolParams(ImageTool.Upscale)).toEqual({});
+    expect(imageToolParams(ImageTool.RemoveBackground)).toEqual({});
+  });
+
+  it('the edit model repaints black, so the area to change is painted black', () => {
+    expect(maskPaintOf(ImageTool.Inpaint)).toBe(MaskPaint.Black);
+    expect(maskPaintOf(ImageTool.Outpaint)).toBe(MaskPaint.Black);
+    expect(maskPaintOf(ImageTool.Reframe)).toBe(MaskPaint.Black);
   });
 });

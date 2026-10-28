@@ -37,6 +37,20 @@ describe('sent overlay', () => {
   });
 });
 
+describe('sent overlay, item by item', () => {
+  it('reads only the items it has not sent before', () => {
+    const sent = new SentOverlay();
+    const kept = { kind: 'path', clip: 'wire', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem;
+    const hover = { kind: 'path', clip: 'hover', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem;
+    sent.changed([kept, hover]);
+    const read = vi.spyOn(JSON, 'stringify');
+
+    expect(sent.changed([kept, { ...hover, matrix: [2, 0, 0, 2, 0, 0] }])).toBe(true);
+    expect(read).toHaveBeenCalledTimes(1);
+    read.mockRestore();
+  });
+});
+
 const use = (clip: string, x = 0, cache = false): Use => ({ kind: 'use', clip, group: `${clip}:1`, matrix: [1, 0, 0, 1, x, 0], ...(cache ? { cache } : {}) });
 
 describe('sent uses', () => {

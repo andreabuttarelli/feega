@@ -30,6 +30,10 @@ The surface changes with the app. Prefer the MCP tools or the CLI; the routes be
 | `GET` | `/api/v1/org/effects` | Image effects |
 | `GET` `POST` | `/api/v1/org/custom-effects` | Custom shader effects (`PATCH`/`DELETE` on `/{id}`) |
 | `GET` `POST` | `/api/v1/org/layouts` | Composition layouts (`PATCH`/`DELETE` on `/{id}`) |
+| `POST` | `/api/v1/studio/quote` | Price a Photo studio batch: count, credits, `quoteId` |
+| `POST` | `/api/v1/studio/start` | Start a batch; needs the `quoteId` of the same selection, 409 if stale |
+| `GET` | `/api/v1/studio/{batchId}` | Batch items and state |
+| `POST` | `/api/v1/studio/{batchId}?action=` | `run`, `more`, `cancel`, `retry`, `regenerate`, `approve`, `reject` on a batch; body `{itemIds?, variations?}` |
 | `POST` | `/api/v1/prompts/enhance` | Rewrite a prompt for a model |
 | `GET` | `/api/v1/org/media` | Signed media links |
 
@@ -52,6 +56,7 @@ The surface changes with the app. Prefer the MCP tools or the CLI; the routes be
 | `GET` `POST` | `/api/v1/orgs` | List and create orgs; `PUT /api/v1/orgs/active` switches |
 | `GET` `POST` | `/api/v1/orgs/{orgId}/team` | Members and invites |
 | `GET` `PUT` | `/api/v1/org/model-allowlist` | [Model allow-list](/ai/model-allow-list/) |
+| `GET` `POST` `DELETE` | `/api/v1/org/fonts` | [Uploaded fonts](/canvas/fonts/) |
 | `GET` `PUT` | `/api/v1/org/spend-caps` | [Spend limits](/ai/spend-limits/) |
 | `GET` | `/api/v1/gallery` | Public gallery; `POST /api/v1/gallery/{id}/remix`, `POST /api/v1/gallery/publish` |
 | `GET` | `/api/v1/version` | Server version |

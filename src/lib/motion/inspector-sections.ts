@@ -131,6 +131,8 @@ const GROUP_SECTION: Record<Group, Section> = {
 
 const TEXT_KEYS: ReadonlySet<string> = new Set(['font', 'weight', 'fontWeight', 'italic', 'size', 'tracking', 'leading', 'textCase', 'stretch', 'slant', 'axes', 'align', 'sizing', 'verticalAlign', 'paragraphSpacing', 'paragraphIndent', 'lineHeight', 'letterSpacing', 'maxLines', 'textWrap', 'leadingTrim', 'decoration', 'decorationStyle', 'decorationThickness', 'decorationOffset', 'decorationColor', 'skipInk', 'features']);
 
+export const ADVANCED_TEXT_KEYS: ReadonlySet<string> = new Set(['stretch', 'slant', 'axes']);
+
 const KEY_SECTION: Record<string, Section> = {
   align: Section.Text,
   opacity: Section.Layer,

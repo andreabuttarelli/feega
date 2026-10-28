@@ -1,9 +1,12 @@
 <script lang="ts">
+  import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
-  import { createMedia, Readiness, VideoPreload } from '@feega/motion-core/motion/gpu-full/media';
+  import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
+  import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
+  import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Outcome } from '@feega/motion-core/motion/gpu-full/core-outcome';
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
@@ -35,22 +38,23 @@
 
   let { frames, edited = new Set(), order = [], live = new Map(), cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
-  const MAX_RESOLUTION = 2;
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
-  const BACKENDS = [createCore, createCoreGl];
+  const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
+  const budget = BUDGET[currentDevice()];
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let backend = $state(0);
+  let attempt = $state(0);
   let raster = $state<CoreRaster | null>(null);
   let lists = $state(new Map<string, DisplayList>());
   const asked = new Set<string>();
   const put = new Set<string>();
   const pictured = new Set<string>();
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
-  const media = createMedia({ videoPreload: VideoPreload.Metadata });
+  const media = createMedia({ videoPreload: VideoPreload.Metadata, frames: sharedFrames() });
   const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
   const keyOf = (f: FrameAt) => `${f.id}:${f.revision}${f.scenes ? `:${f.scenes}` : ''}`;
-  const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
+  const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
 
   let readsHost = $state<HTMLDivElement | null>(null);
   const READ_LANES = 2;
@@ -107,6 +111,21 @@
     const still = frameOfLive(source);
     const custom = await readDom(f, source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
     return { list: drawFrame(prepared, still, custom?.reads), custom };
+  }
+
+  const RUNS_EVERY = 5;
+
+  export async function cache(id: string, range: FrameRange, signal: AbortSignal, onRuns: (runs: FrameRange[]) => void) {
+    const f = frames.find((x) => x.id === id);
+    const held = live.get(id);
+    if (!f || !held) {
+      return;
+    }
+    const source = await withScenes({ revision: f.revision, ...held }, sceneSource(f.scenes ?? ''));
+    const prepared = prepare(source.doc, source.tokens, source.assets);
+    const ram = createRamPreview({ frames: sharedFrames(), uses: (frame) => videoUses(drawFrame(prepared, frame).items) });
+    await ram.fill(range, signal, (done) => done % RUNS_EVERY === 0 && onRuns(ram.runs(range)));
+    onRuns(ram.runs(range));
   }
 
   async function load(f: FrameAt) {
@@ -213,7 +232,7 @@
   const cardPuts = $derived(shownCards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, bytes: pictureBytes(c.frame.list.items), turn: c.turn }] : [])));
 
   const whole = $derived([...cardPuts, ...framePuts]);
-  const textureBytes = BUDGET[currentDevice()].textureBytes;
+  const textureBytes = budget.textureBytes;
   const real = $derived(resident(whole, view, area, textureBytes));
 
   const rank = $derived(new Map(order.map((id, i) => [id, i])));
@@ -284,7 +303,8 @@
     let gone = false;
     let made: CoreRaster | null = null;
     const tried = backend;
-    void BACKENDS[tried](target, width, height).then(
+    void attempt;
+    void BACKENDS[tried](target, width, height, budget.pictureSide).then(
       (r) => {
         made = r;
         if (gone) {
@@ -457,6 +477,12 @@
     if (!into) {
       return false;
     }
+    if (into.lost()) {
+      console.warn('[core] gpu lost, attaching again');
+      raster = null;
+      attempt++;
+      return false;
+    }
     const tails = nearTails();
     const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group));
     for (const group of [...put, ...putting.keys()].filter((g) => !keep.has(g))) {
@@ -507,6 +533,7 @@
     paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
     cacheBytes = into.cacheBytes();
     if (DEBUG) {
+      (window as Window & { __gpuMem?: object }).__gpuMem = { cacheBytes, pictureBytes: into.pictureBytes(), put: put.size, pictured: pictured.size, resolution };
       debugFrame(outcome, skipped, shown);
     }
     return pending || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
@@ -553,7 +580,7 @@
     }
   });
 
-  const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame));
+  const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame), () => raster?.busy?.() ?? false);
 
   $effect(() => {
     void [raster, held, edited, overlay, view.x, view.y, view.zoom, area.width, area.height];
@@ -568,7 +595,9 @@
   <pre class="core-hud">{hud}</pre>
 {/if}
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
-<div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
+{#if !raster?.behindPage}
+  <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
+{/if}
 {#key backend}
   <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
 {/key}

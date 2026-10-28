@@ -2,6 +2,7 @@
   import { pressMenu, type Point } from '$lib/motion/press-menu';
   import { haptic } from '$lib/native-actions';
   import { PickMode } from '$lib/motion/clip-bar';
+  import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
@@ -15,7 +16,7 @@
   import { withParams } from '@feega/motion-core/motion/custom/params';
   import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
   import { Axis, lockAxis, pinchView, type PinchStart } from '$lib/motion/timeline-touch';
-  import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rowWindow, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
+  import { KeyGlyph, KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rowWindow, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
   import { MASK_KINDS, Matte } from '@feega/motion-core/motion/mask';
   import type { MotionTrack } from '@feega/motion-core/motion/doc';
   import { Interp, Source, type EaseSpec, type Keyframe } from '@feega/motion-core/motion/keyframes';
@@ -57,6 +58,7 @@
     snap,
     waveforms = {},
     beats = [],
+    cached = [],
     assetUrls = {},
     reveal = Reveal.Animated,
     pick = PickMode.One,
@@ -73,6 +75,7 @@
     snap: Snap;
     waveforms?: Record<string, number[]>;
     beats?: number[];
+    cached?: FrameRange[];
     assetUrls?: Record<string, string>;
     reveal?: Reveal;
     pick?: PickMode;
@@ -739,6 +742,18 @@
 
 <svelte:window onpointermove={onMove} onpointerup={onUp} onkeydowncapture={onKeys} />
 
+{#snippet glyphShape(glyph: KeyGlyph)}
+  {#if glyph === KeyGlyph.Circle}
+    <circle cx="5" cy="5" r="4" />
+  {:else if glyph === KeyGlyph.Square}
+    <rect x="1" y="1" width="8" height="8" />
+  {:else if glyph === KeyGlyph.Hourglass}
+    <polygon points="1,1 9,1 5,5 9,9 1,9 5,5" />
+  {:else}
+    <polygon points="5,0.75 9.25,5 5,9.25 0.75,5" />
+  {/if}
+{/snippet}
+
 {#snippet propRow(owner: KeyOwner, lane: PropLane, rowId: string)}
   {@const keys = owner.keyframes[lane.prop] ?? []}
   {@const mark = keyMark(keys, frame - owner.from)}
@@ -773,6 +788,7 @@
       {/each}
       {#each keys as key (key.frame)}
         {@const ref = { clipId: owner.id, prop: lane.prop, frame: key.frame }}
+        {@const glyphs = keyGlyph(key)}
         <div
           class="key"
           class:picked={keySelection.some((k) => sameKey(k, ref))}
@@ -785,10 +801,12 @@
           data-key-prop={lane.prop}
           data-key-local={key.frame}
           data-interp={key.out ?? Interp.Bezier}
-          data-glyph={keyGlyph(key)}
           style={`left: ${(owner.from + key.frame) * ppf}px;`}
           onpointerdown={(e) => startKey(e, owner, ref)}
-        ></div>
+        >
+          <svg class="half left" viewBox="0 0 10 10" data-glyph={glyphs.left} aria-hidden="true">{@render glyphShape(glyphs.left)}</svg>
+          <svg class="half right" viewBox="0 0 10 10" data-glyph={glyphs.right} aria-hidden="true">{@render glyphShape(glyphs.right)}</svg>
+        </div>
       {/each}
     </div>
   </div>
@@ -809,6 +827,9 @@
       {#if shown.workArea}
         <span class="work-area" data-testid="work-area" style={`left: ${headPx + shown.workArea.from * ppf}px; width: ${(shown.workArea.to - shown.workArea.from) * ppf}px;`}></span>
       {/if}
+      {#each cached as run (run.from)}
+        <span class="ram-cache" data-testid="ram-cache" style={`left: ${headPx + run.from * ppf}px; width: ${(run.to - run.from) * ppf}px;`}></span>
+      {/each}
       {#each markers as m (`${m.clipId}:${m.label}`)}
         <span class="marker" class:clip-marker={m.clipId} data-marker={m.label} title={m.label} style={`left: ${headPx + m.frame * ppf}px;`}></span>
       {/each}
@@ -1100,6 +1121,14 @@
     font-variant-numeric: tabular-nums;
     color: var(--ui-ink-3);
     white-space: nowrap;
+  }
+
+  .ram-cache {
+    position: absolute;
+    bottom: 0;
+    height: 3px;
+    background: var(--ui-ok, #2ea043);
+    pointer-events: none;
   }
 
   .work-area {
@@ -1662,31 +1691,40 @@
   .key {
     position: absolute;
     top: 50%;
-    width: 9px;
-    height: 9px;
-    margin: -4.5px 0 0 -4.5px;
-    transform: rotate(45deg);
-    background: var(--ui-bg);
-    border: 1.5px solid var(--ui-ink-2);
+    width: 11px;
+    height: 11px;
+    margin: -5.5px 0 0 -5.5px;
+    color: var(--ui-ink-2);
     cursor: grab;
     z-index: 1;
   }
 
-  .key[data-glyph='square'] {
-    transform: none;
+  .key .half {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    fill: var(--ui-bg);
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    overflow: visible;
   }
 
-  .key[data-glyph='circle'] {
-    transform: none;
-    clip-path: circle(50%);
+  .key .half.left {
+    clip-path: inset(-2px 50% -2px -2px);
   }
 
-  .key.roving {
-    border-style: dashed;
+  .key .half.right {
+    clip-path: inset(-2px -2px -2px 50%);
+  }
+
+  .key.roving .half {
+    stroke-dasharray: 2 1.5;
   }
 
   .key:hover {
-    border-color: var(--ui-accent);
+    color: var(--ui-accent);
   }
 
   .marquee {
@@ -1702,8 +1740,11 @@
   }
 
   .key.picked {
-    background: var(--ui-accent);
-    border-color: var(--ui-accent);
+    color: var(--ui-accent);
+  }
+
+  .key.picked .half {
+    fill: var(--ui-accent);
   }
 
   .empty-drop {

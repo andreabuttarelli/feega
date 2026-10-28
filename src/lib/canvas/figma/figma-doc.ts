@@ -4,18 +4,20 @@ import { blankElement, canvasReady, drawClip, drawnFrame, penClip } from '$lib/m
 import { DrawTool } from '$lib/motion/draw-tool';
 import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import type { Effect } from '@feega/motion-core/motion/effects/model';
+import { TYPE_SIZE } from '@feega/motion-core/motion/components';
 import { FillType } from '@feega/motion-core/motion/fill/model';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { registerFont } from '$lib/motion/fonts/ops';
 import { groupClips } from '$lib/motion/group';
+import { createComponent } from '$lib/motion/main-component';
 import { Align, Direction, Justify as MotionJustify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
 import { setParent } from '$lib/motion/parent-ops';
 import { mapOutline, parsePath, type Pt } from '@feega/motion-core/motion/shape/geometry';
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
-import { editClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { addClip, editClip, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { figmaMessage, type FigmaMessage } from './archive';
-import { Clip, Cross, Destination, Fit, FillKind, Flow, Justify, LayerKind, figmaScene, type AutoLayout, type Fill, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
+import { Clip, Cross, Destination, Fit, FillKind, Flow, Justify, LayerKind, figmaScene, type AutoLayout, type ComponentRef, type Fill, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
 
 type NewId = () => string;
 type Unit = { x: number; y: number };
@@ -23,7 +25,8 @@ type Size = { width: number; height: number };
 type Root = { id: string; layer: Layer };
 type Built = { doc: MotionDoc; ids: string[]; roots: Root[] };
 export type FigmaImage = { clipId: string; hash: string; at: number };
-type Place = { centre: Unit; scale: number; frame: number; newId: NewId; report: (what: string) => void; rootSize: Size; images: FigmaImage[] };
+type Main = { compId: string; at: Unit };
+type Place = { centre: Unit; scale: number; frame: number; newId: NewId; report: (what: string) => void; rootSize: Size; images: FigmaImage[]; mains: Map<string, Main> };
 
 export type PlanItem = { destination: Destination; doc: MotionDoc; size: Size; centre: Unit; name: string; kind: FrameKind; images: FigmaImage[] };
 export type FigmaPlan = { items: PlanItem[]; skipped: string[]; fileKey: string | null };
@@ -35,6 +38,7 @@ const MAX_NAME = 60;
 const SHADOW_DISTANCE_LIMIT = 300;
 const MAX_STROKE_WIDTH = 0.2;
 const MIN_STOPS = 2;
+const MIN_TEXT_BOX: Unit = { x: 0.02, y: 0.002 };
 const CENTRE: Unit = { x: 0.5, y: 0.5 };
 
 const round = (n: number) => Math.round(n * DIGITS) / DIGITS;
@@ -147,9 +151,10 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
   }
   const [x0, y0] = toUnit(next, p)([layer.box.x, layer.box.y]);
   const [x1, y1] = toUnit(next, p)([layer.box.x + layer.box.width, layer.box.y + layer.box.height]);
+  const [width, height] = [Math.max(x1 - x0, MIN_TEXT_BOX.x), Math.max(y1 - y0, MIN_TEXT_BOX.y)];
   const id = p.newId();
-  const drawn = drawClip(next, DrawTool.Text, { x: (x0 + x1) / 2, y: (y0 + y1) / 2, width: x1 - x0, height: y1 - y0 }, p.frame, id, TextSizing.AutoWidth, { text: layer.text });
-  const size = (n: number) => round((n * p.scale) / minSide(next));
+  const drawn = drawClip(next, DrawTool.Text, { x: x0 + width / 2, y: y0 + height / 2, width, height }, p.frame, id, TextSizing.AutoWidth, { text: layer.text });
+  const size = (n: number) => clamp(round((n * p.scale) / minSide(next)), TYPE_SIZE.min, TYPE_SIZE.max);
   const font = known.get(layer.font);
   const runs = layer.runs.map(({ font: f, size: s, ...rest }) => ({ ...rest, ...(f && known.get(f) ? { font: f } : {}), ...(s ? { size: size(s) } : {}) }));
   const stacked = layer.fills.length > 1 || layer.fills.some((f) => f.kind !== FillKind.Solid);
@@ -290,8 +295,40 @@ function grouped(built: Built, layer: FrameLayer, p: Place): Built {
   return { doc: named.ok ? named.doc : made.doc, ids: [groupId], roots: [{ id: groupId, layer }] };
 }
 
+function mainFrom(built: Built, layer: FrameLayer, component: ComponentRef, p: Place): Built {
+  const ids = { comp: p.newId(), clip: p.newId() };
+  let n = 0;
+  const made = createComponent(built.doc, built.ids, () => (n++ === 0 ? ids.comp : ids.clip), component.name);
+  if (!made.ok) {
+    return grouped(built, layer, p);
+  }
+  p.mains.set(component.key, { compId: ids.comp, at: { x: layer.box.x, y: layer.box.y } });
+  const named = editClip(made.doc, ids.clip, (clip) => ({ ...clip, name: layer.name.slice(0, MAX_NAME) }));
+  return { doc: named.ok ? named.doc : made.doc, ids: [ids.clip], roots: [{ id: ids.clip, layer }] };
+}
+
+function instanceOfMain(doc: MotionDoc, layer: FrameLayer, main: Main, p: Place): Built {
+  const id = p.newId();
+  const comp = doc.comps[main.compId];
+  const added = addClip(doc, { component: 'Precomp', from: 0, durationInFrames: Math.min(comp.durationInFrames, doc.durationInFrames), props: { comp: main.compId } }, id);
+  const moved = added.ok ? setTransform(added.doc, id, { x: ((layer.box.x - main.at.x) * p.scale) / doc.width, y: ((layer.box.y - main.at.y) * p.scale) / doc.height }) : added;
+  const named = moved.ok ? editClip(moved.doc, id, (clip) => ({ ...clip, name: layer.name.slice(0, MAX_NAME) })) : moved;
+  if (!named.ok) {
+    p.report(`${layer.name}: ${named.error}`);
+    return { doc, ids: [], roots: [] };
+  }
+  return { doc: named.doc, ids: [id], roots: [{ id, layer }] };
+}
+
 function nestedFrame(doc: MotionDoc, layer: FrameLayer, p: Place): Built {
+  const main = layer.component?.inPaste ? p.mains.get(layer.component.key) : undefined;
+  if (main) {
+    return instanceOfMain(doc, layer, main, p);
+  }
   const built = layersOf(doc, layer, p);
+  if (layer.component?.inPaste) {
+    return mainFrom(built, layer, layer.component, p);
+  }
   return layer.autoLayout ? built : grouped(built, layer, p);
 }
 
@@ -307,7 +344,7 @@ function frameItem(layer: FrameLayer, centre: Unit, newId: NewId, skipped: Set<s
   const size = wholeSize(layer.box);
   const blank = drawnFrame({ left: 0, top: 0, ...size }, MotionFormat.Custom, 0);
   const images: FigmaImage[] = [];
-  const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images };
+  const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images, mains: new Map() };
   const built = layersOf(blank, layer, place);
   return { destination: Destination.Frame, doc: built.doc, size, centre, name: layer.name, kind: FrameKind.Frame, images };
 }
@@ -320,7 +357,7 @@ function freeItem(layer: Layer, size: Size, centre: Unit, newId: NewId, skipped:
     return null;
   }
   const images: FigmaImage[] = [];
-  const place: Place = { centre: CENTRE, scale: blank.doc.width / size.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: size, images };
+  const place: Place = { centre: CENTRE, scale: blank.doc.width / size.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: size, images, mains: new Map() };
   const built = BUILD[layer.kind](blank.doc, layer, place);
   const one = layer.kind === LayerKind.Frame ? grouped(built, layer, place) : built;
   const first = one.doc.tracks.flatMap((t) => t.clips)[0];
@@ -357,7 +394,7 @@ export function figmaIntoFrame(doc: MotionDoc, html: string, at: Unit, scale: nu
   const { scene, fileKey } = found;
   const skipped = new Set(scene.skipped);
   const images: FigmaImage[] = [];
-  const place: Place = { centre: at, scale, frame, newId, report: (w) => skipped.add(w), rootSize: scene.combined.box, images };
+  const place: Place = { centre: at, scale, frame, newId, report: (w) => skipped.add(w), rootSize: scene.combined.box, images, mains: new Map() };
   const built = grouped(layersOf(doc, scene.combined, place), scene.combined, place);
   return built.ids.length ? { doc: built.doc, selection: built.ids, skipped: [...skipped], images, fileKey } : null;
 }

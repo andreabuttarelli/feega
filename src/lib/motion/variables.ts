@@ -1,5 +1,6 @@
 import { Control } from '@feega/motion-core/motion/components';
 import { fieldsOf } from './inspector';
+import { fillReplaces } from '@feega/motion-core/motion/fill/elements';
 import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { DEFAULT_MODE, VarType, keyOf, splitKey, variableSchema, variablesSchema, type Collection, type VarAlias, type VarInput, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
@@ -121,6 +122,16 @@ function clamped(clip: MotionClip, target: string, value: VarLiteral): VarLitera
   return typeof value === 'number' && field ? Math.min(field.max ?? value, Math.max(field.min ?? value, value)) : value;
 }
 
+function ownedFill(clip: MotionClip, target: string): MotionClip['props'] {
+  if (!fillReplaces(clip.component, target)) {
+    return clip.props;
+  }
+  const { fills: _stack, ...rest } = clip.props;
+  return rest;
+}
+
+export const fillTarget = (clip: MotionClip): string | undefined => bindableTargets(clip, VarType.Colour).find((t) => fillReplaces(clip.component, t));
+
 function resolvedClip(variables: Variables, clip: MotionClip): MotionClip {
   let next = clip;
   for (const [target, key] of Object.entries(clip.bind ?? {})) {
@@ -128,7 +139,7 @@ function resolvedClip(variables: Variables, clip: MotionClip): MotionClip {
     if (value === undefined) {
       continue;
     }
-    next = target.startsWith(LAYOUT_PREFIX) ? withLayout(next, target, value) : { ...next, props: { ...next.props, [target]: clamped(next, target, value) } };
+    next = target.startsWith(LAYOUT_PREFIX) ? withLayout(next, target, value) : { ...next, props: { ...ownedFill(next, target), [target]: clamped(next, target, value) } };
   }
   return next;
 }
@@ -241,6 +252,20 @@ export type VariableEntry = { key: string; type: VarType };
 export function variableEntries(variables: Variables | undefined): VariableEntry[] {
   return Object.entries(variables ?? {}).flatMap(([collection, c]) => Object.entries(c.vars).map(([name, v]) => ({ key: keyOf(collection, name), type: v.type })));
 }
+
+export type BindChip = { type: VarType; bound: string | null; options: VariableEntry[] };
+
+export function bindChip(clip: MotionClip, target: string, variables: Variables | undefined): BindChip | null {
+  const type = typeOfTarget(clip, target);
+  if (!type) {
+    return null;
+  }
+  const bound = clip.bind?.[target] ?? null;
+  const options = variableEntries(variables).filter((e) => e.type === type);
+  return bound || options.length ? { type, bound, options } : null;
+}
+
+export const variableValue = (variables: Variables | undefined, key: string) => (variables ? valueOf(variables, key) : undefined);
 
 export const typeOfVariable = (variables: Variables | undefined, key: string) => typeOfKey(variables, key);
 

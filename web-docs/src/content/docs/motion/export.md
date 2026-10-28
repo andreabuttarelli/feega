@@ -13,10 +13,11 @@ The formats come from the exporter code: see the generated table in [Export form
 - APNG keeps transparency, up to 10 seconds.
 - Video frames go up to 3840 × 2160 (2160p export).
 - 120 fps renders on servers.
+- "Render in this browser" draws every frame with the same GPU engine as the canvas, then encodes. Videos with line or vector shapes, motion blur or 3D devices are drawn by the previous HTML engine instead; the file has the same size, frame rate and sound either way.
 
 ## Lottie
 
-Export a frame as Lottie or dotLottie, up to 30 seconds, with shapes, gradients, masks and text as shapes. Anything that cannot be written is listed.
+Export a frame as Lottie or dotLottie, up to 30 seconds, with shapes, gradients, masks and text as shapes. Anything that cannot be written is listed. To bring a Lottie file in, see [Lottie import](/integrations/figma-and-svg/#lottie-import).
 
 ## Stills and vectors
 

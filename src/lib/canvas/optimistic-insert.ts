@@ -42,6 +42,20 @@ export function pendingOutput(id: string, drop: { x: number; y: number }): Canva
   };
 }
 
+export function pendingPicture(id: string, drop: { x: number; y: number }, size: { w: number; h: number }): CanvasNodeRecord {
+  return {
+    id,
+    canvasId: '',
+    projectId: '',
+    type: PENDING_FRAME_TYPE,
+    displayName: null,
+    position: { x: drop.x - size.w / 2, y: drop.y - size.h / 2, z: 0 },
+    size: { width: size.w, height: size.h },
+    data: {},
+    version: 0
+  };
+}
+
 const GHOST_FILL = 'rgba(17,17,17,0.08)';
 const GHOST_STROKE = '#111111';
 

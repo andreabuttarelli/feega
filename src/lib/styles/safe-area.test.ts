@@ -41,10 +41,11 @@ describe('safe area shell', () => {
 
 describe('desktop window without a title bar', () => {
   const WINDOW_CSS = read('src/lib/styles/desktop-window.css');
+  const SPACE_TOKEN = read('src/app.css').match(/--ui-space-2:[^;]+;/)![0];
 
   async function style(window: string, markup: string, probe: string, pseudo?: string): Promise<string> {
     const page = await browser.newPage();
-    await page.setContent(`<html data-window="${window}"><style>${SAFE_AREA_CSS}${WINDOW_CSS}</style>${markup}</html>`);
+    await page.setContent(`<html data-window="${window}"><style>:root{${SPACE_TOKEN}}${SAFE_AREA_CSS}${WINDOW_CSS}</style>${markup}</html>`);
     const value = await page.locator('#probe').evaluate(
       (el, [prop, pseudoEl]) => getComputedStyle(el, pseudoEl ?? null).getPropertyValue(prop),
       [probe, pseudo] as const
@@ -68,11 +69,11 @@ describe('desktop window without a title bar', () => {
     expect(await style('mac', '<header class="canvas-topbar"><button id="probe">x</button></header>', 'app-region')).toBe('no-drag');
   });
 
-  it('turns the sidebar wordmark into a bar as tall as the canvas bar, clear of the traffic lights', async () => {
+  it('centres the sidebar wordmark on the traffic lights, net of the inset sidebar card', async () => {
     const side = '<nav class="app-sidebar"><a id="probe" class="wordmark" href="/app">feega</a></nav>';
     expect(await style('mac', side, 'app-region')).toBe('drag');
-    expect(await style('mac', side, 'height')).toBe('48px');
-    expect(await style('mac', side, 'padding-left')).toBe('80px');
+    expect(await style('mac', side, 'height')).toBe('32px');
+    expect(await style('mac', side, 'padding-left')).toBe('64px');
   });
 
   it('hides links to marketing pages', async () => {

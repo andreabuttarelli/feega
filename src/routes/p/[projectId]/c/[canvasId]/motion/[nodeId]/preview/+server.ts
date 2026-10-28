@@ -18,6 +18,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
   const preview: MotionPreview = {
     version: head.version,
     html: composeHtml({ doc, tokens, assets: assetUrls(assets), origin: url.origin }),
+    scene: { doc, tokens, assets: assetUrls(assets) },
     width: doc.width,
     height: doc.height,
     fps: doc.fps,

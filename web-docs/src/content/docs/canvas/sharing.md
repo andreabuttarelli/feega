@@ -6,8 +6,9 @@ sidebar:
 ---
 
 - **Frame viewer link.** Copy a viewer link for a single frame from the export dialog, `feega motion share <nodeId>`, or the MCP tool `share_motion_frame`. The viewer is full screen and loops; on a phone, tap to play and swipe between frames.
+- **Prototype play link.** Copy a link that plays a clickable prototype from the frame inspector (**Copy play link**), `feega motion play <nodeId>` or the MCP tool `get_play_link`. See [Prototype player](/canvas/prototype-player/).
 - **Duplicate.** A signed-in visitor can duplicate a shared frame into their own workspace from its link.
 - **Selection link.** Copy a link to your selection: whoever opens it lands zoomed on those nodes.
-- **Embeds.** Publish a frame as a web embed (`feega motion embed <nodeId>`, MCP `publish_motion_embed` / `get_motion_embed`). Embeds and share links of a combined video play every scene. A published video plays on the same GPU engine as the canvas (WebGPU, WebGL when WebGPU is missing); a video that reads live input (pointer, tilt, variables) keeps the HTML player. The React SDK (`@feega/motion-react`) draws the same way inline in your page, without an iframe.
+- **Embeds.** Publish a frame as a web embed (`feega motion embed <nodeId>`, MCP `publish_motion_embed` / `get_motion_embed`). Embeds and share links of a combined video play every scene. A published video plays on the same GPU engine as the canvas (WebGPU, WebGL when WebGPU is missing); so does a video that reads live input (hover, click, scroll, tilt, variables), see [Interactive embeds](/motion/interactive-embeds/). The React SDK (`@feega/motion-react`) draws the same way inline in your page, without an iframe.
 - **Gallery.** Publish a video to the public gallery (`feega gallery publish`, MCP `publish_to_gallery`). A gallery item is a snapshot with its own copy of files, never a live link. Others remix it into their own project.
 - **Team.** Invite and list members with `feega team` or MCP `list_team` and `team_op`.

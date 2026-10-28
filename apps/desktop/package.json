@@ -1,6 +1,6 @@
 {
   "name": "feega-desktop",
-  "productName": "feega",
+  "productName": "Feega",
   "private": true,
   "version": "0.1.0",
   "main": "main.cjs",
@@ -8,16 +8,23 @@
     "start": "electron .",
     "test": "node --test",
     "build": "electron-builder --publish never",
-    "build:mac": "electron-builder --mac dir --publish never"
+    "build:mac": "electron-builder --mac dir --publish never",
+    "build:native": "node scripts/build-native.cjs",
+    "build:native:universal": "node scripts/build-native.cjs --universal",
+    "start:native": "FEEGA_NATIVE_CANVAS=1 electron .",
+    "build:mac:universal": "electron-builder --mac dir --universal --publish never"
   },
   "build": {
     "appId": "app.feega.desktop",
-    "productName": "feega",
+    "productName": "Feega",
     "files": [
       "main.cjs",
       "routing.cjs",
       "updates.cjs",
-      "chrome.cjs"
+      "chrome.cjs",
+      "native-canvas.cjs",
+      "preload.cjs",
+      "native/*.node"
     ],
     "directories": {
       "buildResources": "build",
@@ -85,7 +92,10 @@
         "url": "https://github.com/andreabuttarelli/feega/releases/download/desktop-latest"
       }
     ],
-    "artifactName": "feega-${version}-${os}-${arch}.${ext}"
+    "artifactName": "feega-${version}-${os}-${arch}.${ext}",
+    "asarUnpack": [
+      "native/*.node"
+    ]
   },
   "devDependencies": {
     "electron": "38.2.0",

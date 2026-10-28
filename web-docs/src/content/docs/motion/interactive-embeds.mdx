@@ -1,0 +1,37 @@
+---
+title: Interactive embeds
+description: Hover, click, scroll, links and variables, on the GPU engine.
+sidebar:
+  order: 7
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="interactive-gpu-core" caption="An interactive hero in a web page: hover, click, scroll." />
+
+An interactive video is a frame with expressions that read live input, or with a scroll-driven timeline. It plays on the same GPU engine as the canvas: the hosted embed, the downloaded HTML file, the live preview on the canvas and the React SDK all draw it there. There is no second player.
+
+## What reacts
+
+| Input | Expression | Set by |
+|---|---|---|
+| Pointer | `input.pointer.x`, `input.pointer.y` (0 to 1 across the video) | cursor or finger |
+| Hover | `input.hover` | the cursor is over the video |
+| Press | `input.pointer.down` | button or finger held |
+| Tilt | `input.tilt.x`, `input.tilt.y` | phone orientation |
+| Scroll | `input.scroll`, or the playhead when scroll scrubs the timeline | the host page |
+| Time | `input.time` | real seconds since the player started |
+| Variables | `vars.<name>` | your page |
+
+Live input drives transforms, number props and liquid blob props. Text and colour variables bind to a text layer. A link set on a range of text in a Text layer opens on click, and the cursor turns into a pointer over it.
+
+## Where it plays
+
+- **Hosted embed.** Publish with `feega motion embed <nodeId>` and paste the snippet. Pages published before this change keep their old player until they are republished.
+- **Downloaded file.** *Download HTML* in the interactive export writes one file with the video, the player and the engine inside. It opens offline, text included. Layers that need a library (custom components, 3D models) still load it from feega when online.
+- **React.** `@feega/motion-react` draws the video inline, no iframe. Pass `vars`, listen to `onLinkClick` and `onVarsChange`.
+- **Canvas.** Live mode on a frame runs the same page.
+
+## Not on the GPU engine yet
+
+Custom components in live mode (games) do not run live: they are read one frame at a time like any other custom component. Liquid glass is not drawn by the GPU engine yet; liquid blobs are, and react to live input.

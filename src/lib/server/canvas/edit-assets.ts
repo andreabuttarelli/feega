@@ -5,7 +5,7 @@ import { signMediaPaths } from './sign-media';
 import type { PixelSize } from '$lib/server/image-mask';
 import type { OutpaintPlan } from '$lib/outpaint';
 
-const NEUTRAL_FILL = '#808080';
+const PADDING_BLUR = 90;
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
 const PNG = 'image/png';
@@ -57,6 +57,9 @@ export async function paddedPng(db: Db, scope: { orgId: string; assetId: string 
   }
   const source = Buffer.from(await (await fetch(url)).arrayBuffer());
   const picture = await sharp(source).resize(size.width, size.height, { fit: 'fill' }).png().toBuffer();
-  const base = sharp({ create: { width: plan.padded.width, height: plan.padded.height, channels: 3, background: NEUTRAL_FILL } });
-  return base.composite([{ input: picture, left: plan.offset.left, top: plan.offset.top }]).png().toBuffer();
+  const { left, top } = plan.offset;
+  const right = plan.padded.width - size.width - left;
+  const bottom = plan.padded.height - size.height - top;
+  const context = await sharp(picture).extend({ left, right, top, bottom, extendWith: 'copy' }).blur(PADDING_BLUR).png().toBuffer();
+  return sharp(context).composite([{ input: picture, left, top }]).png().toBuffer();
 }

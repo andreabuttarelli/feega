@@ -96,7 +96,7 @@
       <ChevronRight size={14} strokeWidth={2} />
     </button>
 
-    <button type="button" class="select-help" onclick={() => requestGuide('loop')} aria-label="Guida">
+    <button type="button" class="select-help" onclick={() => requestGuide('ai/loops')} aria-label="Guida">
       <HelpCircle size={13} strokeWidth={2} />
     </button>
   </header>
@@ -140,7 +140,7 @@
           {:else}
             {@const value = values[out.handle]}
             {#if value?.mediaUrls[0] && out.port === 'images'}
-              <img class="select-output-thumb" src={value.mediaUrls[0]} alt="" loading="lazy" />
+              <img draggable="false" class="select-output-thumb" src={value.mediaUrls[0]} alt="" loading="lazy" />
             {/if}
             <span class="select-output-value">{summary(value)}</span>
           {/if}

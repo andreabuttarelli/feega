@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 const CSS = readFileSync('src/app.css', 'utf8');
 const AA = 4.5;
 const SURFACE_STEP = 1.04;
+const FIELD_STEP = 1.05;
+const HOVER_STEP = 1.02;
 
 type Theme = 'light' | 'dark';
 
@@ -97,6 +99,14 @@ describe.each(['light', 'dark'] as const)('the %s greyscale', (theme) => {
     expect(contrast(t['--ui-canvas'], t['--ui-panel'])).toBeGreaterThan(SURFACE_STEP);
     expect(contrast(t['--ui-panel-sunken'], t['--ui-panel'])).toBeGreaterThan(SURFACE_STEP);
     expect(contrast(t['--ui-divider'], t['--ui-panel'])).toBeGreaterThan(SURFACE_STEP);
+  });
+
+  it('a field is darker than every surface it sits on, and its hover is a visible step from it', () => {
+    for (const surface of ['--ui-panel', '--ui-panel-raised']) {
+      expect(luminance(t['--ui-input']), `--ui-input under ${surface}`).toBeLessThan(luminance(t[surface]));
+      expect(contrast(t['--ui-input'], t[surface]), `--ui-input against ${surface}`).toBeGreaterThan(FIELD_STEP);
+    }
+    expect(contrast(t['--ui-input-hover'], t['--ui-input'])).toBeGreaterThan(HOVER_STEP);
   });
 
   it('white on the solid accent and the accent as text both read at AA', () => {

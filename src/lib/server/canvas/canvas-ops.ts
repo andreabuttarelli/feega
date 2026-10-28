@@ -22,12 +22,15 @@ import {
   type PatchWrite
 } from '$lib/server/repos/canvas';
 import { cancelNodeRun, runsOf } from '$lib/server/canvas/generate';
+import { diffRuns } from '$lib/canvas/run-diff';
 import { runGeneration, type GenerationOutcome } from '$lib/server/canvas/variants';
 import { cancelBatch } from '$lib/server/canvas/cancel-batch';
 import { parseVariantsAsk } from '$lib/canvas/variants';
 import { IMAGE_TOOL_DEPS, startImageTool } from '$lib/server/canvas/image-tool';
 import { layersToFrame, layersToFrameDeps } from '$lib/server/canvas/layers-to-frame';
 import { imageToolAskSchema } from '$lib/image-tools';
+import { videoReframeAskSchema } from '$lib/reframe';
+import { VIDEO_REFRAME_DEPS, startVideoReframe } from '$lib/server/canvas/video-reframe';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
@@ -37,7 +40,10 @@ import { enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
 import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles';
 import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-variables';
-import { drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
+import { importLottieAt } from '$lib/server/motion/lottie-at';
+import { lottieSource } from '$lib/motion/import-lottie';
+import { SafeFetchError, safeFetchBytes } from '$lib/server/tool-guard';
+import { MoveOutcome, drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { NODE_NAME_MAX } from '$lib/canvas/node-name';
@@ -57,14 +63,23 @@ import { createFormats, formatTargetSchema } from '$lib/server/motion/create-for
 import { combineScenes, MAX_SCENES } from '$lib/server/motion/combine-scenes';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { runTechnique, saveFromSelection, TechniqueRun } from '$lib/server/canvas/techniques';
-import { detachInstance, openDefinition, placeInstance, runInstance } from '$lib/server/canvas/technique-instance';
+import { cancelRows, detachInstance, openDefinition, placeInstance, previewRows, rowsProgress, runInstance, runRows } from '$lib/server/canvas/technique-instance';
+import { BATCH_MAX_ROWS } from '$lib/canvas/technique-batch';
 import { deleteTechnique, listTechniques, TechniqueOutcome } from '$lib/server/repos/techniques';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
+import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import';
+import { MAX_FRAMES } from '$lib/server/figma/import-file';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
+import { readSelection, SELECTION_WAIT_MS } from '$lib/server/canvas/selection-read';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { undoGesture } from '$lib/server/canvas/undo';
+import { arrangeNodes } from '$lib/server/canvas/arrange';
+import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileBox, type TileMove } from '$lib/canvas/align';
+import { Axis, Edge } from '$lib/motion/space';
+import { listCanvasEvents } from '$lib/server/repos/canvas-events';
+import { lastGesture } from '$lib/canvas/undo-last';
 import { parseUndoItem, type UndoItem } from '$lib/canvas/undo-plan';
 import { endOnboarding, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
@@ -81,6 +96,8 @@ import { cancelRender } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
 import { importCanvasLink, registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
+import { importFeedImage } from '$lib/server/canvas/feed-image';
+import { DropOn } from '$lib/motion/move-element';
 import { canvasUploadPrefix, verdictForUpload } from '$lib/canvas/upload-kind';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { findProjectById } from '$lib/server/repos/projects';
@@ -212,6 +229,17 @@ const drawElementInput = z
   .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse|polygon|star, box:{left,top,width,height}}, {tool:line|arrow, from:{x,y}, to:{x,y}, stroke?:#hex}, or {tool:pen, path:SVG d}, in canvas units') })
   .strict();
 
+const figmaFramesInput = z.object({ url: z.string().describe('a figma.com design link') }).strict();
+const importFigmaInput = z
+  .object({
+    canvasId: z.string(),
+    url: z.string().describe('a figma.com design link; its node-id picks the frame when frameIds is left out'),
+    frameIds: z.array(z.string()).min(1).max(MAX_FRAMES).optional().describe('frame ids from list_figma_frames'),
+    x: z.number().finite(),
+    y: z.number().finite()
+  })
+  .strict();
+
 const drawFrameInput = z
   .object({
     canvasId: z.string(),
@@ -231,6 +259,32 @@ function frameBox(input: z.infer<typeof drawFrameInput>) {
   return { left: input.x, top: input.y, width: input.w, height };
 }
 
+const LOTTIE_MAX_BYTES = 8_000_000;
+const LOTTIE_FETCH_TIMEOUT_MS = 15_000;
+
+const importLottieInput = z
+  .object({
+    canvasId: z.string(),
+    x: z.number().finite().describe('canvas position of the frame centre'),
+    y: z.number().finite(),
+    lottie: z.record(z.string(), z.unknown()).optional().describe('the Lottie JSON itself'),
+    url: z.string().url().startsWith('https://').optional().describe('an https URL of a .json or .lottie file')
+  })
+  .strict()
+  .refine((a) => Boolean(a.lottie) !== Boolean(a.url), 'give lottie or url, not both');
+
+async function lottieOf(input: z.infer<typeof importLottieInput>): Promise<unknown> {
+  if (input.lottie) {
+    return input.lottie;
+  }
+  try {
+    const fetched = await safeFetchBytes(input.url as string, { maxBytes: LOTTIE_MAX_BYTES, timeoutMs: LOTTIE_FETCH_TIMEOUT_MS, scheme: 'https-only' });
+    return fetched.ok ? lottieSource(fetched.bytes) : 'The file could not be downloaded.';
+  } catch (e) {
+    return e instanceof SafeFetchError ? e.message : 'The file could not be downloaded.';
+  }
+}
+
 const MOTION_TYPE = 'motion';
 
 const createdSize = (type: string, data: Record<string, unknown>) => {
@@ -248,6 +302,8 @@ const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().des
 const scaleGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), width: z.number().positive(), height: z.number().positive() }).strict();
 const moveGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), x: z.number().finite(), y: z.number().finite() }).strict();
 const membersOf = (ctx: CanvasCtx, canvasId: string) => nodeMembers(ctx.db, { orgId: ctx.orgId, canvasId, actor: ctx.actor });
+
+const figmaScope = (ctx: CanvasCtx) => ({ db: ctx.db, orgId: ctx.orgId, userId: ctx.userId, projectId: ctx.projectId, actor: ctx.actor });
 
 const framesOf = (ctx: CanvasCtx) => frameStore(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, projectId: ctx.projectId });
 
@@ -327,6 +383,15 @@ const runTechniqueInput = z
     run: z.boolean().optional().describe('default true: run the inner graph (spends credits); false only places it')
   })
   .strict();
+const techniqueRowsInput = z
+  .object({
+    techniqueId: z.string(),
+    rows: z.array(z.array(z.string().max(4000))).min(1).max(BATCH_MAX_ROWS).describe('one array of cells per row'),
+    mapping: z.array(z.number().int().nullable()).optional().describe('per input slot of the technique, the cell index it takes (null = none); default: slots take the cells in order. Image slots take a URL')
+  })
+  .strict();
+const cancelRowsInput = z.object({ workflowIds: z.array(z.string()).min(1).max(BATCH_MAX_ROWS) }).strict();
+const rowsProgressInput = z.object({ runIds: z.array(z.string()).min(1) }).strict();
 const techniqueIdInput = z.object({ techniqueId: z.string() }).strict();
 const placeTechniqueInput = z.object({ canvasId: z.string(), techniqueId: z.string(), x: z.number(), y: z.number() }).strict();
 const techniqueNodeInput = z.object({ nodeId: z.string() }).strict();
@@ -341,6 +406,7 @@ const addFrameInput = z
     y: z.number()
   })
   .strict();
+const compareRunsInput = z.object({ nodeId: z.string(), runA: z.string().describe('from list_runs'), runB: z.string().describe('from list_runs') }).strict();
 const showRunInput = z.object({ nodeId: z.string(), runId: z.string().describe('from list_runs') }).strict();
 const retryComboInput = z.object({ nodeId: z.string(), outputListNodeId: z.string(), label: z.string(), runId: z.string().optional() }).strict();
 const workflowIdInput = z.object({ workflowId: z.string() }).strict();
@@ -374,6 +440,13 @@ const pasteNodesInput = z
 const undoGestureInput = z
   .object({ canvasId: z.string(), items: z.array(z.unknown()).min(1).describe('the gesture items the canvas recorded, newest write first') })
   .strict();
+const arrangeInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2) }).strict();
+const alignNodesInput = arrangeInput.extend({ edge: z.enum(Object.values(Edge) as [Edge, ...Edge[]]).describe('left|center|right align x, top|middle|bottom align y, to the bounds of the selection') }).strict();
+const distributeNodesInput = arrangeInput.extend({ axis: z.enum(Object.values(Axis) as [Axis, ...Axis[]]).describe('x spreads left to right, y top to bottom; equal gaps, the outer nodes stay') }).strict();
+const stackNodesInput = arrangeInput.extend({ gap: z.number().min(0).default(STACK_GAP).describe('space between nodes in canvas units') }).strict();
+const undoLastInput = z.object({ canvasId: z.string() }).strict();
+const UNDO_LOOKBACK = 50;
+const NOTHING_TO_UNDO = { outcome: 'nothing_to_undo' };
 const endOnboardingInput = z.object({ status: z.enum([OnboardingStatus.Dismissed, OnboardingStatus.Completed]) }).strict();
 const textCostInput = z
   .object({ canvasId: z.string(), nodeId: z.string(), prompt: z.string().default(''), model: z.string().optional().describe('Omit for the default text model.') })
@@ -389,6 +462,20 @@ const MAX_CLONE_SAMPLE_BYTES = 3 * 1024 * 1024;
 
 const requestUploadInput = z.object({ fileName: z.string().min(1), mimeType: z.string().min(1), bytes: z.number().int().positive() }).strict();
 const importLinkInput = z.object({ url: z.string().url().describe('https link to a picture or video') }).strict();
+
+const importFeedImageInput = z
+  .object({
+    canvasId: z.string(),
+    nodeId: z.string().describe('the Social feed or Products node'),
+    itemId: z.string().describe('id of a post (socialPosts) or product (products) in canvas_snapshot'),
+    imageIndex: z.number().int().min(0).default(0).describe('which picture of a carousel post or product'),
+    x: z.number().default(0).describe('canvas position of the new image node, its centre'),
+    y: z.number().default(0),
+    toFrameId: z.string().optional().describe('put the picture inside this Frame instead of making a node'),
+    frameX: z.number().min(0).max(1).default(0.5),
+    frameY: z.number().min(0).max(1).default(0.5)
+  })
+  .strict();
 
 const registerUploadInput = z
   .object({
@@ -465,6 +552,13 @@ async function inProject(ctx: CanvasCtx, canvasId: string): Promise<boolean> {
   return (await listCanvases(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId })).some((c) => c.id === canvasId);
 }
 
+async function arranged(ctx: CanvasCtx, input: { canvasId: string; nodeIds: string[] }, plan: (tiles: TileBox[]) => TileMove[]) {
+  if (!(await inProject(ctx, input.canvasId))) {
+    return NOT_IN_PROJECT;
+  }
+  return arrangeNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, nodeIds: input.nodeIds, actor: ctx.actor, plan });
+}
+
 export const CANVAS_OPS = {
   list_canvases: op({
     access: Access.Read,
@@ -499,6 +593,18 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => {
       const memberships = (await listMemberships(ctx.db, ctx.userId)).filter((m) => m.org.id === ctx.orgId);
       return canvasRevision(ctx.db, { canvasId: input.canvasId, projectId: ctx.projectId, memberships });
+    }
+  }),
+
+  get_selection: op({
+    access: Access.Read,
+    input: canvasIdInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const { channelFeed } = await import('$lib/server/canvas/selection-feed');
+      return readSelection(channelFeed, { canvasId: input.canvasId, userId: ctx.userId, waitMs: SELECTION_WAIT_MS });
     }
   }),
 
@@ -590,6 +696,30 @@ export const CANVAS_OPS = {
     }
   }),
 
+  align_nodes: op({
+    access: Access.Write,
+    input: alignNodesInput,
+    run: async (ctx, input) => arranged(ctx, input, (tiles) => alignTiles(tiles, input.edge))
+  }),
+
+  distribute_nodes: op({
+    access: Access.Write,
+    input: distributeNodesInput.extend({ nodeIds: z.array(z.string()).min(3) }).strict(),
+    run: async (ctx, input) => arranged(ctx, input, (tiles) => distributeTiles(tiles, input.axis))
+  }),
+
+  tidy_nodes: op({
+    access: Access.Write,
+    input: arrangeInput,
+    run: async (ctx, input) => arranged(ctx, input, tidyTiles)
+  }),
+
+  stack_nodes: op({
+    access: Access.Write,
+    input: stackNodesInput,
+    run: async (ctx, input) => arranged(ctx, input, (tiles) => stackTiles(tiles, input.gap))
+  }),
+
   write_nodes: op({
     access: Access.Write,
     input: writeNodesInput,
@@ -645,6 +775,23 @@ export const CANVAS_OPS = {
       }
       const result = await undoGesture(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, gesture: { items: items as UndoItem[] }, actor: ctx.actor });
       return result.outcome === 'refused' ? { outcome: 'refused', reason: result.reason } : { outcome: 'undone', redo: result.redo };
+    }
+  }),
+
+  undo_last: op({
+    access: Access.Write,
+    input: undoLastInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const events = await listCanvasEvents(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, limit: UNDO_LOOKBACK });
+      const gesture = lastGesture(events, ctx.actor);
+      if (!gesture) {
+        return NOTHING_TO_UNDO;
+      }
+      const result = await undoGesture(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, gesture, actor: ctx.actor });
+      return result.outcome === 'refused' ? { outcome: 'refused', reason: result.reason } : { outcome: 'undone', reverted: gesture.items.map((item) => item.kind) };
     }
   }),
 
@@ -775,10 +922,38 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => frameAnswer(await drawElement(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.drawn))
   }),
 
+  list_figma_frames: op({
+    access: Access.Read,
+    input: figmaFramesInput,
+    run: async (ctx, input) => figmaFramesOf(figmaScope(ctx), input.url)
+  }),
+
+  import_figma: op({
+    access: Access.Write,
+    input: importFigmaInput,
+    run: async (ctx, input) => importFigmaInto(figmaScope(ctx), input.canvasId, { url: input.url, nodeIds: input.frameIds ?? null, at: { x: input.x, y: input.y } })
+  }),
+
   draw_frame: op({
     access: Access.Write,
     input: drawFrameInput,
     run: async (ctx, input) => frameAnswer(await drawFrameAt(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, frameBox(input), input.format, input.still))
+  }),
+
+  import_lottie: op({
+    access: Access.Write,
+    input: importLottieInput,
+    run: async (ctx, input) => {
+      const json = await lottieOf(input);
+      if (typeof json === 'string') {
+        return { outcome: MoveOutcome.Invalid, message: json };
+      }
+      const placed = await importLottieAt(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, json, { x: input.x, y: input.y }, () => crypto.randomUUID().slice(0, 8));
+      if ('error' in placed) {
+        return { outcome: MoveOutcome.Invalid, message: placed.error };
+      }
+      return { outcome: placed.outcome, frame_id: placed.frameId, skipped: placed.skipped };
+    }
   }),
 
   group_elements: op({
@@ -884,12 +1059,21 @@ export const CANVAS_OPS = {
     input: imageToolAskSchema,
     run: async (ctx, input) => {
       const started = await ctx.billed(() =>
-        startImageTool(ctx.db, IMAGE_TOOL_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, tool: input.tool, factor: input.factor, prompt: input.prompt, mask: input.mask, extend: input.extend, actor: ctx.actor })
+        startImageTool(ctx.db, IMAGE_TOOL_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, tool: input.tool, factor: input.factor, prompt: input.prompt, mask: input.mask, extend: input.extend, aspect: input.aspect, actor: ctx.actor })
       );
       if (!started.ok) {
         return { error: started.error };
       }
       return { nodeId: started.nodeId, ...outcomeOf(started.outcome) };
+    }
+  }),
+
+  video_reframe: op({
+    access: Access.Write,
+    input: videoReframeAskSchema,
+    run: async (ctx, input) => {
+      const started = await startVideoReframe(ctx.db, VIDEO_REFRAME_DEPS, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, sourceNodeId: input.nodeId, aspect: input.aspect, focus: input.focus, actor: ctx.actor });
+      return started.ok ? { outcome: 'done', nodeId: started.nodeId } : { error: started.error };
     }
   }),
 
@@ -920,6 +1104,22 @@ export const CANVAS_OPS = {
     access: Access.Read,
     input: nodeIdInput,
     run: async (ctx, input) => ({ runs: await runsOf(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId }) })
+  }),
+
+  compare_runs: op({
+    access: Access.Read,
+    input: compareRunsInput,
+    run: async (ctx, input) => {
+      const runs = await runsOf(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId });
+      const a = runs.find((r) => r.id === input.runA);
+      const b = runs.find((r) => r.id === input.runB);
+      if (!a || !b) {
+        return { error: 'run_not_found', message: 'Both runs must belong to the node (list_runs).' };
+      }
+
+      const side = (r: typeof a) => ({ runId: r.id, assetId: r.outputAssetId, prompt: r.prompt, model: r.model, params: r.params, costUsd: r.costUsd, startedAt: r.startedAt });
+      return { a: side(a), b: side(b), diff: diffRuns(a, b) };
+    }
   }),
 
   preview_node_loop: op({
@@ -1248,6 +1448,31 @@ export const CANVAS_OPS = {
     }
   }),
 
+  preview_technique_rows: op({
+    access: Access.Read,
+    input: techniqueRowsInput,
+    run: async (ctx, input) => previewRows(ctx.db, { orgId: ctx.orgId, techniqueId: input.techniqueId, rowCount: input.rows.length })
+  }),
+
+  run_technique_rows: op({
+    access: Access.Spend,
+    input: techniqueRowsInput,
+    run: async (ctx, input) =>
+      ctx.billed(() => runRows(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, techniqueId: input.techniqueId, rows: input.rows, mapping: input.mapping ?? null, actor: ctx.actor }))
+  }),
+
+  technique_rows_progress: op({
+    access: Access.Read,
+    input: rowsProgressInput,
+    run: async (ctx, input) => rowsProgress(ctx.db, { runIds: input.runIds })
+  }),
+
+  cancel_technique_rows: op({
+    access: Access.Write,
+    input: cancelRowsInput,
+    run: async (ctx, input) => cancelRows(ctx.db, { orgId: ctx.orgId, workflowIds: input.workflowIds })
+  }),
+
   place_technique: op({
     access: Access.Write,
     input: placeTechniqueInput,
@@ -1416,6 +1641,21 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: importLinkInput,
     run: async (ctx, input) => uploadAnswer(async () => ({ asset: (await importCanvasLink(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, url: input.url })).asset }))
+  }),
+
+  import_feed_image: op({
+    access: Access.Write,
+    input: importFeedImageInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const drop = input.toFrameId ? { on: DropOn.Frame, nodeId: input.toFrameId, at: { x: input.frameX, y: input.frameY } } as const : { on: DropOn.Canvas, x: input.x, y: input.y } as const;
+      return uploadAnswer(async () => {
+        const landed = await importFeedImage({ db: ctx.db, frames: framesOf(ctx), actor: ctx.actor }, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, nodeId: input.nodeId, itemId: input.itemId, imageIndex: input.imageIndex, drop });
+        return landed.placed === 'frame' ? frameAnswer(landed.moved) : { node: landed.node, asset: landed.asset };
+      });
+    }
   }),
 
   list_voices: op({

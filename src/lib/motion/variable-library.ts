@@ -1,7 +1,7 @@
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
-import { setCollection } from './variables';
-import type { Collection, Variables } from '@feega/motion-core/motion/variables-model';
+import { bindVariable, setCollection } from './variables';
+import { splitKey, type Collection, type Variables } from '@feega/motion-core/motion/variables-model';
 
 export function variableLibraryOf(docs: readonly MotionDoc[]): Variables {
   const library: Variables = {};
@@ -29,4 +29,14 @@ export function syncedCollection(doc: MotionDoc, name: string, collection: Colle
   }
   const synced = setCollection(doc, name, keepingMode(doc, name, collection));
   return synced.ok ? synced.doc : null;
+}
+
+export function bindFromLibrary(doc: MotionDoc, library: Variables, clipId: string, target: string, key: string): OpResult {
+  const collection = splitKey(key)?.[0] ?? '';
+  const shared = library[collection];
+  if (!shared) {
+    return { ok: false, error: `no collection ${collection}` };
+  }
+  const adopted = adoptCollection(doc, collection, shared);
+  return adopted.ok ? bindVariable(adopted.doc, clipId, target, key) : adopted;
 }

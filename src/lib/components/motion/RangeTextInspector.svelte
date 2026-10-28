@@ -5,7 +5,8 @@
   import { resolveColor } from '@feega/motion-core/motion/brand';
   import type { FontLibrary } from '$lib/motion/fonts/library';
   import type { CatalogueFont } from '@feega/motion-core/motion/fonts/model';
-  import { registerFont, withUploaded } from '$lib/motion/fonts/ops';
+  import { registerFont } from '$lib/motion/fonts/ops';
+  import { FontOrigin, withPicked } from '$lib/motion/fonts/local';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import { ListKind } from '@feega/motion-core/motion/text-lists';
   import { MIXED, RUN_CASES, linkOf, type GradientFill, type RunEdit, type StyleKey } from '@feega/motion-core/motion/text-runs';
@@ -54,8 +55,8 @@
     }
   }
 
-  function pickFont(asked: string, catalogue: CatalogueFont[]) {
-    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
+  function pickFont(asked: string, catalogue: CatalogueFont[], origin: FontOrigin) {
+    const { doc: base, family } = withPicked(doc, asked, origin, fonts?.families ?? []);
     const registered = registerFont(base, family, catalogue);
     if (registered.ok) {
       onchange(registered.doc, `Added the font ${family}`);
@@ -95,7 +96,7 @@
 </script>
 
 {#if values}
-  <section class="range" data-testid="range-text-inspector" data-text-range-panel>
+  <section class="range ui-section" data-testid="range-text-inspector" data-text-range-panel>
     <header>Text · selection</header>
     <div class="row">
       <span>Font</span>
@@ -169,7 +170,6 @@
     flex-direction: column;
     gap: var(--ui-space-2);
     padding: var(--ui-space-3) var(--ui-space-4);
-    border-bottom: 1px solid var(--ui-line);
     font-size: var(--ui-type-caption);
   }
 
@@ -190,9 +190,9 @@
   select {
     min-width: 0;
     padding: 4px 6px;
-    border: 1px solid var(--ui-line);
+    border: 1px solid transparent;
     border-radius: var(--ui-radius-sm);
-    background: var(--ui-surface);
+    background: var(--ui-input);
     color: var(--ui-text);
     font: inherit;
   }

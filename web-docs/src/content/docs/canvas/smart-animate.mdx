@@ -1,0 +1,58 @@
+---
+title: Smart animate
+description: Animate between two frames by matching layers by name.
+sidebar:
+  order: 13
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="smart-animate" caption="Link a button to another frame, choose Smart animate and preview the move." />
+
+Smart animate is a transition for a [prototype link](/canvas/prototype-links/). Instead of sliding the whole frame, it finds the layers the two frames share and moves each one from where it is in the source to where it is in the target.
+
+## How layers are matched
+
+- Two layers match when they have the same **name** in both frames and are the same kind of layer (a shape matches a shape, text matches text).
+- A layer without a name matches the layer with the same **id**.
+- A name used by two layers in one frame matches nothing, so a duplicate never steals a partner.
+- A layer found in only one frame fades: out of the source, or into the target.
+
+Name the layers you want to travel the same in both frames. Duplicating a frame keeps the names, so a duplicate is the easiest starting point.
+
+## What is animated
+
+For every matched layer: position, size, rotation, opacity, fill and corner radius. Fills between two hex colours blend; any other pair of fills (brand colours, gradients) switches at the halfway point. An ellipse counts as fully rounded, so a circle becomes a rounded rectangle smoothly. Everything follows the easing you pick, over the duration you set.
+
+## Use it
+
+1. Link a layer to a frame as in [Prototype links](/canvas/prototype-links/).
+2. In **Prototype**, set **Transition** to **Smart animate**.
+3. Pick an easing and a duration in milliseconds (300 by default).
+4. A preview appears under the link. Press **Play**, or drag the slider to scrub.
+
+The preview draws layers as boxes: shapes with their fill, other layers as dashed outlines.
+
+## Agent and MCP
+
+`add_interaction` takes `smart_animate` as the transition kind; no other tool is needed.
+
+```json
+{
+  "tool": "add_interaction",
+  "input": {
+    "clip_id": "cta",
+    "trigger": { "kind": "click" },
+    "action": { "kind": "navigate", "target": "<frame node id>" },
+    "transition": { "kind": "smart_animate", "easing": "enter", "durationMs": 500 }
+  }
+}
+```
+
+```bash
+feega motion tool <nodeId> add_interaction --input '{"clip_id":"cta","trigger":{"kind":"click"},"action":{"kind":"navigate","target":"<frame node id>"},"transition":{"kind":"smart_animate","durationMs":500}}'
+```
+
+## Limits
+
+The matching and the interpolation are a pure function (`smartAnimate`) that the editor preview uses today. Playing links in a present mode is not part of this release; when it lands, it reads the same transition. Text content, strokes and effects are not interpolated.

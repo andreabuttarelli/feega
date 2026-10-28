@@ -8,6 +8,7 @@ import { depthOf, turnedInDepth } from './depth';
 import { warpItem } from './warp';
 import { apply2d } from '../affine';
 import { boxOf } from '../layout';
+import type { AudioAnalysis } from '../audio-analysis';
 import { junctionMovesOf, preparedDoc } from '../hyperframes/compose';
 import type { JunctionMove } from '../junctions';
 import { renderAt } from '../effects/render';
@@ -125,7 +126,7 @@ type Painted = Content[] | Partly | Unsupported;
 type Env = { clip: MotionClip; animators: TextAnimator[]; onPath: OnPath | null; props: Record<string, unknown>; size: Size; box: Box; stage: Size; unit: number; colour: (v: string) => Rgba; css: (v: string) => string; time: number; media: number; fps: number; still: number | null; asset: (id: unknown) => string | null; logo: string | null; typeset: Typeset; read: DomRead | null };
 type Painter = (env: Env) => Painted;
 
-const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment']);
+const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment', 'Light']);
 const DRAWN_SOURCES: ReadonlySet<Source> = new Set([Source.Transform, Source.Prop, Source.Param]);
 const SAMPLED_IN_PLACE: ReadonlySet<Source> = new Set([Source.Mask]);
 const SOLID_PATTERN = 'solid';
@@ -471,8 +472,8 @@ const dimmed = (filters: Filter[], pose: Pose): Filter[] => (pose.dim < 1 ? [...
 
 const scaleOf = (m: Affine) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
 
-export function prepare(doc: MotionDoc, tokens: BrandTokens, assets: Record<string, string> = {}, typeset: Typeset = NO_TYPESET): Prepared {
-  return { doc: preparedDoc({ doc, tokens, assets }), tokens, assets, typeset, moves: junctionMovesOf({ doc, tokens, assets }) };
+export function prepare(doc: MotionDoc, tokens: BrandTokens, assets: Record<string, string> = {}, typeset: Typeset = NO_TYPESET, analyses?: Record<string, AudioAnalysis>): Prepared {
+  return { doc: preparedDoc({ doc, tokens, assets, analyses }), tokens, assets, typeset, moves: junctionMovesOf({ doc, tokens, assets }) };
 }
 
 const NO_READS: DomReads = new Map();

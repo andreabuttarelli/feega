@@ -34,7 +34,10 @@ import { stillSchema } from './still-model';
 import { partStylesSchema } from './part-style-model';
 import { autoLayoutSchema, layoutItemSchema } from './layout/model';
 import { constraintsSchema } from './constraints/model';
+import { flowSchema } from './prototype/flow';
+import { interactionsSchema } from './prototype/model';
 import { layoutGuidesSchema } from './layout-guides/model';
+import { userGuidesSchema } from './user-guides/model';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -122,7 +125,9 @@ const clipSchema = z.object({
   autoLayout: autoLayoutSchema.nullable().optional(),
   layoutItem: layoutItemSchema.optional(),
   constraints: constraintsSchema.optional(),
+  interactions: interactionsSchema.optional(),
   lockRatio: z.boolean().optional(),
+  acceptsLights: z.boolean().optional(),
   partStyles: partStylesSchema.optional(),
   styleRef: z.string().min(1).optional(),
   effectStyleRef: z.string().min(1).optional(),
@@ -147,7 +152,7 @@ const templateMarkSchema = z.object({
   keyFields: keyFieldsSchema
 });
 
-export const propertyDefSchema = z.object({ kind: z.enum(['boolean', 'text', 'swap', 'nested']), target: z.string().min(1).max(80), default: z.union([z.string().max(2000), z.boolean()]).optional(), nested: z.string().min(1).max(40).optional() }).strict();
+export const propertyDefSchema = z.object({ kind: z.enum(['boolean', 'text', 'swap', 'nested']), target: z.string().min(1).max(80), default: z.union([z.string().max(2000), z.boolean()]).optional(), nested: z.string().min(1).max(40).optional(), preferred: z.array(z.string().min(1).max(80)).max(40).optional() }).strict();
 
 export const mainComponentSchema = z.object({ name: z.string().min(1).max(60), set: z.string().min(1).max(60).optional(), variant: z.record(z.string().min(1).max(40), z.string().min(1).max(40)).optional(), properties: z.record(z.string().min(1).max(40), propertyDefSchema).optional() }).strict();
 
@@ -188,6 +193,15 @@ export function fitsResolution(d: { width: number; height: number; still?: unkno
   return Boolean(d.still) || Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE);
 }
 
+const MAX_POINT_TRACKS = 20;
+
+const pointTrackSchema = z.object({
+  clipId: z.string(),
+  anchor: z.number(),
+  lost: z.boolean(),
+  points: z.array(z.object({ x: z.number(), y: z.number(), frame: z.number(), score: z.number() }))
+});
+
 export const motionDocSchema = z
   .object({
     version: z.literal(DOC_VERSION),
@@ -218,9 +232,12 @@ export const motionDocSchema = z
     still: stillSchema.optional(),
     freeSize: z.boolean().optional(),
     layoutGuides: layoutGuidesSchema,
+    userGuides: userGuidesSchema,
     links: z.record(z.string().min(1), z.string().min(1)).optional(),
+    flow: flowSchema.optional(),
     styles: stylesSchema,
-    variables: variablesSchema
+    variables: variablesSchema,
+    pointTracks: z.record(z.string(), pointTrackSchema).refine((t) => Object.keys(t).length <= MAX_POINT_TRACKS, `at most ${MAX_POINT_TRACKS} saved tracks`).optional()
   })
   .refine(fitsResolution, RESOLUTION_PROBLEM)
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] })

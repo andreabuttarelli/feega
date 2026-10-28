@@ -39,6 +39,7 @@ describe('group and ungroup', () => {
       ['tidy-up', 'Mod+Alt+T'],
       ['stack', 'Shift+A'],
       ['section-selection', 'Shift+S'],
+      ['run-technique-rows', null],
       ['edit-technique', null],
       ['detach-technique', null],
       ['save-technique', null],
@@ -73,6 +74,15 @@ describe('group and ungroup', () => {
     expect(shownFor('export', [{ type: 'motion', data: { format: '1:1', kind: 'element' } }]), 'a free element exports on its own').toBe(true);
   });
 
+  it('offers reframe on one image or video that has a result, and nowhere else', () => {
+    for (const type of ['image', 'video']) {
+      expect(shownFor('reframe', [{ type, data: { refId: 'a1' } }])).toBe(true);
+      expect(shownFor('reframe', [{ type, data: {} }])).toBe(false);
+      expect(shownFor('reframe', [{ type, data: { refId: 'a1' } }, { type, data: { refId: 'a1' } }])).toBe(false);
+    }
+    expect(shownFor('reframe', [{ type: 'text', data: { refId: 'a1' } }])).toBe(false);
+  });
+
   it('offers the image tools on one image that has a result, and nowhere else', () => {
     const done = { type: 'image', data: { refId: 'a1' } };
     for (const id of ['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'split-layers'] as const) {
@@ -80,6 +90,12 @@ describe('group and ungroup', () => {
       expect(shownFor(id, [done, done])).toBe(false);
       expect(shownFor(id, [{ type: 'image', data: {} }])).toBe(false);
       expect(shownFor(id, [{ type: 'video', data: { refId: 'a1' } }])).toBe(false);
+    }
+  });
+
+  it('offers the image tools on an uploaded image that holds only an asset', () => {
+    for (const id of ['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers'] as const) {
+      expect(shownFor(id, [{ type: 'image', data: { assetId: 'up1' } }])).toBe(true);
     }
   });
 
@@ -106,7 +122,7 @@ describe('group and ungroup', () => {
 
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
-    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-technique', 'run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup', 'remove-background', 'upscale-image', 'inpaint', 'outpaint', 'split-layers', 'layers-to-frame']);
+    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-technique', 'run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup', 'remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers', 'layers-to-frame']);
     expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['export', ...Object.keys(FRAME_DIALOG_ACTIONS), 'copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });
@@ -150,6 +166,8 @@ describe('enabledFor', () => {
     expect(shownFor('run-technique', [technique])).toBe(true);
     expect(shownFor('detach-technique', [technique])).toBe(true);
     expect(shownFor('edit-technique', [technique, technique])).toBe(false);
+    expect(shownFor('run-technique-rows', [technique])).toBe(true);
+    expect(shownFor('run-technique-rows', [technique, technique])).toBe(false);
     expect(shownFor('run-technique', [{ type: 'text', data: {} }])).toBe(false);
   });
 

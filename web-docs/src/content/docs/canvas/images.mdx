@@ -13,6 +13,54 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 - **Crop:** double-click an image fill, or press Crop image in Properties. Drag to move the picture, drag a corner to scale, `Enter` to apply.
 - **Adjustments:** exposure, contrast, saturation, temperature, tint, highlights and shadows. Identical on the canvas and in exports.
 - **Remove background:** select an image and remove its background in one click.
-- **Upscale:** 2× or 4× from the same toolbar; the result lands in a new node beside the original.
+- **Upscale:** doubles the size from the same toolbar; the result lands in a new node beside the original.
+- **Any image works:** the AI tools (remove background, upscale, inpaint, reframe, outpaint, split into layers) run on any image node that holds a picture: uploaded, dropped, dragged out of a feed or product node, imported from Figma, or generated.
 - **Generation history:** the Assets panel has a History tab with every finished generation across projects, filterable by model.
 - **Shared library:** save any asset to your organization library and use it from every project.
+
+## Inpaint
+
+Inpaint repaints one area of an image and leaves the rest as it is. Use it to remove an object, or to swap one thing for another.
+
+1. Select one image that holds a picture.
+2. Open the selection toolbar or the right-click menu and pick **Inpaint…**.
+3. Paint over the area to change. **Brush** sets the size, **Undo** and **Clear** fix mistakes.
+4. Type what goes in the painted area, like `a deep green velvet armchair`. To remove something, say what should be there instead, like `the empty table and the clean wall`.
+5. Press **Inpaint**. The result lands in a new node beside the original, which stays untouched.
+
+Inpaint spends credits and needs a paid plan. The result can be a few pixels smaller than the original.
+
+From an agent, MCP or the API, call `image_tool` with `tool: "inpaint"`, a `prompt` and a `mask` of brush strokes and regions, as fractions 0-1 of the image:
+
+```json
+{ "op": "image_tool", "input": { "nodeId": "<image node>", "tool": "inpaint", "prompt": "the empty table", "mask": { "regions": [{ "left": 0.66, "top": 0.34, "width": 0.14, "height": 0.26 }] } } }
+```
+
+## Compare and pin generation versions
+
+<DemoVideo name="compare-run-versions" caption="Pick two versions of an image node, slide between them and read what changed." />
+
+An image node keeps every result it has generated. Compare two of them to see what changed, or pin one as the node output.
+
+1. Select an image node that has at least two results. The history button (a grid icon with the result count) appears in the node toolbar.
+2. Click it. The popover lists every version.
+3. Click a version to pin it as the node output. Reruns and nodes downstream use the pinned version.
+4. To compare, press **Compare**, then click two versions.
+5. The compare view opens: drag the slider to wipe between version A and B. Below it a table lists only what differs: prompt, model and each setting (aspect, style and so on). If nothing differs it says so.
+6. Press Esc to close.
+
+Compare works on image nodes. Pinning works on every medium.
+
+### From an agent, MCP or CLI
+
+The same actions are canvas ops, called with `canvas_tool`:
+
+- `list_runs` lists the runs of a node.
+- `compare_runs` returns the fields that differ between two runs.
+- `show_run` pins a past run as the node output.
+
+```json
+{ "op": "compare_runs", "input": { "nodeId": "<node id>", "runA": "<run id>", "runB": "<run id>" } }
+```
+
+Result: `a` and `b` (run id, asset id, prompt, model, params, cost) and `diff`: `[{ "field": "prompt", "a": "... soft morning light", "b": "... hard noon light" }, { "field": "style", "a": "natural", "b": "studio" }]`.
