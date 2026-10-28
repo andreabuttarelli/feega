@@ -5,10 +5,12 @@ import { DEFAULT_MOTION_BLUR } from '../../motion-blur';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, type AutoLayout, type LayoutItem } from '../../layout/model';
 import { Sizing } from '../../layout/auto-layout';
 import type { TextRun } from '../../text-runs';
+import type { Keyframes } from '../../keyframes';
+import type { Interaction } from '../../prototype/model';
 
 export type Px = { left: number; top: number; width: number; height: number };
 
-type Common = { parent?: string; box?: Px; item?: Partial<LayoutItem>; name?: string };
+type Common = { parent?: string; box?: Px; item?: Partial<LayoutItem>; name?: string; animate?: Keyframes; interactions?: Interaction[] };
 
 export type FrameOptions = Common & { fill?: string | null; radius?: number; stroke?: { color: string; width: number; sides?: [number, number, number, number] }; layout?: Partial<AutoLayout>; clip?: boolean; shadow?: { y: number; blur: number; opacity: number } };
 
@@ -40,7 +42,7 @@ export class DocKit {
 
   private add(id: string, component: ComponentId, props: Record<string, unknown>, options: Common, extra: Partial<MotionClip> = {}) {
     const placed = component === 'Precomp' ? {} : this.placed(options.box);
-    const clip = newClip({ id, from: 0, durationInFrames: FRAMES, component, props: { ...placed, ...props }, name: options.name, parent: options.parent ?? null, ...(options.item ? { layoutItem: { ...DEFAULT_LAYOUT_ITEM, ...options.item } } : {}), ...extra });
+    const clip = newClip({ id, from: 0, durationInFrames: FRAMES, component, props: { ...placed, ...props }, name: options.name, parent: options.parent ?? null, ...(options.item ? { layoutItem: { ...DEFAULT_LAYOUT_ITEM, ...options.item } } : {}), ...(options.animate ? { keyframes: options.animate } : {}), ...(options.interactions ? { interactions: options.interactions } : {}), ...extra });
     this.clips.push(clip);
     return id;
   }

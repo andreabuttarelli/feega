@@ -1,3 +1,5 @@
+import type { CodeEase } from './ease';
+
 export enum TokenKind {
   Colour = 'color',
   Font = 'font',
@@ -32,6 +34,7 @@ export type ElementNode = {
   children: CodeNode[];
   styleBinds: StyleBind[];
   shownBy?: string;
+  animation?: Animation;
 };
 
 export type StyleBind = { property: string; prop: string };
@@ -42,7 +45,26 @@ export type BreakNode = { kind: NodeKind.Break };
 
 export type UseNode = { kind: NodeKind.Use; component: string; className: string; rules: Rule[]; props: { name: string; value: string | boolean }[]; forwards: { name: string; prop: string }[]; shownBy?: string };
 
-export type SvgNode = { kind: NodeKind.Svg; className: string; rules: Rule[]; width: number; height: number; markup: string; shownBy?: string };
+export type SvgNode = { kind: NodeKind.Svg; className: string; rules: Rule[]; width: number; height: number; markup: string; shownBy?: string; animation?: Animation };
+
+export enum Trigger {
+  Load = 'load',
+  InView = 'in-view',
+  Hover = 'hover'
+}
+
+export enum Channel {
+  X = 'x',
+  Y = 'y',
+  Scale = 'scale',
+  Rotate = 'rotate',
+  Opacity = 'opacity',
+  Colour = 'color'
+}
+
+export type AnimTrack = { channel: Channel; values: (number | string)[]; times: number[]; eases: CodeEase[]; duration: number; delay: number; loop: boolean };
+
+export type Animation = { trigger: Trigger; tracks: AnimTrack[] };
 
 export type CodeNode = ElementNode | TextNode | BreakNode | UseNode | SvgNode;
 

@@ -8,7 +8,10 @@ export type Dialect<C> = {
   svg: (node: SvgNode, ctx: C) => string;
   shown: (prop: string, lines: string[], depth: number, ctx: C) => string[];
   selfClosing: boolean;
+  tagOf?: (node: ElementNode) => string;
 };
+
+const tagName = <C>(node: ElementNode, dialect: Dialect<C>) => dialect.tagOf?.(node) ?? node.tag;
 
 const INDENT = '  ';
 const VOID_TAGS: ReadonlySet<string> = new Set(['img', 'br', 'input', 'hr']);
@@ -27,7 +30,7 @@ function inline<C>(node: CodeNode, dialect: Dialect<C>, ctx: C): string {
     return dialect.lineBreak;
   }
   const element = node as ElementNode;
-  return `${dialect.openTag(element, ctx)}${element.children.map((c) => inline(c, dialect, ctx)).join('')}</${element.tag}>`;
+  return `${dialect.openTag(element, ctx)}${element.children.map((c) => inline(c, dialect, ctx)).join('')}</${tagName(element, dialect)}>`;
 }
 
 function elementLines<C>(node: ElementNode, depth: number, dialect: Dialect<C>, ctx: C): string[] {
@@ -36,16 +39,16 @@ function elementLines<C>(node: ElementNode, depth: number, dialect: Dialect<C>, 
     return [`${pad(depth)}${dialect.selfClosing ? open.replace(/>$/, ' />') : open}`];
   }
   if (!node.children.length) {
-    return [`${pad(depth)}${dialect.selfClosing ? open.replace(/>$/, ' />') : `${open}</${node.tag}>`}`];
+    return [`${pad(depth)}${dialect.selfClosing ? open.replace(/>$/, ' />') : `${open}</${tagName(node, dialect)}>`}`];
   }
   if (node.children.every(isInline)) {
     const body = node.children.map((c) => inline(c, dialect, ctx)).join('');
-    const line = `${pad(depth)}${open}${body}</${node.tag}>`;
+    const line = `${pad(depth)}${open}${body}</${tagName(node, dialect)}>`;
     if (line.length <= MAX_INLINE || !body.includes(dialect.lineBreak)) {
       return [line];
     }
   }
-  return [`${pad(depth)}${open}`, ...node.children.flatMap((c) => nodeLines(c, depth + 1, dialect, ctx)), `${pad(depth)}</${node.tag}>`];
+  return [`${pad(depth)}${open}`, ...node.children.flatMap((c) => nodeLines(c, depth + 1, dialect, ctx)), `${pad(depth)}</${tagName(node, dialect)}>`];
 }
 
 export function nodeLines<C>(node: CodeNode, depth: number, dialect: Dialect<C>, ctx: C): string[] {
