@@ -29,6 +29,8 @@ const OPEN = '1';
 
 export const blankSample = (): CrashSample => ({ device: '', dpr: 0, resolution: 0, canvas: '', textureBytes: 0, textures: 0, texturesCreated: 0, submits: 0, gpuLagMs: 0, cacheBytes: 0, pictureBytes: 0, wasmBytes: 0, zoom: 0, zoomPerSecond: 0, panPerSecond: 0, gestureFrames: 0, rasterZoom: 0, at: 0 });
 
+export const wasInGesture = (record: CrashSample): boolean => record.gestureFrames > 0;
+
 function quietly<T>(run: () => T, fallback: T): T {
   try {
     return run();
