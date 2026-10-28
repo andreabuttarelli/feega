@@ -58,7 +58,7 @@ export const overrideLabel = (key: OverrideKey) => OVERRIDES[key].label;
 
 export const breakpointSchema = z.object({ id: z.string().min(1).max(40), name: z.string().min(1).max(40), width: z.number().int().min(MIN_BREAKPOINT_WIDTH).max(MAX_LAYOUT_PX) });
 export const breakpointsSchema = z.array(breakpointSchema).max(MAX_BREAKPOINTS).optional();
-export const overridesSchema = z.record(z.string().min(1), z.record(z.enum(OVERRIDE_KEYS as [OverrideKey, ...OverrideKey[]]), z.unknown())).optional();
+export const overridesSchema = z.record(z.string().min(1), z.partialRecord(z.enum(OVERRIDE_KEYS as [OverrideKey, ...OverrideKey[]]), z.unknown())).optional();
 
 export type Breakpoint = z.infer<typeof breakpointSchema>;
 export type ClipOverrides = Partial<Record<OverrideKey, unknown>>;

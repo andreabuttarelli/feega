@@ -454,10 +454,10 @@ describe('motion agent breakpoint tools', () => {
     expect(session.doc.breakpoints).toEqual([{ id: breakpoint_id, name: 'Phone', width: 390 }]);
 
     expect((await run('set_breakpoint_override', { breakpoint_id, clip_id: clipId, key: 'hidden', value: true })).ok).toBe(true);
-    expect(findClip(session.doc, clipId)?.overrides).toEqual({ [breakpoint_id]: { hidden: true } });
+    expect(findClip(session.doc, clipId)?.clip.overrides).toEqual({ [breakpoint_id]: { hidden: true } });
 
     await run('set_breakpoint_override', { breakpoint_id, clip_id: clipId, key: 'hidden', value: null });
-    expect(findClip(session.doc, clipId)?.overrides).toBeUndefined();
+    expect(findClip(session.doc, clipId)?.clip.overrides).toBeUndefined();
 
     await run('remove_breakpoint', { breakpoint_id });
     expect(session.doc.breakpoints).toBeUndefined();
