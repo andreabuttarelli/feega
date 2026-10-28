@@ -228,7 +228,7 @@
   }
   .snippet pre {
     margin: 0;
-    padding: 10px 64px 10px 10px;
+    padding: 10px 88px 10px 10px;
     overflow-x: auto;
     border: 1px solid var(--ui-divider);
     border-radius: var(--ui-radius-sm);
