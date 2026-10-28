@@ -1,6 +1,17 @@
 export const RENDER_LINK_OPEN_MS = 30 * 60_000;
 export const BROWSER_RENDER_DEADLINE_MS = 2 * 60 * 60_000;
 export const RENDER_PAGE = '/render';
+export const LINK_NEVER_OPENED = 'render link was never opened';
+
+type LinkTrace = { link?: { expiresAt?: string; claim?: string | null } };
+
+export function unopenedPast(params: LinkTrace, now: number): boolean {
+  const link = params.link;
+  if (!link?.expiresAt || link.claim) {
+    return false;
+  }
+  return now > Date.parse(link.expiresAt);
+}
 
 export enum LinkRefusal {
   Invalid = 'invalid_link',

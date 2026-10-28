@@ -496,4 +496,15 @@ describe('submitAndTrackVideoRender', () => {
 			persist_opts: { captions: true, fontName: 'Inter', tighten: true }
 		});
 	});
+
+	it('keeps the reason the provider refused the submit', async () => {
+		const { submitAndTrackVideoRender } = await import('./video-render-queue');
+		const { tables, client } = makeDb({ video_renders: [] });
+		submitVideoRender.mockRejectedValue(new Error('duration 13s is not supported by this model'));
+
+		const tracked = await submitAndTrackVideoRender({ admin: client as never, brandId: 'brand-1', userId: 'user-1', imagePrompt: 'a clip', render: {} });
+
+		expect(tracked).toBeNull();
+		expect(tables.video_renders[0]).toMatchObject({ status: 'failed', error: 'provider refused: duration 13s is not supported by this model' });
+	});
 });
