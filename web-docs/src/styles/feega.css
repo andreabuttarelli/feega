@@ -33,57 +33,58 @@
   --ui-radius-lg: 10px;
   --sl-font: 'BDO Grotesk', system-ui, sans-serif;
   --sl-font-mono: 'Fragment Mono', ui-monospace, monospace;
-  --sl-text-h1: 2.25rem;
-  --sl-text-h2: 1.5rem;
-  --sl-text-h3: 1.1875rem;
+  --sl-text-h1: 3rem;
+  --sl-text-h2: 1.75rem;
+  --sl-text-h3: 1.3125rem;
   --sl-text-h4: 1rem;
-  --sl-line-height: 1.7;
+  --sl-line-height: 1.6;
+  --sl-text-body: 1.0625rem;
   --sl-content-width: 46rem;
   --sl-sidebar-width: 17rem;
 }
 
 :root,
 :root[data-theme='light'] {
-  --sl-color-accent: #0b6bcb;
-  --sl-color-accent-high: #0a4f96;
-  --sl-color-accent-low: #e5f2ff;
-  --sl-color-white: #141414;
-  --sl-color-gray-1: #2e2e2e;
-  --sl-color-gray-2: #4d4d4d;
-  --sl-color-gray-3: #666666;
-  --sl-color-gray-4: #a0a0a0;
-  --sl-color-gray-5: #d2d2d2;
-  --sl-color-gray-6: #ebebeb;
-  --sl-color-gray-7: #f9f9f9;
+  --sl-color-accent: #ff5100;
+  --sl-color-accent-high: #c23d00;
+  --sl-color-accent-low: #fff0e8;
+  --sl-color-white: #111111;
+  --sl-color-gray-1: #2b2b2b;
+  --sl-color-gray-2: #5c5c5c;
+  --sl-color-gray-3: #8a8a8a;
+  --sl-color-gray-4: #b3b3b3;
+  --sl-color-gray-5: #d9d9d9;
+  --sl-color-gray-6: #e8e8e8;
+  --sl-color-gray-7: #f3f3f3;
   --sl-color-black: #ffffff;
   --sl-color-bg: #ffffff;
   --sl-color-bg-nav: #ffffff;
-  --sl-color-bg-sidebar: #f9f9f9;
-  --sl-color-bg-inline-code: #f2f2f2;
-  --sl-color-hairline: #ebebeb;
-  --sl-color-hairline-light: #f2f2f2;
-  --sl-color-hairline-shade: #e1e1e1;
+  --sl-color-bg-sidebar: #ffffff;
+  --sl-color-bg-inline-code: #f3f3f3;
+  --sl-color-hairline: #e8e8e8;
+  --sl-color-hairline-light: #e8e8e8;
+  --sl-color-hairline-shade: #e8e8e8;
 }
 
 :root[data-theme='dark'] {
-  --sl-color-accent: #0b6bcb;
-  --sl-color-accent-high: #66b8ff;
-  --sl-color-accent-low: #0a2a47;
-  --sl-color-white: #f2f2f2;
-  --sl-color-gray-1: #e1e1e1;
-  --sl-color-gray-2: #b0b0b0;
-  --sl-color-gray-3: #8f8f8f;
-  --sl-color-gray-4: #545454;
-  --sl-color-gray-5: #313131;
-  --sl-color-gray-6: #1f1f1f;
-  --sl-color-black: #0c0c0c;
-  --sl-color-bg: #0c0c0c;
-  --sl-color-bg-nav: #121212;
-  --sl-color-bg-sidebar: #121212;
-  --sl-color-bg-inline-code: #1f1f1f;
-  --sl-color-hairline: #1f1f1f;
-  --sl-color-hairline-light: #272727;
-  --sl-color-hairline-shade: #181818;
+  --sl-color-accent: #ff5100;
+  --sl-color-accent-high: #ff8a4d;
+  --sl-color-accent-low: #2a1408;
+  --sl-color-white: #ededed;
+  --sl-color-gray-1: #d4d4d4;
+  --sl-color-gray-2: #a3a3a3;
+  --sl-color-gray-3: #737373;
+  --sl-color-gray-4: #525252;
+  --sl-color-gray-5: #333333;
+  --sl-color-gray-6: #1a1a1a;
+  --sl-color-black: #0a0a0a;
+  --sl-color-bg: #0a0a0a;
+  --sl-color-bg-nav: #0a0a0a;
+  --sl-color-bg-sidebar: #0a0a0a;
+  --sl-color-bg-inline-code: #1a1a1a;
+  --sl-color-hairline: #222222;
+  --sl-color-hairline-light: #222222;
+  --sl-color-hairline-shade: #222222;
 }
 
 body {
@@ -97,18 +98,48 @@ h2,
 h3,
 h4 {
   font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-h1 {
   letter-spacing: -0.04em;
   line-height: 1.1;
+  text-wrap: balance;
 }
 
 .sl-markdown-content h2 {
-  margin-top: 2.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--sl-color-hairline);
+  margin-top: 2.2em;
+}
+
+.sl-markdown-content a:not(.sl-link-button, .card a) {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--sl-color-hairline);
+  text-underline-offset: 3px;
+  transition: color 120ms, text-decoration-color 120ms;
+}
+
+.sl-markdown-content a:not(.sl-link-button):hover {
+  color: var(--sl-color-accent);
+  text-decoration-color: var(--sl-color-accent);
+}
+
+.sl-markdown-content blockquote {
+  padding-left: 20px;
+  border-left: 2px solid var(--sl-color-accent);
+  color: var(--sl-color-gray-2);
+}
+
+.sidebar-content a:hover,
+header a:hover {
+  color: var(--sl-color-accent);
+}
+
+.sidebar-content a[aria-current='page'] {
+  background: transparent;
+  color: var(--sl-color-accent);
+}
+
+.pagination-links a,
+.card {
+  border-color: var(--sl-color-hairline);
+  box-shadow: none;
 }
 
 .sl-markdown-content :not(pre) > code {
@@ -157,7 +188,9 @@ input {
 
 .site-title {
   font-weight: 600;
-  letter-spacing: -0.03em;
+  font-size: 20px;
+  color: var(--sl-color-white);
+  letter-spacing: -0.04em;
 }
 
 .hero h1 {
@@ -170,6 +203,6 @@ input {
   :root {
     --sl-content-pad-x: 1rem;
     --sl-nav-pad-x: 1rem;
-    --sl-text-h1: 1.875rem;
+    --sl-text-h1: 2.25rem;
   }
 }
