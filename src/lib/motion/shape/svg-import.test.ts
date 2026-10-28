@@ -216,3 +216,20 @@ describe('a Figma export with masks and <use>', () => {
     }
   });
 });
+
+describe('a Figma "Copy as SVG" logo', () => {
+  const [wave, letter] = svgShapes(fixture('teta-logo')).shapes;
+
+  it('keeps the wave as one even-odd contour with every source segment', () => {
+    const source = fixture('teta-logo').match(/<path d="([^"]+)"/)![1];
+    expect(wave.fillRule).toBe('evenodd');
+    expect(outlineOf(wave.path)).toHaveLength(1);
+    expect(wave.path.match(/[LC]/g)).toHaveLength(source.match(/[LCHV]/g)!.length);
+    expect(letter.fill).toBe('#ffffff');
+  });
+
+  it('reads the user-space gradient as horizontal, teal on the right', () => {
+    expect(wave.gradient).toMatchObject({ type: 'linear-gradient', angle: -180 });
+    expect(wave.gradient && 'stops' in wave.gradient && wave.gradient.stops[0].color).toBe('#22d3b6');
+  });
+});

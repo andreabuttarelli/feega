@@ -41,6 +41,24 @@ Every colour in the editor opens the same picker: fill, stroke, text colour, eff
 
 Colours are still stored as `#rrggbb` (or `#rrggbbaa`) or a brand token, so scripts, the CLI and agents read and write them as before.
 
+## Editing points
+
+Double-click a selected shape, or press `Enter`, to edit its points. Rectangles, ellipses, polygons, stars and lines become free paths when you do.
+
+<DemoVideo name="vector-edit" caption="Double-click a shape, move a point, bend a curve." />
+
+| Action | Result |
+|---|---|
+| Drag a point | Moves it (snaps to the frame and other layers; hold `Cmd` to skip snapping) |
+| Drag a handle | Bends the curve; the opposite handle mirrors it |
+| `Alt`/`Option` + drag a handle | Moves one handle only, breaking the symmetry |
+| Double-click a point (or `Alt`-click) | Toggles it between sharp and smooth |
+| Click the outline | Adds a point |
+| `Delete` | Removes the selected point |
+| `Esc`, `Enter` or click outside | Leaves point editing |
+
+Each change is one undo step. The chat agent edits points the same way with `edit_path_points`.
+
 A shape can morph into any other shape, including hand-drawn paths and shapes with holes.
 
 ## Text
@@ -48,5 +66,9 @@ A shape can morph into any other shape, including hand-drawn paths and shapes wi
 - Select any part of a text and style it: bold, italic, size, colour, gradient, underline or strikethrough (solid, double, dotted, dashed, wavy), small caps, OpenType features.
 - Links: `Shift+Cmd+U`. Lists: `Shift+Cmd+8` bulleted, `Shift+Cmd+7` numbered, `Tab` to nest.
 - Auto width and auto height text grows as you type.
+- A size applies exactly as typed. Auto width and auto height text grows with it; fixed-size text overflows its box and is never shrunk.
+- Weight steps in hundreds, 100 to 900: scrubbing, arrow keys and typed values snap to the nearest 100.
+- Case is five icon buttons: as typed, uppercase, lowercase, title case and small caps. Hover for the name.
+- Width axis, slant axis and other variable-font axes sit under a collapsed **Advanced** row in the Text section.
 - Turn text into editable vector shapes with `Shift+Cmd+O`.
 - Replace a missing or unwanted font in the whole video in one pick.

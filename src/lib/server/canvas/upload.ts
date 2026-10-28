@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Db } from '$lib/server/db/client';
 import { createNode } from '$lib/server/repos/canvas';
+import type { Actor } from '$lib/server/repos/actor';
 import { deleteAsset, insertAsset, type AssetType } from '$lib/server/repos/assets';
 import { removeAssetFile } from '$lib/server/repos/asset-storage';
 import { verdictForUpload, canvasUploadPrefix, UPLOAD_MAX_BYTES, type UploadKind } from '$lib/canvas/upload-kind';
@@ -20,6 +21,8 @@ import { createVideoProxy } from './video-proxy';
  * — mai i byte. Un'immagine potrebbe ancora passare dentro il corpo, ma usare la stessa strada per
  * tutti e tre i tipi è una scrittura sola invece di due che divergono al primo campo.
  */
+export type PictureSize = { width: number; height: number };
+
 export class UploadError extends Error {
   constructor(public readonly status: 400 | 413, message: string) {
     super(message);
@@ -79,6 +82,7 @@ export async function registerUploadedAsset(db: Db, input: {
   fileName: string;
   mimeType: string;
   bytes: number;
+  pixels?: PictureSize;
 }) {
   if (!input.path.startsWith(canvasUploadPrefix(input.orgId, input.projectId)) || input.path.includes('..')) {
     throw new UploadError(400, 'Percorso non valido');
@@ -112,7 +116,9 @@ export async function registerUploadedAsset(db: Db, input: {
     url: input.path,
     content: docContent,
     mimeType: input.mimeType,
-    bytes: input.bytes
+    bytes: input.bytes,
+    width: input.pixels?.width,
+    height: input.pixels?.height
   });
 
   if (kind === 'video') {
@@ -133,8 +139,13 @@ export async function registerCanvasUpload(db: Db, input: {
   fileName: string;
   mimeType: string;
   bytes: number;
+  pixels?: PictureSize;
   x: number;
   y: number;
+  nodeId?: string;
+  box?: PictureSize;
+  actor?: Actor;
+  extra?: Record<string, unknown>;
 }) {
   const { asset, kind } = await registerUploadedAsset(db, input);
 
@@ -142,9 +153,12 @@ export async function registerCanvasUpload(db: Db, input: {
     const data =
       kind === 'document'
         ? { content: asset.content ?? '', public: false }
-        : { assetId: asset.id, url: `/p/${input.projectId}/c/${input.canvasId}/assets/${asset.id}`, name: input.fileName, mimeType: input.mimeType };
+        : { assetId: asset.id, url: `/p/${input.projectId}/c/${input.canvasId}/assets/${asset.id}`, name: input.fileName, mimeType: input.mimeType, ...input.extra };
 
     const node = await createNode(db, {
+      ...(input.nodeId ? { id: input.nodeId } : {}),
+      ...(input.box ? { width: input.box.width, height: input.box.height } : {}),
+      ...(input.actor ? { actor: input.actor } : {}),
       orgId: input.orgId,
       projectId: input.projectId,
       canvasId: input.canvasId,
@@ -173,7 +187,9 @@ const UNSAFE_NAME = /[^\w.-]+/g;
 
 const linkName = (url: string) => decodeURIComponent(new URL(url).pathname.split('/').pop() || 'link').replace(UNSAFE_NAME, '_');
 
-export async function importCanvasLink(db: Db, input: { orgId: string; projectId: string; url: string; maxBytes?: number }) {
+export type FetchedLink = { fileName: string; mime: string; bytes: Uint8Array };
+
+export async function fetchCanvasLink(input: { url: string; maxBytes?: number }): Promise<FetchedLink> {
   const fetched = await safeFetchBytes(input.url, { maxBytes: input.maxBytes ?? UPLOAD_MAX_BYTES.video, timeoutMs: LINK_TIMEOUT_MS, maxRedirects: LINK_REDIRECTS, scheme: 'https-only' }).catch((cause: unknown) => {
     throw new UploadError(400, cause instanceof SafeFetchError ? cause.message : 'That link could not be fetched');
   });
@@ -181,12 +197,20 @@ export async function importCanvasLink(db: Db, input: { orgId: string; projectId
     throw new UploadError(400, 'That link could not be fetched');
   }
 
-  return importCanvasBytes(db, { orgId: input.orgId, projectId: input.projectId, fileName: linkName(fetched.url), mime: fetched.mime, bytes: fetched.bytes });
+  return { fileName: linkName(fetched.url), mime: fetched.mime, bytes: fetched.bytes };
 }
 
-export type CanvasPlace = { canvasId: string; x: number; y: number };
+export async function importCanvasLink(db: Db, input: { orgId: string; projectId: string; url: string; maxBytes?: number }) {
+  return importCanvasBytes(db, { orgId: input.orgId, projectId: input.projectId, ...(await fetchCanvasLink(input)) });
+}
 
-export async function importCanvasBytes(db: Db, input: { orgId: string; projectId: string; fileName: string; mime: string; bytes: Uint8Array; place?: CanvasPlace }) {
+export type CanvasPlace = { canvasId: string; x: number; y: number; nodeId?: string; box?: PictureSize; actor?: Actor; extra?: Record<string, unknown> };
+
+type CanvasBytes = { orgId: string; projectId: string; fileName: string; mime: string; bytes: Uint8Array; pixels?: PictureSize };
+
+export async function importCanvasBytes(db: Db, input: CanvasBytes & { place: CanvasPlace }): Promise<Awaited<ReturnType<typeof registerCanvasUpload>> & { kind: UploadKind }>;
+export async function importCanvasBytes(db: Db, input: CanvasBytes): Promise<Awaited<ReturnType<typeof registerUploadedAsset>>>;
+export async function importCanvasBytes(db: Db, input: CanvasBytes & { place?: CanvasPlace }) {
   const fileName = input.fileName.replace(UNSAFE_NAME, '_');
   const verdict = verdictForUpload(input.mime, fileName, input.bytes.length);
   if (!verdict.ok || !LINK_MEDIA.has(verdict.kind)) {
@@ -199,7 +223,7 @@ export async function importCanvasBytes(db: Db, input: { orgId: string; projectI
     throw new UploadError(400, 'The copy could not be stored');
   }
 
-  const registered = { orgId: input.orgId, projectId: input.projectId, path, fileName, mimeType: input.mime, bytes: input.bytes.length };
+  const registered = { orgId: input.orgId, projectId: input.projectId, path, fileName, mimeType: input.mime, bytes: input.bytes.length, pixels: input.pixels };
   if (input.place) {
     const { asset, node } = await registerCanvasUpload(db, { ...registered, ...input.place });
     return { asset, node, kind: verdict.kind };

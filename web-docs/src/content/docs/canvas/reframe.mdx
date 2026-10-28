@@ -9,14 +9,14 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 Reframe changes the aspect of a finished image or video and puts the result in a new node beside the original. The original stays untouched.
 
-- **Images** grow to the new aspect. The empty area is painted in by the AI, so it spends credits and needs a paid plan.
+- **Images** grow to the new aspect. The empty area is painted in by the AI, continuing the scene beyond the original edges, so it spends credits and needs a paid plan. The original pixels are kept; the result can be a few pixels smaller than the original.
 - **Videos** are cropped to the new aspect around a focus point you choose. No AI model is involved, so it is free.
 
 <DemoVideo name="reframe" caption="Reframe a video to 9:16 around a chosen focus point, then open the image dialog: the video stops before the paid image fill." />
 
 ## From the canvas
 
-1. Select one image or video that has a result.
+1. Select one image or video that has a result. Uploaded images count: any image that holds a picture works.
 2. Open the selection toolbar or the right-click menu and pick **Reframe…**.
 3. Pick an aspect: **9:16**, **1:1**, **4:5**, **16:9**, or **Custom** and type `w:h`, like `21:9`.
 4. For a video, drag the two focus sliders so the subject sits where the crop should centre. The default is the middle.

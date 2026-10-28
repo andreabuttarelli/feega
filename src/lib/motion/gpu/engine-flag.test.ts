@@ -13,15 +13,18 @@ describe('engineFlag', () => {
     expect(engineFlag(url('?engine=html'), false)).toBe(RenderEngine.Html);
   });
 
+  it('drops the retired PixiJS engine back to the default', () => {
+    expect(engineFlag(url('?engine=gpu'), false)).toBe(RenderEngine.GpuCore);
+  });
+
   it('honours an explicit engine in the URL', () => {
-    expect(engineFlag(url('?engine=gpu'), false)).toBe(RenderEngine.Gpu);
     expect(engineFlag(url('?engine=gpu-full'), false)).toBe(RenderEngine.GpuFull);
     expect(engineFlag(url('?engine=gpu-core'), false)).toBe(RenderEngine.GpuCore);
     expect(engineFlag(url('?engine=gpu-core-gl'), false)).toBe(RenderEngine.GpuCoreGl);
   });
 
   it('forces HTML for everyone when the kill switch is on', () => {
-    expect(engineFlag(url('?engine=gpu'), true)).toBe(RenderEngine.Html);
+    expect(engineFlag(url('?engine=gpu-core-gl'), true)).toBe(RenderEngine.Html);
     expect(engineFlag(url('?engine=gpu-full'), true)).toBe(RenderEngine.Html);
     expect(engineFlag(url(), true)).toBe(RenderEngine.Html);
   });
@@ -32,6 +35,6 @@ describe('killSwitch', () => {
     expect(killSwitch('html', false)).toBe(true);
     expect(killSwitch(undefined, true)).toBe(true);
     expect(killSwitch(undefined, false)).toBe(false);
-    expect(killSwitch('gpu', false)).toBe(false);
+    expect(killSwitch('gpu-core', false)).toBe(false);
   });
 });

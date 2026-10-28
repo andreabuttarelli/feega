@@ -79,6 +79,8 @@ import { arrangeNodes } from '$lib/server/canvas/arrange';
 import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileBox, type TileMove } from '$lib/canvas/align';
 import { Axis, Edge } from '$lib/motion/space';
 import { listCanvasEvents } from '$lib/server/repos/canvas-events';
+import { listAgentChanges, rejectChange } from '$lib/server/canvas/reject';
+import { Keep } from '$lib/canvas/reject-plan';
 import { lastGesture } from '$lib/canvas/undo-last';
 import { parseUndoItem, type UndoItem } from '$lib/canvas/undo-plan';
 import { endOnboarding, runDemo } from '$lib/server/onboarding/first-run';
@@ -96,6 +98,8 @@ import { cancelRender } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
 import { importCanvasLink, registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
+import { importFeedImage } from '$lib/server/canvas/feed-image';
+import { DropOn } from '$lib/motion/move-element';
 import { canvasUploadPrefix, verdictForUpload } from '$lib/canvas/upload-kind';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { findProjectById } from '$lib/server/repos/projects';
@@ -444,6 +448,14 @@ const distributeNodesInput = arrangeInput.extend({ axis: z.enum(Object.values(Ax
 const stackNodesInput = arrangeInput.extend({ gap: z.number().min(0).default(STACK_GAP).describe('space between nodes in canvas units') }).strict();
 const undoLastInput = z.object({ canvasId: z.string() }).strict();
 const UNDO_LOOKBACK = 50;
+const rejectChangeInput = z
+  .object({
+    canvasId: z.string(),
+    eventIds: z.array(z.number().int()).min(1).describe('canvas_events ids of one change, from agent_changes or view activity'),
+    choices: z.array(z.object({ eventId: z.number().int(), path: z.string(), keep: z.enum(Keep) })).optional().describe('one per conflict: keep mine, or take the reject'),
+    confirm: z.boolean().optional().describe('delete a created node even though someone else connected or edited it')
+  })
+  .strict();
 const NOTHING_TO_UNDO = { outcome: 'nothing_to_undo' };
 const endOnboardingInput = z.object({ status: z.enum([OnboardingStatus.Dismissed, OnboardingStatus.Completed]) }).strict();
 const textCostInput = z
@@ -460,6 +472,20 @@ const MAX_CLONE_SAMPLE_BYTES = 3 * 1024 * 1024;
 
 const requestUploadInput = z.object({ fileName: z.string().min(1), mimeType: z.string().min(1), bytes: z.number().int().positive() }).strict();
 const importLinkInput = z.object({ url: z.string().url().describe('https link to a picture or video') }).strict();
+
+const importFeedImageInput = z
+  .object({
+    canvasId: z.string(),
+    nodeId: z.string().describe('the Social feed or Products node'),
+    itemId: z.string().describe('id of a post (socialPosts) or product (products) in canvas_snapshot'),
+    imageIndex: z.number().int().min(0).default(0).describe('which picture of a carousel post or product'),
+    x: z.number().default(0).describe('canvas position of the new image node, its centre'),
+    y: z.number().default(0),
+    toFrameId: z.string().optional().describe('put the picture inside this Frame instead of making a node'),
+    frameX: z.number().min(0).max(1).default(0.5),
+    frameY: z.number().min(0).max(1).default(0.5)
+  })
+  .strict();
 
 const registerUploadInput = z
   .object({
@@ -776,6 +802,28 @@ export const CANVAS_OPS = {
       }
       const result = await undoGesture(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, gesture, actor: ctx.actor });
       return result.outcome === 'refused' ? { outcome: 'refused', reason: result.reason } : { outcome: 'undone', reverted: gesture.items.map((item) => item.kind) };
+    }
+  }),
+
+  agent_changes: op({
+    access: Access.Read,
+    input: canvasIdInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return { changes: await listAgentChanges(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) };
+    }
+  }),
+
+  reject_change: op({
+    access: Access.Write,
+    input: rejectChangeInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return rejectChange(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor });
     }
   }),
 
@@ -1625,6 +1673,21 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: importLinkInput,
     run: async (ctx, input) => uploadAnswer(async () => ({ asset: (await importCanvasLink(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, url: input.url })).asset }))
+  }),
+
+  import_feed_image: op({
+    access: Access.Write,
+    input: importFeedImageInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const drop = input.toFrameId ? { on: DropOn.Frame, nodeId: input.toFrameId, at: { x: input.frameX, y: input.frameY } } as const : { on: DropOn.Canvas, x: input.x, y: input.y } as const;
+      return uploadAnswer(async () => {
+        const landed = await importFeedImage({ db: ctx.db, frames: framesOf(ctx), actor: ctx.actor }, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, nodeId: input.nodeId, itemId: input.itemId, imageIndex: input.imageIndex, drop });
+        return landed.placed === 'frame' ? frameAnswer(landed.moved) : { node: landed.node, asset: landed.asset };
+      });
+    }
   }),
 
   list_voices: op({

@@ -27,4 +27,18 @@ function staysInside(target, app) {
   return url.origin === new URL(app).origin;
 }
 
-module.exports = { PRODUCTION_URL, DEEP_LINK_SCHEME, start, authReturn, staysInside };
+const LEAVING_EVENTS = ['will-navigate', 'will-redirect'];
+
+function keepInside(contents, app, openExternal) {
+  for (const name of LEAVING_EVENTS) {
+    contents.on(name, (event, url) => {
+      if (staysInside(url, app)) {
+        return;
+      }
+      event.preventDefault();
+      openExternal(url);
+    });
+  }
+}
+
+module.exports = { PRODUCTION_URL, DEEP_LINK_SCHEME, start, authReturn, staysInside, keepInside };

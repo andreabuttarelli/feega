@@ -528,16 +528,28 @@ describe('insert_row/update_row: le colonne jsonb registrate si giudicano, non s
     expect(out.message).toMatch(/targeting/);
   });
 
-  it('insert: una colonna jsonb intenzionalmente libera (brands.palette) non blocca mai', async () => {
+  it('insert: una colonna jsonb intenzionalmente libera (brands.target) non blocca mai', async () => {
     const { calls, supabase } = fakeAuthority({ writeRows: [{ id: 'b1' }] });
 
     const out = await tools(supabase, 'org-mine').insertRow({
       table: 'brands',
-      values: { name: 'x', slug: 'x', palette: { qualunque: 'cosa' } }
+      values: { name: 'x', slug: 'x', target: { qualunque: 'cosa' } }
     });
 
     expect(out.error).toBeUndefined();
     expect(calls.filter((c) => c.op === 'insert')).toHaveLength(1);
+  });
+
+  it('insert: a brand palette that is not hex swatches is refused before writing', async () => {
+    const { calls, supabase } = fakeAuthority({ writeRows: [{ id: 'b1' }] });
+
+    const out = await tools(supabase, 'org-mine').insertRow({
+      table: 'brands',
+      values: { name: 'x', slug: 'x', palette: [{ hex: 'blue' }] }
+    });
+
+    expect(out.error).toBeDefined();
+    expect(calls.filter((c) => c.op === 'insert')).toHaveLength(0);
   });
 
   it('update: rifiuta un canvases.viewport senza zoom', async () => {

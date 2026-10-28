@@ -48,6 +48,8 @@ const DEFAULTS: Record<string, Row> = {
   motion_revisions: { sealed: false, summary: null }
 };
 
+const SERIAL_IDS = new Set(['canvas_events']);
+
 const LOCAL_FUNCTIONS: Record<string, unknown> = {
   org_credit_balance: 0
 };
@@ -249,6 +251,8 @@ export function createMemoryDb(options: MemoryDbOptions) {
       return builder;
     };
 
+    const idFor = (name: string) => (SERIAL_IDS.has(name) ? rows(name).reduce((top, row) => Math.max(top, Number(row.id)), 0) + 1 : crypto.randomUUID());
+
     const matching = () => rows(table).filter((row) => filters.every((f) => f(row)));
 
     function duplicateOf(row: Row, keys: string[][]): Row | undefined {
@@ -256,7 +260,7 @@ export function createMemoryDb(options: MemoryDbOptions) {
     }
 
     function fill(row: Row): Row {
-      return { ...DEFAULTS[table], id: crypto.randomUUID(), created_at: now(), updated_at: now(), ...structuredClone(row) };
+      return { ...DEFAULTS[table], id: idFor(table), created_at: now(), updated_at: now(), ...structuredClone(row) };
     }
 
     function emit(eventType: ChangeKind, next: Row, old: Row) {

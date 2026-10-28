@@ -3,8 +3,13 @@
   import IconButton from '$lib/components/motion/IconButton.svelte';
   import MotionTimeline from '$lib/components/motion/MotionTimeline.svelte';
   import TimeRemap from '$lib/components/motion/TimeRemap.svelte';
-  import { advance } from '$lib/canvas/frame-playhead';
-  import { Action, type ActionId } from '$lib/motion/actions';
+  import TrackPanel from '$lib/components/motion/TrackPanel.svelte';
+  import { Wrap, advance } from '$lib/canvas/frame-playhead';
+  import { closeLoop, loopRange, setWorkArea } from '@feega/motion-core/motion/organize';
+  import { interactiveOf } from '@feega/motion-core/motion/interactive/settings';
+  import { setInteractive } from '$lib/motion/interactive/presets';
+  import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { Action, Tool, type ActionId } from '$lib/motion/actions';
   import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { proxySetting } from '$lib/motion/gpu/proxy-setting.svelte';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
@@ -30,8 +35,9 @@
     onpin,
     ram = [],
     onram = () => {},
+    assetUrl,
     onchange
-  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; marks?: CommentMark[]; onmark?: (id: string, frame: number) => void; onpin?: () => void; ram?: FrameRange[]; onram?: () => void; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; marks?: CommentMark[]; onmark?: (id: string, frame: number) => void; onpin?: () => void; ram?: FrameRange[]; onram?: () => void; assetUrl?: (assetId: string) => string; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const MODE_LABEL: Record<EditMode, string> = { [EditMode.Design]: 'Design: edits set the resting state', [EditMode.Motion]: 'Animate: edits key at the playhead' };
 
@@ -64,10 +70,21 @@
     };
   });
 
+  const looping = $derived(interactiveOf(doc).loop);
+  const LOOP_LABEL: Record<Wrap, string> = { [Wrap.Loop]: 'Loop playback: on', [Wrap.Stop]: 'Loop playback: off' };
+  const wrap = $derived(looping ? Wrap.Loop : Wrap.Stop);
+
   function tick(now: number) {
-    head = advance({ frame: head, ms: now - last, fps: doc.fps, duration: doc.durationInFrames });
+    const range = loopRange(doc);
+    const next = advance({ head, ms: now - last, fps: doc.fps, range, wrap });
     last = now;
-    onframe(head);
+    if (next === null) {
+      playing = false;
+      onframe(range.to - 1);
+      return;
+    }
+    head = next;
+    onframe(Math.floor(head));
     raf = requestAnimationFrame(tick);
   }
 
@@ -77,10 +94,23 @@
     if (!playing) {
       return;
     }
-    head = frame;
+    const range = loopRange(doc);
+    const inside = frame >= range.from && frame < range.to - 1;
+    head = inside ? frame : range.from;
     last = performance.now();
     raf = requestAnimationFrame(tick);
   }
+
+  function edit(result: OpResult, summary: string) {
+    if (result.ok) {
+      onchange(result.doc, summary);
+    }
+  }
+
+  const WORK_EDGE: Partial<Record<Command, (f: number) => OpResult>> = {
+    [Command.WorkIn]: (f) => setWorkArea(doc, { from: f, to: loopRange(doc).to }),
+    [Command.WorkOut]: (f) => setWorkArea(doc, { from: loopRange(doc).from, to: f + 1 })
+  };
 
   function scrub(next: number) {
     playing = false;
@@ -92,9 +122,16 @@
     if (isTyping(e.target as Parameters<typeof isTyping>[0])) {
       return;
     }
-    if (commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }) === Command.RamPreview) {
+    const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, mode);
+    if (command === Command.RamPreview) {
       e.preventDefault();
       onram();
+      return;
+    }
+    const workEdge = command ? WORK_EDGE[command] : undefined;
+    if (workEdge) {
+      e.preventDefault();
+      edit(workEdge(frame), 'Set the loop region');
     }
   }
 
@@ -106,6 +143,9 @@
 <section bind:this={section} class="timeline" data-testid="frame-timeline" data-dock="timeline">
   <div class="bar">
     <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" data-testid="frame-timeline-play" onclick={toggle} />
+    <IconButton action={Tool.Loop} size={14} pressed={looping} label={LOOP_LABEL[wrap]} data-testid="frame-timeline-loop" onclick={() => edit(setInteractive(doc, { loop: !looping }), looping ? 'Turned looping off' : 'Turned looping on')} />
+    <IconButton action={Tool.CloseLoop} size={14} data-testid="frame-timeline-seamless" onclick={() => edit(closeLoop(doc), 'Made the loop seamless')} />
+    {#if doc.workArea}<IconButton action={Tool.ClearWorkArea} size={14} data-testid="frame-timeline-clear-loop" onclick={() => edit(setWorkArea(doc, null), 'Cleared the loop region')} />{/if}
     <IconButton action={Command.RamPreview} size={14} data-testid="frame-timeline-ram" onclick={onram} />
     <span class="time" data-testid="frame-timeline-time">{(frame / doc.fps).toFixed(2)}s</span>
     {#each grouping as id (id)}<IconButton action={id} size={14} data-testid={`frame-timeline-${id}`} onclick={() => onaction(id)} />{/each}
@@ -122,7 +162,12 @@
       {/each}
     </div>
   {/if}
-  {#if remapped}<TimeRemap {doc} clip={remapped} {frame} {onchange} />{/if}
+  {#if remapped}
+    <div class="tools" data-testid="frame-timeline-tools">
+      <TimeRemap {doc} clip={remapped} {frame} {onchange} />
+      {#if assetUrl}<TrackPanel {doc} clip={remapped} {frame} {assetUrl} {onchange} />{/if}
+    </div>
+  {/if}
   <div class="body">
     {#if graphOpen}
       <GraphEditor {doc} {frame} {selection} bind:keySelection {camera} {onchange} />
@@ -193,6 +238,13 @@
     color: inherit;
     border: 1px solid var(--ui-line, #e5e5e5);
     border-radius: var(--ui-radius-sm, 4px);
+  }
+
+  .tools {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 70%;
+    overflow-y: auto;
   }
 
   .marks {

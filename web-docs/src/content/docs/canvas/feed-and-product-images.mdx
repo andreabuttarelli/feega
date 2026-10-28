@@ -1,0 +1,35 @@
+---
+title: Drag pictures out of feeds and stores
+description: Turn one post or product picture into its own image node, or an image layer in a frame.
+sidebar:
+  order: 8
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="drag-out-feed-images" caption="Drag a product picture and a post picture out of their nodes onto the canvas." />
+
+A Social feed node and a Products node show the pictures they synced as thumbnails. Each thumbnail can be dragged out.
+
+1. Select the node. Its thumbnails move to a strip beside the settings and become draggable.
+2. Drag a thumbnail. A ghost of the picture follows the pointer and a dashed box marks where the node will land, sized to the picture's aspect ratio.
+3. Drop it on empty canvas. A placeholder appears while the picture is copied, then it becomes an image node.
+4. Drop it on a frame instead to add it as an image layer, like an image file dropped there.
+
+The picture is copied into your project's storage, so it keeps working after the original social or store link expires. The node remembers where it came from (the post or product, its id, the picture link and the page link) in its data. Undo removes the node.
+
+Dragging a thumbnail never moves the feed node or pans the canvas. A video post gives its poster picture, a carousel or a product with several pictures gives the first.
+
+### From an agent, MCP or CLI
+
+The same action is the canvas op `import_feed_image`, called with `canvas_tool`. Find post and product ids with `canvas_snapshot` (`socialPosts`, `products`).
+
+```json
+{ "op": "import_feed_image", "input": { "canvasId": "<canvas id>", "nodeId": "<products node id>", "itemId": "<product id>", "imageIndex": 1, "x": 900, "y": 300 } }
+```
+
+- `x`, `y`: canvas position of the new node's centre.
+- `toFrameId`, `frameX`, `frameY`: put the picture in that frame instead (position as fractions of the frame, 0 to 1).
+- `imageIndex`: which picture of a carousel post or product, from 0.
+
+Result: `node` and `asset`, or the frame answer (`frame_id`, `element_id`) when it lands in a frame.

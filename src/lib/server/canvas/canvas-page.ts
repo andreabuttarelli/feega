@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
 import { importCanvasLink, registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
+import { feedImageAskSchema, importFeedImage } from '$lib/server/canvas/feed-image';
 import { saveFontUpload } from '$lib/server/motion/font-upload';
 import { isOutputHandle } from '$lib/canvas/select-outputs';
 import { error, fail, redirect } from '@sveltejs/kit';
@@ -75,6 +76,8 @@ import { MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';
+import { listAgentChanges, rejectChange } from '$lib/server/canvas/reject';
+import { Keep } from '$lib/canvas/reject-plan';
 import { writeNodesBatch, type BatchItem } from '$lib/server/canvas/batch-write';
 import { pasteNodes, type PastedEdge, type PastedNode } from '$lib/server/canvas/paste';
 import { parseUndoItem, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
@@ -85,7 +88,7 @@ import { nextStepsFor, nodeTextCost } from '$lib/server/canvas/node-hints';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { makeEffectsPair } from '$lib/server/canvas/effects-actions';
 import { nodeAcceptsConnection } from '$lib/canvas/connector-ports';
-import { connectVerdict } from '$lib/server/canvas/node-model';
+import { connectVerdict, elementSourceRefusal } from '$lib/server/canvas/node-model';
 import { ShareState, readCanvasShare, setCanvasShare } from '$lib/server/canvas/canvas-share';
 import { referenceLibrary } from '$lib/server/canvas/reference-library';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
@@ -234,6 +237,12 @@ function rowsRequest(fd: FormData) {
     .safeParse({ techniqueId: fd.get('technique_id'), rows: jsonField(fd, 'rows'), mapping: jsonField(fd, 'mapping') ?? null });
   return parsed.success ? parsed.data : null;
 }
+
+const rejectFields = z.object({
+  eventIds: z.array(z.number().int()).min(1),
+  choices: z.array(z.object({ eventId: z.number().int(), path: z.string(), keep: z.enum(Keep) })),
+  confirm: z.boolean()
+});
 
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
@@ -450,7 +459,9 @@ export const actions: Actions<CanvasParams> = {
     if (!deps) {
       return fail(HTTP_UNAVAILABLE, { error: 'elevenlabs_not_configured' });
     }
-    return { voiceId: await deps.provider.addShared(input), name: input.name };
+    const { addLibraryVoice } = await import('$lib/server/voices/custom-voices');
+    const out = await addLibraryVoice(deps, voiceScopeOf(scope), input);
+    return out.ok ? { voiceId: out.voice.providerVoiceId, name: out.voice.name } : voiceFail(out.error);
   },
 
   voice_design: async ({ request, params, locals }) => {
@@ -570,7 +581,7 @@ export const actions: Actions<CanvasParams> = {
   },
   uploadFont: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, path: String((await request.formData()).get('path') ?? '') });
+    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, userId: scope.userId, path: String((await request.formData()).get('path') ?? '') });
     return saved.ok ? { font: saved.font } : fail(400, { error: saved.error });
   },
   importLink: async ({ request, params, locals }) => {
@@ -583,6 +594,25 @@ export const actions: Actions<CanvasParams> = {
     try {
       const { asset } = await importCanvasLink(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, url });
       return { asset };
+    } catch (cause) {
+      if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
+      throw cause;
+    }
+  },
+  importFeedImage: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = feedImageAskSchema.safeParse({ nodeId: fd.get('source'), itemId: fd.get('item_id'), imageIndex: Number(fd.get('image_index') ?? 0), drop: jsonField(fd, 'drop'), id: fd.get('node_id') ?? undefined });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    try {
+      const landed = await importFeedImage(
+        { db: scope.db, frames: canvasFrames(scope), actor: userActor(scope) },
+        { ...ask.data, orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId }
+      );
+      return landed.placed === 'frame' ? movedAnswer(landed.moved) : { outcome: MoveOutcome.Done, node: landed.node, asset: landed.asset };
     } catch (cause) {
       if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
       throw cause;
@@ -1210,7 +1240,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'an effects node takes a single media' });
     }
 
-    const refusal = connectVerdict(sourceNode ?? null, targetNode ?? null);
+    const refusal = connectVerdict(sourceNode ?? null, targetNode ?? null) ?? (await elementSourceRefusal(scope.db, { orgId: scope.orgId, source: sourceNode ?? null }));
     if (refusal) {
       return fail(400, { error: refusal });
     }
@@ -1983,6 +2013,25 @@ export const actions: Actions<CanvasParams> = {
       return fail(409, { reason: result.reason });
     }
     return { outcome: 'undone', redo: result.redo };
+  },
+
+  agent_changes: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    return { changes: await listAgentChanges(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
+  },
+
+  reject_change: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const parsed = rejectFields.safeParse({
+      eventIds: jsonField(fd, 'event_ids'),
+      choices: jsonField(fd, 'choices') ?? [],
+      confirm: fd.get('confirm') === 'true'
+    });
+    if (!parsed.success) {
+      return fail(HTTP_BAD_REQUEST, { error: 'invalid_change' });
+    }
+    return rejectChange(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, ...parsed.data, actor: userActor(scope) });
   },
 
   /**

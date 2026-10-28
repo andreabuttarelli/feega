@@ -9,8 +9,10 @@ describe('JSONB_COLUMN_SCHEMAS — un posto solo per le 20 colonne jsonb raggiun
         'ad_campaigns.placements',
         'ad_campaigns.targeting',
         'ad_creatives.media',
+        'brands.logos',
         'brands.palette',
         'brands.target',
+        'brands.voice',
         'canvas_events.after',
         'canvas_events.before',
         'canvases.viewport',
@@ -128,7 +130,6 @@ describe('validateJsonbColumn — colonne intenzionalmente libere: passano sempr
     ['canvas_events', 'before'],
     ['canvas_events', 'after'],
     ['chat_messages', 'tool_calls'],
-    ['brands', 'palette'],
     ['brands', 'target'],
     ['node_runs', 'params'],
     ['ad_creatives', 'media'],
@@ -158,5 +159,22 @@ describe('validateJsonbColumn — chat_messages.attachments', () => {
   it('accetta la forma che saveTurn scrive e rifiuta il resto', () => {
     expect(validateJsonbColumn('chat_messages', 'attachments', [{ assetId: 'a', kind: 'image', name: 'l.png', mimeType: 'image/png', bytes: 1 }]).ok).toBe(true);
     expect(validateJsonbColumn('chat_messages', 'attachments', [{ name: 'l.png' }]).ok).toBe(false);
+  });
+});
+
+describe('the brand kit columns are validated, not free form', () => {
+  it('palette is a list of hex swatches', () => {
+    expect(validateJsonbColumn('brands', 'palette', [{ hex: '#1A2B3C', name: 'Ink' }]).ok).toBe(true);
+    expect(validateJsonbColumn('brands', 'palette', [{ hex: 'blue' }]).ok).toBe(false);
+  });
+
+  it('voice has a tone and do/don\'t lists', () => {
+    expect(validateJsonbColumn('brands', 'voice', { tone: 'Warm', do: ['Short'], dont: ['Puns'] }).ok).toBe(true);
+    expect(validateJsonbColumn('brands', 'voice', { tone: 3 }).ok).toBe(false);
+  });
+
+  it('logos are variants with a url', () => {
+    expect(validateJsonbColumn('brands', 'logos', [{ variant: 'dark', url: 'https://x/l.png' }]).ok).toBe(true);
+    expect(validateJsonbColumn('brands', 'logos', [{ variant: 'huge', url: 'https://x/l.png' }]).ok).toBe(false);
   });
 });

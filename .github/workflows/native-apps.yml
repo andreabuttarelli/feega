@@ -32,6 +32,27 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  desktop-native:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/native
+      - run: npm ci
+      - run: npm run build:native:universal
+      - run: lipo -archs native/feega_native_canvas.node
+      - run: npm run build:mac:universal
+
   ios:
     runs-on: macos-latest
     defaults:

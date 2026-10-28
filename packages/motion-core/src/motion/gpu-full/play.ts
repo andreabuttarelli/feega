@@ -1,4 +1,5 @@
 import type { BrandTokens } from '../brand';
+import type { AudioAnalysis } from '../audio-analysis';
 import type { MotionDoc } from '../doc';
 import { drawFrame, prepare, type DisplayList, type Prepared } from './display-list';
 import { frameAt } from './frame';
@@ -13,7 +14,7 @@ import type { VideoFrames } from './video-frames';
 import { mountCustomReads, type CustomReads } from './dom/custom';
 import type { Compose } from './dom/reader';
 
-export type Shown = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; compose: Compose };
+export type Shown = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; compose: Compose; analyses?: Record<string, AudioAnalysis> };
 
 export type PlayerMount = {
   canvas: HTMLCanvasElement;
@@ -56,7 +57,7 @@ export function mountPlayer(mount: PlayerMount): Player {
     if (!shown) {
       return;
     }
-    const of = prepare(shown.doc, shown.tokens, shown.assets, typeset);
+    const of = prepare(shown.doc, shown.tokens, shown.assets, typeset, shown.analyses);
     const previous = reads;
     reads = { of, custom: mountCustomReads(host, shown.compose, of), feed: mount.inputs ? liveFeed(shown) : null };
     void previous?.custom.then((r) => r.dispose(), () => {});
@@ -105,7 +106,13 @@ export function mountPlayer(mount: PlayerMount): Player {
         await media.ready(list);
         into.draw(list, (item) => read.picture(item) ?? media.pictures(item));
       })
-      .catch(onfallback)
+      .catch((reason) => {
+        if (reads !== current) {
+          drawn = [null, -1];
+          return;
+        }
+        onfallback(reason);
+      })
       .finally(() => {
         busy = false;
       });

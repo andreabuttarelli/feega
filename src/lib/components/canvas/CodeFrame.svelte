@@ -7,6 +7,7 @@
   import type { CodeLanguage, CodeView } from '$lib/components/motion/code-editor';
   import CodeVarsPanel from './CodeVarsPanel.svelte';
   import { forgetVars, rememberVars, varsOf } from '$lib/canvas/code-vars-registry.svelte';
+  import { orgFonts } from '$lib/fonts/org-font-store.svelte';
 
   const RENDER_DEBOUNCE_MS = 500;
 
@@ -105,7 +106,9 @@
     }
   });
 
-  const html = $derived(codeFrameHtml(framework, shown, { route, values: untrack(() => $state.snapshot(vars)) }));
+  const html = $derived(codeFrameHtml(framework, shown, { route, values: untrack(() => $state.snapshot(vars)) }, orgFonts.css));
+
+  onMount(() => void orgFonts.load());
 
   function commit() {
     timer = null;

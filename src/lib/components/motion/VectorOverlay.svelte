@@ -10,6 +10,7 @@
   import { Tangent, breakAtVertex, deleteVertex, handlesAt, removeVertex, splitSegmentAt, toggleSmoothVertex, type Handle } from '$lib/motion/vector/edit';
   import { addVertex, connect, fillClosed, moveVertex, setTangent } from '$lib/motion/vector/draw';
   import { setNetwork } from '$lib/motion/vector/ops';
+  import { Mirror } from '$lib/motion/shape/pen';
   import type { Guide } from '$lib/motion/scene-select';
   import { pointBounds, snapPoint, snapReach, snapTargets } from '$lib/motion/shape/vector-edit';
 
@@ -79,6 +80,12 @@
     grab = { kind: 'vertex', vertex, from: local(e), base: network };
   }
 
+  function smoothVertex(e: MouseEvent, vertex: number) {
+    e.stopPropagation();
+    selected = vertex;
+    commit(toggleSmoothVertex(network, vertex), 'Toggled a point between corner and smooth');
+  }
+
   function pressHandle(e: PointerEvent, handle: Handle) {
     e.stopPropagation();
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
@@ -140,7 +147,7 @@
     }
     const s = grab.base.segments[grab.handle.segmentIndex];
     const owner = grab.base.vertices[grab.handle.tangent === Tangent.Start ? s.start : s.end];
-    live = setTangent(grab.base, grab.handle.segmentIndex, grab.handle.tangent, { x: at.x - owner.x, y: at.y - owner.y });
+    live = setTangent(grab.base, grab.handle.segmentIndex, grab.handle.tangent, { x: at.x - owner.x, y: at.y - owner.y }, e.altKey ? Mirror.Broken : Mirror.Mirrored);
   }
 
   function end() {
@@ -156,6 +163,12 @@
 
   function key(e: KeyboardEvent) {
     if (isTyping(e.target as HTMLElement | null)) {
+      return;
+    }
+    if (e.key === 'Enter' && !pen) {
+      e.preventDefault();
+      e.stopPropagation();
+      onexit();
       return;
     }
     if (e.key === 'Escape') {
@@ -212,7 +225,7 @@
       }}>Delete point</button>
   </div>
   {#each network.vertices as v, i (i)}
-    <button type="button" data-drawn-small class="point" class:sel={selected === i} aria-label={`Vector point ${i + 1}`} data-vertex={i} style={pct(v)} onpointerdown={(e) => pressVertex(e, i)}></button>
+    <button type="button" data-drawn-small class="point" class:sel={selected === i} aria-label={`Vector point ${i + 1}`} data-vertex={i} style={pct(v)} onpointerdown={(e) => pressVertex(e, i)} ondblclick={(e) => smoothVertex(e, i)}></button>
   {/each}
   {#each shownHandles as h (`${h.segmentIndex}-${h.tangent}`)}
     <button type="button" data-drawn-small class="handle" aria-label="Curve handle" data-handle={`${h.segmentIndex}-${h.tangent}`} style={pct(handlePoint(h))} onpointerdown={(e) => pressHandle(e, h)}></button>

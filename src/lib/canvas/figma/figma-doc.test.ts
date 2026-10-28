@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { cardOverElements, elementsOnly } from '../../../../tests/fixtures/figma/elements';
+import { cardOverElements, elementsOnly, node, solid } from '../../../../tests/fixtures/figma/elements';
 import { buttonInstances, smallTextInHugeFrame } from '../../../../tests/fixtures/figma/components';
+import { figmaClipboardHtml } from '../../../../tests/fixtures/figma/clipboard';
+import { HIDDEN_ICON, landingPage, OVERRIDDEN_LABEL } from '../../../../tests/fixtures/figma/landing';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { parseMotionDoc, type MotionClip } from '@feega/motion-core/motion/doc';
 import { stillFrame } from '$lib/canvas/core/frame-source';
@@ -168,5 +170,86 @@ describe('component instances', () => {
     const [item] = planOf(buttonInstances({ mainCopied: false }), newId)!.items;
     expect(instancesOf(item.doc)).toHaveLength(2);
     expect(mainsOf(item.doc)).toHaveLength(0);
+  });
+});
+
+describe('a whole landing page', () => {
+  const [item] = planOf(landingPage().message, newId)!.items;
+  const texts = clipsOf(item.doc).filter((c) => c.component === 'Text');
+  const textOf = (c: MotionClip) => String(c.props.text);
+
+  it('keeps every text, however small its size or long its paragraph', () => {
+    const kept = texts.map(textOf);
+    for (const expected of landingPage().texts) {
+      expect(kept).toContain(expected);
+    }
+  });
+
+  it('reports no text as skipped', () => {
+    const { skipped } = planOf(landingPage().message, newId)!;
+    expect(skipped.filter((s) => s.startsWith('style of'))).toEqual([]);
+  });
+
+  it('gives a text without a font size a readable one', () => {
+    const copyright = texts.find((c) => textOf(c) === 'Copyright')!;
+    expect(copyright.props.size as number).toBeGreaterThan(0);
+  });
+
+  it('shows the overridden label of an instance, not the main label', () => {
+    const kept = texts.map(textOf);
+    expect(kept).toContain(OVERRIDDEN_LABEL);
+    expect(kept.filter((t) => t === 'Label')).toHaveLength(1);
+  });
+
+  it('paints the overridden label with the overriding fill', () => {
+    const joined = texts.find((c) => textOf(c) === OVERRIDDEN_LABEL)!;
+    expect(joined.props.color).toBe('#1ab34d');
+  });
+
+  it('leaves out the icon an instance hides', () => {
+    const arrows = clipsOf(item.doc).filter((c) => c.name === HIDDEN_ICON);
+    expect(arrows).toHaveLength(1);
+  });
+
+  it('does not report the flattened instance as a loss', () => {
+    const { skipped } = planOf(landingPage().message, newId)!;
+    expect(skipped.filter((s) => s.includes('flattened'))).toEqual([]);
+  });
+});
+
+describe('a landing page through the clipboard encoding', () => {
+  it('keeps the instance overrides after the Figma schema decodes them', () => {
+    const plan = figmaPlan(figmaClipboardHtml(landingPage().message), newId)!;
+    const kept = clipsOf(plan.items[0].doc).filter((c) => c.component === 'Text').map((c) => String(c.props.text));
+    expect(kept).toContain(OVERRIDDEN_LABEL);
+    expect(kept).toContain(landingPage().texts.at(-1));
+  });
+});
+
+describe('a Figma frame with no fill', () => {
+  it('lands as a see-through group, not on the black frame stage', () => {
+    const page = { guid: { sessionID: 0, localID: 1 }, type: 'CANVAS', name: 'Page' };
+    const frame = node('FRAME', 1, { w: 205, h: 158, fillPaints: [], frameMaskDisabled: false });
+    const mark = node('ROUNDED_RECTANGLE', frame.id, { w: 50, h: 50, fillPaints: [solid(1, 1, 1)] });
+
+    const [item] = planOf({ meta: {}, blobs: [], nodes: [page, frame, mark] }, newId)!.items;
+
+    expect(item.destination).toBe(Destination.Free);
+    expect(item.doc.background).toBe('transparent');
+  });
+
+  it('keeps several vectors together as one group, not loose elements', () => {
+    const page = { guid: { sessionID: 0, localID: 1 }, type: 'CANVAS', name: 'Page' };
+    const frame = node('FRAME', 1, { w: 300, h: 100, fillPaints: [], frameMaskDisabled: false });
+    const letters = [0, 1, 2, 3, 4].map((i) => node('ROUNDED_RECTANGLE', frame.id, { x: i * 60, w: 50, h: 50, fillPaints: [solid(0, 0, 0)] }));
+
+    const plan = planOf({ meta: {}, blobs: [], nodes: [page, frame, ...letters] }, newId)!;
+    const [item] = plan.items;
+    const roots = item.doc.tracks.flatMap((t) => t.clips);
+
+    expect(plan.items).toHaveLength(1);
+    expect(item.kind).toBe(FrameKind.Group);
+    expect(roots).toHaveLength(1);
+    expect(item.doc.background).toBe('transparent');
   });
 });

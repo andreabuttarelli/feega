@@ -79,8 +79,10 @@ const range = (min: number, max: number, step: number, fallback: number, label: 
 const choice = <T extends readonly [string, ...string[]]>(values: T, fallback: T[number], label: string, group: Group) =>
   z.enum(values).default(fallback as never).meta({ control: Control.Select, label, group });
 
+export const TEXT_MAX_CHARS = { line: 500, block: 20000 } as const;
+
 const text = (fallback: string, label: string, multiline = false) =>
-  z.string().max(500).default(fallback).meta({ control: multiline ? Control.Textarea : Control.Text, label, group: Group.Content });
+  z.string().max(multiline ? TEXT_MAX_CHARS.block : TEXT_MAX_CHARS.line).default(fallback).meta({ control: multiline ? Control.Textarea : Control.Text, label, group: Group.Content });
 
 const asset = (kind: AssetKind, label: string) =>
   z.string().nullable().default(null).meta({ control: Control.Asset, assetKind: kind, label, group: Group.Content });
@@ -147,8 +149,7 @@ export const AXES = /^('[A-Za-z0-9]{4}' -?\d+(\.\d+)?)(, '[A-Za-z0-9]{4}' -?\d+(
 
 type Look = { weight?: number; tracking: number; leading: number };
 
-const POSTER_TYPE_MAX = 1.2;
-export const TYPE_SIZE = { min: 0.001, max: POSTER_TYPE_MAX } as const;
+export const TYPE_SIZE = { min: 0.001, max: 4 } as const;
 
 const typography = (size: number, fallbackColor: string, look: Look) => ({
   color: color(fallbackColor, 'Colour'),

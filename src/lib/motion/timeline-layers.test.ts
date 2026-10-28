@@ -7,7 +7,7 @@ import { KeyMark, KeyGlyph, ROW_PX, RowKind, keyMark, keyGlyph, layerName, layer
 
 const clip = (id: string, over: Partial<MotionClip> = {}): MotionClip => ({ id, component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Better marketing' }, keyframes: {}, ...over }) as MotionClip;
 const track = (id: string, clips: MotionClip[]): MotionTrack => ({ id, kind: TrackKind.Visual, name: id, clips }) as MotionTrack;
-const key = (frame: number, value = 0, out?: Interp): Keyframe => ({ frame, value, ease: Ease.Standard, out });
+const key = (frame: number, value = 0, out?: Interp, inn?: Interp): Keyframe => ({ frame, value, ease: Ease.Standard, out, in: inn });
 
 describe('timeline layers', () => {
   it('gives every clip its own row under its track, and a folded track only its header', () => {
@@ -56,10 +56,19 @@ describe('timeline layers', () => {
     expect(propValue([{ frame: 0, value: '#ff0000', ease: Ease.Linear }, { frame: 10, value: '#00ff00', ease: Ease.Linear }], 12)).toBe('#00ff00');
   });
 
-  it('draws a keyframe by how it leaves: bezier diamond, hold square, linear circle', () => {
-    expect(keyGlyph(key(0))).toBe(KeyGlyph.Diamond);
-    expect(keyGlyph(key(0, 0, Interp.Hold))).toBe(KeyGlyph.Square);
-    expect(keyGlyph(key(0, 0, Interp.Linear))).toBe(KeyGlyph.Circle);
+  it.each([
+    [Interp.Linear, KeyGlyph.Diamond],
+    [Interp.Bezier, KeyGlyph.Hourglass],
+    [Interp.Auto, KeyGlyph.Circle],
+    [Interp.Continuous, KeyGlyph.Circle],
+    [Interp.Hold, KeyGlyph.Square]
+  ])('draws %s as %s on each side of a keyframe', (interp, glyph) => {
+    expect(keyGlyph(key(0, 0, interp, interp))).toEqual({ left: glyph, right: glyph });
+  });
+
+  it('draws the incoming side left and the outgoing side right, bezier when unset', () => {
+    expect(keyGlyph(key(0, 0, Interp.Hold, Interp.Linear))).toEqual({ left: KeyGlyph.Diamond, right: KeyGlyph.Square });
+    expect(keyGlyph(key(0))).toEqual({ left: KeyGlyph.Hourglass, right: KeyGlyph.Hourglass });
   });
 
   it('labels the ruler on round steps: whole seconds when zoomed out, frames when zoomed in', () => {

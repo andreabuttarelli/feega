@@ -22,3 +22,17 @@ export function filterGuides(guides: Guide[], query: string): Guide[] {
 export function guideUrl(path: string): string {
   return `${DOCS_ORIGIN}/${path}/`;
 }
+
+export async function fetchGuides(fetcher: typeof fetch = fetch): Promise<Guide[]> {
+  const response = await fetcher(GUIDES_INDEX_URL);
+  if (!response.ok) {
+    throw new Error(`guides index ${response.status}`);
+  }
+
+  const guides = parseGuides(await response.json());
+  if (guides.length === 0) {
+    throw new Error('guides index empty');
+  }
+
+  return guides;
+}

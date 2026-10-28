@@ -1,5 +1,6 @@
 <script lang="ts">
   import { runStateOf, type GenNode, type ModelChoice } from '$lib/canvas/gen-node';
+  import type { SectionInputs } from '$lib/canvas/section-source';
   import { shownIndex } from '$lib/canvas/gen-history';
   import { PROMPT_PLACEHOLDER, RUN_LABEL, hasGenBody } from '$lib/canvas/gen-tile-view';
   import { loopCreditsOf, providerQuotesOf, runLabelOf, runQuoteOf } from '$lib/canvas/run-quote';
@@ -31,6 +32,8 @@
     loopCombinationCount = 0,
     variantsInFlight = 0,
     remembered = null,
+    sectionInputs = [],
+    onsectionitem,
     onchange,
     onrun,
     onrunloop,
@@ -59,6 +62,8 @@
     loopQueued?: number;
     loopVisible?: boolean;
     loopCombinationCount?: number;
+    sectionInputs?: SectionInputs[];
+    onsectionitem?: (itemId: string, included: boolean) => void;
     onchange?: (patch: Partial<GenNode>) => void;
     onrun?: () => void;
     onrunloop?: () => void;
@@ -272,7 +277,7 @@
           {:else if shownExample.medium === 'video'}
             <video src={shownExample.src} autoplay muted loop playsinline></video>
           {:else}
-            <img src={shownExample.src} alt={EXAMPLE_LABEL} />
+            <img draggable="false" src={shownExample.src} alt={EXAMPLE_LABEL} />
           {/if}
         </div>
       {:else}
@@ -285,7 +290,7 @@
       <span class="gen-strip-count">{withOutput.length}</span>
       {#each [...withOutput].reverse() as run (run.id)}
         <button type="button" class="gen-strip-one" class:is-shown={run.mediaId === node.refId} title={run.prompt} aria-label="Show this generation" aria-pressed={run.mediaId === node.refId} onclick={() => onshow?.(run.id)}>
-          <img src={thumbUrl(run.mediaId ?? '')} alt="" loading="lazy" decoding="async" />
+          <img draggable="false" src={thumbUrl(run.mediaId ?? '')} alt="" loading="lazy" decoding="async" />
         </button>
       {/each}
     </div>
@@ -316,6 +321,22 @@
   {/if}
 
   <footer class="gen-foot" class:is-full={!hasBody}>
+    {#each sectionInputs as section (section.id)}
+      <details class="gen-section nodrag" data-testid="gen-section-inputs">
+        <summary data-testid="gen-section-summary">Section: {section.name} · {section.items.filter((i) => i.included).length} items</summary>
+        {#if section.trimmed}<p class="gen-section-trim" data-testid="gen-section-trimmed">{section.trimmed}</p>{/if}
+        <ul>
+          {#each section.items as item (item.id)}
+            <li>
+              <label>
+                <input type="checkbox" checked={item.included} onchange={(e) => onsectionitem?.(item.id, e.currentTarget.checked)} />
+                {item.label}
+              </label>
+            </li>
+          {/each}
+        </ul>
+      </details>
+    {/each}
     {#if tooLong && blocked}
       <span class="gen-warn">{blocked}{#if choice?.maxPromptChars} ({node.prompt.length}/{choice.maxPromptChars}){/if}</span>
     {/if}
@@ -605,6 +626,25 @@
     color: var(--ink-soft, #6e6e73);
   }
 
+  .gen-section {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+  .gen-section summary {
+    cursor: pointer;
+    color: var(--muted-foreground);
+  }
+  .gen-section ul {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+    max-height: 120px;
+    overflow: auto;
+  }
+  .gen-section-trim {
+    margin: 2px 0;
+    color: var(--destructive);
+  }
   .gen-foot {
     margin-top: auto;
     padding-top: var(--gen-inset);

@@ -356,13 +356,14 @@ export type FrameView = { route: string; values: VarValues };
 
 const ROOT_VIEW: FrameView = { route: '/', values: {} };
 
-export function codeFrameHtml(framework: Framework, files: CodeFiles, view: FrameView = ROOT_VIEW): string {
+export function codeFrameHtml(framework: Framework, files: CodeFiles, view: FrameView = ROOT_VIEW, fontCss = ''): string {
   const runtime = RUNTIME[framework];
   const config = { route: view.route, values: view.values, shorthands: VAR_SHORTHANDS, inline: INLINE_TYPES, framework, entry: CODE_ENTRY[framework], imports: runtime.imports, external: runtime.external, compiler: runtime.compiler, sucrase: SUCRASE_URL, lexer: LEXER_URL, esm: ESM };
   const importMap = JSON.stringify({ imports: runtime.imports }, null, 1);
 
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="about:srcdoc">
 <style>${STYLE}</style>
+<style>${fontCss}</style>
 <script type="importmap">${importMap}</script>
 <script src="${TAILWIND_URL}"></script>
 </head><body><div id="root"></div>

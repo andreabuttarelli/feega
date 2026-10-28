@@ -54,6 +54,16 @@ describe('GET motion preview', () => {
     expect(body.html).toContain('https://oh.feega.test/motion-libs/');
   });
 
+  it('carries the document so the browser can draw it on gpu-core', async () => {
+    state.head = { version: 3, doc: titled('Launch day'), summary: null, actorKind: 'user' };
+
+    const { body } = await read();
+
+    expect(body.scene.doc.durationInFrames).toBe(90);
+    expect(body.scene.tokens).toBeDefined();
+    expect(body.scene.assets).toEqual({});
+  });
+
   it('a video never saved previews the empty doc of its format', async () => {
     const { body } = await read();
 

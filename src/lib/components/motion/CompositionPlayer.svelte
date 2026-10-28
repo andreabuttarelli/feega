@@ -10,6 +10,7 @@
   let playing = $state(false);
 
   const html = $derived(composeHtml({ doc, tokens, assets, target: Target.Screen }));
+  const fullDoc = $derived({ doc, tokens, assets, compose: (only?: ReadonlySet<string>) => composeHtml({ doc, tokens, assets, target: Target.Screen, only }) });
   const last = $derived(doc.durationInFrames - 1);
 
   $effect(() => {
@@ -29,7 +30,7 @@
 </script>
 
 <div class="composition-player">
-  <MotionPreview {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing />
+  <MotionPreview {html} {fullDoc} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing />
 </div>
 
 <style>

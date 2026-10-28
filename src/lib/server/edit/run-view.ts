@@ -104,7 +104,7 @@ async function activity(caller: OrgCaller, input: { canvas_id: string; since?: s
     status: HTTP_OK,
     body: {
       canvas_id: input.canvas_id,
-      events: events.filter((e) => Date.parse(e.createdAt) > since).map((e) => ({ kind: e.kind, node_id: e.nodeId, edge_id: e.edgeId, actor: e.actorKind, agent: e.agentKey, at: e.createdAt })),
+      events: events.filter((e) => Date.parse(e.createdAt) > since).map((e) => ({ id: e.id, kind: e.kind, node_id: e.nodeId, edge_id: e.edgeId, actor: e.actorKind, agent: e.agentKey, at: e.createdAt })),
       running: running.filter((r) => here.has(r.nodeId)).map((r) => ({ run_id: r.id, node_id: r.nodeId, model: r.model, since: r.startedAt })),
       presence: { available: false, reason: 'Presence lives in the live canvas channel; the server cannot read who is on the canvas or what they select.' }
     }

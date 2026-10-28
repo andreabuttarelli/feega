@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::Arc;
 
 use vello::wgpu;
 use wasm_bindgen::prelude::*;
@@ -20,6 +22,7 @@ use crate::Skipped;
 const CACHE_SIDE: u32 = 4096;
 const RASTERS_PER_DRAW: usize = 1;
 const ITEMS_PER_RASTER: usize = 48;
+const FRAMES_IN_FLIGHT: u32 = 1;
 
 #[wasm_bindgen]
 pub struct WebCore {
@@ -41,6 +44,8 @@ pub struct WebCore {
     retained: wgpu::Texture,
     spare: wgpu::Texture,
     reprojector: Reprojector,
+    lost: Arc<AtomicBool>,
+    in_flight: Arc<AtomicU32>,
 }
 
 struct GpuPainter<'a> {
@@ -115,6 +120,7 @@ impl Painter for GpuPainter<'_> {
             }
         }
         self.queue.submit([encoder.finish()]);
+        scratch.destroy();
         Ok([skipped, missing].concat())
     }
 
@@ -187,6 +193,9 @@ impl WebCore {
         let surface = instance.create_surface(wgpu::SurfaceTarget::Canvas(canvas)).map_err(failed)?;
         let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions { compatible_surface: Some(&surface), ..Default::default() }).await.map_err(failed)?;
         let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default()).await.map_err(failed)?;
+        let lost = Arc::new(AtomicBool::new(false));
+        let flag = lost.clone();
+        device.set_device_lost_callback(move |_, _| flag.store(true, Ordering::Relaxed));
         let format = surface.get_capabilities(&adapter).formats.into_iter().find(|f| !f.is_srgb()).ok_or_else(|| failed("no linear surface format"))?;
         surface.configure(&device, &wgpu::SurfaceConfiguration { usage: wgpu::TextureUsages::RENDER_ATTACHMENT, format, width, height, present_mode: wgpu::PresentMode::Fifo, alpha_mode: wgpu::CompositeAlphaMode::PreMultiplied, view_formats: vec![], desired_maximum_frame_latency: 2, color_space: wgpu::SurfaceColorSpace::Auto });
         let engine = Engine::new(&device).map_err(failed)?;
@@ -200,16 +209,14 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector })
+        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)) })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
         let source = external(source)?;
         let fits = self.textures.get(clip).is_some_and(|t| t.width() == width && t.height() == height);
         if !fits {
-            if let Some(old) = self.pictures.remove(clip) {
-                self.engine.vello.unregister_texture(old);
-            }
+            self.release(clip);
             let texture = upload_target(&self.device, width, height);
             self.pictures.insert(clip.into(), self.engine.vello.register_texture(texture.clone()));
             self.textures.insert(clip.into(), texture);
@@ -223,6 +230,32 @@ impl WebCore {
         self.engine.vello.mark_override_image_dirty(&self.pictures[clip]);
         self.compositor.touch_picture(clip, &self.library);
         Ok(())
+    }
+
+    pub fn forget_picture(&mut self, clip: &str) {
+        self.release(clip);
+        self.compositor.touch_picture(clip, &self.library);
+    }
+
+    fn release(&mut self, clip: &str) {
+        if let Some(old) = self.pictures.remove(clip) {
+            self.engine.vello.unregister_texture(old);
+        }
+        if let Some(texture) = self.textures.remove(clip) {
+            texture.destroy();
+        }
+    }
+
+    pub fn picture_bytes(&self) -> f64 {
+        self.textures.values().map(|t| t.width() as f64 * t.height() as f64 * 4.0).sum()
+    }
+
+    pub fn busy(&self) -> bool {
+        self.in_flight.load(Ordering::Relaxed) >= FRAMES_IN_FLIGHT
+    }
+
+    pub fn lost(&self) -> bool {
+        self.lost.load(Ordering::Relaxed)
     }
 
     pub fn put_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
@@ -268,6 +301,11 @@ impl WebCore {
         let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits: self.limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector };
         let frame = self.compositor.frame(&mut painter, &mut self.library, self.camera, now_ms, &mut js_sys::Date::now)?;
         self.pending = frame.pending;
+        self.in_flight.fetch_add(1, Ordering::Relaxed);
+        let done = self.in_flight.clone();
+        self.queue.on_submitted_work_done(move || {
+            done.fetch_sub(1, Ordering::Relaxed);
+        });
         Ok(frame.report())
     }
 

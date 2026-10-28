@@ -17,7 +17,8 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import { EditMode } from '$lib/motion/edit-mode';
   import { Axis, Edge, alignSpace, distributeSpace, propBoxes } from '$lib/motion/space';
-  import { canEditPoints, enterPointEdit } from '$lib/motion/shape/vector-edit';
+  import { canEditPoints, enterPointEdit, landsOn } from '$lib/motion/shape/vector-edit';
+  import type { Pt } from '@feega/motion-core/motion/shape/geometry';
   import { isTyping } from '$lib/motion/shortcuts';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { containFit } from '$lib/canvas/frame-hover';
@@ -56,6 +57,7 @@
   } = $props();
 
   let pointEdit = $state<string | null>(null);
+  let stage = $state<HTMLDivElement | null>(null);
 
   const only = $derived(picks.length === 1 ? (findClip(doc, picks[0])?.clip ?? null) : null);
   const fit = $derived(containFit(size, { width: doc.width, height: doc.height }));
@@ -78,11 +80,8 @@
     ondrawn(id);
   }
 
-  function enter(e: KeyboardEvent) {
-    if (e.key !== 'Enter' || tool !== DrawTool.Select || pointEdit || !only || !canEditPoints(only) || isTyping(e.target as HTMLElement | null)) {
-      return;
-    }
-    const entered = enterPointEdit(doc, only);
+  function editPoints(e: Event, clip: NonNullable<typeof only>) {
+    const entered = enterPointEdit(doc, clip);
     if (!entered.ok) {
       return;
     }
@@ -91,13 +90,34 @@
     if (entered.doc !== doc) {
       edit(entered.doc, 'Edited the shape as a path');
     }
-    pointEdit = only.id;
+    pointEdit = clip.id;
+  }
+
+  const editable = (e: Event) => (tool === DrawTool.Select && !pointEdit && only && canEditPoints(only) && !isTyping(e.target as HTMLElement | null) ? only : null);
+
+  function enter(e: KeyboardEvent) {
+    const clip = e.key === 'Enter' ? editable(e) : null;
+    if (clip) {
+      editPoints(e, clip);
+    }
+  }
+
+  function double(e: MouseEvent) {
+    const clip = editable(e);
+    const rect = stage?.getBoundingClientRect();
+    if (!clip || !rect || rect.width <= 0) {
+      return;
+    }
+    const at: Pt = [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
+    if (landsOn(doc, clip.id, frame, at)) {
+      editPoints(e, clip);
+    }
   }
 </script>
 
-<svelte:window onkeydowncapture={enter} />
+<svelte:window onkeydowncapture={enter} ondblclickcapture={double} />
 
-<div class="stage" data-testid="frame-tools" style={`left:${fit.left}px;top:${fit.top}px;width:${fit.width}px;height:${fit.height}px`}>
+<div class="stage" bind:this={stage} data-testid="frame-tools" style={`left:${fit.left}px;top:${fit.top}px;width:${fit.width}px;height:${fit.height}px`}>
   {#if shown.has(FrameOverlay.Outlines)}<div class="beneath"><OutlineOverlay {doc} {frame} {boxes} /></div>{/if}
   <PixelGridOverlay width={doc.width} height={doc.height} toggle={shows(views, FrameView.PixelGrid) ? GridToggle.On : GridToggle.Off} />
   {#if shown.has(FrameOverlay.Guides)}<LayoutGuidesOverlay {doc} />{/if}

@@ -1,3 +1,4 @@
+import { sourceAssetIdOf } from '$lib/canvas/image-source';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -108,7 +109,7 @@ function refusalOf(source: Awaited<ReturnType<typeof findNode>>): string | null 
   if (source.type !== 'video') {
     return 'source_not_video';
   }
-  return source.data.refId ? null : 'source_empty';
+  return sourceAssetIdOf(source.data) ? null : 'source_empty';
 }
 
 export async function startVideoReframe(db: Db, deps: VideoReframeDeps, input: VideoReframeInput): Promise<VideoReframeStart> {
@@ -118,7 +119,7 @@ export async function startVideoReframe(db: Db, deps: VideoReframeDeps, input: V
     return { ok: false, error: refusal ?? 'node_not_found' };
   }
 
-  const video = await deps.readVideo(db, { orgId: input.orgId, assetId: String(source.data.refId) });
+  const video = await deps.readVideo(db, { orgId: input.orgId, assetId: sourceAssetIdOf(source.data)! });
   if (!video) {
     return { ok: false, error: 'source_unreadable' };
   }

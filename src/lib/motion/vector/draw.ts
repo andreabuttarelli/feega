@@ -1,3 +1,4 @@
+import { Mirror } from '$lib/motion/shape/pen';
 import { mirrorHandle, oppositeHandle, Tangent } from './edit';
 import { Mirroring, Winding, ZERO, type Vector, type VectorNetwork } from '@feega/motion-core/motion/vector/model';
 import { strokeRuns } from '@feega/motion-core/motion/vector/path-sink';
@@ -29,8 +30,12 @@ export function moveVertex(network: VectorNetwork, vertex: number, by: Vector): 
 
 const vertexOf = (network: VectorNetwork, segment: number, tangent: Tangent) => (tangent === Tangent.Start ? network.segments[segment].start : network.segments[segment].end);
 
-export function setTangent(network: VectorNetwork, segment: number, tangent: Tangent, value: Vector): VectorNetwork {
+export function setTangent(network: VectorNetwork, segment: number, tangent: Tangent, value: Vector, mirror = Mirror.Mirrored): VectorNetwork {
   const vertex = vertexOf(network, segment, tangent);
+  if (mirror === Mirror.Broken) {
+    const vertices = network.vertices.map((v, i) => (i === vertex ? { ...v, mirroring: Mirroring.None } : v));
+    return setTangent({ ...network, vertices }, segment, tangent, value);
+  }
   const opposite = oppositeHandle(network, vertex, segment);
   const mode = network.vertices[vertex].mirroring ?? Mirroring.None;
   const mirrored = opposite ? mirrorHandle(value, mode, Math.hypot(network.segments[opposite.segmentIndex][opposite.tangent].x, network.segments[opposite.segmentIndex][opposite.tangent].y)) : null;

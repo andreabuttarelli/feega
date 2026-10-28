@@ -1,4 +1,4 @@
-import { fontStack, loadedWeight, type FontFace } from '../../fonts/model';
+import { BuiltinFont, fontStack, loadedWeight, type FontFace } from '../../fonts/model';
 import type { Face, FaceBook, Request, Resolved } from './face';
 
 export type FaceRule = { family: string; italic: boolean; weight: [number, number]; url: string; ranges: [number, number][] };
@@ -92,7 +92,7 @@ export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string
 
   return (request, codePoint): Resolved | null => {
     const { family, weight: desired } = resolvedRequest(request, registry);
-    const found = [family, ...SYMBOL_FALLBACKS].reduce<ReturnType<typeof ruleFor>>((hit, f) => hit ?? ruleFor(f, request, desired, codePoint), null);
+    const found = [family, familyName(BuiltinFont.Sans, registry), ...SYMBOL_FALLBACKS].reduce<ReturnType<typeof ruleFor>>((hit, f) => hit ?? ruleFor(f, request, desired, codePoint), null);
     if (!found) {
       return null;
     }

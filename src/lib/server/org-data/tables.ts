@@ -21,6 +21,8 @@ export const ORG_TABLES = [
   'ai_calls',
   'api_keys',
   'assets',
+  'brand_fonts',
+  'brand_pins',
   'brands',
   'canvas_events',
   'canvases',

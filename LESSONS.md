@@ -3387,6 +3387,9 @@ Signal: `frameLocator(...).click()` on a link in a code frame passes, but nothin
 ## A link `#/page` in a srcdoc iframe blanks the frame
 Signal: clicking `<a href="#/pricing">` in a code frame leaves an empty page at `about:blank#/pricing`. Cause: srcdoc documents resolve relative URLs against the parent's base, so the hash link is a cross-document navigation. Move: `<base href="about:srcdoc">` in the srcdoc head. `new URL('/x', location.href)` still throws there, so react-router's HashRouter/BrowserRouter cannot work: use MemoryRouter.
 
+## A video exports on HTML although gpu-core is wired
+**Signal:** the export finishes, `data-export-engine="html"` on `[data-testid=motion-preview]`, no error. **Move:** `MotionPreview.render` takes the core path only when it is handed a scene (`fullDoc`, or the 8th argument) and `prefer` is a core engine; a caller that passes a bare `render` gets HTML silently. Read the attribute after one real export before reporting a surface as moved. Videos with line/vector shapes, motion blur or 3D devices fall back by design (`coreExportable`).
+
 ## Landing
 
 ### A below-the-fold image collage costs Lighthouse mobile points even with `loading="lazy"`
@@ -3409,3 +3412,27 @@ Signal: clicking `<a href="#/pricing">` in a code frame leaves an empty page at 
 ## Worktree tests resolve @feega/* from the main checkout
 
 Signal: a test of code under `packages/` hangs or ignores your edit in a worktree whose `node_modules` is a symlink; `svelte-check` says the new module does not exist. Cause: `node_modules/@feega/*` are relative symlinks, resolved from the real path, so they point at the main checkout. Move: a scratch vitest config that merges `vite.config.ts` and aliases `@feega/motion-core/(.*)` to `packages/motion-core/src/$1` (and a scratch tsconfig with the same `paths` plus `$lib`); do not commit them.
+
+## A mask's polarity belongs to the model, and green tests don't know it
+
+Signal: inpaint keeps the painted area and regenerates the rest; reframe returns the grey padding untouched. Cause: `kie/ideogram/v3-edit` repaints BLACK and keeps white, while the mask builder painted the area to change white; a fake model accepts either. Move: the convention lives in one table next to the model (`MASK_PAINT` in `src/lib/image-tools.ts`), and a new model with a mask is verified with one real generation before the row is trusted. A provider that answers `internal error` with a request body that matches its docs is down, not misused: capture the body first, then swap the model in one row.
+
+## GPU memory on the web is freed by GC, not by Rust's drop
+
+**Signal:** a WebGPU page that runs smoothly and then gets killed on iPhone; on desktop the GPU memory "leaks" but never crashes. Counting `GPUDevice.createTexture` minus `GPUTexture.destroy` shows thousands of live textures (24 GB after 5 min on the heavy canvas). **Move:** wgpu's WebGPU backend makes `Drop` a no-op for textures and buffers; the memory goes only when JS GC collects the wrapper, and Safari's GC does not see GPU pressure. Call `texture.destroy()` / `buffer.destroy()` (after the last submit that uses it) for every short-lived GPU resource. `scripts/perf/mobile-memory.ts` counts them.
+
+## Desktop native canvas
+
+### A render thread that reads the camera, then waits for a drawable, shows a stale frame
+
+**Signal:** native pan intervals at 32 ms while the thread is idle; `get_current_texture` takes ~14 ms per frame. **Move:** acquire the drawable first, then drain the inbox for the latest camera, then paint (`worker.rs`). A timed-out or occluded surface is a skipped frame, never an error: the spike's `?` ended the thread and the canvas froze.
+
+### The bench cannot tell native from wasm on a 60 Hz display
+
+**Signal:** both engines read 57-60 fps. **Move:** compare late-frame percentages and CPU, and say which display refresh the run had; the spike's 120 Hz numbers do not carry over. `screencapture` and `capturePage` do not see the Metal layer: read the retained texture back with the addon `snapshot` (needs `FEEGA_NATIVE_DEBUG=1`).
+
+### Un valore letto da una `Map` non reattiva resta quello del primo render
+Segnale: l'etichetta della modalità (Design/Motion) non cambia al clic e le modifiche si comportano diversamente da ciò che dice. Causa: `savers.get(id)?.mode` in un template, con `savers` una `Map` semplice. Mossa: uno `$state` che riceve le notifiche della sessione, mai la mappa nel template.
+
+### 431 on localhost: cookies are shared across ports and per-ref names accumulate
+Segnale: `localhost:5173` risponde "431 Request Header Fields Too Large" nel profilo normale, non in incognito. Causa: `sb-<ref>-auth-token.N` ha un nome diverso per ogni progetto Supabase, e i cookie di `localhost` valgono per tutte le porte. Mossa: il server cancella i cookie di sessione di altri ref (`stale-session-cookies.ts`); per sbloccarsi a mano, cancella i cookie di localhost.

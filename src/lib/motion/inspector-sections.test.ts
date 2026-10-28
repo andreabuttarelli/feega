@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClipFamily } from './track-style';
-import { Part, SECTION_ORDER, SECTION_TITLE, emptyManaged, optionLabel, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection } from './inspector-sections';
+import { Part, SECTION_ORDER, SECTION_TITLE, emptyManaged, optionLabel, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection, TextTier, textTier } from './inspector-sections';
 import { Control, Group } from '@feega/motion-core/motion/components';
 import { FieldFill } from './number-field';
 import { Source } from '@feega/motion-core/motion/keyframes';
@@ -95,7 +95,7 @@ describe('inspector sections', () => {
     expect(fieldSection(field('size', Control.Range, Group.Style), Typed.Yes)).toBe(Section.Text);
     expect(fieldSection(field('align', Control.Select, Group.Layout), Typed.Yes)).toBe(Section.Text);
     expect(fieldSection(field('align', Control.Select, Group.Layout), Typed.No)).toBe(Section.Text);
-    expect(fieldSection(field('color', Control.Color, Group.Style), Typed.Yes)).toBe(Section.Fill);
+    expect(fieldSection(field('color', Control.Color, Group.Style), Typed.Yes)).toBe(Section.Text);
     expect(fieldSection(field('paper', Control.Color, Group.Style), Typed.No)).toBe(Section.Fill);
     expect(fieldSection(field('strokeWidth', Control.Range, Group.Style), Typed.No)).toBe(Section.Stroke);
     expect(fieldSection(field('corners', Control.Corners, Group.Content), Typed.No)).toBe(Section.Layer);
@@ -123,5 +123,43 @@ describe('inspector sections', () => {
     expect(emptyManaged(Control.Managed, [])).toBe(true);
     expect(emptyManaged(Control.Managed, [1])).toBe(false);
     expect(emptyManaged(Control.Text, [])).toBe(false);
+  });
+
+  describe('text tiers', () => {
+    it('keeps the everyday type controls primary', () => {
+      for (const key of ['font', 'weight', 'size', 'leading', 'tracking', 'align', 'verticalAlign', 'italic', 'decoration', 'textCase']) {
+        expect(textTier(key, 'none')).toBe(TextTier.Primary);
+      }
+    });
+
+    it('folds axes, paragraph, features and overrides into advanced', () => {
+      for (const key of ['stretch', 'slant', 'axes', 'maxLines', 'paragraphSpacing', 'paragraphIndent', 'features']) {
+        expect(textTier(key, 'none')).toBe(TextTier.Advanced);
+      }
+    });
+
+    it('shows decoration details only while a line is drawn', () => {
+      for (const key of ['decorationStyle', 'decorationThickness', 'decorationOffset', 'decorationColor', 'skipInk']) {
+        expect(textTier(key, 'none')).toBe(TextTier.Hidden);
+        expect(textTier(key, 'underline')).toBe(TextTier.Advanced);
+        expect(textTier(key, 'strikethrough')).toBe(TextTier.Advanced);
+      }
+    });
+
+    it('hides the string overrides from the UI', () => {
+      expect(textTier('lineHeight', 'none')).toBe(TextTier.Hidden);
+      expect(textTier('letterSpacing', 'none')).toBe(TextTier.Hidden);
+    });
+
+    it('moves colour into text for typed elements and leaves it in fill otherwise', () => {
+      const colour = { key: 'color', control: Control.Color, group: Group.Style };
+      expect(fieldSection(colour, Typed.Yes)).toBe(Section.Text);
+      expect(fieldSection(colour, Typed.No)).toBe(Section.Fill);
+      expect(textTier('color', 'none')).toBe(TextTier.Primary);
+      const fills = { key: 'fills', control: Control.Fills, group: Group.Style };
+      expect(fieldSection(fills, Typed.Yes)).toBe(Section.Text);
+      expect(fieldSection(fills, Typed.No)).toBe(Section.Fill);
+      expect(textTier('fills', 'none')).toBe(TextTier.Primary);
+    });
   });
 });

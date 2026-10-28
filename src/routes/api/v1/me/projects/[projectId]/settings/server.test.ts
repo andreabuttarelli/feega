@@ -44,6 +44,7 @@ const ROUTES: Record<SettingsSection, () => Promise<{ load?: (e: never) => unkno
   [SettingsSection.Danger]: () => import('$lib/server/settings/pages/danger'),
   [SettingsSection.Products]: () => import('$lib/server/settings/pages/products'),
   [SettingsSection.Models]: () => import('$lib/server/settings/pages/models'),
+  [SettingsSection.Fonts]: () => import('$lib/server/settings/pages/fonts'),
   [SettingsSection.Spend]: () => import('$lib/server/settings/pages/spend')
 };
 const shellApi = await import('./+server');
@@ -133,6 +134,12 @@ const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
   [SettingsSection.Brand, 'update', { name: '' }],
   [SettingsSection.Brand, 'removeLogo', {}],
   [SettingsSection.Brand, 'uploadLogo', {}],
+  [SettingsSection.Brand, 'saveKit', { palette: '#111111 Ink', tone: 'Warm' }],
+  [SettingsSection.Brand, 'saveKit', { palette: 'blue' }],
+  [SettingsSection.Brand, 'saveFonts', { font_heading: 'Inter' }],
+  [SettingsSection.Brand, 'uploadLogoVariant', { variant: 'dark' }],
+  [SettingsSection.Brand, 'removeLogoVariant', { variant: 'dark' }],
+  [SettingsSection.Brand, 'toggleApproved', { assetId: 'a1', approved: 'true' }],
   [SettingsSection.Brand, 'selectBrand', { brandId: 'b2' }],
   [SettingsSection.Brand, 'selectBrand', { brandId: '' }],
   [SettingsSection.Brand, 'createBrand', { name: '' }],

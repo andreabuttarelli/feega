@@ -14,9 +14,9 @@
   import { compOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { ClipEdge, duplicateKeyframes, moveClip, moveKeyframes, moveTrack, removeKeyframes, setKeyEase, setKeyInterp, setKeyframe, setLaneMuted, trimClip, type KeyRef, type OpResult } from '@feega/motion-core/motion/timeline';
   import { withParams } from '@feega/motion-core/motion/custom/params';
-  import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
+  import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped, WorkEdge } from '$lib/motion/timeline-view';
   import { Axis, lockAxis, pinchView, type PinchStart } from '$lib/motion/timeline-touch';
-  import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rowWindow, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
+  import { KeyGlyph, KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rowWindow, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
   import { MASK_KINDS, Matte } from '@feega/motion-core/motion/mask';
   import type { MotionTrack } from '@feega/motion-core/motion/doc';
   import { Interp, Source, type EaseSpec, type Keyframe } from '@feega/motion-core/motion/keyframes';
@@ -31,7 +31,7 @@
   import EasePicker from './EasePicker.svelte';
   import { marqueeHits, relatedSelection } from '$lib/motion/timeline-select';
   import { isTypingTarget } from '$lib/shortcuts';
-  import { allMarkers, isLocked, setClipFlags, setTrackFlags, shownTracks } from '@feega/motion-core/motion/organize';
+  import { allMarkers, isLocked, loopRange, setClipFlags, setTrackFlags, setWorkArea, shownTracks } from '@feega/motion-core/motion/organize';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
   import { FadeEdge, dragFade, fadeHandles } from '$lib/motion/fade-handles';
 
@@ -340,6 +340,39 @@
     const result = mark === KeyMark.Here ? removeKeyframes(doc, owner.id, prop, [local]) : setKeyframe(doc, owner.id, prop, local, value ?? 0);
     if (result.ok) {
       onchange(result.doc, 'Toggled a keyframe');
+    }
+  }
+
+  let areaDraft = $state<{ from: number; to: number } | null>(null);
+  let edge: WorkEdge | null = null;
+  const area = $derived(areaDraft ?? loopRange(shown));
+
+  function grabEdge(e: PointerEvent, grabbed: WorkEdge) {
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    edge = grabbed;
+    areaDraft = loopRange(doc);
+  }
+
+  function dragEdge(e: PointerEvent) {
+    if (!edge || !areaDraft) {
+      return;
+    }
+    const at = Math.min(Math.max(0, frameOfPointer(e)), doc.durationInFrames);
+    areaDraft = edge === WorkEdge.In ? { ...areaDraft, from: Math.min(at, areaDraft.to - 1) } : { ...areaDraft, to: Math.max(at, areaDraft.from + 1) };
+  }
+
+  function dropEdge() {
+    const dropped = areaDraft;
+    edge = null;
+    areaDraft = null;
+    if (!dropped) {
+      return;
+    }
+    const whole = dropped.from === 0 && dropped.to === doc.durationInFrames;
+    const result = setWorkArea(doc, whole ? null : dropped);
+    if (result.ok) {
+      onchange(result.doc, 'Set the loop region');
     }
   }
 
@@ -742,6 +775,18 @@
 
 <svelte:window onpointermove={onMove} onpointerup={onUp} onkeydowncapture={onKeys} />
 
+{#snippet glyphShape(glyph: KeyGlyph)}
+  {#if glyph === KeyGlyph.Circle}
+    <circle cx="5" cy="5" r="4" />
+  {:else if glyph === KeyGlyph.Square}
+    <rect x="1" y="1" width="8" height="8" />
+  {:else if glyph === KeyGlyph.Hourglass}
+    <polygon points="1,1 9,1 5,5 9,9 1,9 5,5" />
+  {:else}
+    <polygon points="5,0.75 9.25,5 5,9.25 0.75,5" />
+  {/if}
+{/snippet}
+
 {#snippet propRow(owner: KeyOwner, lane: PropLane, rowId: string)}
   {@const keys = owner.keyframes[lane.prop] ?? []}
   {@const mark = keyMark(keys, frame - owner.from)}
@@ -776,6 +821,7 @@
       {/each}
       {#each keys as key (key.frame)}
         {@const ref = { clipId: owner.id, prop: lane.prop, frame: key.frame }}
+        {@const glyphs = keyGlyph(key)}
         <div
           class="key"
           class:picked={keySelection.some((k) => sameKey(k, ref))}
@@ -788,10 +834,12 @@
           data-key-prop={lane.prop}
           data-key-local={key.frame}
           data-interp={key.out ?? Interp.Bezier}
-          data-glyph={keyGlyph(key)}
           style={`left: ${(owner.from + key.frame) * ppf}px;`}
           onpointerdown={(e) => startKey(e, owner, ref)}
-        ></div>
+        >
+          <svg class="half left" viewBox="0 0 10 10" data-glyph={glyphs.left} aria-hidden="true">{@render glyphShape(glyphs.left)}</svg>
+          <svg class="half right" viewBox="0 0 10 10" data-glyph={glyphs.right} aria-hidden="true">{@render glyphShape(glyphs.right)}</svg>
+        </div>
       {/each}
     </div>
   </div>
@@ -809,9 +857,11 @@
           {#if mark.label}<em>{mark.label}</em>{/if}
         </span>
       {/each}
-      {#if shown.workArea}
-        <span class="work-area" data-testid="work-area" style={`left: ${headPx + shown.workArea.from * ppf}px; width: ${(shown.workArea.to - shown.workArea.from) * ppf}px;`}></span>
-      {/if}
+      <span class="work-area" class:whole={!shown.workArea && !areaDraft} data-testid="work-area" style={`left: ${headPx + area.from * ppf}px; width: ${(area.to - area.from) * ppf}px;`}>
+        {#each [WorkEdge.In, WorkEdge.Out] as side (side)}
+          <button type="button" class={`work-edge ${side}`} data-testid={`work-area-${side}`} aria-label={side === WorkEdge.In ? 'Loop starts here: drag' : 'Loop ends here: drag'} onpointerdown={(e) => grabEdge(e, side)} onpointermove={dragEdge} onpointerup={dropEdge} onpointercancel={dropEdge}></button>
+        {/each}
+      </span>
       {#each cached as run (run.from)}
         <span class="ram-cache" data-testid="ram-cache" style={`left: ${headPx + run.from * ppf}px; width: ${(run.to - run.from) * ppf}px;`}></span>
       {/each}
@@ -1119,11 +1169,34 @@
   .work-area {
     position: absolute;
     top: 0;
-    height: 4px;
+    height: 6px;
     background: color-mix(in srgb, var(--ui-accent) 50%, transparent);
-    border-left: 2px solid var(--ui-accent);
-    border-right: 2px solid var(--ui-accent);
     pointer-events: none;
+  }
+
+  .work-area.whole {
+    background: color-mix(in srgb, var(--ui-accent) 15%, transparent);
+  }
+
+  .work-edge {
+    position: absolute;
+    top: 0;
+    width: 8px;
+    height: 14px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-xs);
+    background: var(--ui-accent);
+    cursor: ew-resize;
+    pointer-events: auto;
+  }
+
+  .work-edge.in {
+    left: -4px;
+  }
+
+  .work-edge.out {
+    right: -4px;
   }
 
   .marker {
@@ -1676,31 +1749,40 @@
   .key {
     position: absolute;
     top: 50%;
-    width: 9px;
-    height: 9px;
-    margin: -4.5px 0 0 -4.5px;
-    transform: rotate(45deg);
-    background: var(--ui-bg);
-    border: 1.5px solid var(--ui-ink-2);
+    width: 11px;
+    height: 11px;
+    margin: -5.5px 0 0 -5.5px;
+    color: var(--ui-ink-2);
     cursor: grab;
     z-index: 1;
   }
 
-  .key[data-glyph='square'] {
-    transform: none;
+  .key .half {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    fill: var(--ui-bg);
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    overflow: visible;
   }
 
-  .key[data-glyph='circle'] {
-    transform: none;
-    clip-path: circle(50%);
+  .key .half.left {
+    clip-path: inset(-2px 50% -2px -2px);
   }
 
-  .key.roving {
-    border-style: dashed;
+  .key .half.right {
+    clip-path: inset(-2px -2px -2px 50%);
+  }
+
+  .key.roving .half {
+    stroke-dasharray: 2 1.5;
   }
 
   .key:hover {
-    border-color: var(--ui-accent);
+    color: var(--ui-accent);
   }
 
   .marquee {
@@ -1716,8 +1798,11 @@
   }
 
   .key.picked {
-    background: var(--ui-accent);
-    border-color: var(--ui-accent);
+    color: var(--ui-accent);
+  }
+
+  .key.picked .half {
+    fill: var(--ui-accent);
   }
 
   .empty-drop {

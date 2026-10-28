@@ -84,3 +84,11 @@ describe('rich typography', () => {
     expect(compose(doc())).toMatch(/__fontsReady=.*then\(function\(\)\{return document\.fonts\.ready;\}\)\.then\(FIT_TEXT\)/s);
   });
 });
+
+describe('text size', () => {
+  it('has no ceiling a small box could hit: a size of three frame heights is accepted', () => {
+    const text = ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 60 }, 'text'));
+
+    expect(setProps(text, 'text', { size: 3 }).ok).toBe(true);
+  });
+});

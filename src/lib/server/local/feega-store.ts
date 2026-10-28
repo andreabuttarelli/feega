@@ -4,6 +4,8 @@ import { basename } from 'node:path';
 import type { Db } from '$lib/server/db/client';
 import { FEEGA_EXTENSION, FEEGA_REFUSAL_MESSAGE, FEEGA_VERSION, idsIn, packFeega, unpackFeega, type FeegaBlobs, type FeegaCanvas, type FeegaFile } from '$lib/canvas/feega-file';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
+import { FONT_MIME_TYPES, fontFileOf } from '$lib/motion/fonts/library';
+import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
 import { createMemoryDb, type Blobs, type Change, type Row, type Tables } from './memory-db';
 
 import { LOCAL_ORG_ID, LOCAL_USER, LOCAL_USER_ID } from '$lib/local-user';
@@ -62,13 +64,16 @@ function seed(file: FeegaFile, blobs: FeegaBlobs): { tables: Tables; storage: Bl
   const prefix = canvasUploadPrefix(LOCAL_ORG_ID, place.projectId);
   const storage: Blobs = new Map();
 
+  const fontPrefix = orgFontPrefix(LOCAL_ORG_ID);
   const assets = file.canvas.assets.map((a) => {
     const blob = a.file ? blobs.get(a.file) : undefined;
-    const path = blob && a.file ? (a.file.startsWith(`${ASSET_DIR}${prefix}`) ? a.file.slice(ASSET_DIR.length) : `${prefix}${a.file.split('/').pop()}`) : null;
+    const font = isFont(a.mimeType);
+    const kept = font ? `${ASSET_DIR}${fontPrefix}` : `${ASSET_DIR}${prefix}`;
+    const path = blob && a.file ? (a.file.startsWith(kept) ? a.file.slice(ASSET_DIR.length) : `${font ? fontPrefix : prefix}${a.file.split('/').pop()}`) : null;
     if (blob && path) {
       storage.set(`${ASSET_BUCKET}/${path}`, { bytes: blob, contentType: a.mimeType ?? 'application/octet-stream' });
     }
-    return { ...org, id: a.id, project_id: place.projectId, type: a.type, source: blob ? 'upload' : 'imported', url: path ?? a.url, content: a.content, mime_type: a.mimeType, width: a.width, height: a.height, duration_s: a.durationS, bytes: blob?.byteLength ?? null, created_at: at };
+    return { ...org, id: a.id, project_id: font ? null : place.projectId, type: a.type, source: blob ? 'upload' : 'imported', url: path ?? a.url, content: a.content, mime_type: a.mimeType, width: a.width, height: a.height, duration_s: a.durationS, bytes: blob?.byteLength ?? null, created_at: at };
   });
 
   const tables: Tables = new Map<string, Row[]>([
@@ -80,9 +85,17 @@ function seed(file: FeegaFile, blobs: FeegaBlobs): { tables: Tables; storage: Bl
     ['nodes', file.canvas.nodes.map((n) => ({ ...org, id: n.id, project_id: place.projectId, canvas_id: place.canvasId, type: n.type, display_name: n.displayName, x: n.position.x, y: n.position.y, z: n.position.z, width: n.size.width, height: n.size.height, data: n.data, version: 1, deleted_at: null, created_at: at, updated_at: at }))],
     ['nodes_connections', file.canvas.connections.map((c) => ({ ...org, id: c.id, canvas_id: place.canvasId, source_node_id: c.sourceNodeId, target_node_id: c.targetNodeId, source_handle: c.sourceHandle, target_handle: c.targetHandle, mode: c.mode, deleted_at: null, created_at: at }))],
     ['motion_revisions', Object.entries(file.canvas.heads).map(([nodeId, head]) => ({ ...org, id: crypto.randomUUID(), node_id: nodeId, version: head.version, doc: head.doc, summary: null, actor_kind: 'user', actor_id: LOCAL_USER_ID, agent_key: null, sealed: true, created_at: at }))],
-    ['assets', assets]
+    ['assets', assets],
+    ['org_fonts', assets.filter((a) => isFont(a.mime_type) && a.url).map((a) => orgFontRow(a, at))]
   ]);
   return { tables, storage, place };
+}
+
+const isFont = (mimeType: unknown) => FONT_MIME_TYPES.includes(String(mimeType));
+
+function orgFontRow(asset: Row, at: string): Row {
+  const face = fontFileOf({ id: String(asset.id), url: (asset.url as string | null) ?? null, content: (asset.content as string | null) ?? null });
+  return { org_id: LOCAL_ORG_ID, id: face.assetId, family: face.family, weight: face.weight, style: face.italic ? 'italic' : 'normal', path: asset.url, uploaded_by: LOCAL_USER_ID, created_at: at };
 }
 
 const live = (row: Row) => row.deleted_at === null || row.deleted_at === undefined;
@@ -110,7 +123,7 @@ function snapshot(tables: Tables, storage: Blobs, place: LocalPlace): Uint8Array
 
   const referenced = new Set(idsIn(body));
   const blobs: FeegaBlobs = new Map();
-  const assets = rows('assets').filter((a) => referenced.has(String(a.id).toLowerCase())).map((a) => {
+  const assets = rows('assets').filter((a) => referenced.has(String(a.id).toLowerCase()) || isFont(a.mime_type)).map((a) => {
     const url = (a.url as string | null) ?? null;
     const blob = url && !ABSOLUTE_URL.test(url) ? BUCKETS.map((b) => storage.get(`${b}/${url}`)).find(Boolean) : undefined;
     const file = blob && url ? assetFileName(url) : null;

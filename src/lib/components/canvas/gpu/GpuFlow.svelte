@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ownsPress } from '$lib/canvas/press-owner';
   import { cardRadiusOf } from '$lib/canvas/core/gen-card';
   import { LocalOff, isOff } from '$lib/local-user';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
@@ -26,6 +27,7 @@
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
+  import { flipRulers, rulersPref } from '$lib/canvas/rulers-pref.svelte';
   import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from '$lib/canvas/frame-view';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -85,7 +87,7 @@
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
-  import { EditMode, recalledMode, rememberMode, startMode } from '$lib/motion/edit-mode';
+  import { EditMode, recalledMode, rememberMode, shownMode, startMode } from '$lib/motion/edit-mode';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
   import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
   import FrameTimeline from '../FrameTimeline.svelte';
@@ -117,6 +119,7 @@
   import { editableIds } from '$lib/canvas/frame-live';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { elementGlyph } from '$lib/canvas/layers';
+  import { imageSourceTile } from '$lib/canvas/free-image';
   import { frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
@@ -149,6 +152,7 @@
   import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
+  import { CANVAS_DRAG_FEED_IMAGE, parseFeedImageDrag } from '$lib/canvas/feed-image';
   import { isAddable, type Addable } from '$lib/canvas/addable';
   import { edgeKindsFor } from '$lib/canvas/connect-rules';
   import { connectionRefusal, landingOf, type Connection } from '$lib/canvas/connection-verdict';
@@ -160,7 +164,7 @@
   import { STACK_GAP, alignTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
-  import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
+  import { snapDrag, snapResize, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
 
   import { dragOffset } from '$lib/canvas/duplicate-plan';
   import { enterSelected } from '$lib/canvas/enter-frame';
@@ -198,7 +202,7 @@
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -286,11 +290,11 @@
   const tierUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, tier);
 
   let turning = $state<{ id: string; degrees: number } | null>(null);
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning?.id === t.id ? { rotation: turning.degrees } : {}) })));
+  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning?.id === t.id ? { rotation: turning.degrees } : {}) }, liveOf(t.id)?.doc ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
-  const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
+  const nodeOf = $derived(new Map(placed.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
   let sticky = $state(new Map<string, number>());
@@ -761,7 +765,7 @@
   function onClickInside(e: MouseEvent) {
     const target = e.target as HTMLElement;
     const id = target.closest<HTMLElement>('.gpu-dom-node')?.dataset.id;
-    if (!id || !target.closest(INTERACTIVE) || !spec.flow.elementsSelectable || selected.includes(id)) {
+    if (!id || !ownsPress(target, e.clientY) || !spec.flow.elementsSelectable || selected.includes(id)) {
       return;
     }
     clickNode(id, e.shiftKey || e.metaKey || e.ctrlKey);
@@ -1130,6 +1134,7 @@
   });
 
   const modeStore = () => (typeof localStorage === 'undefined' ? null : localStorage);
+  let toggledModes = $state.raw<Partial<Record<string, EditMode>>>({});
 
   function saverOf(nodeId: string) {
     const held = savers.get(nodeId);
@@ -1144,7 +1149,10 @@
       {
         viewPath: () => [],
         playhead: () => frameOfLive(liveOf(nodeId) ?? live),
-        moded: (mode) => rememberMode(modeStore(), mode),
+        moded: (mode) => {
+          rememberMode(modeStore(), mode);
+          toggledModes = { ...toggledModes, [nodeId]: mode };
+        },
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
         recorded: () => autosize(nodeId),
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
@@ -1855,7 +1863,7 @@
       goInside(hit.nodeId, Gesture.Click, null);
     }
     const inDom = target.closest('.gpu-dom-node');
-    if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && hit.kind !== HitKind.Rotate && target.closest(INTERACTIVE)) {
+    if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && hit.kind !== HitKind.Rotate && ownsPress(target, e.clientY)) {
       return;
     }
     if (e.button === 2 && hit.kind !== HitKind.Empty) {
@@ -2020,7 +2028,8 @@
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
-        const box = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
+        const free = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
+        const box = snapResized(a, free, e.shiftKey, e.altKey);
         overrides = new Map([[a.id, box]]);
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
       },
@@ -2045,7 +2054,7 @@
           return;
         }
         const c = candidate(a.from, w);
-        const why = c ? connectionRefusal(tiles, edges, lookup, c) : '';
+        const why = c ? connectionRefusal(placed, edges, lookup, c) : '';
         refusal = why || null;
         ghost = { from: a.from, at: w, ok: c !== null && why === null };
       },
@@ -2104,6 +2113,7 @@
           return;
         }
         props.onLive?.([]);
+        snapGuides = [];
         const box = overrides.get(a.id);
         if (box && (box.x !== a.box.x || box.y !== a.box.y)) {
           props.onMove?.(a.id, box.x, box.y);
@@ -2132,10 +2142,10 @@
         const c = candidate(a.from, w);
         ghost = null;
         refusal = null;
-        if (!c || connectionRefusal(tiles, edges, lookup, c) !== null) {
+        if (!c || connectionRefusal(placed, edges, lookup, c) !== null) {
           return;
         }
-        const landing = landingOf(tiles, lookup, c);
+        const landing = landingOf(placed, lookup, c);
         if (landing) {
           props.onConnect?.(landing.source, landing.target, landing.kind, landing.targetHandle, landing.sourceHandle);
         }
@@ -2291,6 +2301,17 @@
     snapSpacing = snap.spacing;
     const at = new Map(snap.moves.map((m) => [m.id, m]));
     return raw.map((m) => at.get(m.id) ?? m);
+  }
+
+  function snapResized(a: Extract<Active, { kind: GestureKind.Resize }>, free: Box, locked: boolean, symmetric: boolean): Box {
+    snapGuides = [];
+    if (a.rotation || symmetric) {
+      return free;
+    }
+    const others = tiles.filter((t) => t.id !== a.id).map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
+    const snap = snapResize(free, a.unit, others, SNAP_SCREEN_PX / view.zoom, locked);
+    snapGuides = snap.guides;
+    return snap.box.w < a.min.w || snap.box.h < a.min.h ? free : snap.box;
   }
 
   const measured = $derived.by(() => {
@@ -2455,7 +2476,9 @@
     'send-back': () => props.onRestack?.(selected, Stack.Back),
     help: () => (shortcutHelp.open = true),
     view: (c) => {
-      if (c.id === 'view') {
+      if (c.id === 'view' && c.view === FrameView.Rulers) {
+        flipRulers();
+      } else if (c.id === 'view') {
         frameViews = flipView(frameViews, c.view);
       }
     }
@@ -2578,7 +2601,6 @@
     [Pasted.Figma]: ({ html }) => ({ figma: html })
   };
   const PASTED_SUMMARY = 'Pasted';
-  const FIGMA_SKIPPED = 'Pasted from Figma. Approximated or skipped:';
 
   function pasteInFrame(data: PasteData<File>, at: Point): boolean {
     const paste = (IN_FRAME[data.kind] as ((d: PasteData<File>) => FramePaste) | undefined)?.(data);
@@ -2597,7 +2619,8 @@
     select([hit.nodeId]);
     commit(hit.nodeId, { ok: true, doc: done.doc }, PASTED_SUMMARY);
     pickMany(hit.nodeId, done.selection);
-    refusal = done.skipped?.length ? `${FIGMA_SKIPPED} ${done.skipped.join('; ')}` : null;
+    refusal = null;
+    props.onFigmaPaste?.({ skipped: done.skipped ?? [], images: done.images?.length ?? 0, loading: Boolean(done.images?.length && done.fileKey) });
     if (done.images?.length && done.fileKey) {
       void fillFigmaImages({ nodeId: hit.nodeId, fileKey: done.fileKey, images: done.images });
     }
@@ -2783,11 +2806,20 @@
 
   function onDragOver(e: DragEvent) {
     const types = e.dataTransfer?.types ?? [];
-    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, CANVAS_DRAG_COMPONENT, OS_FILES].some((type) => types.includes(type))) {
+    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, CANVAS_DRAG_COMPONENT, CANVAS_DRAG_FEED_IMAGE, OS_FILES].some((type) => types.includes(type))) {
       return;
     }
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'copy';
+    if (types.includes(CANVAS_DRAG_FEED_IMAGE)) {
+      props.onFeedImageOver?.({ x: e.clientX, y: e.clientY });
+    }
+  }
+
+  function onDragLeave(e: DragEvent) {
+    if (!wrap?.contains(e.relatedTarget as Node | null)) {
+      props.onFeedImageOver?.(null);
+    }
   }
 
   function dropComponent(dragged: ComponentDrag, world: Point) {
@@ -2808,6 +2840,12 @@
     if (files.length && props.onUpload) {
       e.preventDefault();
       files.forEach((file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? toFlow(at) : undefined));
+      return;
+    }
+    const feedImage = parseFeedImageDrag(e.dataTransfer?.getData(CANVAS_DRAG_FEED_IMAGE) ?? '');
+    if (feedImage) {
+      e.preventDefault();
+      props.onDropFeedImage?.(feedImage, at);
       return;
     }
     const output = e.dataTransfer?.getData(CANVAS_DRAG_OUTPUT);
@@ -2876,7 +2914,7 @@
 }} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} onpointermove={(e) => (pointer = { x: e.clientX, y: e.clientY })} oncopy={(e) => onCopy(e, false)} oncut={(e) => onCopy(e, true)} onpaste={onPasteEvent} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondragleave={onDragLeave} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
   {#if timeline}
     {@const nodeId = timeline.nodeId}
     <div style="display: contents" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
@@ -2884,7 +2922,7 @@
         doc={timeline.doc}
         frame={timeline.frame}
         selection={picks.length > 1 ? picks : inside?.level.clip ? [inside.level.clip] : []}
-        mode={savers.get(nodeId)?.mode}
+        mode={shownMode(toggledModes, nodeId, timeline.doc, recalledMode(modeStore()))}
         onmode={() => savers.get(nodeId)?.toggleMode()}
         onframe={(f) => scrubTo(nodeId, f)}
         onselect={(ids) => (ids.length > 1 ? pickMany(nodeId, ids) : goInside(nodeId, Gesture.Click, ids[0] ?? null))}
@@ -2893,6 +2931,7 @@
         onmark={(id) => props.onMark?.(id)}
         ram={ramNode === nodeId ? ramRuns : []}
         onram={() => cacheRam(nodeId, timeline!.doc)}
+        {assetUrl}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
       />
@@ -2959,7 +2998,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} views={{ ...frameViews, [FrameView.Rulers]: rulersPref.on }} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}

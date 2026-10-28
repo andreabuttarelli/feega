@@ -16,6 +16,7 @@ program
   .addHelpText('after', `
 Esempi:
   $ feega brands                   Lista tutti i brand
+  $ feega library <slug> [tab]     Kit, prodotti, post e ads di un brand
   $ feega motion list              Lista i video
 
 Documentazione completa: cli/README.md
@@ -56,6 +57,14 @@ program
   .action(async () => {
     const { cmdBrands } = await import('./commands/brands.ts');
     await cmdBrands();
+  });
+
+program
+  .command('library <slug> [tab]')
+  .description('Materiale del brand trascinabile sulla tela: kit, products, posts, ads')
+  .action(async (slug: string, tab: string | undefined) => {
+    const { cmdLibrary } = await import('./commands/library.ts');
+    await cmdLibrary(slug, tab ?? 'kit');
   });
 
 program
@@ -598,6 +607,33 @@ allowlist
   .action(async (medium: string, ids: string[], opts) => {
     const { cmdAllowlistSet } = await import('./commands/model-allowlist.ts');
     await cmdAllowlistSet(medium as 'image' | 'video' | 'model3d', ids, opts);
+  });
+
+const fonts = program
+  .command('fonts')
+  .description('List the fonts uploaded to your org')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdFonts } = await import('./commands/fonts.ts');
+    await cmdFonts(opts);
+  });
+
+fonts
+  .command('upload <file>')
+  .description('Upload a TTF, OTF, WOFF or WOFF2 file to the org font library')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (file: string, opts) => {
+    const { cmdFontsUpload } = await import('./commands/fonts.ts');
+    await cmdFontsUpload(file, opts);
+  });
+
+fonts
+  .command('delete <family>')
+  .description('Delete an uploaded font family; frames using it fall back to a system font')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (family: string, opts) => {
+    const { cmdFontsDelete } = await import('./commands/fonts.ts');
+    await cmdFontsDelete(family, opts);
   });
 
 const caps = program

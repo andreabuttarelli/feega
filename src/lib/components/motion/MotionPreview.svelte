@@ -19,13 +19,15 @@
   import type { VarValues } from '@feega/motion-core/motion/interactive/var-model';
   import { RenderEngine } from '$lib/motion/gpu/engine-flag';
   import { EditEnd, TEXT_EDIT, type TextEditMessage } from '@feega/motion-core/motion/hyperframes/text-edit';
-  import GpuLayer from './GpuLayer.svelte';
   import GpuFullLayer from './GpuFullLayer.svelte';
   import { FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
   import type { BrandTokens } from '@feega/motion-core/motion/brand';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import type { AudioAnalysis } from '@feega/motion-core/motion/audio-analysis';
   import { previewHtml } from '$lib/canvas/gpu/memory-budget';
-  import type { Compose } from '$lib/motion/gpu/engine';
+  import type { Compose } from '@feega/motion-core/motion/gpu-full/dom/reader';
+
+  type Scene = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; analyses?: Record<string, AudioAnalysis>; compose?: Compose };
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
@@ -50,16 +52,16 @@
     redraws = $bindable(0),
     ontap = null,
     background = Background.Brand,
-    engine = RenderEngine.Html,
+    engine = RenderEngine.GpuCore,
     gpuCompose = null,
     fullDoc = null,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; fullDoc?: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> } | null; children?: Snippet } = $props();
-
-  const DRAWN_OVER: ReadonlySet<RenderEngine> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull, RenderEngine.GpuCore, RenderEngine.GpuCoreGl]);
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; fullDoc?: Scene | null; children?: Snippet } = $props();
 
   const FULL_BACKEND: Partial<Record<RenderEngine, FullBackend>> = { [RenderEngine.GpuFull]: FullBackend.WebGl2, [RenderEngine.GpuCore]: FullBackend.Core, [RenderEngine.GpuCoreGl]: FullBackend.CoreGl };
   const FULL_ENGINES: ReadonlySet<RenderEngine> = new Set(Object.keys(FULL_BACKEND) as RenderEngine[]);
+  const drawnOn = $derived(fullDoc && FULL_ENGINES.has(engine) ? engine : RenderEngine.Html);
+  const drawnOver = $derived(drawnOn !== RenderEngine.Html);
 
   let pointer = $state<InputValues>({});
   let exportedOn = $state<RenderEngine | null>(null);
@@ -156,7 +158,7 @@
       el.style.width = '100%';
       el.style.height = '100%';
       el.style.background = PLAYER_BACKDROP[background];
-      el.style.opacity = DRAWN_OVER.has(engine) ? '0' : '';
+      el.style.opacity = drawnOver ? '0' : '';
       el.muted = muted;
       el.loop = loop;
       el.addEventListener('ready', () => {
@@ -271,7 +273,28 @@
     }
   }
 
-  export function still(time: number, captureWidth = CAPTURE_WIDTH, format: FrameFormat = FrameFormat.Jpeg): Promise<string> {
+  const STILL_MIME: Partial<Record<FrameFormat, string>> = { [FrameFormat.Jpeg]: 'image/jpeg', [FrameFormat.Png]: 'image/png' };
+
+  async function stillOnCore(spec: Scene, time: number, captureWidth: number, format: FrameFormat): Promise<string> {
+    const { snapToFrame } = await import('$lib/motion/gpu-full/core-export');
+    let url = '';
+    const drawn = await renderOnCoreOf(spec, FullBackend.Core, [snapToFrame(spec.doc, time)], async (bitmap) => {
+      const shot = document.createElement('canvas');
+      shot.width = captureWidth;
+      shot.height = Math.round((captureWidth * height) / width);
+      shot.getContext('2d')?.drawImage(bitmap, 0, 0, shot.width, shot.height);
+      bitmap.close();
+      url = shot.toDataURL(STILL_MIME[format] ?? STILL_MIME[FrameFormat.Jpeg], CAPTURE_QUALITY);
+    }, new AbortController().signal);
+    return drawn ? url : '';
+  }
+
+  export async function still(time: number, captureWidth = CAPTURE_WIDTH, format: FrameFormat = FrameFormat.Jpeg): Promise<string> {
+    const core = drawnOver && fullDoc ? await stillOnCore(fullDoc, time, captureWidth, format).catch(() => '') : '';
+    return core || stillOnHtml(time, captureWidth, format);
+  }
+
+  function stillOnHtml(time: number, captureWidth: number, format: FrameFormat): Promise<string> {
     const request = { format, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
     return driver.exclusive(async () => {
       await driver.whenLive();
@@ -346,7 +369,7 @@
           textEditing = false;
           player?.iframeElement?.blur();
           window.focus();
-          if (player && DRAWN_OVER.has(engine)) {
+          if (player && drawnOver) {
             player.style.opacity = '0';
           }
         }
@@ -366,30 +389,16 @@
   }
 
   function showPlayer(reason: unknown) {
-    console.warn('motion preview: GPU engine unavailable, HTML engine shown', reason);
+    console.warn('motion preview: gpu-core unavailable, HTML player shown', reason);
     if (player) {
       player.style.opacity = '';
     }
   }
 
-  async function renderOnGpu(compose: Compose, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, lanes: number): Promise<boolean> {
-    const { gpuEngine, GpuIneligible } = await import('$lib/motion/gpu/engine');
-    const engine = host ? await gpuEngine(compose, host).catch((e) => (e instanceof GpuIneligible ? null : Promise.reject(e))) : null;
-    if (!engine) {
-      return false;
-    }
-    try {
-      await engine.renderFrames(times, onFrame, lanes, signal);
-      return true;
-    } finally {
-      engine.dispose();
-    }
-  }
-
-  async function renderOnCoreOf(spec: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> }, backend: FullBackend, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<boolean> {
+  async function renderOnCoreOf(spec: Scene, backend: FullBackend, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<boolean> {
     const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }, { mountCustomReads }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('@feega/motion-core/motion/gpu-full/display-list'), import('@feega/motion-core/motion/gpu-full/text/load'), import('@feega/motion-core/motion/gpu-full/text/painter'), import('@feega/motion-core/motion/gpu-full/dom/custom')]);
-    const prepared = prepare(spec.doc, spec.tokens, spec.assets, { fonts: await loadFonts(spec.doc, spec.assets, spec.tokens), smoothing: smoothingOf(navigator.userAgent) });
-    const custom = await mountCustomReads(host ?? document.body, gpuCompose ?? (() => html), prepared);
+    const prepared = prepare(spec.doc, spec.tokens, spec.assets, { fonts: await loadFonts(spec.doc, spec.assets, spec.tokens), smoothing: smoothingOf(navigator.userAgent) }, spec.analyses);
+    const custom = await mountCustomReads(host ?? document.body, spec.compose ?? gpuCompose ?? (() => html), prepared);
     try {
       return await renderOnCore(prepared, backend, times, onFrame, signal, custom);
     } finally {
@@ -397,15 +406,11 @@
     }
   }
 
-  export async function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast, prefer: RenderEngine = engine): Promise<void> {
+  export async function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast, prefer: RenderEngine = engine, scene: Scene | null = source === html ? fullDoc : null): Promise<void> {
     const { settle, lanes } = CAPTURE_PROFILES[profile];
     const core = FULL_BACKEND[prefer];
-    if (core && core !== FullBackend.WebGl2 && fullDoc && source === html && size.width === width && size.height === height && (await renderOnCoreOf(fullDoc, core, times, onFrame, signal))) {
+    if (core && core !== FullBackend.WebGl2 && scene && (await renderOnCoreOf(scene, core, times, onFrame, signal))) {
       exportedOn = prefer;
-      return;
-    }
-    exportedOn = RenderEngine.Gpu;
-    if (prefer === RenderEngine.Gpu && gpuCompose && source === html && size.width === width && size.height === height && width % 2 === 0 && height % 2 === 0 && (await renderOnGpu(gpuCompose, times, onFrame, signal, lanes()))) {
       return;
     }
     exportedOn = RenderEngine.Html;
@@ -444,6 +449,13 @@
   });
 
   $effect(() => {
+    const over = drawnOver;
+    if (shown && player && !textEditing) {
+      player.style.opacity = over ? '0' : '';
+    }
+  });
+
+  $effect(() => {
     const sound = muted;
     const again = loop;
     if (player) {
@@ -469,17 +481,12 @@
 
 <svelte:window onmessage={redrawn} />
 
-<div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview" data-text-editing={textEditing ? '' : undefined} data-engine={engine} data-export-engine={exportedOn}>
+<div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview" data-text-editing={textEditing ? '' : undefined} data-engine={drawnOn} data-export-engine={exportedOn}>
   <div class="host" bind:this={host}></div>
-  {#if engine === RenderEngine.Gpu && gpuCompose}
-    <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
-      <GpuLayer {html} compose={gpuCompose} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
-    </div>
-  {/if}
-  {#if FULL_ENGINES.has(engine) && fullDoc}
+  {#if drawnOver && fullDoc}
     <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
       {#key `${fullDoc.doc.width}x${fullDoc.doc.height}`}
-        <GpuFullLayer backend={FULL_BACKEND[engine] ?? FullBackend.WebGl2} doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} compose={gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+        <GpuFullLayer backend={FULL_BACKEND[engine] ?? FullBackend.WebGl2} doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} analyses={fullDoc.analyses} compose={fullDoc.compose ?? gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
       {/key}
     </div>
   {/if}

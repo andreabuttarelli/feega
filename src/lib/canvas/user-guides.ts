@@ -64,7 +64,8 @@ export function tickStep(zoom: number): number {
   return TICK_STEPS.find((step) => step * zoom >= MIN_TICK_PX) ?? TICK_STEPS[TICK_STEPS.length - 1];
 }
 
-export function rulerTicks(span: number, zoom: number): RulerTick[] {
+export function rulerTicks(span: number, zoom: number, labelPx = 0): RulerTick[] {
   const step = tickStep(zoom);
-  return Array.from({ length: Math.floor(span / step) + 1 }, (_, i) => ({ at: i * step, label: String(i * step) }));
+  const last = span - labelPx / zoom;
+  return Array.from({ length: Math.floor(span / step) + 1 }, (_, i) => ({ at: i * step, label: String(i * step) })).filter((t) => t.at <= last);
 }
