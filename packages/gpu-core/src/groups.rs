@@ -208,8 +208,8 @@ pub fn report(skipped: &[Skipped]) -> String {
 const CACHE_PREFIX: &str = "cache:";
 const RGBA_BYTES: u64 = 4;
 const CULL_SLACK_PX: f64 = 2.0;
-const SHARPEST: f64 = 1.02;
-const SOFTEST: f64 = 0.8;
+const RUNGS_PER_DOUBLING: f64 = 4.0;
+const RUNG_SLACK: f64 = 1e-9;
 const IDENTITY: Affine = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
 
 #[derive(Debug, Clone, Copy)]
@@ -271,8 +271,14 @@ fn held_within(u: &UseItem, group: &DisplayList, want: f64, side: u32) -> f64 {
     side as f64 / longest
 }
 
+fn rung(scale: f64) -> f64 {
+    let step = (scale.log2() * RUNGS_PER_DOUBLING - RUNG_SLACK).ceil();
+    2f64.powf(step / RUNGS_PER_DOUBLING)
+}
+
 fn fresh(want: f64, held: f64) -> bool {
-    (SOFTEST..=SHARPEST).contains(&(want / held))
+    let one_rung = 2f64.powf(1.0 / RUNGS_PER_DOUBLING);
+    held >= want * (1.0 - RUNG_SLACK) && held <= want * one_rung * (1.0 + RUNG_SLACK)
 }
 
 fn snapped(m: Affine) -> Affine {
@@ -714,7 +720,7 @@ impl Library {
                 }
                 continue;
             }
-            let want = held_within(u, group, scale_of(u.matrix), limits.side);
+            let want = held_within(u, group, rung(scale_of(u.matrix)), limits.side);
             let (w, h) = texels(group, want);
             if let (true, Some(kept)) = (u.cache && u.hold, self.held.get(&u.group).copied()) {
                 seen.insert(u.group.clone());
