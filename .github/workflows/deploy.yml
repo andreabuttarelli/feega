@@ -20,13 +20,16 @@ jobs:
         include:
           - project: feega
             id: prj_2XbPjehleZ9ulUYweIMKtmcjzOHC
-            paths: ". :!cli :!changelog :!docs :!apps :!imgs :!supabase :!landing :!web-docs"
+            paths: ". :!cli :!changelog :!docs :!apps :!imgs :!supabase :!landing :!web-docs :!web-blog"
           - project: feega-mcp
             id: prj_jIZAq6VubJUwWAGloDr6pNAkjeln
             paths: "cli"
           - project: web-docs
             id: prj_spuvPDXx0Lfoxc7sEuWKCCm2AkPZ
             paths: "web-docs docs src/routes/api src/lib/server"
+          - project: web-blog
+            id: prj_BoTkXM9Cx4NCXcjVGfOJMIx5W8iz
+            paths: "web-blog"
     env:
       VERCEL_ORG_ID: team_wWk9EtwETritPiiIdh0CHqua
       VERCEL_PROJECT_ID: ${{ matrix.id }}

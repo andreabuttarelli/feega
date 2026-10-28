@@ -1,0 +1,40 @@
+---
+title: Why we wrote the canvas renderer in Rust
+description: WebGPU, WebAssembly and the same engine for the editor and the export.
+date: 2026-10-28
+cover: /covers/rust-canvas-renderer.png
+coverAlt: "Cover: Rust, WebGPU, WASM. One engine."
+tags: [engineering, rust, webgpu]
+---
+
+A canvas for design and motion has two jobs that pull in different directions. While you edit, it has to stay smooth with everything you have placed on it. When you export, it has to produce exactly the frames you saw. We decided early that those two jobs should be done by **one renderer**, and that decided how we built it.
+
+## The problem with two renderers
+
+The usual way to build an editor on the web is to draw the editing view with the browser's own tools, and to render the final video with something else. It works until the two disagree. A shadow is a pixel off, text wraps differently, a blend mode looks right in the editor and wrong in the file. Every difference is a bug that lives between two systems, and nobody owns it.
+
+If the preview and the export come from the same engine, that class of bug goes away. What you see is what you render.
+
+## WebGPU
+
+To keep a large canvas fluid, the drawing has to happen on the GPU. WebGPU gives the browser direct, modern access to it: we draw shapes, text, images and effects ourselves instead of asking the page to lay out thousands of elements.
+
+## Rust, compiled to WebAssembly
+
+The engine is written in Rust and compiled to WebAssembly, so the same code runs in the browser. Rust gives us predictable performance without a garbage collector pausing in the middle of a frame, and a type system that catches mistakes before they reach a render.
+
+Building to WebAssembly is part of our checks: the Rust crates are compiled for the `wasm32-unknown-unknown` target on every change, next to their tests.
+
+```bash
+cargo build --locked --lib --target wasm32-unknown-unknown
+```
+
+## One engine for the editor and the export
+
+That is the point of the whole exercise. The engine that draws the canvas while you work is the engine that renders the frames you export. One place to fix a bug, one place to make things faster, and no drift between what you edit and what you ship.
+
+The code is open source on [GitHub](https://github.com/andreabuttarelli/feega). To try the canvas yourself:
+
+```bash
+npx feega
+```
