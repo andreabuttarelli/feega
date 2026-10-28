@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { appDir, bundleSource, cachedVersions, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from './launcher.mjs';
+import { createServer } from 'node:net';
+import { appDir, freePort, bundleSource, cachedVersions, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from './launcher.mjs';
 
 describe('parseArgs', () => {
   it('risolve il file contro la cartella di chi lancia, non quella del pacchetto', () => {
@@ -27,6 +28,17 @@ describe('parseArgs', () => {
   it('--no-open non apre il browser', () => {
     expect(parseArgs([], '/').browser).toBe('open');
     expect(parseArgs(['--no-open'], '/').browser).toBe('skip');
+  });
+
+  it('--help, -h e --version non diventano un file', () => {
+    expect(parseArgs(['--help'], '/').command).toBe('help');
+    expect(parseArgs(['-h'], '/').command).toBe('help');
+    expect(parseArgs(['--version'], '/').command).toBe('version');
+  });
+
+  it('rifiuta ogni altra opzione che inizia con un trattino', () => {
+    expect(() => parseArgs(['--hepl'], '/')).toThrow(/unknown option/);
+    expect(() => parseArgs(['-x'], '/')).toThrow(/unknown option/);
   });
 
   it('rifiuta una porta che non è un numero', () => {
@@ -115,5 +127,16 @@ describe('pickVersion', () => {
 
   it('offline e senza cache non può partire', () => {
     expect(() => pickVersion(null, [])).toThrow(/offline/);
+  });
+});
+
+describe('freePort', () => {
+  it('salta una porta occupata solo su ::1, come fa vite dev su localhost', async () => {
+    const taken = createServer();
+    await new Promise((r) => taken.listen(0, '::1', r));
+    const busy = taken.address().port;
+
+    expect(await freePort(busy)).toBeGreaterThan(busy);
+    taken.close();
   });
 });
