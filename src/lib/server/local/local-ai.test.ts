@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AI_KEY_VARS } from '$lib/local-ai-keys';
+import { AI_KEY_VARS, LOCAL_AI_PROVIDERS } from '$lib/local-ai-keys';
 
 process.env.FEEGA_LOCAL_FILE = join(mkdtempSync(join(tmpdir(), 'feega-local-ai-')), 'ai.feega');
 process.env.HOST = '127.0.0.1';
@@ -30,8 +30,8 @@ describe('la generazione in locale segue le chiavi del provider', () => {
     expect(denial?.data.message).toBe(LOCAL_AI_MESSAGE);
   });
 
-  it.each(AI_KEY_VARS)('con %s lascia passare, senza crediti', async (name) => {
-    process.env[name] = 'sk-test-value';
+  it.each(LOCAL_AI_PROVIDERS)('con le chiavi di $label lascia passare, senza crediti', async ({ required }) => {
+    required.forEach((name) => (process.env[name] = 'sk-test-value'));
 
     expect(await gateOrgAiActionForForm(ORG)).toBeUndefined();
   });

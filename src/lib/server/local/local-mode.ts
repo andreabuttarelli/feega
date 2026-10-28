@@ -48,11 +48,6 @@ export const CLOUD_ONLY_ACTIONS: Record<string, string> = {
   resolveComment: `Comments ${CLOUD_ONLY}`,
   saveCanvasVersion: `Saved versions ${CLOUD_ONLY}`,
   restoreCanvasVersion: `Saved versions ${CLOUD_ONLY}`,
-  voice_design: `Voices ${CLOUD_ONLY}`,
-  voice_clone: `Voices ${CLOUD_ONLY}`,
-  voice_save: `Voices ${CLOUD_ONLY}`,
-  voice_library: `Voices ${CLOUD_ONLY}`,
-  voice_use_library: `Voices ${CLOUD_ONLY}`,
   new_canvas: `More canvases ${CLOUD_ONLY}`,
   delete_canvas: `Deleting the canvas ${CLOUD_ONLY}`
 };
@@ -104,6 +99,7 @@ export function localStore(env: Env = process.env): FeegaStore | null {
   store = opened;
   if (hasAiKey(env)) {
     void syncModels(opened, env);
+    void reportKeys(env);
     void import('./local-ticker').then(({ startLocalTicker }) => startLocalTicker(opened.db));
   }
   return store;
@@ -113,6 +109,12 @@ async function syncModels(opened: FeegaStore, env: Env): Promise<void> {
   const { syncLocalModels } = await import('./local-models');
   const outcome = await syncLocalModels(opened.db, env).catch((e: unknown) => ({ ok: false as const, reason: e instanceof Error ? e.message : String(e) }));
   console.log(outcome.ok ? `feega local: ${outcome.synced} models available` : `feega local: model list unavailable (${outcome.reason})`);
+}
+
+async function reportKeys(env: Env): Promise<void> {
+  const { checkLocalKeys } = await import('./key-checks');
+  const checks = await checkLocalKeys(env).catch(() => []);
+  checks.forEach(({ provider, verdict }) => console.log(`feega local: ${provider} key ${verdict}`));
 }
 
 export const canvasPath = (place: LocalPlace) => `/p/${place.projectId}/c/${place.canvasId}`;

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error plain mjs
-import { localEnv } from './local.mjs';
+import { fileEnv, localEnv } from './local.mjs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const SECRET = 'sk-secret-do-not-leak';
 
@@ -32,5 +35,31 @@ describe('npm run local e le chiavi AI', () => {
 
     expect(pub.length).toBeGreaterThan(0);
     expect(pub.map(([, value]) => value).join()).not.toContain(SECRET);
+  });
+
+  it.each([
+    ['Higgsfield', { HIGGSFIELD_API_KEY_ID: 'i', HIGGSFIELD_API_KEY_SECRET: 's' }],
+    ['Wiro', { WIRO_API_KEY: 'k' }],
+    ['ElevenLabs', { ELEVENLABS_API_KEY: 'k' }]
+  ])('le chiavi %s accendono il flag', (_, keys) => {
+    expect(env(keys).PUBLIC_FEEGA_LOCAL_AI).toBe('1');
+  });
+});
+
+describe('il .env della cartella da cui si lancia', () => {
+  const dirWith = (body: string) => {
+    const dir = mkdtempSync(join(tmpdir(), 'feega-env-'));
+    writeFileSync(join(dir, '.env'), body);
+    return dir;
+  };
+
+  it('viene letto, e vince sul .env dell’app', () => {
+    const out = fileEnv(dirWith('WIRO_API_KEY=cwd\n'), dirWith('WIRO_API_KEY=app\nKIE_API_KEY=app\n'));
+
+    expect(out).toEqual({ WIRO_API_KEY: 'cwd', KIE_API_KEY: 'app' });
+  });
+
+  it('senza .env non c’è niente', () => {
+    expect(fileEnv(mkdtempSync(join(tmpdir(), 'feega-env-')), mkdtempSync(join(tmpdir(), 'feega-env-')))).toEqual({});
   });
 });

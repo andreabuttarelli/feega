@@ -7,17 +7,19 @@ import { fileURLToPath } from 'node:url';
 import { hasAiKey } from '../src/lib/local-ai-keys.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const DOTENV = resolve(ROOT, '.env');
 const HANDLER = resolve(ROOT, 'build/handler.js');
 const DEFAULT_FILE = 'canvas.feega';
 const DEFAULT_PORT = '5173';
 const LOOPBACK = '127.0.0.1';
 
-export function dotenv(path = DOTENV) {
+const dotenv = (dir) => {
+  const path = resolve(dir, '.env');
   return existsSync(path) ? parseEnv(readFileSync(path, 'utf8')) : {};
-}
+};
 
-export function localEnv(file, port, base = process.env, fromFile = dotenv()) {
+export const fileEnv = (cwd = process.cwd(), root = ROOT) => ({ ...dotenv(root), ...dotenv(cwd) });
+
+export function localEnv(file, port, base = process.env, fromFile = fileEnv()) {
   const merged = { ...fromFile, ...base };
 
   return {

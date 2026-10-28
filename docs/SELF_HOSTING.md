@@ -5,7 +5,17 @@ export, and the agent and MCP surface. Nothing is credit-gated.
 
 For one canvas on your machine, no account and no database, skip all of this:
 `npx feega my-canvas.feega` (Node 22+) starts local mode and saves to that file. See
-[local mode](../web-docs/src/content/docs/getting-started/local-mode.md).
+[local mode](../web-docs/src/content/docs/getting-started/local-mode.md). Local mode generates with
+your own keys, from the environment or a `.env` in the folder you run it from:
+
+| Provider | Variables | Generates |
+|---|---|---|
+| Kie.ai | `KIE_API_KEY` | images, video, text |
+| OpenRouter | `OPENROUTER_API_KEY` | images, video |
+| Text LLM | `LLM_API_KEY` (`LLM_BASE_URL` for a gateway other than OpenRouter) | text, prompt safety check; also counts as the OpenRouter key |
+| Higgsfield | `HIGGSFIELD_API_KEY_ID` + `HIGGSFIELD_API_KEY_SECRET` | images, video |
+| Wiro | `WIRO_API_KEY` (+ `WIRO_API_SECRET` if your Wiro project signs requests) | 3D models |
+| ElevenLabs | `ELEVENLABS_API_KEY` (`ELEVENLABS_BASE_URL` optional) | voice-over, sound effects, music, voices |
 
 For the full multi-user app, two ways in, both end at a demo login and a canvas with one frame on it:
 
@@ -31,7 +41,8 @@ What needs a key, and what it says when the key is missing:
 | Feature | Env to add |
 |---|---|
 | The chat agent, text generation, prompt enhancement | `LLM_API_KEY` |
-| Image, video, audio, 3D generation | `OPENROUTER_API_KEY`, `WIRO_API_KEY` + `WIRO_API_SECRET`, `KIE_API_KEY`, `HIGGSFIELD_API_KEY_ID` + `HIGGSFIELD_API_KEY_SECRET` |
+| Image, video, 3D generation | `OPENROUTER_API_KEY`, `WIRO_API_KEY` + `WIRO_API_SECRET`, `KIE_API_KEY`, `HIGGSFIELD_API_KEY_ID` + `HIGGSFIELD_API_KEY_SECRET` |
+| Audio, voices, sound effects | `ELEVENLABS_API_KEY` |
 | Web search and browsing in the agent | `EXA_API_KEY`, `BROWSERLESS_API_KEY` |
 | Paid plans | `STRIPE_SECRET_KEY` (not needed, see Billing) |
 | Email | `RESEND_API_KEY` |
